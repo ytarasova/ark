@@ -336,17 +336,24 @@ function launchAgentTmux(
   const claudeSessionId = randomUUID();
   const prevClaudeId = session.claude_session_id;
 
-  const claudeCmd = claudeArgs.join(" ");
-  let launchContent: string;
+  // Shell-quote each arg properly (handles newlines in system prompt)
+  const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+  const claudeCmd = claudeArgs.map((arg, i) => {
+    // Don't quote flags (--xxx), only values that might have special chars
+    if (arg.startsWith("--")) return arg;
+    // Quote the value if the previous arg was a flag that takes a value
+    const prev = claudeArgs[i - 1];
+    if (prev && prev.startsWith("--")) return shellQuote(arg);
+    return arg;
+  }).join(" ");
 
-  // --dangerously-load-development-channels enables the channel as a true Claude channel
-  // (not just an MCP server) — Claude receives <channel source="ark"> tags and can push notifications
-  const channelFlags = `--mcp-config ${mcpConfigPath} --dangerously-load-development-channels server:ark-channel`;
+  let launchContent: string;
+  const channelFlags = `--mcp-config ${shellQuote(mcpConfigPath)} --dangerously-load-development-channels server:ark-channel`;
 
   if (prevClaudeId) {
-    launchContent = `#!/bin/bash\ncd ${JSON.stringify(effectiveWorkdir)}\n${claudeCmd} --resume ${prevClaudeId} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
+    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\n${claudeCmd} --resume ${shellQuote(prevClaudeId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
   } else {
-    launchContent = `#!/bin/bash\ncd ${JSON.stringify(effectiveWorkdir)}\n${claudeCmd} --session-id ${claudeSessionId} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
+    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\n${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
   }
 
   const launcher = tmux.writeLauncher(session.id, launchContent);
