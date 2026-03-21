@@ -390,7 +390,7 @@ function renderStatusBar() {
   if (nErr) left += `  {red-fg}✕ ${nErr} errors{/red-fg}`;
 
   const keys = tab === "sessions"
-    ? "j/k:move  Enter:dispatch  c:done  s:stop  r:resume  n:new  v:events  x:kill  q:quit"
+    ? "j/k:move  Enter:dispatch  a:attach  c:done  s:stop  r:resume  n:new  x:kill  q:quit"
     : tab === "agents"
     ? "j/k:move  e:edit  q:quit"
     : "j/k:move  q:quit";
@@ -555,6 +555,24 @@ screen.key(["n"], () => {
     prompt.destroy();
     renderAll();
   })();
+});
+
+screen.key(["a"], () => {
+  if (tab !== "sessions") return;
+  const topLevel = sessions.filter((s) => !s.parent_id);
+  const s = topLevel[sel];
+  if (!s?.session_id) return;
+
+  // Destroy blessed screen, attach to tmux, re-exec TUI after detach
+  screen.destroy();
+  const cp = require("child_process");
+  try {
+    cp.execFileSync("tmux", ["attach", "-t", s.session_id], { stdio: "inherit" });
+  } catch { /* user detached with Ctrl+B D */ }
+
+  // Re-launch TUI after detach
+  cp.execFileSync(process.execPath, [__filename], { stdio: "inherit" });
+  process.exit(0);
 });
 
 screen.key(["G"], () => {
