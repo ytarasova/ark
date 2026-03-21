@@ -285,16 +285,18 @@ function _renderDetail() {
       const reportType = latestReport.type.replace("agent_", "");
       const reportColor = reportType === "completed" ? "green" : reportType === "error" ? "red" : reportType === "question" ? "yellow" : "cyan";
       lines.push("", `{bold}{inverse} Latest Report {/inverse}{/bold}`);
-      lines.push(` {${reportColor}-fg}${reportType}{/${reportColor}-fg}: ${String(d.message ?? d.summary ?? d.question ?? d.error ?? "").slice(0, 80)}`);
+      const rw = Math.floor((screen.width as number) * 0.6) - 10;
+      lines.push(` {${reportColor}-fg}${reportType}{/${reportColor}-fg}: ${String(d.message ?? d.summary ?? d.question ?? d.error ?? "").slice(0, rw)}`);
     }
 
     // Agent output
     if (s.session_id && s.status === "running") {
       const output = core.getOutput(s.id, { lines: 15 });
       if (output.trim()) {
+        const paneWidth = Math.floor((screen.width as number) * 0.6) - 4;
         lines.push("", "{bold}{inverse} Agent Output {/inverse}{/bold}");
         for (const line of output.split("\n").slice(-12)) {
-          lines.push(` ${line.slice(0, 120)}`);
+          lines.push(` ${line.slice(0, paneWidth)}`);
         }
       }
     } else if (!s.session_id && (s.status === "ready" || s.status === "blocked")) {
@@ -307,9 +309,10 @@ function _renderDetail() {
       for (const ev of events.slice(-10)) {
         const ts = hms(ev.created_at);
         const data = ev.data
-          ? Object.entries(ev.data).slice(0, 3).map(([k, v]) => `${k}=${String(v).slice(0, 30)}`).join(" ")
+          ? Object.entries(ev.data).slice(0, 2).map(([k, v]) => `${k}=${String(v).slice(0, 20)}`).join(" ")
           : "";
-        lines.push(` {gray-fg}${ts}{/gray-fg}  ${ev.type.padEnd(22)} {cyan-fg}${ev.stage ?? ""}{/cyan-fg}  {gray-fg}${data}{/gray-fg}`);
+        const evLine = ` {gray-fg}${ts}{/gray-fg}  ${ev.type.padEnd(20)} {cyan-fg}${(ev.stage ?? "").padEnd(10)}{/cyan-fg} {gray-fg}${data}{/gray-fg}`;
+        lines.push(evLine);
       }
     }
 
