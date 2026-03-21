@@ -339,11 +339,14 @@ function launchAgentTmux(
   const claudeCmd = claudeArgs.join(" ");
   let launchContent: string;
 
+  // --dangerously-load-development-channels enables the channel as a true Claude channel
+  // (not just an MCP server) — Claude receives <channel source="ark"> tags and can push notifications
+  const channelFlags = `--mcp-config ${mcpConfigPath} --dangerously-load-development-channels server:ark-channel`;
+
   if (prevClaudeId) {
-    // Handoff: resume previous conversation
-    launchContent = `#!/bin/bash\ncd ${JSON.stringify(effectiveWorkdir)}\n${claudeCmd} --resume ${prevClaudeId} --dangerously-skip-permissions \\\n  --mcp-config ${mcpConfigPath}\nexec bash\n`;
+    launchContent = `#!/bin/bash\ncd ${JSON.stringify(effectiveWorkdir)}\n${claudeCmd} --resume ${prevClaudeId} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
   } else {
-    launchContent = `#!/bin/bash\ncd ${JSON.stringify(effectiveWorkdir)}\n${claudeCmd} --session-id ${claudeSessionId} --dangerously-skip-permissions \\\n  --mcp-config ${mcpConfigPath}\nexec bash\n`;
+    launchContent = `#!/bin/bash\ncd ${JSON.stringify(effectiveWorkdir)}\n${claudeCmd} --session-id ${claudeSessionId} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
   }
 
   const launcher = tmux.writeLauncher(session.id, launchContent);
@@ -355,13 +358,25 @@ function launchAgentTmux(
   // Start tmux with launcher directly (no shell prompt)
   tmux.createSession(tmuxName, `bash ${launcher}`);
 
-  // Send task via channel HTTP (no tmux send-keys polling needed)
+  // Send task via BOTH paths:
+  // 1. Channel HTTP (structured — Claude sees <channel source="ark" type="task">)
+  // 2. tmux send-keys (fallback — in case channel isn't ready yet)
   const channelUrl = `http://localhost:${channelPort}`;
-  spawn("bash", ["-c",
-    `while ! curl -sf ${channelUrl} > /dev/null 2>&1; do read -t 1 < /dev/null; done; ` +
-    `curl -sf -X POST ${channelUrl} -H 'Content-Type: application/json' ` +
-    `-d '${JSON.stringify({ type: "task", task, sessionId: session.id, stage }).replace(/'/g, "'\\''")}'`
-  ], { stdio: "ignore", detached: true }).unref();
+  const taskJson = JSON.stringify({ type: "task", task, sessionId: session.id, stage }).replace(/'/g, "'\\''");
+  spawn("bash", ["-c", [
+    // Wait for Claude to be ready (prompt visible)
+    `while true; do`,
+    `  OUTPUT=$(tmux capture-pane -t ${tmuxName} -p 2>/dev/null) || exit 1;`,
+    `  echo "$OUTPUT" | grep -qE '❯|tips:|compact|/help' && break;`,
+    `  read -t 1 < /dev/null;`,
+    `done;`,
+    // Send via channel (structured notification)
+    `curl -sf -X POST ${channelUrl} -H 'Content-Type: application/json' -d '${taskJson}' 2>/dev/null;`,
+    // Also send via tmux (ensures Claude gets the task even if channel fails)
+    `tmux load-buffer -b ark-task ${taskFile};`,
+    `tmux paste-buffer -b ark-task -t ${tmuxName};`,
+    `tmux send-keys -t ${tmuxName} Enter`,
+  ].join(" ")], { stdio: "ignore", detached: true }).unref();
 
   // Store Claude session UUID for future handoffs
   store.updateSession(session.id, { claude_session_id: claudeSessionId });
