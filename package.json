@@ -1,0 +1,40 @@
+{
+  "name": "ark",
+  "version": "0.1.0",
+  "description": "Autonomous agent ecosystem — JIRA to production",
+  "type": "module",
+  "bin": {
+    "ark": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli/index.js",
+    "tui": "node dist/tui/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint packages/",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "execa": "^9.0.0",
+    "figures": "^6.0.0",
+    "glob": "^11.0.0",
+    "gray-matter": "^4.0.3",
+    "ink": "^6.8.0",
+    "ink-spinner": "^5.0.0",
+    "neo-blessed": "^0.2.0",
+    "react": "^19.2.4",
+    "yaml": "^2.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0",
+    "eslint": "^9.0.0"
+  }
+}
