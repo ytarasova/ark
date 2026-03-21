@@ -1,0 +1,25 @@
+name: parallel
+description: "Plan → parallel implement (fork/join) → review → merge"
+stages:
+  - name: plan
+    agent: planner
+    gate: manual
+
+  - name: implement
+    type: fork
+    agent: implementer
+    strategy: plan        # reads PLAN.md to split work into subtasks
+    max_parallel: 4       # max concurrent child sessions
+    gate: auto
+
+  - name: review
+    agent: reviewer
+    gate: auto
+
+  - name: pr
+    action: create_pr
+    gate: auto
+
+  - name: merge
+    action: merge_pr
+    gate: manual

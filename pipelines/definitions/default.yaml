@@ -1,0 +1,39 @@
+name: default
+description: "Default SDLC pipeline: plan → implement → PR → review → build → merge → close"
+stages:
+  - name: plan
+    agent: planner
+    gate: manual
+    artifacts:
+      - PLAN.md
+
+  - name: implement
+    agent: implementer
+    gate: auto
+    on_failure: "retry(3)"
+
+  - name: pr
+    action: create_pr
+    gate: auto
+
+  - name: review
+    agent: reviewer
+    gate: auto
+
+  - name: build
+    action: wait_pipeline
+    gate: auto
+    on_failure: notify
+
+  - name: merge
+    action: merge_pr
+    gate: manual
+
+  - name: close
+    action: close_jira
+    gate: auto
+
+  - name: docs
+    agent: documenter
+    gate: auto
+    optional: true

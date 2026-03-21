@@ -1,0 +1,22 @@
+name: fix-bug
+description: "Fix a bug from a Jira ticket"
+parameters:
+  - name: jira_key
+    type: string
+    required: true
+  - name: repo
+    type: string
+    required: true
+pipeline: default
+agent_overrides:
+  implement:
+    system_prompt_append: |
+      This is a BUG FIX. Focus on:
+      1. Reproduce the bug first
+      2. Write a failing test that demonstrates the bug
+      3. Fix the bug with minimal changes
+      4. Verify the test passes
+      5. Run the full test suite to check for regressions
+config:
+  auto_merge: false
+  breakpoint: review

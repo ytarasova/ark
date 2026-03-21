@@ -1,0 +1,13 @@
+name: new-feature
+description: "Implement a new feature from a Jira ticket"
+parameters:
+  - name: jira_key
+    type: string
+    required: true
+  - name: repo
+    type: string
+    required: true
+pipeline: default
+agent_overrides: {}
+config:
+  auto_merge: false

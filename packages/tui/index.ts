@@ -502,6 +502,115 @@ screen.key(["x"], () => {
   }
 });
 
+screen.key(["n"], () => {
+  if (tab !== "sessions") return;
+
+  // New session form using blessed prompt
+  const form = blessed.form({
+    parent: screen,
+    top: "center",
+    left: "center",
+    width: 70,
+    height: 16,
+    border: { type: "line" },
+    style: { border: { fg: "cyan" }, bg: "black" },
+    tags: true,
+    keys: true,
+  });
+
+  blessed.text({ parent: form, top: 0, left: 1, content: "{bold} New Session {/bold}", tags: true });
+
+  blessed.text({ parent: form, top: 2, left: 1, content: "Task:", tags: true });
+  const taskInput = blessed.textbox({
+    parent: form, top: 2, left: 8, width: 58, height: 1,
+    inputOnFocus: true, style: { fg: "white", bg: "gray" },
+  });
+
+  blessed.text({ parent: form, top: 4, left: 1, content: "Repo:", tags: true });
+  const repoInput = blessed.textbox({
+    parent: form, top: 4, left: 8, width: 58, height: 1,
+    inputOnFocus: true, style: { fg: "white", bg: "gray" },
+    value: process.cwd(),
+  });
+
+  blessed.text({ parent: form, top: 6, left: 1, content: "Jira:", tags: true });
+  const jiraInput = blessed.textbox({
+    parent: form, top: 6, left: 8, width: 58, height: 1,
+    inputOnFocus: true, style: { fg: "white", bg: "gray" },
+  });
+
+  blessed.text({ parent: form, top: 8, left: 1, content: "Pipeline:", tags: true });
+  const pipeInput = blessed.textbox({
+    parent: form, top: 8, left: 12, width: 54, height: 1,
+    inputOnFocus: true, style: { fg: "white", bg: "gray" },
+    value: "default",
+  });
+
+  blessed.text({ parent: form, top: 10, left: 1, content: "Group:", tags: true });
+  const groupInput = blessed.textbox({
+    parent: form, top: 10, left: 9, width: 57, height: 1,
+    inputOnFocus: true, style: { fg: "white", bg: "gray" },
+  });
+
+  // Help text added below in the keybinding section
+
+  const fields = [taskInput, repoInput, jiraInput, pipeInput, groupInput];
+
+  function closeForm() {
+    form.destroy();
+    renderAll();
+  }
+
+  function submitForm() {
+    const summary = taskInput.getValue().trim() || "Ad-hoc task";
+    const repoPath = repoInput.getValue().trim() || process.cwd();
+    const jiraKey = jiraInput.getValue().trim() || undefined;
+    const pipelineName = pipeInput.getValue().trim() || "default";
+    const groupName = groupInput.getValue().trim() || undefined;
+
+    const { existsSync } = require("fs");
+    const { resolve: resolvePath, basename } = require("path");
+    let workdir: string | undefined;
+    let repo = repoPath;
+    const rp = resolvePath(repoPath);
+    if (existsSync(rp)) {
+      workdir = rp;
+      if (repoPath === "." || repoPath === "./") repo = basename(rp);
+    }
+
+    const s = core.startSession({
+      jira_key: jiraKey, jira_summary: summary,
+      repo, pipeline: pipelineName, workdir, group_name: groupName,
+    });
+    core.dispatch(s.id);
+    closeForm();
+  }
+
+  // Enter → next field, Ctrl+Enter → submit, Escape → cancel
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i]!;
+    // Enter submits the textbox → advance to next field
+    field.on("submit", () => {
+      if (i < fields.length - 1) {
+        fields[i + 1]!.focus();
+      }
+      // On last field, Enter also just stays (user must Ctrl+Enter to submit)
+    });
+    field.on("cancel", () => closeForm());
+  }
+
+  // Ctrl+Enter from anywhere submits the form
+  form.key(["C-enter"], () => submitForm());
+  // Also support C-s as alternative submit
+  form.key(["C-s"], () => submitForm());
+
+  blessed.text({ parent: form, top: 12, left: 1,
+    content: "{gray-fg}Enter: next field  Ctrl+Enter: submit  Esc: cancel{/gray-fg}", tags: true });
+
+  taskInput.focus();
+  screen.render();
+});
+
 screen.key(["G"], () => {
   const max = tab === "sessions" ? sessions.filter((s) => !s.parent_id).length
     : tab === "agents" ? agents.length

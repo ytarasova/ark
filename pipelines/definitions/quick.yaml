@@ -1,0 +1,20 @@
+name: quick
+description: "Quick pipeline: implement → PR → build (no planning or review stages)"
+stages:
+  - name: implement
+    agent: implementer
+    gate: auto
+    on_failure: "retry(3)"
+
+  - name: pr
+    action: create_pr
+    gate: auto
+
+  - name: build
+    action: wait_pipeline
+    gate: auto
+    on_failure: notify
+
+  - name: merge
+    action: merge_pr
+    gate: manual

@@ -1,0 +1,6 @@
+name: bare
+description: "Single agent session — no pipeline stages, just work"
+stages:
+  - name: work
+    agent: implementer
+    gate: auto
