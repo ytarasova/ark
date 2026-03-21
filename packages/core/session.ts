@@ -8,7 +8,7 @@
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, symlinkSync } from "fs";
 import { join, resolve } from "path";
-import { execFileSync, spawn } from "child_process";
+import { execFileSync } from "child_process";
 import { homedir } from "os";
 
 import * as store from "./store.js";
@@ -355,28 +355,30 @@ function launchAgentTmux(
   const taskFile = join(sessionDir, "task.txt");
   writeFileSync(taskFile, task);
 
-  // Start tmux with launcher directly (no shell prompt)
+  // Start tmux with launcher (no shell prompt)
   tmux.createSession(tmuxName, `bash ${launcher}`);
 
-  // Send task via BOTH paths:
-  // 1. Channel HTTP (structured — Claude sees <channel source="ark" type="task">)
-  // 2. tmux send-keys (fallback — in case channel isn't ready yet)
+  // Send task via channel HTTP — pure TypeScript, no bash/curl/tmux-send-keys
   const channelUrl = `http://localhost:${channelPort}`;
-  const taskJson = JSON.stringify({ type: "task", task, sessionId: session.id, stage }).replace(/'/g, "'\\''");
-  spawn("bash", ["-c", [
-    // Wait for Claude to be ready (prompt visible)
-    `while true; do`,
-    `  OUTPUT=$(tmux capture-pane -t ${tmuxName} -p 2>/dev/null) || exit 1;`,
-    `  echo "$OUTPUT" | grep -qE '❯|tips:|compact|/help' && break;`,
-    `  read -t 1 < /dev/null;`,
-    `done;`,
-    // Send via channel (structured notification)
-    `curl -sf -X POST ${channelUrl} -H 'Content-Type: application/json' -d '${taskJson}' 2>/dev/null;`,
-    // Also send via tmux (ensures Claude gets the task even if channel fails)
-    `tmux load-buffer -b ark-task ${taskFile};`,
-    `tmux paste-buffer -b ark-task -t ${tmuxName};`,
-    `tmux send-keys -t ${tmuxName} Enter`,
-  ].join(" ")], { stdio: "ignore", detached: true }).unref();
+  const taskPayload = { type: "task", task, sessionId: session.id, stage };
+
+  // Background: wait for channel server to be ready, then POST the task
+  (async () => {
+    for (let i = 0; i < 60; i++) {
+      try {
+        const resp = await fetch(channelUrl);
+        if (resp.ok) {
+          await fetch(channelUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(taskPayload),
+          });
+          return;
+        }
+      } catch { /* channel not ready yet */ }
+      await Bun.sleep(1000);
+    }
+  })();
 
   // Store Claude session UUID for future handoffs
   store.updateSession(session.id, { claude_session_id: claudeSessionId });
