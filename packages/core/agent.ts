@@ -11,6 +11,7 @@ import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync } from
 import { join } from "path";
 import YAML from "yaml";
 import { mkdirSync } from "fs";
+import { homedir } from "os";
 import { ARK_DIR } from "./store.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -174,8 +175,10 @@ export function buildClaudeArgs(agent: AgentDefinition, opts?: {
 // ── Channel MCP config ──────────────────────────────────────────────────────
 
 export function channelMcpConfig(sessionId: string, stage: string, channelPort: number): Record<string, unknown> {
+  // Use absolute path to bun — it's not in PATH when Claude spawns MCP servers
+  const bunPath = join(homedir(), ".bun", "bin", "bun");
   return {
-    command: "bun",
+    command: bunPath,
     args: [join(__dirname, "channel.ts")],
     env: {
       ARK_SESSION_ID: sessionId,
