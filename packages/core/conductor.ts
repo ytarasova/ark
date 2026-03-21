@@ -1,0 +1,159 @@
+/**
+ * Conductor: HTTP server that receives channel reports from agents.
+ *
+ * Routes:
+ *   POST /api/channel/:sessionId — receive agent report
+ *   POST /api/relay              — relay message between agents
+ *   GET  /api/sessions           — list sessions
+ *   GET  /api/sessions/:id       — get session detail
+ *   GET  /api/events/:id         — get events
+ *   GET  /health                 — health check
+ */
+
+// Bun global type declaration (avoids requiring @types/bun as a dependency)
+declare const Bun: {
+  serve(options: {
+    port: number;
+    hostname: string;
+    fetch(req: Request): Promise<Response> | Response;
+  }): { stop(): void };
+};
+
+import * as store from "./store.js";
+import * as session from "./session.js";
+import * as pipeline from "./pipeline.js";
+import { eventBus } from "./hooks.js";
+import type { OutboundMessage } from "./channel-types.js";
+
+const DEFAULT_PORT = 19100;
+
+export function startConductor(port = DEFAULT_PORT): void {
+  Bun.serve({
+    port,
+    hostname: "127.0.0.1",
+    async fetch(req) {
+      const url = new URL(req.url);
+      const path = url.pathname;
+
+      try {
+        // Agent channel reports
+        if (req.method === "POST" && path.startsWith("/api/channel/")) {
+          const sessionId = path.split("/")[3]!;
+          const report = (await req.json()) as OutboundMessage;
+          handleReport(sessionId, report);
+          return Response.json({ status: "ok" });
+        }
+
+        // Agent-to-agent relay
+        if (req.method === "POST" && path === "/api/relay") {
+          const { from, target, message } = (await req.json()) as {
+            from: string;
+            target: string;
+            message: string;
+          };
+          const targetSession = store.getSession(target);
+          if (targetSession) {
+            const channelPort =
+              19200 + (parseInt(target.replace("s-", ""), 16) % 1000);
+            try {
+              await fetch(`http://localhost:${channelPort}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  type: "steer",
+                  message,
+                  from,
+                  sessionId: target,
+                }),
+              });
+            } catch {
+              /* target channel not reachable */
+            }
+          }
+          return Response.json({ status: "relayed" });
+        }
+
+        // REST API
+        if (req.method === "GET") {
+          if (path === "/api/sessions")
+            return Response.json(store.listSessions());
+          if (path.startsWith("/api/sessions/")) {
+            const id = path.split("/")[3]!;
+            const s = store.getSession(id);
+            return s
+              ? Response.json(s)
+              : Response.json({ error: "not found" }, { status: 404 });
+          }
+          if (path.startsWith("/api/events/")) {
+            const id = path.split("/")[3]!;
+            return Response.json(store.getEvents(id));
+          }
+          if (path === "/health") {
+            return Response.json({
+              status: "ok",
+              sessions: store.listSessions().length,
+            });
+          }
+        }
+
+        return new Response("Not found", { status: 404 });
+      } catch (e) {
+        return Response.json({ error: String(e) }, { status: 500 });
+      }
+    },
+  });
+
+  console.log(`Ark conductor listening on localhost:${port}`);
+}
+
+function handleReport(sessionId: string, report: OutboundMessage): void {
+  // Log event
+  store.logEvent(sessionId, `agent_${report.type}`, {
+    stage: report.stage,
+    actor: "agent",
+    data: report as unknown as Record<string, unknown>,
+  });
+
+  // Emit to event bus
+  eventBus.emit(`agent_${report.type}`, sessionId, {
+    stage: report.stage,
+    data: report as unknown as Record<string, unknown>,
+  });
+
+  // Handle by type
+  switch (report.type) {
+    case "completed": {
+      store.updateSession(sessionId, { status: "ready", session_id: null });
+      const advResult = session.advance(sessionId);
+      if (advResult.ok) {
+        const updated = store.getSession(sessionId);
+        if (updated && updated.status === "ready" && updated.stage) {
+          const nextAction = pipeline.getStageAction(
+            updated.pipeline,
+            updated.stage
+          );
+          if (nextAction.type === "agent" || nextAction.type === "fork") {
+            session.dispatch(sessionId);
+          }
+        }
+      }
+      break;
+    }
+    case "question":
+      store.updateSession(sessionId, {
+        status: "waiting",
+        breakpoint_reason:
+          (report as any).question ?? (report as any).message,
+      });
+      break;
+    case "error":
+      store.updateSession(sessionId, {
+        status: "failed",
+        error: (report as any).error ?? (report as any).message,
+      });
+      break;
+    case "progress":
+      // Just log, no state change
+      break;
+  }
+}
