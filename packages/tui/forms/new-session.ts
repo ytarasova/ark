@@ -32,10 +32,12 @@ export function showNewSessionForm() {
     if (repoPath === null) { prompt.destroy(); renderAll(); return; }
 
     // Host selection
-    const hostChoices = ["local (this machine)", ...core.listHosts().map(h => `${h.name} (${h.provider})`)];
-    const hostChoice = await selectOne("Compute Host", hostChoices, 0);
-    if (!hostChoice) { prompt.destroy(); renderAll(); return; }
-    const computeName = hostChoice.startsWith("local") ? undefined : hostChoice.split(" ")[0];
+    const hostChoices = [
+      { label: "local (this machine)", value: "" },
+      ...core.listHosts().map(h => ({ label: `${h.name} (${h.provider})`, value: h.name })),
+    ];
+    const computeName = await selectOne("Compute Host", hostChoices, 0);
+    if (computeName === null) { prompt.destroy(); renderAll(); return; }
 
     // Pipeline selection
     const pipelineNames = core.listPipelines().map(p => p.name);
@@ -56,7 +58,7 @@ export function showNewSessionForm() {
     const s = core.startSession({
       jira_summary: summary || "Ad-hoc task",
       repo, pipeline: pipelineChoice, workdir,
-      compute_name: computeName,
+      compute_name: computeName || undefined,
     });
     core.dispatch(s.id);
 

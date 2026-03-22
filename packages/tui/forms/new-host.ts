@@ -31,49 +31,49 @@ export function showNewHostForm() {
 
     if (provider === "ec2") {
       const sizeOptions = [
-        "xs  - Extra Small (2 vCPU, 8 GB)",
-        "s   - Small (4 vCPU, 16 GB)",
-        "m   - Medium (8 vCPU, 32 GB)",
-        "l   - Large (16 vCPU, 64 GB)",
-        "xl  - X-Large (32 vCPU, 128 GB)",
-        "xxl - 2X-Large (48 vCPU, 192 GB)",
-        "xxxl— 4X-Large (64 vCPU, 256 GB)",
+        { label: "Extra Small  (2 vCPU, 8 GB)",    value: "xs" },
+        { label: "Small        (4 vCPU, 16 GB)",   value: "s" },
+        { label: "Medium       (8 vCPU, 32 GB)",   value: "m" },
+        { label: "Large        (16 vCPU, 64 GB)",  value: "l" },
+        { label: "X-Large      (32 vCPU, 128 GB)", value: "xl" },
+        { label: "2X-Large     (48 vCPU, 192 GB)", value: "xxl" },
+        { label: "4X-Large     (64 vCPU, 256 GB)", value: "xxxl" },
       ];
-      const sizeChoice = await selectOne("Instance Size", sizeOptions, 2);
-      if (!sizeChoice) { prompt.destroy(); renderAll(); return; }
-      const size = sizeChoice.split(/\s+-\s/)[0].trim();
+      const size = await selectOne("Instance Size", sizeOptions, 2);
+      if (!size) { prompt.destroy(); renderAll(); return; }
 
-      const arch = await selectOne("Architecture", ["x64 (Intel)", "arm (Graviton)"], 0);
+      const archOptions = [
+        { label: "x64 (Intel)",      value: "x64" },
+        { label: "arm (Graviton)",   value: "arm" },
+      ];
+      const arch = await selectOne("Architecture", archOptions, 0);
       if (!arch) { prompt.destroy(); renderAll(); return; }
-      const archVal = arch.startsWith("arm") ? "arm" : "x64";
 
-      const regions = [
-        "us-east-1      - N. Virginia",
-        "us-east-2      - Ohio",
-        "us-west-1      - N. California",
-        "us-west-2      - Oregon",
-        "eu-west-1      - Ireland",
-        "eu-west-2      - London",
-        "eu-central-1   - Frankfurt",
-        "ap-south-1     - Mumbai",
-        "ap-southeast-1 - Singapore",
-        "ap-northeast-1 - Tokyo",
+      const regionOptions = [
+        { label: "US East (N. Virginia)",  value: "us-east-1" },
+        { label: "US East (Ohio)",         value: "us-east-2" },
+        { label: "US West (N. California)",value: "us-west-1" },
+        { label: "US West (Oregon)",       value: "us-west-2" },
+        { label: "Europe (Ireland)",       value: "eu-west-1" },
+        { label: "Europe (London)",        value: "eu-west-2" },
+        { label: "Europe (Frankfurt)",     value: "eu-central-1" },
+        { label: "Asia (Mumbai)",          value: "ap-south-1" },
+        { label: "Asia (Singapore)",       value: "ap-southeast-1" },
+        { label: "Asia (Tokyo)",           value: "ap-northeast-1" },
       ];
-      const regionChoice = await selectOrType("AWS Region", regions, 0, prompt);
-      if (!regionChoice) { prompt.destroy(); renderAll(); return; }
-      const region = regionChoice.split(/\s+-\s/)[0].trim();
+      const region = await selectOrType("AWS Region", regionOptions, 0, prompt);
+      if (!region) { prompt.destroy(); renderAll(); return; }
 
-      const awsProfiles = getAwsProfiles();
-      const profileChoice = await selectOrType("AWS Profile", awsProfiles, 0, prompt);
-      if (profileChoice === null) { prompt.destroy(); renderAll(); return; }
+      const profiles = getAwsProfiles().map(p => ({ label: p, value: p }));
+      const profile = await selectOrType("AWS Profile", profiles, 0, prompt);
+      if (profile === null) { prompt.destroy(); renderAll(); return; }
 
       try {
         core.createHost({
           name, provider,
           config: {
-            size, arch: archVal,
-            region: region || "us-east-1",
-            ...(profileChoice ? { aws_profile: profileChoice } : {}),
+            size, arch, region,
+            ...(profile ? { aws_profile: profile } : {}),
           },
         });
       } catch { /* duplicate name etc */ }
