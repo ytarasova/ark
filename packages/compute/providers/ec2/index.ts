@@ -24,6 +24,7 @@ import type { Host, Session } from "../../../core/store.js";
 import { updateHost } from "../../../core/store.js";
 import { sshKeyPath, sshExec, waitForSsh, generateSshKey } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
+import { provisionStack, destroyStack } from "./provision.js";
 import { syncToHost, syncProjectFiles } from "./sync.js";
 import { fetchMetrics } from "./metrics.js";
 import { setupTunnels, probeRemotePorts } from "./ports.js";
@@ -31,27 +32,46 @@ import { setupTunnels, probeRemotePorts } from "./ports.js";
 export class EC2Provider implements ComputeProvider {
   readonly name = "ec2";
 
-  async provision(host: Host, _opts?: ProvisionOpts): Promise<void> {
+  async provision(host: Host, opts?: ProvisionOpts): Promise<void> {
     updateHost(host.name, { status: "provisioning" });
 
     // Generate SSH key pair for this host
-    const { privateKeyPath: _privateKeyPath } = generateSshKey(host.name);
+    const { privateKeyPath } = generateSshKey(host.name);
 
     // Build cloud-init user data
-    const _userData = buildUserData({
+    const userData = buildUserData({
       idleMinutes: (host.config as any)?.idle_minutes ?? 60,
     });
 
-    // TODO: provisionStack() — requires provision.ts (Pulumi integration)
-    throw new Error(
-      "EC2 provisioning requires the provision module (not yet available). " +
-        "Use 'ark host create' with a pre-existing instance_id instead.",
-    );
+    // Provision via Pulumi
+    const result = await provisionStack(host.name, {
+      size: opts?.size ?? (host.config as any)?.size ?? "m",
+      arch: opts?.arch ?? (host.config as any)?.arch ?? "x64",
+      region: (host.config as any)?.region ?? "us-east-1",
+      subnetId: (host.config as any)?.subnet_id,
+      securityGroupId: (host.config as any)?.sg_id,
+      userData,
+      tags: opts?.tags ?? (host.config as any)?.tags,
+      sshKeyPath: privateKeyPath,
+    });
+
+    // Update host with runtime state
+    updateHost(host.name, {
+      status: "running",
+      config: { ...host.config, ...result },
+    });
+
+    // Wait for SSH
+    if (result.ip) {
+      waitForSsh(privateKeyPath, result.ip);
+    }
   }
 
   async destroy(host: Host): Promise<void> {
-    // TODO: destroyStack() — requires provision.ts (Pulumi integration)
-    // For now, only update status. Full teardown requires the provision module.
+    await destroyStack(host.name, {
+      region: (host.config as any)?.region ?? "us-east-1",
+      stackName: (host.config as any)?.stack_name,
+    });
     updateHost(host.name, {
       status: "destroyed",
       config: { ...host.config, instance_id: null, ip: null },

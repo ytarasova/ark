@@ -300,14 +300,15 @@ describe("E2E: Host to provider resolution flow", () => {
     expect(localProvider).not.toBeNull();
     expect(localProvider!.name).toBe("local");
 
-    // Verify getProvider("ec2") returns null (not registered yet)
+    // Verify getProvider("ec2") returns the EC2 provider (now registered)
     const ec2Provider = getProvider("ec2");
-    expect(ec2Provider).toBeNull();
+    expect(ec2Provider).not.toBeNull();
+    expect(ec2Provider!.name).toBe("ec2");
 
-    // Verify listProviders() contains "local"
+    // Verify listProviders() contains both
     const providerNames = listProviders();
     expect(providerNames).toContain("local");
-    expect(providerNames).not.toContain("ec2");
+    expect(providerNames).toContain("ec2");
 
     // Verify hosts can be listed
     const hosts = listHosts();
