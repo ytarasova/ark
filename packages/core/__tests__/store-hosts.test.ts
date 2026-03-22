@@ -13,17 +13,17 @@ describe("hosts CRUD", () => {
     getDb().run("DELETE FROM hosts");
   });
 
-  it("creates a host with defaults", () => {
+  it("creates a local host as running by default", () => {
     const host = createHost({ name: "my-laptop" });
     expect(host.name).toBe("my-laptop");
     expect(host.provider).toBe("local");
-    expect(host.status).toBe("stopped");
+    expect(host.status).toBe("running");
     expect(host.config).toEqual({});
     expect(host.created_at).toBeTruthy();
     expect(host.updated_at).toBeTruthy();
   });
 
-  it("creates a host with full config", () => {
+  it("creates a non-local host as stopped by default", () => {
     const host = createHost({
       name: "docker-1",
       provider: "docker",
@@ -66,8 +66,8 @@ describe("hosts CRUD", () => {
   });
 
   it("filters by status", () => {
-    createHost({ name: "a" });
-    createHost({ name: "b" });
+    createHost({ name: "a", provider: "ec2" }); // ec2 defaults to stopped
+    createHost({ name: "b", provider: "ec2" });
     updateHost("b", { status: "running" });
     const running = listHosts({ status: "running" });
     expect(running.length).toBe(1);
@@ -131,7 +131,7 @@ describe("hosts CRUD", () => {
     const updated = updateHost("dev", {});
     expect(updated).not.toBeNull();
     expect(updated!.provider).toBe("local");
-    expect(updated!.status).toBe("stopped");
+    expect(updated!.status).toBe("running"); // local hosts start as running
     expect(updated!.config).toEqual({});
     expect(updated!.updated_at >= originalUpdatedAt).toBe(true);
   });

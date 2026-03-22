@@ -90,7 +90,7 @@ describe("E2E: Full host lifecycle", () => {
     hostNames.push("test-local");
     expect(host.name).toBe("test-local");
     expect(host.provider).toBe("local");
-    expect(host.status).toBe("stopped");
+    expect(host.status).toBe("running"); // local hosts are always running
 
     // Look up its provider
     const provider = getProvider("local");

@@ -329,12 +329,16 @@ export function createHost(opts: {
   const db = getDb();
   const ts = now();
 
+  const provider = opts.provider ?? "local";
+  const status = provider === "local" ? "running" : "stopped";
+
   db.prepare(`
     INSERT INTO hosts (name, provider, status, config, created_at, updated_at)
-    VALUES (?, ?, 'stopped', ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?)
   `).run(
     opts.name,
-    opts.provider ?? "local",
+    provider,
+    status,
     JSON.stringify(opts.config ?? {}),
     ts, ts,
   );
