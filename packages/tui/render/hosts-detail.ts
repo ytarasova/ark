@@ -18,7 +18,17 @@ export function renderHostDetail(): string[] | null {
   const sc = h.status === "running" ? "green"
     : h.status === "provisioning" ? "yellow"
     : h.status === "destroyed" ? "red" : "gray";
-  lines.push(` {gray-fg}Status{/gray-fg}    {${sc}-fg}${h.status}{/${sc}-fg}`);
+  // Provisioning status indicator
+  const cloudInitDone = cfg.cloud_init_done === true;
+  if (h.status === "running" && h.provider === "ec2") {
+    if (cloudInitDone) {
+      lines.push(` {gray-fg}Status{/gray-fg}    {green-fg}{bold}ready{/bold} — fully provisioned{/green-fg}`);
+    } else {
+      lines.push(` {gray-fg}Status{/gray-fg}    {yellow-fg}running — cloud-init in progress...{/yellow-fg}`);
+    }
+  } else {
+    lines.push(` {gray-fg}Status{/gray-fg}    {${sc}-fg}${h.status}{/${sc}-fg}`);
+  }
   if (cfg.ip) lines.push(` {gray-fg}IP{/gray-fg}        ${cfg.ip}`);
   if (cfg.last_error) lines.push("", ` {red-fg}{bold}Error:{/bold} ${String(cfg.last_error).slice(0, paneWidth - 10)}{/red-fg}`);
 

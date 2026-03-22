@@ -1,5 +1,5 @@
 import { state, type Tab } from "../state.js";
-import { screen } from "../layout.js";
+import { screen, detailPane } from "../layout.js";
 import { renderAll } from "../render/index.js";
 
 function getMax(): number {
@@ -52,5 +52,27 @@ export function registerNavigation() {
   screen.key(["g"], () => {
     state.sel = 0;
     renderAll();
+  });
+
+  // Detail pane scrolling
+  screen.key(["pagedown", "C-d"], () => {
+    detailPane.scroll(10);
+    screen.render();
+  });
+
+  screen.key(["pageup", "C-u"], () => {
+    detailPane.scroll(-10);
+    screen.render();
+  });
+
+  // Shift+j/k for fine scroll
+  screen.key(["S-j"], () => {
+    detailPane.scroll(3);
+    screen.render();
+  });
+
+  screen.key(["S-k"], () => {
+    detailPane.scroll(-3);
+    screen.render();
   });
 }

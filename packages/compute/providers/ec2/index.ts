@@ -116,6 +116,9 @@ export class EC2Provider implements ComputeProvider {
         const { stdout } = sshExec(key, result.ip, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 15_000 });
         if (stdout.trim().includes("provisioning complete")) {
           log("Cloud-init complete — all packages installed");
+          updateHost(host.name, {
+            config: { ...(require("../../../core/store.js").getHost(host.name)?.config ?? {}), cloud_init_done: true },
+          });
           break;
         }
         const { stdout: progress } = sshExec(key, result.ip,
