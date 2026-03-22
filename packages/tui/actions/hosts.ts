@@ -1,6 +1,6 @@
 import * as core from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
-import { state } from "../state.js";
+import { state, addHostLog } from "../state.js";
 import { screen } from "../layout.js";
 import { renderAll } from "../render/index.js";
 import { showNewHostForm } from "../forms/new-host.js";
@@ -13,14 +13,32 @@ export function registerHostActions() {
       const provider = getProvider(h.provider);
       if (!provider) return;
       if (h.status === "stopped" || h.status === "destroyed") {
-        // Provision or start
         (async () => {
           try {
+            addHostLog(h.name, "Starting provisioning...");
             core.updateHost(h.name, { status: "provisioning" });
             renderAll();
+
+            addHostLog(h.name, `Provider: ${h.provider}, size: ${(h.config as any)?.size ?? "default"}`);
+            renderAll();
+
+            addHostLog(h.name, "Generating SSH key pair...");
+            renderAll();
+
+            addHostLog(h.name, "Creating Pulumi stack...");
+            renderAll();
+
             await provider.provision(h);
+
+            addHostLog(h.name, "Instance launched, waiting for SSH...");
+            renderAll();
+
             core.updateHost(h.name, { status: "running" });
-          } catch { core.updateHost(h.name, { status: "stopped" }); }
+            addHostLog(h.name, "Provisioning complete — host is running");
+          } catch (e: any) {
+            core.updateHost(h.name, { status: "stopped" });
+            addHostLog(h.name, `Provisioning failed: ${e.message ?? e}`);
+          }
           renderAll();
         })();
       }
@@ -36,13 +54,41 @@ export function registerHostActions() {
       (async () => {
         try {
           if (h.status === "running") {
+            addHostLog(h.name, "Stopping host...");
+            renderAll();
             await provider.stop(h);
             core.updateHost(h.name, { status: "stopped" });
+            addHostLog(h.name, "Host stopped");
           } else if (h.status === "stopped") {
+            addHostLog(h.name, "Starting host...");
+            renderAll();
             await provider.start(h);
             core.updateHost(h.name, { status: "running" });
+            addHostLog(h.name, "Host started");
           }
-        } catch { /* ignore */ }
+        } catch (e: any) {
+          addHostLog(h.name, `Failed: ${e.message ?? e}`);
+        }
+        renderAll();
+      })();
+    }
+  });
+
+  screen.key(["S-s"], () => {
+    if (state.tab === "hosts") {
+      const h = state.hosts[state.sel];
+      if (!h || h.status !== "running") return;
+      const provider = getProvider(h.provider);
+      if (!provider) return;
+      (async () => {
+        try {
+          addHostLog(h.name, "Syncing environment...");
+          renderAll();
+          await provider.syncEnvironment(h, { direction: "push" });
+          addHostLog(h.name, "Sync complete");
+        } catch (e: any) {
+          addHostLog(h.name, `Sync failed: ${e.message ?? e}`);
+        }
         renderAll();
       })();
     }

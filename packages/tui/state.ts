@@ -13,9 +13,19 @@ export const state = {
   pipelines: [] as ReturnType<typeof core.listPipelines>,
   hosts: [] as core.Host[],
   hostSnapshots: new Map<string, HostSnapshot>(),
+  hostLogs: new Map<string, string[]>(),  // per-host activity log
   eventViewMode: false,
   eventSel: 0,
 };
+
+export function addHostLog(hostName: string, message: string) {
+  const logs = state.hostLogs.get(hostName) ?? [];
+  const ts = new Date().toISOString().slice(11, 19);
+  logs.push(`${ts}  ${message}`);
+  // Keep last 50 entries
+  if (logs.length > 50) logs.splice(0, logs.length - 50);
+  state.hostLogs.set(hostName, logs);
+}
 
 export function refresh() {
   try {

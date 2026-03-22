@@ -59,6 +59,15 @@ export function renderHostDetail(): string[] | null {
     lines.push("", "{gray-fg} Fetching metrics...{/gray-fg}");
   }
 
+  // Activity log
+  const logs = state.hostLogs.get(h.name);
+  if (logs?.length) {
+    lines.push("", "{bold}{inverse} Activity Log {/inverse}{/bold}");
+    for (const entry of logs.slice(-15)) {
+      lines.push(` {gray-fg}${entry}{/gray-fg}`);
+    }
+  }
+
   // Port status (from running sessions on this host)
   const hostSessions = sessions.filter(s => s.compute_name === h.name && s.status === "running");
   const allPorts: any[] = [];
