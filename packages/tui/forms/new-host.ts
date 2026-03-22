@@ -1,26 +1,15 @@
-import blessed from "neo-blessed";
 import * as core from "../../core/index.js";
-import { screen } from "../layout.js";
 import { selectOne, selectOrType } from "./select.js";
+import { createPrompt, askInput } from "./prompt.js";
 import { generateName, getAwsProfiles } from "../helpers.js";
 import { renderAll } from "../render/index.js";
+import { runSafe } from "../async.js";
 
 export function showNewHostForm() {
-  const prompt = blessed.prompt({
-    parent: screen,
-    top: "center", left: "center", width: 70, height: 8,
-    border: { type: "line" },
-    style: { border: { fg: "cyan" }, bg: "black" },
-    tags: true,
-  });
+  const prompt = createPrompt();
 
-  const ask = (question: string, defaultVal: string): Promise<string | null> =>
-    new Promise((resolve) => {
-      prompt.input(`{bold}New Host{/bold}\n\n${question}`, defaultVal, (err, value) => {
-        if (err || value === undefined || value === null) resolve(null);
-        else resolve(value.trim());
-      });
-    });
+  const ask = (question: string, defaultVal: string) =>
+    askInput(prompt, "New Host", question, defaultVal);
 
   (async () => {
     const name = await ask("Host name:", generateName());
@@ -68,7 +57,6 @@ export function showNewHostForm() {
       const profile = await selectOrType("AWS Profile", profiles, 0, prompt);
       if (profile === null) { prompt.destroy(); renderAll(); return; }
 
-      const { runSafe } = require("../async.js");
       runSafe("Create host", () => core.createHost({
         name, provider,
         config: {
@@ -77,7 +65,6 @@ export function showNewHostForm() {
         },
       }));
     } else {
-      const { runSafe } = require("../async.js");
       runSafe("Create host", () => core.createHost({ name, provider, config: {} }));
     }
 

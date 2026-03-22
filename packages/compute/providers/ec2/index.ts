@@ -31,6 +31,25 @@ import { setupTunnels, probeRemotePorts } from "./ports.js";
 import { hourlyRate } from "./cost.js";
 import { sleep } from "../../util.js";
 
+interface EC2HostConfig {
+  size?: string;
+  arch?: string;
+  region?: string;
+  aws_profile?: string;
+  subnet_id?: string;
+  sg_id?: string;
+  instance_id?: string;
+  ip?: string;
+  stack_name?: string;
+  key_name?: string;
+  hourlyRate?: number;
+  cloud_init_done?: boolean;
+  last_error?: string;
+  idle_minutes?: number;
+  ingress_cidrs?: string[];
+  tags?: Record<string, string>;
+}
+
 export class EC2Provider implements ComputeProvider {
   readonly name = "ec2";
 

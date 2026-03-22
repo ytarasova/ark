@@ -19,6 +19,8 @@ import * as agentRegistry from "./agent.js";
 import { getProvider } from "../compute/index.js";
 import { resolvePortDecls, parseArcJson } from "../compute/arc-json.js";
 
+const deliveryInFlight = new Map<string, boolean>();
+
 // ── Session lifecycle ───────────────────────────────────────────────────────
 
 export function startSession(opts: {
@@ -322,7 +324,7 @@ async function launchAgentTmux(
   trustWorktree(workdir, effectiveWorkdir);
 
   // Allocate channel port from session id
-  const channelPort = 19200 + parseInt(session.id.replace("s-", ""), 16) % 1000;
+  const channelPort = store.sessionChannelPort(session.id);
 
   // Write MCP config for channel server
   const sessionDir = join(store.TRACKS_DIR, session.id);
@@ -444,19 +446,25 @@ async function launchAgentTmux(
 
   // Background: wait for channel server to be ready, then POST the task
   (async () => {
-    for (let i = 0; i < 60; i++) {
-      try {
-        const resp = await fetch(channelUrl);
-        if (resp.ok) {
-          await fetch(channelUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(taskPayload),
-          });
-          return;
-        }
-      } catch { /* channel not ready yet */ }
-      await Bun.sleep(1000);
+    if (deliveryInFlight.get(session.id)) return;
+    deliveryInFlight.set(session.id, true);
+    try {
+      for (let i = 0; i < 60; i++) {
+        try {
+          const resp = await fetch(channelUrl);
+          if (resp.ok) {
+            await fetch(channelUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(taskPayload),
+            });
+            return;
+          }
+        } catch { /* channel not ready yet */ }
+        await Bun.sleep(1000);
+      }
+    } finally {
+      deliveryInFlight.delete(session.id);
     }
   })();
 

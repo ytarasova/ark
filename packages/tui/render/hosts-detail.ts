@@ -1,14 +1,14 @@
-import { state } from "../state.js";
+import { state, selectedHost } from "../state.js";
 import { bar } from "../helpers.js";
-import { detailPane, screen } from "../layout.js";
+import { sectionHeader, detailPaneWidth } from "./helpers.js";
 
 export function renderHostDetail(): string[] | null {
-  const { hosts, sel, sessions, hostSnapshots } = state;
-  const h = hosts[sel];
+  const { sessions, hostSnapshots } = state;
+  const h = selectedHost();
   if (!h) return null;
 
   // Available width inside the detail pane (subtract border + padding)
-  const paneWidth = Math.floor((screen.width as number) * 0.6) - 4;
+  const paneWidth = detailPaneWidth();
   const barWidth = Math.max(20, paneWidth - 30); // space for label + value
 
   const lines: string[] = [];
@@ -35,7 +35,7 @@ export function renderHostDetail(): string[] | null {
   const snap = hostSnapshots.get(h.name);
   if (snap) {
     const m = snap.metrics;
-    lines.push("", "{bold}{inverse} Metrics {/inverse}{/bold}");
+    lines.push("", sectionHeader("Metrics"));
     lines.push(` CPU   ${bar(m.cpu, barWidth)}  ${m.cpu.toFixed(1)}%`);
     lines.push(` MEM   ${bar(m.memPct, barWidth)}  ${m.memUsedGb.toFixed(1)}/${m.memTotalGb.toFixed(1)} GB`);
     lines.push(` DISK  ${bar(m.diskPct, barWidth)}  ${m.diskPct.toFixed(1)}%`);
@@ -44,7 +44,7 @@ export function renderHostDetail(): string[] | null {
     lines.push(` {gray-fg}Uptime{/gray-fg}  ${m.uptime}   {gray-fg}Idle{/gray-fg}  ${m.idleTicks} ticks`);
 
     if (snap.sessions.length) {
-      lines.push("", "{bold}{inverse} Sessions {/inverse}{/bold}");
+      lines.push("", sectionHeader("Sessions"));
       lines.push(` ${"Name".padEnd(18)} ${"Status".padEnd(10)} ${"Mode".padEnd(8)} ${"CPU".padEnd(6)} ${"MEM".padEnd(6)}`);
       for (const s of snap.sessions) {
         lines.push(` ${s.name.padEnd(18)} ${s.status.padEnd(10)} ${s.mode.padEnd(8)} ${String(s.cpu).padEnd(6)} ${String(s.mem).padEnd(6)}`);
@@ -52,7 +52,7 @@ export function renderHostDetail(): string[] | null {
     }
 
     if (snap.processes.length) {
-      lines.push("", "{bold}{inverse} Processes {/inverse}{/bold}");
+      lines.push("", sectionHeader("Processes"));
       lines.push(` ${"PID".padEnd(8)} ${"CPU".padEnd(6)} ${"MEM".padEnd(6)} ${"Command"}`);
       for (const p of snap.processes.slice(0, 10)) {
         lines.push(` ${p.pid.padEnd(8)} ${p.cpu.padEnd(6)} ${p.mem.padEnd(6)} ${p.command.slice(0, paneWidth - 24)}`);
@@ -60,7 +60,7 @@ export function renderHostDetail(): string[] | null {
     }
 
     if (snap.docker.length) {
-      lines.push("", "{bold}{inverse} Docker {/inverse}{/bold}");
+      lines.push("", sectionHeader("Docker"));
       lines.push(` ${"Name".padEnd(18)} ${"CPU".padEnd(8)} ${"MEM".padEnd(10)} ${"Image"}`);
       for (const c of snap.docker) {
         lines.push(` ${c.name.padEnd(18)} ${c.cpu.padEnd(8)} ${c.memory.padEnd(10)} ${c.image.slice(0, paneWidth - 40)}`);
@@ -73,7 +73,7 @@ export function renderHostDetail(): string[] | null {
   // Activity log
   const logs = state.hostLogs.get(h.name);
   if (logs?.length) {
-    lines.push("", "{bold}{inverse} Activity Log {/inverse}{/bold}");
+    lines.push("", sectionHeader("Activity Log"));
     for (const entry of logs.slice(-15)) {
       lines.push(` {gray-fg}${entry}{/gray-fg}`);
     }
@@ -87,7 +87,7 @@ export function renderHostDetail(): string[] | null {
     allPorts.push(...ports);
   }
   if (allPorts.length > 0) {
-    lines.push("", "{bold}{inverse} Ports {/inverse}{/bold}");
+    lines.push("", sectionHeader("Ports"));
     for (const p of allPorts) {
       const statusIcon = p.listening ? "{green-fg}●{/green-fg}" : "{red-fg}○{/red-fg}";
       const name = p.name ? ` (${p.name})` : "";
@@ -98,7 +98,7 @@ export function renderHostDetail(): string[] | null {
   // Cost estimate
   const rate = (h.config as any)?.hourlyRate;
   if (rate) {
-    lines.push("", `{bold}{inverse} Cost {/inverse}{/bold}`);
+    lines.push("", sectionHeader("Cost"));
     lines.push(` $${rate.toFixed(3)}/hr  ~$${(rate * 24).toFixed(2)}/day`);
   }
 

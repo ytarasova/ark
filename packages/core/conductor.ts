@@ -54,8 +54,7 @@ export function startConductor(port = DEFAULT_PORT): void {
           };
           const targetSession = store.getSession(target);
           if (targetSession) {
-            const channelPort =
-              19200 + (parseInt(target.replace("s-", ""), 16) % 1000);
+            const channelPort = store.sessionChannelPort(target);
             try {
               await fetch(`http://localhost:${channelPort}`, {
                 method: "POST",
@@ -107,7 +106,10 @@ export function startConductor(port = DEFAULT_PORT): void {
   console.log(`Ark conductor listening on localhost:${port}`);
 
   // Background metrics polling - every 30 seconds
+  let polling = false;
   setInterval(async () => {
+    if (polling) return;
+    polling = true;
     try {
       const hosts = store.listHosts({ status: "running" });
       for (const host of hosts) {
@@ -132,7 +134,7 @@ export function startConductor(port = DEFAULT_PORT): void {
           }
         } catch { /* host unreachable, skip */ }
       }
-    } catch { /* ignore polling errors */ }
+    } catch { /* ignore polling errors */ } finally { polling = false; }
   }, 30_000);
 }
 

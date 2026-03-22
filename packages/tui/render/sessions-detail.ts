@@ -1,14 +1,13 @@
 import * as core from "../../core/index.js";
-import { state } from "../state.js";
-import { screen } from "../layout.js";
+import { state, selectedSession } from "../state.js";
 import { ICON, COLOR } from "../constants.js";
 import { hms } from "../helpers.js";
+import { sectionHeader, detailPaneWidth } from "./helpers.js";
 
 export function renderSessionDetail(): string[] | null {
   const lines: string[] = [];
-  const { sessions, sel } = state;
 
-  const s = sessions.filter((s) => !s.parent_id)[sel];
+  const s = selectedSession();
   if (!s) return null;
 
   // Header
@@ -39,7 +38,7 @@ export function renderSessionDetail(): string[] | null {
   if (s.breakpoint_reason) lines.push("", `{yellow-fg}{bold} ⏸ ${s.breakpoint_reason}{/bold}{/yellow-fg}`);
 
   // Info
-  lines.push("", "{bold}{inverse} Info {/inverse}{/bold}");
+  lines.push("", sectionHeader("Info"));
   lines.push(` {gray-fg}${"ID".padEnd(11)}{/gray-fg} ${s.id}`);
   const sc = COLOR[s.status] ?? "white";
   lines.push(` {gray-fg}${"Status".padEnd(11)}{/gray-fg} {${sc}-fg}${ICON[s.status] ?? "?"} ${s.status}{/${sc}-fg}`);
@@ -51,7 +50,7 @@ export function renderSessionDetail(): string[] | null {
 
   // Channel status
   if (s.session_id && s.status === "running") {
-    const channelPort = 19200 + parseInt(s.id.replace("s-", ""), 16) % 1000;
+    const channelPort = core.sessionChannelPort(s.id);
     lines.push(` {green-fg}⚡ Channel: port ${channelPort}{/green-fg}`);
   }
 
@@ -63,8 +62,8 @@ export function renderSessionDetail(): string[] | null {
     const d = latestReport.data ?? {};
     const reportType = latestReport.type.replace("agent_", "");
     const reportColor = reportType === "completed" ? "green" : reportType === "error" ? "red" : reportType === "question" ? "yellow" : "cyan";
-    lines.push("", `{bold}{inverse} Latest Report {/inverse}{/bold}`);
-    const rw = Math.floor((screen.width as number) * 0.6) - 10;
+    lines.push("", sectionHeader("Latest Report"));
+    const rw = detailPaneWidth() - 6;
     lines.push(` {${reportColor}-fg}${reportType}{/${reportColor}-fg}: ${String(d.message ?? d.summary ?? d.question ?? d.error ?? "").slice(0, rw)}`);
   }
 
@@ -72,8 +71,8 @@ export function renderSessionDetail(): string[] | null {
   if (s.session_id && s.status === "running") {
     const output = core.getOutput(s.id, { lines: 15 });
     if (output.trim()) {
-      const paneWidth = Math.floor((screen.width as number) * 0.6) - 4;
-      lines.push("", "{bold}{inverse} Agent Output {/inverse}{/bold}");
+      const paneWidth = detailPaneWidth();
+      lines.push("", sectionHeader("Agent Output"));
       for (const line of output.split("\n").slice(-12)) {
         lines.push(` ${line.slice(0, paneWidth)}`);
       }
@@ -84,7 +83,7 @@ export function renderSessionDetail(): string[] | null {
 
   // Events
   if (events.length) {
-    lines.push("", "{bold}{inverse} Events {/inverse}{/bold}");
+    lines.push("", sectionHeader("Events"));
     for (const ev of events.slice(-10)) {
       const ts = hms(ev.created_at);
       const data = ev.data

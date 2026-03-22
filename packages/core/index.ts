@@ -8,6 +8,7 @@ export {
   getDb, getSession, listSessions, updateSession, deleteSession,
   logEvent, getEvents, getChildren, getGroups, claimSession,
   createHost, getHost, listHosts, updateHost, mergeHostConfig, deleteHost,
+  sessionChannelPort,
   type Session, type Event, type Host,
 } from "./store.js";
 

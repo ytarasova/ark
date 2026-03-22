@@ -1,14 +1,17 @@
+import blessed from "neo-blessed";
 import * as core from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
-import { state, addHostLog } from "../state.js";
-import { screen } from "../layout.js";
+import { state, addHostLog, selectedHost } from "../state.js";
+import { screen, statusBar } from "../layout.js";
 import { renderAll } from "../render/index.js";
 import { showNewHostForm } from "../forms/new-host.js";
+import { selectOne } from "../forms/select.js";
+import { createPrompt, askInput } from "../forms/prompt.js";
 
 export function registerHostActions() {
   screen.key(["enter"], () => {
     if (state.tab === "hosts") {
-      const h = state.hosts[state.sel];
+      const h = selectedHost();
       if (!h) return;
       const provider = getProvider(h.provider);
       if (!provider) return;
@@ -54,7 +57,7 @@ export function registerHostActions() {
 
   screen.key(["s"], () => {
     if (state.tab === "hosts") {
-      const h = state.hosts[state.sel];
+      const h = selectedHost();
       if (!h) return;
       const provider = getProvider(h.provider);
       if (!provider) return;
@@ -83,7 +86,7 @@ export function registerHostActions() {
 
   screen.key(["S-s"], () => {
     if (state.tab === "hosts") {
-      const h = state.hosts[state.sel];
+      const h = selectedHost();
       if (!h || h.status !== "running") return;
       const provider = getProvider(h.provider);
       if (!provider) return;
@@ -103,26 +106,13 @@ export function registerHostActions() {
 
   screen.key(["e"], () => {
     if (state.tab !== "hosts") return;
-    const h = state.hosts[state.sel];
+    const h = selectedHost();
     if (!h) return;
 
-    const blessed = require("neo-blessed");
-    const { selectOne } = require("../forms/select.js");
-    const prompt = blessed.prompt({
-      parent: (require("../layout.js")).screen,
-      top: "center", left: "center", width: 70, height: 8,
-      border: { type: "line" },
-      style: { border: { fg: "cyan" }, bg: "black" },
-      tags: true,
-    });
+    const prompt = createPrompt();
 
-    const ask = (question: string, defaultVal: string): Promise<string | null> =>
-      new Promise((resolve) => {
-        prompt.input(`{bold}Edit ${h.name}{/bold}\n\n${question}`, defaultVal, (err: any, value: any) => {
-          if (err || value === undefined || value === null) resolve(null);
-          else resolve(String(value).trim());
-        });
-      });
+    const ask = (question: string, defaultVal: string) =>
+      askInput(prompt, `Edit ${h.name}`, question, defaultVal);
 
     (async () => {
       const fields = [
@@ -153,7 +143,7 @@ export function registerHostActions() {
 
   screen.key(["x"], () => {
     if (state.tab !== "hosts") return;
-    const h = state.hosts[state.sel];
+    const h = selectedHost();
     if (!h) return;
     // Only allow delete on fully stopped/destroyed hosts
     if (h.status !== "stopped" && h.status !== "destroyed") {
@@ -162,10 +152,9 @@ export function registerHostActions() {
       return;
     }
     // Require confirmation - show in status bar
-    const { statusBar, screen: scr } = require("../layout.js");
     statusBar.setContent(`{red-fg} Delete host '${h.name}'? Press x again to confirm, any other key to cancel{/red-fg}`);
-    scr.render();
-    scr.onceKey(["x"], () => {
+    screen.render();
+    screen.onceKey(["x"], () => {
       core.deleteHost(h.name);
       if (state.sel > 0) state.sel--;
       renderAll();

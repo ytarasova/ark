@@ -1,6 +1,7 @@
 import { state } from "../state.js";
 import { ICON, COLOR } from "../constants.js";
 import { ago } from "../helpers.js";
+import { renderRow } from "./helpers.js";
 
 export function renderSessionsList(): string[] {
   const lines: string[] = [];
@@ -35,10 +36,8 @@ export function renderSessionsList(): string[] {
       const stage = (s.stage ?? "—").padEnd(10);
       const age = ago(s.created_at).padStart(4);
       const marker = isSel ? "▸" : " ";
-      const prefix = isSel ? "{bold}{inverse}" : "";
-      const suffix = isSel ? "{/inverse}{/bold}" : "";
 
-      lines.push(`${prefix} ${marker} {${color}-fg}${icon}{/${color}-fg} ${summary} ${stage} ${age}${suffix}`);
+      lines.push(renderRow(` ${marker} {${color}-fg}${icon}{/${color}-fg} ${summary} ${stage} ${age}`, isSel));
 
       // Show fork children
       if (parentIds.has(s.id)) {

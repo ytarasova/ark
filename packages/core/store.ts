@@ -424,3 +424,7 @@ export function getGroups(): string[] {
   ).all() as any[];
   return rows.map((r) => r.group_name);
 }
+
+export function sessionChannelPort(sessionId: string): number {
+  return 19200 + parseInt(sessionId.replace("s-", ""), 16) % 1000;
+}

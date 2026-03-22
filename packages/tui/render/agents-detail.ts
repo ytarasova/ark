@@ -1,5 +1,6 @@
 import * as core from "../../core/index.js";
 import { state } from "../state.js";
+import { sectionHeader } from "./helpers.js";
 
 export function renderAgentDetail(): string[] | null {
   const a = state.agents[state.sel] ? core.loadAgent(state.agents[state.sel]!.name) : null;
@@ -8,7 +9,7 @@ export function renderAgentDetail(): string[] | null {
   const lines: string[] = [];
   lines.push(`{bold} ${a.name}{/bold} {gray-fg}(${a._source}){/gray-fg}`);
   if (a.description) lines.push(`{gray-fg} ${a.description}{/gray-fg}`);
-  lines.push("", "{bold}{inverse} Config {/inverse}{/bold}");
+  lines.push("", sectionHeader("Config"));
   lines.push(` Model:      ${a.model}`);
   lines.push(` Max turns:  ${a.max_turns}`);
   lines.push(` Permission: ${a.permission_mode}`);
@@ -22,7 +23,7 @@ export function renderAgentDetail(): string[] | null {
   ] as const;
 
   for (const [title, items] of sections) {
-    lines.push("", `{bold}{inverse} ${title} (${items.length}) {/inverse}{/bold}`);
+    lines.push("", sectionHeader(`${title} (${items.length})`));
     if (items.length) {
       for (const item of items) lines.push(` • ${item}`);
     } else {
@@ -31,7 +32,7 @@ export function renderAgentDetail(): string[] | null {
   }
 
   if (a.system_prompt) {
-    lines.push("", "{bold}{inverse} System Prompt {/inverse}{/bold}");
+    lines.push("", sectionHeader("System Prompt"));
     for (const line of a.system_prompt.split("\n").slice(0, 6)) {
       lines.push(` {gray-fg}${line}{/gray-fg}`);
     }

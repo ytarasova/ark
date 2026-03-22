@@ -15,11 +15,12 @@ async function refreshHostMetrics() {
 }
 
 export function startPolling() {
+  let polling = false;
   setInterval(async () => {
-    if (state.tab === "hosts") {
-      await refreshHostMetrics();
-      renderAll();
-    }
+    if (state.tab !== "hosts" || polling) return;
+    polling = true;
+    try { await refreshHostMetrics(); } finally { polling = false; }
+    renderAll();
   }, 10_000);
 
   // Auto-refresh

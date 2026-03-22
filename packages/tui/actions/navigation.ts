@@ -1,4 +1,4 @@
-import { state, type Tab } from "../state.js";
+import { state, TABS } from "../state.js";
 import { screen, detailPane } from "../layout.js";
 import { renderAll } from "../render/index.js";
 
@@ -30,15 +30,13 @@ export function registerNavigation() {
   screen.key(["5"], () => { state.tab = "hosts"; state.sel = 0; renderAll(); });
 
   screen.key(["]", "tab"], () => {
-    const tabs: Tab[] = ["sessions", "agents", "pipelines", "recipes", "hosts"];
-    state.tab = tabs[(tabs.indexOf(state.tab) + 1) % tabs.length]!;
+    state.tab = TABS[(TABS.indexOf(state.tab) + 1) % TABS.length]!;
     state.sel = 0;
     renderAll();
   });
 
   screen.key(["[", "S-tab"], () => {
-    const tabs: Tab[] = ["sessions", "agents", "pipelines", "recipes", "hosts"];
-    state.tab = tabs[(tabs.indexOf(state.tab) - 1 + tabs.length) % tabs.length]!;
+    state.tab = TABS[(TABS.indexOf(state.tab) - 1 + TABS.length) % TABS.length]!;
     state.sel = 0;
     renderAll();
   });

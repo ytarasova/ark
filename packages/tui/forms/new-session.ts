@@ -1,28 +1,16 @@
-import blessed from "neo-blessed";
+import { existsSync } from "fs";
+import { resolve as resolvePath, basename } from "path";
 import * as core from "../../core/index.js";
-import { screen } from "../layout.js";
 import { selectOne } from "./select.js";
+import { createPrompt, askInput } from "./prompt.js";
 import { renderAll } from "../render/index.js";
+import { runAsync } from "../async.js";
 
 export function showNewSessionForm() {
-  const prompt = blessed.prompt({
-    parent: screen,
-    top: "center",
-    left: "center",
-    width: 70,
-    height: 8,
-    border: { type: "line" },
-    style: { border: { fg: "cyan" }, bg: "black" },
-    tags: true,
-  });
+  const prompt = createPrompt();
 
-  const ask = (question: string, defaultVal: string): Promise<string | null> =>
-    new Promise((resolve) => {
-      prompt.input(`{bold}New Session{/bold}\n\n${question}`, defaultVal, (err, value) => {
-        if (err || value === undefined || value === null) resolve(null);
-        else resolve(value.trim());
-      });
-    });
+  const ask = (question: string, defaultVal: string) =>
+    askInput(prompt, "New Session", question, defaultVal);
 
   (async () => {
     const summary = await ask("Task / summary:", "");
@@ -45,8 +33,6 @@ export function showNewSessionForm() {
     if (!pipelineChoice) { prompt.destroy(); renderAll(); return; }
 
     // Create session
-    const { existsSync } = require("fs");
-    const { resolve: resolvePath, basename } = require("path");
     let workdir: string | undefined;
     let repo = repoPath || process.cwd();
     const rp = resolvePath(repo);
@@ -60,7 +46,6 @@ export function showNewSessionForm() {
       repo, pipeline: pipelineChoice, workdir,
       compute_name: computeName || undefined,
     });
-    const { runAsync } = require("../async.js");
     runAsync(`Dispatching ${s.id}`, () => core.dispatch(s.id).then(() => {}));
 
     prompt.destroy();

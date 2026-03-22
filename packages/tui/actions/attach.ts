@@ -1,7 +1,7 @@
 import { execFileSync } from "child_process";
 import { join } from "path";
 import { homedir } from "os";
-import { state } from "../state.js";
+import { state, selectedSession, selectedHost } from "../state.js";
 import { screen } from "../layout.js";
 import { addHostLog } from "../state.js";
 import { renderAll } from "../render/index.js";
@@ -19,8 +19,7 @@ function relaunchTui(): void {
 export function registerAttachActions() {
   screen.key(["a"], () => {
     if (state.tab === "sessions") {
-      const topLevel = state.sessions.filter((s) => !s.parent_id);
-      const s = topLevel[state.sel];
+      const s = selectedSession();
       if (!s?.session_id) return;
 
       // Verify tmux session exists before destroying screen
@@ -40,7 +39,7 @@ export function registerAttachActions() {
       relaunchTui();
 
     } else if (state.tab === "hosts") {
-      const h = state.hosts[state.sel];
+      const h = selectedHost();
       if (!h || h.status !== "running") return;
       const ip = (h.config as any)?.ip;
       if (!ip) return;
