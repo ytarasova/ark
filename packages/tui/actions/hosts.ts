@@ -103,6 +103,56 @@ export function registerHostActions() {
     }
   });
 
+  screen.key(["e"], () => {
+    if (state.tab !== "hosts") return;
+    const h = state.hosts[state.sel];
+    if (!h) return;
+
+    const blessed = require("neo-blessed");
+    const { selectOne } = require("../forms/select.js");
+    const prompt = blessed.prompt({
+      parent: (require("../layout.js")).screen,
+      top: "center", left: "center", width: 70, height: 8,
+      border: { type: "line" },
+      style: { border: { fg: "cyan" }, bg: "black" },
+      tags: true,
+    });
+
+    const ask = (question: string, defaultVal: string): Promise<string | null> =>
+      new Promise((resolve) => {
+        prompt.input(`{bold}Edit ${h.name}{/bold}\n\n${question}`, defaultVal, (err: any, value: any) => {
+          if (err || value === undefined || value === null) resolve(null);
+          else resolve(String(value).trim());
+        });
+      });
+
+    (async () => {
+      const fields = [
+        "size", "arch", "region", "aws_profile", "subnet_id",
+        "ingress_cidrs", "idle_minutes", "Cancel",
+      ];
+      const field = await selectOne("Edit field", fields, 0);
+      if (!field || field === "Cancel") { prompt.destroy(); renderAll(); return; }
+
+      const cfg = h.config as any;
+      const current = cfg[field] !== undefined ? String(cfg[field]) : "";
+      const newVal = await ask(`${field}:`, current);
+
+      if (newVal !== null && newVal !== current) {
+        let parsed: any = newVal;
+        if (field === "ingress_cidrs") {
+          parsed = newVal === "open" ? ["0.0.0.0/0"] : newVal.split(",").map((s: string) => s.trim());
+        } else if (field === "idle_minutes") {
+          parsed = parseInt(newVal) || 60;
+        }
+        core.updateHost(h.name, { config: { ...cfg, [field]: parsed } });
+        addHostLog(h.name, `Config updated: ${field} = ${JSON.stringify(parsed)}`);
+      }
+      prompt.destroy();
+      renderAll();
+    })();
+  });
+
   screen.key(["x"], () => {
     if (state.tab !== "hosts") return;
     const h = state.hosts[state.sel];

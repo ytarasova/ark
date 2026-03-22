@@ -460,6 +460,43 @@ hostCmd.command("delete")
     console.log(chalk.green(`Host '${name}' deleted`));
   });
 
+hostCmd.command("update")
+  .description("Update host configuration")
+  .argument("<name>", "Host name")
+  .option("--size <size>", "Instance size")
+  .option("--arch <arch>", "Architecture: x64, arm")
+  .option("--region <region>", "AWS region")
+  .option("--profile <profile>", "AWS profile")
+  .option("--subnet-id <id>", "Subnet ID")
+  .option("--ingress <cidrs>", "SSH ingress CIDRs (comma-separated, or 'open' for 0.0.0.0/0)")
+  .option("--idle-minutes <min>", "Idle shutdown timeout in minutes")
+  .option("--set <key=value>", "Set arbitrary config key", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+  .action((name, opts) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+
+    const config = { ...host.config } as any;
+    if (opts.size) config.size = opts.size;
+    if (opts.arch) config.arch = opts.arch;
+    if (opts.region) config.region = opts.region;
+    if (opts.profile) config.aws_profile = opts.profile;
+    if (opts.subnetId) config.subnet_id = opts.subnetId;
+    if (opts.ingress) {
+      config.ingress_cidrs = opts.ingress === "open"
+        ? ["0.0.0.0/0"]
+        : opts.ingress.split(",").map((s: string) => s.trim());
+    }
+    if (opts.idleMinutes) config.idle_minutes = parseInt(opts.idleMinutes);
+    for (const kv of opts.set) {
+      const [k, ...rest] = kv.split("=");
+      if (k && rest.length) config[k] = rest.join("=");
+    }
+
+    core.updateHost(name, { config });
+    console.log(chalk.green(`Host '${name}' updated`));
+    console.log(JSON.stringify(config, null, 2));
+  });
+
 hostCmd.command("list")
   .description("List all hosts")
   .action(() => {

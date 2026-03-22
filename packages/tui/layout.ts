@@ -46,6 +46,8 @@ export const detailPane = blessed.box({
   scrollable: true,
   alwaysScroll: true,
   scrollbar: { style: { bg: "gray" } },
+  keys: true,
+  mouse: true,
   tags: true,
 });
 
