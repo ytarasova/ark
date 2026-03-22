@@ -31,5 +31,18 @@ export function clearProviders(): void {
   providers.clear();
 }
 
+// Providers
+import { LocalProvider } from "./providers/local/index.js";
+export { LocalProvider };
+
+// Auto-register local provider
+registerProvider(new LocalProvider());
+
+import { EC2Provider } from "./providers/ec2/index.js";
+export { EC2Provider };
+
+// Auto-register EC2 provider
+registerProvider(new EC2Provider());
+
 // arc.json
 export { parseArcJson, resolvePortDecls, hasDevcontainer, hasComposeFile } from "./arc-json.js";
