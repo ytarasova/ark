@@ -30,3 +30,6 @@ export function listProviders(): string[] {
 export function clearProviders(): void {
   providers.clear();
 }
+
+// arc.json
+export { parseArcJson, resolvePortDecls, hasDevcontainer, hasComposeFile } from "./arc-json.js";
