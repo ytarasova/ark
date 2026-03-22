@@ -353,10 +353,11 @@ async function launchAgentTmux(
   let launchContent: string;
   const channelFlags = `--mcp-config ${shellQuote(mcpConfigPath)} --dangerously-load-development-channels server:ark-channel`;
 
+  // Auto-accept trust and channel prompts by piping "yes" through stdin
   if (prevClaudeId) {
-    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\n${claudeCmd} --resume ${shellQuote(prevClaudeId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
+    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\nyes | ${claudeCmd} --resume ${shellQuote(prevClaudeId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
   } else {
-    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\n${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
+    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\nyes | ${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
   }
 
   const launcher = tmux.writeLauncher(session.id, launchContent);
