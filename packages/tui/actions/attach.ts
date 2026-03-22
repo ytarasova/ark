@@ -11,6 +11,10 @@ const TUI_ENTRY = join(import.meta.dir, "..", "index.ts");
 
 function relaunchTui(): void {
   try {
+    // Reset terminal state before re-launching (clears tmux/ssh artifacts)
+    execFileSync("reset", [], { stdio: "inherit" });
+  } catch { /* reset not available */ }
+  try {
     execFileSync(process.execPath, [TUI_ENTRY], { stdio: "inherit" });
   } catch { /* TUI exited */ }
   process.exit(0);
@@ -32,7 +36,7 @@ export function registerAttachActions() {
         return;
       }
 
-      screen.destroy();
+      try { screen.destroy(); } catch { /* ignore Setulc terminfo error */ }
       try {
         execFileSync("tmux", ["attach", "-t", s.session_id], { stdio: "inherit" });
       } catch { /* user detached */ }
@@ -44,7 +48,7 @@ export function registerAttachActions() {
       const ip = (h.config as any)?.ip;
       if (!ip) return;
 
-      screen.destroy();
+      try { screen.destroy(); } catch { /* ignore Setulc terminfo error */ }
       const keyPath = join(homedir(), ".ssh", `ark-${h.name}`);
       try {
         execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`], { stdio: "inherit" });
