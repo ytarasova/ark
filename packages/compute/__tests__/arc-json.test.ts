@@ -84,7 +84,7 @@ describe("resolvePortDecls", () => {
     ]);
   });
 
-  it("deduplicates ports — arc.json wins", () => {
+  it("deduplicates ports - arc.json wins", () => {
     writeFileSync(
       join(tmpDir, "arc.json"),
       JSON.stringify({
@@ -248,7 +248,7 @@ describe("port precedence", () => {
     // 5000 should come from compose (lowest priority)
     expect(result).toContainEqual({ port: 5000, source: "docker-compose" });
 
-    // Ensure no duplicates — exactly 3 entries
+    // Ensure no duplicates - exactly 3 entries
     expect(result).toHaveLength(3);
   });
 });

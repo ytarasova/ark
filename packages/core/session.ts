@@ -1,8 +1,8 @@
 /**
- * Session lifecycle — start, dispatch, advance, stop, resume, clone, handoff, fork/join.
+ * Session lifecycle - start, dispatch, advance, stop, resume, clone, handoff, fork/join.
  *
  * This is the main orchestration module. All session state mutations go through here.
- * Direct interaction with the store is for reads only — writes go through these functions.
+ * Direct interaction with the store is for reads only - writes go through these functions.
  */
 
 import { randomUUID } from "crypto";
@@ -399,7 +399,7 @@ async function launchAgentTmux(
       });
     } catch { /* sync failure shouldn't block launch */ }
 
-    // Docker Compose — start services if compose file exists
+    // Docker Compose - start services if compose file exists
     if (effectiveWorkdir) {
       const { detectComposeFile } = await import("../compute/providers/docker/compose.js");
       const composeFile = detectComposeFile(effectiveWorkdir);
@@ -412,7 +412,7 @@ async function launchAgentTmux(
       }
     }
 
-    // Devcontainer — wrap launch command if devcontainer is detected
+    // Devcontainer - wrap launch command if devcontainer is detected
     if (effectiveWorkdir) {
       const { detectDevcontainer, buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
       const dcPath = detectDevcontainer(effectiveWorkdir);
@@ -434,10 +434,10 @@ async function launchAgentTmux(
     return result;
   }
 
-  // Start tmux with launcher (no shell prompt) — local path
+  // Start tmux with launcher (no shell prompt) - local path
   tmux.createSession(tmuxName, `bash ${launcher}`);
 
-  // Send task via channel HTTP — pure TypeScript, no bash/curl/tmux-send-keys
+  // Send task via channel HTTP - pure TypeScript, no bash/curl/tmux-send-keys
   const channelUrl = `http://localhost:${channelPort}`;
   const taskPayload = { type: "task", task, sessionId: session.id, stage };
 

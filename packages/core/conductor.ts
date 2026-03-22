@@ -2,12 +2,12 @@
  * Conductor: HTTP server that receives channel reports from agents.
  *
  * Routes:
- *   POST /api/channel/:sessionId — receive agent report
- *   POST /api/relay              — relay message between agents
- *   GET  /api/sessions           — list sessions
- *   GET  /api/sessions/:id       — get session detail
- *   GET  /api/events/:id         — get events
- *   GET  /health                 — health check
+ *   POST /api/channel/:sessionId - receive agent report
+ *   POST /api/relay              - relay message between agents
+ *   GET  /api/sessions           - list sessions
+ *   GET  /api/sessions/:id       - get session detail
+ *   GET  /api/events/:id         - get events
+ *   GET  /health                 - health check
  */
 
 // Bun global type declaration (avoids requiring @types/bun as a dependency)
@@ -106,7 +106,7 @@ export function startConductor(port = DEFAULT_PORT): void {
 
   console.log(`Ark conductor listening on localhost:${port}`);
 
-  // Background metrics polling — every 30 seconds
+  // Background metrics polling - every 30 seconds
   setInterval(async () => {
     try {
       const hosts = store.listHosts({ status: "running" });

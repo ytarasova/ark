@@ -34,6 +34,6 @@ export function refresh() {
     state.pipelines = core.listPipelines();
     state.hosts = core.listHosts();
   } catch (e) {
-    // SQLite may be briefly locked by another process — skip this refresh
+    // SQLite may be briefly locked by another process - skip this refresh
   }
 }

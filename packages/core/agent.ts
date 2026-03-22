@@ -1,5 +1,5 @@
 /**
- * Agent registry — load, validate, template, build claude CLI args.
+ * Agent registry - load, validate, template, build claude CLI args.
  *
  * Agent definitions are YAML files with: model, system prompt, tools,
  * MCP servers, skills, memories, context files.
@@ -175,7 +175,7 @@ export function buildClaudeArgs(agent: AgentDefinition, opts?: {
 // ── Channel MCP config ──────────────────────────────────────────────────────
 
 export function channelMcpConfig(sessionId: string, stage: string, channelPort: number): Record<string, unknown> {
-  // Use absolute path to bun — it's not in PATH when Claude spawns MCP servers
+  // Use absolute path to bun - it's not in PATH when Claude spawns MCP servers
   const bunPath = join(homedir(), ".bun", "bin", "bun");
   return {
     command: bunPath,

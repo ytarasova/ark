@@ -1,5 +1,5 @@
 /**
- * Pipeline engine — load YAML definitions, evaluate gates, advance stages.
+ * Pipeline engine - load YAML definitions, evaluate gates, advance stages.
  *
  * Pipelines are declarative YAML: ordered stages with gates (auto/manual/condition).
  * Stages are either agent tasks or built-in actions (create PR, merge, etc.).

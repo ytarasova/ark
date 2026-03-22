@@ -1,5 +1,5 @@
 /**
- * Compute layer — provider registry and public API.
+ * Compute layer - provider registry and public API.
  */
 
 import type { ComputeProvider } from "./types.js";

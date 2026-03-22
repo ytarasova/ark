@@ -31,7 +31,7 @@ dev-session\t0.3%\t2.1%\t/home/ubuntu/Projects/other\tinteractive
 
 describe("EC2 metrics", () => {
   // -----------------------------------------------------------------------
-  // parseSnapshot — full sample
+  // parseSnapshot - full sample
   // -----------------------------------------------------------------------
   describe("parseSnapshot", () => {
     const snap = parseSnapshot(SAMPLE_OUTPUT);
@@ -93,7 +93,7 @@ describe("EC2 metrics", () => {
   });
 
   // -----------------------------------------------------------------------
-  // parseSnapshot — empty / invalid input
+  // parseSnapshot - empty / invalid input
   // -----------------------------------------------------------------------
   describe("empty input", () => {
     it("returns zero-valued snapshot for empty string", () => {

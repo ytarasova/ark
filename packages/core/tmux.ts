@@ -1,8 +1,8 @@
 /**
- * tmux session management — create, attach, capture, send, kill.
+ * tmux session management - create, attach, capture, send, kill.
  *
  * Each agent session runs in a tmux session. This module provides
- * a clean API over tmux CLI commands. No sleeps — uses tmux primitives.
+ * a clean API over tmux CLI commands. No sleeps - uses tmux primitives.
  */
 
 import { execSync, execFileSync, spawn } from "child_process";
@@ -145,7 +145,7 @@ export function writeLauncher(sessionId: string, content: string): string {
 
 /**
  * Wait for a pattern in tmux output, then send text.
- * Runs as a background process — returns immediately.
+ * Runs as a background process - returns immediately.
  * No sleeps in the main thread.
  */
 export function waitAndSend(name: string, pattern: string, text: string): void {

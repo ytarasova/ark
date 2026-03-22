@@ -1,5 +1,5 @@
 /**
- * EC2 cost tracking — pricing tables and AWS Cost Explorer integration.
+ * EC2 cost tracking - pricing tables and AWS Cost Explorer integration.
  */
 
 import {

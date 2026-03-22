@@ -51,7 +51,7 @@ export function buildUserData(opts?: { idleMinutes?: number }): string {
   ].join('\n');
 
   return `#!/bin/bash
-# NOTE: no set -e — flaky installs (rvm, gpg keys) must not kill the script
+# NOTE: no set -e - flaky installs (rvm, gpg keys) must not kill the script
 
 # ── Base packages ────────────────────────────────────────────────────────────
 apt-get update
@@ -83,7 +83,7 @@ echo "deb [arch=\\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/git
 apt-get update
 apt-get install -y gh
 
-# ── Claude Code (native installer — run as ubuntu, not root) ─────────────────
+# ── Claude Code (native installer - run as ubuntu, not root) ─────────────────
 su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
 echo 'export PATH="\\$HOME/.local/bin:\\$PATH"' >> /home/ubuntu/.bashrc
 echo 'export COLORTERM=truecolor' >> /home/ubuntu/.bashrc

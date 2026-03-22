@@ -1,5 +1,5 @@
 /**
- * arc.json parser — reads per-repo config for port declarations, sync files,
+ * arc.json parser - reads per-repo config for port declarations, sync files,
  * and compose/devcontainer flags. Also resolves ports from devcontainer.json
  * and docker-compose.yml.
  */
@@ -38,7 +38,7 @@ export function hasComposeFile(repoDir: string): boolean {
 export function resolvePortDecls(repoDir: string): PortDecl[] {
   const seen = new Map<number, PortDecl>();
 
-  // arc.json ports have highest priority — add first
+  // arc.json ports have highest priority - add first
   const arcJson = parseArcJson(repoDir);
   if (arcJson?.ports) {
     for (const p of arcJson.ports) {

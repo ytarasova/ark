@@ -1,5 +1,5 @@
 /**
- * Devcontainer support — detects, builds, and manages devcontainers for
+ * Devcontainer support - detects, builds, and manages devcontainers for
  * project sessions. Wraps the `devcontainer` CLI.
  */
 
@@ -154,7 +154,7 @@ export function devcontainerMounts(opts: {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Simple shell quoting — wraps value in single quotes with escaping. */
+/** Simple shell quoting - wraps value in single quotes with escaping. */
 function shellQuote(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`;
 }

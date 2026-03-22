@@ -42,7 +42,7 @@ export function sshExec(
   opts?: { timeout?: number },
 ): { stdout: string; stderr: string; exitCode: number } {
   const args = sshBaseArgs(key, ip);
-  // First element is "ssh" — that's the binary, rest are args.
+  // First element is "ssh" - that's the binary, rest are args.
   const [bin, ...rest] = args;
   rest.push(cmd);
 
@@ -94,7 +94,7 @@ export function rsyncPush(key: string, ip: string, local: string, remote: string
   try {
     execFileSync(bin, rest, { encoding: "utf-8", timeout: 300_000, stdio: ["pipe", "pipe", "pipe"] });
   } catch {
-    // best-effort — caller may retry
+    // best-effort - caller may retry
   }
 }
 
@@ -104,7 +104,7 @@ export function rsyncPull(key: string, ip: string, remote: string, local: string
   try {
     execFileSync(bin, rest, { encoding: "utf-8", timeout: 300_000, stdio: ["pipe", "pipe", "pipe"] });
   } catch {
-    // best-effort — caller may retry
+    // best-effort - caller may retry
   }
 }
 

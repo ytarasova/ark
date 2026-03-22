@@ -54,7 +54,7 @@ describe("EC2 environment sync", () => {
   });
 
   // -----------------------------------------------------------------------
-  // syncToHost / syncProjectFiles — type checks
+  // syncToHost / syncProjectFiles - type checks
   // -----------------------------------------------------------------------
   describe("syncToHost", () => {
     it("is a function", () => {

@@ -394,6 +394,17 @@ export function updateHost(name: string, fields: Partial<Host>): Host | null {
   return getHost(name);
 }
 
+/**
+ * Merge keys into a host's config without replacing the whole object.
+ * This is the safe way to update config - avoids read-then-spread races.
+ */
+export function mergeHostConfig(name: string, patch: Record<string, unknown>): Host | null {
+  const host = getHost(name);
+  if (!host) return null;
+  const merged = { ...host.config, ...patch };
+  return updateHost(name, { config: merged });
+}
+
 export function deleteHost(name: string): boolean {
   const db = getDb();
   const result = db.prepare("DELETE FROM hosts WHERE name = ?").run(name);

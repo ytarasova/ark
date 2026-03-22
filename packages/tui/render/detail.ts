@@ -28,7 +28,7 @@ function _renderDetail() {
     lines = renderHostDetail();
     if (!lines) { detailPane.setContent("{gray-fg}← select a host{/gray-fg}"); return; }
   } else if (state.tab === "recipes") {
-    detailPane.setContent("{gray-fg}Recipes — coming soon{/gray-fg}");
+    detailPane.setContent("{gray-fg}Recipes - coming soon{/gray-fg}");
     return;
   }
 

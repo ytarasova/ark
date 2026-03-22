@@ -38,14 +38,12 @@ export function registerHostActions() {
             ]);
 
             core.updateHost(h.name, { status: "running" });
-            addHostLog(h.name, "Provisioning complete — host is running");
+            addHostLog(h.name, "Provisioning complete - host is running");
           } catch (e: any) {
             const errMsg = e.message ?? String(e);
             // Persist error to DB so it survives TUI restart
-            core.updateHost(h.name, {
-              status: "stopped",
-              config: { ...(core.getHost(h.name)?.config ?? {}), last_error: errMsg },
-            });
+            core.updateHost(h.name, { status: "stopped" });
+            core.mergeHostConfig(h.name, { last_error: errMsg });
             addHostLog(h.name, `FAILED: ${errMsg}`);
           }
           renderAll();
@@ -157,12 +155,21 @@ export function registerHostActions() {
     if (state.tab !== "hosts") return;
     const h = state.hosts[state.sel];
     if (!h) return;
-    // Only allow delete on stopped or destroyed hosts — never running or provisioning
-    if (h.status !== "stopped" && h.status !== "destroyed") return;
-    core.deleteHost(h.name);
-    if (state.sel > 0) state.sel--;
-    addHostLog(h.name, "Host deleted");
-    renderAll();
+    // Only allow delete on fully stopped/destroyed hosts
+    if (h.status !== "stopped" && h.status !== "destroyed") {
+      addHostLog(h.name, `Cannot delete: host is ${h.status}`);
+      renderAll();
+      return;
+    }
+    // Require confirmation - show in status bar
+    const { statusBar, screen: scr } = require("../layout.js");
+    statusBar.setContent(`{red-fg} Delete host '${h.name}'? Press x again to confirm, any other key to cancel{/red-fg}`);
+    scr.render();
+    scr.onceKey(["x"], () => {
+      core.deleteHost(h.name);
+      if (state.sel > 0) state.sel--;
+      renderAll();
+    });
   });
 
   screen.key(["n"], () => {

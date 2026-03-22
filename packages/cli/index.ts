@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Ark CLI — autonomous agent ecosystem.
+ * Ark CLI - autonomous agent ecosystem.
  *
  * ark session start --repo . --summary "Add auth" --dispatch
  * ark session list
@@ -19,7 +19,7 @@ import { getProvider } from "../compute/index.js";
 
 const program = new Command()
   .name("ark")
-  .description("Ark — autonomous agent ecosystem, JIRA to production")
+  .description("Ark - autonomous agent ecosystem, JIRA to production")
   .version("0.1.0");
 
 // ── Session commands ────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ session.command("start")
     if (opts.dispatch || opts.attach) {
       const result = await core.dispatch(s.id);
       if (result.ok) {
-        console.log(chalk.green(`Agent dispatched — session: ${result.message}`));
+        console.log(chalk.green(`Agent dispatched - session: ${result.message}`));
         if (opts.attach) {
           const cmd = core.attachCommand(result.message);
           execSync(cmd, { stdio: "inherit" });

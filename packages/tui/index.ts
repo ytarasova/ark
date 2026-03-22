@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Ark TUI — blessed-based dashboard with proper split panes.
+ * Ark TUI - blessed-based dashboard with proper split panes.
  *
  * Layout:
  * ┌─ Tab Bar ──────────────────────────────────────────────────┐

@@ -95,7 +95,7 @@ export function watchClipboard(
       uploadToSession(key, ip, imgPath, remoteDest);
       opts?.onUpload?.(filename);
     } catch {
-      // best-effort — skip this tick
+      // best-effort - skip this tick
     }
   }, intervalMs);
 

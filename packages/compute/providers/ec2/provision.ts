@@ -18,7 +18,7 @@ import type {
 import { ConfigValue } from "@pulumi/pulumi/automation/index.js";
 
 // ---------------------------------------------------------------------------
-// Instance size tiers — maps size label to [x64_type, arm_type]
+// Instance size tiers - maps size label to [x64_type, arm_type]
 // ---------------------------------------------------------------------------
 
 export interface SizeTier {
@@ -44,7 +44,7 @@ const AMI_PATTERNS: Record<string, string> = {
   arm: "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*",
 };
 
-// Ingress CIDRs for private subnet SGs — configure per-host via host.config.ingress_cidrs
+// Ingress CIDRs for private subnet SGs - configure per-host via host.config.ingress_cidrs
 
 // ---------------------------------------------------------------------------
 // resolveInstanceType
@@ -156,7 +156,7 @@ function makePulumiProgram(
       ...(opts.tags ?? {}),
     };
 
-    // Resolve AMI — latest Ubuntu 22.04 for the target architecture
+    // Resolve AMI - latest Ubuntu 22.04 for the target architecture
     const ami = aws.ec2.getAmi({
       mostRecent: true,
       owners: ["099720109477"], // Canonical
@@ -166,7 +166,7 @@ function makePulumiProgram(
       ],
     });
 
-    // Security group — use provided or create one
+    // Security group - use provided or create one
     let sgIds: pulumi.Input<string>[];
 
     if (opts.securityGroupId) {
@@ -206,7 +206,7 @@ function makePulumiProgram(
 
       sgIds = [sg.id];
     } else {
-      // No subnet — use default VPC, allow SSH from anywhere
+      // No subnet - use default VPC, allow SSH from anywhere
       const sg = new aws.ec2.SecurityGroup(`ark-sg-${hostName}`, {
         description: `Ark compute ${hostName} - SSH access`,
         ingress: [
@@ -235,7 +235,7 @@ function makePulumiProgram(
       sgIds = [sg.id];
     }
 
-    // SSH key pair — import public key to EC2
+    // SSH key pair - import public key to EC2
     let resolvedKeyName = opts.keyName;
     if (!resolvedKeyName && opts.sshPublicKeyPath) {
       const { readFileSync } = require("fs");
@@ -263,7 +263,7 @@ function makePulumiProgram(
       tags: instanceTags,
     });
 
-    // Return outputs — use privateIp when in a private subnet, publicIp otherwise
+    // Return outputs - use privateIp when in a private subnet, publicIp otherwise
     return {
       ip: opts.subnetId ? instance.privateIp : instance.publicIp,
       instance_id: instance.id,
@@ -303,7 +303,7 @@ export function ensurePulumi(onLog?: (msg: string) => void): void {
 
   // Auto-install using curl + sh via execFileSync
   const log = onLog ?? (() => {});
-  log("Pulumi CLI not found — installing...");
+  log("Pulumi CLI not found - installing...");
   try {
     // Download installer script, then run it
     execFileSync("bash", ["-c", "curl -fsSL https://get.pulumi.com | sh"], {
@@ -354,7 +354,7 @@ export async function provisionStack(
   // Set AWS region in stack config
   await stack.setConfig("aws:region", { value: region } as ConfigValue);
 
-  // Deploy — pipe Pulumi output to callback
+  // Deploy - pipe Pulumi output to callback
   const log = opts.onOutput ?? console.log;
   const result = await stack.up({
     onOutput: (msg: string) => {

@@ -1,5 +1,5 @@
 /**
- * EC2 compute provider — implements ComputeProvider for AWS EC2 instances.
+ * EC2 compute provider - implements ComputeProvider for AWS EC2 instances.
  *
  * Ties together all EC2 modules: SSH, cloud-init, sync, metrics, ports.
  * Provision/destroy are stubbed until the Pulumi-based provision module lands.
@@ -21,7 +21,7 @@ import type {
   PortStatus,
 } from "../../types.js";
 import type { Host, Session } from "../../../core/store.js";
-import { updateHost } from "../../../core/store.js";
+import { updateHost, mergeHostConfig } from "../../../core/store.js";
 import { sshKeyPath, sshExec, waitForSsh, generateSshKey } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
@@ -63,7 +63,7 @@ export class EC2Provider implements ComputeProvider {
       tags: opts?.tags ?? (host.config as any)?.tags,
       sshKeyPath: privateKeyPath,
       onOutput: (msg) => {
-        // Filter Pulumi output — show resource creation events
+        // Filter Pulumi output - show resource creation events
         if (msg.includes("creating") || msg.includes("created") || msg.includes("updated")) {
           log(`Pulumi: ${msg.slice(0, 120)}`);
         }
@@ -72,10 +72,8 @@ export class EC2Provider implements ComputeProvider {
 
     // Update host with runtime state
     log(`Instance ${result.instance_id} launched (IP: ${result.ip ?? "pending"})`);
-    updateHost(host.name, {
-      status: "running",
-      config: { ...host.config, ...result },
-    });
+    updateHost(host.name, { status: "running" });
+    mergeHostConfig(host.name, result);
 
     // Store hourly rate for cost tracking
     const instanceType = resolveInstanceType(
@@ -84,13 +82,11 @@ export class EC2Provider implements ComputeProvider {
     );
     const rate = hourlyRate(instanceType);
     if (rate > 0) {
-      updateHost(host.name, {
-        config: { ...host.config, ...result, hourlyRate: rate },
-      });
+      mergeHostConfig(host.name, { hourlyRate: rate });
       log(`Cost: $${rate.toFixed(3)}/hr (~$${(rate * 24).toFixed(2)}/day)`);
     }
 
-    // Wait for SSH (async — doesn't block TUI event loop)
+    // Wait for SSH (async - doesn't block TUI event loop)
     if (result.ip) {
       log(`Waiting for SSH... (key: ${privateKeyPath}, host: ${result.ip})`);
       let sshOk = false;
@@ -115,10 +111,8 @@ export class EC2Provider implements ComputeProvider {
       for (let i = 0; i < 60; i++) {
         const { stdout } = sshExec(key, result.ip, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 15_000 });
         if (stdout.trim().includes("provisioning complete")) {
-          log("Cloud-init complete — all packages installed");
-          updateHost(host.name, {
-            config: { ...(require("../../../core/store.js").getHost(host.name)?.config ?? {}), cloud_init_done: true },
-          });
+          log("Cloud-init complete - all packages installed");
+          mergeHostConfig(host.name, { cloud_init_done: true });
           break;
         }
         const { stdout: progress } = sshExec(key, result.ip,
@@ -138,10 +132,8 @@ export class EC2Provider implements ComputeProvider {
       stackName: (host.config as any)?.stack_name,
       awsProfile: (host.config as any)?.aws_profile,
     });
-    updateHost(host.name, {
-      status: "destroyed",
-      config: { ...host.config, instance_id: null, ip: null },
-    });
+    updateHost(host.name, { status: "destroyed" });
+    mergeHostConfig(host.name, { instance_id: null, ip: null });
   }
 
   async start(host: Host): Promise<void> {
@@ -167,7 +159,8 @@ export class EC2Provider implements ComputeProvider {
       await new Promise((r) => setTimeout(r, 5000));
     }
 
-    updateHost(host.name, { status: "running", config: { ...host.config, ip } });
+    updateHost(host.name, { status: "running" });
+    mergeHostConfig(host.name, { ip });
 
     if (ip) {
       const key = sshKeyPath(host.name);
@@ -195,10 +188,8 @@ export class EC2Provider implements ComputeProvider {
       await new Promise((r) => setTimeout(r, 5000));
     }
 
-    updateHost(host.name, {
-      status: "stopped",
-      config: { ...host.config, ip: null },
-    });
+    updateHost(host.name, { status: "stopped" });
+    mergeHostConfig(host.name, { ip: null });
   }
 
   async launch(host: Host, session: Session, opts: LaunchOpts): Promise<string> {

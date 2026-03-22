@@ -4,7 +4,7 @@ import blessed from "neo-blessed";
 
 export const screen = blessed.screen({
   smartCSR: true,
-  title: "Ark — Autonomous Agent Ecosystem",
+  title: "Ark - Autonomous Agent Ecosystem",
   fullUnicode: true,
   terminal: "xterm-256color",
   warnings: false,

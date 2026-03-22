@@ -31,12 +31,12 @@ export function showNewHostForm() {
 
     if (provider === "ec2") {
       const sizeOptions = [
-        "xs  — Extra Small (2 vCPU, 8 GB)",
-        "s   — Small (4 vCPU, 16 GB)",
-        "m   — Medium (8 vCPU, 32 GB)",
-        "l   — Large (16 vCPU, 64 GB)",
-        "xl  — X-Large (32 vCPU, 128 GB)",
-        "xxl — 2X-Large (48 vCPU, 192 GB)",
+        "xs  - Extra Small (2 vCPU, 8 GB)",
+        "s   - Small (4 vCPU, 16 GB)",
+        "m   - Medium (8 vCPU, 32 GB)",
+        "l   - Large (16 vCPU, 64 GB)",
+        "xl  - X-Large (32 vCPU, 128 GB)",
+        "xxl - 2X-Large (48 vCPU, 192 GB)",
         "xxxl— 4X-Large (64 vCPU, 256 GB)",
       ];
       const sizeChoice = await selectOne("Instance Size", sizeOptions, 2);
@@ -48,16 +48,16 @@ export function showNewHostForm() {
       const archVal = arch.startsWith("arm") ? "arm" : "x64";
 
       const regions = [
-        "us-east-1      — N. Virginia",
-        "us-east-2      — Ohio",
-        "us-west-1      — N. California",
-        "us-west-2      — Oregon",
-        "eu-west-1      — Ireland",
-        "eu-west-2      — London",
-        "eu-central-1   — Frankfurt",
-        "ap-south-1     — Mumbai",
-        "ap-southeast-1 — Singapore",
-        "ap-northeast-1 — Tokyo",
+        "us-east-1      - N. Virginia",
+        "us-east-2      - Ohio",
+        "us-west-1      - N. California",
+        "us-west-2      - Oregon",
+        "eu-west-1      - Ireland",
+        "eu-west-2      - London",
+        "eu-central-1   - Frankfurt",
+        "ap-south-1     - Mumbai",
+        "ap-southeast-1 - Singapore",
+        "ap-northeast-1 - Tokyo",
       ];
       const regionChoice = await selectOrType("AWS Region", regions, 0, prompt);
       if (!regionChoice) { prompt.destroy(); renderAll(); return; }

@@ -22,7 +22,7 @@ export function buildTunnelArgs(key: string, ip: string, ports: PortDecl[]): str
 
 /**
  * Spawn a background SSH process with -L for each port.
- * Non-blocking — returns immediately.
+ * Non-blocking - returns immediately.
  */
 export function setupTunnels(key: string, ip: string, ports: PortDecl[]): void {
   if (ports.length === 0) return;

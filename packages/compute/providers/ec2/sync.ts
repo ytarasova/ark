@@ -61,7 +61,7 @@ function syncSshPush(key: string, ip: string): void {
 }
 
 function syncSshPull(_key: string, _ip: string): void {
-  // SSH keys are push-only — we never pull remote keys to local
+  // SSH keys are push-only - we never pull remote keys to local
 }
 
 function syncAwsPush(key: string, ip: string): void {
@@ -101,7 +101,7 @@ function syncGhPush(key: string, ip: string): void {
       sshExec(key, ip, `echo '${token}' | gh auth login --with-token 2>/dev/null`);
     }
   } catch {
-    // gh CLI not installed or not authenticated — skip
+    // gh CLI not installed or not authenticated - skip
   }
 }
 

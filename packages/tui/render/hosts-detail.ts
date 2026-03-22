@@ -22,9 +22,9 @@ export function renderHostDetail(): string[] | null {
   const cloudInitDone = cfg.cloud_init_done === true;
   if (h.status === "running" && h.provider === "ec2") {
     if (cloudInitDone) {
-      lines.push(` {gray-fg}Status{/gray-fg}    {green-fg}{bold}ready{/bold} — fully provisioned{/green-fg}`);
+      lines.push(` {gray-fg}Status{/gray-fg}    {green-fg}{bold}ready{/bold} - fully provisioned{/green-fg}`);
     } else {
-      lines.push(` {gray-fg}Status{/gray-fg}    {yellow-fg}running — cloud-init in progress...{/yellow-fg}`);
+      lines.push(` {gray-fg}Status{/gray-fg}    {yellow-fg}running - cloud-init in progress...{/yellow-fg}`);
     }
   } else {
     lines.push(` {gray-fg}Status{/gray-fg}    {${sc}-fg}${h.status}{/${sc}-fg}`);

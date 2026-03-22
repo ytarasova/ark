@@ -83,7 +83,7 @@ export class DockerProvider implements ComputeProvider {
   }
 
   async probePorts(_host: Host, ports: PortDecl[]): Promise<PortStatus[]> {
-    // Same as local — check if ports are listening
+    // Same as local - check if ports are listening
     return ports.map((decl) => {
       let listening = false;
       try {

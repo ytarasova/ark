@@ -1,5 +1,5 @@
 /**
- * Compute layer types — provider interface and shared models.
+ * Compute layer types - provider interface and shared models.
  */
 
 import type { Host, Session } from "../core/store.js";

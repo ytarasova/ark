@@ -1,5 +1,5 @@
 /**
- * Ark Core — public API.
+ * Ark Core - public API.
  */
 
 // Store (excluding createSession which is wrapped by session.ts)
@@ -7,7 +7,7 @@ export {
   ARK_DIR, DB_PATH, TRACKS_DIR, WORKTREES_DIR,
   getDb, getSession, listSessions, updateSession, deleteSession,
   logEvent, getEvents, getChildren, getGroups, claimSession,
-  createHost, getHost, listHosts, updateHost, deleteHost,
+  createHost, getHost, listHosts, updateHost, mergeHostConfig, deleteHost,
   type Session, type Event, type Host,
 } from "./store.js";
 
