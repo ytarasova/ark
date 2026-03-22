@@ -655,6 +655,34 @@ screen.key(["x"], () => {
 });
 
 screen.key(["n"], () => {
+  // ── selectOne: dropdown list selector ──────────────────────────────
+  const selectOne = (title: string, items: string[], defaultIdx = 0): Promise<string | null> =>
+    new Promise((resolve) => {
+      const list = blessed.list({
+        parent: screen,
+        top: "center", left: "center", width: 50, height: items.length + 4,
+        border: { type: "line" },
+        style: {
+          border: { fg: "cyan" }, bg: "black",
+          selected: { bg: "cyan", fg: "black" },
+          item: { fg: "white" },
+        },
+        label: ` ${title} `,
+        keys: true, vi: true, mouse: true,
+        items,
+      });
+      list.select(defaultIdx);
+      list.focus();
+      list.on("select", (item: any) => {
+        const val = item.getText ? item.getText() : String(item.content ?? items[list.selected ?? 0]);
+        list.destroy();
+        screen.render();
+        resolve(val);
+      });
+      list.key(["escape"], () => { list.destroy(); screen.render(); resolve(null); });
+      screen.render();
+    });
+
   if (tab === "hosts") {
     // Create new host
     const prompt = blessed.prompt({
@@ -675,31 +703,49 @@ screen.key(["n"], () => {
 
     (async () => {
       const name = await ask("Host name:", "");
-      if (!name) return;
+      if (!name) { prompt.destroy(); renderAll(); return; }
 
-      const provider = await ask("Provider (local/ec2/docker):", "ec2");
-      if (provider === null) return;
+      const provider = await selectOne("Provider", ["ec2", "local", "docker"], 0);
+      if (!provider) { prompt.destroy(); renderAll(); return; }
 
-      const size = await ask("Size: xs(2vCPU/8G) s(4/16) m(8/32) l(16/64) xl(32/128):", "m");
-      if (size === null) return;
+      if (provider === "ec2") {
+        const sizeOptions = [
+          "xs  — Extra Small (2 vCPU, 8 GB)",
+          "s   — Small (4 vCPU, 16 GB)",
+          "m   — Medium (8 vCPU, 32 GB)",
+          "l   — Large (16 vCPU, 64 GB)",
+          "xl  — X-Large (32 vCPU, 128 GB)",
+          "xxl — 2X-Large (48 vCPU, 192 GB)",
+          "xxxl— 4X-Large (64 vCPU, 256 GB)",
+        ];
+        const sizeChoice = await selectOne("Instance Size", sizeOptions, 2);
+        if (!sizeChoice) { prompt.destroy(); renderAll(); return; }
+        const size = sizeChoice.split("—")[0].trim().replace(/\s+/g, "");
 
-      const region = await ask("Region:", "us-east-1");
-      if (region === null) return;
+        const arch = await selectOne("Architecture", ["x64 (Intel)", "arm (Graviton)"], 0);
+        if (!arch) { prompt.destroy(); renderAll(); return; }
+        const archVal = arch.startsWith("arm") ? "arm" : "x64";
 
-      const profile = await ask("AWS profile (or empty):", "");
+        const region = await ask("Region:", "us-east-1");
+        if (region === null) { prompt.destroy(); renderAll(); return; }
 
-      try {
-        core.createHost({
-          name,
-          provider: provider || "ec2",
-          config: {
-            size: size || "m",
-            arch: "x64",
-            region: region || "us-east-1",
-            ...(profile ? { aws_profile: profile } : {}),
-          },
-        });
-      } catch { /* duplicate name etc */ }
+        const profile = await ask("AWS profile:", "");
+
+        try {
+          core.createHost({
+            name, provider,
+            config: {
+              size, arch: archVal,
+              region: region || "us-east-1",
+              ...(profile ? { aws_profile: profile } : {}),
+            },
+          });
+        } catch { /* duplicate name etc */ }
+      } else {
+        try {
+          core.createHost({ name, provider, config: {} });
+        } catch { /* duplicate name etc */ }
+      }
 
       prompt.destroy();
       renderAll();
@@ -731,13 +777,21 @@ screen.key(["n"], () => {
 
   (async () => {
     const summary = await ask("Task / summary:", "");
-    if (summary === null) return; // Esc pressed
+    if (summary === null) { prompt.destroy(); renderAll(); return; }
 
     const repoPath = await ask("Repo path:", process.cwd());
-    if (repoPath === null) return;
+    if (repoPath === null) { prompt.destroy(); renderAll(); return; }
 
-    const pipelineName = await ask("Pipeline:", "default");
-    if (pipelineName === null) return;
+    // Host selection
+    const hostChoices = ["local (this machine)", ...core.listHosts().map(h => `${h.name} (${h.provider})`)];
+    const hostChoice = await selectOne("Compute Host", hostChoices, 0);
+    if (!hostChoice) { prompt.destroy(); renderAll(); return; }
+    const computeName = hostChoice.startsWith("local") ? undefined : hostChoice.split(" ")[0];
+
+    // Pipeline selection
+    const pipelineNames = core.listPipelines().map(p => p.name);
+    const pipelineChoice = await selectOne("Pipeline", pipelineNames, 0);
+    if (!pipelineChoice) { prompt.destroy(); renderAll(); return; }
 
     // Create session
     const { existsSync } = require("fs");
@@ -752,7 +806,8 @@ screen.key(["n"], () => {
 
     const s = core.startSession({
       jira_summary: summary || "Ad-hoc task",
-      repo, pipeline: pipelineName || "default", workdir,
+      repo, pipeline: pipelineChoice, workdir,
+      compute_name: computeName,
     });
     core.dispatch(s.id);
 
