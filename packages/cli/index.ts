@@ -331,8 +331,8 @@ hostCmd.command("create")
   .description("Create a new compute host")
   .argument("<name>", "Host name")
   .option("--provider <type>", "Provider type", "local")
-  .option("--size <size>", "Instance size", "m")
-  .option("--arch <arch>", "Architecture", "x64")
+  .option("--size <size>", "Instance size: xs (2vCPU/8GB), s (4/16), m (8/32), l (16/64), xl (32/128), xxl (48/192), xxxl (64/256)", "m")
+  .option("--arch <arch>", "Architecture: x64, arm", "x64")
   .option("--region <region>", "Region", "us-east-1")
   .option("--profile <profile>", "AWS profile")
   .option("--subnet-id <id>", "Subnet ID")
@@ -356,10 +356,18 @@ hostCmd.command("create")
           ...(Object.keys(tags).length ? { tags } : {}),
         },
       });
+      // Show human-readable size label
+      let sizeLabel = opts.size;
+      try {
+        const { INSTANCE_SIZES } = require("../compute/providers/ec2/provision.js");
+        const tier = INSTANCE_SIZES[opts.size];
+        if (tier) sizeLabel = tier.label;
+      } catch { /* not ec2 provider */ }
+
       console.log(chalk.green(`Host '${host.name}' created`));
       console.log(`  Provider: ${host.provider}`);
       console.log(`  Status:   ${host.status}`);
-      console.log(`  Size:     ${opts.size}`);
+      console.log(`  Size:     ${sizeLabel}`);
       console.log(`  Arch:     ${opts.arch}`);
       console.log(`  Region:   ${opts.region}`);
     } catch (e: any) {

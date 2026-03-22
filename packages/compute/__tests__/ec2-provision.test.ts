@@ -13,12 +13,16 @@ describe("INSTANCE_SIZES", () => {
     expect(Object.keys(INSTANCE_SIZES)).toHaveLength(7);
   });
 
-  it("each entry is a [x64, arm] tuple", () => {
+  it("each entry has types, vcpu, memGb, and label", () => {
     for (const [key, value] of Object.entries(INSTANCE_SIZES)) {
-      expect(Array.isArray(value)).toBe(true);
-      expect(value).toHaveLength(2);
-      expect(typeof value[0]).toBe("string");
-      expect(typeof value[1]).toBe("string");
+      expect(Array.isArray(value.types)).toBe(true);
+      expect(value.types).toHaveLength(2);
+      expect(typeof value.types[0]).toBe("string");
+      expect(typeof value.types[1]).toBe("string");
+      expect(typeof value.vcpu).toBe("number");
+      expect(typeof value.memGb).toBe("number");
+      expect(typeof value.label).toBe("string");
+      expect(value.label.length).toBeGreaterThan(0);
     }
   });
 });

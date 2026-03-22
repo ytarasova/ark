@@ -680,7 +680,7 @@ screen.key(["n"], () => {
       const provider = await ask("Provider (local/ec2/docker):", "ec2");
       if (provider === null) return;
 
-      const size = await ask("Size (xs/s/m/l/xl/xxl/xxxl):", "m");
+      const size = await ask("Size: xs(2vCPU/8G) s(4/16) m(8/32) l(16/64) xl(32/128):", "m");
       if (size === null) return;
 
       const region = await ask("Region:", "us-east-1");

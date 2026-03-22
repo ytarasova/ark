@@ -21,14 +21,21 @@ import { ConfigValue } from "@pulumi/pulumi/automation/index.js";
 // Instance size tiers — maps size label to [x64_type, arm_type]
 // ---------------------------------------------------------------------------
 
-export const INSTANCE_SIZES: Record<string, [string, string]> = {
-  xs:   ["m6i.large",    "m6g.large"],      // 2 vCPU,  8 GB
-  s:    ["m6i.xlarge",   "m6g.xlarge"],      // 4 vCPU, 16 GB
-  m:    ["m6i.2xlarge",  "m6g.2xlarge"],     // 8 vCPU, 32 GB
-  l:    ["m6i.4xlarge",  "m6g.4xlarge"],     // 16 vCPU, 64 GB
-  xl:   ["m6i.8xlarge",  "m6g.8xlarge"],     // 32 vCPU, 128 GB
-  xxl:  ["m6i.12xlarge", "m6g.12xlarge"],    // 48 vCPU, 192 GB
-  xxxl: ["m6i.16xlarge", "m6g.16xlarge"],    // 64 vCPU, 256 GB
+export interface SizeTier {
+  types: [string, string];   // [x64, arm]
+  vcpu: number;
+  memGb: number;
+  label: string;             // human-readable
+}
+
+export const INSTANCE_SIZES: Record<string, SizeTier> = {
+  xs:   { types: ["m6i.large",    "m6g.large"],    vcpu: 2,  memGb: 8,   label: "Extra Small (2 vCPU, 8 GB)" },
+  s:    { types: ["m6i.xlarge",   "m6g.xlarge"],   vcpu: 4,  memGb: 16,  label: "Small (4 vCPU, 16 GB)" },
+  m:    { types: ["m6i.2xlarge",  "m6g.2xlarge"],  vcpu: 8,  memGb: 32,  label: "Medium (8 vCPU, 32 GB)" },
+  l:    { types: ["m6i.4xlarge",  "m6g.4xlarge"],  vcpu: 16, memGb: 64,  label: "Large (16 vCPU, 64 GB)" },
+  xl:   { types: ["m6i.8xlarge",  "m6g.8xlarge"],  vcpu: 32, memGb: 128, label: "X-Large (32 vCPU, 128 GB)" },
+  xxl:  { types: ["m6i.12xlarge", "m6g.12xlarge"], vcpu: 48, memGb: 192, label: "2X-Large (48 vCPU, 192 GB)" },
+  xxxl: { types: ["m6i.16xlarge", "m6g.16xlarge"], vcpu: 64, memGb: 256, label: "4X-Large (64 vCPU, 256 GB)" },
 };
 
 // AMI name patterns by architecture
@@ -65,8 +72,8 @@ export function resolveInstanceType(
 ): string {
   if (!size) return fallback;
   if (size in INSTANCE_SIZES) {
-    const [x64Type, armType] = INSTANCE_SIZES[size];
-    return arch === "arm" ? armType : x64Type;
+    const tier = INSTANCE_SIZES[size];
+    return arch === "arm" ? tier.types[1] : tier.types[0];
   }
   return size; // literal instance type passthrough
 }
