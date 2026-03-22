@@ -439,24 +439,20 @@ async function launchAgentTmux(
   // Start tmux with launcher (no shell prompt) - local path
   tmux.createSession(tmuxName, `bash ${launcher}`);
 
-  // Auto-accept trust and channel prompts
-  // Claude shows up to 2 confirmation dialogs (trust + channels)
-  // We watch the tmux pane for the prompt text and send Enter when it appears
+  // Auto-accept the development channels prompt
+  // Trust dialog is pre-accepted via ~/.claude.json (see trustWorktree)
+  // The channels prompt has no CLI bypass - must send Enter via tmux
   (async () => {
-    const prompts = ["Yes, I trust", "I am using this for local"];
-    for (const prompt of prompts) {
-      for (let attempt = 0; attempt < 15; attempt++) {
-        await Bun.sleep(1000);
-        try {
-          const output = tmux.capturePane(tmuxName, { lines: 20 });
-          if (output.includes(prompt)) {
-            tmux.sendKeys(tmuxName, "Enter");
-            break;
-          }
-          // If Claude is already past prompts (shows the welcome screen), stop
-          if (output.includes("Welcome") || output.includes("Claude Code")) break;
-        } catch { break; /* session gone */ }
-      }
+    for (let attempt = 0; attempt < 15; attempt++) {
+      await Bun.sleep(1000);
+      try {
+        const output = tmux.capturePane(tmuxName, { lines: 20 });
+        if (output.includes("I am using this for local")) {
+          tmux.sendKeys(tmuxName, "Enter");
+          break;
+        }
+        if (output.includes("Welcome") || output.includes("Claude Code v")) break;
+      } catch { break; }
     }
   })();
 
@@ -580,6 +576,7 @@ function setupWorktree(repoPath: string, sessionId: string, branch?: string): st
 }
 
 function trustWorktree(originalRepo: string, worktreeDir: string): void {
+  // Symlink Claude project settings (CLAUDE.md, memories, etc.)
   const projectsDir = join(homedir(), ".claude", "projects");
   const encode = (p: string) => resolve(p).replace(/\//g, "-").replace(/\./g, "-");
 
@@ -589,6 +586,23 @@ function trustWorktree(originalRepo: string, worktreeDir: string): void {
   if (existsSync(origProject) && !existsSync(wtProject)) {
     try { symlinkSync(origProject, wtProject); } catch { /* ignore */ }
   }
+
+  // Pre-accept trust dialog by writing to ~/.claude.json
+  const claudeJsonPath = join(homedir(), ".claude.json");
+  try {
+    const claudeJson = existsSync(claudeJsonPath)
+      ? JSON.parse(readFileSync(claudeJsonPath, "utf-8"))
+      : {};
+    if (!claudeJson.projects) claudeJson.projects = {};
+    const resolvedPath = resolve(worktreeDir);
+    if (!claudeJson.projects[resolvedPath]?.hasTrustDialogAccepted) {
+      claudeJson.projects[resolvedPath] = {
+        ...(claudeJson.projects[resolvedPath] ?? {}),
+        hasTrustDialogAccepted: true,
+      };
+      writeFileSync(claudeJsonPath, JSON.stringify(claudeJson, null, 2));
+    }
+  } catch { /* non-fatal */ }
 }
 
 // ── Output ──────────────────────────────────────────────────────────────────
