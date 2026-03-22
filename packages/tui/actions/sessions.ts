@@ -22,7 +22,10 @@ export function registerSessionActions() {
       const s = topLevel[state.sel];
       if (s && (s.status === "ready" || s.status === "blocked")) {
         dispatchInBackground(s.id);
-        renderAll();
+        // Show immediate feedback in status bar
+        const { statusBar } = require("../layout.js");
+        statusBar.setContent(`{yellow-fg} Dispatching ${s.id}...{/yellow-fg}`);
+        screen.render();
       }
     }
   });
