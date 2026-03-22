@@ -60,6 +60,15 @@ export interface Event {
   created_at: string;
 }
 
+export interface Host {
+  name: string;              // unique identifier
+  provider: string;          // "local" | "docker" | "ec2"
+  status: string;            // "stopped" | "running" | "provisioning" | "destroyed"
+  config: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 // ── Database ────────────────────────────────────────────────────────────────
 
 let _db: Database | null = null;
@@ -130,6 +139,18 @@ function initSchema(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_sessions_repo ON sessions(repo);
     CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_name);
+
+    CREATE TABLE IF NOT EXISTS hosts (
+      name TEXT PRIMARY KEY,
+      provider TEXT NOT NULL DEFAULT 'local',
+      status TEXT NOT NULL DEFAULT 'stopped',
+      config TEXT DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_hosts_provider ON hosts(provider);
+    CREATE INDEX IF NOT EXISTS idx_hosts_status ON hosts(status);
   `);
 }
 
@@ -296,6 +317,83 @@ export function getEvents(
   return (db.prepare(sql).all(...params) as any[]).map((r) => ({
     ...r, data: r.data ? JSON.parse(r.data) : null,
   }));
+}
+
+// ── Host CRUD ───────────────────────────────────────────────────────────────
+
+export function createHost(opts: {
+  name: string;
+  provider?: string;
+  config?: Record<string, unknown>;
+}): Host {
+  const db = getDb();
+  const ts = now();
+
+  db.prepare(`
+    INSERT INTO hosts (name, provider, status, config, created_at, updated_at)
+    VALUES (?, ?, 'stopped', ?, ?, ?)
+  `).run(
+    opts.name,
+    opts.provider ?? "local",
+    JSON.stringify(opts.config ?? {}),
+    ts, ts,
+  );
+
+  return getHost(opts.name)!;
+}
+
+export function getHost(name: string): Host | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM hosts WHERE name = ?").get(name) as any;
+  if (!row) return null;
+  return { ...row, config: JSON.parse(row.config ?? "{}") };
+}
+
+export function listHosts(opts?: {
+  provider?: string;
+  status?: string;
+  limit?: number;
+}): Host[] {
+  const db = getDb();
+  let sql = "SELECT * FROM hosts WHERE 1=1";
+  const params: unknown[] = [];
+
+  if (opts?.provider) { sql += " AND provider = ?"; params.push(opts.provider); }
+  if (opts?.status) { sql += " AND status = ?"; params.push(opts.status); }
+
+  sql += " ORDER BY created_at DESC LIMIT ?";
+  params.push(opts?.limit ?? 100);
+
+  return (db.prepare(sql).all(...params) as any[]).map((r) => ({
+    ...r, config: JSON.parse(r.config ?? "{}"),
+  }));
+}
+
+export function updateHost(name: string, fields: Partial<Host>): Host | null {
+  const db = getDb();
+  const updates: string[] = ["updated_at = ?"];
+  const values: unknown[] = [now()];
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (key === "name" || key === "created_at") continue;
+    if (key === "config" && typeof value === "object") {
+      updates.push("config = ?");
+      values.push(JSON.stringify(value));
+    } else {
+      updates.push(`${key} = ?`);
+      values.push(value ?? null);
+    }
+  }
+  values.push(name);
+
+  db.prepare(`UPDATE hosts SET ${updates.join(", ")} WHERE name = ?`).run(...values);
+  return getHost(name);
+}
+
+export function deleteHost(name: string): boolean {
+  const db = getDb();
+  const result = db.prepare("DELETE FROM hosts WHERE name = ?").run(name);
+  return result.changes > 0;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

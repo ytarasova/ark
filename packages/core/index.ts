@@ -7,7 +7,8 @@ export {
   ARK_DIR, DB_PATH, TRACKS_DIR, WORKTREES_DIR,
   getDb, getSession, listSessions, updateSession, deleteSession,
   logEvent, getEvents, getChildren, getGroups, claimSession,
-  type Session, type Event,
+  createHost, getHost, listHosts, updateHost, deleteHost,
+  type Session, type Event, type Host,
 } from "./store.js";
 
 // Session lifecycle (the main API)
