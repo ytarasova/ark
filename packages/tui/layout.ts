@@ -2,11 +2,14 @@
 
 import blessed from "neo-blessed";
 
+// neo-blessed crashes parsing xterm-256color's Setulc terminfo capability on iTerm2.
+// Use "xterm" for blessed's terminfo parsing - colors still work via blessed's internal handling.
+// Child processes (tmux, ssh) inherit the real TERM from the environment.
 export const screen = blessed.screen({
   smartCSR: true,
   title: "Ark - Autonomous Agent Ecosystem",
   fullUnicode: true,
-  terminal: "xterm-256color",
+  terminal: "xterm",
   warnings: false,
   forceUnicode: true,
 });
