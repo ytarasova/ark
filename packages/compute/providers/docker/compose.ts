@@ -7,21 +7,13 @@ import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { execFileSync } from "child_process";
 import { parse as parseYaml } from "yaml";
-
-// ── Compose file names in priority order ────────────────────────────────────
-
-const COMPOSE_CANDIDATES = [
-  "docker-compose.yml",
-  "docker-compose.yaml",
-  "compose.yml",
-  "compose.yaml",
-] as const;
+import { COMPOSE_FILE_NAMES } from "../../arc-json.js";
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /** Returns path to compose file if found, null otherwise. */
 export function detectComposeFile(repoDir: string): string | null {
-  for (const name of COMPOSE_CANDIDATES) {
+  for (const name of COMPOSE_FILE_NAMES) {
     const p = join(repoDir, name);
     if (existsSync(p)) return p;
   }

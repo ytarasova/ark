@@ -29,6 +29,7 @@ import { syncToHost, syncProjectFiles } from "./sync.js";
 import { fetchMetrics } from "./metrics.js";
 import { setupTunnels, probeRemotePorts } from "./ports.js";
 import { hourlyRate } from "./cost.js";
+import { sleep } from "../../util.js";
 
 export class EC2Provider implements ComputeProvider {
   readonly name = "ec2";
@@ -101,7 +102,7 @@ export class EC2Provider implements ComputeProvider {
           : res.stderr?.includes("timed out") ? " (Timed out)"
           : "";
         log(`SSH attempt ${i + 1}/30...${errHint}`);
-        await new Promise(r => setTimeout(r, 5000));
+        await sleep(5000);
       }
       log(sshOk ? "SSH ready" : "SSH failed after 30 attempts");
 
@@ -121,7 +122,7 @@ export class EC2Provider implements ComputeProvider {
         if (line && line !== "waiting...") {
           log(`cloud-init: ${line}`);
         }
-        await new Promise(r => setTimeout(r, 10_000));
+        await sleep(10_000);
       }
     }
   }
@@ -156,7 +157,7 @@ export class EC2Provider implements ComputeProvider {
         ip = inst.PublicIpAddress ?? inst.PrivateIpAddress ?? null;
         break;
       }
-      await new Promise((r) => setTimeout(r, 5000));
+      await sleep(5000);
     }
 
     updateHost(host.name, { status: "running" });
@@ -185,7 +186,7 @@ export class EC2Provider implements ComputeProvider {
       if (desc.Reservations?.[0]?.Instances?.[0]?.State?.Name === "stopped") {
         break;
       }
-      await new Promise((r) => setTimeout(r, 5000));
+      await sleep(5000);
     }
 
     updateHost(host.name, { status: "stopped" });
@@ -201,12 +202,9 @@ export class EC2Provider implements ComputeProvider {
     const remoteDir = `~/.ark/tracks/${session.id}`;
     sshExec(key, ip, `mkdir -p ${remoteDir}`);
 
-    // Write launcher script to remote host
-    sshExec(
-      key,
-      ip,
-      `cat > ${remoteDir}/launch.sh << 'LAUNCHER'\n${opts.launcherContent}\nLAUNCHER`,
-    );
+    // Write launcher script to remote host (base64-encoded to avoid heredoc injection)
+    const encoded = Buffer.from(opts.launcherContent).toString("base64");
+    sshExec(key, ip, `echo '${encoded}' | base64 -d > ${remoteDir}/launch.sh`);
     sshExec(key, ip, `chmod +x ${remoteDir}/launch.sh`);
 
     // Start remote tmux session running the launcher

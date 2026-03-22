@@ -8,6 +8,14 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import type { ArcJson, PortDecl } from "./types.js";
 
+/** Compose file name candidates in priority order (shared with compose.ts). */
+export const COMPOSE_FILE_NAMES = [
+  "docker-compose.yml",
+  "docker-compose.yaml",
+  "compose.yml",
+  "compose.yaml",
+] as const;
+
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /** Reads and parses arc.json from a repo directory. Returns null if missing. */
@@ -113,13 +121,7 @@ function parseComposePorts(repoDir: string): number[] {
 
 /** Returns the path to the first compose file found, or null. */
 function composeFilePath(repoDir: string): string | null {
-  const candidates = [
-    "docker-compose.yml",
-    "docker-compose.yaml",
-    "compose.yml",
-    "compose.yaml",
-  ];
-  for (const name of candidates) {
+  for (const name of COMPOSE_FILE_NAMES) {
     const p = join(repoDir, name);
     if (existsSync(p)) return p;
   }

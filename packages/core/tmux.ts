@@ -5,7 +5,7 @@
  * a clean API over tmux CLI commands. No sleeps - uses tmux primitives.
  */
 
-import { execSync, execFileSync, spawn } from "child_process";
+import { execSync, execFileSync } from "child_process";
 import { existsSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
 import { TRACKS_DIR } from "./store.js";
@@ -143,25 +143,3 @@ export function writeLauncher(sessionId: string, content: string): string {
   return path;
 }
 
-/**
- * Wait for a pattern in tmux output, then send text.
- * Runs as a background process - returns immediately.
- * No sleeps in the main thread.
- */
-export function waitAndSend(name: string, pattern: string, text: string): void {
-  const msgFile = join(TRACKS_DIR, `.task-${Date.now()}.txt`);
-  writeFileSync(msgFile, text);
-
-  // Background bash: poll for pattern, then send via load-buffer
-  spawn("bash", ["-c", [
-    `while true; do`,
-    `  OUTPUT=$(tmux capture-pane -t ${name} -p 2>/dev/null) || exit 1;`,
-    `  echo "$OUTPUT" | grep -qE '${pattern}' && break;`,
-    `  read -t 1 < /dev/null;`,
-    `done;`,
-    `tmux load-buffer -b ark-task "${msgFile}";`,
-    `tmux paste-buffer -b ark-task -t ${name};`,
-    `tmux send-keys -t ${name} Enter;`,
-    `rm -f "${msgFile}"`,
-  ].join(" ")], { stdio: "ignore", detached: true }).unref();
-}
