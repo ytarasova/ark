@@ -439,10 +439,27 @@ function _renderDetail() {
       lines.push("", "{gray-fg} Fetching metrics...{/gray-fg}");
     }
 
-    // Cost estimate for EC2
-    if (h.provider === "ec2" && cfg.hourlyRate) {
-      lines.push("", "{bold}{inverse} Cost {/inverse}{/bold}");
-      lines.push(` {gray-fg}Hourly{/gray-fg}  $${Number(cfg.hourlyRate).toFixed(3)}/hr`);
+    // Port status (from running sessions on this host)
+    const hostSessions = sessions.filter(s => s.compute_name === h.name && s.status === "running");
+    const allPorts: any[] = [];
+    for (const s of hostSessions) {
+      const ports = (s.config as any)?.ports ?? [];
+      allPorts.push(...ports);
+    }
+    if (allPorts.length > 0) {
+      lines.push("", "{bold}{inverse} Ports {/inverse}{/bold}");
+      for (const p of allPorts) {
+        const statusIcon = p.listening ? "{green-fg}●{/green-fg}" : "{red-fg}○{/red-fg}";
+        const name = p.name ? ` (${p.name})` : "";
+        lines.push(` ${statusIcon} :${p.port}${name}  ${p.source}  ${p.listening ? "listening" : "closed"}`);
+      }
+    }
+
+    // Cost estimate
+    const rate = (h.config as any)?.hourlyRate;
+    if (rate) {
+      lines.push("", `{bold}{inverse} Cost {/inverse}{/bold}`);
+      lines.push(` $${rate.toFixed(3)}/hr  ~$${(rate * 24).toFixed(2)}/day`);
     }
   }
 

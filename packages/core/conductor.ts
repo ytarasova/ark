@@ -24,6 +24,7 @@ import * as session from "./session.js";
 import * as pipeline from "./pipeline.js";
 import { eventBus } from "./hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
+import { getProvider } from "../compute/index.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -104,6 +105,35 @@ export function startConductor(port = DEFAULT_PORT): void {
   });
 
   console.log(`Ark conductor listening on localhost:${port}`);
+
+  // Background metrics polling — every 30 seconds
+  setInterval(async () => {
+    try {
+      const hosts = store.listHosts({ status: "running" });
+      for (const host of hosts) {
+        const provider = getProvider(host.provider);
+        if (!provider) continue;
+        try {
+          // Fetch metrics (results are used by TUI which reads from provider directly)
+          await provider.getMetrics(host);
+
+          // Probe ports for running sessions on this host
+          const sessions = store.listSessions({ status: "running" });
+          for (const s of sessions) {
+            if (s.compute_name !== host.name) continue;
+            const ports = (s.config as any)?.ports ?? [];
+            if (ports.length > 0) {
+              const status = await provider.probePorts(host, ports);
+              // Update session config with port status
+              store.updateSession(s.id, {
+                config: { ...s.config, ports: status },
+              });
+            }
+          }
+        } catch { /* host unreachable, skip */ }
+      }
+    } catch { /* ignore polling errors */ }
+  }, 30_000);
 }
 
 function handleReport(sessionId: string, report: OutboundMessage): void {
