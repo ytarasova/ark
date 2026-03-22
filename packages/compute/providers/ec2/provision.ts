@@ -236,7 +236,7 @@ function makePulumiProgram(
     }
 
     // SSH key pair - import public key to EC2
-    let resolvedKeyName = opts.keyName;
+    let resolvedKeyName: any = opts.keyName;
     if (!resolvedKeyName && opts.sshPublicKeyPath) {
       const { readFileSync } = require("fs");
       const pubKey = readFileSync(opts.sshPublicKeyPath, "utf-8").trim();

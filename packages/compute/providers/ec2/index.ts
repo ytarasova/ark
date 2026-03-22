@@ -94,7 +94,7 @@ export class EC2Provider implements ComputeProvider {
     // Update host with runtime state
     log(`Instance ${result.instance_id} launched (IP: ${result.ip ?? "pending"})`);
     updateHost(host.name, { status: "running" });
-    mergeHostConfig(host.name, result);
+    mergeHostConfig(host.name, result as unknown as Record<string, unknown>);
 
     // Store hourly rate for cost tracking
     const instanceType = resolveInstanceType(
