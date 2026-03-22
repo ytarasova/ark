@@ -92,14 +92,22 @@ export class EC2Provider implements ComputeProvider {
 
     // Wait for SSH (async — doesn't block TUI event loop)
     if (result.ip) {
-      log("Waiting for SSH...");
+      log(`Waiting for SSH... (key: ${privateKeyPath}, host: ${result.ip})`);
+      let sshOk = false;
       for (let i = 0; i < 30; i++) {
-        const { exitCode } = sshExec(privateKeyPath, result.ip, "echo ok", { timeout: 10 });
-        if (exitCode === 0) break;
-        log(`SSH attempt ${i + 1}/30...`);
+        const res = sshExec(privateKeyPath, result.ip, "echo ok", { timeout: 10 });
+        if (res.exitCode === 0) {
+          sshOk = true;
+          break;
+        }
+        const errHint = res.stderr?.includes("Permission denied") ? " (Permission denied)"
+          : res.stderr?.includes("Connection refused") ? " (Connection refused)"
+          : res.stderr?.includes("timed out") ? " (Timed out)"
+          : "";
+        log(`SSH attempt ${i + 1}/30...${errHint}`);
         await new Promise(r => setTimeout(r, 5000));
       }
-      log("SSH ready");
+      log(sshOk ? "SSH ready" : "SSH failed after 30 attempts");
 
       // Poll cloud-init status
       log("Waiting for cloud-init to complete...");
