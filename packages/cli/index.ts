@@ -15,6 +15,7 @@ import { resolve, basename } from "path";
 import { existsSync } from "fs";
 import { execSync } from "child_process";
 import * as core from "../core/index.js";
+import { getProvider } from "../compute/index.js";
 
 const program = new Command()
   .name("ark")
@@ -323,6 +324,229 @@ pipe.command("show").description("Show pipeline").argument("<name>").action((nam
     console.log(`  ${i + 1}. ${s.name.padEnd(14)} [${type}:${detail}] gate=${s.gate}${s.optional ? " (optional)" : ""}`);
   }
 });
+
+// ── Host commands ───────────────────────────────────────────────────────────
+
+const hostCmd = program.command("host").description("Manage compute hosts");
+
+hostCmd.command("create")
+  .description("Create a new compute host")
+  .argument("<name>", "Host name")
+  .option("--provider <type>", "Provider type", "local")
+  .option("--size <size>", "Instance size", "m")
+  .option("--arch <arch>", "Architecture", "x64")
+  .option("--region <region>", "Region", "us-east-1")
+  .option("--profile <profile>", "AWS profile")
+  .option("--subnet-id <id>", "Subnet ID")
+  .option("--tag <key=value>", "Tag (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+  .action((name, opts) => {
+    try {
+      const tags: Record<string, string> = {};
+      for (const t of opts.tag) {
+        const [k, ...rest] = t.split("=");
+        if (k && rest.length) tags[k] = rest.join("=");
+      }
+      const host = core.createHost({
+        name,
+        provider: opts.provider,
+        config: {
+          size: opts.size,
+          arch: opts.arch,
+          region: opts.region,
+          ...(opts.profile ? { aws_profile: opts.profile } : {}),
+          ...(opts.subnetId ? { subnet_id: opts.subnetId } : {}),
+          ...(Object.keys(tags).length ? { tags } : {}),
+        },
+      });
+      console.log(chalk.green(`Host '${host.name}' created`));
+      console.log(`  Provider: ${host.provider}`);
+      console.log(`  Status:   ${host.status}`);
+      console.log(`  Size:     ${opts.size}`);
+      console.log(`  Arch:     ${opts.arch}`);
+      console.log(`  Region:   ${opts.region}`);
+    } catch (e: any) {
+      console.log(chalk.red(`Failed to create host: ${e.message}`));
+    }
+  });
+
+hostCmd.command("provision")
+  .description("Provision a host (create infrastructure)")
+  .argument("<name>", "Host name")
+  .action(async (name) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    const provider = getProvider(host.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    try {
+      console.log(chalk.dim(`Provisioning '${name}' via ${host.provider}...`));
+      core.updateHost(name, { status: "provisioning" });
+      await provider.provision(host);
+      core.updateHost(name, { status: "running" });
+      console.log(chalk.green(`Host '${name}' provisioned and running`));
+    } catch (e: any) {
+      core.updateHost(name, { status: "stopped" });
+      console.log(chalk.red(`Provision failed: ${e.message}`));
+    }
+  });
+
+hostCmd.command("start")
+  .description("Start a host")
+  .argument("<name>", "Host name")
+  .action(async (name) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    const provider = getProvider(host.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    try {
+      await provider.start(host);
+      core.updateHost(name, { status: "running" });
+      console.log(chalk.green(`Host '${name}' started`));
+    } catch (e: any) {
+      console.log(chalk.red(`Start failed: ${e.message}`));
+    }
+  });
+
+hostCmd.command("stop")
+  .description("Stop a host")
+  .argument("<name>", "Host name")
+  .action(async (name) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    const provider = getProvider(host.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    try {
+      await provider.stop(host);
+      core.updateHost(name, { status: "stopped" });
+      console.log(chalk.yellow(`Host '${name}' stopped`));
+    } catch (e: any) {
+      console.log(chalk.red(`Stop failed: ${e.message}`));
+    }
+  });
+
+hostCmd.command("destroy")
+  .description("Destroy a host (remove infrastructure)")
+  .argument("<name>", "Host name")
+  .action(async (name) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    const provider = getProvider(host.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    try {
+      await provider.destroy(host);
+      core.updateHost(name, { status: "destroyed" });
+      console.log(chalk.green(`Host '${name}' destroyed`));
+    } catch (e: any) {
+      console.log(chalk.red(`Destroy failed: ${e.message}`));
+    }
+  });
+
+hostCmd.command("list")
+  .description("List all hosts")
+  .action(() => {
+    const hosts = core.listHosts();
+    if (!hosts.length) {
+      console.log(chalk.dim("No hosts. Create one: ark host create <name> --provider local"));
+      return;
+    }
+    console.log(`  ${"NAME".padEnd(20)} ${"PROVIDER".padEnd(10)} ${"STATUS".padEnd(14)} IP`);
+    for (const h of hosts) {
+      const ip = (h.config as any).ip ?? "-";
+      console.log(`  ${h.name.padEnd(20)} ${h.provider.padEnd(10)} ${h.status.padEnd(14)} ${ip}`);
+    }
+  });
+
+hostCmd.command("status")
+  .description("Show host details")
+  .argument("<name>", "Host name")
+  .action(async (name) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    console.log(JSON.stringify(host, null, 2));
+    if (host.status === "running") {
+      const provider = getProvider(host.provider);
+      if (provider) {
+        try {
+          const snap = await provider.getMetrics(host);
+          console.log(chalk.bold("\nMetrics:"));
+          console.log(`  CPU:  ${snap.metrics.cpu.toFixed(1)}%`);
+          console.log(`  MEM:  ${snap.metrics.memUsedGb.toFixed(1)}/${snap.metrics.memTotalGb.toFixed(1)} GB (${snap.metrics.memPct.toFixed(1)}%)`);
+          console.log(`  DISK: ${snap.metrics.diskPct.toFixed(1)}%`);
+        } catch (e: any) {
+          console.log(chalk.dim(`(metrics unavailable: ${e.message})`));
+        }
+      }
+    }
+  });
+
+hostCmd.command("sync")
+  .description("Sync environment to/from host")
+  .argument("<name>", "Host name")
+  .option("--direction <dir>", "Sync direction (push|pull)", "push")
+  .action(async (name, opts) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    const provider = getProvider(host.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    try {
+      console.log(chalk.dim(`Syncing (${opts.direction}) to '${name}'...`));
+      await provider.syncEnvironment(host, { direction: opts.direction });
+      console.log(chalk.green(`Sync complete (${opts.direction})`));
+    } catch (e: any) {
+      console.log(chalk.red(`Sync failed: ${e.message}`));
+    }
+  });
+
+hostCmd.command("metrics")
+  .description("Show host metrics")
+  .argument("<name>", "Host name")
+  .action(async (name) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    const provider = getProvider(host.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    try {
+      const snap = await provider.getMetrics(host);
+      console.log(chalk.bold(`\nHost: ${name}`));
+      console.log(`  CPU:       ${snap.metrics.cpu.toFixed(1)}%`);
+      console.log(`  MEM:       ${snap.metrics.memUsedGb.toFixed(1)}/${snap.metrics.memTotalGb.toFixed(1)} GB (${snap.metrics.memPct.toFixed(1)}%)`);
+      console.log(`  DISK:      ${snap.metrics.diskPct.toFixed(1)}%`);
+      console.log(`  NET:       rx=${snap.metrics.netRxMb.toFixed(1)} MB  tx=${snap.metrics.netTxMb.toFixed(1)} MB`);
+      console.log(`  Uptime:    ${snap.metrics.uptime}`);
+      console.log(`  Sessions:  ${snap.sessions.length}`);
+      console.log(`  Processes: ${snap.processes.length}`);
+    } catch (e: any) {
+      console.log(chalk.red(`Metrics failed: ${e.message}`));
+    }
+  });
+
+hostCmd.command("default")
+  .description("Set default compute host")
+  .argument("<name>", "Host name")
+  .action((name) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    console.log(chalk.green(`Default host set to '${name}' (will be wired in a future release)`));
+  });
+
+hostCmd.command("ssh")
+  .description("SSH into a host")
+  .argument("<name>", "Host name")
+  .action((name) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    const ip = (host.config as any).ip;
+    const keyPath = (host.config as any).key_path;
+    const user = (host.config as any).ssh_user ?? "ubuntu";
+    if (!ip) { console.log(chalk.red(`Host '${name}' has no IP address`)); return; }
+    const sshArgs = [`${user}@${ip}`];
+    if (keyPath) sshArgs.unshift("-i", keyPath);
+    console.log(chalk.dim(`$ ssh ${sshArgs.join(" ")}`));
+    try {
+      require("child_process").execFileSync("ssh", sshArgs, { stdio: "inherit" });
+    } catch (e: any) {
+      console.log(chalk.red(`SSH failed: ${e.message}`));
+    }
+  });
 
 // ── TUI command ─────────────────────────────────────────────────────────────
 
