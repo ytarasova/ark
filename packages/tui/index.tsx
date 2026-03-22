@@ -3,9 +3,13 @@ import React from "react";
 import { render } from "ink";
 import { App } from "./App.js";
 
-// Global error handling
-process.on("unhandledRejection", (err: any) => {
-  // Swallow gracefully - errors are shown in the TUI status bar
+process.on("unhandledRejection", () => {});
+
+// Enter fullscreen alt buffer
+process.stdout.write("\x1b[?1049h\x1b[?25l");
+process.on("exit", () => {
+  process.stdout.write("\x1b[?1049l\x1b[?25h");
 });
 
-render(<App />);
+const { unmount, waitUntilExit } = render(<App />, { patchConsole: false });
+await waitUntilExit();

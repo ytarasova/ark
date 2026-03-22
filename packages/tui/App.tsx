@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput, useStdout } from "ink";
 import { useStore } from "./hooks/useStore.js";
 import { useAsync } from "./hooks/useAsync.js";
 import { TabBar } from "./components/TabBar.js";
@@ -18,6 +18,8 @@ export function App() {
   const asyncState = useAsync();
   const [tab, setTab] = useState<Tab>("sessions");
   const [showForm, setShowForm] = useState<string | null>(null);
+  const { stdout } = useStdout();
+  const termHeight = stdout?.rows ?? 40;
 
   useInput((input, key) => {
     // Don't handle global keys when a form is showing (let form handle Esc)
@@ -43,7 +45,7 @@ export function App() {
   });
 
   return (
-    <Box flexDirection="column" height="100%">
+    <Box flexDirection="column" height={termHeight}>
       <TabBar active={tab} />
 
       {showForm === "session" ? (
