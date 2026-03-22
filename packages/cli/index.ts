@@ -36,13 +36,11 @@ session.command("start")
   .option("-g, --group <name>", "Group name")
   .option("-d, --dispatch", "Auto-dispatch the first stage agent")
   .option("-a, --attach", "Dispatch and attach to the session")
-  .action((jiraKey, opts) => {
-    // resolve imported at top
+  .action(async (jiraKey, opts) => {
     let workdir: string | undefined;
     let repo = opts.repo;
     if (repo) {
       const rp = resolve(repo);
-      // existsSync imported at top
       if (existsSync(rp)) {
         workdir = rp;
         if (repo === "." || repo === "./") repo = basename(rp);
@@ -63,7 +61,7 @@ session.command("start")
     if (workdir) console.log(`  Workdir:  ${workdir}`);
 
     if (opts.dispatch || opts.attach) {
-      const result = core.dispatch(s.id);
+      const result = await core.dispatch(s.id);
       if (result.ok) {
         console.log(chalk.green(`Agent dispatched — session: ${result.message}`));
         if (opts.attach) {
@@ -124,8 +122,8 @@ session.command("show")
 session.command("dispatch")
   .description("Dispatch the agent for the current stage")
   .argument("<id>", "Session ID")
-  .action((id) => {
-    const r = core.dispatch(id);
+  .action(async (id) => {
+    const r = await core.dispatch(id);
     console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
   });
 
@@ -140,8 +138,8 @@ session.command("stop")
 session.command("resume")
   .description("Resume a stopped/paused session")
   .argument("<id>")
-  .action((id) => {
-    const r = core.resume(id);
+  .action(async (id) => {
+    const r = await core.resume(id);
     console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
   });
 
@@ -174,12 +172,12 @@ session.command("pause")
 session.command("attach")
   .description("Attach to a running agent session")
   .argument("<id>")
-  .action((id) => {
+  .action(async (id) => {
     let s = core.getSession(id);
     if (!s) { console.log(chalk.red("Not found")); return; }
     if (!s.session_id) {
       console.log(chalk.yellow("No active session. Dispatching..."));
-      const r = core.dispatch(id);
+      const r = await core.dispatch(id);
       if (!r.ok) { console.log(chalk.red(r.message)); return; }
       s = core.getSession(id)!;
     }
@@ -210,11 +208,11 @@ session.command("clone")
   .argument("<id>")
   .option("-t, --task <text>", "New task description")
   .option("-d, --dispatch", "Auto-dispatch")
-  .action((id, opts) => {
+  .action(async (id, opts) => {
     const r = core.cloneSession(id, opts.task);
     if (r.ok) {
       console.log(chalk.green(`Cloned → ${r.cloneId}`));
-      if (opts.dispatch) core.dispatch(r.cloneId);
+      if (opts.dispatch) await core.dispatch(r.cloneId);
     } else {
       console.log(chalk.red(r.cloneId));
     }
@@ -225,8 +223,8 @@ session.command("handoff")
   .argument("<id>")
   .argument("<agent>")
   .option("-i, --instructions <text>")
-  .action((id, agent, opts) => {
-    const r = core.handoff(id, agent, opts.instructions);
+  .action(async (id, agent, opts) => {
+    const r = await core.handoff(id, agent, opts.instructions);
     console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
   });
 

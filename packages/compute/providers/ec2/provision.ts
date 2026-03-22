@@ -141,7 +141,7 @@ function makePulumiProgram(
     tags?: Record<string, string>;
   },
 ) {
-  return function pulumiProgram() {
+  return async function pulumiProgram() {
     const arch = opts.arch || "x64";
     const amiPattern = AMI_PATTERNS[arch] ?? AMI_PATTERNS["x64"];
 
@@ -247,9 +247,11 @@ function makePulumiProgram(
       tags: instanceTags,
     });
 
-    // Export outputs — use privateIp when in a private subnet, publicIp otherwise
-    pulumi.export("ip", opts.subnetId ? instance.privateIp : instance.publicIp);
-    pulumi.export("instance_id", instance.id);
+    // Return outputs — use privateIp when in a private subnet, publicIp otherwise
+    return {
+      ip: opts.subnetId ? instance.privateIp : instance.publicIp,
+      instance_id: instance.id,
+    };
   };
 }
 
@@ -327,7 +329,7 @@ export async function destroyStack(
   const args: InlineProgramArgs = {
     stackName: sName,
     projectName: "ark-ec2",
-    program: () => {},
+    program: async () => {},
   };
 
   const stack = await LocalWorkspace.selectStack(
