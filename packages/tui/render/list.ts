@@ -26,6 +26,8 @@ export function renderList() {
     }
   } else if (state.tab === "hosts") {
     lines.push(...renderHostsList());
+  } else if (state.tab === "recipes") {
+    lines.push("{gray-fg}  No recipes yet.{/gray-fg}");
   }
 
   listPane.setContent(lines.join("\n"));
