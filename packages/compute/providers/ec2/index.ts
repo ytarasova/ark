@@ -95,7 +95,7 @@ export class EC2Provider implements ComputeProvider {
       log(`Waiting for SSH... (key: ${privateKeyPath}, host: ${result.ip})`);
       let sshOk = false;
       for (let i = 0; i < 30; i++) {
-        const res = sshExec(privateKeyPath, result.ip, "echo ok", { timeout: 10 });
+        const res = sshExec(privateKeyPath, result.ip, "echo ok", { timeout: 15_000 });
         if (res.exitCode === 0) {
           sshOk = true;
           break;
@@ -113,13 +113,13 @@ export class EC2Provider implements ComputeProvider {
       log("Waiting for cloud-init to complete...");
       const key = sshKeyPath(host.name);
       for (let i = 0; i < 60; i++) {
-        const { stdout } = sshExec(key, result.ip, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 10 });
+        const { stdout } = sshExec(key, result.ip, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 15_000 });
         if (stdout.trim().includes("provisioning complete")) {
           log("Cloud-init complete — all packages installed");
           break;
         }
         const { stdout: progress } = sshExec(key, result.ip,
-          "tail -1 /var/log/cloud-init-output.log 2>/dev/null || echo 'waiting...'", { timeout: 10 });
+          "tail -1 /var/log/cloud-init-output.log 2>/dev/null || echo 'waiting...'", { timeout: 15_000 });
         const line = progress.trim().slice(0, 100);
         if (line && line !== "waiting...") {
           log(`cloud-init: ${line}`);
