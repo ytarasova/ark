@@ -27,7 +27,9 @@ export function registerAttachActions() {
       try {
         execFileSync("tmux", ["has-session", "-t", s.session_id], { stdio: "pipe" });
       } catch {
-        // tmux session doesn't exist
+        const { statusBar } = require("../layout.js");
+        statusBar.setContent(`{red-fg} No active tmux session for ${s.id}. Agent may have exited. Try re-dispatching (Enter).{/red-fg}`);
+        screen.render();
         return;
       }
 
