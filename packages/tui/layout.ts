@@ -6,7 +6,7 @@ export const screen = blessed.screen({
   smartCSR: true,
   title: "Ark - Autonomous Agent Ecosystem",
   fullUnicode: true,
-  terminal: "xterm-256color",
+  terminal: "xterm",
   warnings: false,
   forceUnicode: true,
 });
