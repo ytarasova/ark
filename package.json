@@ -33,7 +33,6 @@
     "ink-spinner": "^5.0.0",
     "ink-testing-library": "^4.0.0",
     "ink-text-input": "^6.0.0",
-    "neo-blessed": "^0.2.0",
     "react": "^19.2.4",
     "yaml": "^2.4.0"
   },
