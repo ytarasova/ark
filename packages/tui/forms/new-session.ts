@@ -60,7 +60,7 @@ export function showNewSessionForm() {
       repo, pipeline: pipelineChoice, workdir,
       compute_name: computeName || undefined,
     });
-    core.dispatch(s.id);
+    await core.dispatch(s.id);
 
     prompt.destroy();
     renderAll();
