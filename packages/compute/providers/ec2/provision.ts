@@ -44,15 +44,7 @@ const AMI_PATTERNS: Record<string, string> = {
   arm: "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*",
 };
 
-// VPN/office CIDRs allowed SSH access to ark computes
-const VPN_CIDRS = [
-  "10.10.0.0/23",     // Richmond Office VPN
-  "10.226.100.0/24",  // Remote VPN
-  "10.228.0.0/23",    // Labs VPN
-  "10.98.5.0/24",     // Fortinet VPN
-  "10.62.0.0/16",     // PPSL Zscaler VPN
-  "172.16.1.0/24",    // Zscaler Tunnel (Skymark DR)
-];
+// Ingress CIDRs for private subnet SGs — configure per-host via host.config.ingress_cidrs
 
 // ---------------------------------------------------------------------------
 // resolveInstanceType
@@ -184,7 +176,7 @@ function makePulumiProgram(
       const subnetInfo = aws.ec2.getSubnet({ id: opts.subnetId });
       const vpcInfo = subnetInfo.then((s) => aws.ec2.getVpc({ id: s.vpcId }));
 
-      const allowedCidrs = vpcInfo.then((v) => [v.cidrBlock, ...VPN_CIDRS]);
+      const allowedCidrs = vpcInfo.then((v) => [v.cidrBlock]);
 
       const sg = new aws.ec2.SecurityGroup(`ark-sg-${hostName}`, {
         vpcId: subnetInfo.then((s) => s.vpcId),
