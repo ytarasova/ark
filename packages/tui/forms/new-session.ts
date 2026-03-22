@@ -60,7 +60,12 @@ export function showNewSessionForm() {
       repo, pipeline: pipelineChoice, workdir,
       compute_name: computeName || undefined,
     });
-    core.dispatch(s.id).catch(() => {});
+    const { spawn } = require("child_process");
+    const { join } = require("path");
+    const arkBin = join(import.meta.dir, "..", "..", "..", "ark");
+    spawn("bash", [arkBin, "session", "dispatch", s.id], {
+      detached: true, stdio: "ignore",
+    }).unref();
 
     prompt.destroy();
     renderAll();

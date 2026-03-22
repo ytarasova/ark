@@ -1,8 +1,19 @@
+import { spawn } from "child_process";
+import { join } from "path";
 import * as core from "../../core/index.js";
 import { state } from "../state.js";
 import { screen } from "../layout.js";
 import { renderAll } from "../render/index.js";
 import { showNewSessionForm } from "../forms/new-session.js";
+
+// Dispatch in a detached child process so the TUI never blocks
+function dispatchInBackground(sessionId: string) {
+  const arkBin = join(import.meta.dir, "..", "..", "..", "ark");
+  spawn("bash", [arkBin, "session", "dispatch", sessionId], {
+    detached: true,
+    stdio: "ignore",
+  }).unref();
+}
 
 export function registerSessionActions() {
   screen.key(["enter"], () => {
@@ -10,8 +21,7 @@ export function registerSessionActions() {
       const topLevel = state.sessions.filter((s) => !s.parent_id);
       const s = topLevel[state.sel];
       if (s && (s.status === "ready" || s.status === "blocked")) {
-        // Fire-and-forget: don't await, let refresh cycle show status
-        core.dispatch(s.id).catch(() => {});
+        dispatchInBackground(s.id);
         renderAll();
       }
     }
@@ -44,7 +54,10 @@ export function registerSessionActions() {
       const topLevel = state.sessions.filter((s) => !s.parent_id);
       const s = topLevel[state.sel];
       if (s && ["blocked", "waiting", "failed"].includes(s.status)) {
-        core.resume(s.id).catch(() => {});
+        const arkBin = join(import.meta.dir, "..", "..", "..", "ark");
+        spawn("bash", [arkBin, "session", "resume", s.id], {
+          detached: true, stdio: "ignore",
+        }).unref();
         renderAll();
       }
     }
