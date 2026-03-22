@@ -660,7 +660,7 @@ screen.key(["n"], () => {
     new Promise((resolve) => {
       const list = blessed.list({
         parent: screen,
-        top: "center", left: "center", width: 50, height: items.length + 4,
+        top: "center", left: "center", width: 50, height: Math.min(items.length + 4, 20),
         border: { type: "line" },
         style: {
           border: { fg: "cyan" }, bg: "black",
@@ -669,6 +669,7 @@ screen.key(["n"], () => {
         },
         label: ` ${title} `,
         keys: true, vi: true, mouse: true,
+        scrollable: true,
         items,
       });
       list.select(defaultIdx);
@@ -682,6 +683,53 @@ screen.key(["n"], () => {
       list.key(["escape"], () => { list.destroy(); screen.render(); resolve(null); });
       screen.render();
     });
+
+  // ── selectOrType: dropdown with "Other..." manual input option ────
+  const selectOrType = async (title: string, items: string[], defaultIdx = 0, promptBox?: any): Promise<string | null> => {
+    const allItems = [...items, "── Other (type manually) ──"];
+    const choice = await selectOne(title, allItems, defaultIdx);
+    if (choice === null) return null;
+    if (choice.includes("Other (type manually)")) {
+      if (!promptBox) return null;
+      return new Promise((resolve) => {
+        promptBox.input(`{bold}${title}{/bold}\n\nEnter value:`, "", (err: any, value: any) => {
+          if (err || value === undefined || value === null) resolve(null);
+          else resolve(String(value).trim());
+        });
+      });
+    }
+    return choice;
+  };
+
+  // ── Fun name generator (adjective-noun) ────────────────────────────
+  const generateName = (): string => {
+    const adj = ["swift","bold","calm","dark","epic","fast","grim","hazy","keen","loud",
+      "mild","neat","odd","pure","rare","slim","tall","vast","warm","wild",
+      "blue","gold","iron","jade","ruby","sage","teal","onyx","zinc","moss"];
+    const noun = ["wolf","bear","hawk","lynx","puma","crow","deer","dove","frog","hare",
+      "kite","lark","mole","newt","orca","pike","quil","rook","swan","toad",
+      "vole","wren","yak","ant","bass","crab","dusk","echo","flux","gale"];
+    const a = adj[Math.floor(Math.random() * adj.length)];
+    const n = noun[Math.floor(Math.random() * noun.length)];
+    return `${a}-${n}`;
+  };
+
+  // ── AWS profiles from ~/.aws/config ───────────────────────────────
+  const getAwsProfiles = (): string[] => {
+    try {
+      const { readFileSync } = require("fs");
+      const { join } = require("path");
+      const { homedir } = require("os");
+      const cfg = readFileSync(join(homedir(), ".aws", "config"), "utf-8");
+      const profiles: string[] = [];
+      for (const line of cfg.split("\n")) {
+        const m = line.match(/^\[profile\s+(.+)\]$/);
+        if (m) profiles.push(m[1]);
+        else if (line.match(/^\[default\]$/)) profiles.push("default");
+      }
+      return profiles;
+    } catch { return ["default"]; }
+  };
 
   if (tab === "hosts") {
     // Create new host
@@ -702,7 +750,7 @@ screen.key(["n"], () => {
       });
 
     (async () => {
-      const name = await ask("Host name:", "");
+      const name = await ask("Host name:", generateName());
       if (!name) { prompt.destroy(); renderAll(); return; }
 
       const provider = await selectOne("Provider", ["ec2", "local", "docker"], 0);
@@ -726,10 +774,25 @@ screen.key(["n"], () => {
         if (!arch) { prompt.destroy(); renderAll(); return; }
         const archVal = arch.startsWith("arm") ? "arm" : "x64";
 
-        const region = await ask("Region:", "us-east-1");
-        if (region === null) { prompt.destroy(); renderAll(); return; }
+        const regions = [
+          "us-east-1      — N. Virginia",
+          "us-east-2      — Ohio",
+          "us-west-1      — N. California",
+          "us-west-2      — Oregon",
+          "eu-west-1      — Ireland",
+          "eu-west-2      — London",
+          "eu-central-1   — Frankfurt",
+          "ap-south-1     — Mumbai",
+          "ap-southeast-1 — Singapore",
+          "ap-northeast-1 — Tokyo",
+        ];
+        const regionChoice = await selectOrType("AWS Region", regions, 0, prompt);
+        if (!regionChoice) { prompt.destroy(); renderAll(); return; }
+        const region = regionChoice.split("—")[0].trim().replace(/\s+/g, "");
 
-        const profile = await ask("AWS profile:", "");
+        const awsProfiles = getAwsProfiles();
+        const profileChoice = await selectOrType("AWS Profile", awsProfiles, 0, prompt);
+        if (profileChoice === null) { prompt.destroy(); renderAll(); return; }
 
         try {
           core.createHost({
@@ -737,7 +800,7 @@ screen.key(["n"], () => {
             config: {
               size, arch: archVal,
               region: region || "us-east-1",
-              ...(profile ? { aws_profile: profile } : {}),
+              ...(profileChoice ? { aws_profile: profileChoice } : {}),
             },
           });
         } catch { /* duplicate name etc */ }
