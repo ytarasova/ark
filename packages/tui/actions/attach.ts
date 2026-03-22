@@ -1,5 +1,20 @@
+import { execFileSync } from "child_process";
+import { join } from "path";
+import { homedir } from "os";
 import { state } from "../state.js";
 import { screen } from "../layout.js";
+import { addHostLog } from "../state.js";
+import { renderAll } from "../render/index.js";
+
+// Path to TUI entry point for re-launch after attach
+const TUI_ENTRY = join(import.meta.dir, "..", "index.ts");
+
+function relaunchTui(): void {
+  try {
+    execFileSync(process.execPath, [TUI_ENTRY], { stdio: "inherit" });
+  } catch { /* TUI exited */ }
+  process.exit(0);
+}
 
 export function registerAttachActions() {
   screen.key(["a"], () => {
@@ -8,14 +23,20 @@ export function registerAttachActions() {
       const s = topLevel[state.sel];
       if (!s?.session_id) return;
 
-      screen.destroy();
-      const cp = require("child_process");
+      // Verify tmux session exists before destroying screen
       try {
-        cp.execFileSync("tmux", ["attach", "-t", s.session_id], { stdio: "inherit" });
-      } catch { /* user detached with Ctrl+B D */ }
+        execFileSync("tmux", ["has-session", "-t", s.session_id], { stdio: "pipe" });
+      } catch {
+        // tmux session doesn't exist
+        return;
+      }
 
-      cp.execFileSync(process.execPath, [__filename], { stdio: "inherit" });
-      process.exit(0);
+      screen.destroy();
+      try {
+        execFileSync("tmux", ["attach", "-t", s.session_id], { stdio: "inherit" });
+      } catch { /* user detached */ }
+      relaunchTui();
+
     } else if (state.tab === "hosts") {
       const h = state.hosts[state.sel];
       if (!h || h.status !== "running") return;
@@ -23,14 +44,11 @@ export function registerAttachActions() {
       if (!ip) return;
 
       screen.destroy();
-      const cp = require("child_process");
-      const keyPath = require("path").join(require("os").homedir(), ".ssh", `ark-${h.name}`);
+      const keyPath = join(homedir(), ".ssh", `ark-${h.name}`);
       try {
-        cp.execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`], { stdio: "inherit" });
+        execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`], { stdio: "inherit" });
       } catch { /* user exited */ }
-
-      cp.execFileSync(process.execPath, [__filename], { stdio: "inherit" });
-      process.exit(0);
+      relaunchTui();
     }
   });
 }
