@@ -90,10 +90,15 @@ export class EC2Provider implements ComputeProvider {
       log(`Cost: $${rate.toFixed(3)}/hr (~$${(rate * 24).toFixed(2)}/day)`);
     }
 
-    // Wait for SSH
+    // Wait for SSH (async — doesn't block TUI event loop)
     if (result.ip) {
       log("Waiting for SSH...");
-      waitForSsh(privateKeyPath, result.ip);
+      for (let i = 0; i < 30; i++) {
+        const { exitCode } = sshExec(privateKeyPath, result.ip, "echo ok", { timeout: 10 });
+        if (exitCode === 0) break;
+        log(`SSH attempt ${i + 1}/30...`);
+        await new Promise(r => setTimeout(r, 5000));
+      }
       log("SSH ready");
 
       // Poll cloud-init status
@@ -105,7 +110,6 @@ export class EC2Provider implements ComputeProvider {
           log("Cloud-init complete — all packages installed");
           break;
         }
-        // Show cloud-init progress
         const { stdout: progress } = sshExec(key, result.ip,
           "tail -1 /var/log/cloud-init-output.log 2>/dev/null || echo 'waiting...'", { timeout: 10 });
         const line = progress.trim().slice(0, 100);
