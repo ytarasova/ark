@@ -91,14 +91,15 @@ export function registerHostActions() {
   });
 
   screen.key(["x"], () => {
-    if (state.tab === "hosts") {
-      const h = state.hosts[state.sel];
-      if (!h) return;
-      if (h.status === "running") return; // can't delete running host
-      core.deleteHost(h.name);
-      if (state.sel > 0) state.sel--;
-      renderAll();
-    }
+    if (state.tab !== "hosts") return;
+    const h = state.hosts[state.sel];
+    if (!h) return;
+    // Only allow delete on stopped or destroyed hosts — never running or provisioning
+    if (h.status !== "stopped" && h.status !== "destroyed") return;
+    core.deleteHost(h.name);
+    if (state.sel > 0) state.sel--;
+    addHostLog(h.name, "Host deleted");
+    renderAll();
   });
 
   screen.key(["n"], () => {
