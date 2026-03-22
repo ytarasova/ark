@@ -497,7 +497,7 @@ function renderStatusBar() {
   if (nErr) left += `  {red-fg}✕ ${nErr} errors{/red-fg}`;
 
   const keys = tab === "hosts"
-    ? "j/k:move  Enter:ssh  s:sync  m:metrics  q:quit"
+    ? "j/k:move  n:new  Enter:provision  s:start/stop  S:sync  x:delete  a:ssh  q:quit"
     : tab === "sessions"
     ? "j/k:move  Enter:dispatch  a:attach  c:done  s:stop  r:resume  n:new  x:kill  q:quit"
     : tab === "agents"
@@ -564,6 +564,23 @@ screen.key(["enter"], () => {
       core.dispatch(s.id);
       renderAll();
     }
+  } else if (tab === "hosts") {
+    const h = hosts[sel];
+    if (!h) return;
+    const provider = getProvider(h.provider);
+    if (!provider) return;
+    if (h.status === "stopped" || h.status === "destroyed") {
+      // Provision or start
+      (async () => {
+        try {
+          core.updateHost(h.name, { status: "provisioning" });
+          renderAll();
+          await provider.provision(h);
+          core.updateHost(h.name, { status: "running" });
+        } catch { core.updateHost(h.name, { status: "stopped" }); }
+        renderAll();
+      })();
+    }
   }
 });
 
@@ -586,6 +603,23 @@ screen.key(["s"], () => {
       core.stop(s.id);
       renderAll();
     }
+  } else if (tab === "hosts") {
+    const h = hosts[sel];
+    if (!h) return;
+    const provider = getProvider(h.provider);
+    if (!provider) return;
+    (async () => {
+      try {
+        if (h.status === "running") {
+          await provider.stop(h);
+          core.updateHost(h.name, { status: "stopped" });
+        } else if (h.status === "stopped") {
+          await provider.start(h);
+          core.updateHost(h.name, { status: "running" });
+        }
+      } catch { /* ignore */ }
+      renderAll();
+    })();
   }
 });
 
@@ -610,10 +644,69 @@ screen.key(["x"], () => {
       if (sel > 0) sel--;
       renderAll();
     }
+  } else if (tab === "hosts") {
+    const h = hosts[sel];
+    if (!h) return;
+    if (h.status === "running") return; // can't delete running host
+    core.deleteHost(h.name);
+    if (sel > 0) sel--;
+    renderAll();
   }
 });
 
 screen.key(["n"], () => {
+  if (tab === "hosts") {
+    // Create new host
+    const prompt = blessed.prompt({
+      parent: screen,
+      top: "center", left: "center", width: 70, height: 8,
+      border: { type: "line" },
+      style: { border: { fg: "cyan" }, bg: "black" },
+      tags: true,
+    });
+
+    const ask = (question: string, defaultVal: string): Promise<string | null> =>
+      new Promise((resolve) => {
+        prompt.input(`{bold}New Host{/bold}\n\n${question}`, defaultVal, (err, value) => {
+          if (err || value === undefined || value === null) resolve(null);
+          else resolve(value.trim());
+        });
+      });
+
+    (async () => {
+      const name = await ask("Host name:", "");
+      if (!name) return;
+
+      const provider = await ask("Provider (local/ec2/docker):", "ec2");
+      if (provider === null) return;
+
+      const size = await ask("Size (xs/s/m/l/xl/xxl/xxxl):", "m");
+      if (size === null) return;
+
+      const region = await ask("Region:", "us-east-1");
+      if (region === null) return;
+
+      const profile = await ask("AWS profile (or empty):", "");
+
+      try {
+        core.createHost({
+          name,
+          provider: provider || "ec2",
+          config: {
+            size: size || "m",
+            arch: "x64",
+            region: region || "us-east-1",
+            ...(profile ? { aws_profile: profile } : {}),
+          },
+        });
+      } catch { /* duplicate name etc */ }
+
+      prompt.destroy();
+      renderAll();
+    })();
+    return;
+  }
+
   if (tab !== "sessions") return;
 
   // Sequential prompts using blessed.prompt (reliable value capture)
@@ -669,21 +762,35 @@ screen.key(["n"], () => {
 });
 
 screen.key(["a"], () => {
-  if (tab !== "sessions") return;
-  const topLevel = sessions.filter((s) => !s.parent_id);
-  const s = topLevel[sel];
-  if (!s?.session_id) return;
+  if (tab === "sessions") {
+    const topLevel = sessions.filter((s) => !s.parent_id);
+    const s = topLevel[sel];
+    if (!s?.session_id) return;
 
-  // Destroy blessed screen, attach to tmux, re-exec TUI after detach
-  screen.destroy();
-  const cp = require("child_process");
-  try {
-    cp.execFileSync("tmux", ["attach", "-t", s.session_id], { stdio: "inherit" });
-  } catch { /* user detached with Ctrl+B D */ }
+    screen.destroy();
+    const cp = require("child_process");
+    try {
+      cp.execFileSync("tmux", ["attach", "-t", s.session_id], { stdio: "inherit" });
+    } catch { /* user detached with Ctrl+B D */ }
 
-  // Re-launch TUI after detach
-  cp.execFileSync(process.execPath, [__filename], { stdio: "inherit" });
-  process.exit(0);
+    cp.execFileSync(process.execPath, [__filename], { stdio: "inherit" });
+    process.exit(0);
+  } else if (tab === "hosts") {
+    const h = hosts[sel];
+    if (!h || h.status !== "running") return;
+    const ip = (h.config as any)?.ip;
+    if (!ip) return;
+
+    screen.destroy();
+    const cp = require("child_process");
+    const keyPath = require("path").join(require("os").homedir(), ".ssh", `ark-${h.name}`);
+    try {
+      cp.execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`], { stdio: "inherit" });
+    } catch { /* user exited */ }
+
+    cp.execFileSync(process.execPath, [__filename], { stdio: "inherit" });
+    process.exit(0);
+  }
 });
 
 screen.key(["G"], () => {
