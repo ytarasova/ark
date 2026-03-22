@@ -24,10 +24,11 @@ import type { Host, Session } from "../../../core/store.js";
 import { updateHost } from "../../../core/store.js";
 import { sshKeyPath, sshExec, waitForSsh, generateSshKey } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
-import { provisionStack, destroyStack } from "./provision.js";
+import { provisionStack, destroyStack, resolveInstanceType } from "./provision.js";
 import { syncToHost, syncProjectFiles } from "./sync.js";
 import { fetchMetrics } from "./metrics.js";
 import { setupTunnels, probeRemotePorts } from "./ports.js";
+import { hourlyRate } from "./cost.js";
 
 export class EC2Provider implements ComputeProvider {
   readonly name = "ec2";
@@ -60,6 +61,18 @@ export class EC2Provider implements ComputeProvider {
       status: "running",
       config: { ...host.config, ...result },
     });
+
+    // Store hourly rate for cost tracking
+    const instanceType = resolveInstanceType(
+      opts?.size ?? (host.config as any)?.size ?? "m",
+      opts?.arch ?? (host.config as any)?.arch ?? "x64",
+    );
+    const rate = hourlyRate(instanceType);
+    if (rate > 0) {
+      updateHost(host.name, {
+        config: { ...host.config, ...result, hourlyRate: rate },
+      });
+    }
 
     // Wait for SSH
     if (result.ip) {

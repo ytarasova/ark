@@ -399,6 +399,30 @@ async function launchAgentTmux(
       });
     } catch { /* sync failure shouldn't block launch */ }
 
+    // Docker Compose — start services if compose file exists
+    if (effectiveWorkdir) {
+      const { detectComposeFile } = await import("../compute/providers/docker/compose.js");
+      const composeFile = detectComposeFile(effectiveWorkdir);
+      const arcJson = parseArcJson(effectiveWorkdir);
+      const shouldCompose = arcJson?.compose ?? !!composeFile;
+      if (shouldCompose && host.config?.ip) {
+        const { sshExec, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
+        sshExec(sshKeyPath(host.name), host.config.ip as string,
+          `cd ${effectiveWorkdir} && docker compose up -d`);
+      }
+    }
+
+    // Devcontainer — wrap launch command if devcontainer is detected
+    if (effectiveWorkdir) {
+      const { detectDevcontainer, buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
+      const dcPath = detectDevcontainer(effectiveWorkdir);
+      const arcJson = parseArcJson(effectiveWorkdir);
+      const shouldDevcontainer = arcJson?.devcontainer ?? !!dcPath;
+      if (shouldDevcontainer) {
+        launchContent = buildLaunchCommand(effectiveWorkdir, launchContent);
+      }
+    }
+
     // Launch via provider
     const result = await provider.launch(host, session, {
       tmuxName,
