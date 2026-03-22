@@ -221,7 +221,7 @@ export function listSessions(opts?: {
 }): Session[] {
   const db = getDb();
   let sql = "SELECT * FROM sessions WHERE 1=1";
-  const params: unknown[] = [];
+  const params: any[] = [];
 
   if (opts?.status) { sql += " AND status = ?"; params.push(opts.status); }
   if (opts?.repo) { sql += " AND repo = ?"; params.push(opts.repo); }
@@ -239,7 +239,7 @@ export function listSessions(opts?: {
 export function updateSession(id: string, fields: Partial<Session>): Session | null {
   const db = getDb();
   const updates: string[] = ["updated_at = ?"];
-  const values: unknown[] = [now()];
+  const values: any[] = [now()];
 
   for (const [key, value] of Object.entries(fields)) {
     if (key === "id" || key === "created_at") continue;
@@ -272,7 +272,7 @@ export function claimSession(
 ): boolean {
   const db = getDb();
   const updates: string[] = ["status = ?", "updated_at = ?"];
-  const values: unknown[] = [newStatus, now()];
+  const values: any[] = [newStatus, now()];
 
   if (extraFields) {
     for (const [key, value] of Object.entries(extraFields)) {
@@ -309,7 +309,7 @@ export function getEvents(
 ): Event[] {
   const db = getDb();
   let sql = "SELECT * FROM events WHERE track_id = ?";
-  const params: unknown[] = [trackId];
+  const params: any[] = [trackId];
   if (opts?.type) { sql += " AND type = ?"; params.push(opts.type); }
   sql += " ORDER BY id ASC LIMIT ?";
   params.push(opts?.limit ?? 200);
@@ -356,7 +356,7 @@ export function listHosts(opts?: {
 }): Host[] {
   const db = getDb();
   let sql = "SELECT * FROM hosts WHERE 1=1";
-  const params: unknown[] = [];
+  const params: any[] = [];
 
   if (opts?.provider) { sql += " AND provider = ?"; params.push(opts.provider); }
   if (opts?.status) { sql += " AND status = ?"; params.push(opts.status); }
@@ -372,7 +372,7 @@ export function listHosts(opts?: {
 export function updateHost(name: string, fields: Partial<Host>): Host | null {
   const db = getDb();
   const updates: string[] = ["updated_at = ?"];
-  const values: unknown[] = [now()];
+  const values: any[] = [now()];
 
   for (const [key, value] of Object.entries(fields)) {
     if (key === "name" || key === "created_at") continue;
