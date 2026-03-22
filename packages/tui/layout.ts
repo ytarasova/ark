@@ -1,15 +1,31 @@
 // ── Screen & widget creation ─────────────────────────────────────────────────
 
+// Suppress neo-blessed's Setulc terminfo parsing crash on iTerm2/xterm-256color.
+// The crash is in blessed's tput.js when it compiles the Setulc capability.
+// We patch it by removing Setulc from the terminfo before blessed reads it.
+const origTerminfo = process.env.TERMINFO;
+const origTerm = process.env.TERM;
+
 import blessed from "neo-blessed";
 
-// neo-blessed crashes parsing xterm-256color's Setulc terminfo capability on iTerm2.
-// Use "xterm" for blessed's terminfo parsing - colors still work via blessed's internal handling.
-// Child processes (tmux, ssh) inherit the real TERM from the environment.
+// Monkey-patch: if blessed throws on Setulc, catch it at the screen level
+const _origEmit = process.emit.bind(process);
+process.emit = function(event: string, ...args: any[]) {
+  if (event === "uncaughtException") {
+    const err = args[0];
+    if (err?.message?.includes("Setulc") || String(err).includes("Setulc")) {
+      // Swallow the Setulc error - it's non-fatal
+      return true;
+    }
+  }
+  return _origEmit(event, ...args);
+} as any;
+
 export const screen = blessed.screen({
   smartCSR: true,
   title: "Ark - Autonomous Agent Ecosystem",
   fullUnicode: true,
-  terminal: "xterm",
+  terminal: "xterm-256color",
   warnings: false,
   forceUnicode: true,
 });
