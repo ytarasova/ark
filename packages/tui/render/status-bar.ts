@@ -14,7 +14,7 @@ export function renderStatusBar() {
   if (nErr) left += `  {red-fg}✕ ${nErr} errors{/red-fg}`;
 
   const keys = tab === "hosts"
-    ? "j/k:move  n:new  e:edit  Enter:provision  s:start/stop  S:sync  a:ssh  x:del  PgUp/Dn:scroll  q:quit"
+    ? "j/k:move  C-j/k:scroll  n:new  e:edit  Enter:provision  s:start/stop  a:ssh  x:del  q:quit"
     : tab === "sessions"
     ? "j/k:move  Enter:dispatch  a:attach  c:done  s:stop  r:resume  n:new  x:kill  q:quit"
     : tab === "agents"

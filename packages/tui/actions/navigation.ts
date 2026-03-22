@@ -54,24 +54,13 @@ export function registerNavigation() {
     renderAll();
   });
 
-  // Detail pane scrolling
-  screen.key(["pagedown", "C-d"], () => {
-    detailPane.scroll(10);
-    screen.render();
-  });
-
-  screen.key(["pageup", "C-u"], () => {
-    detailPane.scroll(-10);
-    screen.render();
-  });
-
-  // Shift+j/k for fine scroll
-  screen.key(["S-j"], () => {
+  // Detail pane scrolling: Ctrl+j/k
+  screen.key(["C-j"], () => {
     detailPane.scroll(3);
     screen.render();
   });
 
-  screen.key(["S-k"], () => {
+  screen.key(["C-k"], () => {
     detailPane.scroll(-3);
     screen.render();
   });
