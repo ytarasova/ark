@@ -1,19 +1,8 @@
-import { spawn } from "child_process";
-import { join } from "path";
 import * as core from "../../core/index.js";
 import { state } from "../state.js";
-import { screen } from "../layout.js";
+import { screen, statusBar } from "../layout.js";
 import { renderAll } from "../render/index.js";
 import { showNewSessionForm } from "../forms/new-session.js";
-
-// Dispatch in a detached child process so the TUI never blocks
-function dispatchInBackground(sessionId: string) {
-  const arkBin = join(import.meta.dir, "..", "..", "..", "ark");
-  spawn("bash", [arkBin, "session", "dispatch", sessionId], {
-    detached: true,
-    stdio: "ignore",
-  }).unref();
-}
 
 export function registerSessionActions() {
   screen.key(["enter"], () => {
@@ -21,11 +10,17 @@ export function registerSessionActions() {
       const topLevel = state.sessions.filter((s) => !s.parent_id);
       const s = topLevel[state.sel];
       if (s && (s.status === "ready" || s.status === "blocked")) {
-        dispatchInBackground(s.id);
-        // Show immediate feedback in status bar
-        const { statusBar } = require("../layout.js");
         statusBar.setContent(`{yellow-fg} Dispatching ${s.id}...{/yellow-fg}`);
         screen.render();
+        // Run dispatch async, don't block the event loop
+        setTimeout(async () => {
+          try {
+            await core.dispatch(s.id);
+          } catch (e: any) {
+            statusBar.setContent(`{red-fg} Dispatch failed: ${e.message}{/red-fg}`);
+          }
+          renderAll();
+        }, 0);
       }
     }
   });
@@ -57,11 +52,14 @@ export function registerSessionActions() {
       const topLevel = state.sessions.filter((s) => !s.parent_id);
       const s = topLevel[state.sel];
       if (s && ["blocked", "waiting", "failed"].includes(s.status)) {
-        const arkBin = join(import.meta.dir, "..", "..", "..", "ark");
-        spawn("bash", [arkBin, "session", "resume", s.id], {
-          detached: true, stdio: "ignore",
-        }).unref();
-        renderAll();
+        statusBar.setContent(`{yellow-fg} Resuming ${s.id}...{/yellow-fg}`);
+        screen.render();
+        setTimeout(async () => {
+          try {
+            await core.resume(s.id);
+          } catch {}
+          renderAll();
+        }, 0);
       }
     }
   });
