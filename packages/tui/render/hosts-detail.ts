@@ -1,10 +1,15 @@
 import { state } from "../state.js";
 import { bar } from "../helpers.js";
+import { detailPane, screen } from "../layout.js";
 
 export function renderHostDetail(): string[] | null {
   const { hosts, sel, sessions, hostSnapshots } = state;
   const h = hosts[sel];
   if (!h) return null;
+
+  // Available width inside the detail pane (subtract border + padding)
+  const paneWidth = Math.floor((screen.width as number) * 0.6) - 4;
+  const barWidth = Math.max(20, paneWidth - 30); // space for label + value
 
   const lines: string[] = [];
   const cfg = h.config as Record<string, unknown>;
@@ -20,9 +25,9 @@ export function renderHostDetail(): string[] | null {
   if (snap) {
     const m = snap.metrics;
     lines.push("", "{bold}{inverse} Metrics {/inverse}{/bold}");
-    lines.push(` CPU   ${bar(m.cpu, 30)}  ${m.cpu.toFixed(1)}%`);
-    lines.push(` MEM   ${bar(m.memPct, 30)}  ${m.memUsedGb.toFixed(1)}/${m.memTotalGb.toFixed(1)} GB`);
-    lines.push(` DISK  ${bar(m.diskPct, 30)}  ${m.diskPct.toFixed(1)}%`);
+    lines.push(` CPU   ${bar(m.cpu, barWidth)}  ${m.cpu.toFixed(1)}%`);
+    lines.push(` MEM   ${bar(m.memPct, barWidth)}  ${m.memUsedGb.toFixed(1)}/${m.memTotalGb.toFixed(1)} GB`);
+    lines.push(` DISK  ${bar(m.diskPct, barWidth)}  ${m.diskPct.toFixed(1)}%`);
     lines.push("");
     lines.push(` {gray-fg}Net RX{/gray-fg}  ${m.netRxMb.toFixed(1)} MB   {gray-fg}TX{/gray-fg}  ${m.netTxMb.toFixed(1)} MB`);
     lines.push(` {gray-fg}Uptime{/gray-fg}  ${m.uptime}   {gray-fg}Idle{/gray-fg}  ${m.idleTicks} ticks`);
@@ -39,7 +44,7 @@ export function renderHostDetail(): string[] | null {
       lines.push("", "{bold}{inverse} Processes {/inverse}{/bold}");
       lines.push(` ${"PID".padEnd(8)} ${"CPU".padEnd(6)} ${"MEM".padEnd(6)} ${"Command"}`);
       for (const p of snap.processes.slice(0, 10)) {
-        lines.push(` ${p.pid.padEnd(8)} ${p.cpu.padEnd(6)} ${p.mem.padEnd(6)} ${p.command.slice(0, 40)}`);
+        lines.push(` ${p.pid.padEnd(8)} ${p.cpu.padEnd(6)} ${p.mem.padEnd(6)} ${p.command.slice(0, paneWidth - 24)}`);
       }
     }
 
@@ -47,7 +52,7 @@ export function renderHostDetail(): string[] | null {
       lines.push("", "{bold}{inverse} Docker {/inverse}{/bold}");
       lines.push(` ${"Name".padEnd(18)} ${"CPU".padEnd(8)} ${"MEM".padEnd(10)} ${"Image"}`);
       for (const c of snap.docker) {
-        lines.push(` ${c.name.padEnd(18)} ${c.cpu.padEnd(8)} ${c.memory.padEnd(10)} ${c.image.slice(0, 30)}`);
+        lines.push(` ${c.name.padEnd(18)} ${c.cpu.padEnd(8)} ${c.memory.padEnd(10)} ${c.image.slice(0, paneWidth - 40)}`);
       }
     }
   } else if (h.status === "running") {
