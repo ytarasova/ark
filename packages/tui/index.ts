@@ -27,7 +27,31 @@ import { registerHostActions } from "./actions/hosts.js";
 import { registerAttachActions } from "./actions/attach.js";
 import { startPolling } from "./polling.js";
 import { renderAll } from "./render/index.js";
+import { addHostLog, state } from "./state.js";
+import { statusBar } from "./layout.js";
 
+// ── Global error boundary ───────────────────────────────────────────────────
+process.on("unhandledRejection", (err: any) => {
+  const msg = err?.message ?? String(err);
+  // Log to the current host if on hosts tab
+  if (state.tab === "hosts" && state.hosts[state.sel]) {
+    addHostLog(state.hosts[state.sel].name, `ERROR: ${msg}`);
+  }
+  // Always show in status bar
+  statusBar.setContent(`{red-fg} Error: ${msg.slice(0, 120)}{/red-fg}`);
+  try { renderAll(); } catch { /* don't recurse */ }
+});
+
+process.on("uncaughtException", (err: any) => {
+  const msg = err?.message ?? String(err);
+  if (state.tab === "hosts" && state.hosts[state.sel]) {
+    addHostLog(state.hosts[state.sel].name, `CRASH: ${msg}`);
+  }
+  statusBar.setContent(`{red-fg} Crash: ${msg.slice(0, 120)}{/red-fg}`);
+  try { renderAll(); } catch { /* don't recurse */ }
+});
+
+// ── Initialize ──────────────────────────────────────────────────────────────
 registerNavigation();
 registerSessionActions();
 registerHostActions();

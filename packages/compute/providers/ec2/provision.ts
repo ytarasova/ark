@@ -276,7 +276,7 @@ function makePulumiProgram(
  * Creates or selects a Pulumi stack named "ark-compute-{hostName}", defines
  * the EC2 resources inline, and runs `stack.up()` to deploy.
  */
-function ensurePulumiInstalled(onLog?: (msg: string) => void): void {
+export function ensurePulumi(onLog?: (msg: string) => void): void {
   const { execFileSync } = require("child_process");
   const { existsSync } = require("fs");
   const { join } = require("path");
@@ -318,7 +318,7 @@ export async function provisionStack(
   hostName: string,
   opts: ProvisionStackOpts,
 ): Promise<ProvisionResult> {
-  ensurePulumiInstalled(opts.onOutput);
+  // Note: caller should run ensurePulumi() before calling this
   const arch = opts.arch ?? "x64";
   const region = opts.region ?? "us-east-1";
   const instanceType = resolveInstanceType(opts.size, arch);

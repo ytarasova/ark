@@ -24,7 +24,7 @@ import type { Host, Session } from "../../../core/store.js";
 import { updateHost } from "../../../core/store.js";
 import { sshKeyPath, sshExec, waitForSsh, generateSshKey } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
-import { provisionStack, destroyStack, resolveInstanceType } from "./provision.js";
+import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
 import { syncToHost, syncProjectFiles } from "./sync.js";
 import { fetchMetrics } from "./metrics.js";
 import { setupTunnels, probeRemotePorts } from "./ports.js";
@@ -36,6 +36,9 @@ export class EC2Provider implements ComputeProvider {
   async provision(host: Host, opts?: ProvisionOpts): Promise<void> {
     const log = opts?.onLog ?? (() => {});
     updateHost(host.name, { status: "provisioning" });
+
+    // Ensure Pulumi CLI is available (auto-installs if missing)
+    ensurePulumi(log);
 
     // Generate SSH key pair for this host
     log("Generating SSH key pair...");
