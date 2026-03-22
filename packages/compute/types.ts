@@ -13,6 +13,7 @@ export interface ProvisionOpts {
   size?: string;
   arch?: string;
   tags?: Record<string, string>;
+  onLog?: (msg: string) => void;
 }
 
 export interface LaunchOpts {

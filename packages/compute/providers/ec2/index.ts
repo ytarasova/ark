@@ -34,17 +34,21 @@ export class EC2Provider implements ComputeProvider {
   readonly name = "ec2";
 
   async provision(host: Host, opts?: ProvisionOpts): Promise<void> {
+    const log = opts?.onLog ?? (() => {});
     updateHost(host.name, { status: "provisioning" });
 
     // Generate SSH key pair for this host
+    log("Generating SSH key pair...");
     const { privateKeyPath } = generateSshKey(host.name);
 
     // Build cloud-init user data
+    log("Building cloud-init script...");
     const userData = buildUserData({
       idleMinutes: (host.config as any)?.idle_minutes ?? 60,
     });
 
     // Provision via Pulumi
+    log("Creating Pulumi stack...");
     const result = await provisionStack(host.name, {
       size: opts?.size ?? (host.config as any)?.size ?? "m",
       arch: opts?.arch ?? (host.config as any)?.arch ?? "x64",
@@ -54,9 +58,16 @@ export class EC2Provider implements ComputeProvider {
       userData,
       tags: opts?.tags ?? (host.config as any)?.tags,
       sshKeyPath: privateKeyPath,
+      onOutput: (msg) => {
+        // Filter Pulumi output — show resource creation events
+        if (msg.includes("creating") || msg.includes("created") || msg.includes("updated")) {
+          log(`Pulumi: ${msg.slice(0, 120)}`);
+        }
+      },
     });
 
     // Update host with runtime state
+    log(`Instance ${result.instance_id} launched (IP: ${result.ip ?? "pending"})`);
     updateHost(host.name, {
       status: "running",
       config: { ...host.config, ...result },
@@ -72,11 +83,33 @@ export class EC2Provider implements ComputeProvider {
       updateHost(host.name, {
         config: { ...host.config, ...result, hourlyRate: rate },
       });
+      log(`Cost: $${rate.toFixed(3)}/hr (~$${(rate * 24).toFixed(2)}/day)`);
     }
 
     // Wait for SSH
     if (result.ip) {
+      log("Waiting for SSH...");
       waitForSsh(privateKeyPath, result.ip);
+      log("SSH ready");
+
+      // Poll cloud-init status
+      log("Waiting for cloud-init to complete...");
+      const key = sshKeyPath(host.name);
+      for (let i = 0; i < 60; i++) {
+        const { stdout } = sshExec(key, result.ip, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 10 });
+        if (stdout.trim().includes("provisioning complete")) {
+          log("Cloud-init complete — all packages installed");
+          break;
+        }
+        // Show cloud-init progress
+        const { stdout: progress } = sshExec(key, result.ip,
+          "tail -1 /var/log/cloud-init-output.log 2>/dev/null || echo 'waiting...'", { timeout: 10 });
+        const line = progress.trim().slice(0, 100);
+        if (line && line !== "waiting...") {
+          log(`cloud-init: ${line}`);
+        }
+        await new Promise(r => setTimeout(r, 10_000));
+      }
     }
   }
 

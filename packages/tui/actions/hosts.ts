@@ -22,16 +22,12 @@ export function registerHostActions() {
             addHostLog(h.name, `Provider: ${h.provider}, size: ${(h.config as any)?.size ?? "default"}`);
             renderAll();
 
-            addHostLog(h.name, "Generating SSH key pair...");
-            renderAll();
-
-            addHostLog(h.name, "Creating Pulumi stack...");
-            renderAll();
-
-            await provider.provision(h);
-
-            addHostLog(h.name, "Instance launched, waiting for SSH...");
-            renderAll();
+            await provider.provision(h, {
+              onLog: (msg: string) => {
+                addHostLog(h.name, msg);
+                renderAll();
+              },
+            });
 
             core.updateHost(h.name, { status: "running" });
             addHostLog(h.name, "Provisioning complete — host is running");

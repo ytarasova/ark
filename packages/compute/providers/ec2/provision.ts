@@ -100,6 +100,7 @@ export interface ProvisionStackOpts {
   tags?: Record<string, string>;
   keyName?: string;
   sshKeyPath?: string;
+  onOutput?: (msg: string) => void;
 }
 
 export interface DestroyStackOpts {
@@ -305,8 +306,14 @@ export async function provisionStack(
   // Set AWS region in stack config
   await stack.setConfig("aws:region", { value: region } as ConfigValue);
 
-  // Deploy
-  const result = await stack.up({ onOutput: console.log });
+  // Deploy — pipe Pulumi output to callback
+  const log = opts.onOutput ?? console.log;
+  const result = await stack.up({
+    onOutput: (msg: string) => {
+      const line = msg.trim();
+      if (line) log(line);
+    },
+  });
 
   const ip = result.outputs["ip"]?.value as string | undefined ?? null;
   const instanceId = (result.outputs["instance_id"]?.value as string) ?? "";
