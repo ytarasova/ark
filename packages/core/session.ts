@@ -355,11 +355,10 @@ async function launchAgentTmux(
   let launchContent: string;
   const channelFlags = `--mcp-config ${shellQuote(mcpConfigPath)} --dangerously-load-development-channels server:ark-channel`;
 
-  // Auto-accept trust and channel prompts by piping "yes" through stdin
   if (prevClaudeId) {
-    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\nyes | ${claudeCmd} --resume ${shellQuote(prevClaudeId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
+    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\n${claudeCmd} --resume ${shellQuote(prevClaudeId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
   } else {
-    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\nyes | ${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
+    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\n${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
   }
 
   const launcher = tmux.writeLauncher(session.id, launchContent);
@@ -439,6 +438,27 @@ async function launchAgentTmux(
 
   // Start tmux with launcher (no shell prompt) - local path
   tmux.createSession(tmuxName, `bash ${launcher}`);
+
+  // Auto-accept trust and channel prompts
+  // Claude shows up to 2 confirmation dialogs (trust + channels)
+  // We watch the tmux pane for the prompt text and send Enter when it appears
+  (async () => {
+    const prompts = ["Yes, I trust", "I am using this for local"];
+    for (const prompt of prompts) {
+      for (let attempt = 0; attempt < 15; attempt++) {
+        await Bun.sleep(1000);
+        try {
+          const output = tmux.capturePane(tmuxName, { lines: 20 });
+          if (output.includes(prompt)) {
+            tmux.sendKeys(tmuxName, "Enter");
+            break;
+          }
+          // If Claude is already past prompts (shows the welcome screen), stop
+          if (output.includes("Welcome") || output.includes("Claude Code")) break;
+        } catch { break; /* session gone */ }
+      }
+    }
+  })();
 
   // Send task via channel HTTP - pure TypeScript, no bash/curl/tmux-send-keys
   const channelUrl = `http://localhost:${channelPort}`;
