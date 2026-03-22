@@ -100,12 +100,14 @@ export interface ProvisionStackOpts {
   tags?: Record<string, string>;
   keyName?: string;
   sshKeyPath?: string;
+  awsProfile?: string;
   onOutput?: (msg: string) => void;
 }
 
 export interface DestroyStackOpts {
   region?: string;
   stackName?: string;
+  awsProfile?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +118,7 @@ function stackName(hostName: string): string {
   return `ark-compute-${hostName}`;
 }
 
-function workspaceOpts(region: string): LocalWorkspaceOptions {
+function workspaceOpts(region: string, awsProfile?: string): LocalWorkspaceOptions {
   const stateDir = path.join(homedir(), ".ark", "pulumi");
   mkdirSync(stateDir, { recursive: true });
 
@@ -124,6 +126,7 @@ function workspaceOpts(region: string): LocalWorkspaceOptions {
     envVars: {
       PULUMI_CONFIG_PASSPHRASE: "",
       AWS_DEFAULT_REGION: region,
+      ...(awsProfile ? { AWS_PROFILE: awsProfile } : {}),
     },
     projectSettings: {
       name: "ark-ec2",
@@ -300,7 +303,7 @@ export async function provisionStack(
 
   const stack = await LocalWorkspace.createOrSelectStack(
     args,
-    workspaceOpts(region),
+    workspaceOpts(region, opts.awsProfile),
   );
 
   // Set AWS region in stack config
@@ -348,7 +351,7 @@ export async function destroyStack(
 
   const stack = await LocalWorkspace.selectStack(
     args,
-    workspaceOpts(region),
+    workspaceOpts(region, opts?.awsProfile),
   );
 
   await stack.destroy({ onOutput: console.log });

@@ -55,6 +55,7 @@ export class EC2Provider implements ComputeProvider {
       region: (host.config as any)?.region ?? "us-east-1",
       subnetId: (host.config as any)?.subnet_id,
       securityGroupId: (host.config as any)?.sg_id,
+      awsProfile: (host.config as any)?.aws_profile,
       userData,
       tags: opts?.tags ?? (host.config as any)?.tags,
       sshKeyPath: privateKeyPath,
@@ -117,6 +118,7 @@ export class EC2Provider implements ComputeProvider {
     await destroyStack(host.name, {
       region: (host.config as any)?.region ?? "us-east-1",
       stackName: (host.config as any)?.stack_name,
+      awsProfile: (host.config as any)?.aws_profile,
     });
     updateHost(host.name, {
       status: "destroyed",
