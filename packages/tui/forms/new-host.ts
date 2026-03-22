@@ -41,7 +41,7 @@ export function showNewHostForm() {
       ];
       const sizeChoice = await selectOne("Instance Size", sizeOptions, 2);
       if (!sizeChoice) { prompt.destroy(); renderAll(); return; }
-      const size = sizeChoice.split("—")[0].trim().replace(/\s+/g, "");
+      const size = sizeChoice.split(/\s+-\s/)[0].trim();
 
       const arch = await selectOne("Architecture", ["x64 (Intel)", "arm (Graviton)"], 0);
       if (!arch) { prompt.destroy(); renderAll(); return; }
@@ -61,7 +61,7 @@ export function showNewHostForm() {
       ];
       const regionChoice = await selectOrType("AWS Region", regions, 0, prompt);
       if (!regionChoice) { prompt.destroy(); renderAll(); return; }
-      const region = regionChoice.split("—")[0].trim().replace(/\s+/g, "");
+      const region = regionChoice.split(/\s+-\s/)[0].trim();
 
       const awsProfiles = getAwsProfiles();
       const profileChoice = await selectOrType("AWS Profile", awsProfiles, 0, prompt);
