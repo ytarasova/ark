@@ -20,6 +20,7 @@ export function renderHostDetail(): string[] | null {
     : h.status === "destroyed" ? "red" : "gray";
   lines.push(` {gray-fg}Status{/gray-fg}    {${sc}-fg}${h.status}{/${sc}-fg}`);
   if (cfg.ip) lines.push(` {gray-fg}IP{/gray-fg}        ${cfg.ip}`);
+  if (cfg.last_error) lines.push("", ` {red-fg}{bold}Error:{/bold} ${String(cfg.last_error).slice(0, paneWidth - 10)}{/red-fg}`);
 
   const snap = hostSnapshots.get(h.name);
   if (snap) {

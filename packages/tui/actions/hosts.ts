@@ -22,18 +22,31 @@ export function registerHostActions() {
             addHostLog(h.name, `Provider: ${h.provider}, size: ${(h.config as any)?.size ?? "default"}`);
             renderAll();
 
-            await provider.provision(h, {
-              onLog: (msg: string) => {
-                addHostLog(h.name, msg);
-                renderAll();
-              },
-            });
+            // Provision with 10-minute timeout
+            const timeout = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("Provisioning timed out after 10 minutes")), 600_000)
+            );
+
+            await Promise.race([
+              provider.provision(h, {
+                onLog: (msg: string) => {
+                  addHostLog(h.name, msg);
+                  renderAll();
+                },
+              }),
+              timeout,
+            ]);
 
             core.updateHost(h.name, { status: "running" });
             addHostLog(h.name, "Provisioning complete — host is running");
           } catch (e: any) {
-            core.updateHost(h.name, { status: "stopped" });
-            addHostLog(h.name, `Provisioning failed: ${e.message ?? e}`);
+            const errMsg = e.message ?? String(e);
+            // Persist error to DB so it survives TUI restart
+            core.updateHost(h.name, {
+              status: "stopped",
+              config: { ...(core.getHost(h.name)?.config ?? {}), last_error: errMsg },
+            });
+            addHostLog(h.name, `FAILED: ${errMsg}`);
           }
           renderAll();
         })();
