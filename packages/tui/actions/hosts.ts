@@ -1,4 +1,3 @@
-import blessed from "neo-blessed";
 import * as core from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
 import { state, addHostLog, selectedHost } from "../state.js";

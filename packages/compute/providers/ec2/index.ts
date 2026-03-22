@@ -55,6 +55,7 @@ export class EC2Provider implements ComputeProvider {
 
   async provision(host: Host, opts?: ProvisionOpts): Promise<void> {
     const log = opts?.onLog ?? (() => {});
+    const cfg = host.config as EC2HostConfig;
     updateHost(host.name, { status: "provisioning" });
 
     // Ensure Pulumi CLI is available (auto-installs if missing)
@@ -67,20 +68,20 @@ export class EC2Provider implements ComputeProvider {
     // Build cloud-init user data
     log("Building cloud-init script...");
     const userData = buildUserData({
-      idleMinutes: (host.config as any)?.idle_minutes ?? 60,
+      idleMinutes: cfg.idle_minutes ?? 60,
     });
 
     // Provision via Pulumi
     log("Creating Pulumi stack...");
     const result = await provisionStack(host.name, {
-      size: opts?.size ?? (host.config as any)?.size ?? "m",
-      arch: opts?.arch ?? (host.config as any)?.arch ?? "x64",
-      region: (host.config as any)?.region ?? "us-east-1",
-      subnetId: (host.config as any)?.subnet_id,
-      securityGroupId: (host.config as any)?.sg_id,
-      awsProfile: (host.config as any)?.aws_profile,
+      size: opts?.size ?? cfg.size ?? "m",
+      arch: opts?.arch ?? cfg.arch ?? "x64",
+      region: cfg.region ?? "us-east-1",
+      subnetId: cfg.subnet_id,
+      securityGroupId: cfg.sg_id,
+      awsProfile: cfg.aws_profile,
       userData,
-      tags: opts?.tags ?? (host.config as any)?.tags,
+      tags: opts?.tags ?? cfg.tags,
       sshKeyPath: privateKeyPath,
       onOutput: (msg) => {
         // Filter Pulumi output - show resource creation events
@@ -97,8 +98,8 @@ export class EC2Provider implements ComputeProvider {
 
     // Store hourly rate for cost tracking
     const instanceType = resolveInstanceType(
-      opts?.size ?? (host.config as any)?.size ?? "m",
-      opts?.arch ?? (host.config as any)?.arch ?? "x64",
+      opts?.size ?? cfg.size ?? "m",
+      opts?.arch ?? cfg.arch ?? "x64",
     );
     const rate = hourlyRate(instanceType);
     if (rate > 0) {
@@ -147,21 +148,23 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async destroy(host: Host): Promise<void> {
+    const cfg = host.config as EC2HostConfig;
     await destroyStack(host.name, {
-      region: (host.config as any)?.region ?? "us-east-1",
-      stackName: (host.config as any)?.stack_name,
-      awsProfile: (host.config as any)?.aws_profile,
+      region: cfg.region ?? "us-east-1",
+      stackName: cfg.stack_name,
+      awsProfile: cfg.aws_profile,
     });
     updateHost(host.name, { status: "destroyed" });
     mergeHostConfig(host.name, { instance_id: null, ip: null });
   }
 
   async start(host: Host): Promise<void> {
-    const instanceId = (host.config as any)?.instance_id;
+    const cfg = host.config as EC2HostConfig;
+    const instanceId = cfg.instance_id;
     if (!instanceId) throw new Error(`Host '${host.name}' has no instance_id`);
 
     const ec2 = new EC2Client({
-      region: (host.config as any)?.region ?? "us-east-1",
+      region: cfg.region ?? "us-east-1",
     });
     await ec2.send(new StartInstancesCommand({ InstanceIds: [instanceId] }));
 
@@ -189,11 +192,12 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async stop(host: Host): Promise<void> {
-    const instanceId = (host.config as any)?.instance_id;
+    const cfg = host.config as EC2HostConfig;
+    const instanceId = cfg.instance_id;
     if (!instanceId) throw new Error(`Host '${host.name}' has no instance_id`);
 
     const ec2 = new EC2Client({
-      region: (host.config as any)?.region ?? "us-east-1",
+      region: cfg.region ?? "us-east-1",
     });
     await ec2.send(new StopInstancesCommand({ InstanceIds: [instanceId] }));
 
@@ -213,7 +217,8 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async launch(host: Host, session: Session, opts: LaunchOpts): Promise<string> {
-    const ip = (host.config as any)?.ip;
+    const cfg = host.config as EC2HostConfig;
+    const ip = cfg.ip;
     if (!ip) throw new Error(`Host '${host.name}' has no IP`);
     const key = sshKeyPath(host.name);
 
@@ -242,7 +247,8 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async attach(host: Host, session: Session): Promise<void> {
-    const ip = (host.config as any)?.ip;
+    const cfg = host.config as EC2HostConfig;
+    const ip = cfg.ip;
     if (!ip) return;
     const key = sshKeyPath(host.name);
 
@@ -254,19 +260,22 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async getMetrics(host: Host): Promise<HostSnapshot> {
-    const ip = (host.config as any)?.ip;
+    const cfg = host.config as EC2HostConfig;
+    const ip = cfg.ip;
     if (!ip) throw new Error(`Host '${host.name}' has no IP`);
     return fetchMetrics(sshKeyPath(host.name), ip);
   }
 
   async probePorts(host: Host, ports: PortDecl[]): Promise<PortStatus[]> {
-    const ip = (host.config as any)?.ip;
+    const cfg = host.config as EC2HostConfig;
+    const ip = cfg.ip;
     if (!ip) return ports.map((p) => ({ ...p, listening: false }));
     return probeRemotePorts(sshKeyPath(host.name), ip, ports);
   }
 
   async syncEnvironment(host: Host, opts: SyncOpts): Promise<void> {
-    const ip = (host.config as any)?.ip;
+    const cfg = host.config as EC2HostConfig;
+    const ip = cfg.ip;
     if (!ip) throw new Error(`Host '${host.name}' has no IP`);
     const key = sshKeyPath(host.name);
 
