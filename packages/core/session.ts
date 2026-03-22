@@ -12,9 +12,12 @@ import { execFileSync } from "child_process";
 import { homedir } from "os";
 
 import * as store from "./store.js";
+import { getHost } from "./store.js";
 import * as tmux from "./tmux.js";
 import * as pipeline from "./pipeline.js";
 import * as agentRegistry from "./agent.js";
+import { getProvider } from "../compute/index.js";
+import { resolvePortDecls, parseArcJson } from "../compute/arc-json.js";
 
 // ── Session lifecycle ───────────────────────────────────────────────────────
 
@@ -43,7 +46,7 @@ export function startSession(opts: {
   return store.getSession(session.id)!;
 }
 
-export function dispatch(sessionId: string): { ok: boolean; message: string } {
+export async function dispatch(sessionId: string): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -77,7 +80,7 @@ export function dispatch(sessionId: string): { ok: boolean; message: string } {
   const claudeArgs = agentRegistry.buildClaudeArgs(agent);
 
   // Launch in tmux
-  const tmuxName = launchAgentTmux(session, stage, claudeArgs, task, agent);
+  const tmuxName = await launchAgentTmux(session, stage, claudeArgs, task, agent);
 
   store.updateSession(sessionId, { status: "running", agent: agentName, session_id: tmuxName });
   store.logEvent(sessionId, "stage_started", {
@@ -143,7 +146,7 @@ export function stop(sessionId: string): { ok: boolean; message: string } {
   return { ok: true, message: "Session stopped" };
 }
 
-export function resume(sessionId: string): { ok: boolean; message: string } {
+export async function resume(sessionId: string): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status === "completed") return { ok: false, message: "Already completed" };
@@ -161,7 +164,7 @@ export function resume(sessionId: string): { ok: boolean; message: string } {
   });
 
   // Auto re-dispatch
-  return dispatch(sessionId);
+  return await dispatch(sessionId);
 }
 
 export function complete(sessionId: string): { ok: boolean; message: string } {
@@ -217,7 +220,7 @@ export function cloneSession(sessionId: string, newTask?: string): { ok: boolean
   return { ok: true, cloneId: clone.id };
 }
 
-export function handoff(sessionId: string, toAgent: string, instructions?: string): { ok: boolean; message: string } {
+export async function handoff(sessionId: string, toAgent: string, instructions?: string): Promise<{ ok: boolean; message: string }> {
   const { ok, cloneId } = cloneSession(sessionId, instructions);
   if (!ok) return { ok: false, message: cloneId };
 
@@ -226,7 +229,7 @@ export function handoff(sessionId: string, toAgent: string, instructions?: strin
     data: { from_session: sessionId, to_agent: toAgent, instructions },
   });
 
-  return dispatch(cloneId);
+  return await dispatch(cloneId);
 }
 
 // ── Fork/Join ───────────────────────────────────────────────────────────────
@@ -260,7 +263,7 @@ export function fork(parentId: string, task: string, opts?: {
   });
 
   if (opts?.dispatch !== false) {
-    dispatch(child.id);
+    void dispatch(child.id);
   }
   return { ok: true, childId: child.id };
 }
@@ -301,10 +304,10 @@ export function joinFork(parentId: string, force = false): { ok: boolean; messag
 
 // ── Internal ────────────────────────────────────────────────────────────────
 
-function launchAgentTmux(
+async function launchAgentTmux(
   session: store.Session, stage: string,
   claudeArgs: string[], task: string, agent: agentRegistry.AgentDefinition,
-): string {
+): Promise<string> {
   const tmuxName = `ark-${session.id}`;
   const workdir = session.workdir ?? ".";
 
@@ -362,7 +365,52 @@ function launchAgentTmux(
   const taskFile = join(sessionDir, "task.txt");
   writeFileSync(taskFile, task);
 
-  // Start tmux with launcher (no shell prompt)
+  // Check for remote compute host
+  const host = session.compute_name ? getHost(session.compute_name) : null;
+
+  if (host && host.provider !== "local") {
+    const provider = getProvider(host.provider);
+    if (!provider) {
+      return tmuxName; // fallback to local if provider not found
+    }
+
+    // Auto-start stopped hosts
+    if (host.status === "stopped") {
+      await provider.start(host);
+    }
+
+    // Resolve ports from arc.json / devcontainer / compose
+    const ports = effectiveWorkdir ? resolvePortDecls(effectiveWorkdir) : [];
+
+    // Store ports on session config
+    if (ports.length > 0) {
+      store.updateSession(session.id, {
+        config: { ...session.config, ports },
+      });
+    }
+
+    // Sync environment to host
+    try {
+      const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
+      await provider.syncEnvironment(host, {
+        direction: "push",
+        projectFiles: arcJson?.sync,
+        projectDir: effectiveWorkdir,
+      });
+    } catch { /* sync failure shouldn't block launch */ }
+
+    // Launch via provider
+    const result = await provider.launch(host, session, {
+      tmuxName,
+      workdir: effectiveWorkdir,
+      launcherContent: launchContent,
+      ports,
+    });
+
+    return result;
+  }
+
+  // Start tmux with launcher (no shell prompt) — local path
   tmux.createSession(tmuxName, `bash ${launcher}`);
 
   // Send task via channel HTTP — pure TypeScript, no bash/curl/tmux-send-keys
