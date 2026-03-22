@@ -438,6 +438,20 @@ hostCmd.command("destroy")
     }
   });
 
+hostCmd.command("delete")
+  .description("Delete a host record from the database")
+  .argument("<name>", "Host name")
+  .action((name) => {
+    const host = core.getHost(name);
+    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    if (host.status === "running") {
+      console.log(chalk.red("Host is running. Stop or destroy it first."));
+      return;
+    }
+    core.deleteHost(name);
+    console.log(chalk.green(`Host '${name}' deleted`));
+  });
+
 hostCmd.command("list")
   .description("List all hosts")
   .action(() => {
