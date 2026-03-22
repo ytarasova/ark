@@ -22,9 +22,9 @@ export function registerHostActions() {
             addHostLog(h.name, `Provider: ${h.provider}, size: ${(h.config as any)?.size ?? "default"}`);
             renderAll();
 
-            // Provision with 10-minute timeout
+            // Provision with 20-minute timeout (Pulumi + SSH + cloud-init can take 15+ min)
             const timeout = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("Provisioning timed out after 10 minutes")), 600_000)
+              setTimeout(() => reject(new Error("Provisioning timed out after 20 minutes")), 1_200_000)
             );
 
             await Promise.race([
