@@ -10,10 +10,9 @@ export function registerSessionActions() {
       const topLevel = state.sessions.filter((s) => !s.parent_id);
       const s = topLevel[state.sel];
       if (s && (s.status === "ready" || s.status === "blocked")) {
-        (async () => {
-          await core.dispatch(s.id);
-          renderAll();
-        })();
+        // Fire-and-forget: don't await, let refresh cycle show status
+        core.dispatch(s.id).catch(() => {});
+        renderAll();
       }
     }
   });
@@ -45,10 +44,8 @@ export function registerSessionActions() {
       const topLevel = state.sessions.filter((s) => !s.parent_id);
       const s = topLevel[state.sel];
       if (s && ["blocked", "waiting", "failed"].includes(s.status)) {
-        (async () => {
-          await core.resume(s.id);
-          renderAll();
-        })();
+        core.resume(s.id).catch(() => {});
+        renderAll();
       }
     }
   });
