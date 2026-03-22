@@ -44,5 +44,11 @@ export { EC2Provider };
 // Auto-register EC2 provider
 registerProvider(new EC2Provider());
 
+import { DockerProvider } from "./providers/docker/index.js";
+export { DockerProvider };
+
+// Auto-register Docker provider
+registerProvider(new DockerProvider());
+
 // arc.json
 export { parseArcJson, resolvePortDecls, hasDevcontainer, hasComposeFile } from "./arc-json.js";
