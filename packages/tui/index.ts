@@ -23,6 +23,8 @@
 
 import blessed from "neo-blessed";
 import * as core from "../core/index.js";
+import { getProvider, listProviders } from "../compute/index.js";
+import type { HostSnapshot } from "../compute/types.js";
 
 // ── Icons ───────────────────────────────────────────────────────────────────
 
@@ -38,13 +40,15 @@ const COLOR: Record<string, string> = {
 
 // ── State ───────────────────────────────────────────────────────────────────
 
-type Tab = "sessions" | "agents" | "pipelines" | "recipes";
+type Tab = "sessions" | "agents" | "pipelines" | "recipes" | "hosts";
 
 let tab: Tab = "sessions";
 let sel = 0;
 let sessions: core.Session[] = [];
 let agents: ReturnType<typeof core.listAgents> = [];
 let pipelines: ReturnType<typeof core.listPipelines> = [];
+let hosts: core.Host[] = [];
+let hostSnapshots = new Map<string, HostSnapshot>();
 let eventViewMode = false;
 let eventSel = 0;
 
@@ -53,6 +57,7 @@ function refresh() {
     sessions = core.listSessions({ limit: 50 });
     agents = core.listAgents();
     pipelines = core.listPipelines();
+    hosts = core.listHosts();
   } catch (e) {
     // SQLite may be briefly locked by another process — skip this refresh
   }
@@ -102,6 +107,7 @@ function renderTabBar() {
     { key: "2", label: "Agents", t: "agents" },
     { key: "3", label: "Pipelines", t: "pipelines" },
     { key: "4", label: "Recipes", t: "recipes" },
+    { key: "5", label: "Hosts", t: "hosts" },
   ];
   const parts = tabs.map((t) =>
     t.t === tab
@@ -196,6 +202,22 @@ function renderList() {
       const prefix = isSel ? "{bold}{inverse}" : "";
       const suffix = isSel ? "{/inverse}{/bold}" : "";
       lines.push(`${prefix} ${isSel ? "▸" : " "} ${p.name.padEnd(14)} ${p.stages.join(" > ").slice(0, 40)}${suffix}`);
+    }
+  } else if (tab === "hosts") {
+    for (let i = 0; i < hosts.length; i++) {
+      const h = hosts[i]!;
+      const isSel = i === sel;
+      const prefix = isSel ? "{bold}{inverse}" : "";
+      const suffix = isSel ? "{/inverse}{/bold}" : "";
+      const icon = h.status === "running" ? "{green-fg}●{/green-fg}"
+        : h.status === "provisioning" ? "{yellow-fg}●{/yellow-fg}"
+        : h.status === "destroyed" ? "{red-fg}✕{/red-fg}"
+        : "{gray-fg}○{/gray-fg}";
+      const ip = (h.config as Record<string, unknown>).ip ?? "";
+      lines.push(`${prefix} ${isSel ? "▸" : " "} ${icon} ${h.name.padEnd(16)} ${h.provider.padEnd(8)} ${String(ip)}${suffix}`);
+    }
+    if (lines.length === 0) {
+      lines.push("{gray-fg}  No hosts configured.{/gray-fg}");
     }
   }
 
@@ -365,9 +387,74 @@ function _renderDetail() {
       const opt = s.optional ? " {gray-fg}(optional){/gray-fg}" : "";
       lines.push(` ${i + 1}. ${s.name.padEnd(14)} {cyan-fg}[${type}:${detail}]{/cyan-fg} gate=${s.gate}${opt}`);
     }
+
+  } else if (tab === "hosts") {
+    const h = hosts[sel];
+    if (!h) { detailPane.setContent("{gray-fg}← select a host{/gray-fg}"); return; }
+
+    const cfg = h.config as Record<string, unknown>;
+    lines.push(`{bold} ${h.name}{/bold}  {gray-fg}${h.provider}{/gray-fg}`);
+    if (cfg.instanceType) lines.push(` {gray-fg}Instance{/gray-fg}  ${cfg.instanceType}`);
+    const sc = h.status === "running" ? "green"
+      : h.status === "provisioning" ? "yellow"
+      : h.status === "destroyed" ? "red" : "gray";
+    lines.push(` {gray-fg}Status{/gray-fg}    {${sc}-fg}${h.status}{/${sc}-fg}`);
+    if (cfg.ip) lines.push(` {gray-fg}IP{/gray-fg}        ${cfg.ip}`);
+
+    const snap = hostSnapshots.get(h.name);
+    if (snap) {
+      const m = snap.metrics;
+      lines.push("", "{bold}{inverse} Metrics {/inverse}{/bold}");
+      lines.push(` CPU   ${bar(m.cpu, 30)}  ${m.cpu.toFixed(1)}%`);
+      lines.push(` MEM   ${bar(m.memPct, 30)}  ${m.memUsedGb.toFixed(1)}/${m.memTotalGb.toFixed(1)} GB`);
+      lines.push(` DISK  ${bar(m.diskPct, 30)}  ${m.diskPct.toFixed(1)}%`);
+      lines.push("");
+      lines.push(` {gray-fg}Net RX{/gray-fg}  ${m.netRxMb.toFixed(1)} MB   {gray-fg}TX{/gray-fg}  ${m.netTxMb.toFixed(1)} MB`);
+      lines.push(` {gray-fg}Uptime{/gray-fg}  ${m.uptime}   {gray-fg}Idle{/gray-fg}  ${m.idleTicks} ticks`);
+
+      if (snap.sessions.length) {
+        lines.push("", "{bold}{inverse} Sessions {/inverse}{/bold}");
+        lines.push(` ${"Name".padEnd(18)} ${"Status".padEnd(10)} ${"Mode".padEnd(8)} ${"CPU".padEnd(6)} ${"MEM".padEnd(6)}`);
+        for (const s of snap.sessions) {
+          lines.push(` ${s.name.padEnd(18)} ${s.status.padEnd(10)} ${s.mode.padEnd(8)} ${String(s.cpu).padEnd(6)} ${String(s.mem).padEnd(6)}`);
+        }
+      }
+
+      if (snap.processes.length) {
+        lines.push("", "{bold}{inverse} Processes {/inverse}{/bold}");
+        lines.push(` ${"PID".padEnd(8)} ${"CPU".padEnd(6)} ${"MEM".padEnd(6)} ${"Command"}`);
+        for (const p of snap.processes.slice(0, 10)) {
+          lines.push(` ${p.pid.padEnd(8)} ${p.cpu.padEnd(6)} ${p.mem.padEnd(6)} ${p.command.slice(0, 40)}`);
+        }
+      }
+
+      if (snap.docker.length) {
+        lines.push("", "{bold}{inverse} Docker {/inverse}{/bold}");
+        lines.push(` ${"Name".padEnd(18)} ${"CPU".padEnd(8)} ${"MEM".padEnd(10)} ${"Image"}`);
+        for (const c of snap.docker) {
+          lines.push(` ${c.name.padEnd(18)} ${c.cpu.padEnd(8)} ${c.memory.padEnd(10)} ${c.image.slice(0, 30)}`);
+        }
+      }
+    } else if (h.status === "running") {
+      lines.push("", "{gray-fg} Fetching metrics...{/gray-fg}");
+    }
+
+    // Cost estimate for EC2
+    if (h.provider === "ec2" && cfg.hourlyRate) {
+      lines.push("", "{bold}{inverse} Cost {/inverse}{/bold}");
+      lines.push(` {gray-fg}Hourly{/gray-fg}  $${Number(cfg.hourlyRate).toFixed(3)}/hr`);
+    }
   }
 
   detailPane.setContent(lines.join("\n"));
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function bar(pct: number, width: number): string {
+  const filled = Math.round((pct / 100) * width);
+  const color = pct > 80 ? "red" : pct > 50 ? "yellow" : "green";
+  return `{${color}-fg}${"█".repeat(filled)}${"░".repeat(Math.max(0, width - filled))}{/${color}-fg}`;
 }
 
 // ── Status Bar ──────────────────────────────────────────────────────────────
@@ -392,7 +479,9 @@ function renderStatusBar() {
   if (nWait) left += `  {yellow-fg}⏸ ${nWait} waiting{/yellow-fg}`;
   if (nErr) left += `  {red-fg}✕ ${nErr} errors{/red-fg}`;
 
-  const keys = tab === "sessions"
+  const keys = tab === "hosts"
+    ? "j/k:move  Enter:ssh  s:sync  m:metrics  q:quit"
+    : tab === "sessions"
     ? "j/k:move  Enter:dispatch  a:attach  c:done  s:stop  r:resume  n:new  x:kill  q:quit"
     : tab === "agents"
     ? "j/k:move  e:edit  q:quit"
@@ -419,7 +508,8 @@ screen.key(["q", "C-c"], () => process.exit(0));
 screen.key(["j", "down"], () => {
   const max = tab === "sessions" ? sessions.filter((s) => !s.parent_id).length
     : tab === "agents" ? agents.length
-    : tab === "pipelines" ? pipelines.length : 0;
+    : tab === "pipelines" ? pipelines.length
+    : tab === "hosts" ? hosts.length : 0;
   if (sel < max - 1) sel++;
   renderAll();
 });
@@ -433,16 +523,17 @@ screen.key(["1"], () => { tab = "sessions"; sel = 0; renderAll(); });
 screen.key(["2"], () => { tab = "agents"; sel = 0; renderAll(); });
 screen.key(["3"], () => { tab = "pipelines"; sel = 0; renderAll(); });
 screen.key(["4"], () => { tab = "recipes"; sel = 0; renderAll(); });
+screen.key(["5"], () => { tab = "hosts"; sel = 0; renderAll(); });
 
 screen.key(["]", "tab"], () => {
-  const tabs: Tab[] = ["sessions", "agents", "pipelines", "recipes"];
+  const tabs: Tab[] = ["sessions", "agents", "pipelines", "recipes", "hosts"];
   tab = tabs[(tabs.indexOf(tab) + 1) % tabs.length]!;
   sel = 0;
   renderAll();
 });
 
 screen.key(["[", "S-tab"], () => {
-  const tabs: Tab[] = ["sessions", "agents", "pipelines", "recipes"];
+  const tabs: Tab[] = ["sessions", "agents", "pipelines", "recipes", "hosts"];
   tab = tabs[(tabs.indexOf(tab) - 1 + tabs.length) % tabs.length]!;
   sel = 0;
   renderAll();
@@ -581,7 +672,8 @@ screen.key(["a"], () => {
 screen.key(["G"], () => {
   const max = tab === "sessions" ? sessions.filter((s) => !s.parent_id).length
     : tab === "agents" ? agents.length
-    : tab === "pipelines" ? pipelines.length : 0;
+    : tab === "pipelines" ? pipelines.length
+    : tab === "hosts" ? hosts.length : 0;
   sel = Math.max(0, max - 1);
   renderAll();
 });
@@ -590,6 +682,27 @@ screen.key(["g"], () => {
   sel = 0;
   renderAll();
 });
+
+// ── Host metrics background fetch ───────────────────────────────────────────
+
+async function refreshHostMetrics() {
+  for (const h of hosts) {
+    if (h.status !== "running") continue;
+    const provider = getProvider(h.provider);
+    if (!provider) continue;
+    try {
+      const snap = await provider.getMetrics(h);
+      hostSnapshots.set(h.name, snap);
+    } catch { /* skip */ }
+  }
+}
+
+setInterval(async () => {
+  if (tab === "hosts") {
+    await refreshHostMetrics();
+    renderAll();
+  }
+}, 10_000);
 
 // ── Auto-refresh ────────────────────────────────────────────────────────────
 
