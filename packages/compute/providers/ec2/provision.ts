@@ -146,6 +146,7 @@ function makePulumiProgram(
   opts: {
     arch: string;
     keyName?: string;
+    sshPublicKeyPath?: string;
     subnetId?: string;
     securityGroupId?: string;
     userData?: string;
@@ -242,11 +243,23 @@ function makePulumiProgram(
       sgIds = [sg.id];
     }
 
+    // SSH key pair — import public key to EC2
+    let resolvedKeyName = opts.keyName;
+    if (!resolvedKeyName && opts.sshPublicKeyPath) {
+      const { readFileSync } = require("fs");
+      const pubKey = readFileSync(opts.sshPublicKeyPath, "utf-8").trim();
+      const keyPair = new aws.ec2.KeyPair(`ark-key-${hostName}`, {
+        keyName: `ark-${hostName}`,
+        publicKey: pubKey,
+      });
+      resolvedKeyName = keyPair.keyName;
+    }
+
     // EC2 instance
     const instance = new aws.ec2.Instance("ark-compute", {
       instanceType,
       ami: ami.then((a) => a.id),
-      keyName: opts.keyName,
+      keyName: resolvedKeyName,
       vpcSecurityGroupIds: sgIds,
       subnetId: opts.subnetId,
       userData: opts.userData,
@@ -328,6 +341,7 @@ export async function provisionStack(
   const program = makePulumiProgram(instanceType, hostName, {
     arch,
     keyName: opts.keyName,
+    sshPublicKeyPath: opts.sshKeyPath ? `${opts.sshKeyPath}.pub` : undefined,
     subnetId: opts.subnetId,
     securityGroupId: opts.securityGroupId,
     userData: opts.userData,
