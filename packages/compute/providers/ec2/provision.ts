@@ -276,16 +276,41 @@ function makePulumiProgram(
  * Creates or selects a Pulumi stack named "ark-compute-{hostName}", defines
  * the EC2 resources inline, and runs `stack.up()` to deploy.
  */
-function checkPulumiInstalled(): void {
+function ensurePulumiInstalled(onLog?: (msg: string) => void): void {
+  const { execFileSync } = require("child_process");
+  const { existsSync } = require("fs");
+  const { join } = require("path");
+  const { homedir: home } = require("os");
+
+  // Check PATH first
   try {
-    const { execFileSync } = require("child_process");
     execFileSync("pulumi", ["version"], { stdio: "pipe", timeout: 5000 });
-  } catch {
-    throw new Error(
-      "Pulumi CLI not found. Install it:\n" +
-      "  curl -fsSL https://get.pulumi.com | sh\n" +
-      "Then add ~/.pulumi/bin to your PATH."
-    );
+    return;
+  } catch { /* not in PATH */ }
+
+  // Check ~/.pulumi/bin (installed but not in PATH)
+  const pulumiBin = join(home(), ".pulumi", "bin");
+  const pulumiPath = join(pulumiBin, "pulumi");
+  if (existsSync(pulumiPath)) {
+    process.env.PATH = `${pulumiBin}:${process.env.PATH}`;
+    return;
+  }
+
+  // Auto-install using curl + sh via execFileSync
+  const log = onLog ?? (() => {});
+  log("Pulumi CLI not found — installing...");
+  try {
+    // Download installer script, then run it
+    execFileSync("bash", ["-c", "curl -fsSL https://get.pulumi.com | sh"], {
+      stdio: "pipe",
+      timeout: 120_000,
+      env: { ...process.env, PULUMI_SKIP_UPDATE_CHECK: "true" },
+    });
+    process.env.PATH = `${pulumiBin}:${process.env.PATH}`;
+    const version = execFileSync(pulumiPath, ["version"], { encoding: "utf-8", timeout: 5000 }).trim();
+    log(`Pulumi ${version} installed`);
+  } catch (e: any) {
+    throw new Error(`Failed to install Pulumi: ${e.message ?? e}`);
   }
 }
 
@@ -293,7 +318,7 @@ export async function provisionStack(
   hostName: string,
   opts: ProvisionStackOpts,
 ): Promise<ProvisionResult> {
-  checkPulumiInstalled();
+  ensurePulumiInstalled(opts.onOutput);
   const arch = opts.arch ?? "x64";
   const region = opts.region ?? "us-east-1";
   const instanceType = resolveInstanceType(opts.size, arch);
