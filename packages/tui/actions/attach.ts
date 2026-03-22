@@ -36,10 +36,13 @@ export function registerAttachActions() {
         return;
       }
 
-      try { screen.destroy(); } catch { /* ignore Setulc terminfo error */ }
+      // Write alternate screen escape to hide blessed, then exec into tmux
+      process.stdout.write("\x1b[?1049l\x1b[?25h"); // exit alt screen, show cursor
       try {
         execFileSync("tmux", ["attach", "-t", s.session_id], { stdio: "inherit" });
       } catch { /* user detached */ }
+      // Reset terminal and re-launch TUI
+      process.stdout.write("\x1b[2J\x1b[H"); // clear screen
       relaunchTui();
 
     } else if (state.tab === "hosts") {
@@ -48,7 +51,7 @@ export function registerAttachActions() {
       const ip = (h.config as any)?.ip;
       if (!ip) return;
 
-      try { screen.destroy(); } catch { /* ignore Setulc terminfo error */ }
+      process.stdout.write("\x1b[?1049l\x1b[?25h");
       const keyPath = join(homedir(), ".ssh", `ark-${h.name}`);
       try {
         execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`], { stdio: "inherit" });
