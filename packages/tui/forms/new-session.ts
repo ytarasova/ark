@@ -60,7 +60,8 @@ export function showNewSessionForm() {
       repo, pipeline: pipelineChoice, workdir,
       compute_name: computeName || undefined,
     });
-    setTimeout(() => { core.dispatch(s.id).catch(() => {}); }, 0);
+    const { runAsync } = require("../async.js");
+    runAsync(`Dispatching ${s.id}`, () => core.dispatch(s.id).then(() => {}));
 
     prompt.destroy();
     renderAll();

@@ -68,19 +68,17 @@ export function showNewHostForm() {
       const profile = await selectOrType("AWS Profile", profiles, 0, prompt);
       if (profile === null) { prompt.destroy(); renderAll(); return; }
 
-      try {
-        core.createHost({
-          name, provider,
-          config: {
-            size, arch, region,
-            ...(profile ? { aws_profile: profile } : {}),
-          },
-        });
-      } catch { /* duplicate name etc */ }
+      const { runSafe } = require("../async.js");
+      runSafe("Create host", () => core.createHost({
+        name, provider,
+        config: {
+          size, arch, region,
+          ...(profile ? { aws_profile: profile } : {}),
+        },
+      }));
     } else {
-      try {
-        core.createHost({ name, provider, config: {} });
-      } catch { /* duplicate name etc */ }
+      const { runSafe } = require("../async.js");
+      runSafe("Create host", () => core.createHost({ name, provider, config: {} }));
     }
 
     prompt.destroy();

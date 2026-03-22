@@ -1,7 +1,8 @@
 import * as core from "../../core/index.js";
 import { state } from "../state.js";
-import { screen, statusBar } from "../layout.js";
+import { screen } from "../layout.js";
 import { renderAll } from "../render/index.js";
+import { runAsync } from "../async.js";
 import { showNewSessionForm } from "../forms/new-session.js";
 
 export function registerSessionActions() {
@@ -10,17 +11,7 @@ export function registerSessionActions() {
       const topLevel = state.sessions.filter((s) => !s.parent_id);
       const s = topLevel[state.sel];
       if (s && (s.status === "ready" || s.status === "blocked")) {
-        statusBar.setContent(`{yellow-fg} Dispatching ${s.id}...{/yellow-fg}`);
-        screen.render();
-        // Run dispatch async, don't block the event loop
-        setTimeout(async () => {
-          try {
-            await core.dispatch(s.id);
-          } catch (e: any) {
-            statusBar.setContent(`{red-fg} Dispatch failed: ${e.message}{/red-fg}`);
-          }
-          renderAll();
-        }, 0);
+        runAsync(`Dispatching ${s.id}`, () => core.dispatch(s.id).then(() => {}));
       }
     }
   });
@@ -52,14 +43,7 @@ export function registerSessionActions() {
       const topLevel = state.sessions.filter((s) => !s.parent_id);
       const s = topLevel[state.sel];
       if (s && ["blocked", "waiting", "failed"].includes(s.status)) {
-        statusBar.setContent(`{yellow-fg} Resuming ${s.id}...{/yellow-fg}`);
-        screen.render();
-        setTimeout(async () => {
-          try {
-            await core.resume(s.id);
-          } catch {}
-          renderAll();
-        }, 0);
+        runAsync(`Resuming ${s.id}`, () => core.resume(s.id).then(() => {}));
       }
     }
   });
