@@ -1,7 +1,7 @@
 /**
  * End-to-end integration tests for the Ark compute foundation.
  *
- * Exercises the full flow: host CRUD, provider registry, session launch,
+ * Exercises the full flow: compute CRUD, provider registry, session launch,
  * port probing, arc.json resolution, and metrics collection.
  */
 
@@ -12,11 +12,11 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 import {
-  createHost,
-  getHost,
-  updateHost,
-  deleteHost,
-  listHosts,
+  createCompute,
+  getCompute,
+  updateCompute,
+  deleteCompute,
+  listCompute,
 } from "../../core/store.js";
 
 import {
@@ -55,14 +55,14 @@ const fakeSession = {
 };
 
 // Track resources for cleanup
-const hostNames: string[] = [];
+const computeNames: string[] = [];
 const tmuxSessions: string[] = [];
 
-function cleanupHosts() {
-  for (const name of hostNames) {
-    try { deleteHost(name); } catch { /* already gone */ }
+function cleanupComputes() {
+  for (const name of computeNames) {
+    try { deleteCompute(name); } catch { /* already gone */ }
   }
-  hostNames.length = 0;
+  computeNames.length = 0;
 }
 
 function cleanupTmux() {
@@ -76,21 +76,21 @@ function cleanupTmux() {
   tmuxSessions.length = 0;
 }
 
-// ── Test 1: Full host lifecycle ──────────────────────────────────────────────
+// ── Test 1: Full compute lifecycle ──────────────────────────────────────────────
 
-describe("E2E: Full host lifecycle", () => {
+describe("E2E: Full compute lifecycle", () => {
   afterEach(() => {
-    cleanupHosts();
+    cleanupComputes();
     cleanupTmux();
   });
 
-  it("uses the auto-created local host, provisions, updates, and collects metrics", async () => {
-    // The "local" host is auto-created by ensureLocalHost() in getDb()
-    const host = getHost("local");
-    expect(host).not.toBeNull();
-    expect(host!.name).toBe("local");
-    expect(host!.provider).toBe("local");
-    expect(host!.status).toBe("running"); // local hosts are always running
+  it("uses the auto-created local compute, provisions, updates, and collects metrics", async () => {
+    // The "local" compute is auto-created by ensureLocalCompute() in getDb()
+    const compute = getCompute("local");
+    expect(compute).not.toBeNull();
+    expect(compute!.name).toBe("local");
+    expect(compute!.provider).toBe("local");
+    expect(compute!.status).toBe("running"); // local computes are always running
 
     // Look up its provider
     const provider = getProvider("local");
@@ -98,10 +98,10 @@ describe("E2E: Full host lifecycle", () => {
     expect(provider!.name).toBe("local");
 
     // Provision (no-op for local)
-    await provider!.provision(host!);
+    await provider!.provision(compute!);
 
     // Collect metrics -- verify valid snapshot
-    const snapshot = await provider!.getMetrics(host!);
+    const snapshot = await provider!.getMetrics(compute!);
     expect(snapshot).toBeDefined();
     expect(snapshot.metrics).toBeDefined();
     expect(typeof snapshot.metrics.cpu).toBe("number");
@@ -115,9 +115,9 @@ describe("E2E: Full host lifecycle", () => {
     expect(Array.isArray(snapshot.processes)).toBe(true);
     expect(Array.isArray(snapshot.docker)).toBe(true);
 
-    // Destroy and stop throw for local hosts
-    expect(provider!.destroy(host!)).rejects.toThrow("Cannot destroy the local host");
-    expect(provider!.stop(host!)).rejects.toThrow("Cannot stop the local host");
+    // Destroy and stop throw for local computes
+    expect(provider!.destroy(compute!)).rejects.toThrow("Cannot destroy the local compute");
+    expect(provider!.stop(compute!)).rejects.toThrow("Cannot stop the local compute");
   }, 30_000);
 });
 
@@ -126,13 +126,13 @@ describe("E2E: Full host lifecycle", () => {
 describe("E2E: Launch and probe a session", () => {
   afterEach(() => {
     cleanupTmux();
-    cleanupHosts();
+    cleanupComputes();
   });
 
   it("launches a tmux session, probes ports with a live server", async () => {
-    // Use the auto-created "local" host
-    const host = getHost("local")!;
-    expect(host).not.toBeNull();
+    // Use the auto-created "local" compute
+    const compute = getCompute("local")!;
+    expect(compute).not.toBeNull();
 
     const provider = getProvider("local")!;
     expect(provider).not.toBeNull();
@@ -141,7 +141,7 @@ describe("E2E: Launch and probe a session", () => {
     const tmuxName = `ark-e2e-test-${Date.now()}`;
     tmuxSessions.push(tmuxName);
 
-    await provider.launch(host, fakeSession as any, {
+    await provider.launch(compute, fakeSession as any, {
       tmuxName,
       workdir: "/tmp",
       launcherContent: "#!/bin/bash\nsleep 30",
@@ -171,7 +171,7 @@ describe("E2E: Launch and probe a session", () => {
 
     try {
       // Probe that port -- should be listening
-      const probeUp = await provider.probePorts(host, [
+      const probeUp = await provider.probePorts(compute, [
         { port, source: "test" },
       ]);
       expect(probeUp).toHaveLength(1);
@@ -185,7 +185,7 @@ describe("E2E: Launch and probe a session", () => {
       await new Promise((r) => setTimeout(r, 500));
 
       // Probe again -- should not be listening
-      const probeDown = await provider.probePorts(host, [
+      const probeDown = await provider.probePorts(compute, [
         { port, source: "test" },
       ]);
       expect(probeDown).toHaveLength(1);
@@ -208,7 +208,7 @@ describe("E2E: arc.json port resolution and probing", () => {
   });
 
   afterEach(() => {
-    cleanupHosts();
+    cleanupComputes();
     try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* ok */ }
   });
 
@@ -249,11 +249,11 @@ describe("E2E: arc.json port resolution and probing", () => {
     expect(devDecl!.source).toBe("devcontainer.json");
 
     // Probe those ports via provider -- both should be not listening
-    const host = getHost("local")!;
-    expect(host).not.toBeNull();
+    const compute = getCompute("local")!;
+    expect(compute).not.toBeNull();
 
     const provider = getProvider("local")!;
-    const statuses = await provider.probePorts(host, portDecls);
+    const statuses = await provider.probePorts(compute, portDecls);
     expect(statuses).toHaveLength(2);
     for (const s of statuses) {
       expect(s.listening).toBe(false);
@@ -261,22 +261,22 @@ describe("E2E: arc.json port resolution and probing", () => {
   });
 });
 
-// ── Test 4: Host -> provider resolution flow ─────────────────────────────────
+// ── Test 4: Compute -> provider resolution flow ─────────────────────────────────
 
-describe("E2E: Host to provider resolution flow", () => {
+describe("E2E: Compute to provider resolution flow", () => {
   afterEach(() => {
-    cleanupHosts();
+    cleanupComputes();
   });
 
-  it("resolves providers for hosts with different provider types", () => {
-    // Use the auto-created "local" host and create an ec2 host
-    const localHost = getHost("local")!;
-    expect(localHost).not.toBeNull();
-    const ec2Host = createHost({ name: "my-ec2", provider: "ec2" });
-    hostNames.push("my-ec2");
+  it("resolves providers for computes with different provider types", () => {
+    // Use the auto-created "local" compute and create an ec2 compute
+    const localCompute = getCompute("local")!;
+    expect(localCompute).not.toBeNull();
+    const ec2Compute = createCompute({ name: "my-ec2", provider: "ec2" });
+    computeNames.push("my-ec2");
 
-    expect(localHost.provider).toBe("local");
-    expect(ec2Host.provider).toBe("ec2");
+    expect(localCompute.provider).toBe("local");
+    expect(ec2Compute.provider).toBe("ec2");
 
     // Verify getProvider("local") returns the local provider
     const localProvider = getProvider("local");
@@ -293,17 +293,17 @@ describe("E2E: Host to provider resolution flow", () => {
     expect(providerNames).toContain("local");
     expect(providerNames).toContain("ec2");
 
-    // Verify hosts can be listed
-    const hosts = listHosts();
-    const testHosts = hosts.filter((h) =>
+    // Verify computes can be listed
+    const computes = listCompute();
+    const testComputes = computes.filter((h) =>
       h.name === "local" || h.name === "my-ec2"
     );
-    expect(testHosts.length).toBe(2);
+    expect(testComputes.length).toBe(2);
 
-    // Clean up ec2 host only (local is a singleton)
-    deleteHost("my-ec2");
-    hostNames.length = 0;
+    // Clean up ec2 compute only (local is a singleton)
+    deleteCompute("my-ec2");
+    computeNames.length = 0;
 
-    expect(getHost("my-ec2")).toBeNull();
+    expect(getCompute("my-ec2")).toBeNull();
   });
 });

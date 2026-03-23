@@ -12,7 +12,7 @@ import { generateName } from "../helpers.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
-type Field = "name" | "repo" | "isolation" | "group" | "host" | "flow";
+type Field = "name" | "repo" | "isolation" | "group" | "compute" | "flow";
 
 interface NewSessionFormProps {
   store: StoreData;
@@ -20,7 +20,7 @@ interface NewSessionFormProps {
   onDone: () => void;
 }
 
-const FIELDS: Field[] = ["name", "repo", "isolation", "group", "host", "flow"];
+const FIELDS: Field[] = ["name", "repo", "isolation", "group", "compute", "flow"];
 
 const ISOLATION_CHOICES = [
   { label: "Git worktree (isolated)", value: "worktree" },
@@ -37,7 +37,7 @@ export function NewSessionForm({
   const [repoPath, setRepoPath] = useState(process.cwd());
   const [isolation, setIsolation] = useState("worktree");
   const [groupName, setGroupName] = useState("");
-  const [hostName, setHostName] = useState("local");
+  const [computeName, setComputeName] = useState("local");
   const [flowName, setFlowName] = useState("bare");
 
   const isGitRepo = useMemo(() => {
@@ -51,12 +51,12 @@ export function NewSessionForm({
     [isGitRepo],
   );
 
-  const hostChoices = useMemo(() =>
-    store.hosts.map(h => ({
+  const computeChoices = useMemo(() =>
+    store.computes.map(h => ({
       label: h.provider === "local" ? "local" : `${h.name} (${h.provider})`,
       value: h.name,
     })),
-    [store.hosts],
+    [store.computes],
   );
 
   const flowChoices = useMemo(() =>
@@ -112,7 +112,7 @@ export function NewSessionForm({
           repo,
           flow: flowName,
           workdir,
-          compute_name: hostName || undefined,
+          compute_name: computeName || undefined,
           group_name: groupName || undefined,
           config: { worktree: isolation === "worktree" },
         });
@@ -192,15 +192,15 @@ export function NewSessionForm({
         )}
       </FormField>
 
-      {/* Host */}
-      <FormField label="Host" active={active === "host"}>
-        {active === "host" ? (
+      {/* Compute */}
+      <FormField label="Compute" active={active === "compute"}>
+        {active === "compute" ? (
           <SelectMenu
-            items={hostChoices}
-            onSelect={(item) => { setHostName(item.value); moveField(1); }}
+            items={computeChoices}
+            onSelect={(item) => { setComputeName(item.value); moveField(1); }}
           />
         ) : (
-          <Text>{hostName || "local"}</Text>
+          <Text>{computeName || "local"}</Text>
         )}
       </FormField>
 
@@ -222,7 +222,7 @@ export function NewSessionForm({
   );
 }
 
-// ── Form Field ──────────────────────────────────────────────────────────────
+// -- Form Field --------------------------------------------------------------
 
 function FormField({ label, active, children }: {
   label: string;

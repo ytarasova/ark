@@ -21,7 +21,7 @@ describe("TUI App rendering", () => {
     const frame = lastFrame()!;
 
     expect(frame).toContain("Sessions");
-    expect(frame).toContain("Hosts");
+    expect(frame).toContain("Compute");
     expect(frame).toContain("Agents");
     expect(frame).toContain("Flows");
     expect(frame).toContain("Recipes");
@@ -40,14 +40,14 @@ describe("TUI App rendering", () => {
   it("tab switching works via key press", async () => {
     const { lastFrame, stdin, unmount } = render(<App />);
 
-    // Press "2" to switch to Hosts tab
+    // Press "2" to switch to Compute tab
     stdin.write("2");
 
     // Allow React to re-render
     await new Promise((r) => setTimeout(r, 50));
 
     const frame = lastFrame()!;
-    // The Hosts tab should now be active - its key hints should be visible
+    // The Compute tab should now be active - its key hints should be visible
     expect(frame).toContain("provision");
     unmount();
   });

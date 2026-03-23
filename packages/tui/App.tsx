@@ -9,11 +9,11 @@ import type { Pane } from "./components/SplitPane.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { EventLog } from "./components/EventLog.js";
 import { SessionsTab } from "./tabs/SessionsTab.js";
-import { HostsTab } from "./tabs/HostsTab.js";
+import { ComputeTab } from "./tabs/ComputeTab.js";
 import { AgentsTab } from "./tabs/AgentsTab.js";
 import { FlowsTab } from "./tabs/FlowsTab.js";
 import { NewSessionForm } from "./forms/NewSessionForm.js";
-import { NewHostForm } from "./forms/NewHostForm.js";
+import { NewComputeForm } from "./forms/NewComputeForm.js";
 
 export function App() {
   const { exit } = useApp();
@@ -68,7 +68,7 @@ export function App() {
     } else if (input === "1") {
       switchTab("sessions");
     } else if (input === "2") {
-      switchTab("hosts");
+      switchTab("compute");
     } else if (input === "3") {
       switchTab("agents");
     } else if (input === "4") {
@@ -97,14 +97,14 @@ export function App() {
             />
           ) : undefined}
         />
-      ) : tab === "hosts" ? (
-        <HostsTab
+      ) : tab === "compute" ? (
+        <ComputeTab
           {...store}
           pane={pane}
           async={asyncState}
-          onShowForm={() => setShowForm("host")}
-          formOverlay={showForm === "host" ? (
-            <NewHostForm async={asyncState} onDone={() => setShowForm(null)} />
+          onShowForm={() => setShowForm("compute")}
+          formOverlay={showForm === "compute" ? (
+            <NewComputeForm async={asyncState} onDone={() => setShowForm(null)} />
           ) : undefined}
         />
       ) : tab === "agents" ? (

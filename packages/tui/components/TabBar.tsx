@@ -1,13 +1,13 @@
 import React from "react";
 import { Box, Text } from "ink";
 
-export type Tab = "sessions" | "hosts" | "agents" | "flows" | "recipes";
+export type Tab = "sessions" | "compute" | "agents" | "flows" | "recipes";
 
-export const TABS: Tab[] = ["sessions", "hosts", "agents", "flows", "recipes"];
+export const TABS: Tab[] = ["sessions", "compute", "agents", "flows", "recipes"];
 
 const TAB_KEYS: Record<Tab, string> = {
   sessions: "1",
-  hosts: "2",
+  compute: "2",
   agents: "3",
   flows: "4",
   recipes: "5",

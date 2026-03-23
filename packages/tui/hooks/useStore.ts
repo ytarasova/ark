@@ -3,7 +3,7 @@ import * as core from "../../core/index.js";
 
 export interface StoreData {
   sessions: core.Session[];
-  hosts: core.Host[];
+  computes: core.Compute[];
   agents: ReturnType<typeof core.listAgents>;
   flows: ReturnType<typeof core.listFlows>;
   refreshing: boolean;
@@ -41,10 +41,10 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
   }
 }
 
-/** Shallow fingerprint: only re-render when session/host list actually changes. */
-function fingerprint(sessions: core.Session[], hosts: core.Host[]): string {
+/** Shallow fingerprint: only re-render when session/compute list actually changes. */
+function fingerprint(sessions: core.Session[], computes: core.Compute[]): string {
   const s = sessions.map(s => `${s.id}:${s.status}:${s.session_id}:${s.error ?? ""}`).join("|");
-  const h = hosts.map(h => `${h.name}:${h.status}`).join("|");
+  const h = computes.map(h => `${h.name}:${h.status}`).join("|");
   return s + ";" + h;
 }
 
@@ -56,7 +56,7 @@ function fingerprint(sessions: core.Session[], hosts: core.Host[]): string {
 export function useStore(refreshMs = 3000): StoreData {
   const [ver, setVer] = useState(0);
   const dataRef = useRef<Omit<StoreData, "refreshing" | "refresh">>({
-    sessions: [], hosts: [], agents: [], flows: [],
+    sessions: [], computes: [], agents: [], flows: [],
   });
   const fpRef = useRef("");
   const running = useRef(false);
@@ -67,13 +67,13 @@ export function useStore(refreshMs = 3000): StoreData {
     try {
       const sessions = core.listSessions({ limit: 50 });
       await reconcileSessions(sessions);
-      const hosts = core.listHosts();
-      const fp = fingerprint(sessions, hosts);
+      const computes = core.listCompute();
+      const fp = fingerprint(sessions, computes);
       if (fp !== fpRef.current) {
         fpRef.current = fp;
         dataRef.current = {
           sessions,
-          hosts,
+          computes,
           agents: core.listAgents(),
           flows: core.listFlows(),
         };
@@ -92,11 +92,11 @@ export function useStore(refreshMs = 3000): StoreData {
   // Sync refresh: re-read DB immediately, skip reconciliation (fast path)
   const refresh = useCallback(() => {
     const sessions = core.listSessions({ limit: 50 });
-    const hosts = core.listHosts();
-    fpRef.current = fingerprint(sessions, hosts);
+    const computes = core.listCompute();
+    fpRef.current = fingerprint(sessions, computes);
     dataRef.current = {
       sessions,
-      hosts,
+      computes,
       agents: core.listAgents(),
       flows: core.listFlows(),
     };

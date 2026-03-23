@@ -11,7 +11,7 @@ import { execFileSync } from "child_process";
 import { homedir } from "os";
 
 import * as store from "./store.js";
-import { getHost } from "./store.js";
+import { getCompute } from "./store.js";
 import * as tmux from "./tmux.js";
 import * as flow from "./flow.js";
 import * as agentRegistry from "./agent.js";
@@ -60,11 +60,11 @@ export async function dispatch(sessionId: string): Promise<{ ok: boolean; messag
   const stage = session.stage;
   if (!stage) return { ok: false, message: "No current stage" };
 
-  // Validate compute host exists if specified
+  // Validate compute exists if specified
   if (session.compute_name) {
-    const host = store.getHost(session.compute_name);
-    if (!host) {
-      return { ok: false, message: `Compute host '${session.compute_name}' not found. Delete and recreate the session.` };
+    const compute = store.getCompute(session.compute_name);
+    if (!compute) {
+      return { ok: false, message: `Compute '${session.compute_name}' not found. Delete and recreate the session.` };
     }
   }
 
@@ -349,18 +349,18 @@ async function launchAgentTmux(
   mkdirSync(sessionDir, { recursive: true });
   writeFileSync(join(sessionDir, "task.txt"), task);
 
-  // Check for remote compute host
-  const host = session.compute_name ? getHost(session.compute_name) : null;
+  // Check for remote compute
+  const compute = session.compute_name ? getCompute(session.compute_name) : null;
 
-  if (host && host.provider !== "local") {
-    const provider = getProvider(host.provider);
+  if (compute && compute.provider !== "local") {
+    const provider = getProvider(compute.provider);
     if (!provider) {
       return tmuxName; // fallback to local if provider not found
     }
 
-    // Auto-start stopped hosts
-    if (host.status === "stopped") {
-      await provider.start(host);
+    // Auto-start stopped computes
+    if (compute.status === "stopped") {
+      await provider.start(compute);
     }
 
     // Resolve ports from arc.json / devcontainer / compose
@@ -373,10 +373,10 @@ async function launchAgentTmux(
       });
     }
 
-    // Sync environment to host
+    // Sync environment to compute
     try {
       const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
-      await provider.syncEnvironment(host, {
+      await provider.syncEnvironment(compute, {
         direction: "push",
         projectFiles: arcJson?.sync,
         projectDir: effectiveWorkdir,
@@ -389,9 +389,9 @@ async function launchAgentTmux(
       const composeFile = detectComposeFile(effectiveWorkdir);
       const arcJson = parseArcJson(effectiveWorkdir);
       const shouldCompose = arcJson?.compose ?? !!composeFile;
-      if (shouldCompose && host.config?.ip) {
+      if (shouldCompose && compute.config?.ip) {
         const { sshExec, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
-        sshExec(sshKeyPath(host.name), host.config.ip as string,
+        sshExec(sshKeyPath(compute.name), compute.config.ip as string,
           `cd ${effectiveWorkdir} && docker compose up -d`);
       }
     }
@@ -408,7 +408,7 @@ async function launchAgentTmux(
     }
 
     // Launch via provider
-    const result = await provider.launch(host, session, {
+    const result = await provider.launch(compute, session, {
       tmuxName,
       workdir: effectiveWorkdir,
       launcherContent: finalLaunchContent,

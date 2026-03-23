@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import {
   createTestContext, setContext, resetContext, closeDb,
   getDb, listSessions, getSession, deleteSession,
-  createHost, listHosts, getHost, deleteHost,
+  createCompute, listCompute, getCompute, deleteCompute,
   startSession,
 } from "../index.js";
 import { createSession } from "../store.js";
@@ -50,12 +50,12 @@ describe("Store context isolation", () => {
     setContext(ctx);
   });
 
-  it("hosts are isolated between contexts", () => {
-    // Default local host is auto-created
-    const hosts = listHosts();
-    const localHost = hosts.find(h => h.name === "local");
-    expect(localHost).toBeDefined();
-    expect(localHost!.provider).toBe("local");
+  it("computes are isolated between contexts", () => {
+    // Default local compute is auto-created
+    const computes = listCompute();
+    const localCompute = computes.find(h => h.name === "local");
+    expect(localCompute).toBeDefined();
+    expect(localCompute!.provider).toBe("local");
   });
 
   it("CRUD works in isolated context", () => {
@@ -76,17 +76,17 @@ describe("Store context isolation", () => {
     expect(listSessions().length).toBe(0);
   });
 
-  it("host CRUD works in isolated context", () => {
-    createHost({ name: "test-ec2", provider: "ec2", config: { size: "m" } });
-    const host = getHost("test-ec2");
-    expect(host).not.toBeNull();
-    expect(host!.provider).toBe("ec2");
+  it("compute CRUD works in isolated context", () => {
+    createCompute({ name: "test-ec2", provider: "ec2", config: { size: "m" } });
+    const compute = getCompute("test-ec2");
+    expect(compute).not.toBeNull();
+    expect(compute!.provider).toBe("ec2");
 
     // local + test-ec2
-    expect(listHosts().length).toBe(2);
+    expect(listCompute().length).toBe(2);
 
-    deleteHost("test-ec2");
-    expect(listHosts().length).toBe(1);
+    deleteCompute("test-ec2");
+    expect(listCompute().length).toBe(1);
   });
 
   it("cleanup removes temp directory", () => {

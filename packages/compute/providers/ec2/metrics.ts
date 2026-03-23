@@ -5,10 +5,10 @@
 
 import type {
   DockerContainer,
-  HostMetrics,
-  HostProcess,
-  HostSession,
-  HostSnapshot,
+  ComputeMetrics,
+  ComputeProcess,
+  ComputeSession,
+  ComputeSnapshot,
 } from "../../types.js";
 import { sshExec, sshExecAsync } from "./ssh.js";
 
@@ -79,7 +79,7 @@ export const SSH_DOCKER_CMD: string = [
 
 const PROJECT_PREFIX = "/home/ubuntu/Projects/";
 
-function emptyMetrics(): HostMetrics {
+function emptyMetrics(): ComputeMetrics {
   return {
     cpu: 0,
     memUsedGb: 0,
@@ -93,7 +93,7 @@ function emptyMetrics(): HostMetrics {
   };
 }
 
-function emptySnapshot(): HostSnapshot {
+function emptySnapshot(): ComputeSnapshot {
   return { metrics: emptyMetrics(), sessions: [], processes: [], docker: [] };
 }
 
@@ -124,7 +124,7 @@ function g(s: Record<string, string[]>, key: string, d = "0"): string {
   return arr[0];
 }
 
-function parseMetrics(s: Record<string, string[]>): HostMetrics {
+function parseMetrics(s: Record<string, string[]>): ComputeMetrics {
   const m = emptyMetrics();
   m.cpu = f(g(s, "CPU"));
   m.diskPct = f(g(s, "DISK"));
@@ -151,7 +151,7 @@ function parseMetrics(s: Record<string, string[]>): HostMetrics {
   return m;
 }
 
-function parseSessions(s: Record<string, string[]>): HostSession[] {
+function parseSessions(s: Record<string, string[]>): ComputeSession[] {
   // Build Claude info lookup from CLAUDE section
   const claude: Record<
     string,
@@ -170,7 +170,7 @@ function parseSessions(s: Record<string, string[]>): HostSession[] {
     }
   }
 
-  const out: HostSession[] = [];
+  const out: ComputeSession[] = [];
   for (const ln of s["TMUX"] ?? ["(none)"]) {
     if (ln === "(none)") continue;
     const nm = ln.split(":")[0].trim();
@@ -187,8 +187,8 @@ function parseSessions(s: Record<string, string[]>): HostSession[] {
   return out;
 }
 
-function parseProcesses(s: Record<string, string[]>): HostProcess[] {
-  const out: HostProcess[] = [];
+function parseProcesses(s: Record<string, string[]>): ComputeProcess[] {
+  const out: ComputeProcess[] = [];
   for (const ln of s["PROCESSES"] ?? []) {
     const p = ln.split("\t");
     if (p.length >= 4) {
@@ -245,10 +245,10 @@ function parseDocker(s: Record<string, string[]>): DockerContainer[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Parse section-delimited SSH output into a typed HostSnapshot.
+ * Parse section-delimited SSH output into a typed ComputeSnapshot.
  * Returns a zero-valued snapshot for empty / invalid input (never throws).
  */
-export function parseSnapshot(stdout: string): HostSnapshot {
+export function parseSnapshot(stdout: string): ComputeSnapshot {
   if (!stdout || !stdout.trim()) return emptySnapshot();
 
   const s = splitSections(stdout);
@@ -262,9 +262,9 @@ export function parseSnapshot(stdout: string): HostSnapshot {
 
 /**
  * Fetch fast metrics from an EC2 host via SSH.
- * Runs SSH_FAST_CMD and parses the output into a HostSnapshot.
+ * Runs SSH_FAST_CMD and parses the output into a ComputeSnapshot.
  */
-export function fetchMetrics(key: string, ip: string): HostSnapshot {
+export function fetchMetrics(key: string, ip: string): ComputeSnapshot {
   const { stdout } = sshExec(key, ip, SSH_FAST_CMD, { timeout: 15_000 });
   return parseSnapshot(stdout);
 }
@@ -272,7 +272,7 @@ export function fetchMetrics(key: string, ip: string): HostSnapshot {
 /**
  * Fetch fast metrics from an EC2 host via SSH (async / non-blocking).
  */
-export async function fetchMetricsAsync(key: string, ip: string): Promise<HostSnapshot> {
+export async function fetchMetricsAsync(key: string, ip: string): Promise<ComputeSnapshot> {
   const { stdout } = await sshExecAsync(key, ip, SSH_FAST_CMD, { timeout: 15_000 });
   return parseSnapshot(stdout);
 }
@@ -281,7 +281,7 @@ export async function fetchMetricsAsync(key: string, ip: string): Promise<HostSn
  * Fetch docker metrics from an EC2 host via SSH.
  * Runs SSH_DOCKER_CMD and parses the output (only docker fields populated).
  */
-export function fetchDocker(key: string, ip: string): HostSnapshot {
+export function fetchDocker(key: string, ip: string): ComputeSnapshot {
   const { stdout } = sshExec(key, ip, SSH_DOCKER_CMD, { timeout: 30_000 });
   return parseSnapshot(stdout);
 }
@@ -289,7 +289,7 @@ export function fetchDocker(key: string, ip: string): HostSnapshot {
 /**
  * Fetch docker metrics from an EC2 host via SSH (async / non-blocking).
  */
-export async function fetchDockerAsync(key: string, ip: string): Promise<HostSnapshot> {
+export async function fetchDockerAsync(key: string, ip: string): Promise<ComputeSnapshot> {
   const { stdout } = await sshExecAsync(key, ip, SSH_DOCKER_CMD, { timeout: 30_000 });
   return parseSnapshot(stdout);
 }

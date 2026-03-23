@@ -18,10 +18,10 @@ import { join } from "path";
 const execFileAsync = promisify(execFile);
 import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
-  HostSnapshot, HostMetrics, HostProcess, PortDecl, PortStatus,
+  ComputeSnapshot, ComputeMetrics, ComputeProcess, PortDecl, PortStatus,
 } from "../../types.js";
-import type { Host, Session } from "../../../core/store.js";
-import { mergeHostConfig, updateHost } from "../../../core/store.js";
+import type { Compute, Session } from "../../../core/store.js";
+import { mergeComputeConfig, updateCompute } from "../../../core/store.js";
 import { buildDevcontainer, detectDevcontainer } from "./devcontainer.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -80,16 +80,16 @@ export class DockerProvider implements ComputeProvider {
 
   // ── Provision ────────────────────────────────────────────────────────────
 
-  async provision(host: Host, _opts?: ProvisionOpts): Promise<void> {
+  async provision(compute: Compute, _opts?: ProvisionOpts): Promise<void> {
     assertDockerAvailable();
 
-    const cfg = host.config as Record<string, unknown>;
-    const name = containerName(host.name);
+    const cfg = compute.config as Record<string, unknown>;
+    const name = containerName(compute.name);
     const useDevcontainer = Boolean(cfg.devcontainer);
     const image = (cfg.image as string) || DEFAULT_IMAGE;
     const extraVolumes = (cfg.volumes as string[]) ?? [];
 
-    updateHost(host.name, { status: "provisioning" });
+    updateCompute(compute.name, { status: "provisioning" });
 
     try {
       if (useDevcontainer) {
@@ -102,7 +102,7 @@ export class DockerProvider implements ComputeProvider {
         if (!result.ok) {
           throw new Error(`devcontainer up failed: ${result.error}`);
         }
-        mergeHostConfig(host.name, {
+        mergeComputeConfig(compute.name, {
           container_name: name,
           devcontainer: true,
           workdir,
@@ -154,26 +154,26 @@ export class DockerProvider implements ComputeProvider {
           "inspect", "--format", "{{.Id}}", name,
         ]);
 
-        mergeHostConfig(host.name, {
+        mergeComputeConfig(compute.name, {
           image,
           container_id: containerId || name,
           container_name: name,
         });
       }
 
-      updateHost(host.name, { status: "running" });
+      updateCompute(compute.name, { status: "running" });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      mergeHostConfig(host.name, { last_error: message });
-      updateHost(host.name, { status: "stopped" });
+      mergeComputeConfig(compute.name, { last_error: message });
+      updateCompute(compute.name, { status: "stopped" });
       throw err;
     }
   }
 
   // ── Start / Stop ─────────────────────────────────────────────────────────
 
-  async start(host: Host): Promise<void> {
-    const name = containerName(host.name);
+  async start(compute: Compute): Promise<void> {
+    const name = containerName(compute.name);
     try {
       execFileSync("docker", ["start", name], {
         timeout: 15_000,
@@ -182,40 +182,40 @@ export class DockerProvider implements ComputeProvider {
     } catch (err) {
       throw new Error(`Failed to start container ${name}: ${err instanceof Error ? err.message : err}`);
     }
-    updateHost(host.name, { status: "running" });
+    updateCompute(compute.name, { status: "running" });
   }
 
-  async stop(host: Host): Promise<void> {
-    const name = containerName(host.name);
+  async stop(compute: Compute): Promise<void> {
+    const name = containerName(compute.name);
     try {
       execFileSync("docker", ["stop", name], {
         timeout: 15_000,
         stdio: ["pipe", "pipe", "pipe"],
       });
     } catch { /* container may already be stopped */ }
-    updateHost(host.name, { status: "stopped" });
+    updateCompute(compute.name, { status: "stopped" });
   }
 
   // ── Destroy ──────────────────────────────────────────────────────────────
 
-  async destroy(host: Host): Promise<void> {
-    const name = containerName(host.name);
+  async destroy(compute: Compute): Promise<void> {
+    const name = containerName(compute.name);
     try {
       execFileSync("docker", ["rm", "-f", name], {
         timeout: 15_000,
         stdio: ["pipe", "pipe", "pipe"],
       });
     } catch { /* container may not exist */ }
-    updateHost(host.name, { status: "destroyed" });
+    updateCompute(compute.name, { status: "destroyed" });
   }
 
   // ── Launch ───────────────────────────────────────────────────────────────
 
-  async launch(_host: Host, _session: Session, opts: LaunchOpts): Promise<string> {
+  async launch(_compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
     const { createSession, writeLauncher } = await import("../../../core/tmux.js");
 
-    const cfg = _host.config as Record<string, unknown>;
-    const name = (cfg.container_name as string) || containerName(_host.name);
+    const cfg = _compute.config as Record<string, unknown>;
+    const name = (cfg.container_name as string) || containerName(_compute.name);
     const useDevcontainer = Boolean(cfg.devcontainer);
 
     let shellCmd: string;
@@ -237,14 +237,14 @@ export class DockerProvider implements ComputeProvider {
 
   // ── Attach ───────────────────────────────────────────────────────────────
 
-  async attach(_host: Host, _session: Session): Promise<void> {
+  async attach(_compute: Compute, _session: Session): Promise<void> {
     // No tunnels needed for local Docker — tmux attach handled by CLI layer
   }
 
   // ── Metrics ──────────────────────────────────────────────────────────────
 
-  async getMetrics(host: Host): Promise<HostSnapshot> {
-    const name = containerName(host.name);
+  async getMetrics(compute: Compute): Promise<ComputeSnapshot> {
+    const name = containerName(compute.name);
 
     // Run all independent docker commands in parallel - non-blocking
     const [statsOut, dfOut, startedAt, psOut, dockerStatsOut] = await Promise.all([
@@ -310,7 +310,7 @@ export class DockerProvider implements ComputeProvider {
     }
 
     // -- Running processes inside the container --
-    const processes: HostProcess[] = [];
+    const processes: ComputeProcess[] = [];
     if (psOut) {
       const lines = psOut.split("\n");
       for (let i = 1; i < lines.length; i++) {
@@ -341,13 +341,13 @@ export class DockerProvider implements ComputeProvider {
           name: cName?.trim() ?? "",
           cpu: cCpu?.trim() ?? "",
           memory: cMemory?.trim() ?? "",
-          image: ((host.config as Record<string, unknown>).image as string) ?? "",
-          project: host.name,
+          image: ((compute.config as Record<string, unknown>).image as string) ?? "",
+          project: compute.name,
         });
       }
     }
 
-    const metrics: HostMetrics = {
+    const metrics: ComputeMetrics = {
       cpu,
       memUsedGb,
       memTotalGb,
@@ -364,8 +364,8 @@ export class DockerProvider implements ComputeProvider {
 
   // ── Port probing ─────────────────────────────────────────────────────────
 
-  async probePorts(host: Host, ports: PortDecl[]): Promise<PortStatus[]> {
-    const name = containerName(host.name);
+  async probePorts(compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
+    const name = containerName(compute.name);
 
     return ports.map((decl) => {
       let listening = false;
@@ -395,7 +395,7 @@ export class DockerProvider implements ComputeProvider {
 
   // ── Sync ─────────────────────────────────────────────────────────────────
 
-  async syncEnvironment(_host: Host, _opts: SyncOpts): Promise<void> {
+  async syncEnvironment(_compute: Compute, _opts: SyncOpts): Promise<void> {
     // Docker uses volume mounts, not sync.
     // Credentials are mounted at container creation time.
   }

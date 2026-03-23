@@ -7,7 +7,7 @@ import type { ComputeProvider } from "./types.js";
 // Re-export types
 export type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
-  HostSnapshot, HostMetrics, HostSession, HostProcess, DockerContainer,
+  ComputeSnapshot, ComputeMetrics, ComputeSession, ComputeProcess, DockerContainer,
   PortDecl, PortStatus, ArcJson,
 } from "./types.js";
 

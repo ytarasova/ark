@@ -324,13 +324,13 @@ pipe.command("show").description("Show flow").argument("<name>").action((name) =
   }
 });
 
-// ── Host commands ───────────────────────────────────────────────────────────
+// ── Compute commands ────────────────────────────────────────────────────────
 
-const hostCmd = program.command("host").description("Manage compute hosts");
+const computeCmd = program.command("compute").description("Manage compute resources");
 
-hostCmd.command("create")
-  .description("Create a new compute host")
-  .argument("<name>", "Host name")
+computeCmd.command("create")
+  .description("Create a new compute resource")
+  .argument("<name>", "Compute name")
   .option("--provider <type>", "Provider type", "local")
   // EC2-specific options
   .option("--size <size>", "Instance size: xs (2vCPU/8GB), s (4/16), m (8/32), l (16/64), xl (32/128), xxl (48/192), xxxl (64/256)", "m")
@@ -345,7 +345,7 @@ hostCmd.command("create")
   .option("--volume <mount>", "Extra volume mount (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
   .action((name, opts) => {
     if (opts.provider === "local") {
-      console.log(chalk.red("Local host is auto-created. Use 'ec2' or 'docker' provider."));
+      console.log(chalk.red("Local compute is auto-created. Use 'ec2' or 'docker' provider."));
       return;
     }
     try {
@@ -375,15 +375,15 @@ hostCmd.command("create")
         config = {};
       }
 
-      const host = core.createHost({
+      const compute = core.createCompute({
         name,
         provider: opts.provider,
         config,
       });
 
-      console.log(chalk.green(`Host '${host.name}' created`));
-      console.log(`  Provider: ${host.provider}`);
-      console.log(`  Status:   ${host.status}`);
+      console.log(chalk.green(`Compute '${compute.name}' created`));
+      console.log(`  Provider: ${compute.provider}`);
+      console.log(`  Status:   ${compute.status}`);
 
       if (opts.provider === "docker") {
         console.log(`  Image:    ${(config.image as string) ?? "ubuntu:22.04"}`);
@@ -403,98 +403,98 @@ hostCmd.command("create")
         console.log(`  Region:   ${opts.region}`);
       }
     } catch (e: any) {
-      console.log(chalk.red(`Failed to create host: ${e.message}`));
+      console.log(chalk.red(`Failed to create compute: ${e.message}`));
     }
   });
 
-hostCmd.command("provision")
-  .description("Provision a host (create infrastructure)")
-  .argument("<name>", "Host name")
+computeCmd.command("provision")
+  .description("Provision a compute resource (create infrastructure)")
+  .argument("<name>", "Compute name")
   .action(async (name) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
-    const provider = getProvider(host.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    const provider = getProvider(compute.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
     try {
-      console.log(chalk.dim(`Provisioning '${name}' via ${host.provider}...`));
-      core.updateHost(name, { status: "provisioning" });
-      await provider.provision(host);
-      core.updateHost(name, { status: "running" });
-      console.log(chalk.green(`Host '${name}' provisioned and running`));
+      console.log(chalk.dim(`Provisioning '${name}' via ${compute.provider}...`));
+      core.updateCompute(name, { status: "provisioning" });
+      await provider.provision(compute);
+      core.updateCompute(name, { status: "running" });
+      console.log(chalk.green(`Compute '${name}' provisioned and running`));
     } catch (e: any) {
-      core.updateHost(name, { status: "stopped" });
+      core.updateCompute(name, { status: "stopped" });
       console.log(chalk.red(`Provision failed: ${e.message}`));
     }
   });
 
-hostCmd.command("start")
-  .description("Start a host")
-  .argument("<name>", "Host name")
+computeCmd.command("start")
+  .description("Start a compute resource")
+  .argument("<name>", "Compute name")
   .action(async (name) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
-    const provider = getProvider(host.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    const provider = getProvider(compute.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
     try {
-      await provider.start(host);
-      core.updateHost(name, { status: "running" });
-      console.log(chalk.green(`Host '${name}' started`));
+      await provider.start(compute);
+      core.updateCompute(name, { status: "running" });
+      console.log(chalk.green(`Compute '${name}' started`));
     } catch (e: any) {
       console.log(chalk.red(`Start failed: ${e.message}`));
     }
   });
 
-hostCmd.command("stop")
-  .description("Stop a host")
-  .argument("<name>", "Host name")
+computeCmd.command("stop")
+  .description("Stop a compute resource")
+  .argument("<name>", "Compute name")
   .action(async (name) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
-    const provider = getProvider(host.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    const provider = getProvider(compute.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
     try {
-      await provider.stop(host);
-      core.updateHost(name, { status: "stopped" });
-      console.log(chalk.yellow(`Host '${name}' stopped`));
+      await provider.stop(compute);
+      core.updateCompute(name, { status: "stopped" });
+      console.log(chalk.yellow(`Compute '${name}' stopped`));
     } catch (e: any) {
       console.log(chalk.red(`Stop failed: ${e.message}`));
     }
   });
 
-hostCmd.command("destroy")
-  .description("Destroy a host (remove infrastructure)")
-  .argument("<name>", "Host name")
+computeCmd.command("destroy")
+  .description("Destroy a compute resource (remove infrastructure)")
+  .argument("<name>", "Compute name")
   .action(async (name) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
-    const provider = getProvider(host.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    const provider = getProvider(compute.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
     try {
-      await provider.destroy(host);
-      core.updateHost(name, { status: "destroyed" });
-      console.log(chalk.green(`Host '${name}' destroyed`));
+      await provider.destroy(compute);
+      core.updateCompute(name, { status: "destroyed" });
+      console.log(chalk.green(`Compute '${name}' destroyed`));
     } catch (e: any) {
       console.log(chalk.red(`Destroy failed: ${e.message}`));
     }
   });
 
-hostCmd.command("delete")
-  .description("Delete a host record from the database")
-  .argument("<name>", "Host name")
+computeCmd.command("delete")
+  .description("Delete a compute record from the database")
+  .argument("<name>", "Compute name")
   .action((name) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
-    if (host.status === "running") {
-      console.log(chalk.red("Host is running. Stop or destroy it first."));
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    if (compute.status === "running") {
+      console.log(chalk.red("Compute is running. Stop or destroy it first."));
       return;
     }
-    core.deleteHost(name);
-    console.log(chalk.green(`Host '${name}' deleted`));
+    core.deleteCompute(name);
+    console.log(chalk.green(`Compute '${name}' deleted`));
   });
 
-hostCmd.command("update")
-  .description("Update host configuration")
-  .argument("<name>", "Host name")
+computeCmd.command("update")
+  .description("Update compute configuration")
+  .argument("<name>", "Compute name")
   .option("--size <size>", "Instance size")
   .option("--arch <arch>", "Architecture: x64, arm")
   .option("--region <region>", "AWS region")
@@ -504,10 +504,10 @@ hostCmd.command("update")
   .option("--idle-minutes <min>", "Idle shutdown timeout in minutes")
   .option("--set <key=value>", "Set arbitrary config key", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
   .action((name, opts) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
 
-    const config = { ...host.config } as any;
+    const config = { ...compute.config } as any;
     if (opts.size) config.size = opts.size;
     if (opts.arch) config.arch = opts.arch;
     if (opts.region) config.region = opts.region;
@@ -524,38 +524,38 @@ hostCmd.command("update")
       if (k && rest.length) config[k] = rest.join("=");
     }
 
-    core.updateHost(name, { config });
-    console.log(chalk.green(`Host '${name}' updated`));
+    core.updateCompute(name, { config });
+    console.log(chalk.green(`Compute '${name}' updated`));
     console.log(JSON.stringify(config, null, 2));
   });
 
-hostCmd.command("list")
-  .description("List all hosts")
+computeCmd.command("list")
+  .description("List all compute")
   .action(() => {
-    const hosts = core.listHosts();
-    if (!hosts.length) {
-      console.log(chalk.dim("No hosts. Create one: ark host create <name> --provider local"));
+    const computes = core.listCompute();
+    if (!computes.length) {
+      console.log(chalk.dim("No compute. Create one: ark compute create <name> --provider local"));
       return;
     }
     console.log(`  ${"NAME".padEnd(20)} ${"PROVIDER".padEnd(10)} ${"STATUS".padEnd(14)} IP`);
-    for (const h of hosts) {
+    for (const h of computes) {
       const ip = (h.config as any).ip ?? "-";
       console.log(`  ${h.name.padEnd(20)} ${h.provider.padEnd(10)} ${h.status.padEnd(14)} ${ip}`);
     }
   });
 
-hostCmd.command("status")
-  .description("Show host details")
-  .argument("<name>", "Host name")
+computeCmd.command("status")
+  .description("Show compute details")
+  .argument("<name>", "Compute name")
   .action(async (name) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
-    console.log(JSON.stringify(host, null, 2));
-    if (host.status === "running") {
-      const provider = getProvider(host.provider);
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    console.log(JSON.stringify(compute, null, 2));
+    if (compute.status === "running") {
+      const provider = getProvider(compute.provider);
       if (provider) {
         try {
-          const snap = await provider.getMetrics(host);
+          const snap = await provider.getMetrics(compute);
           console.log(chalk.bold("\nMetrics:"));
           console.log(`  CPU:  ${snap.metrics.cpu.toFixed(1)}%`);
           console.log(`  MEM:  ${snap.metrics.memUsedGb.toFixed(1)}/${snap.metrics.memTotalGb.toFixed(1)} GB (${snap.metrics.memPct.toFixed(1)}%)`);
@@ -567,35 +567,35 @@ hostCmd.command("status")
     }
   });
 
-hostCmd.command("sync")
-  .description("Sync environment to/from host")
-  .argument("<name>", "Host name")
+computeCmd.command("sync")
+  .description("Sync environment to/from compute")
+  .argument("<name>", "Compute name")
   .option("--direction <dir>", "Sync direction (push|pull)", "push")
   .action(async (name, opts) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
-    const provider = getProvider(host.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    const provider = getProvider(compute.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
     try {
       console.log(chalk.dim(`Syncing (${opts.direction}) to '${name}'...`));
-      await provider.syncEnvironment(host, { direction: opts.direction });
+      await provider.syncEnvironment(compute, { direction: opts.direction });
       console.log(chalk.green(`Sync complete (${opts.direction})`));
     } catch (e: any) {
       console.log(chalk.red(`Sync failed: ${e.message}`));
     }
   });
 
-hostCmd.command("metrics")
-  .description("Show host metrics")
-  .argument("<name>", "Host name")
+computeCmd.command("metrics")
+  .description("Show compute metrics")
+  .argument("<name>", "Compute name")
   .action(async (name) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
-    const provider = getProvider(host.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${host.provider}' not found`)); return; }
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    const provider = getProvider(compute.provider);
+    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
     try {
-      const snap = await provider.getMetrics(host);
-      console.log(chalk.bold(`\nHost: ${name}`));
+      const snap = await provider.getMetrics(compute);
+      console.log(chalk.bold(`\nCompute: ${name}`));
       console.log(`  CPU:       ${snap.metrics.cpu.toFixed(1)}%`);
       console.log(`  MEM:       ${snap.metrics.memUsedGb.toFixed(1)}/${snap.metrics.memTotalGb.toFixed(1)} GB (${snap.metrics.memPct.toFixed(1)}%)`);
       console.log(`  DISK:      ${snap.metrics.diskPct.toFixed(1)}%`);
@@ -608,25 +608,25 @@ hostCmd.command("metrics")
     }
   });
 
-hostCmd.command("default")
-  .description("Set default compute host")
-  .argument("<name>", "Host name")
+computeCmd.command("default")
+  .description("Set default compute")
+  .argument("<name>", "Compute name")
   .action((name) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
-    console.log(chalk.green(`Default host set to '${name}' (will be wired in a future release)`));
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    console.log(chalk.green(`Default compute set to '${name}' (will be wired in a future release)`));
   });
 
-hostCmd.command("ssh")
-  .description("SSH into a host")
-  .argument("<name>", "Host name")
+computeCmd.command("ssh")
+  .description("SSH into a compute")
+  .argument("<name>", "Compute name")
   .action((name) => {
-    const host = core.getHost(name);
-    if (!host) { console.log(chalk.red(`Host '${name}' not found`)); return; }
-    const ip = (host.config as any).ip;
-    const keyPath = (host.config as any).key_path;
-    const user = (host.config as any).ssh_user ?? "ubuntu";
-    if (!ip) { console.log(chalk.red(`Host '${name}' has no IP address`)); return; }
+    const compute = core.getCompute(name);
+    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    const ip = (compute.config as any).ip;
+    const keyPath = (compute.config as any).key_path;
+    const user = (compute.config as any).ssh_user ?? "ubuntu";
+    if (!ip) { console.log(chalk.red(`Compute '${name}' has no IP address`)); return; }
     const sshArgs = [`${user}@${ip}`];
     if (keyPath) sshArgs.unshift("-i", keyPath);
     console.log(chalk.dim(`$ ssh ${sshArgs.join(" ")}`));

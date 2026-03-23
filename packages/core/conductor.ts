@@ -111,28 +111,28 @@ export function startConductor(port = DEFAULT_PORT): void {
     if (polling) return;
     polling = true;
     try {
-      const hosts = store.listHosts({ status: "running" });
-      for (const host of hosts) {
-        const provider = getProvider(host.provider);
+      const computes = store.listCompute({ status: "running" });
+      for (const compute of computes) {
+        const provider = getProvider(compute.provider);
         if (!provider) continue;
         try {
           // Fetch metrics (results are used by TUI which reads from provider directly)
-          await provider.getMetrics(host);
+          await provider.getMetrics(compute);
 
-          // Probe ports for running sessions on this host
+          // Probe ports for running sessions on this compute
           const sessions = store.listSessions({ status: "running" });
           for (const s of sessions) {
-            if (s.compute_name !== host.name) continue;
+            if (s.compute_name !== compute.name) continue;
             const ports = (s.config as any)?.ports ?? [];
             if (ports.length > 0) {
-              const status = await provider.probePorts(host, ports);
+              const status = await provider.probePorts(compute, ports);
               // Update session config with port status
               store.updateSession(s.id, {
                 config: { ...s.config, ports: status },
               });
             }
           }
-        } catch { /* host unreachable, skip */ }
+        } catch { /* compute unreachable, skip */ }
       }
     } catch { /* ignore polling errors */ } finally { polling = false; }
   }, 30_000);

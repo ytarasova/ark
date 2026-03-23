@@ -76,7 +76,7 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
   return hints;
 }
 
-function getHostHints(): React.ReactNode[] {
+function getComputeHints(): React.ReactNode[] {
   return [
     <KeyHint key="jk" k="j/k" label="move" />,
     <KeyHint key="tab" k="Tab" label="detail" />,
@@ -103,7 +103,7 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
 
   const hints = pane === "right" ? getRightPaneHints()
     : tab === "sessions" ? getSessionHints(selectedSession)
-    : tab === "hosts" ? getHostHints()
+    : tab === "compute" ? getComputeHints()
     : getGenericHints();
 
   return (

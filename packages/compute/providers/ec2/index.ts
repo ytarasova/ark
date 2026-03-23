@@ -17,12 +17,12 @@ import type {
   ProvisionOpts,
   LaunchOpts,
   SyncOpts,
-  HostSnapshot,
+  ComputeSnapshot,
   PortDecl,
   PortStatus,
 } from "../../types.js";
-import type { Host, Session } from "../../../core/store.js";
-import { updateHost, mergeHostConfig } from "../../../core/store.js";
+import type { Compute, Session } from "../../../core/store.js";
+import { updateCompute, mergeComputeConfig } from "../../../core/store.js";
 import { sshKeyPath, sshExec, sshExecAsync, waitForSsh, waitForSshAsync, generateSshKey } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
@@ -62,17 +62,17 @@ function createEc2Client(cfg: EC2HostConfig): EC2Client {
 export class EC2Provider implements ComputeProvider {
   readonly name = "ec2";
 
-  async provision(host: Host, opts?: ProvisionOpts): Promise<void> {
+  async provision(compute: Compute, opts?: ProvisionOpts): Promise<void> {
     const log = opts?.onLog ?? (() => {});
-    const cfg = host.config as EC2HostConfig;
-    updateHost(host.name, { status: "provisioning" });
+    const cfg = compute.config as EC2HostConfig;
+    updateCompute(compute.name, { status: "provisioning" });
 
     // Ensure Pulumi CLI is available (auto-installs if missing)
     ensurePulumi(log);
 
-    // Generate SSH key pair for this host
+    // Generate SSH key pair for this compute
     log("Generating SSH key pair...");
-    const { privateKeyPath } = generateSshKey(host.name);
+    const { privateKeyPath } = generateSshKey(compute.name);
 
     // Build cloud-init user data
     log("Building cloud-init script...");
@@ -82,7 +82,7 @@ export class EC2Provider implements ComputeProvider {
 
     // Provision via Pulumi
     log("Creating Pulumi stack...");
-    const result = await provisionStack(host.name, {
+    const result = await provisionStack(compute.name, {
       size: opts?.size ?? cfg.size ?? "m",
       arch: opts?.arch ?? cfg.arch ?? "x64",
       region: cfg.region ?? "us-east-1",
@@ -100,10 +100,10 @@ export class EC2Provider implements ComputeProvider {
       },
     });
 
-    // Update host with runtime state
+    // Update compute with runtime state
     log(`Instance ${result.instance_id} launched (IP: ${result.ip ?? "pending"})`);
-    updateHost(host.name, { status: "running" });
-    mergeHostConfig(host.name, result as unknown as Record<string, unknown>);
+    updateCompute(compute.name, { status: "running" });
+    mergeComputeConfig(compute.name, result as unknown as Record<string, unknown>);
 
     // Store hourly rate for cost tracking
     const instanceType = resolveInstanceType(
@@ -112,7 +112,7 @@ export class EC2Provider implements ComputeProvider {
     );
     const rate = hourlyRate(instanceType);
     if (rate > 0) {
-      mergeHostConfig(host.name, { hourlyRate: rate });
+      mergeComputeConfig(compute.name, { hourlyRate: rate });
       log(`Cost: $${rate.toFixed(3)}/hr (~$${(rate * 24).toFixed(2)}/day)`);
     }
 
@@ -135,13 +135,13 @@ export class EC2Provider implements ComputeProvider {
       // Poll cloud-init status
       if (sshOk) {
         log("Waiting for cloud-init to complete...");
-        const key = sshKeyPath(host.name);
+        const key = sshKeyPath(compute.name);
         await poll(
           async () => {
             const { stdout } = await sshExecAsync(key, result.ip!, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 15_000 });
             if (stdout.trim().includes("provisioning complete")) {
               log("Cloud-init complete - all packages installed");
-              mergeHostConfig(host.name, { cloud_init_done: true });
+              mergeComputeConfig(compute.name, { cloud_init_done: true });
               return true;
             }
             const { stdout: progress } = await sshExecAsync(key, result.ip!,
@@ -156,21 +156,21 @@ export class EC2Provider implements ComputeProvider {
     }
   }
 
-  async destroy(host: Host): Promise<void> {
-    const cfg = host.config as EC2HostConfig;
-    await destroyStack(host.name, {
+  async destroy(compute: Compute): Promise<void> {
+    const cfg = compute.config as EC2HostConfig;
+    await destroyStack(compute.name, {
       region: cfg.region ?? "us-east-1",
       stackName: cfg.stack_name,
       awsProfile: cfg.aws_profile,
     });
-    updateHost(host.name, { status: "destroyed" });
-    mergeHostConfig(host.name, { instance_id: null, ip: null });
+    updateCompute(compute.name, { status: "destroyed" });
+    mergeComputeConfig(compute.name, { instance_id: null, ip: null });
   }
 
-  async start(host: Host): Promise<void> {
-    const cfg = host.config as EC2HostConfig;
+  async start(compute: Compute): Promise<void> {
+    const cfg = compute.config as EC2HostConfig;
     const instanceId = cfg.instance_id;
-    if (!instanceId) throw new Error(`Host '${host.name}' has no instance_id`);
+    if (!instanceId) throw new Error(`Compute '${compute.name}' has no instance_id`);
 
     const ec2 = createEc2Client(cfg);
     await ec2.send(new StartInstancesCommand({ InstanceIds: [instanceId] }));
@@ -190,19 +190,19 @@ export class EC2Provider implements ComputeProvider {
       { maxAttempts: 60, delayMs: 5000 },
     );
 
-    updateHost(host.name, { status: "running" });
-    mergeHostConfig(host.name, { ip });
+    updateCompute(compute.name, { status: "running" });
+    mergeComputeConfig(compute.name, { ip });
 
     if (ip) {
-      const key = sshKeyPath(host.name);
+      const key = sshKeyPath(compute.name);
       await waitForSshAsync(key, ip);
     }
   }
 
-  async stop(host: Host): Promise<void> {
-    const cfg = host.config as EC2HostConfig;
+  async stop(compute: Compute): Promise<void> {
+    const cfg = compute.config as EC2HostConfig;
     const instanceId = cfg.instance_id;
-    if (!instanceId) throw new Error(`Host '${host.name}' has no instance_id`);
+    if (!instanceId) throw new Error(`Compute '${compute.name}' has no instance_id`);
 
     const ec2 = createEc2Client(cfg);
     await ec2.send(new StopInstancesCommand({ InstanceIds: [instanceId] }));
@@ -215,15 +215,15 @@ export class EC2Provider implements ComputeProvider {
       { maxAttempts: 60, delayMs: 5000 },
     );
 
-    updateHost(host.name, { status: "stopped" });
-    mergeHostConfig(host.name, { ip: null });
+    updateCompute(compute.name, { status: "stopped" });
+    mergeComputeConfig(compute.name, { ip: null });
   }
 
-  async launch(host: Host, session: Session, opts: LaunchOpts): Promise<string> {
-    const cfg = host.config as EC2HostConfig;
+  async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
+    const cfg = compute.config as EC2HostConfig;
     const ip = cfg.ip;
-    if (!ip) throw new Error(`Host '${host.name}' has no IP`);
-    const key = sshKeyPath(host.name);
+    if (!ip) throw new Error(`Compute '${compute.name}' has no IP`);
+    const key = sshKeyPath(compute.name);
 
     // 1. Resolve repo URL
     const repoUrl = resolveRepoUrl(session.repo ?? opts.workdir);
@@ -285,11 +285,11 @@ export class EC2Provider implements ComputeProvider {
     return opts.tmuxName;
   }
 
-  async attach(host: Host, session: Session): Promise<void> {
-    const cfg = host.config as EC2HostConfig;
+  async attach(compute: Compute, session: Session): Promise<void> {
+    const cfg = compute.config as EC2HostConfig;
     const ip = cfg.ip;
     if (!ip) return;
-    const key = sshKeyPath(host.name);
+    const key = sshKeyPath(compute.name);
 
     // Re-establish tunnels from session's port list
     const ports: PortDecl[] = (session.config as any)?.ports ?? [];
@@ -298,25 +298,25 @@ export class EC2Provider implements ComputeProvider {
     }
   }
 
-  async getMetrics(host: Host): Promise<HostSnapshot> {
-    const cfg = host.config as EC2HostConfig;
+  async getMetrics(compute: Compute): Promise<ComputeSnapshot> {
+    const cfg = compute.config as EC2HostConfig;
     const ip = cfg.ip;
-    if (!ip) throw new Error(`Host '${host.name}' has no IP`);
-    return fetchMetricsAsync(sshKeyPath(host.name), ip);
+    if (!ip) throw new Error(`Compute '${compute.name}' has no IP`);
+    return fetchMetricsAsync(sshKeyPath(compute.name), ip);
   }
 
-  async probePorts(host: Host, ports: PortDecl[]): Promise<PortStatus[]> {
-    const cfg = host.config as EC2HostConfig;
+  async probePorts(compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
+    const cfg = compute.config as EC2HostConfig;
     const ip = cfg.ip;
     if (!ip) return ports.map((p) => ({ ...p, listening: false }));
-    return probeRemotePorts(sshKeyPath(host.name), ip, ports);
+    return probeRemotePorts(sshKeyPath(compute.name), ip, ports);
   }
 
-  async syncEnvironment(host: Host, opts: SyncOpts): Promise<void> {
-    const cfg = host.config as EC2HostConfig;
+  async syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void> {
+    const cfg = compute.config as EC2HostConfig;
     const ip = cfg.ip;
-    if (!ip) throw new Error(`Host '${host.name}' has no IP`);
-    const key = sshKeyPath(host.name);
+    if (!ip) throw new Error(`Compute '${compute.name}' has no IP`);
+    const key = sshKeyPath(compute.name);
 
     syncToHost(key, ip, {
       direction: opts.direction,

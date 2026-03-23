@@ -38,7 +38,7 @@ export function useStoreContext(): StoreData {
 export function createMockStore(overrides?: Partial<StoreData>): StoreData {
   return {
     sessions: [],
-    hosts: [],
+    computes: [],
     agents: [],
     flows: [],
     refreshing: false,

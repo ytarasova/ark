@@ -2,7 +2,7 @@
  * Extended end-to-end tests for the compute layer.
  *
  * Exercises provider resolution, port probing with live servers,
- * arc.json resolution from multiple sources, mergeHostConfig,
+ * arc.json resolution from multiple sources, mergeComputeConfig,
  * and sessionChannelPort.
  */
 
@@ -12,11 +12,11 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 import {
-  createHost,
-  getHost,
-  updateHost,
-  deleteHost,
-  mergeHostConfig,
+  createCompute,
+  getCompute,
+  updateCompute,
+  deleteCompute,
+  mergeComputeConfig,
   sessionChannelPort,
   getDb,
 } from "../../core/store.js";
@@ -39,62 +39,62 @@ function ensureProviders() {
 }
 
 // Track resources for cleanup
-const hostNames: string[] = [];
+const computeNames: string[] = [];
 
-function cleanupHosts() {
-  for (const name of hostNames) {
-    try { deleteHost(name); } catch { /* already gone */ }
+function cleanupComputes() {
+  for (const name of computeNames) {
+    try { deleteCompute(name); } catch { /* already gone */ }
   }
-  hostNames.length = 0;
+  computeNames.length = 0;
 }
 
-// ── Test 1: EC2 host creation and provider resolution ───────────────────────
+// ── Test 1: EC2 compute creation and provider resolution ───────────────────────
 
-describe("E2E Compute: EC2 host provider resolution", () => {
+describe("E2E Compute: EC2 compute provider resolution", () => {
   beforeEach(() => ensureProviders());
-  afterEach(() => cleanupHosts());
+  afterEach(() => cleanupComputes());
 
-  it("creates an EC2 host and resolves its provider", () => {
+  it("creates an EC2 compute and resolves its provider", () => {
     const name = `test-ec2-resolve-${Date.now()}`;
-    const host = createHost({
+    const compute = createCompute({
       name,
       provider: "ec2",
       config: { size: "m", region: "us-east-1" },
     });
-    hostNames.push(name);
+    computeNames.push(name);
 
-    expect(host.name).toBe(name);
-    expect(host.provider).toBe("ec2");
-    expect(host.status).toBe("stopped"); // non-local hosts start stopped
+    expect(compute.name).toBe(name);
+    expect(compute.provider).toBe("ec2");
+    expect(compute.status).toBe("stopped"); // non-local computes start stopped
 
     const provider = getProvider("ec2");
     expect(provider).not.toBeNull();
     expect(provider!.name).toBe("ec2");
 
     // Verify config was stored
-    expect((host.config as any).size).toBe("m");
-    expect((host.config as any).region).toBe("us-east-1");
+    expect((compute.config as any).size).toBe("m");
+    expect((compute.config as any).region).toBe("us-east-1");
   });
 });
 
-// ── Test 2: Docker host creation and provider resolution ────────────────────
+// ── Test 2: Docker compute creation and provider resolution ────────────────────
 
-describe("E2E Compute: Docker host provider resolution", () => {
+describe("E2E Compute: Docker compute provider resolution", () => {
   beforeEach(() => ensureProviders());
-  afterEach(() => cleanupHosts());
+  afterEach(() => cleanupComputes());
 
-  it("creates a Docker host and resolves its provider", () => {
+  it("creates a Docker compute and resolves its provider", () => {
     const name = `test-docker-resolve-${Date.now()}`;
-    const host = createHost({
+    const compute = createCompute({
       name,
       provider: "docker",
       config: { image: "ubuntu:22.04", memory: "4g" },
     });
-    hostNames.push(name);
+    computeNames.push(name);
 
-    expect(host.name).toBe(name);
-    expect(host.provider).toBe("docker");
-    expect(host.status).toBe("stopped");
+    expect(compute.name).toBe(name);
+    expect(compute.provider).toBe("docker");
+    expect(compute.status).toBe("stopped");
 
     const provider = getProvider("docker");
     expect(provider).not.toBeNull();
@@ -206,17 +206,17 @@ describe("E2E Compute: resolvePortDecls with all three sources", () => {
 
 describe("E2E Compute: Local provider getMetrics", () => {
   beforeEach(() => ensureProviders());
-  afterEach(() => cleanupHosts());
+  afterEach(() => cleanupComputes());
 
   it("returns a valid metrics snapshot", async () => {
     const name = `test-metrics-local-${Date.now()}`;
-    const host = createHost({ name, provider: "local" });
-    hostNames.push(name);
+    const compute = createCompute({ name, provider: "local" });
+    computeNames.push(name);
 
     const provider = getProvider("local")!;
     expect(provider).not.toBeNull();
 
-    const snapshot = await provider.getMetrics(host);
+    const snapshot = await provider.getMetrics(compute);
 
     // Verify all metric fields exist and are valid
     expect(snapshot).toBeDefined();
@@ -250,12 +250,12 @@ describe("E2E Compute: Local provider getMetrics", () => {
 
 describe("E2E Compute: Local provider probePorts", () => {
   beforeEach(() => ensureProviders());
-  afterEach(() => cleanupHosts());
+  afterEach(() => cleanupComputes());
 
   it("detects a listening port and a closed port", async () => {
     const name = `test-probe-local-${Date.now()}`;
-    const host = createHost({ name, provider: "local" });
-    hostNames.push(name);
+    const compute = createCompute({ name, provider: "local" });
+    computeNames.push(name);
 
     const provider = getProvider("local")!;
 
@@ -270,7 +270,7 @@ describe("E2E Compute: Local provider probePorts", () => {
 
     try {
       // Probe the listening port
-      const probeUp = await provider.probePorts(host, [
+      const probeUp = await provider.probePorts(compute, [
         { port, source: "test" },
       ]);
       expect(probeUp).toHaveLength(1);
@@ -284,7 +284,7 @@ describe("E2E Compute: Local provider probePorts", () => {
       await new Promise((r) => setTimeout(r, 500));
 
       // Probe again - should not be listening
-      const probeDown = await provider.probePorts(host, [
+      const probeDown = await provider.probePorts(compute, [
         { port, source: "test" },
       ]);
       expect(probeDown).toHaveLength(1);
@@ -296,35 +296,35 @@ describe("E2E Compute: Local provider probePorts", () => {
   });
 });
 
-// ── Test 6: mergeHostConfig ─────────────────────────────────────────────────
+// ── Test 6: mergeComputeConfig ─────────────────────────────────────────────────
 
-describe("E2E Compute: mergeHostConfig", () => {
-  afterEach(() => cleanupHosts());
+describe("E2E Compute: mergeComputeConfig", () => {
+  afterEach(() => cleanupComputes());
 
   it("merges config keys without overwriting existing ones", () => {
     const name = `test-merge-cfg-${Date.now()}`;
-    createHost({
+    createCompute({
       name,
       provider: "local",
       config: { existing: "value", count: 42 },
     });
-    hostNames.push(name);
+    computeNames.push(name);
 
-    const updated = mergeHostConfig(name, { newKey: "hello", count: 99 });
+    const updated = mergeComputeConfig(name, { newKey: "hello", count: 99 });
     expect(updated).not.toBeNull();
     expect((updated!.config as any).existing).toBe("value"); // preserved
     expect((updated!.config as any).newKey).toBe("hello");   // added
     expect((updated!.config as any).count).toBe(99);         // overwritten
 
     // Verify via re-read
-    const host = getHost(name);
-    expect((host!.config as any).existing).toBe("value");
-    expect((host!.config as any).newKey).toBe("hello");
-    expect((host!.config as any).count).toBe(99);
+    const compute = getCompute(name);
+    expect((compute!.config as any).existing).toBe("value");
+    expect((compute!.config as any).newKey).toBe("hello");
+    expect((compute!.config as any).count).toBe(99);
   });
 
-  it("returns null for non-existent host", () => {
-    const result = mergeHostConfig("nonexistent-host", { key: "val" });
+  it("returns null for non-existent compute", () => {
+    const result = mergeComputeConfig("nonexistent-compute", { key: "val" });
     expect(result).toBeNull();
   });
 });

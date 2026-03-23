@@ -145,15 +145,15 @@ describe("e2e: reconciliation", () => {
   }, 30_000);
 });
 
-// ── Test 3: Nonexistent compute host ───────────────────────────────────────
+// ── Test 3: Nonexistent compute ───────────────────────────────────────
 
 describe("e2e: dispatch edge cases", () => {
-  it("dispatch to nonexistent compute host fails gracefully", async () => {
+  it("dispatch to nonexistent compute fails gracefully", async () => {
     const session = core.startSession({
       repo: process.cwd(),
-      summary: "e2e-bad-host",
+      summary: "e2e-bad-compute",
       flow: "bare",
-      compute_name: "nonexistent-host",
+      compute_name: "nonexistent-compute",
     });
     sessionIds.push(session.id);
     expect(session.status).toBe("ready");

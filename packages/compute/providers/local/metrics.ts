@@ -7,10 +7,10 @@
 import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
 import type {
-  HostSnapshot,
-  HostMetrics,
-  HostSession,
-  HostProcess,
+  ComputeSnapshot,
+  ComputeMetrics,
+  ComputeSession,
+  ComputeProcess,
   DockerContainer,
 } from "../../types.js";
 
@@ -146,11 +146,11 @@ async function getUptimeAsync(): Promise<string> {
 
 // ── Tmux sessions ───────────────────────────────────────────────────────────
 
-function getTmuxSessions(): HostSession[] {
+function getTmuxSessions(): ComputeSession[] {
   const listOut = run("tmux", ["list-sessions"]);
   if (!listOut) return [];
 
-  const sessions: HostSession[] = [];
+  const sessions: ComputeSession[] = [];
 
   for (const line of listOut.split("\n")) {
     if (!line.trim()) continue;
@@ -220,11 +220,11 @@ function getTmuxSessions(): HostSession[] {
   return sessions;
 }
 
-async function getTmuxSessionsAsync(): Promise<HostSession[]> {
+async function getTmuxSessionsAsync(): Promise<ComputeSession[]> {
   const listOut = await runAsync("tmux", ["list-sessions"]);
   if (!listOut) return [];
 
-  const sessions: HostSession[] = [];
+  const sessions: ComputeSession[] = [];
 
   for (const line of listOut.split("\n")) {
     if (!line.trim()) continue;
@@ -292,14 +292,14 @@ async function getTmuxSessionsAsync(): Promise<HostSession[]> {
 
 // ── Top processes ───────────────────────────────────────────────────────────
 
-function getTopProcesses(): HostProcess[] {
+function getTopProcesses(): ComputeProcess[] {
   const out = run("ps", ["aux"]);
   if (!out) return [];
 
   const lines = out.split("\n");
   if (lines.length < 2) return [];
 
-  const procs: HostProcess[] = [];
+  const procs: ComputeProcess[] = [];
 
   // Skip header (first line)
   for (let i = 1; i < lines.length; i++) {
@@ -327,13 +327,13 @@ function getTopProcesses(): HostProcess[] {
   return procs.slice(0, 8);
 }
 
-function parseTopProcesses(out: string): HostProcess[] {
+function parseTopProcesses(out: string): ComputeProcess[] {
   if (!out) return [];
 
   const lines = out.split("\n");
   if (lines.length < 2) return [];
 
-  const procs: HostProcess[] = [];
+  const procs: ComputeProcess[] = [];
 
   // Skip header (first line)
   for (let i = 1; i < lines.length; i++) {
@@ -361,7 +361,7 @@ function parseTopProcesses(out: string): HostProcess[] {
   return procs.slice(0, 8);
 }
 
-async function getTopProcessesAsync(): Promise<HostProcess[]> {
+async function getTopProcessesAsync(): Promise<ComputeProcess[]> {
   return parseTopProcesses(await runAsync("ps", ["aux"]));
 }
 
@@ -485,7 +485,7 @@ async function getDockerContainersAsync(): Promise<DockerContainer[]> {
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
-export async function collectLocalMetrics(): Promise<HostSnapshot> {
+export async function collectLocalMetrics(): Promise<ComputeSnapshot> {
   // Run all async collectors in parallel - non-blocking
   const [cpu, mem, diskPct, uptime, sessions, processes, docker] = await Promise.all([
     getCpuAsync(),
@@ -497,7 +497,7 @@ export async function collectLocalMetrics(): Promise<HostSnapshot> {
     getDockerContainersAsync(),
   ]);
 
-  const metrics: HostMetrics = {
+  const metrics: ComputeMetrics = {
     cpu,
     memUsedGb: mem.usedGb,
     memTotalGb: mem.totalGb,

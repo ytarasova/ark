@@ -10,7 +10,7 @@ interface EventLogProps {
 
 interface DisplayEvent {
   time: string;
-  source: string;  // session ID or host name
+  source: string;  // session ID or compute name
   type: string;
   message: string; // human-readable via formatEvent
   color: string;

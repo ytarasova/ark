@@ -6,7 +6,7 @@ import { join } from "path";
 import { homedir } from "os";
 import * as core from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
-import type { HostSnapshot } from "../../compute/types.js";
+import type { ComputeSnapshot } from "../../compute/types.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { MetricBar } from "../components/MetricBar.js";
@@ -14,13 +14,13 @@ import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { KeyValue } from "../components/KeyValue.js";
 import { DataTable } from "../components/DataTable.js";
-import { useHostMetrics } from "../hooks/useHostMetrics.js";
+import { useComputeMetrics } from "../hooks/useComputeMetrics.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 
-interface HostsTabProps extends StoreData {
+interface ComputeTabProps extends StoreData {
   async: AsyncState;
   pane: "left" | "right";
   onShowForm: () => void;
@@ -28,13 +28,13 @@ interface HostsTabProps extends StoreData {
   refresh: () => void;
 }
 
-export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: asyncState, onShowForm, formOverlay }: HostsTabProps) {
+export function ComputeTab({ computes, sessions, refreshing, refresh, pane, async: asyncState, onShowForm, formOverlay }: ComputeTabProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const { sel } = useListNavigation(hosts.length, { active: pane === "left" && !formOverlay && !confirmDelete });
+  const { sel } = useListNavigation(computes.length, { active: pane === "left" && !formOverlay && !confirmDelete });
   const status = useStatusMessage();
-  const { snapshots, logs, addLog } = useHostMetrics(hosts, true);
+  const { snapshots, logs, addLog } = useComputeMetrics(computes, true);
 
-  const selected = hosts[sel] ?? null;
+  const selected = computes[sel] ?? null;
 
   useInput((input, key) => {
     if (formOverlay) return;
@@ -43,8 +43,8 @@ export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: as
     // If in confirm-delete mode, only respond to x or cancel
     if (confirmDelete) {
       if (input === "x" && selected) {
-        asyncState.run(`Deleting host ${selected.name}`, async () => {
-          core.deleteHost(selected.name);
+        asyncState.run(`Deleting compute ${selected.name}`, async () => {
+          core.deleteCompute(selected.name);
           refresh();
         });
       }
@@ -58,7 +58,7 @@ export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: as
         if (!provider) return;
 
         addLog(selected.name, "Starting provisioning...");
-        core.updateHost(selected.name, { status: "provisioning" });
+        core.updateCompute(selected.name, { status: "provisioning" });
 
         asyncState.run(`Provisioning ${selected.name}`, async () => {
           addLog(selected.name, `Provider: ${selected.provider}, size: ${(selected.config as any)?.size ?? "default"}`);
@@ -72,8 +72,8 @@ export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: as
             }),
             timeout,
           ]);
-          core.updateHost(selected.name, { status: "running" });
-          addLog(selected.name, "Provisioning complete - host is running");
+          core.updateCompute(selected.name, { status: "running" });
+          addLog(selected.name, "Provisioning complete - compute is running");
           refresh();
         });
       }
@@ -83,30 +83,30 @@ export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: as
       if (!provider) return;
 
       if (selected.status === "running") {
-        addLog(selected.name, "Stopping host...");
+        addLog(selected.name, "Stopping compute...");
         asyncState.run(`Stopping ${selected.name}`, async () => {
           await provider.stop(selected);
-          core.updateHost(selected.name, { status: "stopped" });
-          addLog(selected.name, "Host stopped");
+          core.updateCompute(selected.name, { status: "stopped" });
+          addLog(selected.name, "Compute stopped");
           refresh();
         });
       } else if (selected.status === "stopped") {
-        addLog(selected.name, "Starting host...");
+        addLog(selected.name, "Starting compute...");
         asyncState.run(`Starting ${selected.name}`, async () => {
           await provider.start(selected);
-          core.updateHost(selected.name, { status: "running" });
-          addLog(selected.name, "Host started");
+          core.updateCompute(selected.name, { status: "running" });
+          addLog(selected.name, "Compute started");
           refresh();
         });
       }
     } else if (input === "x") {
       if (!selected) return;
       if (selected.status !== "stopped" && selected.status !== "destroyed") {
-        addLog(selected.name, `Cannot delete: host is ${selected.status}`);
+        addLog(selected.name, `Cannot delete: compute is ${selected.status}`);
         return;
       }
       setConfirmDelete(true);
-      status.show(`Delete host '${selected.name}'? Press x to confirm, any key to cancel`);
+      status.show(`Delete compute '${selected.name}'? Press x to confirm, any key to cancel`);
     } else if (input === "a") {
       if (selected?.status === "running") {
         const ip = (selected.config as any)?.ip;
@@ -155,31 +155,31 @@ export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: as
       {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
         focus={pane}
-        leftTitle="Hosts"
+        leftTitle="Compute"
         rightTitle="Details"
         left={
           <TreeList
-            items={hosts}
+            items={computes}
             groupBy={h => h.provider}
             renderRow={(h) => {
-              const icon = h.status === "destroyed" ? "✕" : h.status === "running" ? "●" : "○";
-              const marker = hosts.indexOf(h) === sel ? ">" : " ";
+              const icon = h.status === "destroyed" ? "\u2715" : h.status === "running" ? "\u25CF" : "\u25CB";
+              const marker = computes.indexOf(h) === sel ? ">" : " ";
               return ` ${marker} ${icon} ${h.name.padEnd(16)} ${h.provider}`;
             }}
             renderColoredRow={(h) => {
               const iconColor = (h.status === "running" ? "green" : h.status === "provisioning" ? "yellow" : h.status === "destroyed" ? "red" : "gray") as any;
-              const icon = h.status === "destroyed" ? "✕" : h.status === "running" ? "●" : "○";
+              const icon = h.status === "destroyed" ? "\u2715" : h.status === "running" ? "\u25CF" : "\u25CB";
               return <Text>{" "} <Text color={iconColor}>{icon}</Text>{` ${h.name.padEnd(16)} ${h.provider}`}</Text>;
             }}
             sel={sel}
-            emptyMessage="No hosts configured."
+            emptyMessage="No compute configured."
           />
         }
         right={formOverlay ??
-          <HostDetail
-            host={selected}
+          <ComputeDetail
+            compute={selected}
             snapshot={selected ? snapshots.get(selected.name) : undefined}
-            hostLogs={selected ? logs.get(selected.name) : undefined}
+            computeLogs={selected ? logs.get(selected.name) : undefined}
             sessions={sessions}
             pane={pane}
           />
@@ -194,19 +194,19 @@ export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: as
   );
 }
 
-// ── Detail ──────────────────────────────────────────────────────────────────
+// -- Detail ------------------------------------------------------------------
 
-interface HostDetailProps {
-  host: core.Host | null;
-  snapshot?: HostSnapshot;
-  hostLogs?: string[];
+interface ComputeDetailProps {
+  compute: core.Compute | null;
+  snapshot?: ComputeSnapshot;
+  computeLogs?: string[];
   sessions: core.Session[];
   pane: "left" | "right";
 }
 
-function HostDetail({ host: h, snapshot, hostLogs, sessions, pane }: HostDetailProps) {
+function ComputeDetail({ compute: h, snapshot, computeLogs, sessions, pane }: ComputeDetailProps) {
   if (!h) {
-    return <Text dimColor>{"  No host selected"}</Text>;
+    return <Text dimColor>{"  No compute selected"}</Text>;
   }
 
   const cfg = h.config as Record<string, unknown>;
@@ -335,11 +335,11 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions, pane }: HostDetailP
       )}
 
       {/* Activity log */}
-      {hostLogs && hostLogs.length > 0 && (
+      {computeLogs && computeLogs.length > 0 && (
         <>
           <Text> </Text>
           <SectionHeader title="Activity Log" />
-          {hostLogs.slice(-15).map((entry, i) => (
+          {computeLogs.slice(-15).map((entry, i) => (
             <Text key={i} dimColor>{`  ${entry}`}</Text>
           ))}
         </>
@@ -347,11 +347,11 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions, pane }: HostDetailP
 
       {/* Ports */}
       {(() => {
-        const hostSessions = sessions.filter(
+        const computeSessions = sessions.filter(
           (s) => s.compute_name === h.name && s.status === "running"
         );
         const allPorts: any[] = [];
-        for (const s of hostSessions) {
+        for (const s of computeSessions) {
           const ports = (s.config as any)?.ports ?? [];
           allPorts.push(...ports);
         }
@@ -364,7 +364,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions, pane }: HostDetailP
               const name = p.name ? ` (${p.name})` : "";
               return (
                 <Text key={i}>
-                  {"  "}<Text color={p.listening ? "green" : "red"}>{p.listening ? "●" : "○"}</Text>
+                  {"  "}<Text color={p.listening ? "green" : "red"}>{p.listening ? "\u25CF" : "\u25CB"}</Text>
                   {` :${p.port}${name}  ${p.source}  ${p.listening ? "listening" : "closed"}`}
                 </Text>
               );

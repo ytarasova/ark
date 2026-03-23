@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { DockerProvider, containerName } from "../providers/docker/index.js";
 
 const provider = new DockerProvider();
-const fakeHost = { name: "docker-test", provider: "docker", status: "running", config: {}, created_at: "", updated_at: "" };
+const fakeCompute = { name: "docker-test", provider: "docker", status: "running", config: {}, created_at: "", updated_at: "" };
 
 describe("DockerProvider", () => {
   it("has name 'docker'", () => {
@@ -16,7 +16,7 @@ describe("DockerProvider", () => {
   });
 
   it("getMetrics returns valid snapshot shape", async () => {
-    const snap = await provider.getMetrics(fakeHost);
+    const snap = await provider.getMetrics(fakeCompute);
     expect(snap).toHaveProperty("metrics");
     expect(snap).toHaveProperty("sessions");
     expect(snap).toHaveProperty("processes");
@@ -39,19 +39,19 @@ describe("DockerProvider", () => {
   });
 
   it("probePorts returns status for each port", async () => {
-    const result = await provider.probePorts(fakeHost, [{ port: 99999, source: "test" }]);
+    const result = await provider.probePorts(fakeCompute, [{ port: 99999, source: "test" }]);
     expect(result).toHaveLength(1);
     expect(result[0].listening).toBe(false);
   });
 
   it("syncEnvironment is a no-op (uses mounts)", async () => {
-    await provider.syncEnvironment(fakeHost, { direction: "push" });
+    await provider.syncEnvironment(fakeCompute, { direction: "push" });
   });
 });
 
 describe("containerName", () => {
-  it("prefixes host name with ark-", () => {
-    expect(containerName("my-host")).toBe("ark-my-host");
+  it("prefixes compute name with ark-", () => {
+    expect(containerName("my-compute")).toBe("ark-my-compute");
   });
 
   it("handles simple names", () => {
@@ -68,8 +68,8 @@ describe("DockerProvider.provision", () => {
     // This test will only pass in environments without Docker.
     // In CI with Docker, provision would succeed. We check that
     // the method at least validates Docker availability.
-    const hostNoDocker = {
-      ...fakeHost,
+    const computeNoDocker = {
+      ...fakeCompute,
       name: "no-docker-test",
       config: { image: "nonexistent-image-abc:latest" },
     };
@@ -78,7 +78,7 @@ describe("DockerProvider.provision", () => {
     // or if the image doesn't exist. Either way it should not
     // silently succeed with a bogus image.
     try {
-      await provider.provision(hostNoDocker);
+      await provider.provision(computeNoDocker);
       // If we reach here, Docker is running. That's fine,
       // it will fail on the pull of a nonexistent image.
     } catch (err) {

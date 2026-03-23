@@ -1,11 +1,11 @@
 import { describe, it, expect } from "bun:test";
 import { execFileSync } from "child_process";
 import { LocalProvider } from "../providers/local/index.js";
-import type { Host, Session } from "../../core/store.js";
+import type { Compute, Session } from "../../core/store.js";
 
 const provider = new LocalProvider();
 
-const fakeHost: Host = {
+const fakeCompute: Compute = {
   name: "local",
   provider: "local",
   status: "running",
@@ -47,35 +47,35 @@ describe("LocalProvider", () => {
   });
 
   it("provision is a no-op", async () => {
-    await provider.provision(fakeHost);
+    await provider.provision(fakeCompute);
   });
 
   it("destroy throws", async () => {
-    expect(provider.destroy(fakeHost)).rejects.toThrow("Cannot destroy the local host");
+    expect(provider.destroy(fakeCompute)).rejects.toThrow("Cannot destroy the local compute");
   });
 
   it("start is a no-op", async () => {
-    await provider.start(fakeHost);
+    await provider.start(fakeCompute);
   });
 
   it("stop throws", async () => {
-    expect(provider.stop(fakeHost)).rejects.toThrow("Cannot stop the local host");
+    expect(provider.stop(fakeCompute)).rejects.toThrow("Cannot stop the local compute");
   });
 
   it("attach is a no-op", async () => {
-    await provider.attach(fakeHost, fakeSession);
+    await provider.attach(fakeCompute, fakeSession);
     // Should resolve without throwing
   });
 
   it("getMetrics returns a valid snapshot", async () => {
-    const snap = await provider.getMetrics(fakeHost);
+    const snap = await provider.getMetrics(fakeCompute);
     expect(snap.metrics.cpu).toBeGreaterThanOrEqual(0);
     expect(snap.metrics.memTotalGb).toBeGreaterThan(0);
     expect(Array.isArray(snap.sessions)).toBe(true);
   }, 30_000);
 
   it("probePorts returns status for each port", async () => {
-    const result = await provider.probePorts(fakeHost, [
+    const result = await provider.probePorts(fakeCompute, [
       { port: 99999, source: "test" },
     ]);
     expect(result).toHaveLength(1);
@@ -92,7 +92,7 @@ describe("LocalProvider", () => {
     });
     try {
       const port = server.port;
-      const result = await provider.probePorts(fakeHost, [
+      const result = await provider.probePorts(fakeCompute, [
         { port, source: "test" },
       ]);
       expect(result).toHaveLength(1);
@@ -114,7 +114,7 @@ describe("LocalProvider", () => {
       const listeningPort = server.port;
       const closedPort1 = 19111;
       const closedPort2 = 19222;
-      const result = await provider.probePorts(fakeHost, [
+      const result = await provider.probePorts(fakeCompute, [
         { port: listeningPort, source: "server" },
         { port: closedPort1, source: "closed1" },
         { port: closedPort2, source: "closed2" },
@@ -131,7 +131,7 @@ describe("LocalProvider", () => {
   it("launch creates a tmux session", async () => {
     const tmuxName = `ark-test-${Date.now()}`;
     try {
-      const returnedName = await provider.launch(fakeHost, fakeSession, {
+      const returnedName = await provider.launch(fakeCompute, fakeSession, {
         tmuxName,
         workdir: "/tmp",
         launcherContent: "echo hello && sleep 1",
@@ -150,6 +150,6 @@ describe("LocalProvider", () => {
   }, 10_000);
 
   it("syncEnvironment is a no-op", async () => {
-    await provider.syncEnvironment(fakeHost, { direction: "push" });
+    await provider.syncEnvironment(fakeCompute, { direction: "push" });
   });
 });

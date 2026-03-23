@@ -30,15 +30,15 @@ function arkSafe(...args: string[]): string {
 }
 
 // Track resources for cleanup
-const testHosts: string[] = [];
+const testComputes: string[] = [];
 const testSessionIds: string[] = [];
 
 afterEach(() => {
-  // Clean up hosts
-  for (const name of testHosts) {
-    try { ark("host", "delete", name); } catch { /* already gone */ }
+  // Clean up computes
+  for (const name of testComputes) {
+    try { ark("compute", "delete", name); } catch { /* already gone */ }
   }
-  testHosts.length = 0;
+  testComputes.length = 0;
 
   // Clean up sessions
   for (const id of testSessionIds) {
@@ -56,65 +56,65 @@ describe("CLI: version", () => {
   });
 });
 
-// ── Host commands ───────────────────────────────────────────────────────────
+// ── Compute commands ───────────────────────────────────────────────────────────
 
-describe("CLI: host lifecycle", () => {
-  it("creates a host with --provider ec2", () => {
-    const name = `test-e2e-host-${Date.now()}`;
-    testHosts.push(name);
+describe("CLI: compute lifecycle", () => {
+  it("creates a compute with --provider ec2", () => {
+    const name = `test-e2e-compute-${Date.now()}`;
+    testComputes.push(name);
 
-    const out = ark("host", "create", name, "--provider", "ec2");
-    expect(out).toContain(`Host '${name}' created`);
+    const out = ark("compute", "create", name, "--provider", "ec2");
+    expect(out).toContain(`Compute '${name}' created`);
     expect(out).toContain("Provider: ec2");
   });
 
-  it("lists hosts and shows the created host", () => {
+  it("lists computes and shows the created compute", () => {
     const name = `test-e2e-list-${Date.now()}`;
-    testHosts.push(name);
-    ark("host", "create", name, "--provider", "ec2");
+    testComputes.push(name);
+    ark("compute", "create", name, "--provider", "ec2");
 
-    const out = ark("host", "list");
+    const out = ark("compute", "list");
     expect(out).toContain(name);
     expect(out).toContain("ec2");
   });
 
-  it("shows host status as JSON", () => {
-    // Use ec2 provider so host starts as "stopped" - avoids the async
-    // metrics fetch that makes `host status` hang for local/running hosts
+  it("shows compute status as JSON", () => {
+    // Use ec2 provider so compute starts as "stopped" - avoids the async
+    // metrics fetch that makes `compute status` hang for local/running computes
     const name = `test-e2e-status-${Date.now()}`;
-    testHosts.push(name);
-    ark("host", "create", name, "--provider", "ec2");
+    testComputes.push(name);
+    ark("compute", "create", name, "--provider", "ec2");
 
-    const out = ark("host", "status", name);
-    // host status outputs JSON for the host object
+    const out = ark("compute", "status", name);
+    // compute status outputs JSON for the compute object
     expect(out).toContain(`"name": "${name}"`);
     expect(out).toContain(`"provider": "ec2"`);
     expect(out).toContain(`"status": "stopped"`);
   });
 
-  it("updates host config with --set", () => {
+  it("updates compute config with --set", () => {
     const name = `test-e2e-update-${Date.now()}`;
-    testHosts.push(name);
-    ark("host", "create", name, "--provider", "ec2");
+    testComputes.push(name);
+    ark("compute", "create", name, "--provider", "ec2");
 
-    const out = ark("host", "update", name, "--set", "foo=bar");
-    expect(out).toContain(`Host '${name}' updated`);
+    const out = ark("compute", "update", name, "--set", "foo=bar");
+    expect(out).toContain(`Compute '${name}' updated`);
     expect(out).toContain('"foo": "bar"');
   });
 
-  it("rejects deleting a running host", () => {
-    // The auto-created "local" host is always running, so delete should fail
-    const delOut = arkSafe("host", "delete", "local");
+  it("rejects deleting a running compute", () => {
+    // The auto-created "local" compute is always running, so delete should fail
+    const delOut = arkSafe("compute", "delete", "local");
     expect(delOut).toContain("running");
   });
 
-  it("deletes a stopped host", () => {
-    // EC2 hosts start as "stopped" which allows deletion
+  it("deletes a stopped compute", () => {
+    // EC2 computes start as "stopped" which allows deletion
     const name = `test-e2e-del2-${Date.now()}`;
-    ark("host", "create", name, "--provider", "ec2");
+    ark("compute", "create", name, "--provider", "ec2");
 
-    const out = ark("host", "delete", name);
-    expect(out).toContain(`Host '${name}' deleted`);
+    const out = ark("compute", "delete", name);
+    expect(out).toContain(`Compute '${name}' deleted`);
   });
 });
 

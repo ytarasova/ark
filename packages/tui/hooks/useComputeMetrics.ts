@@ -1,24 +1,24 @@
 import { useState, useEffect, useRef } from "react";
 import { getProvider } from "../../compute/index.js";
-import type { Host } from "../../core/index.js";
-import type { HostSnapshot } from "../../compute/types.js";
+import type { Compute } from "../../core/index.js";
+import type { ComputeSnapshot } from "../../compute/types.js";
 
-export function useHostMetrics(hosts: Host[], active: boolean, pollMs = 10000) {
-  const [snapshots, setSnapshots] = useState<Map<string, HostSnapshot>>(new Map());
+export function useComputeMetrics(computes: Compute[], active: boolean, pollMs = 10000) {
+  const [snapshots, setSnapshots] = useState<Map<string, ComputeSnapshot>>(new Map());
   const [logs, setLogs] = useState<Map<string, string[]>>(new Map());
   const [fetching, setFetching] = useState(false);
   const running = useRef(false);
-  const hostsRef = useRef(hosts);
-  hostsRef.current = hosts;
+  const computesRef = useRef(computes);
+  computesRef.current = computes;
 
-  const addLog = (hostName: string, message: string) => {
+  const addLog = (computeName: string, message: string) => {
     setLogs((prev) => {
       const next = new Map(prev);
-      const entries = [...(next.get(hostName) ?? [])];
+      const entries = [...(next.get(computeName) ?? [])];
       const ts = new Date().toISOString().slice(11, 19);
       entries.push(`${ts}  ${message}`);
       if (entries.length > 50) entries.splice(0, entries.length - 50);
-      next.set(hostName, entries);
+      next.set(computeName, entries);
       return next;
     });
   };
@@ -28,13 +28,13 @@ export function useHostMetrics(hosts: Host[], active: boolean, pollMs = 10000) {
 
     const refresh = async () => {
       if (running.current) return;
-      const runningHosts = hostsRef.current.filter(h => h.status === "running");
-      if (runningHosts.length === 0) return;
+      const runningComputes = computesRef.current.filter(h => h.status === "running");
+      if (runningComputes.length === 0) return;
 
       running.current = true;
       setFetching(true);
-      const next = new Map<string, HostSnapshot>();
-      for (const h of runningHosts) {
+      const next = new Map<string, ComputeSnapshot>();
+      for (const h of runningComputes) {
         const provider = getProvider(h.provider);
         if (!provider) continue;
         try {

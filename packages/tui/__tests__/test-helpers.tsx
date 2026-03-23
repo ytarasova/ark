@@ -7,7 +7,7 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { StoreProvider, createMockStore } from "../context/StoreProvider.js";
 import type { StoreData } from "../hooks/useStore.js";
-import type { Session, Host } from "../../core/index.js";
+import type { Session, Compute } from "../../core/index.js";
 
 /** Render a component wrapped in StoreProvider with mock data. */
 export function renderWithStore(
@@ -53,10 +53,10 @@ export function fakeSession(overrides?: Partial<Session>): Session {
   };
 }
 
-/** Create a fake host for tests. */
-export function fakeHost(overrides?: Partial<Host>): Host {
+/** Create a fake compute for tests. */
+export function fakeCompute(overrides?: Partial<Compute>): Compute {
   return {
-    name: "test-host",
+    name: "test-compute",
     provider: "local",
     status: "running",
     config: {},

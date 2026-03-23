@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { collectLocalMetrics } from "../providers/local/metrics.js";
 
 describe("local metrics", () => {
-  it("returns a valid HostSnapshot", async () => {
+  it("returns a valid ComputeSnapshot", async () => {
     const snap = await collectLocalMetrics();
     expect(snap.metrics.cpu).toBeGreaterThanOrEqual(0);
     expect(snap.metrics.cpu).toBeLessThanOrEqual(100);

@@ -109,12 +109,12 @@ describe("e2e attach flow", () => {
     expect(action!.args[1]).toBe("user@host");
   });
 
-  it("dispatch validates compute host exists", async () => {
+  it("dispatch validates compute exists", async () => {
     const s = core.startSession({
       summary: "bad-compute",
       repo: process.cwd(),
       flow: "bare",
-      compute_name: "nonexistent-host-xyz",
+      compute_name: "nonexistent-compute-xyz",
     });
     sessionIds.push(s.id);
 

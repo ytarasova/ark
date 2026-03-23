@@ -2,10 +2,10 @@
  * Compute layer types - provider interface and shared models.
  */
 
-import type { Host, Session } from "../core/store.js";
+import type { Compute, Session } from "../core/store.js";
 
 // Re-export for convenience
-export type { Host, Session };
+export type { Compute, Session };
 
 // ── Provider interface ──────────────────────────────────────────────────────
 
@@ -33,23 +33,23 @@ export interface SyncOpts {
 export interface ComputeProvider {
   readonly name: string;
 
-  provision(host: Host, opts?: ProvisionOpts): Promise<void>;
-  destroy(host: Host): Promise<void>;
-  start(host: Host): Promise<void>;
-  stop(host: Host): Promise<void>;
+  provision(compute: Compute, opts?: ProvisionOpts): Promise<void>;
+  destroy(compute: Compute): Promise<void>;
+  start(compute: Compute): Promise<void>;
+  stop(compute: Compute): Promise<void>;
 
-  launch(host: Host, session: Session, opts: LaunchOpts): Promise<string>;
-  attach(host: Host, session: Session): Promise<void>;
+  launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string>;
+  attach(compute: Compute, session: Session): Promise<void>;
 
-  getMetrics(host: Host): Promise<HostSnapshot>;
-  probePorts(host: Host, ports: PortDecl[]): Promise<PortStatus[]>;
+  getMetrics(compute: Compute): Promise<ComputeSnapshot>;
+  probePorts(compute: Compute, ports: PortDecl[]): Promise<PortStatus[]>;
 
-  syncEnvironment(host: Host, opts: SyncOpts): Promise<void>;
+  syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void>;
 }
 
 // ── Metrics types ───────────────────────────────────────────────────────────
 
-export interface HostMetrics {
+export interface ComputeMetrics {
   cpu: number;
   memUsedGb: number;
   memTotalGb: number;
@@ -61,7 +61,7 @@ export interface HostMetrics {
   idleTicks: number;
 }
 
-export interface HostSession {
+export interface ComputeSession {
   name: string;
   status: string;
   mode: string;
@@ -70,7 +70,7 @@ export interface HostSession {
   mem: number;
 }
 
-export interface HostProcess {
+export interface ComputeProcess {
   pid: string;
   cpu: string;
   mem: string;
@@ -86,10 +86,10 @@ export interface DockerContainer {
   project: string;
 }
 
-export interface HostSnapshot {
-  metrics: HostMetrics;
-  sessions: HostSession[];
-  processes: HostProcess[];
+export interface ComputeSnapshot {
+  metrics: ComputeMetrics;
+  sessions: ComputeSession[];
+  processes: ComputeProcess[];
   docker: DockerContainer[];
 }
 

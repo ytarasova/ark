@@ -20,7 +20,7 @@ describe("TabBar", () => {
     const { lastFrame } = render(<TabBar active="sessions" />);
     const frame = lastFrame()!;
     expect(frame).toContain("1:Sessions");
-    expect(frame).toContain("2:Hosts");
+    expect(frame).toContain("2:Compute");
     expect(frame).toContain("3:Agents");
     expect(frame).toContain("4:Flows");
     expect(frame).toContain("5:Recipes");
@@ -30,7 +30,7 @@ describe("TabBar", () => {
     // ink-testing-library strips ANSI codes, so we verify each tab
     // label is present and the component renders without error for
     // every possible active tab
-    const tabs = ["sessions", "hosts", "agents", "flows", "recipes"] as const;
+    const tabs = ["sessions", "compute", "agents", "flows", "recipes"] as const;
     for (const tab of tabs) {
       const { lastFrame } = render(<TabBar active={tab} />);
       const frame = lastFrame()!;
@@ -41,7 +41,7 @@ describe("TabBar", () => {
   });
 
   it("renders correctly with each tab active", () => {
-    const tabs = ["sessions", "hosts", "agents", "flows", "recipes"] as const;
+    const tabs = ["sessions", "compute", "agents", "flows", "recipes"] as const;
     for (const tab of tabs) {
       const { lastFrame } = render(<TabBar active={tab} />);
       const frame = lastFrame()!;
@@ -141,7 +141,7 @@ describe("StatusBar", () => {
     expect(f1()!).toContain("quit");
 
     const { lastFrame: f2 } = render(
-      <StatusBar tab="hosts" sessions={sessions} loading={false} error={null} label={null} />
+      <StatusBar tab="compute" sessions={sessions} loading={false} error={null} label={null} />
     );
     expect(f2()!).toContain("provision");
   });

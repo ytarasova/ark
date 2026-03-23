@@ -20,8 +20,8 @@ describe("EC2Provider", () => {
     expect(typeof provider.syncEnvironment).toBe("function");
   });
 
-  it("probePorts returns not-listening for host without IP", async () => {
-    const host = {
+  it("probePorts returns not-listening for compute without IP", async () => {
+    const compute = {
       name: "test",
       provider: "ec2",
       status: "stopped",
@@ -29,7 +29,7 @@ describe("EC2Provider", () => {
       created_at: "",
       updated_at: "",
     };
-    const result = await provider.probePorts(host, [
+    const result = await provider.probePorts(compute, [
       { port: 3000, source: "test" },
     ]);
     expect(result).toHaveLength(1);
@@ -47,18 +47,18 @@ describe("EC2Provider", () => {
     expect(typeof provider.destroy).toBe("function");
 
     // Verify they reject when instance_id is missing
-    const hostNoInstance = {
+    const computeNoInstance = {
       name: "test", provider: "ec2", status: "running",
       config: { region: "us-east-1", aws_profile: "yt" },
       created_at: "", updated_at: "",
     };
-    expect(provider.start(hostNoInstance)).rejects.toThrow("has no instance_id");
-    expect(provider.stop(hostNoInstance)).rejects.toThrow("has no instance_id");
+    expect(provider.start(computeNoInstance)).rejects.toThrow("has no instance_id");
+    expect(provider.stop(computeNoInstance)).rejects.toThrow("has no instance_id");
   });
 
-  it("launch rejects when host has no IP", async () => {
+  it("launch rejects when compute has no IP", async () => {
     const provider = new EC2Provider();
-    const host = {
+    const compute = {
       name: "test", provider: "ec2", status: "running",
       config: {},
       created_at: "", updated_at: "",
@@ -72,14 +72,14 @@ describe("EC2Provider", () => {
       breakpoint_reason: null, attached_by: null, config: {},
       created_at: "", updated_at: "",
     };
-    await expect(provider.launch(host, session, {
+    await expect(provider.launch(compute, session, {
       tmuxName: "test", workdir: "/tmp", launcherContent: "echo hi", ports: [],
     })).rejects.toThrow("has no IP");
   });
 
   it("launch rejects when repo URL cannot be resolved", async () => {
     const provider = new EC2Provider();
-    const host = {
+    const compute = {
       name: "test", provider: "ec2", status: "running",
       config: { ip: "1.2.3.4" },
       created_at: "", updated_at: "",
@@ -93,7 +93,7 @@ describe("EC2Provider", () => {
       breakpoint_reason: null, attached_by: null, config: {},
       created_at: "", updated_at: "",
     };
-    await expect(provider.launch(host, session, {
+    await expect(provider.launch(compute, session, {
       tmuxName: "test", workdir: "/tmp/ark-nonexistent-not-a-repo", launcherContent: "echo hi", ports: [],
     })).rejects.toThrow("Cannot determine git repo URL");
   });

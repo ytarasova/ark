@@ -7,10 +7,10 @@ export {
   ARK_DIR, DB_PATH, TRACKS_DIR, WORKTREES_DIR,
   getDb, getSession, listSessions, updateSession, deleteSession,
   logEvent, getEvents, getChildren, getGroups, claimSession,
-  createHost, getHost, listHosts, updateHost, mergeHostConfig, deleteHost,
+  createCompute, getCompute, listCompute, updateCompute, mergeComputeConfig, deleteCompute,
   sessionChannelPort,
   createTestContext, setContext, resetContext, closeDb,
-  type Session, type Event, type Host, type TestContext,
+  type Session, type Event, type Compute, type TestContext,
 } from "./store.js";
 
 // Context (DI)

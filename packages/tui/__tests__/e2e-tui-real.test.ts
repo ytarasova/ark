@@ -130,7 +130,7 @@ describe("e2e TUI (real tmux)", () => {
       await tui.start();
       const screen = tui.screen();
       expect(screen).toContain("Sessions");
-      expect(screen).toContain("Hosts");
+      expect(screen).toContain("Compute");
       expect(screen).toContain("Agents");
       expect(screen).toContain("Flows");
       expect(screen).toContain("Recipes");
@@ -145,10 +145,10 @@ describe("e2e TUI (real tmux)", () => {
     try {
       await tui.start();
 
-      // Switch to Hosts tab (key 2)
+      // Switch to Compute tab (key 2)
       tui.press("2");
-      await tui.waitFor("Hosts", 5000);
-      expect(tui.screen()).toContain("Hosts");
+      await tui.waitFor("Compute", 5000);
+      expect(tui.screen()).toContain("Compute");
 
       // Switch to Agents tab (key 3)
       tui.press("3");
@@ -199,12 +199,12 @@ describe("e2e TUI (real tmux)", () => {
     }
   }, 30_000);
 
-  // Test 5: Hosts tab shows local host
-  it("shows local host on hosts tab", async () => {
+  // Test 5: Compute tab shows local compute
+  it("shows local compute on compute tab", async () => {
     const tui = new TuiDriver();
     try {
       await tui.start();
-      tui.press("2"); // switch to hosts tab
+      tui.press("2"); // switch to compute tab
       await tui.waitFor("local", 5000);
       const screen = tui.screen();
       expect(screen).toContain("local");
@@ -306,7 +306,7 @@ describe("e2e TUI (real tmux)", () => {
       const dbSession = core.getSession(sessionId);
       expect(dbSession).toBeNull();
 
-      // 3. Run the cleanup logic (same as HostsTab 'c' key handler)
+      // 3. Run the cleanup logic (same as ComputeTab 'c' key handler)
       const tmuxSessions = listArkSessions();
       let cleaned = 0;
       for (const ts of tmuxSessions) {
@@ -339,12 +339,12 @@ describe("e2e TUI (real tmux)", () => {
       expect(sessionsScreen).toContain("new");
       expect(sessionsScreen).toContain("quit");
 
-      // Hosts tab hints
+      // Compute tab hints
       tui.press("2");
       await tui.waitFor("provision", 3000);
-      const hostsScreen = tui.screen();
-      expect(hostsScreen).toContain("provision");
-      expect(hostsScreen).toContain("new");
+      const computeScreen = tui.screen();
+      expect(computeScreen).toContain("provision");
+      expect(computeScreen).toContain("new");
     } finally {
       tui.stop();
     }

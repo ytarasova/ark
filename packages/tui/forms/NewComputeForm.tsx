@@ -8,7 +8,7 @@ import type { AsyncState } from "../hooks/useAsync.js";
 
 type Step = "name" | "provider" | "image" | "size" | "arch" | "region" | "profile";
 
-interface NewHostFormProps {
+interface NewComputeFormProps {
   async: AsyncState;
   onDone: () => void;
 }
@@ -47,7 +47,7 @@ const PROVIDER_OPTIONS = [
   { label: "docker", value: "docker" },
 ];
 
-export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
+export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProps) {
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState(generateName());
   const [provider, setProvider] = useState("");
@@ -74,9 +74,9 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
     } else if (item.value === "docker") {
       setStep("image");
     } else {
-      // Create non-EC2/non-Docker host directly
+      // Create non-EC2/non-Docker compute directly
       try {
-        core.createHost({ name: name.trim(), provider: item.value, config: {} });
+        core.createCompute({ name: name.trim(), provider: item.value, config: {} });
       } catch (e: any) {
         asyncState.run("Create failed", async () => { throw e; });
       }
@@ -88,7 +88,7 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
   const handleSubmitImage = () => {
     const img = image.trim() || "ubuntu:22.04";
     try {
-      core.createHost({
+      core.createCompute({
         name: name.trim(),
         provider: "docker",
         config: { image: img },
@@ -116,7 +116,7 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
 
   const handleSelectProfile = (item: { label: string; value: string }) => {
     try {
-      core.createHost({
+      core.createCompute({
         name: name.trim(),
         provider,
         config: {
@@ -136,12 +136,12 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
-      <Text bold color="cyan">{" New Host "}</Text>
+      <Text bold color="cyan">{" New Compute "}</Text>
       <Text> </Text>
 
       {step === "name" && (
         <Box flexDirection="column">
-          <Text>{"Host name:"}</Text>
+          <Text>{"Compute name:"}</Text>
           <Box>
             <Text color="cyan">{"> "}</Text>
             <TextInputEnhanced

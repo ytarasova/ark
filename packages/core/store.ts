@@ -80,7 +80,7 @@ export interface Event {
   created_at: string;
 }
 
-export interface Host {
+export interface Compute {
   name: string;              // unique identifier
   provider: string;          // "local" | "docker" | "ec2"
   status: string;            // "stopped" | "running" | "provisioning" | "destroyed"
@@ -102,12 +102,12 @@ export function getDb(): Database {
   if (!_initialized.has(db)) {
     _initialized.add(db); // mark BEFORE init to prevent recursion
     initSchema(db);
-    // Ensure local host exists (use db directly, not getDb)
-    const row = db.prepare("SELECT name FROM hosts WHERE name = 'local'").get();
+    // Ensure local compute exists (use db directly, not getDb)
+    const row = db.prepare("SELECT name FROM compute WHERE name = 'local'").get();
     if (!row) {
       const ts = now();
       db.prepare(
-        "INSERT OR IGNORE INTO hosts (name, provider, status, config, created_at, updated_at) VALUES ('local', 'local', 'running', '{}', ?, ?)"
+        "INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at) VALUES ('local', 'local', 'running', '{}', ?, ?)"
       ).run(ts, ts);
     }
   }
@@ -160,7 +160,7 @@ function initSchema(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_name);
 
-    CREATE TABLE IF NOT EXISTS hosts (
+    CREATE TABLE IF NOT EXISTS compute (
       name TEXT PRIMARY KEY,
       provider TEXT NOT NULL DEFAULT 'local',
       status TEXT NOT NULL DEFAULT 'stopped',
@@ -169,8 +169,8 @@ function initSchema(db: Database): void {
       updated_at TEXT NOT NULL
     );
 
-    CREATE INDEX IF NOT EXISTS idx_hosts_provider ON hosts(provider);
-    CREATE INDEX IF NOT EXISTS idx_hosts_status ON hosts(status);
+    CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider);
+    CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status);
   `);
 }
 
@@ -343,28 +343,28 @@ export function getEvents(
   }));
 }
 
-// ── Host CRUD ───────────────────────────────────────────────────────────────
+// ── Compute CRUD ────────────────────────────────────────────────────────────
 
 /**
- * Ensure the singleton "local" host exists. Called on DB init.
+ * Ensure the singleton "local" compute exists. Called on DB init.
  */
-export function ensureLocalHost(): Host {
-  const existing = getHost("local");
+export function ensureLocalCompute(): Compute {
+  const existing = getCompute("local");
   if (existing) return existing;
   const db = getDb();
   const ts = now();
   db.prepare(`
-    INSERT OR IGNORE INTO hosts (name, provider, status, config, created_at, updated_at)
+    INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at)
     VALUES ('local', 'local', 'running', '{}', ?, ?)
   `).run(ts, ts);
-  return getHost("local")!;
+  return getCompute("local")!;
 }
 
-export function createHost(opts: {
+export function createCompute(opts: {
   name: string;
   provider?: string;
   config?: Record<string, unknown>;
-}): Host {
+}): Compute {
   const db = getDb();
   const ts = now();
 
@@ -372,7 +372,7 @@ export function createHost(opts: {
   const status = provider === "local" ? "running" : "stopped";
 
   db.prepare(`
-    INSERT INTO hosts (name, provider, status, config, created_at, updated_at)
+    INSERT INTO compute (name, provider, status, config, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(
     opts.name,
@@ -382,23 +382,23 @@ export function createHost(opts: {
     ts, ts,
   );
 
-  return getHost(opts.name)!;
+  return getCompute(opts.name)!;
 }
 
-export function getHost(name: string): Host | null {
+export function getCompute(name: string): Compute | null {
   const db = getDb();
-  const row = db.prepare("SELECT * FROM hosts WHERE name = ?").get(name) as any;
+  const row = db.prepare("SELECT * FROM compute WHERE name = ?").get(name) as any;
   if (!row) return null;
   return { ...row, config: JSON.parse(row.config ?? "{}") };
 }
 
-export function listHosts(opts?: {
+export function listCompute(opts?: {
   provider?: string;
   status?: string;
   limit?: number;
-}): Host[] {
+}): Compute[] {
   const db = getDb();
-  let sql = "SELECT * FROM hosts WHERE 1=1";
+  let sql = "SELECT * FROM compute WHERE 1=1";
   const params: any[] = [];
 
   if (opts?.provider) { sql += " AND provider = ?"; params.push(opts.provider); }
@@ -412,7 +412,7 @@ export function listHosts(opts?: {
   }));
 }
 
-export function updateHost(name: string, fields: Partial<Host>): Host | null {
+export function updateCompute(name: string, fields: Partial<Compute>): Compute | null {
   const db = getDb();
   const updates: string[] = ["updated_at = ?"];
   const values: any[] = [now()];
@@ -429,24 +429,24 @@ export function updateHost(name: string, fields: Partial<Host>): Host | null {
   }
   values.push(name);
 
-  db.prepare(`UPDATE hosts SET ${updates.join(", ")} WHERE name = ?`).run(...values);
-  return getHost(name);
+  db.prepare(`UPDATE compute SET ${updates.join(", ")} WHERE name = ?`).run(...values);
+  return getCompute(name);
 }
 
 /**
- * Merge keys into a host's config without replacing the whole object.
+ * Merge keys into a compute's config without replacing the whole object.
  * This is the safe way to update config - avoids read-then-spread races.
  */
-export function mergeHostConfig(name: string, patch: Record<string, unknown>): Host | null {
-  const host = getHost(name);
-  if (!host) return null;
-  const merged = { ...host.config, ...patch };
-  return updateHost(name, { config: merged });
+export function mergeComputeConfig(name: string, patch: Record<string, unknown>): Compute | null {
+  const compute = getCompute(name);
+  if (!compute) return null;
+  const merged = { ...compute.config, ...patch };
+  return updateCompute(name, { config: merged });
 }
 
-export function deleteHost(name: string): boolean {
+export function deleteCompute(name: string): boolean {
   const db = getDb();
-  const result = db.prepare("DELETE FROM hosts WHERE name = ?").run(name);
+  const result = db.prepare("DELETE FROM compute WHERE name = ?").run(name);
   return result.changes > 0;
 }
 
