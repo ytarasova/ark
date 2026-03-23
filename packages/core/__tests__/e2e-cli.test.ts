@@ -59,23 +59,23 @@ describe("CLI: version", () => {
 // ── Host commands ───────────────────────────────────────────────────────────
 
 describe("CLI: host lifecycle", () => {
-  it("creates a host with --provider local", () => {
+  it("creates a host with --provider ec2", () => {
     const name = `test-e2e-host-${Date.now()}`;
     testHosts.push(name);
 
-    const out = ark("host", "create", name, "--provider", "local");
+    const out = ark("host", "create", name, "--provider", "ec2");
     expect(out).toContain(`Host '${name}' created`);
-    expect(out).toContain("Provider: local");
+    expect(out).toContain("Provider: ec2");
   });
 
   it("lists hosts and shows the created host", () => {
     const name = `test-e2e-list-${Date.now()}`;
     testHosts.push(name);
-    ark("host", "create", name, "--provider", "local");
+    ark("host", "create", name, "--provider", "ec2");
 
     const out = ark("host", "list");
     expect(out).toContain(name);
-    expect(out).toContain("local");
+    expect(out).toContain("ec2");
   });
 
   it("shows host status as JSON", () => {
@@ -95,7 +95,7 @@ describe("CLI: host lifecycle", () => {
   it("updates host config with --set", () => {
     const name = `test-e2e-update-${Date.now()}`;
     testHosts.push(name);
-    ark("host", "create", name, "--provider", "local");
+    ark("host", "create", name, "--provider", "ec2");
 
     const out = ark("host", "update", name, "--set", "foo=bar");
     expect(out).toContain(`Host '${name}' updated`);
@@ -103,12 +103,8 @@ describe("CLI: host lifecycle", () => {
   });
 
   it("rejects deleting a running host", () => {
-    const name = `test-e2e-del-${Date.now()}`;
-    testHosts.push(name);
-    ark("host", "create", name, "--provider", "local");
-
-    // Local hosts start as "running" so delete should fail
-    const delOut = arkSafe("host", "delete", name);
+    // The auto-created "local" host is always running, so delete should fail
+    const delOut = arkSafe("host", "delete", "local");
     expect(delOut).toContain("running");
   });
 

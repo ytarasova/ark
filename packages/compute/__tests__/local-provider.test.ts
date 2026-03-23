@@ -50,16 +50,16 @@ describe("LocalProvider", () => {
     await provider.provision(fakeHost);
   });
 
-  it("destroy is a no-op", async () => {
-    await provider.destroy(fakeHost);
+  it("destroy throws", async () => {
+    expect(provider.destroy(fakeHost)).rejects.toThrow("Cannot destroy the local host");
   });
 
   it("start is a no-op", async () => {
     await provider.start(fakeHost);
   });
 
-  it("stop is a no-op", async () => {
-    await provider.stop(fakeHost);
+  it("stop throws", async () => {
+    expect(provider.stop(fakeHost)).rejects.toThrow("Cannot stop the local host");
   });
 
   it("attach is a no-op", async () => {
