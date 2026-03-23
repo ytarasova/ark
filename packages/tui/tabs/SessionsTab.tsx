@@ -108,16 +108,18 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
+        // Fork+exec: replace this process with tmux attach.
+        // Mute Ink, then exec — on detach, returns to parent shell.
         const sid = selected.session_id;
-        const cmd = `tmux attach -t ${sid}`;
-        // Copy to clipboard
-        try {
-          const { execFileSync: efs } = require("child_process");
-          efs("bash", ["-c", `echo -n '${cmd}' | pbcopy`], { stdio: "pipe" });
-          status.show(`Copied: ${cmd} (paste in new tab)`);
-        } catch {
-          status.show(cmd);
-        }
+        process.stdout.write = (() => true) as any;
+        process.stderr.write = (() => true) as any;
+        setImmediate(() => {
+          const { exitCode } = Bun.spawnSync(
+            ["bash", "-c", `exec tmux attach -t '${sid}'`],
+            { stdin: "inherit", stdout: "inherit", stderr: "inherit" },
+          );
+          process.exit(exitCode ?? 0);
+        });
       }
     } else if (input === "n") {
       onShowForm();
