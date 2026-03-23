@@ -16,8 +16,8 @@ interface StatusBarProps {
 function KeyHint({ k, label }: { k: string; label: string }) {
   return (
     <Text>
-      <Text color="cyan" bold>{k}</Text>
-      <Text dimColor>:{label}  </Text>
+      <Text color="white" bold>{k}</Text>
+      <Text color="gray">:{label}  </Text>
     </Text>
   );
 }
@@ -100,18 +100,18 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
           <Text color="red">{` ${error}`}</Text>
         </Box>
       )}
-      <Box backgroundColor="gray">
+      <Box>
         {loading && label ? (
           <>
             <Text color="yellow">
-              {" "}<Spinner type="dots" />{` ${label}`}
+              <Spinner type="dots" />{` ${label}`}
             </Text>
             <Text>{"  "}</Text>
           </>
         ) : (
-          <Text color="white">{` ${sessions.length} sessions`}</Text>
+          <Text bold>{` ${sessions.length} sessions`}</Text>
         )}
-        {!loading && nRun > 0 && <Text color="cyan">{`  ●${nRun} running`}</Text>}
+        {!loading && nRun > 0 && <Text color="green">{`  ●${nRun} running`}</Text>}
         {nErr > 0 && <Text color="red">{`  ✕${nErr} failed`}</Text>}
         <Text>{"  "}</Text>
         {hints}
