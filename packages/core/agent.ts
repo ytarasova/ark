@@ -7,11 +7,9 @@
  * Supports Pi-style SKILL.md discovery and prompt templates.
  */
 
-import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync } from "fs";
+import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import { mkdirSync } from "fs";
-import { homedir } from "os";
 import { ARK_DIR } from "./store.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -124,69 +122,24 @@ export function resolveAgent(name: string, session: Record<string, unknown>): Ag
 
 // ── Build claude CLI args ───────────────────────────────────────────────────
 
-const MODEL_MAP: Record<string, string> = {
-  opus: "claude-opus-4-6",
-  sonnet: "claude-sonnet-4-6",
-  haiku: "claude-haiku-4-5-20251001",
-};
+import * as claude from "./claude.js";
 
 export function buildClaudeArgs(agent: AgentDefinition, opts?: {
   task?: string;
   sessionId?: string;
   headless?: boolean;
 }): string[] {
-  const args = ["claude"];
-
-  // Headless: -p with stream-json, skips trust prompt
-  if (opts?.headless && opts.task) {
-    args.push("-p", opts.task, "--verbose", "--output-format", "stream-json",
-      "--dangerously-skip-permissions");
-  }
-
-  // Resume existing Claude session (handoff)
-  if (opts?.sessionId) {
-    args.push("--session-id", opts.sessionId);
-  }
-
-  // Model
-  const model = MODEL_MAP[agent.model] ?? agent.model;
-  if (model) args.push("--model", model);
-
-  // Max turns
-  if (agent.max_turns) args.push("--max-turns", String(agent.max_turns));
-
-  // System prompt
-  if (agent.system_prompt) args.push("--append-system-prompt", agent.system_prompt);
-
-  // Permissions (only in interactive mode)
-  if (!opts?.headless) {
-    args.push("--dangerously-skip-permissions");
-  }
-
-  // MCP servers
-  for (const mcp of agent.mcp_servers) {
-    if (typeof mcp === "object") {
-      args.push("--mcp-config", JSON.stringify(mcp));
-    } else {
-      args.push("--mcp-config", mcp);
-    }
-  }
-
-  return args;
+  return claude.buildArgs({
+    model: agent.model,
+    maxTurns: agent.max_turns,
+    systemPrompt: agent.system_prompt,
+    mcpServers: agent.mcp_servers,
+    task: opts?.task,
+    sessionId: opts?.sessionId,
+    headless: opts?.headless,
+  });
 }
 
-// ── Channel MCP config ──────────────────────────────────────────────────────
-
 export function channelMcpConfig(sessionId: string, stage: string, channelPort: number): Record<string, unknown> {
-  // Use absolute path to bun - it's not in PATH when Claude spawns MCP servers
-  const bunPath = join(homedir(), ".bun", "bin", "bun");
-  return {
-    command: bunPath,
-    args: [join(__dirname, "channel.ts")],
-    env: {
-      ARK_SESSION_ID: sessionId,
-      ARK_STAGE: stage,
-      ARK_CHANNEL_PORT: String(channelPort),
-    },
-  };
+  return claude.channelMcpConfig(sessionId, stage, channelPort);
 }

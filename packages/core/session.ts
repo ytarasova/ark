@@ -5,21 +5,19 @@
  * Direct interaction with the store is for reads only - writes go through these functions.
  */
 
-import { randomUUID } from "crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, symlinkSync } from "fs";
-import { join, resolve } from "path";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { join } from "path";
 import { execFileSync } from "child_process";
 import { homedir } from "os";
 
 import * as store from "./store.js";
 import { getHost } from "./store.js";
 import * as tmux from "./tmux.js";
-import * as pipeline from "./pipeline.js";
+import * as flow from "./flow.js";
 import * as agentRegistry from "./agent.js";
+import * as claude from "./claude.js";
 import { getProvider } from "../compute/index.js";
 import { resolvePortDecls, parseArcJson } from "../compute/arc-json.js";
-
-const deliveryInFlight = new Map<string, boolean>();
 
 // ── Session lifecycle ───────────────────────────────────────────────────────
 
@@ -27,7 +25,7 @@ export function startSession(opts: {
   ticket?: string;
   summary?: string;
   repo?: string;
-  pipeline?: string;
+  flow?: string;
   compute_name?: string;
   workdir?: string;
   group_name?: string;
@@ -36,9 +34,9 @@ export function startSession(opts: {
   const session = store.createSession(opts);
 
   // Set first stage
-  const firstStage = pipeline.getFirstStage(opts.pipeline ?? "default");
+  const firstStage = flow.getFirstStage(opts.flow ?? "default");
   if (firstStage) {
-    const action = pipeline.getStageAction(opts.pipeline ?? "default", firstStage);
+    const action = flow.getStageAction(opts.flow ?? "default", firstStage);
     store.updateSession(session.id, { stage: firstStage, status: "ready" });
     store.logEvent(session.id, "stage_ready", {
       stage: firstStage, actor: "system",
@@ -71,12 +69,12 @@ export async function dispatch(sessionId: string): Promise<{ ok: boolean; messag
   }
 
   // Check if fork stage
-  const stageDef = pipeline.getStage(session.pipeline, stage);
+  const stageDef = flow.getStage(session.flow, stage);
   if (stageDef?.type === "fork") {
     return dispatchFork(sessionId, stageDef);
   }
 
-  const action = pipeline.getStageAction(session.pipeline, stage);
+  const action = flow.getStageAction(session.flow, stage);
   if (action.type !== "agent") {
     return { ok: false, message: `Stage '${stage}' is ${action.type}, not agent` };
   }
@@ -109,26 +107,26 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  const { pipeline: pipelineName, stage } = session;
+  const { flow: flowName, stage } = session;
   if (!stage) return { ok: false, message: "No current stage" };
 
   if (!force) {
-    const { canProceed, reason } = pipeline.evaluateGate(pipelineName, stage, session);
+    const { canProceed, reason } = flow.evaluateGate(flowName, stage, session);
     if (!canProceed) return { ok: false, message: reason };
   }
 
-  const nextStage = pipeline.getNextStage(pipelineName, stage);
+  const nextStage = flow.getNextStage(flowName, stage);
   if (!nextStage) {
-    // Pipeline complete
+    // Flow complete
     store.updateSession(sessionId, { status: "completed" });
     store.logEvent(sessionId, "session_completed", {
       stage, actor: "system",
-      data: { final_stage: stage, pipeline: pipelineName },
+      data: { final_stage: stage, flow: flowName },
     });
-    return { ok: true, message: "Pipeline completed" };
+    return { ok: true, message: "Flow completed" };
   }
 
-  const nextAction = pipeline.getStageAction(pipelineName, nextStage);
+  const nextAction = flow.getStageAction(flowName, nextStage);
   store.updateSession(sessionId, { stage: nextStage, status: "ready", error: null });
   store.logEvent(sessionId, "stage_ready", {
     stage: nextStage, actor: "system",
@@ -211,7 +209,7 @@ export function cloneSession(sessionId: string, newTask?: string): { ok: boolean
     ticket: original.ticket || undefined,
     summary: newTask ?? `Clone of ${original.summary ?? sessionId}`,
     repo: original.repo || undefined,
-    pipeline: original.pipeline,
+    flow: original.flow,
     compute_name: original.compute_name || undefined,
     workdir: original.workdir || undefined,
   });
@@ -258,7 +256,7 @@ export function fork(parentId: string, task: string, opts?: {
     ticket: parent.ticket || undefined,
     summary: task,
     repo: parent.repo || undefined,
-    pipeline: "bare",
+    flow: "bare",
     compute_name: parent.compute_name || undefined,
     workdir: parent.workdir || undefined,
   });
@@ -278,7 +276,7 @@ export function fork(parentId: string, task: string, opts?: {
   return { ok: true, childId: child.id };
 }
 
-function dispatchFork(sessionId: string, stageDef: pipeline.StageDefinition): { ok: boolean; message: string } {
+function dispatchFork(sessionId: string, stageDef: flow.StageDefinition): { ok: boolean; message: string } {
   // Read PLAN.md or use default subtasks
   const session = store.getSession(sessionId)!;
   const subtasks = extractSubtasks(session);
@@ -321,72 +319,35 @@ async function launchAgentTmux(
   const tmuxName = `ark-${session.id}`;
   const workdir = session.workdir ?? ".";
 
-  // Setup worktree
+  // Setup worktree (unless session explicitly chose in-place)
   let effectiveWorkdir = workdir;
-  if (workdir !== "." && existsSync(join(workdir, ".git"))) {
+  const wantWorktree = session.config?.worktree !== false;
+  if (wantWorktree && workdir !== "." && existsSync(join(workdir, ".git"))) {
     const wt = setupWorktree(workdir, session.id, session.branch ?? undefined);
     if (wt) effectiveWorkdir = wt;
   }
 
   // Trust worktree for Claude
-  trustWorktree(workdir, effectiveWorkdir);
+  claude.trustWorktree(workdir, effectiveWorkdir);
 
-  // Allocate channel port from session id
+  // Channel config + launcher
   const channelPort = store.sessionChannelPort(session.id);
+  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort);
 
-  // Write MCP config for channel server
-  const sessionDir = join(store.TRACKS_DIR, session.id);
-  mkdirSync(sessionDir, { recursive: true });
-  const mcpConfigPath = join(sessionDir, "mcp.json");
-  const mcpConfig = {
-    mcpServers: {
-      "ark-channel": agentRegistry.channelMcpConfig(session.id, stage, channelPort),
-    },
-  };
-  writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2));
+  const { content: launchContent, claudeSessionId } = claude.buildLauncher({
+    workdir: effectiveWorkdir,
+    claudeArgs,
+    mcpConfigPath,
+    prevClaudeSessionId: session.claude_session_id,
+  });
 
-  // Build launcher
-  const claudeSessionId = randomUUID();
-  const prevClaudeId = session.claude_session_id;
-
-  // Shell-quote each arg properly (handles newlines in system prompt)
-  const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-  const claudeCmd = claudeArgs.map((arg, i) => {
-    // Don't quote flags (--xxx), only values that might have special chars
-    if (arg.startsWith("--")) return arg;
-    // Quote the value if the previous arg was a flag that takes a value
-    const prev = claudeArgs[i - 1];
-    if (prev && prev.startsWith("--")) return shellQuote(arg);
-    return arg;
-  }).join(" ");
-
-  let launchContent: string;
-  const channelFlags = `--mcp-config ${shellQuote(mcpConfigPath)} --dangerously-load-development-channels server:ark-channel`;
-
-  if (prevClaudeId) {
-    // Try --resume first; if conversation doesn't exist, fall back to new --session-id
-    launchContent = `#!/bin/bash
-cd ${shellQuote(effectiveWorkdir)}
-${claudeCmd} --resume ${shellQuote(prevClaudeId)} --dangerously-skip-permissions \\
-  ${channelFlags} || \\
-${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\
-  ${channelFlags}
-exec bash
-`;
-  } else {
-    launchContent = `#!/bin/bash
-cd ${shellQuote(effectiveWorkdir)}
-${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\
-  ${channelFlags}
-exec bash
-`;
-  }
-
+  let finalLaunchContent = launchContent;
   const launcher = tmux.writeLauncher(session.id, launchContent);
 
   // Save task for reference
-  const taskFile = join(sessionDir, "task.txt");
-  writeFileSync(taskFile, task);
+  const sessionDir = join(store.TRACKS_DIR, session.id);
+  mkdirSync(sessionDir, { recursive: true });
+  writeFileSync(join(sessionDir, "task.txt"), task);
 
   // Check for remote compute host
   const host = session.compute_name ? getHost(session.compute_name) : null;
@@ -442,7 +403,7 @@ exec bash
       const arcJson = parseArcJson(effectiveWorkdir);
       const shouldDevcontainer = arcJson?.devcontainer ?? !!dcPath;
       if (shouldDevcontainer) {
-        launchContent = buildLaunchCommand(effectiveWorkdir, launchContent);
+        finalLaunchContent = buildLaunchCommand(effectiveWorkdir, finalLaunchContent);
       }
     }
 
@@ -450,62 +411,17 @@ exec bash
     const result = await provider.launch(host, session, {
       tmuxName,
       workdir: effectiveWorkdir,
-      launcherContent: launchContent,
+      launcherContent: finalLaunchContent,
       ports,
     });
 
     return result;
   }
 
-  // Start tmux with launcher (no shell prompt) - local path
+  // Local launch
   tmux.createSession(tmuxName, `bash ${launcher}`);
-
-  // Auto-accept the development channels prompt
-  // Trust dialog is pre-accepted via ~/.claude.json (see trustWorktree)
-  // The channels prompt has no CLI bypass - must send Enter via tmux
-  (async () => {
-    for (let attempt = 0; attempt < 15; attempt++) {
-      await Bun.sleep(1000);
-      try {
-        const output = tmux.capturePane(tmuxName, { lines: 20 });
-        if (output.includes("I am using this for local")) {
-          tmux.sendKeys(tmuxName, "Enter");
-          break;
-        }
-        if (output.includes("Welcome") || output.includes("Claude Code v")) break;
-      } catch { break; }
-    }
-  })();
-
-  // Send task via channel HTTP - pure TypeScript, no bash/curl/tmux-send-keys
-  const channelUrl = `http://localhost:${channelPort}`;
-  const taskPayload = { type: "task", task, sessionId: session.id, stage };
-
-  // Background: wait for channel server to be ready, then POST the task
-  (async () => {
-    if (deliveryInFlight.get(session.id)) return;
-    deliveryInFlight.set(session.id, true);
-    try {
-      for (let i = 0; i < 60; i++) {
-        try {
-          const resp = await fetch(channelUrl);
-          if (resp.ok) {
-            await fetch(channelUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(taskPayload),
-            });
-            return;
-          }
-        } catch { /* channel not ready yet */ }
-        await Bun.sleep(1000);
-      }
-    } finally {
-      deliveryInFlight.delete(session.id);
-    }
-  })();
-
-  // Store Claude session UUID for future handoffs
+  claude.autoAcceptChannelPrompt(tmuxName);
+  claude.deliverTask(session.id, channelPort, task, stage);
   store.updateSession(session.id, { claude_session_id: claudeSessionId });
 
   return tmuxName;
@@ -594,36 +510,6 @@ function setupWorktree(repoPath: string, sessionId: string, branch?: string): st
     } catch { /* give up */ }
   } catch { /* ignore */ }
   return null;
-}
-
-function trustWorktree(originalRepo: string, worktreeDir: string): void {
-  // Symlink Claude project settings (CLAUDE.md, memories, etc.)
-  const projectsDir = join(homedir(), ".claude", "projects");
-  const encode = (p: string) => resolve(p).replace(/\//g, "-").replace(/\./g, "-");
-
-  const origProject = join(projectsDir, encode(originalRepo));
-  const wtProject = join(projectsDir, encode(worktreeDir));
-
-  if (existsSync(origProject) && !existsSync(wtProject)) {
-    try { symlinkSync(origProject, wtProject); } catch { /* ignore */ }
-  }
-
-  // Pre-accept trust dialog by writing to ~/.claude.json
-  const claudeJsonPath = join(homedir(), ".claude.json");
-  try {
-    const claudeJson = existsSync(claudeJsonPath)
-      ? JSON.parse(readFileSync(claudeJsonPath, "utf-8"))
-      : {};
-    if (!claudeJson.projects) claudeJson.projects = {};
-    const resolvedPath = resolve(worktreeDir);
-    if (!claudeJson.projects[resolvedPath]?.hasTrustDialogAccepted) {
-      claudeJson.projects[resolvedPath] = {
-        ...(claudeJson.projects[resolvedPath] ?? {}),
-        hasTrustDialogAccepted: true,
-      };
-      writeFileSync(claudeJsonPath, JSON.stringify(claudeJson, null, 2));
-    }
-  } catch { /* non-fatal */ }
 }
 
 // ── Output ──────────────────────────────────────────────────────────────────

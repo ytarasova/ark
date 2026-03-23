@@ -18,11 +18,14 @@ export {
   cloneSession, handoff, fork, joinFork, getOutput, send,
 } from "./session.js";
 
-// Pipeline
-export * from "./pipeline.js";
+// Flow
+export * from "./flow.js";
 
 // Agent
 export { loadAgent, listAgents, saveAgent, deleteAgent, resolveAgent, buildClaudeArgs } from "./agent.js";
+
+// Claude integration
+export * as claude from "./claude.js";
 
 // Tmux
 export * from "./tmux.js";
