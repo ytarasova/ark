@@ -331,45 +331,76 @@ hostCmd.command("create")
   .description("Create a new compute host")
   .argument("<name>", "Host name")
   .option("--provider <type>", "Provider type", "local")
+  // EC2-specific options
   .option("--size <size>", "Instance size: xs (2vCPU/8GB), s (4/16), m (8/32), l (16/64), xl (32/128), xxl (48/192), xxxl (64/256)", "m")
   .option("--arch <arch>", "Architecture: x64, arm", "x64")
   .option("--region <region>", "Region", "us-east-1")
   .option("--profile <profile>", "AWS profile")
   .option("--subnet-id <id>", "Subnet ID")
   .option("--tag <key=value>", "Tag (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+  // Docker-specific options
+  .option("--image <image>", "Docker image (default: ubuntu:22.04)")
+  .option("--devcontainer", "Use devcontainer.json from project")
+  .option("--volume <mount>", "Extra volume mount (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
   .action((name, opts) => {
+    if (opts.provider === "local") {
+      console.log(chalk.red("Local host is auto-created. Use 'ec2' or 'docker' provider."));
+      return;
+    }
     try {
-      const tags: Record<string, string> = {};
-      for (const t of opts.tag) {
-        const [k, ...rest] = t.split("=");
-        if (k && rest.length) tags[k] = rest.join("=");
-      }
-      const host = core.createHost({
-        name,
-        provider: opts.provider,
-        config: {
+      let config: Record<string, unknown>;
+
+      if (opts.provider === "docker") {
+        config = {
+          image: opts.image ?? "ubuntu:22.04",
+          ...(opts.devcontainer ? { devcontainer: true } : {}),
+          ...(opts.volume?.length ? { volumes: opts.volume } : {}),
+        };
+      } else if (opts.provider === "ec2") {
+        const tags: Record<string, string> = {};
+        for (const t of opts.tag) {
+          const [k, ...rest] = t.split("=");
+          if (k && rest.length) tags[k] = rest.join("=");
+        }
+        config = {
           size: opts.size,
           arch: opts.arch,
           region: opts.region,
           ...(opts.profile ? { aws_profile: opts.profile } : {}),
           ...(opts.subnetId ? { subnet_id: opts.subnetId } : {}),
           ...(Object.keys(tags).length ? { tags } : {}),
-        },
+        };
+      } else {
+        config = {};
+      }
+
+      const host = core.createHost({
+        name,
+        provider: opts.provider,
+        config,
       });
-      // Show human-readable size label
-      let sizeLabel = opts.size;
-      try {
-        const { INSTANCE_SIZES } = require("../compute/providers/ec2/provision.js");
-        const tier = INSTANCE_SIZES[opts.size];
-        if (tier) sizeLabel = tier.label;
-      } catch { /* not ec2 provider */ }
 
       console.log(chalk.green(`Host '${host.name}' created`));
       console.log(`  Provider: ${host.provider}`);
       console.log(`  Status:   ${host.status}`);
-      console.log(`  Size:     ${sizeLabel}`);
-      console.log(`  Arch:     ${opts.arch}`);
-      console.log(`  Region:   ${opts.region}`);
+
+      if (opts.provider === "docker") {
+        console.log(`  Image:    ${(config.image as string) ?? "ubuntu:22.04"}`);
+        if (config.devcontainer) console.log(`  Devcontainer: yes`);
+        if ((config.volumes as string[] | undefined)?.length) {
+          console.log(`  Volumes:  ${(config.volumes as string[]).join(", ")}`);
+        }
+      } else if (opts.provider === "ec2") {
+        let sizeLabel = opts.size;
+        try {
+          const { INSTANCE_SIZES } = require("../compute/providers/ec2/provision.js");
+          const tier = INSTANCE_SIZES[opts.size];
+          if (tier) sizeLabel = tier.label;
+        } catch { /* not ec2 provider */ }
+        console.log(`  Size:     ${sizeLabel}`);
+        console.log(`  Arch:     ${opts.arch}`);
+        console.log(`  Region:   ${opts.region}`);
+      }
     } catch (e: any) {
       console.log(chalk.red(`Failed to create host: ${e.message}`));
     }

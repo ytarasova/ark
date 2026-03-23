@@ -91,6 +91,7 @@ export function getDb(): Database {
   _db.run("PRAGMA foreign_keys = ON");
   _db.run("PRAGMA busy_timeout = 10000");
   initSchema(_db);
+  ensureLocalHost();
   return _db;
 }
 
@@ -320,6 +321,21 @@ export function getEvents(
 }
 
 // ── Host CRUD ───────────────────────────────────────────────────────────────
+
+/**
+ * Ensure the singleton "local" host exists. Called on DB init.
+ */
+export function ensureLocalHost(): Host {
+  const existing = getHost("local");
+  if (existing) return existing;
+  const db = getDb();
+  const ts = now();
+  db.prepare(`
+    INSERT OR IGNORE INTO hosts (name, provider, status, config, created_at, updated_at)
+    VALUES ('local', 'local', 'running', '{}', ?, ?)
+  `).run(ts, ts);
+  return getHost("local")!;
+}
 
 export function createHost(opts: {
   name: string;

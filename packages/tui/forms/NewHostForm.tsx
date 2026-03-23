@@ -5,7 +5,7 @@ import * as core from "../../core/index.js";
 import { generateName, getAwsProfiles } from "../helpers.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 
-type Step = "name" | "provider" | "size" | "arch" | "region" | "profile";
+type Step = "name" | "provider" | "image" | "size" | "arch" | "region" | "profile";
 
 interface NewHostFormProps {
   onDone: () => void;
@@ -49,6 +49,7 @@ export function NewHostForm({ onDone }: NewHostFormProps) {
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState(generateName());
   const [provider, setProvider] = useState("");
+  const [image, setImage] = useState("ubuntu:22.04");
   const [size, setSize] = useState("");
   const [arch, setArch] = useState("");
   const [region, setRegion] = useState("");
@@ -68,11 +69,24 @@ export function NewHostForm({ onDone }: NewHostFormProps) {
     setProvider(item.value);
     if (item.value === "ec2") {
       setStep("size");
+    } else if (item.value === "docker") {
+      setStep("image");
     } else {
-      // Create non-EC2 host directly
+      // Create non-EC2/non-Docker host directly
       core.createHost({ name: name.trim(), provider: item.value, config: {} });
       onDone();
     }
+  };
+
+  // Docker: submit image name
+  const handleSubmitImage = () => {
+    const img = image.trim() || "ubuntu:22.04";
+    core.createHost({
+      name: name.trim(),
+      provider: "docker",
+      config: { image: img },
+    });
+    onDone();
   };
 
   const handleSelectSize = (item: { label: string; value: string }) => {
@@ -133,6 +147,23 @@ export function NewHostForm({ onDone }: NewHostFormProps) {
           <Text>{"Provider:"}</Text>
           <SelectMenu items={PROVIDER_OPTIONS} onSelect={handleSelectProvider} />
           <Text dimColor>{"  Esc to cancel"}</Text>
+        </Box>
+      )}
+
+      {step === "image" && (
+        <Box flexDirection="column">
+          <Text dimColor>{`Name: ${name}  Provider: docker`}</Text>
+          <Text>{""}</Text>
+          <Text>{"Docker image:"}</Text>
+          <Box>
+            <Text color="cyan">{"> "}</Text>
+            <TextInput
+              value={image}
+              onChange={setImage}
+              onSubmit={handleSubmitImage}
+            />
+          </Box>
+          <Text dimColor>{"  Enter to create (default: ubuntu:22.04), Esc to cancel"}</Text>
         </Box>
       )}
 

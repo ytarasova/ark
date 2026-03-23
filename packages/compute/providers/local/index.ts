@@ -14,11 +14,21 @@ import { collectLocalMetrics } from "./metrics.js";
 
 export class LocalProvider implements ComputeProvider {
   readonly name = "local";
+  /** Local host is a singleton - it's your machine, always running */
+  readonly singleton = true;
 
-  async provision(_host: Host, _opts?: ProvisionOpts): Promise<void> {}
-  async destroy(_host: Host): Promise<void> {}
-  async start(_host: Host): Promise<void> {}
-  async stop(_host: Host): Promise<void> {}
+  async provision(_host: Host, _opts?: ProvisionOpts): Promise<void> {
+    // No-op: your machine is already provisioned
+  }
+  async destroy(_host: Host): Promise<void> {
+    throw new Error("Cannot destroy the local host");
+  }
+  async start(_host: Host): Promise<void> {
+    // No-op: your machine is always running
+  }
+  async stop(_host: Host): Promise<void> {
+    throw new Error("Cannot stop the local host");
+  }
 
   async launch(_host: Host, _session: Session, opts: LaunchOpts): Promise<string> {
     const launcher = tmux.writeLauncher(opts.tmuxName, opts.launcherContent);
