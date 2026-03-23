@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { existsSync } from "fs";
 import { resolve as resolvePath, basename } from "path";
 import { execFileSync } from "child_process";
@@ -224,7 +224,7 @@ export function NewSessionForm({
           <Text>{"Task / summary:"}</Text>
           <Box>
             <Text color="cyan">{"> "}</Text>
-            <TextInput
+            <TextInputEnhanced
               value={summary}
               onChange={setSummary}
               onSubmit={handleSubmitSummary}

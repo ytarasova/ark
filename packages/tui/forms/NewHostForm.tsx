@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import * as core from "../../core/index.js";
 import { generateName, getAwsProfiles } from "../helpers.js";
 import { SelectMenu } from "../components/SelectMenu.js";
@@ -144,7 +144,7 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
           <Text>{"Host name:"}</Text>
           <Box>
             <Text color="cyan">{"> "}</Text>
-            <TextInput
+            <TextInputEnhanced
               value={name}
               onChange={setName}
               onSubmit={handleSubmitName}
@@ -171,7 +171,7 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
           <Text>{"Docker image:"}</Text>
           <Box>
             <Text color="cyan">{"> "}</Text>
-            <TextInput
+            <TextInputEnhanced
               value={image}
               onChange={setImage}
               onSubmit={handleSubmitImage}

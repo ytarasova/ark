@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Box, Text } from "ink";
-import TextInput from "ink-text-input";
+import { TextInputEnhanced } from "./TextInputEnhanced.js";
 import { readdirSync, statSync } from "fs";
 import { join, dirname, basename } from "path";
 
@@ -46,7 +46,7 @@ export function PathInput({ value, onChange, onSubmit }: PathInputProps) {
     <Box flexDirection="column">
       <Box>
         <Text color="cyan">{"> "}</Text>
-        <TextInput
+        <TextInputEnhanced
           value={value}
           onChange={onChange}
           onSubmit={() => onSubmit(value)}
