@@ -3,14 +3,18 @@ import { Box, Text, useInput } from "ink";
 import * as core from "../../core/index.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
+import { ScrollBox } from "../components/ScrollBox.js";
 import type { StoreData } from "../hooks/useStore.js";
 
-interface AgentsTabProps extends StoreData {}
+interface AgentsTabProps extends StoreData {
+  pane: "left" | "right";
+}
 
-export function AgentsTab({ agents }: AgentsTabProps) {
+export function AgentsTab({ agents, pane }: AgentsTabProps) {
   const [sel, setSel] = useState(0);
 
   useInput((input, key) => {
+    if (pane === "right") return;
     if (input === "j" || key.downArrow) {
       setSel((s) => Math.min(s + 1, agents.length - 1));
     } else if (input === "k" || key.upArrow) {
@@ -26,8 +30,11 @@ export function AgentsTab({ agents }: AgentsTabProps) {
 
   return (
     <SplitPane
+      focus={pane}
+      leftTitle="Agents"
+      rightTitle="Details"
       left={<AgentsList agents={agents} sel={sel} />}
-      right={<AgentDetail agent={selected} />}
+      right={<AgentDetail agent={selected} pane={pane} />}
     />
   );
 }
@@ -65,9 +72,10 @@ function AgentsList({ agents, sel }: AgentsListProps) {
 
 interface AgentDetailProps {
   agent: ReturnType<typeof core.listAgents>[number] | null;
+  pane: "left" | "right";
 }
 
-function AgentDetail({ agent }: AgentDetailProps) {
+function AgentDetail({ agent, pane }: AgentDetailProps) {
   if (!agent) {
     return <Text dimColor>{"  No agent selected"}</Text>;
   }
@@ -87,11 +95,11 @@ function AgentDetail({ agent }: AgentDetailProps) {
   ];
 
   return (
-    <Box flexDirection="column">
+    <ScrollBox active={pane === "right"}>
       <Text bold>{` ${a.name}`}<Text dimColor>{` (${a._source})`}</Text></Text>
       {a.description && <Text dimColor>{` ${a.description}`}</Text>}
 
-      <Text>{""}</Text>
+      <Text> </Text>
       <SectionHeader title="Config" />
       <Text>{`  Model:      ${a.model}`}</Text>
       <Text>{`  Max turns:  ${a.max_turns}`}</Text>
@@ -99,7 +107,7 @@ function AgentDetail({ agent }: AgentDetailProps) {
 
       {sections.map(([title, items]) => (
         <React.Fragment key={title}>
-          <Text>{""}</Text>
+          <Text> </Text>
           <SectionHeader title={`${title} (${items.length})`} />
           {items.length > 0 ? (
             items.map((item, i) => <Text key={i}>{`  * ${item}`}</Text>)
@@ -111,13 +119,13 @@ function AgentDetail({ agent }: AgentDetailProps) {
 
       {a.system_prompt && (
         <>
-          <Text>{""}</Text>
+          <Text> </Text>
           <SectionHeader title="System Prompt" />
-          {a.system_prompt.split("\n").slice(0, 6).map((line, i) => (
+          {a.system_prompt.split("\n").map((line, i) => (
             <Text key={i} dimColor>{`  ${line}`}</Text>
           ))}
         </>
       )}
-    </Box>
+    </ScrollBox>
   );
 }

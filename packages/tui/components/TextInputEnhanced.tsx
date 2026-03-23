@@ -9,7 +9,7 @@
  * - Ctrl+B/F: char left/right (standard readline)
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Text, useInput } from "ink";
 
 interface TextInputEnhancedProps {
@@ -28,10 +28,15 @@ export function TextInputEnhanced({
   focus = true,
 }: TextInputEnhancedProps) {
   const [cursor, setCursor] = useState(value.length);
+  const internalEdit = useRef(false);
 
-  // Keep cursor in bounds when value changes externally
+  // Move cursor to end when value changes externally (e.g. Tab completion)
   useEffect(() => {
-    setCursor(c => Math.min(c, value.length));
+    if (internalEdit.current) {
+      internalEdit.current = false;
+    } else {
+      setCursor(value.length);
+    }
   }, [value]);
 
   useInput((input, key) => {
@@ -71,6 +76,7 @@ export function TextInputEnhanced({
       const before = value.slice(0, cursor);
       const after = value.slice(cursor);
       const wordStart = before.replace(/\S+\s*$/, "").length;
+      internalEdit.current = true;
       onChange(before.slice(0, wordStart) + after);
       setCursor(wordStart);
       return;
@@ -78,6 +84,7 @@ export function TextInputEnhanced({
 
     // Ctrl+U: delete to beginning
     if (input === "u" && key.ctrl) {
+      internalEdit.current = true;
       onChange(value.slice(cursor));
       setCursor(0);
       return;
@@ -85,6 +92,7 @@ export function TextInputEnhanced({
 
     // Ctrl+K: delete to end
     if (input === "k" && key.ctrl) {
+      internalEdit.current = true;
       onChange(value.slice(0, cursor));
       return;
     }
@@ -118,6 +126,7 @@ export function TextInputEnhanced({
     // Backspace
     if (key.backspace || key.delete) {
       if (cursor > 0) {
+        internalEdit.current = true;
         onChange(value.slice(0, cursor - 1) + value.slice(cursor));
         setCursor(c => c - 1);
       }
@@ -126,6 +135,7 @@ export function TextInputEnhanced({
 
     // Regular character input
     if (input && !key.ctrl && !key.meta && input.length === 1) {
+      internalEdit.current = true;
       onChange(value.slice(0, cursor) + input + value.slice(cursor));
       setCursor(c => c + 1);
     }

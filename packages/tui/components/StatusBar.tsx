@@ -11,6 +11,7 @@ interface StatusBarProps {
   loading: boolean;
   error: string | null;
   label: string | null;
+  pane?: "left" | "right";
 }
 
 function KeyHint({ k, label }: { k: string; label: string }) {
@@ -22,9 +23,18 @@ function KeyHint({ k, label }: { k: string; label: string }) {
   );
 }
 
+function getRightPaneHints(): React.ReactNode[] {
+  return [
+    <KeyHint key="jk" k="j/k" label="scroll" />,
+    <KeyHint key="gg" k="g/G" label="top/bottom" />,
+    <KeyHint key="tab" k="Tab" label="back" />,
+  ];
+}
+
 function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
   const hints: React.ReactNode[] = [
     <KeyHint key="jk" k="j/k" label="move" />,
+    <KeyHint key="tab" k="Tab" label="detail" />,
   ];
 
   if (!s) {
@@ -57,8 +67,11 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
       break;
   }
 
+  hints.push(<KeyHint key="m" k="m" label="group" />);
   hints.push(<KeyHint key="n" k="n" label="new" />);
-  hints.push(<KeyHint key="e" k="e" label="events" />);
+  if (s.group_name) {
+    hints.push(<KeyHint key="X" k="X" label="del-group" />);
+  }
   hints.push(<KeyHint key="q" k="q" label="quit" />);
   return hints;
 }
@@ -66,13 +79,12 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
 function getHostHints(): React.ReactNode[] {
   return [
     <KeyHint key="jk" k="j/k" label="move" />,
+    <KeyHint key="tab" k="Tab" label="detail" />,
     <KeyHint key="enter" k="Enter" label="provision" />,
     <KeyHint key="s" k="s" label="start/stop" />,
-    <KeyHint key="a" k="a" label="ssh" />,
     <KeyHint key="c" k="c" label="clean" />,
     <KeyHint key="n" k="n" label="new" />,
     <KeyHint key="x" k="x" label="delete" />,
-    <KeyHint key="e" k="e" label="events" />,
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
@@ -80,16 +92,17 @@ function getHostHints(): React.ReactNode[] {
 function getGenericHints(): React.ReactNode[] {
   return [
     <KeyHint key="jk" k="j/k" label="move" />,
-    <KeyHint key="e" k="e" label="events" />,
+    <KeyHint key="tab" k="Tab" label="detail" />,
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
 
-export function StatusBar({ tab, sessions, selectedSession, loading, error, label }: StatusBarProps) {
+export function StatusBar({ tab, sessions, selectedSession, loading, error, label, pane }: StatusBarProps) {
   const nRun = sessions.filter((s) => s.status === "running").length;
   const nErr = sessions.filter((s) => s.status === "failed").length;
 
-  const hints = tab === "sessions" ? getSessionHints(selectedSession)
+  const hints = pane === "right" ? getRightPaneHints()
+    : tab === "sessions" ? getSessionHints(selectedSession)
     : tab === "hosts" ? getHostHints()
     : getGenericHints();
 

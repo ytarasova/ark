@@ -1,21 +1,11 @@
 #!/usr/bin/env bun
 import React from "react";
 import { render } from "ink";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { appendFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { App } from "./App.js";
 import { getPostExitAction } from "./post-exit.js";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-      gcTime: 5 * 60 * 1000, // keep cache for 5 min
-    },
-  },
-});
 
 // ── Global logging ──────────────────────────────────────────────────────────
 const LOG_DIR = join(homedir(), ".ark", "logs");
@@ -51,9 +41,7 @@ try { process.stdin.setRawMode(true); process.stdin.setRawMode(false); } catch {
 // ── Render ───────────────────────────────────────────────────────────────────
 try {
   const { waitUntilExit } = render(
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>,
+    <App />,
     { patchConsole: false, exitOnCtrlC: true },
   );
   log("INFO", "TUI rendered");

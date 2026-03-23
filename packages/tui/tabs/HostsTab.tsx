@@ -17,11 +17,13 @@ import { useStatusMessage } from "../hooks/useStatusMessage.js";
 
 interface HostsTabProps extends StoreData {
   async: AsyncState;
+  pane: "left" | "right";
   onShowForm: () => void;
   formOverlay?: React.ReactNode;
+  refresh: () => void;
 }
 
-export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onShowForm, formOverlay }: HostsTabProps) {
+export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: asyncState, onShowForm, formOverlay }: HostsTabProps) {
   const [sel, setSel] = useState(0);
   const status = useStatusMessage();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -37,14 +39,15 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
   const selected = hosts[sel] ?? null;
 
   useInput((input, key) => {
-    // Don't handle keys when form overlay is active (form owns input)
     if (formOverlay) return;
+    if (pane === "right") return;
 
     // If in confirm-delete mode, only respond to x or cancel
     if (confirmDelete) {
       if (input === "x" && selected) {
         asyncState.run(`Deleting host ${selected.name}`, async () => {
           core.deleteHost(selected.name);
+          refresh();
         });
       }
       setConfirmDelete(false);
@@ -81,6 +84,7 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
           ]);
           core.updateHost(selected.name, { status: "running" });
           addLog(selected.name, "Provisioning complete - host is running");
+          refresh();
         });
       }
     } else if (input === "s") {
@@ -94,6 +98,7 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
           await provider.stop(selected);
           core.updateHost(selected.name, { status: "stopped" });
           addLog(selected.name, "Host stopped");
+          refresh();
         });
       } else if (selected.status === "stopped") {
         addLog(selected.name, "Starting host...");
@@ -101,6 +106,7 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
           await provider.start(selected);
           core.updateHost(selected.name, { status: "running" });
           addLog(selected.name, "Host started");
+          refresh();
         });
       }
     } else if (input === "x") {
@@ -125,24 +131,28 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
         }
       }
     } else if (input === "c") {
-      // Clean orphaned tmux sessions
-      asyncState.run("Cleaning orphan sessions", async () => {
+      // Clean orphaned/zombie tmux sessions
+      asyncState.run("Cleaning zombie sessions", async () => {
         const { listArkSessions, killSession } = await import("../../core/tmux.js");
         const tmuxSessions = listArkSessions();
         let cleaned = 0;
         for (const ts of tmuxSessions) {
           const sessionId = ts.name.replace("ark-", "");
           const dbSession = core.getSession(sessionId);
-          if (!dbSession) {
+          // Kill if: no DB entry, or DB says it's dead but tmux still lives
+          if (!dbSession || ["failed", "completed"].includes(dbSession.status)) {
             killSession(ts.name);
+            if (dbSession) {
+              core.updateSession(dbSession.id, { session_id: null });
+            }
             cleaned++;
           }
         }
-        // Show result
         if (cleaned > 0) {
-          status.show(`Cleaned ${cleaned} orphan session(s)`);
+          status.show(`Killed ${cleaned} zombie session(s)`);
+          refresh();
         } else {
-          status.show("No orphan sessions found");
+          status.show("No zombie sessions found");
         }
       });
     } else if (input === "n") {
@@ -154,6 +164,9 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
     <Box flexDirection="column" flexGrow={1}>
       {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
+        focus={pane}
+        leftTitle="Hosts"
+        rightTitle="Details"
         left={<HostsList hosts={hosts} sel={sel} />}
         right={formOverlay ??
           <HostDetail
@@ -262,7 +275,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
       {cfg.last_error && (
         <>
           <Text> </Text>
-          <Text color="red" bold>{`  Error: ${String(cfg.last_error).slice(0, 70)}`}</Text>
+          <Text color="red" bold wrap="truncate">{`  Error: ${String(cfg.last_error)}`}</Text>
         </>
       )}
 
@@ -324,8 +337,8 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
                 {`  ${"PID".padEnd(8)} ${"CPU".padEnd(6)} ${"MEM".padEnd(6)} Command`}
               </Text>
               {snapshot.processes.slice(0, 10).map((p, i) => (
-                <Text key={i}>
-                  {`  ${p.pid.padEnd(8)} ${p.cpu.padEnd(6)} ${p.mem.padEnd(6)} ${p.command.slice(0, 50)}`}
+                <Text key={i} wrap="truncate">
+                  {`  ${p.pid.padEnd(8)} ${p.cpu.padEnd(6)} ${p.mem.padEnd(6)} ${p.command}`}
                 </Text>
               ))}
             </>
@@ -340,8 +353,8 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
                 {`  ${"Name".padEnd(18)} ${"CPU".padEnd(8)} ${"MEM".padEnd(10)} Image`}
               </Text>
               {snapshot.docker.map((c, i) => (
-                <Text key={i}>
-                  {`  ${c.name.padEnd(18)} ${c.cpu.padEnd(8)} ${c.memory.padEnd(10)} ${c.image.slice(0, 40)}`}
+                <Text key={i} wrap="truncate">
+                  {`  ${c.name.padEnd(18)} ${c.cpu.padEnd(8)} ${c.memory.padEnd(10)} ${c.image}`}
                 </Text>
               ))}
             </>
