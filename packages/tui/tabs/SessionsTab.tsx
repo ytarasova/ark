@@ -14,9 +14,10 @@ import type { AsyncState } from "../hooks/useAsync.js";
 interface SessionsTabProps extends StoreData {
   async: AsyncState;
   onShowForm: () => void;
+  formOverlay?: React.ReactNode;
 }
 
-export function SessionsTab({ sessions, refreshing, async: asyncState, onShowForm }: SessionsTabProps) {
+export function SessionsTab({ sessions, refreshing, async: asyncState, onShowForm, formOverlay }: SessionsTabProps) {
   const { exit } = useApp();
   const [sel, setSel] = useState(0);
   const status = useStatusMessage();
@@ -121,7 +122,7 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           parentIds={parentIds}
           sel={sel}
         />}
-        right={<SessionDetail session={selected} sessions={sessions} />}
+        right={formOverlay ?? <SessionDetail session={selected} sessions={sessions} />}
       />
       {status.message && (
         <Box>

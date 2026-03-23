@@ -18,9 +18,10 @@ import { useStatusMessage } from "../hooks/useStatusMessage.js";
 interface HostsTabProps extends StoreData {
   async: AsyncState;
   onShowForm: () => void;
+  formOverlay?: React.ReactNode;
 }
 
-export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onShowForm }: HostsTabProps) {
+export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onShowForm, formOverlay }: HostsTabProps) {
   const { exit } = useApp();
   const [sel, setSel] = useState(0);
   const status = useStatusMessage();
@@ -145,7 +146,7 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
       {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
         left={<HostsList hosts={hosts} sel={sel} />}
-        right={
+        right={formOverlay ??
           <HostDetail
             host={selected}
             snapshot={selected ? snapshots.get(selected.name) : undefined}

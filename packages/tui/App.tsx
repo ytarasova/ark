@@ -52,33 +52,27 @@ export function App() {
     <Box flexDirection="column" height={termHeight}>
       <TabBar active={tab} />
 
-      {showForm === "session" ? (
-        <Box flexGrow={1} justifyContent="center" alignItems="center">
-          <Box width={60}>
+      {tab === "sessions" ? (
+        <SessionsTab
+          {...store}
+          async={asyncState}
+          onShowForm={() => setShowForm("session")}
+          formOverlay={showForm === "session" ? (
             <NewSessionForm
               store={store}
               async={asyncState}
               onDone={() => setShowForm(null)}
             />
-          </Box>
-        </Box>
-      ) : showForm === "host" ? (
-        <Box flexGrow={1} justifyContent="center" alignItems="center">
-          <Box width={60}>
-            <NewHostForm async={asyncState} onDone={() => setShowForm(null)} />
-          </Box>
-        </Box>
-      ) : tab === "sessions" ? (
-        <SessionsTab
-          {...store}
-          async={asyncState}
-          onShowForm={() => setShowForm("session")}
+          ) : undefined}
         />
       ) : tab === "hosts" ? (
         <HostsTab
           {...store}
           async={asyncState}
           onShowForm={() => setShowForm("host")}
+          formOverlay={showForm === "host" ? (
+            <NewHostForm async={asyncState} onDone={() => setShowForm(null)} />
+          ) : undefined}
         />
       ) : tab === "agents" ? (
         <AgentsTab {...store} />
