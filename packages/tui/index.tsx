@@ -64,21 +64,21 @@ try {
 const action = getPostExitAction();
 if (action) {
   log("INFO", `Post-exit action: ${action.type} ${action.args.join(" ")}`);
-  if (action.type === "tmux-attach") {
+
+  // Use exec to replace this process — avoids Bun's stdout interfering with tmux/ssh
+  const cmd = action.type === "tmux-attach"
+    ? `exec tmux attach -t ${action.args[0]}`
+    : action.type === "ssh"
+    ? `exec ssh ${action.args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(" ")}`
+    : null;
+
+  if (cmd) {
     try {
-      execFileSync("tmux", ["attach", "-t", ...action.args], { stdio: "inherit" });
-      log("INFO", "tmux detached");
+      execFileSync("bash", ["-c", cmd], { stdio: "inherit" });
+      log("INFO", `${action.type} completed`);
     } catch (e: any) {
-      log("ERROR", `Attach failed: ${e.message}`);
-      process.stderr.write(`\nAttach failed: ${e.message ?? e}\n`);
-    }
-  } else if (action.type === "ssh") {
-    try {
-      execFileSync("ssh", action.args, { stdio: "inherit" });
-      log("INFO", "SSH exited");
-    } catch (e: any) {
-      log("ERROR", `SSH failed: ${e.message}`);
-      process.stderr.write(`\nSSH failed: ${e.message ?? e}\n`);
+      log("ERROR", `${action.type} failed: ${e.message}`);
+      process.stderr.write(`\n${action.type} failed: ${e.message ?? e}\n`);
     }
   }
 }
