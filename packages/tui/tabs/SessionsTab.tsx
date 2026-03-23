@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput, useApp } from "ink";
 import Spinner from "ink-spinner";
 import { execFileSync } from "child_process";
@@ -14,10 +14,11 @@ import type { AsyncState } from "../hooks/useAsync.js";
 interface SessionsTabProps extends StoreData {
   async: AsyncState;
   onShowForm: () => void;
+  onSelectionChange?: (session: any) => void;
   formOverlay?: React.ReactNode;
 }
 
-export function SessionsTab({ sessions, refreshing, async: asyncState, onShowForm, formOverlay }: SessionsTabProps) {
+export function SessionsTab({ sessions, refreshing, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
   const { exit } = useApp();
   const [sel, setSel] = useState(0);
   const status = useStatusMessage();
@@ -47,6 +48,11 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
 
   const selected = topLevel[sel] ?? null;
 
+  // Notify parent of selection changes for context-sensitive status bar
+  useEffect(() => {
+    onSelectionChange?.(selected);
+  }, [selected?.id, selected?.status]);
+
   useInput((input, key) => {
     if (input === "j" || key.downArrow) {
       setSel((s) => Math.min(s + 1, topLevel.length - 1));
@@ -60,6 +66,11 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
       if (selected && (selected.status === "ready" || selected.status === "blocked")) {
         asyncState.run(`Dispatching ${selected.id}`, () =>
           core.dispatch(selected.id).then(() => {})
+        );
+      } else if (selected && selected.status === "failed") {
+        // Enter on failed = retry (same as r)
+        asyncState.run(`Retrying ${selected.id}`, () =>
+          core.resume(selected.id).then(() => {})
         );
       }
     } else if (input === "s") {

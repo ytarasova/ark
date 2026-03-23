@@ -20,6 +20,7 @@ export function App() {
   const [tab, setTab] = useState<Tab>("sessions");
   const [showForm, setShowForm] = useState<string | null>(null);
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;
 
@@ -57,6 +58,7 @@ export function App() {
           {...store}
           async={asyncState}
           onShowForm={() => setShowForm("session")}
+          onSelectionChange={setSelectedSession}
           formOverlay={showForm === "session" ? (
             <NewSessionForm
               store={store}
@@ -92,6 +94,7 @@ export function App() {
       <StatusBar
         tab={tab}
         sessions={store.sessions}
+        selectedSession={selectedSession}
         loading={asyncState.loading}
         error={asyncState.error}
         label={asyncState.label}

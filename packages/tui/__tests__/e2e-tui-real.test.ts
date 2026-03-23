@@ -334,18 +334,17 @@ describe("e2e TUI (real tmux)", () => {
     try {
       await tui.start();
 
-      // Sessions tab hints
+      // Sessions tab hints (no session selected = new/quit)
       const sessionsScreen = tui.screen();
-      expect(sessionsScreen).toContain("Enter:dispatch");
-      expect(sessionsScreen).toContain("n:new");
-      expect(sessionsScreen).toContain("x:kill");
+      expect(sessionsScreen).toContain("new");
+      expect(sessionsScreen).toContain("quit");
 
       // Hosts tab hints
       tui.press("2");
-      await tui.waitFor("Enter:provision", 3000);
+      await tui.waitFor("provision", 3000);
       const hostsScreen = tui.screen();
-      expect(hostsScreen).toContain("Enter:provision");
-      expect(hostsScreen).toContain("n:new");
+      expect(hostsScreen).toContain("provision");
+      expect(hostsScreen).toContain("new");
     } finally {
       tui.stop();
     }

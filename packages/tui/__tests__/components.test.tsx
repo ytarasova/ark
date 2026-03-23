@@ -127,9 +127,8 @@ describe("StatusBar", () => {
       <StatusBar tab="sessions" sessions={sessions} loading={false} error={null} label={null} />
     );
     const frame = lastFrame()!;
-    // ink may wrap across lines; check both the count and the label exist
     expect(frame).toContain("2");
-    expect(frame).toContain("errors");
+    expect(frame).toContain("failed");
   });
 
   it("shows key hints for the active tab", () => {
@@ -137,7 +136,9 @@ describe("StatusBar", () => {
     const { lastFrame: f1 } = render(
       <StatusBar tab="sessions" sessions={sessions} loading={false} error={null} label={null} />
     );
-    expect(f1()!).toContain("dispatch");
+    // With no selected session, shows "new" and "quit"
+    expect(f1()!).toContain("new");
+    expect(f1()!).toContain("quit");
 
     const { lastFrame: f2 } = render(
       <StatusBar tab="hosts" sessions={sessions} loading={false} error={null} label={null} />
