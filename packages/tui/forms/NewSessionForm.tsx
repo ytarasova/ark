@@ -52,23 +52,25 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
   };
 
   const handleSelectPipeline = (item: { label: string; value: string }) => {
-    // Create session
-    let workdir: string | undefined;
-    let repo = repoPath || process.cwd();
-    const rp = resolvePath(repo);
-    if (existsSync(rp)) {
-      workdir = rp;
-      if (repo === "." || repo === "./") repo = basename(rp);
-    }
+    // Create session + dispatch, all wrapped for progress / error visibility
+    asyncState.run("Creating session", async () => {
+      let workdir: string | undefined;
+      let repo = repoPath || process.cwd();
+      const rp = resolvePath(repo);
+      if (existsSync(rp)) {
+        workdir = rp;
+        if (repo === "." || repo === "./") repo = basename(rp);
+      }
 
-    const s = core.startSession({
-      jira_summary: summary || "Ad-hoc task",
-      repo,
-      pipeline: item.value,
-      workdir,
-      compute_name: computeName || undefined,
+      const s = core.startSession({
+        jira_summary: summary || "Ad-hoc task",
+        repo,
+        pipeline: item.value,
+        workdir,
+        compute_name: computeName || undefined,
+      });
+      await core.dispatch(s.id);
     });
-    asyncState.run(`Dispatching ${s.id}`, () => core.dispatch(s.id).then(() => {}));
     onDone();
   };
 

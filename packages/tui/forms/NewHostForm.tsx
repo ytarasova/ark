@@ -4,10 +4,12 @@ import TextInput from "ink-text-input";
 import * as core from "../../core/index.js";
 import { generateName, getAwsProfiles } from "../helpers.js";
 import { SelectMenu } from "../components/SelectMenu.js";
+import type { AsyncState } from "../hooks/useAsync.js";
 
 type Step = "name" | "provider" | "image" | "size" | "arch" | "region" | "profile";
 
 interface NewHostFormProps {
+  async: AsyncState;
   onDone: () => void;
 }
 
@@ -45,7 +47,7 @@ const PROVIDER_OPTIONS = [
   { label: "docker", value: "docker" },
 ];
 
-export function NewHostForm({ onDone }: NewHostFormProps) {
+export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState(generateName());
   const [provider, setProvider] = useState("");
@@ -73,7 +75,9 @@ export function NewHostForm({ onDone }: NewHostFormProps) {
       setStep("image");
     } else {
       // Create non-EC2/non-Docker host directly
-      core.createHost({ name: name.trim(), provider: item.value, config: {} });
+      asyncState.run(`Creating host ${name.trim()}`, async () => {
+        core.createHost({ name: name.trim(), provider: item.value, config: {} });
+      });
       onDone();
     }
   };
@@ -81,10 +85,12 @@ export function NewHostForm({ onDone }: NewHostFormProps) {
   // Docker: submit image name
   const handleSubmitImage = () => {
     const img = image.trim() || "ubuntu:22.04";
-    core.createHost({
-      name: name.trim(),
-      provider: "docker",
-      config: { image: img },
+    asyncState.run(`Creating docker host ${name.trim()}`, async () => {
+      core.createHost({
+        name: name.trim(),
+        provider: "docker",
+        config: { image: img },
+      });
     });
     onDone();
   };
@@ -105,15 +111,17 @@ export function NewHostForm({ onDone }: NewHostFormProps) {
   };
 
   const handleSelectProfile = (item: { label: string; value: string }) => {
-    core.createHost({
-      name: name.trim(),
-      provider,
-      config: {
-        size,
-        arch,
-        region,
-        ...(item.value ? { aws_profile: item.value } : {}),
-      },
+    asyncState.run(`Creating EC2 host ${name.trim()}`, async () => {
+      core.createHost({
+        name: name.trim(),
+        provider,
+        config: {
+          size,
+          arch,
+          region,
+          ...(item.value ? { aws_profile: item.value } : {}),
+        },
+      });
     });
     onDone();
   };

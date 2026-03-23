@@ -27,8 +27,10 @@ export function HostsTab({ hosts, sessions, async: asyncState, onShowForm }: Hos
     // If in confirm-delete mode, only respond to x or cancel
     if (confirmDelete) {
       if (input === "x" && selected) {
-        core.deleteHost(selected.name);
-        setSel((s) => Math.max(0, s - 1));
+        asyncState.run(`Deleting host ${selected.name}`, async () => {
+          core.deleteHost(selected.name);
+          setSel((s) => Math.max(0, s - 1));
+        });
       }
       setConfirmDelete(false);
       return;

@@ -14,17 +14,21 @@ export function useAsync(): AsyncState {
   const [label, setLabel] = useState<string | null>(null);
 
   const run = useCallback((actionLabel: string, action: () => Promise<void>) => {
-    setLoading(true);
-    setLabel(actionLabel);
-    setError(null);
-    action()
-      .catch((e: any) => {
-        setError(`${actionLabel} failed: ${e?.message ?? String(e)}`);
-      })
-      .finally(() => {
-        setLoading(false);
-        setLabel(null);
-      });
+    // Guard against concurrent actions — reject if already running
+    setLoading((prev) => {
+      if (prev) return prev; // already loading, skip
+      setLabel(actionLabel);
+      setError(null);
+      action()
+        .catch((e: any) => {
+          setError(`${actionLabel} failed: ${e?.message ?? String(e)}`);
+        })
+        .finally(() => {
+          setLoading(false);
+          setLabel(null);
+        });
+      return true;
+    });
   }, []);
 
   const clearError = useCallback(() => setError(null), []);

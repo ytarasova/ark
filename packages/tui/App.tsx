@@ -55,7 +55,7 @@ export function App() {
           onDone={() => setShowForm(null)}
         />
       ) : showForm === "host" ? (
-        <NewHostForm onDone={() => setShowForm(null)} />
+        <NewHostForm async={asyncState} onDone={() => setShowForm(null)} />
       ) : tab === "sessions" ? (
         <SessionsTab
           {...store}

@@ -200,7 +200,12 @@ function SessionDetail({ session: s }: SessionDetailProps) {
   }
 
   // Pipeline bar
-  const stages = core.getStages(s.pipeline);
+  let stages: ReturnType<typeof core.getStages> = [];
+  try {
+    stages = core.getStages(s.pipeline);
+  } catch {
+    // ignore — DB may be locked
+  }
   let passed = false;
 
   // Events
