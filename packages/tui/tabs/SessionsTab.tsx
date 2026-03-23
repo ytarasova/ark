@@ -108,12 +108,12 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Attach via tmux — open in new tmux window or show command
+        // Attach via tmux new-window
         const sid = selected.session_id;
         try {
-          execFileSync("tmux", ["new-window", "-n", sid, `tmux attach -t ${sid}`], { stdio: "pipe" });
-          status.show(`Opened ${sid} in new tmux window`);
-        } catch {
+          execFileSync("tmux", ["new-window", "-n", sid, "bash", "-c", `tmux attach -t ${sid}`], { stdio: "pipe" });
+          status.show(`Opened ${sid} in new tmux window (Ctrl+B n/p to switch)`);
+        } catch (e: any) {
           status.show(`Run: tmux attach -t ${sid}`);
         }
       }

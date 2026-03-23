@@ -109,7 +109,7 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
         const keyPath = join(homedir(), ".ssh", `ark-${selected.name}`);
         const sshCmd = `ssh -i ${keyPath} -o StrictHostKeyChecking=no ubuntu@${ip}`;
         try {
-          execFileSync("tmux", ["new-window", "-n", `ssh-${selected.name}`, sshCmd], { stdio: "pipe" });
+          execFileSync("tmux", ["new-window", "-n", `ssh-${selected.name}`, "bash", "-c", sshCmd], { stdio: "pipe" });
           status.show(`Opened SSH to ${selected.name} in new tmux window`);
         } catch {
           status.show(`Run: ${sshCmd}`);
