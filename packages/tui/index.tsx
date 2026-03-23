@@ -38,6 +38,18 @@ if (!process.stdin.isTTY) {
 
 try { process.stdin.setRawMode(true); process.stdin.setRawMode(false); } catch {}
 
+// ── Ensure we're inside tmux (needed for attach via new-window) ─────────────
+if (!process.env.TMUX) {
+  log("INFO", "Not inside tmux, wrapping in tmux session");
+  const sessionName = `ark-tui-${process.pid}`;
+  const args = [process.execPath, ...process.argv.slice(1)].map(a => `'${a}'`).join(" ");
+  const result = Bun.spawnSync(
+    ["tmux", "new-session", "-s", sessionName, "-n", "ark", args],
+    { stdin: "inherit", stdout: "inherit", stderr: "inherit" },
+  );
+  process.exit(result.exitCode ?? 0);
+}
+
 // ── Render ───────────────────────────────────────────────────────────────────
 try {
   const { waitUntilExit } = render(<App />, { patchConsole: false, exitOnCtrlC: true });
