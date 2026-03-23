@@ -59,7 +59,7 @@ function AgentsList({ agents, sel }: AgentsListProps) {
         const source = a._source === "user" ? "*" : " ";
         const content = `${marker} ${source} ${a.name.padEnd(16)} ${a.model}`;
         return isSel ? (
-          <Text key={a.name} bold inverse>{` ${content} `}</Text>
+          <Text key={a.name} bold inverse>{` ${content}`.padEnd(200)}</Text>
         ) : (
           <Text key={a.name}>{` ${content}`}</Text>
         );

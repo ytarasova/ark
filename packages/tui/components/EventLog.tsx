@@ -77,7 +77,7 @@ export function EventLog({ expanded }: EventLogProps) {
   }
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} height={Math.min(events.length + 2, 15)}>
+    <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} height={Math.min(events.length + 2, 10)}>
       <Text bold>{"Events"}<Text dimColor>{" (e:collapse)"}</Text></Text>
       {events.map((ev, i) => (
         <Text key={i}>

@@ -207,7 +207,6 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
       {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
         focus={pane}
-        leftWidth="35%"
         leftTitle="Sessions"
         rightTitle="Details"
         left={<SessionsList
@@ -280,12 +279,11 @@ function SessionsList({ groups, sortedGroups, sessions, parentIds, sel }: Sessio
               const age = ago(s.created_at).padStart(4);
               const marker = isSel ? ">" : " ";
 
+              const line = ` ${marker} ${icon} ${summary} ${stage} ${age}`;
               return (
                 <Box key={s.id} flexDirection="column">
                   {isSel ? (
-                    <Text bold inverse>
-                      {` ${marker} `}<Text color={color}>{icon}</Text>{` ${summary} ${stage} ${age} `}
-                    </Text>
+                    <Text bold inverse>{line.padEnd(200)}</Text>
                   ) : (
                     <Text>
                       {` ${marker} `}<Text color={color}>{icon}</Text>{` ${summary} ${stage} ${age}`}

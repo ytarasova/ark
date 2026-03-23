@@ -213,15 +213,13 @@ function HostsList({ hosts, sel }: HostsListProps) {
         const marker = isSel ? ">" : " ";
         const content = `${marker} `;
 
+        const line = ` ${content}${icon} ${h.name.padEnd(16)} ${h.provider}`;
         return isSel ? (
-          <Text key={h.name} bold inverse>
-            {` ${content}`}<Text color={iconColor}>{icon}</Text>
-            {` ${h.name.padEnd(16)} ${h.provider.padEnd(8)} ${String(ip)} `}
-          </Text>
+          <Text key={h.name} bold inverse>{line.padEnd(200)}</Text>
         ) : (
           <Text key={h.name}>
             {` ${content}`}<Text color={iconColor}>{icon}</Text>
-            {` ${h.name.padEnd(16)} ${h.provider.padEnd(8)} ${String(ip)}`}
+            {` ${h.name.padEnd(16)} ${h.provider}`}
           </Text>
         );
       })}

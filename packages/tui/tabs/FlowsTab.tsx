@@ -58,7 +58,7 @@ function FlowsList({ flows, sel }: FlowsListProps) {
         const source = p.source === "user" ? "*" : " ";
         const content = `${marker} ${source} ${p.name.padEnd(16)} ${p.stages.length} stages`;
         return isSel ? (
-          <Text key={p.name} bold inverse>{` ${content} `}</Text>
+          <Text key={p.name} bold inverse>{` ${content}`.padEnd(200)}</Text>
         ) : (
           <Text key={p.name}>{` ${content}`}</Text>
         );
