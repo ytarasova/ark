@@ -8,6 +8,7 @@ import { ago, hms } from "../helpers.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
+import { useAgentOutput } from "../hooks/useAgentOutput.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
@@ -246,15 +247,13 @@ function SessionDetail({ session: s }: SessionDetailProps) {
   const agentReports = events.filter((e) => e.type.startsWith("agent_"));
   const latestReport = agentReports[agentReports.length - 1] ?? null;
 
-  // Agent output
-  let agentOutput = "";
-  if (s.session_id && s.status === "running") {
-    try {
-      agentOutput = core.getOutput(s.id, { lines: 15 });
-    } catch {
-      // ignore
-    }
-  }
+  // Agent output - live polling via hook
+  const agentOutput = useAgentOutput(
+    s.id,
+    s.session_id,
+    s.status === "running",
+    500, // refresh every 500ms for near-real-time
+  );
 
   return (
     <Box flexDirection="column">
