@@ -95,15 +95,13 @@ export function SessionsTab({ sessions, async: asyncState, onShowForm }: Session
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Exit Ink, attach to tmux, re-launch TUI after detach
+        // Exit Ink cleanly, then attach to tmux
         exit();
         process.stdout.write("\x1b[?1049l\x1b[?25h"); // exit alt screen
         try {
           execFileSync("tmux", ["attach", "-t", selected.session_id], { stdio: "inherit" });
         } catch { /* user detached */ }
-        // Re-launch TUI
-        process.stdout.write("\x1b[?1049h\x1b[?25l"); // re-enter alt screen
-        execFileSync(process.execPath, [process.argv[1]], { stdio: "inherit" });
+        // After detach, just exit. User runs `ark tui` to return.
         process.exit(0);
       }
     } else if (input === "n") {

@@ -111,8 +111,6 @@ export function HostsTab({ hosts, sessions, async: asyncState, onShowForm }: Hos
         try {
           execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`], { stdio: "inherit" });
         } catch { /* user exited */ }
-        process.stdout.write("\x1b[?1049h\x1b[?25l");
-        execFileSync(process.execPath, [process.argv[1]], { stdio: "inherit" });
         process.exit(0);
       }
     } else if (input === "n") {

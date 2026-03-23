@@ -29,10 +29,10 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
     }
   });
 
-  const hostChoices = [
-    { label: "local (this machine)", value: "" },
-    ...store.hosts.map((h) => ({ label: `${h.name} (${h.provider})`, value: h.name })),
-  ];
+  const hostChoices = store.hosts.map((h) => ({
+    label: h.provider === "local" ? "local (this machine)" : `${h.name} (${h.provider})`,
+    value: h.name,
+  }));
 
   const pipelineChoices = store.pipelines.map((p) => ({
     label: p.name,
