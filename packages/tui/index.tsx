@@ -72,24 +72,62 @@ if (action) {
     ? `exec ssh ${action.args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(" ")}`
     : null;
 
+  // Use Bun.Terminal for proper PTY — the subprocess gets a real terminal
+  const cols = process.stdout.columns ?? 80;
+  const rows = process.stdout.rows ?? 24;
+
   if (action.type === "tmux-attach") {
-    log("INFO", `Attaching to tmux: ${action.args[0]}`);
-    // Use Bun's native PTY for proper terminal handling
+    log("INFO", `Attaching to tmux: ${action.args[0]} (${cols}x${rows})`);
+    process.stdin.setRawMode(true);
+
     const proc = Bun.spawn(["tmux", "attach", "-t", action.args[0]], {
-      stdin: "inherit",
-      stdout: "inherit",
-      stderr: "inherit",
+      terminal: {
+        cols,
+        rows,
+        data(_terminal, data) {
+          process.stdout.write(data);
+        },
+      },
     });
+
+    // Forward stdin to the PTY
+    process.stdin.on("data", (chunk: Buffer) => {
+      proc.terminal.write(chunk.toString());
+    });
+
+    // Handle terminal resize
+    process.stdout.on("resize", () => {
+      proc.terminal.resize(process.stdout.columns, process.stdout.rows);
+    });
+
     await proc.exited;
+    process.stdin.setRawMode(false);
     log("INFO", "tmux detached");
+
   } else if (action.type === "ssh") {
     log("INFO", `SSH: ${action.args.join(" ")}`);
+    process.stdin.setRawMode(true);
+
     const proc = Bun.spawn(["ssh", ...action.args], {
-      stdin: "inherit",
-      stdout: "inherit",
-      stderr: "inherit",
+      terminal: {
+        cols,
+        rows,
+        data(_terminal, data) {
+          process.stdout.write(data);
+        },
+      },
     });
+
+    process.stdin.on("data", (chunk: Buffer) => {
+      proc.terminal.write(chunk.toString());
+    });
+
+    process.stdout.on("resize", () => {
+      proc.terminal.resize(process.stdout.columns, process.stdout.rows);
+    });
+
     await proc.exited;
+    process.stdin.setRawMode(false);
     log("INFO", "SSH exited");
   }
 }

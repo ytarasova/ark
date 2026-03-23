@@ -34,6 +34,7 @@
     "ink-spinner": "^5.0.0",
     "ink-testing-library": "^4.0.0",
     "ink-text-input": "^6.0.0",
+    "node-tmux": "^1.0.2",
     "react": "^19.2.4",
     "yaml": "^2.4.0"
   },
