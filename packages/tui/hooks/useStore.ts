@@ -25,9 +25,24 @@ export function useStore(refreshMs = 3000): StoreData {
         for (const s of sessions) {
           if (s.status === "running" && s.session_id) {
             if (!core.sessionExists(s.session_id)) {
-              core.updateSession(s.id, { status: "failed", error: "Agent process exited", session_id: null });
+              // Try to capture last output before marking dead
+              let lastOutput = "";
+              try {
+                lastOutput = core.capturePane(s.session_id, { lines: 30 }).trim();
+              } catch { /* session already gone */ }
+
+              const error = lastOutput
+                ? `Agent exited. Last output: ${lastOutput.split("\n").pop()?.slice(0, 100) ?? "unknown"}`
+                : "Agent process exited";
+
+              core.updateSession(s.id, { status: "failed", error, session_id: null });
+              core.logEvent(s.id, "agent_exited", {
+                stage: s.stage ?? undefined,
+                actor: "system",
+                data: { last_output: lastOutput.slice(0, 500) },
+              });
               s.status = "failed";
-              s.error = "Agent process exited";
+              s.error = error;
               s.session_id = null;
             }
           }
