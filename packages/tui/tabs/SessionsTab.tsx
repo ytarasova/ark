@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput, useApp } from "ink";
 import Spinner from "ink-spinner";
-import { execFileSync } from "child_process";
 import * as core from "../../core/index.js";
 import { ICON, COLOR } from "../constants.js";
 import { ago, hms } from "../helpers.js";
@@ -109,20 +108,10 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Suppress Ink output, then run tmux attach as a child
-        const sid = selected.session_id;
-        // Mute stdout so Ink cleanup can't write escape codes
-        const origWrite = process.stdout.write.bind(process.stdout);
-        process.stdout.write = (() => true) as any;
+        // Set post-exit action and cleanly exit Ink
+        const { setPostExitAction } = require("../post-exit.js");
+        setPostExitAction({ type: "tmux-attach", args: [selected.session_id] });
         exit();
-        // Restore stdout after a tick for tmux to use
-        setTimeout(() => {
-          process.stdout.write = origWrite;
-          try {
-            execFileSync("tmux", ["attach", "-t", sid], { stdio: "inherit" });
-          } catch { /* user detached */ }
-          process.exit(0);
-        }, 50);
       }
     } else if (input === "n") {
       onShowForm();

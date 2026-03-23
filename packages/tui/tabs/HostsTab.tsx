@@ -107,15 +107,13 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
       if (selected?.status === "running") {
         const ip = (selected.config as any)?.ip;
         if (!ip) return;
-        exit();
+        const { setPostExitAction } = require("../post-exit.js");
         const keyPath = join(homedir(), ".ssh", `ark-${selected.name}`);
-        const host = ip;
-        setTimeout(() => {
-          try {
-            execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${host}`], { stdio: "inherit" });
-          } catch { /* user exited */ }
-          process.exit(0);
-        }, 100);
+        setPostExitAction({
+          type: "ssh",
+          args: ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`],
+        });
+        exit();
       }
     } else if (input === "c") {
       // Clean orphaned tmux sessions
