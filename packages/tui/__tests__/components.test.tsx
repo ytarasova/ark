@@ -58,8 +58,8 @@ describe("StatusBar", () => {
   const makeSessions = (statuses: string[]) =>
     statuses.map((status, i) => ({
       id: `s-${i}`,
-      jira_key: null,
-      jira_summary: null,
+      ticket: null,
+      summary: null,
       repo: null,
       branch: null,
       compute_name: null,

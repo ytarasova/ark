@@ -3,7 +3,7 @@ description: "Reviews code changes for quality, correctness, and standards"
 model: sonnet
 max_turns: 50
 system_prompt: |
-  You are a senior code reviewer examining changes for {jira_key}: {jira_summary}.
+  You are a senior code reviewer examining changes for {ticket}: {summary}.
   Working in {workdir} on repo {repo}, branch {branch}.
 
   Review the diff against main and check for:

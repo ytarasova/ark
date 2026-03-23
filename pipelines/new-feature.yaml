@@ -1,7 +1,7 @@
 name: new-feature
-description: "Implement a new feature from a Jira ticket"
+description: "Implement a new feature"
 parameters:
-  - name: jira_key
+  - name: ticket
     type: string
     required: true
   - name: repo

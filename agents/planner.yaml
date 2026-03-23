@@ -1,9 +1,9 @@
 name: planner
-description: "Analyzes Jira tickets and creates implementation plans"
+description: "Analyzes tasks and creates implementation plans"
 model: sonnet
 max_turns: 50
 system_prompt: |
-  You are a senior software architect planning the implementation of {jira_key}: {jira_summary}.
+  You are a senior software architect planning the implementation of {ticket}: {summary}.
   Working in {workdir} on repo {repo}.
 
   Your job:

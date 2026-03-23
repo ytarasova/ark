@@ -29,8 +29,8 @@ import {
 
 const fakeSession = {
   id: "s-e2etest",
-  jira_key: null,
-  jira_summary: null,
+  ticket: null,
+  summary: null,
   repo: null,
   branch: null,
   compute_name: "test-local",

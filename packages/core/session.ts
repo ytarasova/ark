@@ -24,8 +24,8 @@ const deliveryInFlight = new Map<string, boolean>();
 // ── Session lifecycle ───────────────────────────────────────────────────────
 
 export function startSession(opts: {
-  jira_key?: string;
-  jira_summary?: string;
+  ticket?: string;
+  summary?: string;
   repo?: string;
   pipeline?: string;
   compute_name?: string;
@@ -208,8 +208,8 @@ export function cloneSession(sessionId: string, newTask?: string): { ok: boolean
   if (!original) return { ok: false, cloneId: `Session ${sessionId} not found` };
 
   const clone = store.createSession({
-    jira_key: original.jira_key || undefined,
-    jira_summary: newTask ?? `Clone of ${original.jira_summary ?? sessionId}`,
+    ticket: original.ticket || undefined,
+    summary: newTask ?? `Clone of ${original.summary ?? sessionId}`,
     repo: original.repo || undefined,
     pipeline: original.pipeline,
     compute_name: original.compute_name || undefined,
@@ -255,8 +255,8 @@ export function fork(parentId: string, task: string, opts?: {
   if (!parent.fork_group) store.updateSession(parentId, { fork_group: forkGroup });
 
   const child = store.createSession({
-    jira_key: parent.jira_key || undefined,
-    jira_summary: task,
+    ticket: parent.ticket || undefined,
+    summary: task,
     repo: parent.repo || undefined,
     pipeline: "bare",
     compute_name: parent.compute_name || undefined,
@@ -512,7 +512,7 @@ exec bash
 }
 
 function buildTaskWithHandoff(session: store.Session, stage: string, agentName: string): string {
-  const parts = [`Work on ${session.jira_key ?? session.id}: ${session.jira_summary ?? "the task"}`];
+  const parts = [`Work on ${session.ticket ?? session.id}: ${session.summary ?? "the task"}`];
   parts.push(`\nYou are the ${agentName} agent, running the '${stage}' stage.`);
 
   // Previous stage context
@@ -563,7 +563,7 @@ function extractSubtasks(session: store.Session): { name: string; task: string }
     }
   }
 
-  const summary = session.jira_summary ?? "the task";
+  const summary = session.summary ?? "the task";
   return [
     { name: "implementation", task: `Implement: ${summary}` },
     { name: "tests", task: `Write tests for: ${summary}` },

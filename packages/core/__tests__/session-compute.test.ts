@@ -20,7 +20,7 @@ describe("session compute dispatch", () => {
   it("dispatch resolves with ok: false when session has no stage", async () => {
     // Create a session with no pipeline stage set up
     const { createSession } = await import("../store.js");
-    const session = createSession({ jira_summary: "test-no-stage" });
+    const session = createSession({ summary: "test-no-stage" });
     // Session starts with status 'pending' and no stage
     const result = await dispatch(session.id);
     expect(result.ok).toBe(false);

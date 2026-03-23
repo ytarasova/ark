@@ -64,7 +64,7 @@ describe("EC2Provider", () => {
       created_at: "", updated_at: "",
     };
     const session = {
-      id: "s-test", jira_key: null, jira_summary: null, repo: "test/repo",
+      id: "s-test", ticket: null, summary: null, repo: "test/repo",
       branch: null, compute_name: "test", session_id: null, claude_session_id: null,
       stage: "work", status: "running", pipeline: "bare", agent: null,
       workdir: null, pr_url: null, pr_id: null, error: null,
@@ -85,7 +85,7 @@ describe("EC2Provider", () => {
       created_at: "", updated_at: "",
     };
     const session = {
-      id: "s-test", jira_key: null, jira_summary: null, repo: null,
+      id: "s-test", ticket: null, summary: null, repo: null,
       branch: null, compute_name: "test", session_id: null, claude_session_id: null,
       stage: "work", status: "running", pipeline: "bare", agent: null,
       workdir: null, pr_url: null, pr_id: null, error: null,

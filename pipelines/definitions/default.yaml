@@ -30,7 +30,7 @@ stages:
     gate: manual
 
   - name: close
-    action: close_jira
+    action: close_ticket
     gate: auto
 
   - name: docs

@@ -65,7 +65,7 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
     submitForm({
       create: () => {
         const s = core.startSession({
-          jira_summary: summary || "Ad-hoc task",
+          summary: summary || "Ad-hoc task",
           repo,
           pipeline: item.value,
           workdir,

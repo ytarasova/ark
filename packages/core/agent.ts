@@ -101,8 +101,11 @@ export function resolveAgent(name: string, session: Record<string, unknown>): Ag
   if (!agent) return null;
 
   const vars: Record<string, string> = {
-    jira_key: String(session.jira_key ?? ""),
-    jira_summary: String(session.jira_summary ?? ""),
+    ticket: String(session.ticket ?? ""),
+    summary: String(session.summary ?? ""),
+    // Backward compat: agent YAML templates may still use {jira_key}/{jira_summary}
+    jira_key: String(session.ticket ?? ""),
+    jira_summary: String(session.summary ?? ""),
     repo: String(session.repo ?? ""),
     branch: String(session.branch ?? ""),
     workdir: String(session.workdir ?? "."),

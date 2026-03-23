@@ -182,7 +182,7 @@ describe("e2e TUI (real tmux)", () => {
     // Create a session before launching TUI
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "e2e-tui-visible",
+      summary: "e2e-tui-visible",
       pipeline: "bare",
     });
     createdSessionIds.push(session.id);
@@ -254,7 +254,7 @@ describe("e2e TUI (real tmux)", () => {
     // Create a session
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "e2e-tui-delete-me",
+      summary: "e2e-tui-delete-me",
       pipeline: "bare",
     });
     createdSessionIds.push(session.id);

@@ -4,6 +4,7 @@ import Spinner from "ink-spinner";
 import * as core from "../../core/index.js";
 import { ICON, COLOR } from "../constants.js";
 import { ago, hms } from "../helpers.js";
+import { formatEvent } from "../helpers/formatEvent.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
@@ -171,7 +172,7 @@ function SessionsList({ groups, sortedGroups, sessions, parentIds, sel }: Sessio
               const isSel = idx === sel;
               const icon = ICON[s.status] ?? "?";
               const color = (COLOR[s.status] ?? "white") as any;
-              const summary = (s.jira_summary ?? s.jira_key ?? s.repo ?? "---").slice(0, 22).padEnd(22);
+              const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
               const stage = (s.stage ?? "---").padEnd(10);
               const age = ago(s.created_at).padStart(4);
               const marker = isSel ? ">" : " ";
@@ -193,7 +194,7 @@ function SessionsList({ groups, sortedGroups, sessions, parentIds, sel }: Sessio
                       .map((child) => {
                         const ci = ICON[child.status] ?? "?";
                         const cc = (COLOR[child.status] ?? "white") as any;
-                        const cs = (child.jira_summary ?? "---").slice(0, 20);
+                        const cs = (child.summary ?? "---").slice(0, 20);
                         return (
                           <Text key={child.id} dimColor>
                             {"   | "}<Text color={cc}>{ci}</Text>{` ${cs}`}
@@ -249,7 +250,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
   return (
     <Box flexDirection="column">
       {/* Header */}
-      <Text bold>{` ${s.jira_key ?? s.id}  ${s.jira_summary ?? ""}`}</Text>
+      <Text bold>{` ${s.ticket ?? s.id}  ${s.summary ?? ""}`}</Text>
       <Text> </Text>
 
       {/* Pipeline bar */}
@@ -357,19 +358,12 @@ function SessionDetail({ session: s }: SessionDetailProps) {
           <Text> </Text>
           <SectionHeader title="Events" />
           {events.slice(-10).map((ev, i) => {
-            const ts = hms(ev.created_at);
-            const data = ev.data
-              ? Object.entries(ev.data)
-                  .slice(0, 2)
-                  .map(([k, v]) => `${k}=${String(v).slice(0, 20)}`)
-                  .join(" ")
-              : "";
+            const ts = hms(ev.created_at).slice(0, 5); // HH:MM
+            const msg = formatEvent(ev.type, ev.data ?? undefined);
             return (
               <Text key={i}>
                 {"  "}<Text dimColor>{ts}</Text>{"  "}
-                {ev.type.padEnd(20)}
-                <Text color="cyan">{` ${(ev.stage ?? "").padEnd(10)}`}</Text>
-                <Text dimColor>{` ${data}`}</Text>
+                {msg}
               </Text>
             );
           })}

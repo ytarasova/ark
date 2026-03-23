@@ -29,8 +29,8 @@ export const WORKTREES_DIR = join(ARK_DIR, "worktrees");
 
 export interface Session {
   id: string;
-  jira_key: string | null;
-  jira_summary: string | null;
+  ticket: string | null;      // DB column: jira_key — external ticket reference (Jira, GitHub issue, etc.)
+  summary: string | null;     // DB column: jira_summary — task description
   repo: string | null;
   branch: string | null;
   compute_name: string | null;
@@ -171,8 +171,8 @@ export function generateId(): string {
 }
 
 export function createSession(opts: {
-  jira_key?: string | null;
-  jira_summary?: string | null;
+  ticket?: string | null;
+  summary?: string | null;
   repo?: string | null;
   pipeline?: string | null;
   compute_name?: string | null;
@@ -183,8 +183,8 @@ export function createSession(opts: {
   const db = getDb();
   const id = generateId();
   const ts = now();
-  const branch = opts.jira_key
-    ? `feat/${opts.jira_key}-${(opts.jira_summary ?? "work").toLowerCase().replace(/\s+/g, "-").slice(0, 30)}`
+  const branch = opts.ticket
+    ? `feat/${opts.ticket}-${(opts.summary ?? "work").toLowerCase().replace(/\s+/g, "-").slice(0, 30)}`
     : null;
 
   db.prepare(`
@@ -192,7 +192,7 @@ export function createSession(opts: {
       workdir, stage, status, pipeline, group_name, config, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?)
   `).run(
-    id, opts.jira_key ?? null, opts.jira_summary ?? null, opts.repo ?? null,
+    id, opts.ticket ?? null, opts.summary ?? null, opts.repo ?? null,
     branch, opts.compute_name ?? null, opts.workdir ?? null,
     opts.pipeline ?? "default", opts.group_name ?? null,
     JSON.stringify(opts.config ?? {}), ts, ts,
@@ -201,7 +201,7 @@ export function createSession(opts: {
   logEvent(id, "session_created", {
     actor: "user",
     data: {
-      jira_key: opts.jira_key, jira_summary: opts.jira_summary,
+      ticket: opts.ticket, summary: opts.summary,
       repo: opts.repo, pipeline: opts.pipeline ?? "default",
       branch, workdir: opts.workdir, group_name: opts.group_name,
     },
@@ -214,7 +214,7 @@ export function getSession(id: string): Session | null {
   const db = getDb();
   const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as any;
   if (!row) return null;
-  return { ...row, config: JSON.parse(row.config ?? "{}") };
+  return { ...row, ticket: row.jira_key, summary: row.jira_summary, config: JSON.parse(row.config ?? "{}") };
 }
 
 export function listSessions(opts?: {
@@ -237,7 +237,7 @@ export function listSessions(opts?: {
   params.push(opts?.limit ?? 100);
 
   return (db.prepare(sql).all(...params) as any[]).map((r) => ({
-    ...r, config: JSON.parse(r.config ?? "{}"),
+    ...r, ticket: r.jira_key, summary: r.jira_summary, config: JSON.parse(r.config ?? "{}"),
   }));
 }
 

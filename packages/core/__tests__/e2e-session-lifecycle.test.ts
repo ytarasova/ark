@@ -33,7 +33,7 @@ describe("core lifecycle: startSession", () => {
   it("returns a valid session with correct defaults", () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-start-test",
+      summary: "lifecycle-start-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -43,7 +43,7 @@ describe("core lifecycle: startSession", () => {
     expect(session.pipeline).toBe("bare");
     expect(session.stage).toBe("work");
     expect(session.repo).toBe(process.cwd());
-    expect(session.jira_summary).toBe("lifecycle-start-test");
+    expect(session.summary).toBe("lifecycle-start-test");
     expect(session.session_id).toBeNull();
     expect(session.error).toBeNull();
     expect(session.created_at).toBeTruthy();
@@ -52,7 +52,7 @@ describe("core lifecycle: startSession", () => {
   it("logs session_created event", () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-event-test",
+      summary: "lifecycle-event-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -72,7 +72,7 @@ describe("core lifecycle: dispatch", () => {
   it("transitions session to running with tmux", async () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-dispatch-test",
+      summary: "lifecycle-dispatch-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -97,7 +97,7 @@ describe("core lifecycle: dispatch", () => {
   it("rejects dispatch on non-ready session", async () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-reject-test",
+      summary: "lifecycle-reject-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -127,7 +127,7 @@ describe("core lifecycle: getOutput", () => {
   it("returns string for running session (may be empty initially)", async () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-output-test",
+      summary: "lifecycle-output-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -144,7 +144,7 @@ describe("core lifecycle: getOutput", () => {
   it("returns empty string for session without tmux", () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-no-output-test",
+      summary: "lifecycle-no-output-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -161,7 +161,7 @@ describe("core lifecycle: stop", () => {
   it("transitions running session to failed", async () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-stop-test",
+      summary: "lifecycle-stop-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -193,7 +193,7 @@ describe("core lifecycle: resume", () => {
   it("re-dispatches a stopped session", async () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-resume-test",
+      summary: "lifecycle-resume-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -228,7 +228,7 @@ describe("core lifecycle: complete", () => {
   it("advances pipeline when completing a stage", async () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-complete-test",
+      summary: "lifecycle-complete-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -257,7 +257,7 @@ describe("core lifecycle: deleteSession", () => {
   it("removes session and its events from the database", () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-delete-test",
+      summary: "lifecycle-delete-test",
       pipeline: "bare",
     });
     // Don't add to sessionIds since we're deleting manually
@@ -288,7 +288,7 @@ describe("core lifecycle: full round-trip", () => {
     // 1. Start
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "lifecycle-roundtrip",
+      summary: "lifecycle-roundtrip",
       pipeline: "bare",
     });
     sessionIds.push(session.id);

@@ -1,7 +1,7 @@
 name: fix-bug
-description: "Fix a bug from a Jira ticket"
+description: "Fix a bug"
 parameters:
-  - name: jira_key
+  - name: ticket
     type: string
     required: true
   - name: repo

@@ -19,7 +19,7 @@ import { getProvider } from "../compute/index.js";
 
 const program = new Command()
   .name("ark")
-  .description("Ark - autonomous agent ecosystem, JIRA to production")
+  .description("Ark - autonomous agent ecosystem")
   .version("0.1.0");
 
 // ── Session commands ────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ const session = program.command("session").description("Manage SDLC pipeline ses
 
 session.command("start")
   .description("Start a new session")
-  .argument("[jira-key]", "Jira ticket key")
+  .argument("[ticket]", "External ticket reference (Jira key, GitHub issue, etc.)")
   .option("-r, --repo <path>", "Repository path or name")
   .option("-s, --summary <text>", "Task summary")
   .option("-p, --pipeline <name>", "Pipeline name", "default")
@@ -36,7 +36,7 @@ session.command("start")
   .option("-g, --group <name>", "Group name")
   .option("-d, --dispatch", "Auto-dispatch the first stage agent")
   .option("-a, --attach", "Dispatch and attach to the session")
-  .action(async (jiraKey, opts) => {
+  .action(async (ticket, opts) => {
     let workdir: string | undefined;
     let repo = opts.repo;
     if (repo) {
@@ -48,13 +48,13 @@ session.command("start")
     }
 
     const s = core.startSession({
-      jira_key: jiraKey, jira_summary: opts.summary ?? jiraKey,
+      ticket, summary: opts.summary ?? ticket,
       repo, pipeline: opts.pipeline, compute_name: opts.compute,
       workdir, group_name: opts.group,
     });
 
     console.log(chalk.green(`Session ${s.id} created`));
-    console.log(`  Summary:  ${s.jira_summary ?? "-"}`);
+    console.log(`  Summary:  ${s.summary ?? "-"}`);
     console.log(`  Repo:     ${s.repo ?? "-"}`);
     console.log(`  Pipeline: ${s.pipeline}`);
     console.log(`  Stage:    ${s.stage ?? "-"}`);
@@ -97,7 +97,7 @@ session.command("list")
       const icon = icons[s.status] ?? "?";
       const color = colors[s.status] ?? chalk.dim;
       const group = s.group_name ? chalk.dim(`[${s.group_name}] `) : "";
-      const summary = s.jira_summary ?? s.jira_key ?? s.repo ?? "-";
+      const summary = s.summary ?? s.ticket ?? s.repo ?? "-";
       console.log(`  ${color(icon)} ${s.id}  ${group}${summary.slice(0, 40)}  ${s.stage ?? "-"}  ${s.status}`);
     }
   });
@@ -108,7 +108,7 @@ session.command("show")
   .action((id) => {
     const s = core.getSession(id);
     if (!s) { console.log(chalk.red(`Session ${id} not found`)); return; }
-    console.log(chalk.bold(`\n${s.jira_key ?? s.id}: ${s.jira_summary ?? ""}`));
+    console.log(chalk.bold(`\n${s.ticket ?? s.id}: ${s.summary ?? ""}`));
     console.log(`  ID:       ${s.id}`);
     console.log(`  Status:   ${s.status}`);
     console.log(`  Stage:    ${s.stage ?? "-"}`);
@@ -249,12 +249,13 @@ session.command("join")
 session.command("events")
   .description("Show event history")
   .argument("<id>")
-  .action((id) => {
+  .action(async (id) => {
+    const { formatEvent } = await import("../tui/helpers/formatEvent.js");
     const events = core.getEvents(id);
     for (const e of events) {
-      const ts = e.created_at.slice(11, 19);
-      const data = e.data ? Object.entries(e.data).map(([k, v]) => `${k}=${String(v).slice(0, 40)}`).join(" ") : "";
-      console.log(`  ${chalk.dim(ts)}  ${e.type.padEnd(22)} ${chalk.cyan(e.stage ?? "")}  ${chalk.dim(data)}`);
+      const ts = e.created_at.slice(11, 16);
+      const msg = formatEvent(e.type, e.data ?? undefined);
+      console.log(`  ${chalk.dim(ts)}  ${msg}`);
     }
   });
 

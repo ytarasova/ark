@@ -16,8 +16,8 @@ const fakeHost: Host = {
 
 const fakeSession: Session = {
   id: "test-session-id",
-  jira_key: null,
-  jira_summary: null,
+  ticket: null,
+  summary: null,
   repo: null,
   branch: null,
   compute_name: null,

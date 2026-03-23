@@ -41,7 +41,7 @@ describe("e2e: session lifecycle", () => {
     // 1. Create session
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "e2e-lifecycle-test",
+      summary: "e2e-lifecycle-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -85,7 +85,7 @@ describe("e2e: reconciliation", () => {
     // 1. Create and dispatch
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "e2e-reconciliation-test",
+      summary: "e2e-reconciliation-test",
       pipeline: "bare",
     });
     sessionIds.push(session.id);
@@ -151,7 +151,7 @@ describe("e2e: dispatch edge cases", () => {
   it("dispatch to nonexistent compute host fails gracefully", async () => {
     const session = core.startSession({
       repo: process.cwd(),
-      jira_summary: "e2e-bad-host",
+      summary: "e2e-bad-host",
       pipeline: "bare",
       compute_name: "nonexistent-host",
     });
@@ -182,8 +182,8 @@ describe("e2e: session detail", () => {
   it("has all required fields after creation", () => {
     const session = core.startSession({
       repo: "/tmp/test-repo",
-      jira_key: "TEST-123",
-      jira_summary: "e2e-fields-test",
+      ticket: "TEST-123",
+      summary: "e2e-fields-test",
       pipeline: "bare",
       compute_name: "local",
       group_name: "test-group",
@@ -197,13 +197,13 @@ describe("e2e: session detail", () => {
     expect(session.repo).toBe("/tmp/test-repo");
     expect(session.pipeline).toBe("bare");
     expect(session.stage).toBe("work");
-    expect(session.jira_key).toBe("TEST-123");
-    expect(session.jira_summary).toBe("e2e-fields-test");
+    expect(session.ticket).toBe("TEST-123");
+    expect(session.summary).toBe("e2e-fields-test");
     expect(session.group_name).toBe("test-group");
     expect(session.created_at).toBeTruthy();
     expect(session.updated_at).toBeTruthy();
 
-    // Auto-generated branch from jira_key
+    // Auto-generated branch from ticket reference
     expect(session.branch).toContain("feat/TEST-123");
 
     // Events: at least session_created + stage_ready
@@ -222,7 +222,7 @@ describe("e2e: multiple sessions", () => {
     for (let i = 0; i < 3; i++) {
       const s = core.startSession({
         repo: process.cwd(),
-        jira_summary: `e2e-multi-${i}`,
+        summary: `e2e-multi-${i}`,
         pipeline: "bare",
       });
       ids.push(s.id);
@@ -261,7 +261,7 @@ describe("e2e: worktree", () => {
 
     const session = core.startSession({
       repo: arkRoot,
-      jira_summary: "e2e-worktree-test",
+      summary: "e2e-worktree-test",
       pipeline: "bare",
       workdir: arkRoot,
     });
