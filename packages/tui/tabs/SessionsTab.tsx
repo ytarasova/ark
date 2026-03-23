@@ -54,6 +54,9 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
   }, [selected?.id, selected?.status]);
 
   useInput((input, key) => {
+    // Don't handle keys when form overlay is active (form owns input)
+    if (formOverlay) return;
+
     if (input === "j" || key.downArrow) {
       setSel((s) => Math.min(s + 1, topLevel.length - 1));
     } else if (input === "k" || key.upArrow) {

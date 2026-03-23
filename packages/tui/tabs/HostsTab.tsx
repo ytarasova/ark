@@ -30,6 +30,9 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
   const selected = hosts[sel] ?? null;
 
   useInput((input, key) => {
+    // Don't handle keys when form overlay is active (form owns input)
+    if (formOverlay) return;
+
     // If in confirm-delete mode, only respond to x or cancel
     if (confirmDelete) {
       if (input === "x" && selected) {
