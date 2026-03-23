@@ -112,7 +112,7 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
         const sid = selected.session_id;
         try {
           const { execFileSync: efs } = require("child_process");
-          efs("tmux", ["new-window", "-n", sid, "bash", "-c", `tmux attach -t '${sid}'`],
+          efs("tmux", ["new-window", "-n", sid, "bash", "-c", `unset TMUX && tmux attach -t '${sid}'`],
             { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" });
           status.show(`Opened in new tmux window (Ctrl+B n/p to switch)`);
         } catch (e: any) {
