@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import * as core from "../../core/index.js";
 
 export interface StoreData {
@@ -7,6 +7,51 @@ export interface StoreData {
   agents: ReturnType<typeof core.listAgents>;
   pipelines: ReturnType<typeof core.listPipelines>;
   refreshing: boolean;
+}
+
+/**
+ * Reconcile DB sessions with tmux reality.
+ * Marks "running" sessions as "failed" if their tmux session is dead.
+ */
+async function reconcileSessions(sessions: core.Session[]): Promise<void> {
+  for (const s of sessions) {
+    if (s.status !== "running" || !s.session_id) continue;
+
+    const exists = await core.sessionExistsAsync(s.session_id);
+    if (exists) continue;
+
+    let lastOutput = "";
+    try {
+      lastOutput = (await core.capturePaneAsync(s.session_id, { lines: 30 })).trim();
+    } catch {}
+
+    const error = lastOutput
+      ? `Agent exited. Last output: ${lastOutput.split("\n").pop()?.slice(0, 100) ?? "unknown"}`
+      : "Agent process exited";
+
+    core.updateSession(s.id, { status: "failed", error, session_id: null });
+    core.logEvent(s.id, "agent_exited", {
+      stage: s.stage ?? undefined,
+      actor: "system",
+      data: { last_output: lastOutput.slice(0, 500) },
+    });
+
+    s.status = "failed";
+    s.error = error;
+    s.session_id = null;
+  }
+}
+
+/**
+ * Fetch all store data from SQLite.
+ */
+function fetchStoreData(): Omit<StoreData, "refreshing"> {
+  return {
+    sessions: core.listSessions({ limit: 50 }),
+    hosts: core.listHosts(),
+    agents: core.listAgents(),
+    pipelines: core.listPipelines(),
+  };
 }
 
 export function useStore(refreshMs = 3000): StoreData {
@@ -18,53 +63,30 @@ export function useStore(refreshMs = 3000): StoreData {
     refreshing: false,
   });
 
-  useEffect(() => {
-    const refresh = () => {
+  const refresh = useCallback(async () => {
+    try {
+      const store = fetchStoreData();
+      await reconcileSessions(store.sessions);
+      setData({ ...store, refreshing: false });
+    } catch (e: any) {
+      // Log refresh errors - don't crash the TUI, retry on next cycle
+      const { appendFileSync } = require("fs");
+      const { join } = require("path");
+      const { homedir } = require("os");
       try {
-        const sessions = core.listSessions({ limit: 50 });
+        appendFileSync(
+          join(homedir(), ".ark", "logs", "tui.log"),
+          `${new Date().toISOString()} [WARN] Store refresh failed: ${e.message}\n`,
+        );
+      } catch {}
+    }
+  }, []);
 
-        // Reconcile: if DB says "running" but tmux session is dead, mark as failed
-        for (const s of sessions) {
-          if (s.status === "running" && s.session_id) {
-            if (!core.sessionExists(s.session_id)) {
-              // Try to capture last output before marking dead
-              let lastOutput = "";
-              try {
-                lastOutput = core.capturePane(s.session_id, { lines: 30 }).trim();
-              } catch { /* session already gone */ }
-
-              const error = lastOutput
-                ? `Agent exited. Last output: ${lastOutput.split("\n").pop()?.slice(0, 100) ?? "unknown"}`
-                : "Agent process exited";
-
-              core.updateSession(s.id, { status: "failed", error, session_id: null });
-              core.logEvent(s.id, "agent_exited", {
-                stage: s.stage ?? undefined,
-                actor: "system",
-                data: { last_output: lastOutput.slice(0, 500) },
-              });
-              s.status = "failed";
-              s.error = error;
-              s.session_id = null;
-            }
-          }
-        }
-
-        setData({
-          sessions,
-          hosts: core.listHosts(),
-          agents: core.listAgents(),
-          pipelines: core.listPipelines(),
-          refreshing: false,
-        });
-      } catch {
-        // SQLite may be briefly locked - skip this refresh
-      }
-    };
+  useEffect(() => {
     refresh();
     const t = setInterval(refresh, refreshMs);
     return () => clearInterval(t);
-  }, [refreshMs]);
+  }, [refresh, refreshMs]);
 
   return data;
 }
