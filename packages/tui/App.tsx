@@ -5,6 +5,7 @@ import { useAsync } from "./hooks/useAsync.js";
 import { TabBar } from "./components/TabBar.js";
 import type { Tab } from "./components/TabBar.js";
 import { StatusBar } from "./components/StatusBar.js";
+import { EventLog } from "./components/EventLog.js";
 import { SessionsTab } from "./tabs/SessionsTab.js";
 import { HostsTab } from "./tabs/HostsTab.js";
 import { AgentsTab } from "./tabs/AgentsTab.js";
@@ -18,6 +19,7 @@ export function App() {
   const asyncState = useAsync();
   const [tab, setTab] = useState<Tab>("sessions");
   const [showForm, setShowForm] = useState<string | null>(null);
+  const [eventLogExpanded, setEventLogExpanded] = useState(false);
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;
 
@@ -27,6 +29,8 @@ export function App() {
 
     if (input === "q") {
       exit();
+    } else if (input === "e") {
+      setEventLogExpanded((v) => !v);
     } else if (input === "1") {
       setTab("sessions");
     } else if (input === "2") {
@@ -85,6 +89,11 @@ export function App() {
           <Text dimColor>{"Recipes - coming soon"}</Text>
         </Box>
       )}
+
+      <EventLog
+        expanded={eventLogExpanded}
+        onToggle={() => setEventLogExpanded((v) => !v)}
+      />
 
       <StatusBar
         tab={tab}

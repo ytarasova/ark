@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput, useApp } from "ink";
+import Spinner from "ink-spinner";
 import { execFileSync } from "child_process";
 import { join } from "path";
 import { homedir } from "os";
@@ -19,7 +20,7 @@ interface HostsTabProps extends StoreData {
   onShowForm: () => void;
 }
 
-export function HostsTab({ hosts, sessions, async: asyncState, onShowForm }: HostsTabProps) {
+export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onShowForm }: HostsTabProps) {
   const { exit } = useApp();
   const [sel, setSel] = useState(0);
   const status = useStatusMessage();
@@ -141,6 +142,7 @@ export function HostsTab({ hosts, sessions, async: asyncState, onShowForm }: Hos
 
   return (
     <Box flexDirection="column" flexGrow={1}>
+      {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
         left={<HostsList hosts={hosts} sel={sel} />}
         right={

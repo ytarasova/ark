@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput, useApp } from "ink";
+import Spinner from "ink-spinner";
 import { execFileSync } from "child_process";
 import * as core from "../../core/index.js";
 import { ICON, COLOR } from "../constants.js";
@@ -15,7 +16,7 @@ interface SessionsTabProps extends StoreData {
   onShowForm: () => void;
 }
 
-export function SessionsTab({ sessions, async: asyncState, onShowForm }: SessionsTabProps) {
+export function SessionsTab({ sessions, refreshing, async: asyncState, onShowForm }: SessionsTabProps) {
   const { exit } = useApp();
   const [sel, setSel] = useState(0);
   const status = useStatusMessage();
@@ -111,6 +112,7 @@ export function SessionsTab({ sessions, async: asyncState, onShowForm }: Session
 
   return (
     <Box flexDirection="column" flexGrow={1}>
+      {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
         left={<SessionsList
           groups={groups}

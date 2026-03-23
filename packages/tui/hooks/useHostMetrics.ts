@@ -6,6 +6,7 @@ import type { Host } from "../../core/index.js";
 export function useHostMetrics(hosts: Host[], active: boolean, refreshMs = 10000) {
   const [snapshots, setSnapshots] = useState<Map<string, HostSnapshot>>(new Map());
   const [logs, setLogs] = useState<Map<string, string[]>>(new Map());
+  const [fetching, setFetching] = useState(false);
   const polling = useRef(false);
 
   const addLog = (hostName: string, message: string) => {
@@ -26,6 +27,7 @@ export function useHostMetrics(hosts: Host[], active: boolean, refreshMs = 10000
     const refresh = async () => {
       if (polling.current) return;
       polling.current = true;
+      setFetching(true);
       try {
         const next = new Map(snapshots);
         for (const h of hosts) {
@@ -47,6 +49,7 @@ export function useHostMetrics(hosts: Host[], active: boolean, refreshMs = 10000
         setSnapshots(next);
       } finally {
         polling.current = false;
+        setFetching(false);
       }
     };
 
@@ -55,5 +58,5 @@ export function useHostMetrics(hosts: Host[], active: boolean, refreshMs = 10000
     return () => clearInterval(t);
   }, [active, hosts.length, refreshMs]);
 
-  return { snapshots, logs, addLog };
+  return { snapshots, logs, addLog, fetching };
 }

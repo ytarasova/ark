@@ -25,9 +25,9 @@ export function TabBar({ active }: TabBarProps) {
         const key = TAB_KEYS[tab];
         const label = `${key}:${tab.charAt(0).toUpperCase() + tab.slice(1)}`;
         return (
-          <Box key={tab} marginRight={2}>
+          <Box key={tab} marginRight={1}>
             {isActive ? (
-              <Text bold inverse>{` ${label} `}</Text>
+              <Text backgroundColor="cyan" color="black" bold>{` ${label} `}</Text>
             ) : (
               <Text dimColor>{` ${label} `}</Text>
             )}

@@ -6,6 +6,7 @@ export interface StoreData {
   hosts: core.Host[];
   agents: ReturnType<typeof core.listAgents>;
   pipelines: ReturnType<typeof core.listPipelines>;
+  refreshing: boolean;
 }
 
 export function useStore(refreshMs = 3000): StoreData {
@@ -14,10 +15,15 @@ export function useStore(refreshMs = 3000): StoreData {
     hosts: [],
     agents: [],
     pipelines: [],
+    refreshing: false,
   });
 
   useEffect(() => {
+    let firstLoad = true;
     const refresh = () => {
+      if (!firstLoad) {
+        setData((prev) => ({ ...prev, refreshing: true }));
+      }
       try {
         const sessions = core.listSessions({ limit: 50 });
 
@@ -53,10 +59,13 @@ export function useStore(refreshMs = 3000): StoreData {
           hosts: core.listHosts(),
           agents: core.listAgents(),
           pipelines: core.listPipelines(),
+          refreshing: false,
         });
       } catch {
+        setData((prev) => ({ ...prev, refreshing: false }));
         // SQLite may be briefly locked
       }
+      firstLoad = false;
     };
     refresh();
     const t = setInterval(refresh, refreshMs);
