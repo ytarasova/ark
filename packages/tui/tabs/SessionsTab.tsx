@@ -108,24 +108,34 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Attach via posix_spawnp + waitpid.
-        // Mute Ink completely during tmux — child inherits real fd 0/1/2.
+        // Attach: mute Ink, reset terminal for tmux, spawn+wait, restore Ink
         const sid = selected.session_id;
-        const { spawnAndWait } = require("../../core/exec.js");
         const origWrite = process.stdout.write.bind(process.stdout);
         const origErrWrite = process.stderr.write.bind(process.stderr);
-        // Mute Ink writes immediately
         process.stdout.write = (() => true) as any;
         process.stderr.write = (() => true) as any;
-        // Defer to let current render finish, then block on tmux
         setTimeout(() => {
-          // posix_spawnp: child gets real fd 0/1/2, parent blocks on waitpid
-          // stdout.write is still muted so Ink can't interfere
-          spawnAndWait("tmux", ["attach", "-t", sid]);
-          // Restore Ink after detach
           process.stdout.write = origWrite;
           process.stderr.write = origErrWrite;
-          status.show("Detached from session");
+          // Reset terminal state so tmux gets a clean terminal
+          try { process.stdin.setRawMode(false); } catch {}
+          process.stdout.write("\x1b[?1049l"); // exit alt screen if active
+          process.stdout.write("\x1b[?25h");    // show cursor
+          // Spawn tmux as child, block until detach
+          const result = Bun.spawnSync(["tmux", "attach", "-t", sid], {
+            stdin: "inherit",
+            stdout: "inherit",
+            stderr: "inherit",
+            env: { ...process.env, TERM: "xterm-256color" },
+          });
+          // Restore for Ink
+          process.stdout.write("\x1b[2J\x1b[H"); // clear
+          // Mute again briefly so Ink re-renders cleanly
+          process.stdout.write = (() => true) as any;
+          setTimeout(() => {
+            process.stdout.write = origWrite;
+            status.show("Detached from session");
+          }, 50);
         }, 100);
       }
     } else if (input === "n") {
