@@ -108,11 +108,12 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
         const ip = (selected.config as any)?.ip;
         if (!ip) return;
         exit();
-        process.stdout.write("\x1b[?1049l\x1b[?25h");
+        try { execFileSync("reset", [], { stdio: "inherit" }); } catch {}
         const keyPath = join(homedir(), ".ssh", `ark-${selected.name}`);
         try {
           execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`], { stdio: "inherit" });
         } catch { /* user exited */ }
+        try { execFileSync("reset", [], { stdio: "inherit" }); } catch {}
         process.exit(0);
       }
     } else if (input === "c") {

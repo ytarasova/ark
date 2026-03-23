@@ -19,11 +19,7 @@ export function useStore(refreshMs = 3000): StoreData {
   });
 
   useEffect(() => {
-    let firstLoad = true;
     const refresh = () => {
-      if (!firstLoad) {
-        setData((prev) => ({ ...prev, refreshing: true }));
-      }
       try {
         const sessions = core.listSessions({ limit: 50 });
 
@@ -62,10 +58,8 @@ export function useStore(refreshMs = 3000): StoreData {
           refreshing: false,
         });
       } catch {
-        setData((prev) => ({ ...prev, refreshing: false }));
-        // SQLite may be briefly locked
+        // SQLite may be briefly locked - skip this refresh
       }
-      firstLoad = false;
     };
     refresh();
     const t = setInterval(refresh, refreshMs);
