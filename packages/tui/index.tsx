@@ -73,13 +73,13 @@ if (action) {
     : null;
 
   if (cmd) {
+    // stty sane resets terminal, sleep lets iTerm2 DA queries drain
+    // Don't treat non-zero exit as error — tmux detach is normal
     try {
-      // stty sane resets terminal, sleep lets iTerm2 DA queries drain
       execFileSync("bash", ["-c", `stty sane 2>/dev/null; sleep 0.1; ${cmd}`], { stdio: "inherit" });
-      log("INFO", `${action.type} completed`);
-    } catch (e: any) {
-      log("ERROR", `${action.type} failed: ${e.message}`);
-      process.stderr.write(`\n${action.type} failed: ${e.message ?? e}\n`);
+    } catch {
+      // Normal — tmux/ssh exited (detach, disconnect, etc.)
     }
+    log("INFO", `${action.type} completed`);
   }
 }
