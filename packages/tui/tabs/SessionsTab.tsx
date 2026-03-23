@@ -238,9 +238,6 @@ function SessionDetail({ session: s }: SessionDetailProps) {
   } catch {
     // ignore
   }
-  const agentReports = events.filter((e) => e.type.startsWith("agent_"));
-  const latestReport = agentReports[agentReports.length - 1] ?? null;
-
   // Agent output - live polling via hook
   const agentOutput = useAgentOutput(
     s.id,
@@ -336,33 +333,11 @@ function SessionDetail({ session: s }: SessionDetailProps) {
         </Text>
       )}
 
-      {/* Latest agent report */}
-      {latestReport && (() => {
-        const d = latestReport.data ?? {};
-        const reportType = latestReport.type.replace("agent_", "");
-        const reportColor = (
-          reportType === "completed" ? "green"
-          : reportType === "error" ? "red"
-          : reportType === "question" ? "yellow"
-          : "cyan"
-        ) as any;
-        const message = String(d.message ?? d.summary ?? d.question ?? d.error ?? "").slice(0, 80);
-        return (
-          <>
-            <Text> </Text>
-            <SectionHeader title="Latest Report" />
-            <Text>
-              {"  "}<Text color={reportColor}>{reportType}</Text>{`: ${message}`}
-            </Text>
-          </>
-        );
-      })()}
-
-      {/* Agent output */}
+      {/* Agent output (live tmux capture) */}
       {agentOutput.trim() ? (
         <>
           <Text> </Text>
-          <SectionHeader title="Agent Output" />
+          <SectionHeader title="Live Output" />
           {agentOutput.split("\n").slice(-12).map((line, i) => (
             <Text key={i}>{`  ${line.slice(0, 80)}`}</Text>
           ))}
@@ -374,9 +349,11 @@ function SessionDetail({ session: s }: SessionDetailProps) {
         </>
       ) : null}
 
-      {/* Events */}
+      {/* Events - visual separator */}
       {events.length > 0 && (
         <>
+          <Text> </Text>
+          <Text dimColor>{"  " + "─".repeat(50)}</Text>
           <Text> </Text>
           <SectionHeader title="Events" />
           {events.slice(-10).map((ev, i) => {
