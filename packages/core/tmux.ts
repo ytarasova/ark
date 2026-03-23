@@ -5,7 +5,7 @@
  * a clean API over tmux CLI commands. No sleeps - uses tmux primitives.
  */
 
-import { execSync, execFileSync } from "child_process";
+import { execSync, execFileSync, spawn } from "child_process";
 import { existsSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
 import { TRACKS_DIR } from "./store.js";
@@ -43,6 +43,15 @@ export function killSession(name: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Kill a tmux session (async - non-blocking) */
+export function killSessionAsync(name: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const cp = spawn("tmux", ["kill-session", "-t", name], { stdio: "pipe" });
+    cp.on("close", (code) => resolve(code === 0));
+    cp.on("error", () => resolve(false));
+  });
 }
 
 /** Create a new tmux session running a command directly (no shell prompt) */

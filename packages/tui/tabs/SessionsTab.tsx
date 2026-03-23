@@ -59,7 +59,9 @@ export function SessionsTab({ sessions, async: asyncState, onShowForm }: Session
       }
     } else if (input === "s") {
       if (selected && !["completed", "failed"].includes(selected.status)) {
-        core.stop(selected.id);
+        asyncState.run(`Stopping ${selected.id}`, async () => {
+          core.stop(selected.id);
+        });
       }
     } else if (input === "r") {
       if (selected && ["blocked", "waiting", "failed"].includes(selected.status)) {
@@ -69,13 +71,19 @@ export function SessionsTab({ sessions, async: asyncState, onShowForm }: Session
       }
     } else if (input === "c") {
       if (selected && selected.status === "running") {
-        core.complete(selected.id);
+        asyncState.run(`Completing ${selected.id}`, async () => {
+          core.complete(selected.id);
+        });
       }
     } else if (input === "x") {
       if (selected) {
-        if (selected.session_id) core.killSession(selected.session_id);
-        core.deleteSession(selected.id);
-        setSel((s) => Math.max(0, s - 1));
+        asyncState.run(`Deleting ${selected.id}`, async () => {
+          if (selected.session_id) {
+            await core.killSessionAsync(selected.session_id);
+          }
+          core.deleteSession(selected.id);
+          setSel((s) => Math.max(0, s - 1));
+        });
       }
     } else if (input === "a") {
       if (selected?.session_id) {
