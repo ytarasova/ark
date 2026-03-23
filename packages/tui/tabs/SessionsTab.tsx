@@ -108,28 +108,13 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Attach: mute Ink rendering, run tmux as child, resume Ink after
+        // Attach via posix_spawnp + waitpid: proper POSIX process management.
+        // Child inherits parent's stdin/stdout/stderr (the terminal).
+        // Parent (Ink) blocks on waitpid until child exits (detach).
         const sid = selected.session_id;
-        const origWrite = process.stdout.write;
-        process.stdout.write = (() => true) as any;
-
-        setImmediate(() => {
-          // Restore stdout for tmux to use
-          process.stdout.write = origWrite;
-          // Clear screen
-          process.stdout.write("\x1b[2J\x1b[H");
-
-          // Run tmux as a child process with inherited stdio
-          Bun.spawnSync(["tmux", "attach", "-t", sid], {
-            stdin: "inherit",
-            stdout: "inherit",
-            stderr: "inherit",
-          });
-
-          // After detach: clear and let Ink re-render
-          process.stdout.write("\x1b[2J\x1b[H");
-          status.show("Detached from session");
-        });
+        const { spawnAndWait } = require("../../core/exec.js");
+        spawnAndWait("tmux", ["attach", "-t", sid]);
+        status.show("Detached from session");
       }
     } else if (input === "n") {
       onShowForm();
