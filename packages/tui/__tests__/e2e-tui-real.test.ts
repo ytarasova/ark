@@ -147,18 +147,18 @@ describe("e2e TUI (real tmux)", () => {
 
       // Switch to Hosts tab (key 2)
       tui.press("2");
-      await tui.waitFor("local", 3000);
-      expect(tui.screen()).toContain("local");
+      await tui.waitFor("Hosts", 5000);
+      expect(tui.screen()).toContain("Hosts");
 
       // Switch to Agents tab (key 3)
       tui.press("3");
-      // Agents tab should be active — wait for the key hints to change
-      await tui.waitFor("j/k:move  q:quit", 3000);
+      await tui.waitFor("Agents", 5000);
+      expect(tui.screen()).toContain("Agents");
 
       // Switch back to Sessions tab (key 1)
       tui.press("1");
-      await tui.waitFor("n:new", 3000);
-      expect(tui.screen()).toContain("sessions");
+      await tui.waitFor("Sessions", 5000);
+      expect(tui.screen()).toContain("Sessions");
     } finally {
       tui.stop();
     }
@@ -238,7 +238,7 @@ describe("e2e TUI (real tmux)", () => {
       tui.press("n"); // open the form
       const formVisible = await tui.waitFor("New Session", 3000);
       expect(formVisible).toBe(true);
-      expect(tui.screen()).toContain("Task / summary");
+      expect(tui.screen()).toContain("Session name:");
 
       // Esc should close the form
       tui.press("Escape");

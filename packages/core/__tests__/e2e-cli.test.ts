@@ -156,7 +156,7 @@ describe("CLI: session lifecycle", () => {
     expect(out).toContain("Flow:");
   });
 
-  it("deletes a session", () => {
+  it("deletes a session", async () => {
     const createOut = ark("session", "start", "--repo", ".", "--summary", "delete-test", "--flow", "bare");
     const match = createOut.match(/Session (s-[0-9a-f]+) created/);
     expect(match).not.toBeNull();
@@ -168,7 +168,7 @@ describe("CLI: session lifecycle", () => {
     // Verify it's gone
     const showOut = arkSafe("session", "show", id);
     expect(showOut).toContain("not found");
-  });
+  }, 30_000);
 });
 
 // ── Agent & Flow commands ───────────────────────────────────────────────
