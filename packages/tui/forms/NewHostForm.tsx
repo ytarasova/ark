@@ -75,9 +75,11 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
       setStep("image");
     } else {
       // Create non-EC2/non-Docker host directly
-      asyncState.run(`Creating host ${name.trim()}`, async () => {
+      try {
         core.createHost({ name: name.trim(), provider: item.value, config: {} });
-      });
+      } catch (e: any) {
+        asyncState.run("Create failed", async () => { throw e; });
+      }
       onDone();
     }
   };
@@ -85,13 +87,15 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
   // Docker: submit image name
   const handleSubmitImage = () => {
     const img = image.trim() || "ubuntu:22.04";
-    asyncState.run(`Creating docker host ${name.trim()}`, async () => {
+    try {
       core.createHost({
         name: name.trim(),
         provider: "docker",
         config: { image: img },
       });
-    });
+    } catch (e: any) {
+      asyncState.run("Create failed", async () => { throw e; });
+    }
     onDone();
   };
 
@@ -111,7 +115,7 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
   };
 
   const handleSelectProfile = (item: { label: string; value: string }) => {
-    asyncState.run(`Creating EC2 host ${name.trim()}`, async () => {
+    try {
       core.createHost({
         name: name.trim(),
         provider,
@@ -122,7 +126,9 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
           ...(item.value ? { aws_profile: item.value } : {}),
         },
       });
-    });
+    } catch (e: any) {
+      asyncState.run("Create failed", async () => { throw e; });
+    }
     onDone();
   };
 

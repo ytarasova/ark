@@ -52,16 +52,19 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
   };
 
   const handleSelectPipeline = (item: { label: string; value: string }) => {
-    // Create session + dispatch, all wrapped for progress / error visibility
-    asyncState.run("Creating session", async () => {
-      let workdir: string | undefined;
-      let repo = repoPath || process.cwd();
-      const rp = resolvePath(repo);
-      if (existsSync(rp)) {
-        workdir = rp;
-        if (repo === "." || repo === "./") repo = basename(rp);
-      }
+    // Close form first, then create + dispatch in background
+    onDone();
 
+    // Create session synchronously (fast DB write)
+    let workdir: string | undefined;
+    let repo = repoPath || process.cwd();
+    const rp = resolvePath(repo);
+    if (existsSync(rp)) {
+      workdir = rp;
+      if (repo === "." || repo === "./") repo = basename(rp);
+    }
+
+    try {
       const s = core.startSession({
         jira_summary: summary || "Ad-hoc task",
         repo,
@@ -69,9 +72,13 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
         workdir,
         compute_name: computeName || undefined,
       });
-      await core.dispatch(s.id);
-    });
-    onDone();
+      // Dispatch async via the parent's asyncState
+      asyncState.run(`Dispatching ${s.id}`, async () => {
+        await core.dispatch(s.id);
+      });
+    } catch (e: any) {
+      asyncState.run("Create failed", async () => { throw e; });
+    }
   };
 
   return (
