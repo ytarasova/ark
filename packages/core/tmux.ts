@@ -5,10 +5,13 @@
  * a clean API over tmux CLI commands. No sleeps - uses tmux primitives.
  */
 
-import { execSync, execFileSync, spawn } from "child_process";
+import { execSync, execFile, execFileSync, spawn } from "child_process";
+import { promisify } from "util";
 import { existsSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
 import { TRACKS_DIR } from "./store.js";
+
+const execFileAsync = promisify(execFile);
 
 export interface TmuxSession {
   name: string;
@@ -29,6 +32,16 @@ export function hasTmux(): boolean {
 export function sessionExists(name: string): boolean {
   try {
     execFileSync("tmux", ["has-session", "-t", name], { stdio: "pipe" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Check if a tmux session exists (async - non-blocking) */
+export async function sessionExistsAsync(name: string): Promise<boolean> {
+  try {
+    await execFileAsync("tmux", ["has-session", "-t", name], { stdio: ["pipe", "pipe", "pipe"] });
     return true;
   } catch {
     return false;
@@ -91,6 +104,21 @@ export function capturePane(name: string, opts?: {
     const args = ["capture-pane", "-t", name, "-p", "-S", `-${opts?.lines ?? 50}`];
     if (opts?.ansi) args.splice(4, 0, "-e");
     return execFileSync("tmux", args, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+  } catch {
+    return "";
+  }
+}
+
+/** Capture pane output (async - non-blocking) */
+export async function capturePaneAsync(name: string, opts?: {
+  lines?: number;
+  ansi?: boolean;
+}): Promise<string> {
+  try {
+    const args = ["capture-pane", "-t", name, "-p", "-S", `-${opts?.lines ?? 50}`];
+    if (opts?.ansi) args.splice(4, 0, "-e");
+    const { stdout } = await execFileAsync("tmux", args, { encoding: "utf-8" });
+    return stdout;
   } catch {
     return "";
   }

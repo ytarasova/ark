@@ -10,7 +10,7 @@ import type {
   HostSession,
   HostSnapshot,
 } from "../../types.js";
-import { sshExec } from "./ssh.js";
+import { sshExec, sshExecAsync } from "./ssh.js";
 
 // ---------------------------------------------------------------------------
 // Internal sub-commands
@@ -270,10 +270,26 @@ export function fetchMetrics(key: string, ip: string): HostSnapshot {
 }
 
 /**
+ * Fetch fast metrics from an EC2 host via SSH (async / non-blocking).
+ */
+export async function fetchMetricsAsync(key: string, ip: string): Promise<HostSnapshot> {
+  const { stdout } = await sshExecAsync(key, ip, SSH_FAST_CMD, { timeout: 15_000 });
+  return parseSnapshot(stdout);
+}
+
+/**
  * Fetch docker metrics from an EC2 host via SSH.
  * Runs SSH_DOCKER_CMD and parses the output (only docker fields populated).
  */
 export function fetchDocker(key: string, ip: string): HostSnapshot {
   const { stdout } = sshExec(key, ip, SSH_DOCKER_CMD, { timeout: 30_000 });
+  return parseSnapshot(stdout);
+}
+
+/**
+ * Fetch docker metrics from an EC2 host via SSH (async / non-blocking).
+ */
+export async function fetchDockerAsync(key: string, ip: string): Promise<HostSnapshot> {
+  const { stdout } = await sshExecAsync(key, ip, SSH_DOCKER_CMD, { timeout: 30_000 });
   return parseSnapshot(stdout);
 }

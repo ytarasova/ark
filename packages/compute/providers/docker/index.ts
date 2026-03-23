@@ -10,9 +10,12 @@
  *   destroy   → docker rm -f
  */
 
-import { execFileSync } from "child_process";
+import { execFile, execFileSync } from "child_process";
+import { promisify } from "util";
 import { homedir } from "os";
 import { join } from "path";
+
+const execFileAsync = promisify(execFile);
 import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
   HostSnapshot, HostMetrics, HostProcess, PortDecl, PortStatus,
@@ -35,6 +38,19 @@ function run(cmd: string, args: string[]): string {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
+  } catch {
+    return "";
+  }
+}
+
+/** Run a command asynchronously, return trimmed stdout or "" on failure. */
+async function runA(cmd: string, args: string[]): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync(cmd, args, {
+      timeout: 30_000,
+      encoding: "utf-8",
+    });
+    return stdout.trim();
   } catch {
     return "";
   }
@@ -230,17 +246,30 @@ export class DockerProvider implements ComputeProvider {
   async getMetrics(host: Host): Promise<HostSnapshot> {
     const name = containerName(host.name);
 
+    // Run all independent docker commands in parallel - non-blocking
+    const [statsOut, dfOut, startedAt, psOut, dockerStatsOut] = await Promise.all([
+      runA("docker", [
+        "stats", "--no-stream", "--format",
+        "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}",
+        name,
+      ]),
+      runA("docker", ["exec", name, "df", "-h", "/"]),
+      runA("docker", [
+        "inspect", "--format", "{{.State.StartedAt}}", name,
+      ]),
+      runA("docker", ["exec", name, "ps", "aux"]),
+      runA("docker", [
+        "stats", "--no-stream", "--format",
+        "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}",
+        name,
+      ]),
+    ]);
+
     // -- Container-level CPU / MEM from docker stats --
     let cpu = 0;
     let memUsedGb = 0;
     let memTotalGb = 0;
     let memPct = 0;
-
-    const statsOut = run("docker", [
-      "stats", "--no-stream", "--format",
-      "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}",
-      name,
-    ]);
 
     if (statsOut) {
       const parts = statsOut.split("\t");
@@ -260,7 +289,6 @@ export class DockerProvider implements ComputeProvider {
 
     // -- Disk usage inside the container --
     let diskPct = 0;
-    const dfOut = run("docker", ["exec", name, "df", "-h", "/"]);
     if (dfOut) {
       const lines = dfOut.split("\n");
       if (lines.length >= 2) {
@@ -271,9 +299,6 @@ export class DockerProvider implements ComputeProvider {
 
     // -- Uptime (container start time) --
     let uptime = "";
-    const startedAt = run("docker", [
-      "inspect", "--format", "{{.State.StartedAt}}", name,
-    ]);
     if (startedAt) {
       const started = new Date(startedAt);
       if (!isNaN(started.getTime())) {
@@ -286,7 +311,6 @@ export class DockerProvider implements ComputeProvider {
 
     // -- Running processes inside the container --
     const processes: HostProcess[] = [];
-    const psOut = run("docker", ["exec", name, "ps", "aux"]);
     if (psOut) {
       const lines = psOut.split("\n");
       for (let i = 1; i < lines.length; i++) {
@@ -310,11 +334,6 @@ export class DockerProvider implements ComputeProvider {
 
     // -- Docker container info for the snapshot --
     const docker: { name: string; cpu: string; memory: string; image: string; project: string }[] = [];
-    const dockerStatsOut = run("docker", [
-      "stats", "--no-stream", "--format",
-      "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}",
-      name,
-    ]);
     if (dockerStatsOut) {
       for (const line of dockerStatsOut.split("\n").filter(Boolean)) {
         const [cName, cCpu, cMemory] = line.split("\t");

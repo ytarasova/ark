@@ -22,11 +22,11 @@ import type {
 } from "../../types.js";
 import type { Host, Session } from "../../../core/store.js";
 import { updateHost, mergeHostConfig } from "../../../core/store.js";
-import { sshKeyPath, sshExec, waitForSsh, generateSshKey } from "./ssh.js";
+import { sshKeyPath, sshExec, sshExecAsync, waitForSsh, waitForSshAsync, generateSshKey } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
 import { syncToHost, syncProjectFiles } from "./sync.js";
-import { fetchMetrics } from "./metrics.js";
+import { fetchMetrics, fetchMetricsAsync } from "./metrics.js";
 import { setupTunnels, probeRemotePorts } from "./ports.js";
 import { hourlyRate } from "./cost.js";
 import { sleep } from "../../util.js";
@@ -112,7 +112,7 @@ export class EC2Provider implements ComputeProvider {
       log(`Waiting for SSH... (key: ${privateKeyPath}, host: ${result.ip})`);
       let sshOk = false;
       for (let i = 0; i < 30; i++) {
-        const res = sshExec(privateKeyPath, result.ip, "echo ok", { timeout: 15_000 });
+        const res = await sshExecAsync(privateKeyPath, result.ip, "echo ok", { timeout: 15_000 });
         if (res.exitCode === 0) {
           sshOk = true;
           break;
@@ -130,13 +130,13 @@ export class EC2Provider implements ComputeProvider {
       log("Waiting for cloud-init to complete...");
       const key = sshKeyPath(host.name);
       for (let i = 0; i < 60; i++) {
-        const { stdout } = sshExec(key, result.ip, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 15_000 });
+        const { stdout } = await sshExecAsync(key, result.ip, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 15_000 });
         if (stdout.trim().includes("provisioning complete")) {
           log("Cloud-init complete - all packages installed");
           mergeHostConfig(host.name, { cloud_init_done: true });
           break;
         }
-        const { stdout: progress } = sshExec(key, result.ip,
+        const { stdout: progress } = await sshExecAsync(key, result.ip,
           "tail -1 /var/log/cloud-init-output.log 2>/dev/null || echo 'waiting...'", { timeout: 15_000 });
         const line = progress.trim().slice(0, 100);
         if (line && line !== "waiting...") {
@@ -187,7 +187,7 @@ export class EC2Provider implements ComputeProvider {
 
     if (ip) {
       const key = sshKeyPath(host.name);
-      waitForSsh(key, ip);
+      await waitForSshAsync(key, ip);
     }
   }
 
@@ -263,7 +263,7 @@ export class EC2Provider implements ComputeProvider {
     const cfg = host.config as EC2HostConfig;
     const ip = cfg.ip;
     if (!ip) throw new Error(`Host '${host.name}' has no IP`);
-    return fetchMetrics(sshKeyPath(host.name), ip);
+    return fetchMetricsAsync(sshKeyPath(host.name), ip);
   }
 
   async probePorts(host: Host, ports: PortDecl[]): Promise<PortStatus[]> {

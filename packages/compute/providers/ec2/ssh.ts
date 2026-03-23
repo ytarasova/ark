@@ -3,10 +3,13 @@
  * Ported from BigBox's Python ssh.py to TypeScript.
  */
 
-import { execFileSync } from "child_process";
+import { execFile, execFileSync } from "child_process";
+import { promisify } from "util";
 import { existsSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+
+const execFileAsync = promisify(execFile);
 
 export const SSH_OPTS: string[] = [
   "-o", "StrictHostKeyChecking=no",
@@ -51,6 +54,35 @@ export function sshExec(
       encoding: "utf-8",
       timeout: opts?.timeout ?? 30_000,
       stdio: ["pipe", "pipe", "pipe"],
+    });
+    return { stdout, stderr: "", exitCode: 0 };
+  } catch (err: any) {
+    return {
+      stdout: err.stdout?.toString() ?? "",
+      stderr: err.stderr?.toString() ?? "",
+      exitCode: typeof err.status === "number" ? err.status : 1,
+    };
+  }
+}
+
+/**
+ * Execute a command on a remote host via SSH (async / non-blocking).
+ * Uses promisified execFile; never throws. Returns stdout, stderr, and exitCode.
+ */
+export async function sshExecAsync(
+  key: string,
+  ip: string,
+  cmd: string,
+  opts?: { timeout?: number },
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const args = sshBaseArgs(key, ip);
+  const [bin, ...rest] = args;
+  rest.push(cmd);
+
+  try {
+    const { stdout } = await execFileAsync(bin, rest, {
+      encoding: "utf-8",
+      timeout: opts?.timeout ?? 30_000,
     });
     return { stdout, stderr: "", exitCode: 0 };
   } catch (err: any) {
@@ -122,6 +154,21 @@ export function waitForSsh(key: string, ip: string, maxAttempts = 30): boolean {
     if (exitCode === 0) return true;
     if (i < maxAttempts - 1) {
       execFileSync("sleep", ["5"]);
+    }
+  }
+  return false;
+}
+
+/**
+ * Poll SSH readiness (async / non-blocking).
+ * Returns true as soon as a connection succeeds.
+ */
+export async function waitForSshAsync(key: string, ip: string, maxAttempts = 30): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const { exitCode } = await sshExecAsync(key, ip, "echo ok", { timeout: 10_000 });
+    if (exitCode === 0) return true;
+    if (i < maxAttempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
   return false;
