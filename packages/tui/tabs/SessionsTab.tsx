@@ -112,11 +112,10 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
         const sid = selected.session_id;
         try {
           const { execFileSync: efs } = require("child_process");
-          // Open in new window, auto-return to TUI when detached
-          // remain-on-exit off + automatic window closing brings you back
-          efs("tmux", ["new-window", "-n", sid, "bash", "-c", `unset TMUX; tmux attach -t '${sid}'`],
+          // Switch to the agent's tmux session. Ctrl+B L switches back to TUI.
+          efs("tmux", ["switch-client", "-t", sid],
             { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" });
-          status.show(`Opened in new tmux window (Ctrl+B n/p to switch)`);
+          status.show(`Switched to session. Ctrl+B L to return to TUI`);
         } catch (e: any) {
           const stderr = e?.stderr ?? e?.message ?? String(e);
           status.show(`Attach error: ${stderr.slice(0, 80)}`);
