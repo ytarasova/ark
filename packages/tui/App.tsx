@@ -49,13 +49,21 @@ export function App() {
       <TabBar active={tab} />
 
       {showForm === "session" ? (
-        <NewSessionForm
-          store={store}
-          async={asyncState}
-          onDone={() => setShowForm(null)}
-        />
+        <Box flexGrow={1} justifyContent="center" alignItems="center">
+          <Box width={60}>
+            <NewSessionForm
+              store={store}
+              async={asyncState}
+              onDone={() => setShowForm(null)}
+            />
+          </Box>
+        </Box>
       ) : showForm === "host" ? (
-        <NewHostForm async={asyncState} onDone={() => setShowForm(null)} />
+        <Box flexGrow={1} justifyContent="center" alignItems="center">
+          <Box width={60}>
+            <NewHostForm async={asyncState} onDone={() => setShowForm(null)} />
+          </Box>
+        </Box>
       ) : tab === "sessions" ? (
         <SessionsTab
           {...store}
