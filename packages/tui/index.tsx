@@ -50,55 +50,5 @@ try {
   process.exit(1);
 }
 
-// ── Post-exit action ─────────────────────────────────────────────────────────
-const action = getPostExitAction();
-if (action) {
-  log("INFO", `Post-exit: ${action.type} ${action.args.join(" ")}`);
-
-  const cmd = action.type === "tmux-attach"
-    ? ["tmux", "attach", "-t", ...action.args]
-    : action.type === "ssh"
-    ? ["ssh", ...action.args]
-    : null;
-
-  if (cmd) {
-    log("INFO", `Running: ${cmd.join(" ")}`);
-
-    // Use Bun.Terminal for proper PTY — gives subprocess a real terminal
-    process.stdin.setRawMode(true);
-    const proc = Bun.spawn(cmd, {
-      terminal: {
-        cols: process.stdout.columns ?? 80,
-        rows: process.stdout.rows ?? 24,
-        data(_terminal, data) {
-          process.stdout.write(data);
-        },
-      },
-    });
-
-    // Forward stdin to PTY
-    process.stdin.on("data", (chunk: Buffer) => {
-      proc.terminal.write(chunk.toString());
-    });
-
-    // Handle resize
-    process.stdout.on("resize", () => {
-      proc.terminal.resize(process.stdout.columns, process.stdout.rows);
-    });
-
-    await proc.exited;
-    process.stdin.setRawMode(false);
-    process.stdin.removeAllListeners("data");
-    process.stdout.removeAllListeners("resize");
-    log("INFO", `${action.type} exited: ${proc.exitCode}`);
-
-    // Re-launch TUI after detach
-    log("INFO", "Re-launching TUI");
-    const result = Bun.spawnSync([process.execPath, import.meta.filename], {
-      stdin: "inherit",
-      stdout: "inherit",
-      stderr: "inherit",
-    });
-    process.exit(result.exitCode ?? 0);
-  }
-}
+// Post-exit actions (attach/ssh) are now handled inline in components
+// via Bun.Terminal PTY — no need to exit/re-launch the TUI

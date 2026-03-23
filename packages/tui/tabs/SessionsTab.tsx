@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Box, Text, useInput, useApp } from "ink";
+import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import * as core from "../../core/index.js";
 import { ICON, COLOR } from "../constants.js";
@@ -20,7 +20,6 @@ interface SessionsTabProps extends StoreData {
 }
 
 export function SessionsTab({ sessions, refreshing, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
-  const { exit } = useApp();
   const [sel, setSel] = useState(0);
   const status = useStatusMessage();
 
@@ -109,10 +108,42 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Attach using Bun's native PTY support
-        const { setPostExitAction } = require("../post-exit.js");
-        setPostExitAction({ type: "tmux-attach", args: [selected.session_id] });
-        exit();
+        // Attach: suspend Ink, run tmux with PTY, resume Ink
+        const sid = selected.session_id;
+        // Hide Ink output temporarily
+        const origWrite = process.stdout.write;
+        process.stdout.write = (() => true) as any;
+
+        // Run tmux attach synchronously with inherited TTY
+        setTimeout(async () => {
+          process.stdout.write = origWrite;
+          // Clear screen for tmux
+          process.stdout.write("\x1b[2J\x1b[H");
+          process.stdin.setRawMode(false);
+
+          const proc = Bun.spawn(["tmux", "attach", "-t", sid], {
+            terminal: {
+              cols: process.stdout.columns ?? 80,
+              rows: process.stdout.rows ?? 24,
+              data(_t: any, data: string) { process.stdout.write(data); },
+            },
+          });
+
+          process.stdin.on("data", (chunk: Buffer) => {
+            try { proc.terminal.write(chunk.toString()); } catch {}
+          });
+          process.stdout.on("resize", () => {
+            try { proc.terminal.resize(process.stdout.columns, process.stdout.rows); } catch {}
+          });
+
+          await proc.exited;
+
+          // Restore Ink
+          process.stdin.removeAllListeners("data");
+          process.stdout.removeAllListeners("resize");
+          process.stdout.write("\x1b[2J\x1b[H"); // clear
+          status.show("Detached from session");
+        }, 50);
       }
     } else if (input === "n") {
       onShowForm();
