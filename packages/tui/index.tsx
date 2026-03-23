@@ -7,6 +7,11 @@ import { getPostExitAction } from "./post-exit.js";
 
 process.on("unhandledRejection", () => {});
 
+// Ensure terminal is in a clean state (may be corrupted after tmux detach)
+if (process.stdin.isTTY && !process.stdin.isRaw) {
+  try { process.stdin.setRawMode(true); process.stdin.setRawMode(false); } catch {}
+}
+
 const { waitUntilExit } = render(<App />, {
   patchConsole: false,
   exitOnCtrlC: true,
