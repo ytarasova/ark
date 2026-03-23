@@ -108,42 +108,14 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Attach: suspend Ink, run tmux with PTY, resume Ink
+        // Attach via tmux — open in new tmux window or show command
         const sid = selected.session_id;
-        // Hide Ink output temporarily
-        const origWrite = process.stdout.write;
-        process.stdout.write = (() => true) as any;
-
-        // Run tmux attach synchronously with inherited TTY
-        setTimeout(async () => {
-          process.stdout.write = origWrite;
-          // Clear screen for tmux
-          process.stdout.write("\x1b[2J\x1b[H");
-          process.stdin.setRawMode(false);
-
-          const proc = Bun.spawn(["tmux", "attach", "-t", sid], {
-            terminal: {
-              cols: process.stdout.columns ?? 80,
-              rows: process.stdout.rows ?? 24,
-              data(_t: any, data: string) { process.stdout.write(data); },
-            },
-          });
-
-          process.stdin.on("data", (chunk: Buffer) => {
-            try { proc.terminal.write(chunk.toString()); } catch {}
-          });
-          process.stdout.on("resize", () => {
-            try { proc.terminal.resize(process.stdout.columns, process.stdout.rows); } catch {}
-          });
-
-          await proc.exited;
-
-          // Restore Ink
-          process.stdin.removeAllListeners("data");
-          process.stdout.removeAllListeners("resize");
-          process.stdout.write("\x1b[2J\x1b[H"); // clear
-          status.show("Detached from session");
-        }, 50);
+        try {
+          execFileSync("tmux", ["new-window", "-n", sid, `tmux attach -t ${sid}`], { stdio: "pipe" });
+          status.show(`Opened ${sid} in new tmux window`);
+        } catch {
+          status.show(`Run: tmux attach -t ${sid}`);
+        }
       }
     } else if (input === "n") {
       onShowForm();

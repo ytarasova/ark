@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Text, useInput, useApp } from "ink";
+import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import { execFileSync } from "child_process";
 import { join } from "path";
@@ -22,7 +22,6 @@ interface HostsTabProps extends StoreData {
 }
 
 export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onShowForm, formOverlay }: HostsTabProps) {
-  const { exit } = useApp();
   const [sel, setSel] = useState(0);
   const status = useStatusMessage();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -107,13 +106,14 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
       if (selected?.status === "running") {
         const ip = (selected.config as any)?.ip;
         if (!ip) return;
-        const { setPostExitAction } = require("../post-exit.js");
         const keyPath = join(homedir(), ".ssh", `ark-${selected.name}`);
-        setPostExitAction({
-          type: "ssh",
-          args: ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`],
-        });
-        exit();
+        const sshCmd = `ssh -i ${keyPath} -o StrictHostKeyChecking=no ubuntu@${ip}`;
+        try {
+          execFileSync("tmux", ["new-window", "-n", `ssh-${selected.name}`, sshCmd], { stdio: "pipe" });
+          status.show(`Opened SSH to ${selected.name} in new tmux window`);
+        } catch {
+          status.show(`Run: ${sshCmd}`);
+        }
       }
     } else if (input === "c") {
       // Clean orphaned tmux sessions
