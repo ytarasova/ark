@@ -88,6 +88,17 @@ if (action) {
 
     await proc.exited;
     process.stdin.setRawMode(false);
+    process.stdin.removeAllListeners("data");
+    process.stdout.removeAllListeners("resize");
     log("INFO", `${action.type} exited: ${proc.exitCode}`);
+
+    // Re-launch TUI after detach
+    log("INFO", "Re-launching TUI");
+    const result = Bun.spawnSync([process.execPath, import.meta.filename], {
+      stdin: "inherit",
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    process.exit(result.exitCode ?? 0);
   }
 }
