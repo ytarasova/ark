@@ -5,6 +5,7 @@
 
 import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
+import { poll } from "../../util.js";
 import { existsSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
@@ -164,14 +165,13 @@ export function waitForSsh(key: string, ip: string, maxAttempts = 30): boolean {
  * Returns true as soon as a connection succeeds.
  */
 export async function waitForSshAsync(key: string, ip: string, maxAttempts = 30): Promise<boolean> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const { exitCode } = await sshExecAsync(key, ip, "echo ok", { timeout: 10_000 });
-    if (exitCode === 0) return true;
-    if (i < maxAttempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    }
-  }
-  return false;
+  return poll(
+    async () => {
+      const { exitCode } = await sshExecAsync(key, ip, "echo ok", { timeout: 10_000 });
+      return exitCode === 0;
+    },
+    { maxAttempts, delayMs: 5000 },
+  );
 }
 
 /**

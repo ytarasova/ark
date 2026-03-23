@@ -9,6 +9,7 @@ import { MetricBar } from "../components/MetricBar.js";
 import { useHostMetrics } from "../hooks/useHostMetrics.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
+import { useStatusMessage } from "../hooks/useStatusMessage.js";
 
 interface HostsTabProps extends StoreData {
   async: AsyncState;
@@ -17,7 +18,7 @@ interface HostsTabProps extends StoreData {
 
 export function HostsTab({ hosts, sessions, async: asyncState, onShowForm }: HostsTabProps) {
   const [sel, setSel] = useState(0);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const status = useStatusMessage();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { snapshots, logs, addLog } = useHostMetrics(hosts, true);
 
@@ -95,14 +96,12 @@ export function HostsTab({ hosts, sessions, async: asyncState, onShowForm }: Hos
         return;
       }
       setConfirmDelete(true);
-      setStatusMessage(`Delete host '${selected.name}'? Press x to confirm, any key to cancel`);
-      setTimeout(() => setStatusMessage(null), 5000);
+      status.show(`Delete host '${selected.name}'? Press x to confirm, any key to cancel`);
     } else if (input === "a") {
       if (selected?.status === "running") {
         const ip = (selected.config as any)?.ip;
         if (ip) {
-          setStatusMessage(`Run: ssh ubuntu@${ip}`);
-          setTimeout(() => setStatusMessage(null), 5000);
+          status.show(`Run: ssh ubuntu@${ip}`);
         }
       }
     } else if (input === "n") {
@@ -123,9 +122,9 @@ export function HostsTab({ hosts, sessions, async: asyncState, onShowForm }: Hos
           />
         }
       />
-      {statusMessage && (
+      {status.message && (
         <Box>
-          <Text color={confirmDelete ? "red" : "cyan"}>{` ${statusMessage}`}</Text>
+          <Text color={confirmDelete ? "red" : "cyan"}>{` ${status.message}`}</Text>
         </Box>
       )}
     </Box>

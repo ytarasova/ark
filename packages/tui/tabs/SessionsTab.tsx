@@ -5,6 +5,7 @@ import { ICON, COLOR } from "../constants.js";
 import { ago, hms } from "../helpers.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
+import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
@@ -15,7 +16,7 @@ interface SessionsTabProps extends StoreData {
 
 export function SessionsTab({ sessions, async: asyncState, onShowForm }: SessionsTabProps) {
   const [sel, setSel] = useState(0);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const status = useStatusMessage();
 
   // Top-level sessions only (exclude fork children from list)
   const topLevel = useMemo(() => sessions.filter((s) => !s.parent_id), [sessions]);
@@ -88,8 +89,7 @@ export function SessionsTab({ sessions, async: asyncState, onShowForm }: Session
     } else if (input === "a") {
       if (selected?.session_id) {
         const cmd = core.attachCommand(selected.session_id);
-        setStatusMessage(`Run: ${cmd}`);
-        setTimeout(() => setStatusMessage(null), 5000);
+        status.show(`Run: ${cmd}`);
       }
     } else if (input === "n") {
       onShowForm();
@@ -108,9 +108,9 @@ export function SessionsTab({ sessions, async: asyncState, onShowForm }: Session
         />}
         right={<SessionDetail session={selected} sessions={sessions} />}
       />
-      {statusMessage && (
+      {status.message && (
         <Box>
-          <Text color="cyan">{` ${statusMessage}`}</Text>
+          <Text color="cyan">{` ${status.message}`}</Text>
         </Box>
       )}
     </Box>

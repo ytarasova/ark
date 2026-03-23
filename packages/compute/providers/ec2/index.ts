@@ -29,7 +29,7 @@ import { syncToHost, syncProjectFiles } from "./sync.js";
 import { fetchMetrics, fetchMetricsAsync } from "./metrics.js";
 import { setupTunnels, probeRemotePorts } from "./ports.js";
 import { hourlyRate } from "./cost.js";
-import { sleep } from "../../util.js";
+import { sleep, poll } from "../../util.js";
 
 interface EC2HostConfig {
   size?: string;
@@ -107,42 +107,42 @@ export class EC2Provider implements ComputeProvider {
       log(`Cost: $${rate.toFixed(3)}/hr (~$${(rate * 24).toFixed(2)}/day)`);
     }
 
-    // Wait for SSH (async - doesn't block TUI event loop)
+    // Wait for SSH
     if (result.ip) {
-      log(`Waiting for SSH... (key: ${privateKeyPath}, host: ${result.ip})`);
-      let sshOk = false;
-      for (let i = 0; i < 30; i++) {
-        const res = await sshExecAsync(privateKeyPath, result.ip, "echo ok", { timeout: 15_000 });
-        if (res.exitCode === 0) {
-          sshOk = true;
-          break;
-        }
-        const errHint = res.stderr?.includes("Permission denied") ? " (Permission denied)"
-          : res.stderr?.includes("Connection refused") ? " (Connection refused)"
-          : res.stderr?.includes("timed out") ? " (Timed out)"
-          : "";
-        log(`SSH attempt ${i + 1}/30...${errHint}`);
-        await sleep(5000);
-      }
+      log(`Waiting for SSH...`);
+      const sshOk = await poll(
+        async () => {
+          const res = await sshExecAsync(privateKeyPath, result.ip!, "echo ok", { timeout: 15_000 });
+          return res.exitCode === 0;
+        },
+        {
+          maxAttempts: 30,
+          delayMs: 5000,
+          onRetry: (attempt) => log(`SSH attempt ${attempt}/30...`),
+        },
+      );
       log(sshOk ? "SSH ready" : "SSH failed after 30 attempts");
 
       // Poll cloud-init status
-      log("Waiting for cloud-init to complete...");
-      const key = sshKeyPath(host.name);
-      for (let i = 0; i < 60; i++) {
-        const { stdout } = await sshExecAsync(key, result.ip, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 15_000 });
-        if (stdout.trim().includes("provisioning complete")) {
-          log("Cloud-init complete - all packages installed");
-          mergeHostConfig(host.name, { cloud_init_done: true });
-          break;
-        }
-        const { stdout: progress } = await sshExecAsync(key, result.ip,
-          "tail -1 /var/log/cloud-init-output.log 2>/dev/null || echo 'waiting...'", { timeout: 15_000 });
-        const line = progress.trim().slice(0, 100);
-        if (line && line !== "waiting...") {
-          log(`cloud-init: ${line}`);
-        }
-        await sleep(10_000);
+      if (sshOk) {
+        log("Waiting for cloud-init to complete...");
+        const key = sshKeyPath(host.name);
+        await poll(
+          async () => {
+            const { stdout } = await sshExecAsync(key, result.ip!, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 15_000 });
+            if (stdout.trim().includes("provisioning complete")) {
+              log("Cloud-init complete - all packages installed");
+              mergeHostConfig(host.name, { cloud_init_done: true });
+              return true;
+            }
+            const { stdout: progress } = await sshExecAsync(key, result.ip!,
+              "tail -1 /var/log/cloud-init-output.log 2>/dev/null || echo 'waiting...'", { timeout: 15_000 });
+            const line = progress.trim().slice(0, 100);
+            if (line && line !== "waiting...") log(`cloud-init: ${line}`);
+            return false;
+          },
+          { maxAttempts: 60, delayMs: 10_000 },
+        );
       }
     }
   }
@@ -168,19 +168,20 @@ export class EC2Provider implements ComputeProvider {
     });
     await ec2.send(new StartInstancesCommand({ InstanceIds: [instanceId] }));
 
-    // Wait for running state and get new IP
+    // Wait for running state and get IP
     let ip: string | null = null;
-    for (let i = 0; i < 60; i++) {
-      const desc = await ec2.send(
-        new DescribeInstancesCommand({ InstanceIds: [instanceId] }),
-      );
-      const inst = desc.Reservations?.[0]?.Instances?.[0];
-      if (inst?.State?.Name === "running") {
-        ip = inst.PublicIpAddress ?? inst.PrivateIpAddress ?? null;
-        break;
-      }
-      await sleep(5000);
-    }
+    await poll(
+      async () => {
+        const desc = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [instanceId!] }));
+        const inst = desc.Reservations?.[0]?.Instances?.[0];
+        if (inst?.State?.Name === "running") {
+          ip = inst.PublicIpAddress ?? inst.PrivateIpAddress ?? null;
+          return true;
+        }
+        return false;
+      },
+      { maxAttempts: 60, delayMs: 5000 },
+    );
 
     updateHost(host.name, { status: "running" });
     mergeHostConfig(host.name, { ip });
@@ -201,16 +202,13 @@ export class EC2Provider implements ComputeProvider {
     });
     await ec2.send(new StopInstancesCommand({ InstanceIds: [instanceId] }));
 
-    // Wait for stopped state
-    for (let i = 0; i < 60; i++) {
-      const desc = await ec2.send(
-        new DescribeInstancesCommand({ InstanceIds: [instanceId] }),
-      );
-      if (desc.Reservations?.[0]?.Instances?.[0]?.State?.Name === "stopped") {
-        break;
-      }
-      await sleep(5000);
-    }
+    await poll(
+      async () => {
+        const desc = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [instanceId!] }));
+        return desc.Reservations?.[0]?.Instances?.[0]?.State?.Name === "stopped";
+      },
+      { maxAttempts: 60, delayMs: 5000 },
+    );
 
     updateHost(host.name, { status: "stopped" });
     mergeHostConfig(host.name, { ip: null });
