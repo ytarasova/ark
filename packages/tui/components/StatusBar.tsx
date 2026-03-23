@@ -13,7 +13,7 @@ interface StatusBarProps {
 
 const KEY_HINTS: Record<Tab, string> = {
   sessions: "j/k:move  Enter:dispatch  a:attach  c:done  s:stop  r:resume  n:new  x:kill  q:quit",
-  hosts: "j/k:move  Enter:provision  s:start/stop  e:edit  a:ssh  n:new  x:del  q:quit",
+  hosts: "j/k:move  Enter:provision  s:start/stop  e:edit  a:ssh  c:clean  n:new  x:del  q:quit",
   agents: "j/k:move  q:quit",
   pipelines: "j/k:move  q:quit",
   recipes: "q:quit",

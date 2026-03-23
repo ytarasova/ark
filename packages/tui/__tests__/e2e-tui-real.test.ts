@@ -284,7 +284,51 @@ describe("e2e TUI (real tmux)", () => {
     }
   }, 30_000);
 
-  // Test 9: Key hints change per tab
+  // Test 9: Orphan tmux session cleanup
+  it("cleans orphan tmux sessions that have no DB record", async () => {
+    const { listArkSessions, killSession } = await import("../../core/tmux.js");
+    const orphanName = `ark-s-orphan-test-${Date.now()}`;
+
+    try {
+      // 1. Create an orphan tmux session (no DB record)
+      execFileSync("tmux", [
+        "new-session", "-d", "-s", orphanName,
+        "-x", "80", "-y", "24",
+        "bash", "-c", "sleep 300",
+      ], { stdio: "pipe" });
+
+      // Verify it exists
+      let found = listArkSessions().some((s) => s.name === orphanName);
+      expect(found).toBe(true);
+
+      // 2. Confirm it has no DB record
+      const sessionId = orphanName.replace("ark-", "");
+      const dbSession = core.getSession(sessionId);
+      expect(dbSession).toBeNull();
+
+      // 3. Run the cleanup logic (same as HostsTab 'c' key handler)
+      const tmuxSessions = listArkSessions();
+      let cleaned = 0;
+      for (const ts of tmuxSessions) {
+        const sid = ts.name.replace("ark-", "");
+        const db = core.getSession(sid);
+        if (!db) {
+          killSession(ts.name);
+          cleaned++;
+        }
+      }
+
+      // 4. Verify the orphan session was killed
+      expect(cleaned).toBeGreaterThanOrEqual(1);
+      found = listArkSessions().some((s) => s.name === orphanName);
+      expect(found).toBe(false);
+    } finally {
+      // Safety cleanup in case test failed before cleanup logic ran
+      try { execFileSync("tmux", ["kill-session", "-t", orphanName], { stdio: "pipe" }); } catch { /* already gone */ }
+    }
+  }, 30_000);
+
+  // Test 10: Key hints change per tab
   it("shows correct key hints per tab", async () => {
     const tui = new TuiDriver();
     try {

@@ -113,6 +113,27 @@ export function HostsTab({ hosts, sessions, async: asyncState, onShowForm }: Hos
         } catch { /* user exited */ }
         process.exit(0);
       }
+    } else if (input === "c") {
+      // Clean orphaned tmux sessions
+      asyncState.run("Cleaning orphan sessions", async () => {
+        const { listArkSessions, killSession } = await import("../../core/tmux.js");
+        const tmuxSessions = listArkSessions();
+        let cleaned = 0;
+        for (const ts of tmuxSessions) {
+          const sessionId = ts.name.replace("ark-", "");
+          const dbSession = core.getSession(sessionId);
+          if (!dbSession) {
+            killSession(ts.name);
+            cleaned++;
+          }
+        }
+        // Show result
+        if (cleaned > 0) {
+          status.show(`Cleaned ${cleaned} orphan session(s)`);
+        } else {
+          status.show("No orphan sessions found");
+        }
+      });
     } else if (input === "n") {
       onShowForm();
     }
