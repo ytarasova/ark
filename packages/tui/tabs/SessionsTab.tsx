@@ -314,6 +314,9 @@ function SessionDetail({ session: s }: SessionDetailProps) {
       {s.repo && <Text><Text dimColor>{"  Repo".padEnd(13)}</Text>{s.repo}</Text>}
       {s.branch && <Text><Text dimColor>{"  Branch".padEnd(13)}</Text>{s.branch}</Text>}
       {s.workdir && <Text><Text dimColor>{"  Workdir".padEnd(13)}</Text>{s.workdir}</Text>}
+      {(s.config as any)?.remoteWorkdir && (
+        <Text><Text dimColor>{"  Remote".padEnd(13)}</Text>{(s.config as any).remoteWorkdir}</Text>
+      )}
       {s.branch && <Text><Text dimColor>{"  Branch".padEnd(13)}</Text>{s.branch}</Text>}
       <Text><Text dimColor>{"  Pipeline".padEnd(13)}</Text>{s.pipeline}</Text>
       {s.agent && <Text><Text dimColor>{"  Agent".padEnd(13)}</Text>{s.agent}</Text>}

@@ -30,6 +30,7 @@ import { fetchMetrics, fetchMetricsAsync } from "./metrics.js";
 import { setupTunnels, probeRemotePorts } from "./ports.js";
 import { hourlyRate } from "./cost.js";
 import { sleep, poll } from "../../util.js";
+import { resolveRepoUrl, getRepoName, cloneRepoOnRemote, trustRemoteDirectory, autoAcceptChannelPrompt } from "./remote-setup.js";
 
 interface EC2HostConfig {
   size?: string;
@@ -220,26 +221,62 @@ export class EC2Provider implements ComputeProvider {
     if (!ip) throw new Error(`Host '${host.name}' has no IP`);
     const key = sshKeyPath(host.name);
 
-    // Create remote directory for this session
+    // 1. Resolve repo URL
+    const repoUrl = resolveRepoUrl(session.repo ?? opts.workdir);
+    if (!repoUrl) throw new Error("Cannot determine git repo URL. Provide org/repo or a git repo path.");
+    const repoName = getRepoName(repoUrl);
+
+    // 2. Clone on remote
+    const remoteWorkdir = await cloneRepoOnRemote(key, ip, repoUrl, repoName, {
+      branch: session.branch ?? undefined,
+      sessionId: session.id,
+    });
+
+    // 3. Sync project files from arc.json
+    const { parseArcJson } = await import("../../arc-json.js");
+    const arcJson = opts.workdir ? parseArcJson(opts.workdir) : null;
+    if (arcJson?.sync?.length && opts.workdir) {
+      syncProjectFiles(key, ip, arcJson.sync, opts.workdir, remoteWorkdir);
+    }
+
+    // 4. Trust remote directory
+    await trustRemoteDirectory(key, ip, remoteWorkdir);
+
+    // 5. Build launcher with REMOTE paths
+    let remoteLauncher = opts.launcherContent;
+    if (opts.workdir) {
+      // Replace all occurrences of the local workdir with the remote one
+      const escaped = opts.workdir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      remoteLauncher = remoteLauncher.replace(new RegExp(escaped, 'g'), remoteWorkdir);
+    }
+    // Also fix the cd command to use remote path
+    remoteLauncher = remoteLauncher.replace(/^cd .*$/m, `cd '${remoteWorkdir}'`);
+
+    // 6. Upload launcher
+    const encoded = Buffer.from(remoteLauncher).toString("base64");
     const remoteDir = `~/.ark/tracks/${session.id}`;
-    sshExec(key, ip, `mkdir -p ${remoteDir}`);
+    await sshExecAsync(key, ip,
+      `mkdir -p ${remoteDir} && echo '${encoded}' | base64 -d > ${remoteDir}/launch.sh && chmod +x ${remoteDir}/launch.sh`,
+      { timeout: 15_000 });
 
-    // Write launcher script to remote host (base64-encoded to avoid heredoc injection)
-    const encoded = Buffer.from(opts.launcherContent).toString("base64");
-    sshExec(key, ip, `echo '${encoded}' | base64 -d > ${remoteDir}/launch.sh`);
-    sshExec(key, ip, `chmod +x ${remoteDir}/launch.sh`);
+    // 7. Create remote tmux session
+    await sshExecAsync(key, ip,
+      `tmux new-session -d -s ${opts.tmuxName} -c ${remoteWorkdir} 'bash ${remoteDir}/launch.sh'`,
+      { timeout: 15_000 });
 
-    // Start remote tmux session running the launcher
-    sshExec(
-      key,
-      ip,
-      `tmux new-session -d -s ${opts.tmuxName} 'bash ${remoteDir}/launch.sh'`,
-    );
+    // 8. Auto-accept channel prompt
+    await autoAcceptChannelPrompt(key, ip, opts.tmuxName);
 
-    // Setup port tunnels if any ports are declared
+    // 9. Setup port tunnels
     if (opts.ports.length > 0) {
       setupTunnels(key, ip, opts.ports);
     }
+
+    // 10. Store remote workdir in session config for display
+    const { updateSession } = await import("../../../core/store.js");
+    updateSession(session.id, {
+      config: { ...(session.config ?? {}), remoteWorkdir },
+    });
 
     return opts.tmuxName;
   }
