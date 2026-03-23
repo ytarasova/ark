@@ -111,10 +111,13 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
         // Attach via tmux new-window
         const sid = selected.session_id;
         try {
-          execFileSync("tmux", ["new-window", "-n", sid, "bash", "-c", `tmux attach -t ${sid}`], { stdio: "pipe" });
-          status.show(`Opened ${sid} in new tmux window (Ctrl+B n/p to switch)`);
+          const { execFileSync: efs } = require("child_process");
+          efs("tmux", ["new-window", "-n", sid, "bash", "-c", `tmux attach -t '${sid}'`],
+            { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" });
+          status.show(`Opened in new tmux window (Ctrl+B n/p to switch)`);
         } catch (e: any) {
-          status.show(`Run: tmux attach -t ${sid}`);
+          const stderr = e?.stderr ?? e?.message ?? String(e);
+          status.show(`Attach error: ${stderr.slice(0, 80)}`);
         }
       }
     } else if (input === "n") {
