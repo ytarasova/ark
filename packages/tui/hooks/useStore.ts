@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import * as core from "../../core/index.js";
 
 export interface StoreData {
@@ -11,12 +11,10 @@ export interface StoreData {
 
 /**
  * Reconcile DB sessions with tmux reality.
- * Marks "running" sessions as "failed" if their tmux session is dead.
  */
 async function reconcileSessions(sessions: core.Session[]): Promise<void> {
   for (const s of sessions) {
     if (s.status !== "running" || !s.session_id) continue;
-
     const exists = await core.sessionExistsAsync(s.session_id);
     if (exists) continue;
 
@@ -35,19 +33,17 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
       actor: "system",
       data: { last_output: lastOutput.slice(0, 500) },
     });
-
     s.status = "failed";
     s.error = error;
     s.session_id = null;
   }
 }
 
-/**
- * Fetch all store data from SQLite.
- */
-function fetchStoreData(): Omit<StoreData, "refreshing"> {
+async function fetchStore(): Promise<Omit<StoreData, "refreshing">> {
+  const sessions = core.listSessions({ limit: 50 });
+  await reconcileSessions(sessions);
   return {
-    sessions: core.listSessions({ limit: 50 }),
+    sessions,
     hosts: core.listHosts(),
     agents: core.listAgents(),
     pipelines: core.listPipelines(),
@@ -55,38 +51,19 @@ function fetchStoreData(): Omit<StoreData, "refreshing"> {
 }
 
 export function useStore(refreshMs = 3000): StoreData {
-  const [data, setData] = useState<StoreData>({
-    sessions: [],
-    hosts: [],
-    agents: [],
-    pipelines: [],
-    refreshing: false,
+  const { data, isFetching } = useQuery({
+    queryKey: ["store"],
+    queryFn: fetchStore,
+    refetchInterval: refreshMs,
+    staleTime: refreshMs - 500, // data considered fresh for most of the interval
+    placeholderData: (prev) => prev, // keep previous data while refetching (stale-while-revalidate)
   });
 
-  const refresh = useCallback(async () => {
-    try {
-      const store = fetchStoreData();
-      await reconcileSessions(store.sessions);
-      setData({ ...store, refreshing: false });
-    } catch (e: any) {
-      // Log refresh errors - don't crash the TUI, retry on next cycle
-      const { appendFileSync } = require("fs");
-      const { join } = require("path");
-      const { homedir } = require("os");
-      try {
-        appendFileSync(
-          join(homedir(), ".ark", "logs", "tui.log"),
-          `${new Date().toISOString()} [WARN] Store refresh failed: ${e.message}\n`,
-        );
-      } catch {}
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, refreshMs);
-    return () => clearInterval(t);
-  }, [refresh, refreshMs]);
-
-  return data;
+  return {
+    sessions: data?.sessions ?? [],
+    hosts: data?.hosts ?? [],
+    agents: data?.agents ?? [],
+    pipelines: data?.pipelines ?? [],
+    refreshing: isFetching,
+  };
 }

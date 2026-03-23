@@ -1,13 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useQueries } from "@tanstack/react-query";
+import { useState } from "react";
 import { getProvider } from "../../compute/index.js";
-import type { HostSnapshot } from "../../compute/types.js";
 import type { Host } from "../../core/index.js";
+import type { HostSnapshot } from "../../compute/types.js";
 
-export function useHostMetrics(hosts: Host[], active: boolean, refreshMs = 10000) {
-  const [snapshots, setSnapshots] = useState<Map<string, HostSnapshot>>(new Map());
+export function useHostMetrics(hosts: Host[], active: boolean, pollMs = 10000) {
   const [logs, setLogs] = useState<Map<string, string[]>>(new Map());
-  const [fetching, setFetching] = useState(false);
-  const polling = useRef(false);
 
   const addLog = (hostName: string, message: string) => {
     setLogs((prev) => {
@@ -21,42 +19,35 @@ export function useHostMetrics(hosts: Host[], active: boolean, refreshMs = 10000
     });
   };
 
-  useEffect(() => {
-    if (!active) return;
+  const runningHosts = active ? hosts.filter(h => h.status === "running") : [];
 
-    const refresh = async () => {
-      if (polling.current) return;
-      polling.current = true;
-      setFetching(true);
-      try {
-        const next = new Map(snapshots);
-        for (const h of hosts) {
-          if (h.status !== "running") continue;
-          const provider = getProvider(h.provider);
-          if (!provider) continue;
-          try {
-            const snap = await provider.getMetrics(h);
-            next.set(h.name, snap);
-          } catch {
-            // skip
-          }
+  const results = useQueries({
+    queries: runningHosts.map((h) => ({
+      queryKey: ["hostMetrics", h.name],
+      queryFn: async (): Promise<HostSnapshot | null> => {
+        const provider = getProvider(h.provider);
+        if (!provider) return null;
+        try {
+          return await provider.getMetrics(h);
+        } catch {
+          return null;
         }
-        // Prune stale entries
-        const hostNames = new Set(hosts.map((h) => h.name));
-        for (const key of next.keys()) {
-          if (!hostNames.has(key)) next.delete(key);
-        }
-        setSnapshots(next);
-      } finally {
-        polling.current = false;
-        setFetching(false);
-      }
-    };
+      },
+      refetchInterval: pollMs,
+      staleTime: pollMs - 1000,
+      placeholderData: (prev: HostSnapshot | null | undefined) => prev ?? undefined,
+      enabled: active,
+    })),
+  });
 
-    refresh();
-    const t = setInterval(refresh, refreshMs);
-    return () => clearInterval(t);
-  }, [active, hosts.length, refreshMs]);
+  const snapshots = new Map<string, HostSnapshot>();
+  results.forEach((result, i) => {
+    if (result.data) {
+      snapshots.set(runningHosts[i].name, result.data);
+    }
+  });
+
+  const fetching = results.some(r => r.isFetching);
 
   return { snapshots, logs, addLog, fetching };
 }
