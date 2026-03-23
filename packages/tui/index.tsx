@@ -5,11 +5,10 @@ import { App } from "./App.js";
 
 process.on("unhandledRejection", () => {});
 
-// Enter fullscreen alt buffer
-process.stdout.write("\x1b[?1049h\x1b[?25l");
-process.on("exit", () => {
-  process.stdout.write("\x1b[?1049l\x1b[?25h");
+// Use Ink's built-in fullscreen support — no manual escape codes
+const { waitUntilExit } = render(<App />, {
+  patchConsole: false,
+  exitOnCtrlC: true,
 });
 
-const { unmount, waitUntilExit } = render(<App />, { patchConsole: false });
 await waitUntilExit();

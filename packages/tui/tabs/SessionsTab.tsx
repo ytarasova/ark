@@ -108,14 +108,15 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Exit Ink, reset terminal, attach to tmux
+        // Exit Ink, wait for cleanup, then attach
         exit();
-        try { execFileSync("reset", [], { stdio: "inherit" }); } catch {}
-        try {
-          execFileSync("tmux", ["attach", "-t", selected.session_id], { stdio: "inherit" });
-        } catch { /* user detached */ }
-        try { execFileSync("reset", [], { stdio: "inherit" }); } catch {}
-        process.exit(0);
+        const sid = selected.session_id;
+        setTimeout(() => {
+          try {
+            execFileSync("tmux", ["attach", "-t", sid], { stdio: "inherit" });
+          } catch { /* user detached */ }
+          process.exit(0);
+        }, 100);
       }
     } else if (input === "n") {
       onShowForm();

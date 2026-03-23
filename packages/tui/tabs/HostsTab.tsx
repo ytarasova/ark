@@ -108,13 +108,14 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
         const ip = (selected.config as any)?.ip;
         if (!ip) return;
         exit();
-        try { execFileSync("reset", [], { stdio: "inherit" }); } catch {}
         const keyPath = join(homedir(), ".ssh", `ark-${selected.name}`);
-        try {
-          execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`], { stdio: "inherit" });
-        } catch { /* user exited */ }
-        try { execFileSync("reset", [], { stdio: "inherit" }); } catch {}
-        process.exit(0);
+        const host = ip;
+        setTimeout(() => {
+          try {
+            execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${host}`], { stdio: "inherit" });
+          } catch { /* user exited */ }
+          process.exit(0);
+        }, 100);
       }
     } else if (input === "c") {
       // Clean orphaned tmux sessions
