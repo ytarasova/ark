@@ -364,9 +364,22 @@ async function launchAgentTmux(
   const channelFlags = `--mcp-config ${shellQuote(mcpConfigPath)} --dangerously-load-development-channels server:ark-channel`;
 
   if (prevClaudeId) {
-    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\n${claudeCmd} --resume ${shellQuote(prevClaudeId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
+    // Try --resume first; if conversation doesn't exist, fall back to new --session-id
+    launchContent = `#!/bin/bash
+cd ${shellQuote(effectiveWorkdir)}
+${claudeCmd} --resume ${shellQuote(prevClaudeId)} --dangerously-skip-permissions \\
+  ${channelFlags} || \\
+${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\
+  ${channelFlags}
+exec bash
+`;
   } else {
-    launchContent = `#!/bin/bash\ncd ${shellQuote(effectiveWorkdir)}\n${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\\n  ${channelFlags}\nexec bash\n`;
+    launchContent = `#!/bin/bash
+cd ${shellQuote(effectiveWorkdir)}
+${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\
+  ${channelFlags}
+exec bash
+`;
   }
 
   const launcher = tmux.writeLauncher(session.id, launchContent);
