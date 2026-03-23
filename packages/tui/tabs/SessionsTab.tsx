@@ -46,6 +46,13 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
     [groups]
   );
 
+  // Clamp selection when list shrinks (e.g. after deletion)
+  useEffect(() => {
+    if (topLevel.length > 0) {
+      setSel((s) => Math.min(s, topLevel.length - 1));
+    }
+  }, [topLevel.length]);
+
   const selected = topLevel[sel] ?? null;
 
   // Notify parent of selection changes for context-sensitive status bar
@@ -101,7 +108,8 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
             await core.killSessionAsync(selected.session_id);
           }
           core.deleteSession(selected.id);
-          setSel((s) => Math.max(0, s - 1));
+          // sel stays at same index — the next item fills this position.
+          // useEffect clamp handles the edge case where we deleted the last item.
         });
       }
     } else if (input === "a") {

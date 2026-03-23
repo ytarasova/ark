@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import { execFileSync } from "child_process";
@@ -27,6 +27,13 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { snapshots, logs, addLog } = useHostMetrics(hosts, true);
 
+  // Clamp selection when list shrinks (e.g. after deletion)
+  useEffect(() => {
+    if (hosts.length > 0) {
+      setSel((s) => Math.min(s, hosts.length - 1));
+    }
+  }, [hosts.length]);
+
   const selected = hosts[sel] ?? null;
 
   useInput((input, key) => {
@@ -38,7 +45,6 @@ export function HostsTab({ hosts, sessions, refreshing, async: asyncState, onSho
       if (input === "x" && selected) {
         asyncState.run(`Deleting host ${selected.name}`, async () => {
           core.deleteHost(selected.name);
-          setSel((s) => Math.max(0, s - 1));
         });
       }
       setConfirmDelete(false);
