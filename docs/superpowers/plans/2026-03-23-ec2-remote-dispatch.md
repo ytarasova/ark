@@ -22,20 +22,18 @@ When dispatching a session to an EC2 host:
 
 ## What EC2Provider.launch() Should Do
 
+BigBox approach: fresh `git clone` per session into a timestamped directory. No worktrees. Simple and proven.
+
 ```
-1. Determine remote repo path:
-   - If session.repo looks like a GitHub URL → use it directly
-   - If session.repo is a local path → extract the git remote URL
-   - If neither → error
+1. Determine repo URL:
+   - If session.repo looks like org/repo → git@github.com:{repo}.git
+   - If session.repo is a local path → extract git remote URL via `git remote get-url origin`
+   - If session.repo is already a URL → use directly
 
-2. Clone/update repo on remote:
-   - SSH: check if ~/Projects/{repoName} exists
-   - If not: git clone {repoUrl} ~/Projects/{repoName}
-   - If yes: git fetch in the existing clone
-
-3. Create worktree (or checkout branch):
-   - SSH: git worktree add ~/ark-worktrees/{sessionId} {branch}
-   - Or just work in the main clone if no branch
+2. Clone repo into isolated directory on remote:
+   - SSH: git clone [-b branch] {repoUrl} ~/Projects/{repoName}-{timestamp}
+   - Each session gets its own clean checkout
+   - No worktrees, no shared state between sessions
 
 4. Sync credentials (provider.syncEnvironment):
    - Push SSH keys, AWS creds, git config, gh auth, Claude config
