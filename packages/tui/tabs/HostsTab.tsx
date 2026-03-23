@@ -220,7 +220,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
 
       {cfg.last_error && (
         <>
-          <Text>{""}</Text>
+          <Text> </Text>
           <Text color="red" bold>{`  Error: ${String(cfg.last_error).slice(0, 70)}`}</Text>
         </>
       )}
@@ -228,7 +228,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
       {/* Metrics */}
       {snapshot && (
         <>
-          <Text>{""}</Text>
+          <Text> </Text>
           <SectionHeader title="Metrics" />
           <MetricBar
             label="CPU"
@@ -248,7 +248,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
             max={100}
             suffix={`${snapshot.metrics.diskPct.toFixed(1)}%`}
           />
-          <Text>{""}</Text>
+          <Text> </Text>
           <Text>
             <Text dimColor>{"  Net RX  "}</Text>{`${snapshot.metrics.netRxMb.toFixed(1)} MB`}
             <Text dimColor>{"   TX  "}</Text>{`${snapshot.metrics.netTxMb.toFixed(1)} MB`}
@@ -261,7 +261,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
           {/* Sessions */}
           {snapshot.sessions.length > 0 && (
             <>
-              <Text>{""}</Text>
+              <Text> </Text>
               <SectionHeader title="Sessions" />
               <Text dimColor>
                 {`  ${"Name".padEnd(18)} ${"Status".padEnd(10)} ${"Mode".padEnd(8)} ${"CPU".padEnd(6)} ${"MEM"}`}
@@ -277,7 +277,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
           {/* Processes */}
           {snapshot.processes.length > 0 && (
             <>
-              <Text>{""}</Text>
+              <Text> </Text>
               <SectionHeader title="Processes" />
               <Text dimColor>
                 {`  ${"PID".padEnd(8)} ${"CPU".padEnd(6)} ${"MEM".padEnd(6)} Command`}
@@ -293,7 +293,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
           {/* Docker */}
           {snapshot.docker.length > 0 && (
             <>
-              <Text>{""}</Text>
+              <Text> </Text>
               <SectionHeader title="Docker" />
               <Text dimColor>
                 {`  ${"Name".padEnd(18)} ${"CPU".padEnd(8)} ${"MEM".padEnd(10)} Image`}
@@ -310,7 +310,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
 
       {!snapshot && h.status === "running" && (
         <>
-          <Text>{""}</Text>
+          <Text> </Text>
           <Text dimColor>{" Fetching metrics..."}</Text>
         </>
       )}
@@ -318,7 +318,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
       {/* Activity log */}
       {hostLogs && hostLogs.length > 0 && (
         <>
-          <Text>{""}</Text>
+          <Text> </Text>
           <SectionHeader title="Activity Log" />
           {hostLogs.slice(-15).map((entry, i) => (
             <Text key={i} dimColor>{`  ${entry}`}</Text>
@@ -339,7 +339,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
         if (allPorts.length === 0) return null;
         return (
           <>
-            <Text>{""}</Text>
+            <Text> </Text>
             <SectionHeader title="Ports" />
             {allPorts.map((p: any, i: number) => {
               const name = p.name ? ` (${p.name})` : "";
@@ -360,7 +360,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
         if (!rate) return null;
         return (
           <>
-            <Text>{""}</Text>
+            <Text> </Text>
             <SectionHeader title="Cost" />
             <Text>{`  $${rate.toFixed(3)}/hr  ~$${(rate * 24).toFixed(2)}/day`}</Text>
           </>

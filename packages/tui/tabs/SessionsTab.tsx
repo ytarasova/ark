@@ -232,7 +232,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
     <Box flexDirection="column">
       {/* Header */}
       <Text bold>{` ${s.jira_key ?? s.id}  ${s.jira_summary ?? ""}`}</Text>
-      <Text>{""}</Text>
+      <Text> </Text>
 
       {/* Pipeline bar */}
       <Box>
@@ -276,19 +276,19 @@ function SessionDetail({ session: s }: SessionDetailProps) {
       {/* Banners */}
       {s.error && (
         <>
-          <Text>{""}</Text>
+          <Text> </Text>
           <Text color="red" bold>{` ✕ ${s.error}`}</Text>
         </>
       )}
       {s.breakpoint_reason && (
         <>
-          <Text>{""}</Text>
+          <Text> </Text>
           <Text color="yellow" bold>{` ⏸ ${s.breakpoint_reason}`}</Text>
         </>
       )}
 
       {/* Info */}
-      <Text>{""}</Text>
+      <Text> </Text>
       <SectionHeader title="Info" />
       <Text><Text dimColor>{"  ID".padEnd(13)}</Text>{s.id}</Text>
       <Text>
@@ -323,7 +323,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
         const message = String(d.message ?? d.summary ?? d.question ?? d.error ?? "").slice(0, 80);
         return (
           <>
-            <Text>{""}</Text>
+            <Text> </Text>
             <SectionHeader title="Latest Report" />
             <Text>
               {"  "}<Text color={reportColor}>{reportType}</Text>{`: ${message}`}
@@ -335,7 +335,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
       {/* Agent output */}
       {agentOutput.trim() ? (
         <>
-          <Text>{""}</Text>
+          <Text> </Text>
           <SectionHeader title="Agent Output" />
           {agentOutput.split("\n").slice(-12).map((line, i) => (
             <Text key={i}>{`  ${line.slice(0, 80)}`}</Text>
@@ -343,7 +343,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
         </>
       ) : !s.session_id && (s.status === "ready" || s.status === "blocked") ? (
         <>
-          <Text>{""}</Text>
+          <Text> </Text>
           <Text dimColor>{" Press Enter to dispatch agent"}</Text>
         </>
       ) : null}
@@ -351,7 +351,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
       {/* Events */}
       {events.length > 0 && (
         <>
-          <Text>{""}</Text>
+          <Text> </Text>
           <SectionHeader title="Events" />
           {events.slice(-10).map((ev, i) => {
             const ts = hms(ev.created_at);
