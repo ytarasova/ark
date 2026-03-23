@@ -128,14 +128,11 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
             stderr: "inherit",
             env: { ...process.env, TERM: "xterm-256color" },
           });
-          // Restore for Ink
-          process.stdout.write("\x1b[2J\x1b[H"); // clear
-          // Mute again briefly so Ink re-renders cleanly
-          process.stdout.write = (() => true) as any;
-          setTimeout(() => {
-            process.stdout.write = origWrite;
-            status.show("Detached from session");
-          }, 50);
+          // Restore terminal for Ink
+          try { process.stdin.setRawMode(true); } catch {}
+          process.stdout.write("\x1b[?25l");      // hide cursor
+          process.stdout.write("\x1b[2J\x1b[H");  // clear screen
+          status.show("Detached from session");
         }, 100);
       }
     } else if (input === "n") {
