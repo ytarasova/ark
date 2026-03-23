@@ -216,7 +216,7 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
         <Text><Text dimColor>{"  Status    "}</Text><Text color={statusColor}>{h.status}</Text></Text>
       )}
 
-      {cfg.ip && <Text><Text dimColor>{"  IP        "}</Text>{String(cfg.ip)}</Text>}
+      {cfg.ip && <Text><Text dimColor>{"  IP        "}</Text>{String(cfg.ip)}{cfg.hourlyRate ? <Text dimColor>{`  ($${Number(cfg.hourlyRate).toFixed(2)}/hr)`}</Text> : null}</Text>}
 
       {cfg.last_error && (
         <>
@@ -354,18 +354,6 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
         );
       })()}
 
-      {/* Cost */}
-      {(() => {
-        const rate = (h.config as any)?.hourlyRate;
-        if (!rate) return null;
-        return (
-          <>
-            <Text> </Text>
-            <SectionHeader title="Cost" />
-            <Text>{`  $${rate.toFixed(3)}/hr  ~$${(rate * 24).toFixed(2)}/day`}</Text>
-          </>
-        );
-      })()}
     </Box>
   );
 }
