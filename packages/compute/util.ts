@@ -1,12 +1,18 @@
 /**
  * Shared async utilities for the compute layer.
+ *
+ * retry() and poll() delegate to p-retry and p-wait-for respectively,
+ * while preserving the same call-site interface.
  */
+
+import pRetry from "p-retry";
+import pWaitFor from "p-wait-for";
 
 /** Async delay using Bun.sleep (native) with setTimeout fallback */
 export const sleep = (ms: number): Promise<void> =>
   typeof Bun !== "undefined" ? Bun.sleep(ms) : new Promise<void>(r => setTimeout(r, ms));
 
-/** Options for retry */
+/** Options for retry / poll */
 export interface RetryOpts {
   /** Maximum number of attempts (default: 10) */
   maxAttempts?: number;
@@ -28,46 +34,43 @@ export async function retry<T>(
   action: () => Promise<T>,
   opts: RetryOpts = {},
 ): Promise<T | null> {
-  const { maxAttempts = 10, delayMs = 5000, onRetry, onAttempt, signal } = opts;
-
-  for (let i = 0; i < maxAttempts; i++) {
-    if (signal?.aborted) return null;
-    onAttempt?.(i + 1);
-
-    try {
-      return await action();
-    } catch (e) {
-      onRetry?.(i + 1, e);
-      if (i < maxAttempts - 1) {
-        await sleep(delayMs);
-      }
-    }
+  try {
+    return await pRetry(
+      (attemptNumber) => {
+        opts.onAttempt?.(attemptNumber);
+        return action();
+      },
+      {
+        retries: (opts.maxAttempts ?? 10) - 1,
+        minTimeout: opts.delayMs ?? 5000,
+        maxTimeout: opts.delayMs ?? 5000,
+        signal: opts.signal,
+        onFailedAttempt: (error) => {
+          opts.onRetry?.(error.attemptNumber, error);
+        },
+      },
+    );
+  } catch {
+    return null;
   }
-  return null;
 }
 
 /**
- * Poll a condition until it returns true or max attempts reached.
+ * Poll a condition until it returns true or timeout.
  */
 export async function poll(
   check: () => Promise<boolean> | boolean,
   opts: RetryOpts = {},
 ): Promise<boolean> {
-  const { maxAttempts = 30, delayMs = 5000, onRetry, onAttempt, signal } = opts;
-
-  for (let i = 0; i < maxAttempts; i++) {
-    if (signal?.aborted) return false;
-    onAttempt?.(i + 1);
-
-    try {
-      if (await check()) return true;
-    } catch (e) {
-      onRetry?.(i + 1, e);
-    }
-
-    if (i < maxAttempts - 1) {
-      await sleep(delayMs);
-    }
+  try {
+    await pWaitFor(check, {
+      interval: opts.delayMs ?? 5000,
+      timeout: {
+        milliseconds: (opts.maxAttempts ?? 30) * (opts.delayMs ?? 5000),
+      },
+    });
+    return true;
+  } catch {
+    return false;
   }
-  return false;
 }
