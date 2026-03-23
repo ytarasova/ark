@@ -72,15 +72,24 @@ if (action) {
     ? `exec ssh ${action.args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(" ")}`
     : null;
 
-  if (cmd) {
-    log("INFO", `Running: ${cmd}`);
-    // Use Bun.spawnSync for proper process wait — execFileSync can get killed
-    // when Bun's event loop drains
-    const result = Bun.spawnSync(["bash", "-c", `stty sane 2>/dev/null; sleep 0.2; ${cmd}`], {
+  if (action.type === "tmux-attach") {
+    log("INFO", `Attaching to tmux: ${action.args[0]}`);
+    // Use Bun's native PTY for proper terminal handling
+    const proc = Bun.spawn(["tmux", "attach", "-t", action.args[0]], {
       stdin: "inherit",
       stdout: "inherit",
       stderr: "inherit",
     });
-    log("INFO", `${action.type} exited with code ${result.exitCode}`);
+    await proc.exited;
+    log("INFO", "tmux detached");
+  } else if (action.type === "ssh") {
+    log("INFO", `SSH: ${action.args.join(" ")}`);
+    const proc = Bun.spawn(["ssh", ...action.args], {
+      stdin: "inherit",
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    await proc.exited;
+    log("INFO", "SSH exited");
   }
 }

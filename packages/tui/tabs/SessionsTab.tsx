@@ -109,7 +109,7 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Set post-exit action and cleanly exit Ink
+        // Attach using Bun's native PTY support
         const { setPostExitAction } = require("../post-exit.js");
         setPostExitAction({ type: "tmux-attach", args: [selected.session_id] });
         exit();
