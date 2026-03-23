@@ -19,14 +19,28 @@ export function useStore(refreshMs = 3000): StoreData {
   useEffect(() => {
     const refresh = () => {
       try {
+        const sessions = core.listSessions({ limit: 50 });
+
+        // Reconcile: if DB says "running" but tmux session is dead, mark as failed
+        for (const s of sessions) {
+          if (s.status === "running" && s.session_id) {
+            if (!core.sessionExists(s.session_id)) {
+              core.updateSession(s.id, { status: "failed", error: "Agent process exited", session_id: null });
+              s.status = "failed";
+              s.error = "Agent process exited";
+              s.session_id = null;
+            }
+          }
+        }
+
         setData({
-          sessions: core.listSessions({ limit: 50 }),
+          sessions,
           hosts: core.listHosts(),
           agents: core.listAgents(),
           pipelines: core.listPipelines(),
         });
       } catch {
-        // SQLite may be briefly locked by another process - skip this refresh
+        // SQLite may be briefly locked
       }
     };
     refresh();
