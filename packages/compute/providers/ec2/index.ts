@@ -11,6 +11,7 @@ import {
   StopInstancesCommand,
   DescribeInstancesCommand,
 } from "@aws-sdk/client-ec2";
+import { fromIni } from "@aws-sdk/credential-providers";
 import type {
   ComputeProvider,
   ProvisionOpts,
@@ -49,6 +50,13 @@ interface EC2HostConfig {
   idle_minutes?: number;
   ingress_cidrs?: string[];
   tags?: Record<string, string>;
+}
+
+function createEc2Client(cfg: EC2HostConfig): EC2Client {
+  return new EC2Client({
+    region: cfg.region ?? "us-east-1",
+    ...(cfg.aws_profile ? { credentials: fromIni({ profile: cfg.aws_profile }) } : {}),
+  });
 }
 
 export class EC2Provider implements ComputeProvider {
@@ -164,9 +172,7 @@ export class EC2Provider implements ComputeProvider {
     const instanceId = cfg.instance_id;
     if (!instanceId) throw new Error(`Host '${host.name}' has no instance_id`);
 
-    const ec2 = new EC2Client({
-      region: cfg.region ?? "us-east-1",
-    });
+    const ec2 = createEc2Client(cfg);
     await ec2.send(new StartInstancesCommand({ InstanceIds: [instanceId] }));
 
     // Wait for running state and get IP
@@ -198,9 +204,7 @@ export class EC2Provider implements ComputeProvider {
     const instanceId = cfg.instance_id;
     if (!instanceId) throw new Error(`Host '${host.name}' has no instance_id`);
 
-    const ec2 = new EC2Client({
-      region: cfg.region ?? "us-east-1",
-    });
+    const ec2 = createEc2Client(cfg);
     await ec2.send(new StopInstancesCommand({ InstanceIds: [instanceId] }));
 
     await poll(
