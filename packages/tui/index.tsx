@@ -73,13 +73,14 @@ if (action) {
     : null;
 
   if (cmd) {
-    // stty sane resets terminal, sleep lets iTerm2 DA queries drain
-    // Don't treat non-zero exit as error — tmux detach is normal
-    try {
-      execFileSync("bash", ["-c", `stty sane 2>/dev/null; sleep 0.1; ${cmd}`], { stdio: "inherit" });
-    } catch {
-      // Normal — tmux/ssh exited (detach, disconnect, etc.)
-    }
-    log("INFO", `${action.type} completed`);
+    log("INFO", `Running: ${cmd}`);
+    // Use Bun.spawnSync for proper process wait — execFileSync can get killed
+    // when Bun's event loop drains
+    const result = Bun.spawnSync(["bash", "-c", `stty sane 2>/dev/null; sleep 0.2; ${cmd}`], {
+      stdin: "inherit",
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    log("INFO", `${action.type} exited with code ${result.exitCode}`);
   }
 }
