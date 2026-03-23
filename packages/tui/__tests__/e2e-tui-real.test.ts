@@ -132,7 +132,7 @@ describe("e2e TUI (real tmux)", () => {
       expect(screen).toContain("Sessions");
       expect(screen).toContain("Hosts");
       expect(screen).toContain("Agents");
-      expect(screen).toContain("Pipelines");
+      expect(screen).toContain("Flows");
       expect(screen).toContain("Recipes");
     } finally {
       tui.stop();
@@ -183,7 +183,7 @@ describe("e2e TUI (real tmux)", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "e2e-tui-visible",
-      pipeline: "bare",
+      flow: "bare",
     });
     createdSessionIds.push(session.id);
 
@@ -255,7 +255,7 @@ describe("e2e TUI (real tmux)", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "e2e-tui-delete-me",
-      pipeline: "bare",
+      flow: "bare",
     });
     createdSessionIds.push(session.id);
 

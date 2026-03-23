@@ -7,35 +7,29 @@
 import { describe, it, expect } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "../App.js";
-
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-const WrappedApp = () => (
-  <QueryClientProvider client={queryClient}><App /></QueryClientProvider>
-);
 
 describe("TUI App rendering", () => {
   it("renders without crashing", () => {
-    const { lastFrame, unmount } = render(<WrappedApp />);
+    const { lastFrame, unmount } = render(<App />);
     expect(lastFrame()).toBeTruthy();
     unmount();
   });
 
   it("renders tab bar with all 5 tabs", () => {
-    const { lastFrame, unmount } = render(<WrappedApp />);
+    const { lastFrame, unmount } = render(<App />);
     const frame = lastFrame()!;
 
     expect(frame).toContain("Sessions");
     expect(frame).toContain("Hosts");
     expect(frame).toContain("Agents");
-    expect(frame).toContain("Pipelines");
+    expect(frame).toContain("Flows");
     expect(frame).toContain("Recipes");
     unmount();
   });
 
   it("sessions tab shows empty state when no sessions exist", () => {
-    const { lastFrame, unmount } = render(<WrappedApp />);
+    const { lastFrame, unmount } = render(<App />);
     const frame = lastFrame()!;
 
     // The sessions tab renders (may show tab name, empty state, or status bar)
@@ -44,7 +38,7 @@ describe("TUI App rendering", () => {
   });
 
   it("tab switching works via key press", async () => {
-    const { lastFrame, stdin, unmount } = render(<WrappedApp />);
+    const { lastFrame, stdin, unmount } = render(<App />);
 
     // Press "2" to switch to Hosts tab
     stdin.write("2");
@@ -59,7 +53,7 @@ describe("TUI App rendering", () => {
   });
 
   it("status bar shows session count", () => {
-    const { lastFrame, unmount } = render(<WrappedApp />);
+    const { lastFrame, unmount } = render(<App />);
     const frame = lastFrame()!;
 
     // Status bar always shows session count

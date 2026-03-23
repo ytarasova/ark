@@ -25,7 +25,7 @@ const fakeSession: Session = {
   claude_session_id: null,
   stage: null,
   status: "running",
-  pipeline: "test",
+  flow: "test",
   agent: null,
   workdir: null,
   pr_url: null,

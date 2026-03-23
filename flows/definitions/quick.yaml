@@ -1,5 +1,5 @@
 name: quick
-description: "Quick pipeline: implement → PR → build (no planning or review stages)"
+description: "Quick flow: implement → PR → build (no planning or review stages)"
 stages:
   - name: implement
     agent: implementer
@@ -11,7 +11,7 @@ stages:
     gate: auto
 
   - name: build
-    action: wait_pipeline
+    action: wait_flow
     gate: auto
     on_failure: notify
 

@@ -21,7 +21,7 @@ declare const Bun: {
 
 import * as store from "./store.js";
 import * as session from "./session.js";
-import * as pipeline from "./pipeline.js";
+import * as flow from "./flow.js";
 import { eventBus } from "./hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../compute/index.js";
@@ -160,8 +160,8 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
       if (advResult.ok) {
         const updated = store.getSession(sessionId);
         if (updated && updated.status === "ready" && updated.stage) {
-          const nextAction = pipeline.getStageAction(
-            updated.pipeline,
+          const nextAction = flow.getStageAction(
+            updated.flow,
             updated.stage
           );
           if (nextAction.type === "agent" || nextAction.type === "fork") {

@@ -42,12 +42,12 @@ describe("e2e: session lifecycle", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "e2e-lifecycle-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
     expect(session.id).toMatch(/^s-[0-9a-f]+$/);
     expect(session.status).toBe("ready");
-    expect(session.pipeline).toBe("bare");
+    expect(session.flow).toBe("bare");
     expect(session.stage).toBe("work");
 
     // 2. Dispatch
@@ -86,7 +86,7 @@ describe("e2e: reconciliation", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "e2e-reconciliation-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
 
@@ -152,7 +152,7 @@ describe("e2e: dispatch edge cases", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "e2e-bad-host",
-      pipeline: "bare",
+      flow: "bare",
       compute_name: "nonexistent-host",
     });
     sessionIds.push(session.id);
@@ -184,7 +184,7 @@ describe("e2e: session detail", () => {
       repo: "/tmp/test-repo",
       ticket: "TEST-123",
       summary: "e2e-fields-test",
-      pipeline: "bare",
+      flow: "bare",
       compute_name: "local",
       group_name: "test-group",
     });
@@ -195,7 +195,7 @@ describe("e2e: session detail", () => {
     expect(session.status).toBe("ready");
     expect(session.compute_name).toBe("local");
     expect(session.repo).toBe("/tmp/test-repo");
-    expect(session.pipeline).toBe("bare");
+    expect(session.flow).toBe("bare");
     expect(session.stage).toBe("work");
     expect(session.ticket).toBe("TEST-123");
     expect(session.summary).toBe("e2e-fields-test");
@@ -223,7 +223,7 @@ describe("e2e: multiple sessions", () => {
       const s = core.startSession({
         repo: process.cwd(),
         summary: `e2e-multi-${i}`,
-        pipeline: "bare",
+        flow: "bare",
       });
       ids.push(s.id);
       sessionIds.push(s.id);
@@ -262,7 +262,7 @@ describe("e2e: worktree", () => {
     const session = core.startSession({
       repo: arkRoot,
       summary: "e2e-worktree-test",
-      pipeline: "bare",
+      flow: "bare",
       workdir: arkRoot,
     });
     sessionIds.push(session.id);

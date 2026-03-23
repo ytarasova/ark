@@ -38,7 +38,7 @@ const fakeSession = {
   claude_session_id: null,
   stage: null,
   status: "ready",
-  pipeline: "default",
+  flow: "default",
   agent: null,
   workdir: null,
   pr_url: null,

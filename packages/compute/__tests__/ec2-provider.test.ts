@@ -66,7 +66,7 @@ describe("EC2Provider", () => {
     const session = {
       id: "s-test", ticket: null, summary: null, repo: "test/repo",
       branch: null, compute_name: "test", session_id: null, claude_session_id: null,
-      stage: "work", status: "running", pipeline: "bare", agent: null,
+      stage: "work", status: "running", flow: "bare", agent: null,
       workdir: null, pr_url: null, pr_id: null, error: null,
       parent_id: null, fork_group: null, group_name: null,
       breakpoint_reason: null, attached_by: null, config: {},
@@ -87,7 +87,7 @@ describe("EC2Provider", () => {
     const session = {
       id: "s-test", ticket: null, summary: null, repo: null,
       branch: null, compute_name: "test", session_id: null, claude_session_id: null,
-      stage: "work", status: "running", pipeline: "bare", agent: null,
+      stage: "work", status: "running", flow: "bare", agent: null,
       workdir: null, pr_url: null, pr_id: null, error: null,
       parent_id: null, fork_group: null, group_name: null,
       breakpoint_reason: null, attached_by: null, config: {},

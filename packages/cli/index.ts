@@ -24,14 +24,14 @@ const program = new Command()
 
 // ── Session commands ────────────────────────────────────────────────────────
 
-const session = program.command("session").description("Manage SDLC pipeline sessions");
+const session = program.command("session").description("Manage SDLC flow sessions");
 
 session.command("start")
   .description("Start a new session")
   .argument("[ticket]", "External ticket reference (Jira key, GitHub issue, etc.)")
   .option("-r, --repo <path>", "Repository path or name")
   .option("-s, --summary <text>", "Task summary")
-  .option("-p, --pipeline <name>", "Pipeline name", "default")
+  .option("-p, --flow <name>", "Flow name", "default")
   .option("-c, --compute <name>", "Compute name")
   .option("-g, --group <name>", "Group name")
   .option("-d, --dispatch", "Auto-dispatch the first stage agent")
@@ -49,14 +49,14 @@ session.command("start")
 
     const s = core.startSession({
       ticket, summary: opts.summary ?? ticket,
-      repo, pipeline: opts.pipeline, compute_name: opts.compute,
+      repo, flow: opts.flow, compute_name: opts.compute,
       workdir, group_name: opts.group,
     });
 
     console.log(chalk.green(`Session ${s.id} created`));
     console.log(`  Summary:  ${s.summary ?? "-"}`);
     console.log(`  Repo:     ${s.repo ?? "-"}`);
-    console.log(`  Pipeline: ${s.pipeline}`);
+    console.log(`  Flow:     ${s.flow}`);
     console.log(`  Stage:    ${s.stage ?? "-"}`);
     if (workdir) console.log(`  Workdir:  ${workdir}`);
 
@@ -113,7 +113,7 @@ session.command("show")
     console.log(`  Status:   ${s.status}`);
     console.log(`  Stage:    ${s.stage ?? "-"}`);
     console.log(`  Repo:     ${s.repo ?? "-"}`);
-    console.log(`  Pipeline: ${s.pipeline}`);
+    console.log(`  Flow:     ${s.flow}`);
     if (s.agent) console.log(`  Agent:    ${s.agent}`);
     if (s.error) console.log(chalk.red(`  Error:    ${s.error}`));
     if (s.breakpoint_reason) console.log(chalk.yellow(`  Waiting:  ${s.breakpoint_reason}`));
@@ -144,7 +144,7 @@ session.command("resume")
   });
 
 session.command("advance")
-  .description("Advance to the next pipeline stage")
+  .description("Advance to the next flow stage")
   .argument("<id>")
   .option("-f, --force", "Force past gate")
   .action((id, opts) => {
@@ -302,18 +302,18 @@ agent.command("show").description("Show agent details").argument("<name>").actio
   console.log(`  Memories:   ${a.memories.length ? a.memories.join(", ") : "-"}`);
 });
 
-// ── Pipeline commands ───────────────────────────────────────────────────────
+// ── Flow commands ───────────────────────────────────────────────────────────
 
-const pipe = program.command("pipeline").description("Manage pipelines");
+const pipe = program.command("flow").description("Manage flows");
 
-pipe.command("list").description("List pipelines").action(() => {
-  for (const p of core.listPipelines()) {
+pipe.command("list").description("List flows").action(() => {
+  for (const p of core.listFlows()) {
     console.log(`  ${p.name.padEnd(16)} ${p.stages.join(" > ")}  ${chalk.dim(p.description.slice(0, 40))}`);
   }
 });
 
-pipe.command("show").description("Show pipeline").argument("<name>").action((name) => {
-  const p = core.loadPipeline(name);
+pipe.command("show").description("Show flow").argument("<name>").action((name) => {
+  const p = core.loadFlow(name);
   if (!p) { console.log(chalk.red("Not found")); return; }
   console.log(chalk.bold(`\n${p.name}`));
   if (p.description) console.log(chalk.dim(`  ${p.description}`));

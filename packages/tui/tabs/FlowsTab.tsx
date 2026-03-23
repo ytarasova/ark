@@ -5,48 +5,54 @@ import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import type { StoreData } from "../hooks/useStore.js";
 
-interface PipelinesTabProps extends StoreData {}
+interface FlowsTabProps extends StoreData {
+  pane: "left" | "right";
+}
 
-export function PipelinesTab({ pipelines }: PipelinesTabProps) {
+export function FlowsTab({ flows, pane }: FlowsTabProps) {
   const [sel, setSel] = useState(0);
 
   useInput((input, key) => {
+    if (pane === "right") return;
     if (input === "j" || key.downArrow) {
-      setSel((s) => Math.min(s + 1, pipelines.length - 1));
+      setSel((s) => Math.min(s + 1, flows.length - 1));
     } else if (input === "k" || key.upArrow) {
       setSel((s) => Math.max(s - 1, 0));
     } else if (input === "g") {
       setSel(0);
     } else if (input === "G") {
-      setSel(Math.max(0, pipelines.length - 1));
+      setSel(Math.max(0, flows.length - 1));
     }
   });
 
-  const selected = pipelines[sel] ?? null;
+  const selected = flows[sel] ?? null;
 
   return (
     <SplitPane
-      left={<PipelinesList pipelines={pipelines} sel={sel} />}
-      right={<PipelineDetail pipeline={selected} />}
+      focus={pane}
+      leftTitle="Flows"
+      rightTitle="Details"
+      left={<FlowsList flows={flows} sel={sel} />}
+      right={<FlowDetail flow={selected} />}
     />
   );
 }
 
 // ── List ────────────────────────────────────────────────────────────────────
 
-interface PipelinesListProps {
-  pipelines: ReturnType<typeof core.listPipelines>;
+interface FlowsListProps {
+  flows: ReturnType<typeof core.listFlows>;
   sel: number;
 }
 
-function PipelinesList({ pipelines, sel }: PipelinesListProps) {
-  if (pipelines.length === 0) {
-    return <Text dimColor>{"  No pipelines found."}</Text>;
+function FlowsList({ flows, sel }: FlowsListProps) {
+  if (flows.length === 0) {
+    return <Text dimColor>{"  No flows found."}</Text>;
   }
 
   return (
     <Box flexDirection="column">
-      {pipelines.map((p, i) => {
+      {flows.map((p, i) => {
         const isSel = i === sel;
         const marker = isSel ? ">" : " ";
         const source = p.source === "user" ? "*" : " ";
@@ -63,19 +69,18 @@ function PipelinesList({ pipelines, sel }: PipelinesListProps) {
 
 // ── Detail ──────────────────────────────────────────────────────────────────
 
-interface PipelineDetailProps {
-  pipeline: ReturnType<typeof core.listPipelines>[number] | null;
+interface FlowDetailProps {
+  flow: ReturnType<typeof core.listFlows>[number] | null;
 }
 
-function PipelineDetail({ pipeline }: PipelineDetailProps) {
-  if (!pipeline) {
-    return <Text dimColor>{"  No pipeline selected"}</Text>;
+function FlowDetail({ flow }: FlowDetailProps) {
+  if (!flow) {
+    return <Text dimColor>{"  No flow selected"}</Text>;
   }
 
-  // Load full pipeline definition for stage detail
-  const p = core.loadPipeline(pipeline.name);
+  const p = core.loadFlow(flow.name);
   if (!p) {
-    return <Text dimColor>{"  Failed to load pipeline"}</Text>;
+    return <Text dimColor>{"  Failed to load flow"}</Text>;
   }
 
   return (
@@ -83,7 +88,7 @@ function PipelineDetail({ pipeline }: PipelineDetailProps) {
       <Text bold>{` ${p.name}`}</Text>
       {p.description && <Text dimColor>{` ${p.description}`}</Text>}
 
-      <Text>{""}</Text>
+      <Text> </Text>
       <SectionHeader title="Stages" />
       {p.stages.map((s, i) => {
         const type = s.type ?? (s.action ? "action" : "agent");

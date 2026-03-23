@@ -22,7 +22,7 @@ describe("TabBar", () => {
     expect(frame).toContain("1:Sessions");
     expect(frame).toContain("2:Hosts");
     expect(frame).toContain("3:Agents");
-    expect(frame).toContain("4:Pipelines");
+    expect(frame).toContain("4:Flows");
     expect(frame).toContain("5:Recipes");
   });
 
@@ -30,7 +30,7 @@ describe("TabBar", () => {
     // ink-testing-library strips ANSI codes, so we verify each tab
     // label is present and the component renders without error for
     // every possible active tab
-    const tabs = ["sessions", "hosts", "agents", "pipelines", "recipes"] as const;
+    const tabs = ["sessions", "hosts", "agents", "flows", "recipes"] as const;
     for (const tab of tabs) {
       const { lastFrame } = render(<TabBar active={tab} />);
       const frame = lastFrame()!;
@@ -41,7 +41,7 @@ describe("TabBar", () => {
   });
 
   it("renders correctly with each tab active", () => {
-    const tabs = ["sessions", "hosts", "agents", "pipelines", "recipes"] as const;
+    const tabs = ["sessions", "hosts", "agents", "flows", "recipes"] as const;
     for (const tab of tabs) {
       const { lastFrame } = render(<TabBar active={tab} />);
       const frame = lastFrame()!;
@@ -67,7 +67,7 @@ describe("StatusBar", () => {
       claude_session_id: null,
       stage: null,
       status,
-      pipeline: "default",
+      flow: "default",
       agent: null,
       workdir: null,
       pr_url: null,

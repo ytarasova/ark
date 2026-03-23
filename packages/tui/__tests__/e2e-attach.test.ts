@@ -32,7 +32,7 @@ describe("e2e attach flow", () => {
     const s = core.startSession({
       summary: "attach-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(s.id);
 
@@ -61,7 +61,7 @@ describe("e2e attach flow", () => {
     const s = core.startSession({
       summary: "reconcile-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(s.id);
 
@@ -113,7 +113,7 @@ describe("e2e attach flow", () => {
     const s = core.startSession({
       summary: "bad-compute",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
       compute_name: "nonexistent-host-xyz",
     });
     sessionIds.push(s.id);
@@ -127,7 +127,7 @@ describe("e2e attach flow", () => {
     const s = core.startSession({
       summary: "reject-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(s.id);
 
@@ -146,7 +146,7 @@ describe("e2e attach flow", () => {
     const s = core.startSession({
       summary: "resume-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(s.id);
 
@@ -175,7 +175,7 @@ describe("e2e attach flow", () => {
     const s = core.startSession({
       summary: "resume-completed-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(s.id);
 
@@ -192,7 +192,7 @@ describe("e2e attach flow", () => {
     const s = core.startSession({
       summary: "output-empty-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(s.id);
 
@@ -204,7 +204,7 @@ describe("e2e attach flow", () => {
     const s = core.startSession({
       summary: "output-running-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(s.id);
 
@@ -217,8 +217,8 @@ describe("e2e attach flow", () => {
 
   it("full reconciliation loop matches useStore behavior", async () => {
     // Create two sessions, dispatch both, kill one tmux
-    const s1 = core.startSession({ summary: "recon-1", repo: process.cwd(), pipeline: "bare" });
-    const s2 = core.startSession({ summary: "recon-2", repo: process.cwd(), pipeline: "bare" });
+    const s1 = core.startSession({ summary: "recon-1", repo: process.cwd(), flow: "bare" });
+    const s2 = core.startSession({ summary: "recon-2", repo: process.cwd(), flow: "bare" });
     sessionIds.push(s1.id, s2.id);
 
     await core.dispatch(s1.id);

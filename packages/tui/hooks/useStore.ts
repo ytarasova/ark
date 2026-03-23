@@ -1,12 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useRef, useCallback } from "react";
 import * as core from "../../core/index.js";
 
 export interface StoreData {
   sessions: core.Session[];
   hosts: core.Host[];
   agents: ReturnType<typeof core.listAgents>;
-  pipelines: ReturnType<typeof core.listPipelines>;
+  flows: ReturnType<typeof core.listFlows>;
   refreshing: boolean;
+  /** Force an immediate refresh (call after mutations like delete/stop). */
+  refresh: () => void;
 }
 
 /**
@@ -39,31 +41,67 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
   }
 }
 
-async function fetchStore(): Promise<Omit<StoreData, "refreshing">> {
-  const sessions = core.listSessions({ limit: 50 });
-  await reconcileSessions(sessions);
-  return {
-    sessions,
-    hosts: core.listHosts(),
-    agents: core.listAgents(),
-    pipelines: core.listPipelines(),
-  };
+/** Shallow fingerprint: only re-render when session/host list actually changes. */
+function fingerprint(sessions: core.Session[], hosts: core.Host[]): string {
+  const s = sessions.map(s => `${s.id}:${s.status}:${s.session_id}:${s.error ?? ""}`).join("|");
+  const h = hosts.map(h => `${h.name}:${h.status}`).join("|");
+  return s + ";" + h;
 }
 
+/**
+ * Poll the store with setInterval. Only triggers a React re-render
+ * when the data actually changes (checked via fingerprint).
+ * Exposes refresh() for immediate updates after mutations.
+ */
 export function useStore(refreshMs = 3000): StoreData {
-  const { data, isFetching } = useQuery({
-    queryKey: ["store"],
-    queryFn: fetchStore,
-    refetchInterval: refreshMs,
-    staleTime: refreshMs - 500, // data considered fresh for most of the interval
-    placeholderData: (prev) => prev, // keep previous data while refetching (stale-while-revalidate)
+  const [ver, setVer] = useState(0);
+  const dataRef = useRef<Omit<StoreData, "refreshing" | "refresh">>({
+    sessions: [], hosts: [], agents: [], flows: [],
   });
+  const fpRef = useRef("");
+  const running = useRef(false);
 
-  return {
-    sessions: data?.sessions ?? [],
-    hosts: data?.hosts ?? [],
-    agents: data?.agents ?? [],
-    pipelines: data?.pipelines ?? [],
-    refreshing: isFetching,
-  };
+  const doRefresh = useCallback(async () => {
+    if (running.current) return;
+    running.current = true;
+    try {
+      const sessions = core.listSessions({ limit: 50 });
+      await reconcileSessions(sessions);
+      const hosts = core.listHosts();
+      const fp = fingerprint(sessions, hosts);
+      if (fp !== fpRef.current) {
+        fpRef.current = fp;
+        dataRef.current = {
+          sessions,
+          hosts,
+          agents: core.listAgents(),
+          flows: core.listFlows(),
+        };
+        setVer(v => v + 1);
+      }
+    } catch {}
+    running.current = false;
+  }, []);
+
+  useEffect(() => {
+    doRefresh();
+    const t = setInterval(doRefresh, refreshMs);
+    return () => clearInterval(t);
+  }, [doRefresh, refreshMs]);
+
+  // Sync refresh: re-read DB immediately, skip reconciliation (fast path)
+  const refresh = useCallback(() => {
+    const sessions = core.listSessions({ limit: 50 });
+    const hosts = core.listHosts();
+    fpRef.current = fingerprint(sessions, hosts);
+    dataRef.current = {
+      sessions,
+      hosts,
+      agents: core.listAgents(),
+      flows: core.listFlows(),
+    };
+    setVer(v => v + 1);
+  }, []);
+
+  return { ...dataRef.current, refreshing: false, refresh };
 }

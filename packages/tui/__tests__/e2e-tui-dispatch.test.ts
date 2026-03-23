@@ -104,7 +104,7 @@ describe("e2e TUI dispatch and interaction", () => {
     const s = core.startSession({
       summary: "tui-dispatch-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     createdSessionIds.push(s.id);
 
@@ -134,7 +134,7 @@ describe("e2e TUI dispatch and interaction", () => {
     const s = core.startSession({
       summary: "live-output-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     createdSessionIds.push(s.id);
     await core.dispatch(s.id);
@@ -160,7 +160,7 @@ describe("e2e TUI dispatch and interaction", () => {
     const s = core.startSession({
       summary: "tui-stop-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     createdSessionIds.push(s.id);
     await core.dispatch(s.id);
@@ -190,7 +190,7 @@ describe("e2e TUI dispatch and interaction", () => {
     const s = core.startSession({
       summary: "events-display-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     createdSessionIds.push(s.id);
 
@@ -213,7 +213,7 @@ describe("e2e TUI dispatch and interaction", () => {
     const s = core.startSession({
       summary: "tui-delete-target",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     createdSessionIds.push(s.id);
 
@@ -240,11 +240,11 @@ describe("e2e TUI dispatch and interaction", () => {
     }
   }, 30_000);
 
-  it("session detail shows pipeline and status info", async () => {
+  it("session detail shows flow and status info", async () => {
     const s = core.startSession({
       summary: "detail-info-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     createdSessionIds.push(s.id);
 
@@ -254,11 +254,11 @@ describe("e2e TUI dispatch and interaction", () => {
       await tui.waitFor("detail-info-test", 5000);
       const screen = tui.screen();
 
-      // Detail pane should show the session ID, pipeline info, and status
+      // Detail pane should show the session ID, flow info, and status
       expect(screen).toContain(s.id);
       expect(screen).toContain("bare");
       expect(
-        screen.includes("Pipeline") || screen.includes("ready")
+        screen.includes("Flow") || screen.includes("ready")
       ).toBe(true);
     } finally {
       tui.stop();

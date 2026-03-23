@@ -7,7 +7,7 @@ parameters:
   - name: repo
     type: string
     required: true
-pipeline: default
+flow: default
 agent_overrides:
   implement:
     system_prompt_append: |

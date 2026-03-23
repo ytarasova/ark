@@ -122,7 +122,7 @@ describe("CLI: host lifecycle", () => {
 
 describe("CLI: session lifecycle", () => {
   it("creates a session with --repo and --summary", () => {
-    const out = ark("session", "start", "--repo", ".", "--summary", "test-e2e-session", "--pipeline", "bare");
+    const out = ark("session", "start", "--repo", ".", "--summary", "test-e2e-session", "--flow", "bare");
     expect(out).toContain("Session");
     expect(out).toContain("created");
     expect(out).toContain("test-e2e-session");
@@ -134,7 +134,7 @@ describe("CLI: session lifecycle", () => {
   });
 
   it("lists sessions", () => {
-    const createOut = ark("session", "start", "--repo", ".", "--summary", "list-test", "--pipeline", "bare");
+    const createOut = ark("session", "start", "--repo", ".", "--summary", "list-test", "--flow", "bare");
     const match = createOut.match(/Session (s-[0-9a-f]+) created/);
     if (match) testSessionIds.push(match[1]);
 
@@ -144,7 +144,7 @@ describe("CLI: session lifecycle", () => {
   });
 
   it("shows session details", () => {
-    const createOut = ark("session", "start", "--repo", ".", "--summary", "show-test", "--pipeline", "bare");
+    const createOut = ark("session", "start", "--repo", ".", "--summary", "show-test", "--flow", "bare");
     const match = createOut.match(/Session (s-[0-9a-f]+) created/);
     expect(match).not.toBeNull();
     const id = match![1];
@@ -153,11 +153,11 @@ describe("CLI: session lifecycle", () => {
     const out = ark("session", "show", id);
     expect(out).toContain(id);
     expect(out).toContain("show-test");
-    expect(out).toContain("Pipeline:");
+    expect(out).toContain("Flow:");
   });
 
   it("deletes a session", () => {
-    const createOut = ark("session", "start", "--repo", ".", "--summary", "delete-test", "--pipeline", "bare");
+    const createOut = ark("session", "start", "--repo", ".", "--summary", "delete-test", "--flow", "bare");
     const match = createOut.match(/Session (s-[0-9a-f]+) created/);
     expect(match).not.toBeNull();
     const id = match![1];
@@ -171,7 +171,7 @@ describe("CLI: session lifecycle", () => {
   });
 });
 
-// ── Agent & Pipeline commands ───────────────────────────────────────────────
+// ── Agent & Flow commands ───────────────────────────────────────────────
 
 describe("CLI: agent list", () => {
   it("lists available agents", () => {
@@ -181,10 +181,10 @@ describe("CLI: agent list", () => {
   });
 });
 
-describe("CLI: pipeline list", () => {
-  it("lists available pipelines", () => {
-    const out = ark("pipeline", "list");
-    // Should list at least the builtin pipelines
+describe("CLI: flow list", () => {
+  it("lists available flows", () => {
+    const out = ark("flow", "list");
+    // Should list at least the builtin flows
     expect(out.length).toBeGreaterThan(0);
   });
 });

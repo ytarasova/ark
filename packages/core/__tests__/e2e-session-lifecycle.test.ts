@@ -34,13 +34,13 @@ describe("core lifecycle: startSession", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-start-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
 
     expect(session.id).toMatch(/^s-[0-9a-f]+$/);
     expect(session.status).toBe("ready");
-    expect(session.pipeline).toBe("bare");
+    expect(session.flow).toBe("bare");
     expect(session.stage).toBe("work");
     expect(session.repo).toBe(process.cwd());
     expect(session.summary).toBe("lifecycle-start-test");
@@ -53,7 +53,7 @@ describe("core lifecycle: startSession", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-event-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
 
@@ -62,7 +62,7 @@ describe("core lifecycle: startSession", () => {
     const created = events.find((e) => e.type === "session_created");
     expect(created).toBeTruthy();
     expect(created!.data).toBeTruthy();
-    expect(created!.data!.pipeline).toBe("bare");
+    expect(created!.data!.flow).toBe("bare");
   });
 });
 
@@ -73,7 +73,7 @@ describe("core lifecycle: dispatch", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-dispatch-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
     expect(session.status).toBe("ready");
@@ -98,7 +98,7 @@ describe("core lifecycle: dispatch", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-reject-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
 
@@ -128,7 +128,7 @@ describe("core lifecycle: getOutput", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-output-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
 
@@ -145,7 +145,7 @@ describe("core lifecycle: getOutput", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-no-output-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
 
@@ -162,7 +162,7 @@ describe("core lifecycle: stop", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-stop-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
 
@@ -194,7 +194,7 @@ describe("core lifecycle: resume", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-resume-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
 
@@ -225,11 +225,11 @@ describe("core lifecycle: resume", () => {
 // ── complete ───────────────────────────────────────────────────────────────
 
 describe("core lifecycle: complete", () => {
-  it("advances pipeline when completing a stage", async () => {
+  it("advances flow when completing a stage", async () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-complete-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
 
@@ -241,8 +241,8 @@ describe("core lifecycle: complete", () => {
     expect(result.ok).toBe(true);
 
     const completed = core.getSession(session.id)!;
-    // "bare" pipeline has only one stage ("work"), so completing it
-    // should complete the entire pipeline
+    // "bare" flow has only one stage ("work"), so completing it
+    // should complete the entire flow
     expect(completed.status).toBe("completed");
 
     // Verify stage_completed event
@@ -258,7 +258,7 @@ describe("core lifecycle: deleteSession", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-delete-test",
-      pipeline: "bare",
+      flow: "bare",
     });
     // Don't add to sessionIds since we're deleting manually
 
@@ -289,7 +289,7 @@ describe("core lifecycle: full round-trip", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-roundtrip",
-      pipeline: "bare",
+      flow: "bare",
     });
     sessionIds.push(session.id);
     expect(session.status).toBe("ready");
@@ -306,7 +306,7 @@ describe("core lifecycle: full round-trip", () => {
     await core.resume(session.id);
     expect(core.getSession(session.id)!.status).toBe("running");
 
-    // 5. Complete (advances pipeline)
+    // 5. Complete (advances flow)
     core.complete(session.id);
     expect(core.getSession(session.id)!.status).toBe("completed");
 

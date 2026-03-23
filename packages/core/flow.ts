@@ -1,7 +1,7 @@
 /**
- * Pipeline engine - load YAML definitions, evaluate gates, advance stages.
+ * Flow engine - load YAML definitions, evaluate gates, advance stages.
  *
- * Pipelines are declarative YAML: ordered stages with gates (auto/manual/condition).
+ * Flows are declarative YAML: ordered stages with gates (auto/manual/condition).
  * Stages are either agent tasks or built-in actions (create PR, merge, etc.).
  * Fork stages split into parallel children.
  */
@@ -27,7 +27,7 @@ export interface StageDefinition {
   subtasks?: { name: string; task: string }[];
 }
 
-export interface PipelineDefinition {
+export interface FlowDefinition {
   name: string;
   description?: string;
   stages: StageDefinition[];
@@ -38,8 +38,8 @@ export interface PipelineDefinition {
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BUILTIN_DIR = join(__dirname, "..", "..", "pipelines", "definitions");
-const USER_DIR = join(ARK_DIR, "pipelines");
+const BUILTIN_DIR = join(__dirname, "..", "..", "flows", "definitions");
+const USER_DIR = join(ARK_DIR, "flows");
 
 // ── Loading ─────────────────────────────────────────────────────────────────
 
@@ -47,16 +47,16 @@ function loadYaml(path: string): Record<string, unknown> {
   return YAML.parse(readFileSync(path, "utf-8")) ?? {};
 }
 
-export function loadPipeline(name: string): PipelineDefinition | null {
+export function loadFlow(name: string): FlowDefinition | null {
   // User overrides builtin
   for (const dir of [USER_DIR, BUILTIN_DIR]) {
     const path = join(dir, `${name}.yaml`);
-    if (existsSync(path)) return loadYaml(path) as unknown as PipelineDefinition;
+    if (existsSync(path)) return loadYaml(path) as unknown as FlowDefinition;
   }
   return null;
 }
 
-export function listPipelines(): { name: string; description: string; stages: string[]; source: string }[] {
+export function listFlows(): { name: string; description: string; stages: string[]; source: string }[] {
   const result: Map<string, { name: string; description: string; stages: string[]; source: string }> = new Map();
 
   for (const [dir, source] of [[BUILTIN_DIR, "builtin"], [USER_DIR, "user"]] as const) {
@@ -77,21 +77,21 @@ export function listPipelines(): { name: string; description: string; stages: st
 
 // ── Stage navigation ────────────────────────────────────────────────────────
 
-export function getStages(pipelineName: string): StageDefinition[] {
-  return loadPipeline(pipelineName)?.stages ?? [];
+export function getStages(flowName: string): StageDefinition[] {
+  return loadFlow(flowName)?.stages ?? [];
 }
 
-export function getStage(pipelineName: string, stageName: string): StageDefinition | null {
-  return getStages(pipelineName).find((s) => s.name === stageName) ?? null;
+export function getStage(flowName: string, stageName: string): StageDefinition | null {
+  return getStages(flowName).find((s) => s.name === stageName) ?? null;
 }
 
-export function getFirstStage(pipelineName: string): string | null {
-  const stages = getStages(pipelineName);
+export function getFirstStage(flowName: string): string | null {
+  const stages = getStages(flowName);
   return stages[0]?.name ?? null;
 }
 
-export function getNextStage(pipelineName: string, currentStage: string): string | null {
-  const stages = getStages(pipelineName);
+export function getNextStage(flowName: string, currentStage: string): string | null {
+  const stages = getStages(flowName);
   const idx = stages.findIndex((s) => s.name === currentStage);
   return idx >= 0 && idx + 1 < stages.length ? stages[idx + 1].name : null;
 }
@@ -99,9 +99,9 @@ export function getNextStage(pipelineName: string, currentStage: string): string
 // ── Gate evaluation ─────────────────────────────────────────────────────────
 
 export function evaluateGate(
-  pipelineName: string, stageName: string, session: { error?: string | null },
+  flowName: string, stageName: string, session: { error?: string | null },
 ): { canProceed: boolean; reason: string } {
-  const stage = getStage(pipelineName, stageName);
+  const stage = getStage(flowName, stageName);
   if (!stage) return { canProceed: false, reason: `Stage '${stageName}' not found` };
 
   switch (stage.gate) {
@@ -130,8 +130,8 @@ export interface StageAction {
   optional?: boolean;
 }
 
-export function getStageAction(pipelineName: string, stageName: string): StageAction {
-  const stage = getStage(pipelineName, stageName);
+export function getStageAction(flowName: string, stageName: string): StageAction {
+  const stage = getStage(flowName, stageName);
   if (!stage) return { type: "unknown" };
 
   if (stage.type === "fork") {

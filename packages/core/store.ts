@@ -38,7 +38,7 @@ export interface Session {
   claude_session_id: string | null; // Claude UUID for --resume
   stage: string | null;
   status: string;
-  pipeline: string;
+  flow: string;           // DB column: pipeline — flow definition name
   agent: string | null;
   workdir: string | null;
   pr_url: string | null;
@@ -174,7 +174,7 @@ export function createSession(opts: {
   ticket?: string | null;
   summary?: string | null;
   repo?: string | null;
-  pipeline?: string | null;
+  flow?: string | null;
   compute_name?: string | null;
   workdir?: string | null;
   group_name?: string | null;
@@ -194,7 +194,7 @@ export function createSession(opts: {
   `).run(
     id, opts.ticket ?? null, opts.summary ?? null, opts.repo ?? null,
     branch, opts.compute_name ?? null, opts.workdir ?? null,
-    opts.pipeline ?? "default", opts.group_name ?? null,
+    opts.flow ?? "default", opts.group_name ?? null,
     JSON.stringify(opts.config ?? {}), ts, ts,
   );
 
@@ -202,7 +202,7 @@ export function createSession(opts: {
     actor: "user",
     data: {
       ticket: opts.ticket, summary: opts.summary,
-      repo: opts.repo, pipeline: opts.pipeline ?? "default",
+      repo: opts.repo, flow: opts.flow ?? "default",
       branch, workdir: opts.workdir, group_name: opts.group_name,
     },
   });
@@ -214,7 +214,7 @@ export function getSession(id: string): Session | null {
   const db = getDb();
   const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as any;
   if (!row) return null;
-  return { ...row, ticket: row.jira_key, summary: row.jira_summary, config: JSON.parse(row.config ?? "{}") };
+  return { ...row, ticket: row.jira_key, summary: row.jira_summary, flow: row.pipeline, config: JSON.parse(row.config ?? "{}") };
 }
 
 export function listSessions(opts?: {
@@ -237,7 +237,7 @@ export function listSessions(opts?: {
   params.push(opts?.limit ?? 100);
 
   return (db.prepare(sql).all(...params) as any[]).map((r) => ({
-    ...r, ticket: r.jira_key, summary: r.jira_summary, config: JSON.parse(r.config ?? "{}"),
+    ...r, ticket: r.jira_key, summary: r.jira_summary, flow: r.pipeline, config: JSON.parse(r.config ?? "{}"),
   }));
 }
 
@@ -246,13 +246,17 @@ export function updateSession(id: string, fields: Partial<Session>): Session | n
   const updates: string[] = ["updated_at = ?"];
   const values: any[] = [now()];
 
+  // Map TS field names to DB column names
+  const fieldMap: Record<string, string> = { ticket: "jira_key", summary: "jira_summary", flow: "pipeline" };
+
   for (const [key, value] of Object.entries(fields)) {
     if (key === "id" || key === "created_at") continue;
-    if (key === "config" && typeof value === "object") {
+    const col = fieldMap[key] ?? key;
+    if (col === "config" && typeof value === "object") {
       updates.push("config = ?");
       values.push(JSON.stringify(value));
     } else {
-      updates.push(`${key} = ?`);
+      updates.push(`${col} = ?`);
       values.push(value ?? null);
     }
   }

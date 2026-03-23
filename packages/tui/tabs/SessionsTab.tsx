@@ -7,6 +7,9 @@ import { ago, hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
+import { ScrollBox } from "../components/ScrollBox.js";
+import { SelectMenu } from "../components/SelectMenu.js";
+import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
 import type { StoreData } from "../hooks/useStore.js";
@@ -14,13 +17,16 @@ import type { AsyncState } from "../hooks/useAsync.js";
 
 interface SessionsTabProps extends StoreData {
   async: AsyncState;
+  pane: "left" | "right";
   onShowForm: () => void;
   onSelectionChange?: (session: any) => void;
   formOverlay?: React.ReactNode;
+  refresh: () => void;
 }
 
-export function SessionsTab({ sessions, refreshing, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
+export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
   const [sel, setSel] = useState(0);
+  const [moveMode, setMoveMode] = useState(false);
   const status = useStatusMessage();
 
   // Top-level sessions only (exclude fork children from list)
@@ -55,14 +61,25 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
 
   const selected = topLevel[sel] ?? null;
 
-  // Notify parent of selection changes for context-sensitive status bar
+  // Notify parent of selection/pane changes for status bar
   useEffect(() => {
     onSelectionChange?.(selected);
   }, [selected?.id, selected?.status]);
 
+  // Helper: get all sessions in the same group as selected
+  const selectedGroup = selected?.group_name ?? "";
+  const groupSessions = useMemo(
+    () => topLevel.filter(s => (s.group_name ?? "") === selectedGroup),
+    [topLevel, selectedGroup],
+  );
+
   useInput((input, key) => {
     // Don't handle keys when form overlay is active (form owns input)
     if (formOverlay) return;
+    if (moveMode) return; // let SelectMenu handle input
+
+    // In right pane, ScrollBox handles j/k — skip list keys
+    if (pane === "right") return;
 
     if (input === "j" || key.downArrow) {
       setSel((s) => Math.min(s + 1, topLevel.length - 1));
@@ -74,31 +91,35 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
       setSel(Math.max(0, topLevel.length - 1));
     } else if (key.return) {
       if (selected && (selected.status === "ready" || selected.status === "blocked")) {
-        asyncState.run(`Dispatching ${selected.id}`, () =>
-          core.dispatch(selected.id).then(() => {})
-        );
+        asyncState.run(`Dispatching ${selected.id}`, async () => {
+          await core.dispatch(selected.id);
+          refresh();
+        });
       } else if (selected && selected.status === "failed") {
-        // Enter on failed = retry (same as r)
-        asyncState.run(`Retrying ${selected.id}`, () =>
-          core.resume(selected.id).then(() => {})
-        );
+        asyncState.run(`Retrying ${selected.id}`, async () => {
+          await core.resume(selected.id);
+          refresh();
+        });
       }
     } else if (input === "s") {
       if (selected && !["completed", "failed"].includes(selected.status)) {
         asyncState.run(`Stopping ${selected.id}`, async () => {
           core.stop(selected.id);
+          refresh();
         });
       }
     } else if (input === "r") {
       if (selected && ["blocked", "waiting", "failed"].includes(selected.status)) {
-        asyncState.run(`Resuming ${selected.id}`, () =>
-          core.resume(selected.id).then(() => {})
-        );
+        asyncState.run(`Resuming ${selected.id}`, async () => {
+          await core.resume(selected.id);
+          refresh();
+        });
       }
     } else if (input === "c") {
       if (selected && selected.status === "running") {
         asyncState.run(`Completing ${selected.id}`, async () => {
           core.complete(selected.id);
+          refresh();
         });
       }
     } else if (input === "x") {
@@ -108,8 +129,7 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
             await core.killSessionAsync(selected.session_id);
           }
           core.deleteSession(selected.id);
-          // sel stays at same index — the next item fills this position.
-          // useEffect clamp handles the edge case where we deleted the last item.
+          refresh();
         });
       }
     } else if (input === "a") {
@@ -146,6 +166,37 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show("Detached from session");
         }, 100);
       }
+    } else if (input === "m") {
+      if (selected) setMoveMode(true);
+    } else if (input === "S") {
+      if (selectedGroup && groupSessions.length > 0) {
+        asyncState.run(`Stopping group '${selectedGroup}'`, async () => {
+          for (const s of groupSessions) {
+            if (!["completed", "failed"].includes(s.status)) core.stop(s.id);
+          }
+          refresh();
+        });
+      }
+    } else if (input === "R") {
+      if (selectedGroup && groupSessions.length > 0) {
+        asyncState.run(`Resuming group '${selectedGroup}'`, async () => {
+          for (const s of groupSessions) {
+            if (["blocked", "waiting", "failed"].includes(s.status)) await core.resume(s.id);
+          }
+          refresh();
+        });
+      }
+    } else if (input === "X") {
+      if (selectedGroup && groupSessions.length > 0) {
+        asyncState.run(`Deleting group '${selectedGroup}'`, async () => {
+          for (const s of groupSessions) {
+            if (s.session_id) await core.killSessionAsync(s.session_id);
+            core.deleteSession(s.id);
+          }
+          setSel(0);
+          refresh();
+        });
+      }
     } else if (input === "n") {
       onShowForm();
     }
@@ -155,6 +206,9 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
     <Box flexDirection="column" flexGrow={1}>
       {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
+        focus={pane}
+        leftTitle="Sessions"
+        rightTitle="Details"
         left={<SessionsList
           groups={groups}
           sortedGroups={sortedGroups}
@@ -162,7 +216,23 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           parentIds={parentIds}
           sel={sel}
         />}
-        right={formOverlay ?? <SessionDetail session={selected} sessions={sessions} />}
+        right={
+          formOverlay ? formOverlay
+          : moveMode ? (
+            <MoveToGroup
+              session={selected}
+              onDone={(group) => {
+                if (selected && group !== undefined) {
+                  core.updateSession(selected.id, { group_name: group || null });
+                  status.show(group ? `Moved to '${group}'` : "Removed from group");
+                  refresh();
+                }
+                setMoveMode(false);
+              }}
+            />
+          )
+          : <SessionDetail session={selected} sessions={sessions} />
+        }
       />
       {status.message && (
         <Box>
@@ -255,10 +325,10 @@ function SessionDetail({ session: s }: SessionDetailProps) {
     return <Text dimColor>{"  No session selected"}</Text>;
   }
 
-  // Pipeline bar
+  // Flow bar
   let stages: ReturnType<typeof core.getStages> = [];
   try {
-    stages = core.getStages(s.pipeline);
+    stages = core.getStages(s.flow);
   } catch {
     // ignore — DB may be locked
   }
@@ -280,12 +350,12 @@ function SessionDetail({ session: s }: SessionDetailProps) {
   );
 
   return (
-    <Box flexDirection="column">
+    <ScrollBox active={pane === "right"}>
       {/* Header */}
       <Text bold>{` ${s.ticket ?? s.id}  ${s.summary ?? ""}`}</Text>
       <Text> </Text>
 
-      {/* Pipeline bar — only show for multi-stage pipelines */}
+      {/* Flow bar — only show for multi-stage flows */}
       {stages.length > 1 && <Box>
         <Text>{" "}</Text>
         {stages.map((stg, i) => {
@@ -324,38 +394,29 @@ function SessionDetail({ session: s }: SessionDetailProps) {
         })}
       </Box>}
 
-      {/* Banners */}
-      {s.error && (
-        <>
-          <Text> </Text>
-          <Text color="red" bold>{` ✕ ${s.error}`}</Text>
-        </>
-      )}
+      {/* Status line — single source of truth */}
+      <Text> </Text>
+      <Text color={(COLOR[s.status] ?? "white") as any} bold>
+        {` ${ICON[s.status] ?? "?"} ${s.error ? s.error : s.status}`}
+      </Text>
       {s.breakpoint_reason && (
-        <>
-          <Text> </Text>
-          <Text color="yellow" bold>{` ⏸ ${s.breakpoint_reason}`}</Text>
-        </>
+        <Text color="yellow" bold>{` ⏸ ${s.breakpoint_reason}`}</Text>
       )}
 
       {/* Info */}
       <Text> </Text>
       <SectionHeader title="Info" />
       <Text><Text dimColor>{"  ID".padEnd(13)}</Text>{s.id}</Text>
-      <Text>
-        <Text dimColor>{"  Status".padEnd(13)}</Text>
-        <Text color={(COLOR[s.status] ?? "white") as any}>
-          {`${ICON[s.status] ?? "?"} ${s.status}`}
-        </Text>
-      </Text>
       <Text><Text dimColor>{"  Compute".padEnd(13)}</Text>{s.compute_name || "local"}</Text>
       {s.repo && <Text><Text dimColor>{"  Repo".padEnd(13)}</Text>{s.repo}</Text>}
       {s.branch && <Text><Text dimColor>{"  Branch".padEnd(13)}</Text>{s.branch}</Text>}
-      {s.workdir && <Text><Text dimColor>{"  Workdir".padEnd(13)}</Text>{s.workdir}</Text>}
+      {s.workdir && s.workdir !== s.repo && (
+        <Text><Text dimColor>{"  Workdir".padEnd(13)}</Text>{s.workdir}</Text>
+      )}
       {(s.config as any)?.remoteWorkdir && (
         <Text><Text dimColor>{"  Remote".padEnd(13)}</Text>{(s.config as any).remoteWorkdir}</Text>
       )}
-      <Text><Text dimColor>{"  Pipeline".padEnd(13)}</Text>{s.pipeline}</Text>
+      <Text><Text dimColor>{"  Flow".padEnd(13)}</Text>{s.flow}</Text>
       {s.agent && <Text><Text dimColor>{"  Agent".padEnd(13)}</Text>{s.agent}</Text>}
       {s.group_name && <Text><Text dimColor>{"  Group".padEnd(13)}</Text>{s.group_name}</Text>}
 
@@ -372,7 +433,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
           <Text> </Text>
           <SectionHeader title="Live Output" />
           {agentOutput.split("\n").slice(-12).map((line, i) => (
-            <Text key={i}>{`  ${line.slice(0, 80)}`}</Text>
+            <Text key={i} wrap="truncate">{`  ${line}`}</Text>
           ))}
         </>
       ) : !s.session_id && (s.status === "ready" || s.status === "blocked") ? (
@@ -401,6 +462,73 @@ function SessionDetail({ session: s }: SessionDetailProps) {
           })}
         </>
       )}
+    </ScrollBox>
+  );
+}
+
+// ── Move to Group ──────────────────────────────────────────────────────────
+
+interface MoveToGroupProps {
+  session: core.Session | null;
+  onDone: (group: string | undefined) => void;
+}
+
+function MoveToGroup({ session, onDone }: MoveToGroupProps) {
+  const [newGroup, setNewGroup] = useState("");
+  const [mode, setMode] = useState<"pick" | "new">("pick");
+  const existing = core.getGroups();
+
+  useInput((input, key) => {
+    if (key.escape) onDone(undefined);
+  });
+
+  const choices = [
+    ...existing.map(g => ({ label: g, value: g })),
+    { label: "(none) — remove from group", value: "__none__" },
+    { label: "+ New group...", value: "__new__" },
+  ];
+
+  if (mode === "new") {
+    return (
+      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+        <Text bold color="cyan">{" Move to Group "}</Text>
+        <Text> </Text>
+        <Text>{`Session: ${session?.summary ?? session?.id}`}</Text>
+        <Text> </Text>
+        <Text>{"New group name:"}</Text>
+        <Box>
+          <Text color="cyan">{"> "}</Text>
+          <TextInputEnhanced
+            value={newGroup}
+            onChange={setNewGroup}
+            onSubmit={() => { if (newGroup.trim()) onDone(newGroup.trim()); }}
+            placeholder="Enter group name..."
+          />
+        </Box>
+        <Text dimColor>{"  Enter to confirm, Esc to cancel"}</Text>
+      </Box>
+    );
+  }
+
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+      <Text bold color="cyan">{" Move to Group "}</Text>
+      <Text> </Text>
+      <Text>{`Session: ${session?.summary ?? session?.id}`}</Text>
+      <Text> </Text>
+      <SelectMenu
+        items={choices}
+        onSelect={(item) => {
+          if (item.value === "__new__") {
+            setMode("new");
+          } else if (item.value === "__none__") {
+            onDone("");
+          } else {
+            onDone(item.value);
+          }
+        }}
+      />
+      <Text dimColor>{"  Esc to cancel"}</Text>
     </Box>
   );
 }

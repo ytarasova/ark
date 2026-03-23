@@ -52,7 +52,7 @@ describe("e2e TUI attach via tmux new-window", () => {
     const session = core.startSession({
       summary: "attach-newwin-test",
       repo: process.cwd(),
-      pipeline: "bare",
+      flow: "bare",
     });
     arkSessions.push(session.id);
     await core.dispatch(session.id);

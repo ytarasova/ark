@@ -1,15 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
+import { execFileSync } from "child_process";
 import { useStore } from "./hooks/useStore.js";
 import { useAsync } from "./hooks/useAsync.js";
 import { TabBar } from "./components/TabBar.js";
 import type { Tab } from "./components/TabBar.js";
+import type { Pane } from "./components/SplitPane.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { EventLog } from "./components/EventLog.js";
 import { SessionsTab } from "./tabs/SessionsTab.js";
 import { HostsTab } from "./tabs/HostsTab.js";
 import { AgentsTab } from "./tabs/AgentsTab.js";
-import { PipelinesTab } from "./tabs/PipelinesTab.js";
+import { FlowsTab } from "./tabs/FlowsTab.js";
 import { NewSessionForm } from "./forms/NewSessionForm.js";
 import { NewHostForm } from "./forms/NewHostForm.js";
 
@@ -21,31 +23,58 @@ export function App() {
   const [showForm, setShowForm] = useState<string | null>(null);
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
   const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [pane, setPane] = useState<Pane>("left");
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;
 
+  const switchTab = (t: Tab) => { setTab(t); setPane("left"); };
+
+  const takeSnapshot = useCallback(() => {
+    try {
+      if (process.env.TMUX) {
+        execFileSync("tmux", ["capture-pane", "-S", "-"], { stdio: "pipe" });
+        execFileSync("tmux", ["save-buffer", "-"], { stdio: ["pipe", "pipe", "pipe"] });
+        // Pipe buffer to clipboard
+        const content = execFileSync("tmux", ["save-buffer", "-"], {
+          encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+        });
+        execFileSync("pbcopy", { input: content, stdio: ["pipe", "pipe", "pipe"] });
+      } else {
+        // No tmux — not much we can capture
+      }
+    } catch {}
+  }, []);
+
   useInput((input, key) => {
-    // Don't handle global keys when a form is showing (let form handle Esc)
+    // Always available
+    if (input === "q") { exit(); return; }
+    if (input === "p") { takeSnapshot(); return; }
+
     if (showForm) return;
 
-    if (input === "q") {
-      exit();
-    } else if (input === "e") {
+    // Tab switches pane focus (all tabs with SplitPane)
+    if (key.tab) {
+      setPane(p => p === "left" ? "right" : "left");
+      return;
+    }
+    // Esc returns to list pane
+    if (key.escape && pane === "right") {
+      setPane("left");
+      return;
+    }
+
+    if (input === "e") {
       setEventLogExpanded((v) => !v);
     } else if (input === "1") {
-      setTab("sessions");
+      switchTab("sessions");
     } else if (input === "2") {
-      setTab("hosts");
+      switchTab("hosts");
     } else if (input === "3") {
-      setTab("agents");
+      switchTab("agents");
     } else if (input === "4") {
-      setTab("pipelines");
+      switchTab("flows");
     } else if (input === "5") {
-      setTab("recipes");
-    } else if (key.tab) {
-      const tabs: Tab[] = ["sessions", "hosts", "agents", "pipelines", "recipes"];
-      const idx = tabs.indexOf(tab);
-      setTab(tabs[(idx + 1) % tabs.length]!);
+      switchTab("recipes");
     }
   });
 
@@ -56,6 +85,7 @@ export function App() {
       {tab === "sessions" ? (
         <SessionsTab
           {...store}
+          pane={pane}
           async={asyncState}
           onShowForm={() => setShowForm("session")}
           onSelectionChange={setSelectedSession}
@@ -70,6 +100,7 @@ export function App() {
       ) : tab === "hosts" ? (
         <HostsTab
           {...store}
+          pane={pane}
           async={asyncState}
           onShowForm={() => setShowForm("host")}
           formOverlay={showForm === "host" ? (
@@ -77,9 +108,9 @@ export function App() {
           ) : undefined}
         />
       ) : tab === "agents" ? (
-        <AgentsTab {...store} />
-      ) : tab === "pipelines" ? (
-        <PipelinesTab {...store} />
+        <AgentsTab {...store} pane={pane} />
+      ) : tab === "flows" ? (
+        <FlowsTab {...store} pane={pane} />
       ) : (
         <Box flexGrow={1} justifyContent="center" alignItems="center">
           <Text dimColor>{"Recipes - coming soon"}</Text>
@@ -98,6 +129,7 @@ export function App() {
         loading={asyncState.loading}
         error={asyncState.error}
         label={asyncState.label}
+        pane={pane}
       />
     </Box>
   );
