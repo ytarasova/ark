@@ -74,7 +74,8 @@ if (action) {
 
   if (cmd) {
     try {
-      execFileSync("bash", ["-c", cmd], { stdio: "inherit" });
+      // stty sane resets terminal, sleep lets iTerm2 DA queries drain
+      execFileSync("bash", ["-c", `stty sane 2>/dev/null; sleep 0.1; ${cmd}`], { stdio: "inherit" });
       log("INFO", `${action.type} completed`);
     } catch (e: any) {
       log("ERROR", `${action.type} failed: ${e.message}`);
