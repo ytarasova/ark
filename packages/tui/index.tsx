@@ -62,11 +62,32 @@ if (action) {
     : null;
 
   if (cmd) {
-    const result = Bun.spawnSync(cmd, {
-      stdin: "inherit",
-      stdout: "inherit",
-      stderr: "inherit",
+    log("INFO", `Running: ${cmd.join(" ")}`);
+
+    // Use Bun.Terminal for proper PTY — gives subprocess a real terminal
+    process.stdin.setRawMode(true);
+    const proc = Bun.spawn(cmd, {
+      terminal: {
+        cols: process.stdout.columns ?? 80,
+        rows: process.stdout.rows ?? 24,
+        data(_terminal, data) {
+          process.stdout.write(data);
+        },
+      },
     });
-    log("INFO", `${action.type} exited: ${result.exitCode}`);
+
+    // Forward stdin to PTY
+    process.stdin.on("data", (chunk: Buffer) => {
+      proc.terminal.write(chunk.toString());
+    });
+
+    // Handle resize
+    process.stdout.on("resize", () => {
+      proc.terminal.resize(process.stdout.columns, process.stdout.rows);
+    });
+
+    await proc.exited;
+    process.stdin.setRawMode(false);
+    log("INFO", `${action.type} exited: ${proc.exitCode}`);
   }
 }
