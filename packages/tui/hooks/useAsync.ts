@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 export interface AsyncState {
   loading: boolean;
@@ -8,27 +8,44 @@ export interface AsyncState {
   clearError: () => void;
 }
 
+interface PendingAction {
+  label: string;
+  action: () => Promise<void>;
+}
+
 export function useAsync(): AsyncState {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [label, setLabel] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const running = useRef(false);
+
+  // Execute pending action via useEffect (safe - never during render)
+  useEffect(() => {
+    if (!pending || running.current) return;
+    running.current = true;
+
+    setLoading(true);
+    setLabel(pending.label);
+    setError(null);
+
+    const { label: actionLabel, action } = pending;
+    setPending(null);
+
+    action()
+      .catch((e: any) => {
+        setError(`${actionLabel} failed: ${e?.message ?? String(e)}`);
+      })
+      .finally(() => {
+        running.current = false;
+        setLoading(false);
+        setLabel(null);
+      });
+  }, [pending]);
 
   const run = useCallback((actionLabel: string, action: () => Promise<void>) => {
-    // Guard against concurrent actions — reject if already running
-    setLoading((prev) => {
-      if (prev) return prev; // already loading, skip
-      setLabel(actionLabel);
-      setError(null);
-      action()
-        .catch((e: any) => {
-          setError(`${actionLabel} failed: ${e?.message ?? String(e)}`);
-        })
-        .finally(() => {
-          setLoading(false);
-          setLabel(null);
-        });
-      return true;
-    });
+    if (running.current) return;
+    setPending({ label: actionLabel, action });
   }, []);
 
   const clearError = useCallback(() => setError(null), []);

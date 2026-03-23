@@ -297,6 +297,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
           {`${ICON[s.status] ?? "?"} ${s.status}`}
         </Text>
       </Text>
+      <Text><Text dimColor>{"  Compute".padEnd(13)}</Text>{s.compute_name || "local"}</Text>
       {s.repo && <Text><Text dimColor>{"  Repo".padEnd(13)}</Text>{s.repo}</Text>}
       {s.branch && <Text><Text dimColor>{"  Branch".padEnd(13)}</Text>{s.branch}</Text>}
       <Text><Text dimColor>{"  Pipeline".padEnd(13)}</Text>{s.pipeline}</Text>
