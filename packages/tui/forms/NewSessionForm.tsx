@@ -5,6 +5,7 @@ import { existsSync } from "fs";
 import { resolve as resolvePath, basename } from "path";
 import * as core from "../../core/index.js";
 import { SelectMenu } from "../components/SelectMenu.js";
+import { submitForm } from "./submitForm.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
@@ -52,10 +53,6 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
   };
 
   const handleSelectPipeline = (item: { label: string; value: string }) => {
-    // Close form first, then create + dispatch in background
-    onDone();
-
-    // Create session synchronously (fast DB write)
     let workdir: string | undefined;
     let repo = repoPath || process.cwd();
     const rp = resolvePath(repo);
@@ -64,21 +61,25 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
       if (repo === "." || repo === "./") repo = basename(rp);
     }
 
-    try {
-      const s = core.startSession({
-        jira_summary: summary || "Ad-hoc task",
-        repo,
-        pipeline: item.value,
-        workdir,
-        compute_name: computeName || undefined,
-      });
-      // Dispatch async via the parent's asyncState
-      asyncState.run(`Dispatching ${s.id}`, async () => {
-        await core.dispatch(s.id);
-      });
-    } catch (e: any) {
-      asyncState.run("Create failed", async () => { throw e; });
-    }
+    let sessionId = "";
+    submitForm({
+      create: () => {
+        const s = core.startSession({
+          jira_summary: summary || "Ad-hoc task",
+          repo,
+          pipeline: item.value,
+          workdir,
+          compute_name: computeName || undefined,
+        });
+        sessionId = s.id;
+      },
+      onDone,
+      asyncFollowUp: {
+        label: `Dispatching session`,
+        action: () => core.dispatch(sessionId).then(() => {}),
+      },
+      asyncState,
+    });
   };
 
   return (

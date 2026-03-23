@@ -62,6 +62,14 @@ export async function dispatch(sessionId: string): Promise<{ ok: boolean; messag
   const stage = session.stage;
   if (!stage) return { ok: false, message: "No current stage" };
 
+  // Validate compute host exists if specified
+  if (session.compute_name) {
+    const host = store.getHost(session.compute_name);
+    if (!host) {
+      return { ok: false, message: `Compute host '${session.compute_name}' not found. Delete and recreate the session.` };
+    }
+  }
+
   // Check if fork stage
   const stageDef = pipeline.getStage(session.pipeline, stage);
   if (stageDef?.type === "fork") {
