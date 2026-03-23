@@ -274,8 +274,8 @@ function SessionDetail({ session: s }: SessionDetailProps) {
       <Text bold>{` ${s.ticket ?? s.id}  ${s.summary ?? ""}`}</Text>
       <Text> </Text>
 
-      {/* Pipeline bar */}
-      <Box>
+      {/* Pipeline bar — only show for multi-stage pipelines */}
+      {stages.length > 1 && <Box>
         <Text>{" "}</Text>
         {stages.map((stg, i) => {
           const isFork = stg.type === "fork";
@@ -311,7 +311,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
             </React.Fragment>
           );
         })}
-      </Box>
+      </Box>}
 
       {/* Banners */}
       {s.error && (
