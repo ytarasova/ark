@@ -21,10 +21,15 @@ if (action) {
   if (action.type === "tmux-attach") {
     try {
       execFileSync("tmux", ["attach", "-t", ...action.args], { stdio: "inherit" });
-    } catch { /* user detached */ }
+    } catch (e: any) {
+      // If attach failed, show why
+      process.stderr.write(`\nAttach failed: ${e.message ?? e}\n`);
+    }
   } else if (action.type === "ssh") {
     try {
       execFileSync("ssh", action.args, { stdio: "inherit" });
-    } catch { /* user exited */ }
+    } catch (e: any) {
+      process.stderr.write(`\nSSH failed: ${e.message ?? e}\n`);
+    }
   }
 }
