@@ -7,9 +7,12 @@ import { ago, hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
-import { ScrollBox } from "../components/ScrollBox.js";
+import { TreeList } from "../components/TreeList.js";
+import { DetailPanel } from "../components/DetailPanel.js";
+import { KeyValue } from "../components/KeyValue.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
+import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
 import type { StoreData } from "../hooks/useStore.js";
@@ -25,39 +28,13 @@ interface SessionsTabProps extends StoreData {
 }
 
 export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
-  const [sel, setSel] = useState(0);
   const [moveMode, setMoveMode] = useState(false);
   const status = useStatusMessage();
 
   // Top-level sessions only (exclude fork children from list)
   const topLevel = useMemo(() => sessions.filter((s) => !s.parent_id), [sessions]);
-  const parentIds = useMemo(
-    () => new Set(sessions.filter((s) => s.parent_id).map((s) => s.parent_id)),
-    [sessions]
-  );
 
-  // Group sessions
-  const groups = useMemo(() => {
-    const g = new Map<string, core.Session[]>();
-    for (const s of topLevel) {
-      const name = s.group_name ?? "";
-      if (!g.has(name)) g.set(name, []);
-      g.get(name)!.push(s);
-    }
-    return g;
-  }, [topLevel]);
-
-  const sortedGroups = useMemo(
-    () => [...groups.keys()].sort((a, b) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b))),
-    [groups]
-  );
-
-  // Clamp selection when list shrinks (e.g. after deletion)
-  useEffect(() => {
-    if (topLevel.length > 0) {
-      setSel((s) => Math.min(s, topLevel.length - 1));
-    }
-  }, [topLevel.length]);
+  const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !formOverlay && !moveMode });
 
   const selected = topLevel[sel] ?? null;
 
@@ -78,18 +55,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
     if (formOverlay) return;
     if (moveMode) return; // let SelectMenu handle input
 
-    // In right pane, ScrollBox handles j/k — skip list keys
-    if (pane === "right") return;
-
-    if (input === "j" || key.downArrow) {
-      setSel((s) => Math.min(s + 1, topLevel.length - 1));
-    } else if (input === "k" || key.upArrow) {
-      setSel((s) => Math.max(s - 1, 0));
-    } else if (input === "g") {
-      setSel(0);
-    } else if (input === "G") {
-      setSel(Math.max(0, topLevel.length - 1));
-    } else if (key.return) {
+    if (key.return) {
       if (selected && (selected.status === "ready" || selected.status === "blocked")) {
         asyncState.run(`Dispatching ${selected.id}`, async () => {
           await core.dispatch(selected.id);
@@ -209,13 +175,41 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
         focus={pane}
         leftTitle="Sessions"
         rightTitle="Details"
-        left={<SessionsList
-          groups={groups}
-          sortedGroups={sortedGroups}
-          sessions={sessions}
-          parentIds={parentIds}
-          sel={sel}
-        />}
+        left={
+          <TreeList
+            items={topLevel}
+            groupBy={s => s.group_name ?? ""}
+            renderRow={(s, selected) => {
+              const icon = ICON[s.status] ?? "?";
+              const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
+              const stage = (s.stage ?? "---").padEnd(10);
+              const age = ago(s.created_at).padStart(4);
+              const marker = topLevel.indexOf(s) === sel ? ">" : " ";
+              return ` ${marker} ${icon} ${summary} ${stage} ${age}`;
+            }}
+            renderColoredRow={(s) => {
+              const icon = ICON[s.status] ?? "?";
+              const color = (COLOR[s.status] ?? "white") as any;
+              const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
+              const stage = (s.stage ?? "---").padEnd(10);
+              const age = ago(s.created_at).padStart(4);
+              return <Text>{" "} <Text color={color}>{icon}</Text>{` ${summary} ${stage} ${age}`}</Text>;
+            }}
+            renderChildren={(s) => {
+              // fork children
+              const children = sessions.filter(c => c.parent_id === s.id);
+              if (children.length === 0) return null;
+              return children.map(child => {
+                const ci = ICON[child.status] ?? "?";
+                const cc = (COLOR[child.status] ?? "white") as any;
+                const cs = (child.summary ?? "---").slice(0, 20);
+                return <Text key={child.id} dimColor>{"   | "}<Text color={cc}>{ci}</Text>{` ${cs}`}</Text>;
+              });
+            }}
+            sel={sel}
+            emptyMessage="No sessions. Press n to create."
+          />
+        }
         right={
           formOverlay ? formOverlay
           : moveMode ? (
@@ -231,7 +225,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
               }}
             />
           )
-          : <SessionDetail session={selected} sessions={sessions} />
+          : <SessionDetail session={selected} sessions={sessions} pane={pane} />
         }
       />
       {status.message && (
@@ -243,83 +237,15 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
   );
 }
 
-// ── List ────────────────────────────────────────────────────────────────────
-
-interface SessionsListProps {
-  groups: Map<string, core.Session[]>;
-  sortedGroups: string[];
-  sessions: core.Session[];
-  parentIds: Set<string | null>;
-  sel: number;
-}
-
-function SessionsList({ groups, sortedGroups, sessions, parentIds, sel }: SessionsListProps) {
-  let displayIdx = 0;
-
-  if (sortedGroups.length === 0) {
-    return <Text dimColor>{"  No sessions. Press n to create."}</Text>;
-  }
-
-  return (
-    <Box flexDirection="column">
-      {sortedGroups.map((groupName) => {
-        const items = groups.get(groupName)!;
-        return (
-          <Box key={groupName || "__ungrouped"} flexDirection="column">
-            {groupName ? (
-              <Text backgroundColor="gray" color="white">{` ${groupName} `}</Text>
-            ) : null}
-            {items.map((s) => {
-              const idx = displayIdx++;
-              const isSel = idx === sel;
-              const icon = ICON[s.status] ?? "?";
-              const color = (COLOR[s.status] ?? "white") as any;
-              const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
-              const stage = (s.stage ?? "---").padEnd(10);
-              const age = ago(s.created_at).padStart(4);
-              const marker = isSel ? ">" : " ";
-
-              const line = ` ${marker} ${icon} ${summary} ${stage} ${age}`;
-              return (
-                <Box key={s.id} flexDirection="column">
-                  {isSel ? (
-                    <Text bold inverse>{line.padEnd(200)}</Text>
-                  ) : (
-                    <Text>
-                      {` ${marker} `}<Text color={color}>{icon}</Text>{` ${summary} ${stage} ${age}`}
-                    </Text>
-                  )}
-                  {parentIds.has(s.id) &&
-                    sessions
-                      .filter((c) => c.parent_id === s.id)
-                      .map((child) => {
-                        const ci = ICON[child.status] ?? "?";
-                        const cc = (COLOR[child.status] ?? "white") as any;
-                        const cs = (child.summary ?? "---").slice(0, 20);
-                        return (
-                          <Text key={child.id} dimColor>
-                            {"   | "}<Text color={cc}>{ci}</Text>{` ${cs}`}
-                          </Text>
-                        );
-                      })}
-                </Box>
-              );
-            })}
-          </Box>
-        );
-      })}
-    </Box>
-  );
-}
-
 // ── Detail ──────────────────────────────────────────────────────────────────
 
 interface SessionDetailProps {
   session: core.Session | null;
   sessions: core.Session[];
+  pane: "left" | "right";
 }
 
-function SessionDetail({ session: s }: SessionDetailProps) {
+function SessionDetail({ session: s, pane }: SessionDetailProps) {
   if (!s) {
     return <Text dimColor>{"  No session selected"}</Text>;
   }
@@ -349,7 +275,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
   );
 
   return (
-    <ScrollBox active={pane === "right"}>
+    <DetailPanel active={pane === "right"}>
       {/* Header */}
       <Text bold>{` ${s.ticket ?? s.id}  ${s.summary ?? ""}`}</Text>
       <Text> </Text>
@@ -405,19 +331,19 @@ function SessionDetail({ session: s }: SessionDetailProps) {
       {/* Info */}
       <Text> </Text>
       <SectionHeader title="Info" />
-      <Text><Text dimColor>{"  ID".padEnd(13)}</Text>{s.id}</Text>
-      <Text><Text dimColor>{"  Compute".padEnd(13)}</Text>{s.compute_name || "local"}</Text>
-      {s.repo && <Text><Text dimColor>{"  Repo".padEnd(13)}</Text>{s.repo}</Text>}
-      {s.branch && <Text><Text dimColor>{"  Branch".padEnd(13)}</Text>{s.branch}</Text>}
+      <KeyValue label="ID">{s.id}</KeyValue>
+      <KeyValue label="Compute">{s.compute_name || "local"}</KeyValue>
+      {s.repo && <KeyValue label="Repo">{s.repo}</KeyValue>}
+      {s.branch && <KeyValue label="Branch">{s.branch}</KeyValue>}
       {s.workdir && s.workdir !== s.repo && (
-        <Text><Text dimColor>{"  Workdir".padEnd(13)}</Text>{s.workdir}</Text>
+        <KeyValue label="Workdir">{s.workdir}</KeyValue>
       )}
       {(s.config as any)?.remoteWorkdir && (
-        <Text><Text dimColor>{"  Remote".padEnd(13)}</Text>{(s.config as any).remoteWorkdir}</Text>
+        <KeyValue label="Remote">{(s.config as any).remoteWorkdir}</KeyValue>
       )}
-      <Text><Text dimColor>{"  Flow".padEnd(13)}</Text>{s.flow}</Text>
-      {s.agent && <Text><Text dimColor>{"  Agent".padEnd(13)}</Text>{s.agent}</Text>}
-      {s.group_name && <Text><Text dimColor>{"  Group".padEnd(13)}</Text>{s.group_name}</Text>}
+      <KeyValue label="Flow">{s.flow}</KeyValue>
+      {s.agent && <KeyValue label="Agent">{s.agent}</KeyValue>}
+      {s.group_name && <KeyValue label="Group">{s.group_name}</KeyValue>}
 
       {/* Channel status */}
       {s.session_id && s.status === "running" && (
@@ -461,7 +387,7 @@ function SessionDetail({ session: s }: SessionDetailProps) {
           })}
         </>
       )}
-    </ScrollBox>
+    </DetailPanel>
   );
 }
 

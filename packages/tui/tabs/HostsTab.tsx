@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import { execFileSync } from "child_process";
@@ -10,7 +10,12 @@ import type { HostSnapshot } from "../../compute/types.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { MetricBar } from "../components/MetricBar.js";
+import { TreeList } from "../components/TreeList.js";
+import { DetailPanel } from "../components/DetailPanel.js";
+import { KeyValue } from "../components/KeyValue.js";
+import { DataTable } from "../components/DataTable.js";
 import { useHostMetrics } from "../hooks/useHostMetrics.js";
+import { useListNavigation } from "../hooks/useListNavigation.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
@@ -24,17 +29,10 @@ interface HostsTabProps extends StoreData {
 }
 
 export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: asyncState, onShowForm, formOverlay }: HostsTabProps) {
-  const [sel, setSel] = useState(0);
-  const status = useStatusMessage();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { sel } = useListNavigation(hosts.length, { active: pane === "left" && !formOverlay && !confirmDelete });
+  const status = useStatusMessage();
   const { snapshots, logs, addLog } = useHostMetrics(hosts, true);
-
-  // Clamp selection when list shrinks (e.g. after deletion)
-  useEffect(() => {
-    if (hosts.length > 0) {
-      setSel((s) => Math.min(s, hosts.length - 1));
-    }
-  }, [hosts.length]);
 
   const selected = hosts[sel] ?? null;
 
@@ -54,15 +52,7 @@ export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: as
       return;
     }
 
-    if (input === "j" || key.downArrow) {
-      setSel((s) => Math.min(s + 1, hosts.length - 1));
-    } else if (input === "k" || key.upArrow) {
-      setSel((s) => Math.max(s - 1, 0));
-    } else if (input === "g") {
-      setSel(0);
-    } else if (input === "G") {
-      setSel(Math.max(0, hosts.length - 1));
-    } else if (key.return) {
+    if (key.return) {
       if (selected && (selected.status === "stopped" || selected.status === "destroyed")) {
         const provider = getProvider(selected.provider);
         if (!provider) return;
@@ -167,13 +157,31 @@ export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: as
         focus={pane}
         leftTitle="Hosts"
         rightTitle="Details"
-        left={<HostsList hosts={hosts} sel={sel} />}
+        left={
+          <TreeList
+            items={hosts}
+            groupBy={h => h.provider}
+            renderRow={(h) => {
+              const icon = h.status === "destroyed" ? "✕" : h.status === "running" ? "●" : "○";
+              const marker = hosts.indexOf(h) === sel ? ">" : " ";
+              return ` ${marker} ${icon} ${h.name.padEnd(16)} ${h.provider}`;
+            }}
+            renderColoredRow={(h) => {
+              const iconColor = (h.status === "running" ? "green" : h.status === "provisioning" ? "yellow" : h.status === "destroyed" ? "red" : "gray") as any;
+              const icon = h.status === "destroyed" ? "✕" : h.status === "running" ? "●" : "○";
+              return <Text>{" "} <Text color={iconColor}>{icon}</Text>{` ${h.name.padEnd(16)} ${h.provider}`}</Text>;
+            }}
+            sel={sel}
+            emptyMessage="No hosts configured."
+          />
+        }
         right={formOverlay ??
           <HostDetail
             host={selected}
             snapshot={selected ? snapshots.get(selected.name) : undefined}
             hostLogs={selected ? logs.get(selected.name) : undefined}
             sessions={sessions}
+            pane={pane}
           />
         }
       />
@@ -186,47 +194,6 @@ export function HostsTab({ hosts, sessions, refreshing, refresh, pane, async: as
   );
 }
 
-// ── List ────────────────────────────────────────────────────────────────────
-
-interface HostsListProps {
-  hosts: core.Host[];
-  sel: number;
-}
-
-function HostsList({ hosts, sel }: HostsListProps) {
-  if (hosts.length === 0) {
-    return <Text dimColor>{"  No hosts configured."}</Text>;
-  }
-
-  return (
-    <Box flexDirection="column">
-      {hosts.map((h, i) => {
-        const isSel = i === sel;
-        const iconColor = (
-          h.status === "running" ? "green"
-          : h.status === "provisioning" ? "yellow"
-          : h.status === "destroyed" ? "red"
-          : "gray"
-        ) as any;
-        const icon = h.status === "destroyed" ? "✕" : h.status === "running" ? "●" : "○";
-        const ip = (h.config as Record<string, unknown>).ip ?? "";
-        const marker = isSel ? ">" : " ";
-        const content = `${marker} `;
-
-        const line = ` ${content}${icon} ${h.name.padEnd(16)} ${h.provider}`;
-        return isSel ? (
-          <Text key={h.name} bold inverse>{line.padEnd(200)}</Text>
-        ) : (
-          <Text key={h.name}>
-            {` ${content}`}<Text color={iconColor}>{icon}</Text>
-            {` ${h.name.padEnd(16)} ${h.provider}`}
-          </Text>
-        );
-      })}
-    </Box>
-  );
-}
-
 // ── Detail ──────────────────────────────────────────────────────────────────
 
 interface HostDetailProps {
@@ -234,9 +201,10 @@ interface HostDetailProps {
   snapshot?: HostSnapshot;
   hostLogs?: string[];
   sessions: core.Session[];
+  pane: "left" | "right";
 }
 
-function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) {
+function HostDetail({ host: h, snapshot, hostLogs, sessions, pane }: HostDetailProps) {
   if (!h) {
     return <Text dimColor>{"  No host selected"}</Text>;
   }
@@ -252,10 +220,10 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
   const cloudInitDone = cfg.cloud_init_done === true;
 
   return (
-    <Box flexDirection="column">
+    <DetailPanel active={pane === "right"}>
       {/* Header */}
       <Text bold>{` ${h.name}`}<Text dimColor>{`  ${h.provider}`}</Text></Text>
-      {cfg.instanceType && <Text><Text dimColor>{"  Instance  "}</Text>{String(cfg.instanceType)}</Text>}
+      {cfg.instanceType && <KeyValue label="Instance" width={12}>{String(cfg.instanceType)}</KeyValue>}
 
       {/* Status */}
       {h.status === "running" && h.provider === "ec2" ? (
@@ -265,10 +233,10 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
           <Text color="yellow">{"  running - cloud-init in progress..."}</Text>
         )
       ) : (
-        <Text><Text dimColor>{"  Status    "}</Text><Text color={statusColor}>{h.status}</Text></Text>
+        <KeyValue label="Status" width={12}><Text color={statusColor}>{h.status}</Text></KeyValue>
       )}
 
-      {cfg.ip && <Text><Text dimColor>{"  IP        "}</Text>{String(cfg.ip)}{cfg.hourlyRate ? <Text dimColor>{`  ($${Number(cfg.hourlyRate).toFixed(2)}/hr)`}</Text> : null}</Text>}
+      {cfg.ip && <KeyValue label="IP" width={12}><Text>{String(cfg.ip)}{cfg.hourlyRate ? <Text dimColor>{`  ($${Number(cfg.hourlyRate).toFixed(2)}/hr)`}</Text> : null}</Text></KeyValue>}
 
       {cfg.last_error && (
         <>
@@ -301,28 +269,24 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
             suffix={`${snapshot.metrics.diskPct.toFixed(1)}%`}
           />
           <Text> </Text>
-          <Text>
-            <Text dimColor>{"  Net RX  "}</Text>{`${snapshot.metrics.netRxMb.toFixed(1)} MB`}
-            <Text dimColor>{"   TX  "}</Text>{`${snapshot.metrics.netTxMb.toFixed(1)} MB`}
-          </Text>
-          <Text>
-            <Text dimColor>{"  Uptime  "}</Text>{snapshot.metrics.uptime}
-            <Text dimColor>{"   Idle  "}</Text>{`${snapshot.metrics.idleTicks} ticks`}
-          </Text>
+          <KeyValue label="Net RX" width={10}><Text>{`${snapshot.metrics.netRxMb.toFixed(1)} MB`}<Text dimColor>{"   TX  "}</Text>{`${snapshot.metrics.netTxMb.toFixed(1)} MB`}</Text></KeyValue>
+          <KeyValue label="Uptime" width={10}><Text>{snapshot.metrics.uptime}<Text dimColor>{"   Idle  "}</Text>{`${snapshot.metrics.idleTicks} ticks`}</Text></KeyValue>
 
           {/* Sessions */}
           {snapshot.sessions.length > 0 && (
             <>
               <Text> </Text>
               <SectionHeader title="Sessions" />
-              <Text dimColor>
-                {`  ${"Name".padEnd(18)} ${"Status".padEnd(10)} ${"Mode".padEnd(8)} ${"CPU".padEnd(6)} ${"MEM"}`}
-              </Text>
-              {snapshot.sessions.map((s, i) => (
-                <Text key={i}>
-                  {`  ${s.name.padEnd(18)} ${s.status.padEnd(10)} ${s.mode.padEnd(8)} ${String(s.cpu).padEnd(6)} ${String(s.mem)}`}
-                </Text>
-              ))}
+              <DataTable
+                columns={[
+                  { key: "name", label: "Name", width: 18 },
+                  { key: "status", label: "Status", width: 10 },
+                  { key: "mode", label: "Mode", width: 8 },
+                  { key: "cpu", label: "CPU", width: 6 },
+                  { key: "mem", label: "MEM" },
+                ]}
+                rows={snapshot.sessions}
+              />
             </>
           )}
 
@@ -331,14 +295,16 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
             <>
               <Text> </Text>
               <SectionHeader title="Processes" />
-              <Text dimColor>
-                {`  ${"PID".padEnd(8)} ${"CPU".padEnd(6)} ${"MEM".padEnd(6)} Command`}
-              </Text>
-              {snapshot.processes.slice(0, 10).map((p, i) => (
-                <Text key={i} wrap="truncate">
-                  {`  ${p.pid.padEnd(8)} ${p.cpu.padEnd(6)} ${p.mem.padEnd(6)} ${p.command}`}
-                </Text>
-              ))}
+              <DataTable
+                columns={[
+                  { key: "pid", label: "PID", width: 8 },
+                  { key: "cpu", label: "CPU", width: 6 },
+                  { key: "mem", label: "MEM", width: 6 },
+                  { key: "command", label: "Command" },
+                ]}
+                rows={snapshot.processes}
+                limit={10}
+              />
             </>
           )}
 
@@ -347,14 +313,15 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
             <>
               <Text> </Text>
               <SectionHeader title="Docker" />
-              <Text dimColor>
-                {`  ${"Name".padEnd(18)} ${"CPU".padEnd(8)} ${"MEM".padEnd(10)} Image`}
-              </Text>
-              {snapshot.docker.map((c, i) => (
-                <Text key={i} wrap="truncate">
-                  {`  ${c.name.padEnd(18)} ${c.cpu.padEnd(8)} ${c.memory.padEnd(10)} ${c.image}`}
-                </Text>
-              ))}
+              <DataTable
+                columns={[
+                  { key: "name", label: "Name", width: 18 },
+                  { key: "cpu", label: "CPU", width: 8 },
+                  { key: "memory", label: "MEM", width: 10 },
+                  { key: "image", label: "Image" },
+                ]}
+                rows={snapshot.docker}
+              />
             </>
           )}
         </>
@@ -406,6 +373,6 @@ function HostDetail({ host: h, snapshot, hostLogs, sessions }: HostDetailProps) 
         );
       })()}
 
-    </Box>
+    </DetailPanel>
   );
 }

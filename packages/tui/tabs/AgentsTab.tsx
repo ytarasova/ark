@@ -1,9 +1,11 @@
-import React, { useState } from "react";
-import { Box, Text, useInput } from "ink";
+import React from "react";
+import { Text } from "ink";
 import * as core from "../../core/index.js";
 import { SplitPane } from "../components/SplitPane.js";
+import { TreeList } from "../components/TreeList.js";
+import { DetailPanel } from "../components/DetailPanel.js";
 import { SectionHeader } from "../components/SectionHeader.js";
-import { ScrollBox } from "../components/ScrollBox.js";
+import { useListNavigation } from "../hooks/useListNavigation.js";
 import type { StoreData } from "../hooks/useStore.js";
 
 interface AgentsTabProps extends StoreData {
@@ -11,20 +13,7 @@ interface AgentsTabProps extends StoreData {
 }
 
 export function AgentsTab({ agents, pane }: AgentsTabProps) {
-  const [sel, setSel] = useState(0);
-
-  useInput((input, key) => {
-    if (pane === "right") return;
-    if (input === "j" || key.downArrow) {
-      setSel((s) => Math.min(s + 1, agents.length - 1));
-    } else if (input === "k" || key.upArrow) {
-      setSel((s) => Math.max(s - 1, 0));
-    } else if (input === "g") {
-      setSel(0);
-    } else if (input === "G") {
-      setSel(Math.max(0, agents.length - 1));
-    }
-  });
+  const { sel } = useListNavigation(agents.length, { active: pane === "left" });
 
   const selected = agents[sel] ?? null;
 
@@ -33,38 +22,20 @@ export function AgentsTab({ agents, pane }: AgentsTabProps) {
       focus={pane}
       leftTitle="Agents"
       rightTitle="Details"
-      left={<AgentsList agents={agents} sel={sel} />}
+      left={
+        <TreeList
+          items={agents}
+          renderRow={(a) => {
+            const marker = agents.indexOf(a) === sel ? ">" : " ";
+            const source = a._source === "user" ? "*" : " ";
+            return `${marker} ${source} ${a.name.padEnd(16)} ${a.model}`;
+          }}
+          sel={sel}
+          emptyMessage="No agents found."
+        />
+      }
       right={<AgentDetail agent={selected} pane={pane} />}
     />
-  );
-}
-
-// ── List ────────────────────────────────────────────────────────────────────
-
-interface AgentsListProps {
-  agents: ReturnType<typeof core.listAgents>;
-  sel: number;
-}
-
-function AgentsList({ agents, sel }: AgentsListProps) {
-  if (agents.length === 0) {
-    return <Text dimColor>{"  No agents found."}</Text>;
-  }
-
-  return (
-    <Box flexDirection="column">
-      {agents.map((a, i) => {
-        const isSel = i === sel;
-        const marker = isSel ? ">" : " ";
-        const source = a._source === "user" ? "*" : " ";
-        const content = `${marker} ${source} ${a.name.padEnd(16)} ${a.model}`;
-        return isSel ? (
-          <Text key={a.name} bold inverse>{` ${content}`.padEnd(200)}</Text>
-        ) : (
-          <Text key={a.name}>{` ${content}`}</Text>
-        );
-      })}
-    </Box>
   );
 }
 
@@ -95,7 +66,7 @@ function AgentDetail({ agent, pane }: AgentDetailProps) {
   ];
 
   return (
-    <ScrollBox active={pane === "right"}>
+    <DetailPanel active={pane === "right"}>
       <Text bold>{` ${a.name}`}<Text dimColor>{` (${a._source})`}</Text></Text>
       {a.description && <Text dimColor>{` ${a.description}`}</Text>}
 
@@ -126,6 +97,6 @@ function AgentDetail({ agent, pane }: AgentDetailProps) {
           ))}
         </>
       )}
-    </ScrollBox>
+    </DetailPanel>
   );
 }
