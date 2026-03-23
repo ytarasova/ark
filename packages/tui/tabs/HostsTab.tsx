@@ -1,5 +1,8 @@
 import React, { useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput, useApp } from "ink";
+import { execFileSync } from "child_process";
+import { join } from "path";
+import { homedir } from "os";
 import * as core from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
 import type { HostSnapshot } from "../../compute/types.js";
@@ -17,6 +20,7 @@ interface HostsTabProps extends StoreData {
 }
 
 export function HostsTab({ hosts, sessions, async: asyncState, onShowForm }: HostsTabProps) {
+  const { exit } = useApp();
   const [sel, setSel] = useState(0);
   const status = useStatusMessage();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -100,9 +104,16 @@ export function HostsTab({ hosts, sessions, async: asyncState, onShowForm }: Hos
     } else if (input === "a") {
       if (selected?.status === "running") {
         const ip = (selected.config as any)?.ip;
-        if (ip) {
-          status.show(`Run: ssh ubuntu@${ip}`);
-        }
+        if (!ip) return;
+        exit();
+        process.stdout.write("\x1b[?1049l\x1b[?25h");
+        const keyPath = join(homedir(), ".ssh", `ark-${selected.name}`);
+        try {
+          execFileSync("ssh", ["-i", keyPath, "-o", "StrictHostKeyChecking=no", `ubuntu@${ip}`], { stdio: "inherit" });
+        } catch { /* user exited */ }
+        process.stdout.write("\x1b[?1049h\x1b[?25l");
+        execFileSync(process.execPath, [process.argv[1]], { stdio: "inherit" });
+        process.exit(0);
       }
     } else if (input === "n") {
       onShowForm();

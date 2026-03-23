@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text, useInput, useApp } from "ink";
+import { execFileSync } from "child_process";
 import * as core from "../../core/index.js";
 import { ICON, COLOR } from "../constants.js";
 import { ago, hms } from "../helpers.js";
@@ -15,6 +16,7 @@ interface SessionsTabProps extends StoreData {
 }
 
 export function SessionsTab({ sessions, async: asyncState, onShowForm }: SessionsTabProps) {
+  const { exit } = useApp();
   const [sel, setSel] = useState(0);
   const status = useStatusMessage();
 
@@ -88,8 +90,21 @@ export function SessionsTab({ sessions, async: asyncState, onShowForm }: Session
       }
     } else if (input === "a") {
       if (selected?.session_id) {
-        const cmd = core.attachCommand(selected.session_id);
-        status.show(`Run: ${cmd}`);
+        // Verify tmux session exists
+        if (!core.sessionExists(selected.session_id)) {
+          status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
+          return;
+        }
+        // Exit Ink, attach to tmux, re-launch TUI after detach
+        exit();
+        process.stdout.write("\x1b[?1049l\x1b[?25h"); // exit alt screen
+        try {
+          execFileSync("tmux", ["attach", "-t", selected.session_id], { stdio: "inherit" });
+        } catch { /* user detached */ }
+        // Re-launch TUI
+        process.stdout.write("\x1b[?1049h\x1b[?25l"); // re-enter alt screen
+        execFileSync(process.execPath, [process.argv[1]], { stdio: "inherit" });
+        process.exit(0);
       }
     } else if (input === "n") {
       onShowForm();
@@ -299,6 +314,8 @@ function SessionDetail({ session: s }: SessionDetailProps) {
       </Text>
       <Text><Text dimColor>{"  Compute".padEnd(13)}</Text>{s.compute_name || "local"}</Text>
       {s.repo && <Text><Text dimColor>{"  Repo".padEnd(13)}</Text>{s.repo}</Text>}
+      {s.branch && <Text><Text dimColor>{"  Branch".padEnd(13)}</Text>{s.branch}</Text>}
+      {s.workdir && <Text><Text dimColor>{"  Workdir".padEnd(13)}</Text>{s.workdir}</Text>}
       {s.branch && <Text><Text dimColor>{"  Branch".padEnd(13)}</Text>{s.branch}</Text>}
       <Text><Text dimColor>{"  Pipeline".padEnd(13)}</Text>{s.pipeline}</Text>
       {s.agent && <Text><Text dimColor>{"  Agent".padEnd(13)}</Text>{s.agent}</Text>}
