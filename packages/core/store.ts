@@ -13,17 +13,33 @@ import { randomBytes } from "crypto";
 import { mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import {
+  getContext, getDb as getDbFromContext, closeDb,
+  createTestContext, setContext, resetContext,
+  type StoreContext, type TestContext,
+} from "./context.js";
 
-// ── Paths ───────────────────────────────────────────────────────────────────
-// Tests use ARK_TEST_DIR env var to isolate from production state
+// ── Paths (derived from active context) ─────────────────────────────────────
 
-const isTest = process.env.NODE_ENV === "test" || !!process.env.ARK_TEST_DIR;
+export const get = {
+  get ARK_DIR() { return getContext().arkDir; },
+  get DB_PATH() { return getContext().dbPath; },
+  get TRACKS_DIR() { return getContext().tracksDir; },
+  get WORKTREES_DIR() { return getContext().worktreesDir; },
+};
+
+// Backward-compat: direct exports that read from context at call time
+export function getArkDir() { return getContext().arkDir; }
+
+// Legacy constants — still work via env var for existing code
 const baseDir = process.env.ARK_TEST_DIR ?? join(homedir(), ".ark");
-
 export const ARK_DIR = baseDir;
 export const DB_PATH = join(ARK_DIR, "ark.db");
 export const TRACKS_DIR = join(ARK_DIR, "tracks");
 export const WORKTREES_DIR = join(ARK_DIR, "worktrees");
+
+// Re-export context utilities for tests
+export { createTestContext, setContext, resetContext, closeDb, type TestContext };
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -75,28 +91,27 @@ export interface Host {
 
 // ── Database ────────────────────────────────────────────────────────────────
 
-let _db: Database | null = null;
-
 function now(): string {
   return new Date().toISOString();
 }
 
-function ensureDirs(): void {
-  for (const dir of [ARK_DIR, TRACKS_DIR, WORKTREES_DIR]) {
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  }
-}
+const _initialized = new WeakSet<Database>();
 
 export function getDb(): Database {
-  if (_db) return _db;
-  ensureDirs();
-  _db = new Database(DB_PATH);
-  _db.run("PRAGMA journal_mode = WAL");
-  _db.run("PRAGMA foreign_keys = ON");
-  _db.run("PRAGMA busy_timeout = 10000");
-  initSchema(_db);
-  ensureLocalHost();
-  return _db;
+  const db = getDbFromContext();
+  if (!_initialized.has(db)) {
+    _initialized.add(db); // mark BEFORE init to prevent recursion
+    initSchema(db);
+    // Ensure local host exists (use db directly, not getDb)
+    const row = db.prepare("SELECT name FROM hosts WHERE name = 'local'").get();
+    if (!row) {
+      const ts = now();
+      db.prepare(
+        "INSERT OR IGNORE INTO hosts (name, provider, status, config, created_at, updated_at) VALUES ('local', 'local', 'running', '{}', ?, ?)"
+      ).run(ts, ts);
+    }
+  }
+  return db;
 }
 
 function initSchema(db: Database): void {

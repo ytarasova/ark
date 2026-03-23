@@ -9,8 +9,12 @@ export {
   logEvent, getEvents, getChildren, getGroups, claimSession,
   createHost, getHost, listHosts, updateHost, mergeHostConfig, deleteHost,
   sessionChannelPort,
-  type Session, type Event, type Host,
+  createTestContext, setContext, resetContext, closeDb,
+  type Session, type Event, type Host, type TestContext,
 } from "./store.js";
+
+// Context (DI)
+export { getContext, type StoreContext } from "./context.js";
 
 // Session lifecycle (the main API)
 export {
