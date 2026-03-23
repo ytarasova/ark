@@ -108,17 +108,27 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Fork+exec: replace this process with tmux attach.
-        // Mute Ink, then exec — on detach, returns to parent shell.
+        // Attach: mute Ink rendering, run tmux as child, resume Ink after
         const sid = selected.session_id;
+        const origWrite = process.stdout.write;
         process.stdout.write = (() => true) as any;
-        process.stderr.write = (() => true) as any;
+
         setImmediate(() => {
-          const { exitCode } = Bun.spawnSync(
-            ["bash", "-c", `exec tmux attach -t '${sid}'`],
-            { stdin: "inherit", stdout: "inherit", stderr: "inherit" },
-          );
-          process.exit(exitCode ?? 0);
+          // Restore stdout for tmux to use
+          process.stdout.write = origWrite;
+          // Clear screen
+          process.stdout.write("\x1b[2J\x1b[H");
+
+          // Run tmux as a child process with inherited stdio
+          Bun.spawnSync(["tmux", "attach", "-t", sid], {
+            stdin: "inherit",
+            stdout: "inherit",
+            stderr: "inherit",
+          });
+
+          // After detach: clear and let Ink re-render
+          process.stdout.write("\x1b[2J\x1b[H");
+          status.show("Detached from session");
         });
       }
     } else if (input === "n") {
