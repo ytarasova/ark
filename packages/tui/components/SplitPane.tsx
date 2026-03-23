@@ -8,13 +8,15 @@ interface SplitPaneProps {
   right: React.ReactNode;
   leftTitle?: string;
   rightTitle?: string;
+  leftWidth?: string;
   focus?: Pane;
 }
 
-export function SplitPane({ left, right, leftTitle, rightTitle, focus = "left" }: SplitPaneProps) {
+export function SplitPane({ left, right, leftTitle, rightTitle, leftWidth = "30%", focus = "left" }: SplitPaneProps) {
+  const rightWidth = `${100 - parseInt(leftWidth)}%`;
   return (
     <Box flexGrow={1}>
-      <Box flexDirection="column" width="40%"
+      <Box flexDirection="column" width={leftWidth}
         borderStyle="single"
         borderColor={focus === "left" ? "cyan" : "gray"}
         paddingX={1}>
@@ -30,7 +32,7 @@ export function SplitPane({ left, right, leftTitle, rightTitle, focus = "left" }
           {left}
         </Box>
       </Box>
-      <Box flexDirection="column" width="60%"
+      <Box flexDirection="column" width={rightWidth}
         borderStyle="single"
         borderColor={focus === "right" ? "cyan" : "gray"}
         paddingX={1}>

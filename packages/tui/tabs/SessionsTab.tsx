@@ -207,6 +207,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
       {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
         focus={pane}
+        leftWidth="35%"
         leftTitle="Sessions"
         rightTitle="Details"
         left={<SessionsList
