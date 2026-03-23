@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { existsSync } from "fs";
 import { resolve as resolvePath, basename } from "path";
-import { execFileSync } from "child_process";
 import * as core from "../../core/index.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import { PathInput, getPathCompletions } from "../components/PathInput.js";
@@ -13,8 +12,7 @@ import { generateName } from "../helpers.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
-type Step = "summary" | "repoSource" | "repo" | "isolation" | "group" | "host" | "flow";
-type RepoSource = "local" | "github" | "recent";
+type Field = "name" | "repo" | "isolation" | "group" | "host" | "flow";
 
 interface NewSessionFormProps {
   store: StoreData;
@@ -22,196 +20,81 @@ interface NewSessionFormProps {
   onDone: () => void;
 }
 
-const REPO_SOURCE_CHOICES = [
-  { label: "Local directory", value: "local" },
-  { label: "GitHub repo", value: "github" },
-  { label: "Recent repos", value: "recent" },
+const FIELDS: Field[] = ["name", "repo", "isolation", "group", "host", "flow"];
+
+const ISOLATION_CHOICES = [
+  { label: "Git worktree (isolated)", value: "worktree" },
+  { label: "In-place (direct)", value: "inplace" },
 ];
-
-interface GitHubRepo {
-  label: string;
-  value: string;
-}
-
-function fetchGitHubRepos(): GitHubRepo[] {
-  try {
-    const args = [
-      "repo",
-      "list",
-      "--json",
-      "nameWithOwner,description",
-      "--limit",
-      "20",
-    ];
-    const output = execFileSync("gh", args, {
-      encoding: "utf-8",
-      timeout: 10000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    const repos = JSON.parse(output);
-    return repos.map((r: any) => ({
-      label: `${r.nameWithOwner}${r.description ? ` - ${r.description.slice(0, 40)}` : ""}`,
-      value: r.nameWithOwner,
-    }));
-  } catch {
-    return [];
-  }
-}
 
 export function NewSessionForm({
   store,
   async: asyncState,
   onDone,
 }: NewSessionFormProps) {
-  const [step, setStep] = useState<Step>("summary");
-  const [summary, setSummary] = useState(generateName());
-  const [repoSource, setRepoSource] = useState<RepoSource>("local");
+  const [active, setActive] = useState<Field>("name");
+  const [name, setName] = useState(generateName());
   const [repoPath, setRepoPath] = useState(process.cwd());
-  const [computeName, setComputeName] = useState("");
-  const [useWorktree, setUseWorktree] = useState(true);
+  const [isolation, setIsolation] = useState("worktree");
   const [groupName, setGroupName] = useState("");
-  const [groupMode, setGroupMode] = useState<"pick" | "new">("pick");
+  const [hostName, setHostName] = useState("local");
+  const [flowName, setFlowName] = useState("bare");
 
-  // GitHub repos: loaded async to avoid blocking the TUI
-  const [ghRepos, setGhRepos] = useState<GitHubRepo[]>([]);
-  const [ghLoading, setGhLoading] = useState(false);
-  const [ghError, setGhError] = useState("");
+  const isGitRepo = useMemo(() => {
+    const rp = resolvePath(repoPath);
+    return existsSync(rp) && existsSync(resolvePath(rp, ".git"));
+  }, [repoPath]);
 
-  // Recent repos
-  const recentRepos = useMemo(() => getRecentRepos(), []);
-  const recentChoices = useMemo(
-    () => recentRepos.slice(0, 10).map((r) => ({ label: r, value: r })),
-    [recentRepos],
+  // Available fields (skip isolation for non-git repos)
+  const fields = useMemo(
+    () => isGitRepo ? FIELDS : FIELDS.filter(f => f !== "isolation"),
+    [isGitRepo],
   );
 
-  // Path completions for tab handler
-  const completions = useMemo(
-    () =>
-      step === "repo" && repoSource === "local"
-        ? getPathCompletions(repoPath)
-        : [],
-    [step, repoSource, repoPath],
+  const hostChoices = useMemo(() =>
+    store.hosts.map(h => ({
+      label: h.provider === "local" ? "local" : `${h.name} (${h.provider})`,
+      value: h.name,
+    })),
+    [store.hosts],
   );
+
+  const flowChoices = useMemo(() =>
+    store.flows.map(p => ({ label: p.name, value: p.name })),
+    [store.flows],
+  );
+
+  const groupChoices = useMemo(() => {
+    const existing = core.getGroups();
+    return [
+      { label: "(none)", value: "" },
+      ...existing.map(g => ({ label: g, value: g })),
+    ];
+  }, []);
+
+  // Navigation
+  const moveField = (dir: 1 | -1) => {
+    const idx = fields.indexOf(active);
+    const next = idx + dir;
+    if (next >= 0 && next < fields.length) setActive(fields[next]);
+  };
 
   useInput((input, key) => {
-    if (key.escape) {
-      // If we're in the repo sub-step, go back to source selection
-      if (step === "repo") {
-        setStep("repoSource");
-        return;
-      }
-      onDone();
+    if (key.escape) { onDone(); return; }
+
+    // Ctrl+J / Ctrl+K to move between fields
+    if (input === "j" && key.ctrl) { moveField(1); return; }
+    if (input === "k" && key.ctrl) { moveField(-1); return; }
+
+    // Tab completion for repo path
+    if (active === "repo" && key.tab) {
+      const completions = getPathCompletions(repoPath);
+      if (completions.length > 0) setRepoPath(completions[0] + "/");
       return;
-    }
-    // Tab completion for local directory path
-    if (
-      step === "repo" &&
-      repoSource === "local" &&
-      key.tab &&
-      completions.length > 0
-    ) {
-      setRepoPath(completions[0] + "/");
     }
   });
 
-  // Load GitHub repos when source is selected
-  useEffect(() => {
-    if (step === "repo" && repoSource === "github" && ghRepos.length === 0 && !ghLoading) {
-      setGhLoading(true);
-      setGhError("");
-      // Run in a microtask so the "Loading..." text renders first
-      const timer = setTimeout(() => {
-        const repos = fetchGitHubRepos();
-        if (repos.length === 0) {
-          setGhError(
-            "No repos found. Is the GitHub CLI (gh) installed and authenticated?",
-          );
-        }
-        setGhRepos(repos);
-        setGhLoading(false);
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [step, repoSource, ghRepos.length, ghLoading]);
-
-  const hostChoices = store.hosts.map((h) => ({
-    label:
-      h.provider === "local"
-        ? "local (this machine)"
-        : `${h.name} (${h.provider})`,
-    value: h.name,
-  }));
-
-  const flowChoices = store.flows.map((p) => ({
-    label: p.name,
-    value: p.name,
-  }));
-
-  const handleSubmitSummary = () => {
-    setStep("repoSource");
-  };
-
-  const handleSelectRepoSource = (item: { label: string; value: string }) => {
-    const src = item.value as RepoSource;
-    setRepoSource(src);
-    setStep("repo");
-  };
-
-  const handleRepoSelected = (repo: string) => {
-    setRepoPath(repo);
-    addRecentRepo(repo);
-    // Only offer worktree choice for local git repos
-    const rp = resolvePath(repo);
-    if (existsSync(rp) && existsSync(resolvePath(rp, ".git"))) {
-      setStep("isolation");
-    } else {
-      setStep("group");
-    }
-  };
-
-  const handleSelectIsolation = (item: { label: string; value: string }) => {
-    setUseWorktree(item.value === "worktree");
-    setStep("group");
-  };
-
-  const existingGroups = core.getGroups();
-  const groupChoices = [
-    { label: "(none)", value: "__none__" },
-    ...existingGroups.map(g => ({ label: g, value: g })),
-    { label: "+ New group...", value: "__new__" },
-  ];
-
-  const handleSelectGroup = (item: { label: string; value: string }) => {
-    if (item.value === "__new__") {
-      setGroupMode("new");
-    } else {
-      setGroupName(item.value === "__none__" ? "" : item.value);
-      setStep("host");
-    }
-  };
-
-  const handleSubmitNewGroup = () => {
-    if (groupName.trim()) setStep("host");
-  };
-
-  const handleSubmitLocalRepo = () => {
-    handleRepoSelected(repoPath);
-  };
-
-  const handleSelectGitHubRepo = (item: { label: string; value: string }) => {
-    handleRepoSelected(item.value);
-  };
-
-  const handleSelectRecentRepo = (item: { label: string; value: string }) => {
-    handleRepoSelected(item.value);
-  };
-
-  const handleSelectHost = (item: { label: string; value: string }) => {
-    setComputeName(item.value);
-    setStep("flow");
-  };
-
-  const handleSelectFlow = (item: { label: string; value: string }) => {
+  const submit = () => {
     let workdir: string | undefined;
     let repo = repoPath || process.cwd();
     const rp = resolvePath(repo);
@@ -219,196 +102,142 @@ export function NewSessionForm({
       workdir = rp;
       if (repo === "." || repo === "./") repo = basename(rp);
     }
+    addRecentRepo(repoPath);
 
     let sessionId = "";
     submitForm({
       create: () => {
         const s = core.startSession({
-          summary: summary.trim() || generateName(),
+          summary: name.trim() || generateName(),
           repo,
-          flow: item.value,
+          flow: flowName,
           workdir,
-          compute_name: computeName || undefined,
+          compute_name: hostName || undefined,
           group_name: groupName || undefined,
-          config: { worktree: useWorktree },
+          config: { worktree: isolation === "worktree" },
         });
         sessionId = s.id;
       },
       onDone,
       asyncFollowUp: {
-        label: `Dispatching session`,
+        label: "Dispatching session",
         action: () => core.dispatch(sessionId).then(() => {}),
       },
       asyncState,
     });
   };
 
+  // Submit on Enter when on last field
+  const handleFieldSubmit = () => {
+    const idx = fields.indexOf(active);
+    if (idx === fields.length - 1) {
+      submit();
+    } else {
+      moveField(1);
+    }
+  };
+
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={2}
-      paddingY={1}
-    >
-      <Text bold color="cyan">
-        {" New Session "}
-      </Text>
-      <Text>{""}</Text>
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+      <Text bold color="cyan">{" New Session "}</Text>
+      <Text> </Text>
 
-      {step === "summary" && (
-        <Box flexDirection="column">
-          <Text>{"Session name:"}</Text>
-          <Box>
-            <Text color="cyan">{"> "}</Text>
-            <TextInputEnhanced
-              value={summary}
-              onChange={setSummary}
-              onSubmit={handleSubmitSummary}
-            />
-          </Box>
-          <Text dimColor>{"  Enter to continue, Esc to cancel"}</Text>
-        </Box>
-      )}
+      {/* Name */}
+      <FormField label="Name" active={active === "name"}>
+        <TextInputEnhanced
+          value={name}
+          onChange={setName}
+          onSubmit={handleFieldSubmit}
+          focus={active === "name"}
+        />
+      </FormField>
 
-      {step === "repoSource" && (
-        <Box flexDirection="column">
-          <Text dimColor>{`Session: ${summary}`}</Text>
-          <Text>{""}</Text>
-          <Text>{"Source:"}</Text>
-          <SelectMenu
-            items={REPO_SOURCE_CHOICES}
-            onSelect={handleSelectRepoSource}
-          />
-          <Text dimColor>{"  Esc to cancel"}</Text>
-        </Box>
-      )}
-
-      {step === "repo" && repoSource === "local" && (
-        <Box flexDirection="column">
-          <Text dimColor>{`Session: ${summary}`}</Text>
-          <Text>{""}</Text>
-          <Text>{"Repo path:"}</Text>
-          <PathInput
+      {/* Repo */}
+      <FormField label="Repo" active={active === "repo"}>
+        {active === "repo" ? (
+          <TextInputEnhanced
             value={repoPath}
             onChange={setRepoPath}
-            onSubmit={handleSubmitLocalRepo}
+            onSubmit={handleFieldSubmit}
+            focus={true}
           />
-        </Box>
-      )}
+        ) : (
+          <Text>{repoPath}</Text>
+        )}
+      </FormField>
 
-      {step === "repo" && repoSource === "github" && (
-        <Box flexDirection="column">
-          <Text dimColor>{`Session: ${summary}`}</Text>
-          <Text>{""}</Text>
-          <Text>{"GitHub repo:"}</Text>
-          {ghLoading && <Text color="yellow">{"  Loading repos..."}</Text>}
-          {ghError && <Text color="red">{`  ${ghError}`}</Text>}
-          {!ghLoading && !ghError && ghRepos.length > 0 && (
+      {/* Isolation (only for git repos) */}
+      {isGitRepo && (
+        <FormField label="Isolation" active={active === "isolation"}>
+          {active === "isolation" ? (
             <SelectMenu
-              items={ghRepos}
-              onSelect={handleSelectGitHubRepo}
-              limit={10}
-            />
-          )}
-          <Text dimColor>{"  Esc to go back"}</Text>
-        </Box>
-      )}
-
-      {step === "repo" && repoSource === "recent" && (
-        <Box flexDirection="column">
-          <Text dimColor>{`Session: ${summary}`}</Text>
-          <Text>{""}</Text>
-          <Text>{"Recent repos:"}</Text>
-          {recentChoices.length > 0 ? (
-            <SelectMenu
-              items={recentChoices}
-              onSelect={handleSelectRecentRepo}
-              limit={10}
+              items={ISOLATION_CHOICES}
+              onSelect={(item) => { setIsolation(item.value); moveField(1); }}
             />
           ) : (
-            <Text color="yellow">{"  No recent repos yet"}</Text>
+            <Text>{isolation === "worktree" ? "worktree" : "in-place"}</Text>
           )}
-          <Text dimColor>{"  Esc to go back"}</Text>
-        </Box>
+        </FormField>
       )}
 
-      {step === "isolation" && (
-        <Box flexDirection="column">
-          <Text dimColor>{`Session: ${summary}`}</Text>
-          <Text dimColor>{`Repo: ${repoPath}`}</Text>
-          <Text>{""}</Text>
-          <Text>{"Working copy:"}</Text>
+      {/* Group */}
+      <FormField label="Group" active={active === "group"}>
+        {active === "group" ? (
           <SelectMenu
-            items={[
-              { label: "Git worktree  (isolated branch, safe)", value: "worktree" },
-              { label: "In-place      (work directly in repo)", value: "inplace" },
-            ]}
-            onSelect={handleSelectIsolation}
+            items={groupChoices}
+            onSelect={(item) => { setGroupName(item.value); moveField(1); }}
           />
-          <Text dimColor>{"  Esc to cancel"}</Text>
-        </Box>
-      )}
+        ) : (
+          <Text>{groupName || "(none)"}</Text>
+        )}
+      </FormField>
 
-      {step === "group" && groupMode === "pick" && (
-        <Box flexDirection="column">
-          <Text dimColor>{`Session: ${summary}`}</Text>
-          <Text dimColor>{`Repo: ${repoPath}`}</Text>
-          <Text>{""}</Text>
-          <Text>{"Group:"}</Text>
-          <SelectMenu items={groupChoices} onSelect={handleSelectGroup} />
-          <Text dimColor>{"  Esc to cancel"}</Text>
-        </Box>
-      )}
+      {/* Host */}
+      <FormField label="Host" active={active === "host"}>
+        {active === "host" ? (
+          <SelectMenu
+            items={hostChoices}
+            onSelect={(item) => { setHostName(item.value); moveField(1); }}
+          />
+        ) : (
+          <Text>{hostName || "local"}</Text>
+        )}
+      </FormField>
 
-      {step === "group" && groupMode === "new" && (
-        <Box flexDirection="column">
-          <Text dimColor>{`Session: ${summary}`}</Text>
-          <Text dimColor>{`Repo: ${repoPath}`}</Text>
-          <Text>{""}</Text>
-          <Text>{"New group name:"}</Text>
-          <Box>
-            <Text color="cyan">{"> "}</Text>
-            <TextInputEnhanced
-              value={groupName}
-              onChange={setGroupName}
-              onSubmit={handleSubmitNewGroup}
-              placeholder="Enter group name..."
-            />
-          </Box>
-          <Text dimColor>{"  Enter to continue, Esc to cancel"}</Text>
-        </Box>
-      )}
+      {/* Flow */}
+      <FormField label="Flow" active={active === "flow"}>
+        {active === "flow" ? (
+          <SelectMenu
+            items={flowChoices}
+            onSelect={(item) => { setFlowName(item.value); submit(); }}
+          />
+        ) : (
+          <Text>{flowName}</Text>
+        )}
+      </FormField>
 
-      {step === "host" && (
-        <Box flexDirection="column">
-          <Text dimColor>{`Session: ${summary}`}</Text>
-          <Text dimColor>{`Repo: ${repoPath}`}</Text>
-          <Text>{""}</Text>
-          <Text>{"Compute host:"}</Text>
-          <SelectMenu items={hostChoices} onSelect={handleSelectHost} />
-          <Text dimColor>{"  Esc to cancel"}</Text>
-        </Box>
-      )}
+      <Text> </Text>
+      <Text dimColor>{"  Ctrl+J/K:navigate  Enter:next/submit  Esc:cancel"}</Text>
+    </Box>
+  );
+}
 
-      {step === "flow" && (
-        <Box flexDirection="column">
-          <Text dimColor>{`Session: ${summary}`}</Text>
-          <Text dimColor>{`Repo: ${repoPath}`}</Text>
-          <Text dimColor>{`Host: ${computeName || "local"}`}</Text>
-          <Text>{""}</Text>
-          <Text>{"Flow:"}</Text>
-          {flowChoices.length > 0 ? (
-            <SelectMenu
-              items={flowChoices}
-              onSelect={handleSelectFlow}
-            />
-          ) : (
-            <Text color="red">{"  No flows available"}</Text>
-          )}
-          <Text dimColor>{"  Esc to cancel"}</Text>
-        </Box>
-      )}
+// ── Form Field ──────────────────────────────────────────────────────────────
+
+function FormField({ label, active, children }: {
+  label: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box>
+      <Text color={active ? "cyan" : "gray"}>
+        {active ? "> " : "  "}
+      </Text>
+      <Text color={active ? "white" : "gray"} bold={active}>
+        {`${label.padEnd(10)} `}
+      </Text>
+      {children}
     </Box>
   );
 }

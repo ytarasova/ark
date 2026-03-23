@@ -137,7 +137,7 @@ export function NewHostForm({ async: asyncState, onDone }: NewHostFormProps) {
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
       <Text bold color="cyan">{" New Host "}</Text>
-      <Text>{""}</Text>
+      <Text> </Text>
 
       {step === "name" && (
         <Box flexDirection="column">
