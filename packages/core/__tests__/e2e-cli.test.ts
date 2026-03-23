@@ -17,7 +17,7 @@ function ark(...args: string[]): string {
     cwd: ROOT,
     timeout: 15_000,
     stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, NO_COLOR: "1" },
+    env: { ...process.env, NO_COLOR: "1", ARK_TEST_DIR: process.env.ARK_TEST_DIR ?? "" },
   });
 }
 

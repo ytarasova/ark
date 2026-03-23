@@ -15,8 +15,12 @@ import { join } from "path";
 import { homedir } from "os";
 
 // ── Paths ───────────────────────────────────────────────────────────────────
+// Tests use ARK_TEST_DIR env var to isolate from production state
 
-export const ARK_DIR = join(homedir(), ".ark");
+const isTest = process.env.NODE_ENV === "test" || !!process.env.ARK_TEST_DIR;
+const baseDir = process.env.ARK_TEST_DIR ?? join(homedir(), ".ark");
+
+export const ARK_DIR = baseDir;
 export const DB_PATH = join(ARK_DIR, "ark.db");
 export const TRACKS_DIR = join(ARK_DIR, "tracks");
 export const WORKTREES_DIR = join(ARK_DIR, "worktrees");
