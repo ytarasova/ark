@@ -108,21 +108,15 @@ export function SessionsTab({ sessions, refreshing, async: asyncState, onShowFor
           status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
           return;
         }
-        // Link the agent's window into our tmux session, select it.
-        // When the user is done, Ctrl+B p returns to the TUI window.
         const sid = selected.session_id;
+        const cmd = `tmux attach -t ${sid}`;
+        // Copy to clipboard
         try {
           const { execFileSync: efs } = require("child_process");
-          // Link the agent session's window:0 into our session as a new window
-          efs("tmux", ["link-window", "-s", `${sid}:0`, "-a"],
-            { stdio: "pipe" });
-          // Select the newly linked window
-          efs("tmux", ["next-window"],
-            { stdio: "pipe" });
-          status.show(`Viewing agent. Ctrl+B p to return to TUI`);
-        } catch (e: any) {
-          const stderr = e?.stderr ?? e?.message ?? String(e);
-          status.show(`Attach error: ${stderr.slice(0, 80)}`);
+          efs("bash", ["-c", `echo -n '${cmd}' | pbcopy`], { stdio: "pipe" });
+          status.show(`Copied: ${cmd} (paste in new tab)`);
+        } catch {
+          status.show(cmd);
         }
       }
     } else if (input === "n") {
