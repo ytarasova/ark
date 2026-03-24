@@ -6,6 +6,8 @@ interface TreeListProps<T> {
   items: T[];
   /** Group items by this key. Ungrouped items go under "" group. */
   groupBy?: (item: T) => string;
+  /** Extra group names to show even if they have no items (empty buckets). */
+  emptyGroups?: string[];
   /** Render a single row as a plain string (for ListRow highlight). */
   renderRow: (item: T, selected: boolean) => string;
   /** Render colored version for unselected rows (optional). If not provided, uses renderRow. */
@@ -14,28 +16,25 @@ interface TreeListProps<T> {
   renderChildren?: (item: T) => React.ReactNode;
   /** Currently selected index (in the flat items array). */
   sel: number;
-  /** Message when list is empty. */
+  /** Message when list is empty and no groups exist. */
   emptyMessage?: string;
 }
 
 /**
  * Grouped or flat list for left panels. Items are grouped by a key,
  * each group gets a header. Flat lists = single unnamed group.
- * Selected row fills panel width via ListRow.
+ * Empty groups from emptyGroups prop are shown with "(empty)" label.
  */
 export function TreeList<T>({
   items,
   groupBy,
+  emptyGroups,
   renderRow,
   renderColoredRow,
   renderChildren,
   sel,
   emptyMessage = "No items.",
 }: TreeListProps<T>) {
-  if (items.length === 0) {
-    return <Text dimColor>{`  ${emptyMessage}`}</Text>;
-  }
-
   // Group items
   const groups = new Map<string, { item: T; flatIndex: number }[]>();
   items.forEach((item, i) => {
@@ -44,10 +43,19 @@ export function TreeList<T>({
     groups.get(key)!.push({ item, flatIndex: i });
   });
 
+  // Add empty groups that aren't already represented
+  for (const g of emptyGroups ?? []) {
+    if (!groups.has(g)) groups.set(g, []);
+  }
+
   // Sort: unnamed group first, then alphabetical
   const sortedKeys = [...groups.keys()].sort((a, b) =>
     a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)
   );
+
+  if (items.length === 0 && sortedKeys.filter(k => k !== "").length === 0) {
+    return <Text dimColor>{`  ${emptyMessage}`}</Text>;
+  }
 
   return (
     <Box flexDirection="column">
@@ -57,6 +65,9 @@ export function TreeList<T>({
           <Box key={groupName || "__ungrouped"} flexDirection="column">
             {groupName ? (
               <Text backgroundColor="gray" color="white">{` ${groupName} `}</Text>
+            ) : null}
+            {entries.length === 0 && groupName ? (
+              <Text dimColor>{"    (empty)"}</Text>
             ) : null}
             {entries.map(({ item, flatIndex }) => {
               const isSel = flatIndex === sel;

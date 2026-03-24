@@ -182,6 +182,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
           <TreeList
             items={topLevel}
             groupBy={s => s.group_name ?? ""}
+            emptyGroups={core.getGroups()}
             renderRow={(s, selected) => {
               const icon = ICON[s.status] ?? "?";
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
