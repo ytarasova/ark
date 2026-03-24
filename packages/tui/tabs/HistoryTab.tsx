@@ -28,6 +28,7 @@ export function HistoryTab({ pane, async: asyncState, refresh }: HistoryTabProps
   // Load Claude sessions on mount
   useEffect(() => {
     asyncState.run("Loading Claude sessions...", async () => {
+      await new Promise(r => setTimeout(r, 50)); // yield so spinner renders
       const sessions = core.listClaudeSessions({ limit: 50 });
       setClaudeSessions(sessions);
       if (sessions.length === 0) {
@@ -71,6 +72,7 @@ export function HistoryTab({ pane, async: asyncState, refresh }: HistoryTabProps
     // r — reload sessions list
     if (input === "r") {
       asyncState.run("Reloading Claude sessions...", async () => {
+        await new Promise(r => setTimeout(r, 50)); // yield so spinner renders
         const sessions = core.listClaudeSessions({ limit: 50 });
         setClaudeSessions(sessions);
         status.show(`Loaded ${sessions.length} Claude sessions`);
