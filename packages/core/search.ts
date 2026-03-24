@@ -134,6 +134,7 @@ function searchTranscriptsFiles(query: string, opts?: SearchOpts): SearchResult[
         if (!line.trim() || !line.toLowerCase().includes(lowerQuery)) continue;
         try {
           const entry = JSON.parse(line);
+          if (entry.type !== "user" && entry.type !== "assistant") continue;
           const text = extractText(entry);
           if (text.toLowerCase().includes(lowerQuery)) {
             results.push({

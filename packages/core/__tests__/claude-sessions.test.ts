@@ -17,11 +17,20 @@ function baseDir() {
   return join(ctx.arkDir, "claude-projects");
 }
 
-/** Write a fake JSONL transcript file under the test baseDir. */
+/** Minimum messages to pass the >1 message filter */
+const MIN_MSGS = [
+  { type: "user", message: { role: "user", content: "hello" }, timestamp: "2026-03-24T10:00:01Z" },
+  { type: "assistant", message: { role: "assistant", content: "hi" }, timestamp: "2026-03-24T10:00:02Z" },
+];
+
+/** Write a fake JSONL transcript file under the test baseDir. Ensures minimum 2 messages. */
 function writeTranscript(projectDirName: string, filename: string, lines: object[]) {
   const dir = join(baseDir(), projectDirName);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, filename), lines.map(l => JSON.stringify(l)).join("\n"));
+  // Ensure at least 2 user/assistant messages so session passes filter
+  const hasEnoughMsgs = lines.filter((l: any) => l.type === "user" || l.type === "assistant").length > 1;
+  const allLines = hasEnoughMsgs ? lines : [...lines, ...MIN_MSGS];
+  writeFileSync(join(dir, filename), allLines.map(l => JSON.stringify(l)).join("\n"));
 }
 
 beforeEach(() => {
@@ -110,12 +119,14 @@ describe("listClaudeSessions", () => {
 
   it("sorts by most recent activity first", async () => {
     writeTranscript("-proj-a", "old.jsonl", [
-      { type: "system", sessionId: "old", timestamp: "2026-01-01T00:00:00Z" },
-      { type: "user", message: { role: "user", content: "old task" }, timestamp: "2026-01-01T01:00:00Z" },
+      { type: "system", sessionId: "old", timestamp: "2025-01-01T00:00:00Z" },
+      { type: "user", message: { role: "user", content: "old task" }, timestamp: "2025-01-01T01:00:00Z" },
+      { type: "assistant", message: { role: "assistant", content: "ok" }, timestamp: "2025-01-01T01:01:00Z" },
     ]);
     writeTranscript("-proj-b", "new.jsonl", [
-      { type: "system", sessionId: "new", timestamp: "2026-03-24T10:00:00Z" },
-      { type: "user", message: { role: "user", content: "new task" }, timestamp: "2026-03-24T12:00:00Z" },
+      { type: "system", sessionId: "new", timestamp: "2026-12-01T10:00:00Z" },
+      { type: "user", message: { role: "user", content: "new task" }, timestamp: "2026-12-01T12:00:00Z" },
+      { type: "assistant", message: { role: "assistant", content: "ok" }, timestamp: "2026-12-01T12:01:00Z" },
     ]);
 
     const sessions = await listClaudeSessions({ baseDir: baseDir() });

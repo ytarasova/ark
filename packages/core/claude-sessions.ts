@@ -124,6 +124,9 @@ export async function listClaudeSessions(opts?: ListOpts): Promise<ClaudeSession
       const meta = parseTranscriptMeta(filePath);
       if (!meta) continue;
 
+      // Skip sessions with 1 or fewer messages — nothing useful
+      if (meta.messageCount <= 1) continue;
+
       sessions.push({
         ...meta,
         project: decodedProject,
