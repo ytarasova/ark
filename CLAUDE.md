@@ -10,6 +10,9 @@ make test             # bun test (NOT vitest — tests use bun:test)
 make dev              # tsc --watch
 make tui              # ark tui
 ./ark <command>       # run CLI directly via bun
+ark search <query>    # search sessions, events, messages (--transcripts for JSONL, --index to rebuild FTS5)
+ark index             # rebuild transcript FTS5 search index
+ark claude list       # list Claude Code sessions on disk (--project to filter)
 ```
 
 ## Project Structure
@@ -17,7 +20,7 @@ make tui              # ark tui
 ```
 packages/
   cli/       → Commander.js CLI entry (ark command)
-  core/      → Sessions, store (SQLite), flows, agents, channels, conductor
+  core/      → Sessions, store (SQLite), flows, agents, channels, conductor, search (FTS5), claude-sessions, app context, config
   compute/   → Providers: local, docker, ec2
   tui/       → React + Ink terminal dashboard
 agents/      → Agent YAML definitions (planner, implementer, reviewer, documenter, worker)
@@ -118,6 +121,8 @@ system_prompt: |
   Working on {repo}. Task: {summary}. Ticket: {ticket}.
 tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch]
 permission_mode: bypassPermissions
+env:
+  CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80"  # optional — env vars exported before claude launch
 ```
 
 Template variables: `{ticket}`, `{summary}`, `{workdir}`, `{repo}`, `{branch}` — substituted at dispatch.
@@ -142,35 +147,12 @@ stages:
 
 The TUI uses `useAsync` hook which provides `asyncState.run(label, fn)` — it queues work, shows a spinner with the label, and keeps the UI responsive.
 
-**In `useInput` handlers:**
 ```ts
-// WRONG — blocks the event loop, freezes UI
-if (input === "x") {
-  core.doSomething(); // ← NEVER do this
-}
+// useInput handlers: ALWAYS wrap I/O in asyncState.run()
+asyncState.run("Label...", async () => { await core.doThing(); status.show("Done"); refresh(); });
 
-// CORRECT — non-blocking with spinner
-if (input === "x") {
-  asyncState.run("Doing something...", async () => {
-    await core.doSomethingAsync();  // or sync wrapped in run()
-    status.show("Done");
-    refresh();
-  });
-}
-```
-
-**In component render bodies:**
-```ts
-// WRONG — I/O during render
-function MyComponent({ id }) {
-  const data = core.loadData(id); // ← NEVER do this in render
-
-// CORRECT — memoized or in useEffect
-function MyComponent({ id }) {
-  const data = useMemo(() => core.loadData(id), [id]);
-  // or
-  const [data, setData] = useState(null);
-  useEffect(() => { setData(core.loadData(id)); }, [id]);
+// Render bodies: ALWAYS use useMemo or useEffect for I/O
+const data = useMemo(() => core.loadData(id), [id]);
 ```
 
 **Rules:**
