@@ -44,5 +44,8 @@ export * from "./tmux.js";
 // Event bus
 export * from "./hooks.js";
 
+// Search
+export { searchSessions, searchTranscripts, type SearchResult, type SearchOpts } from "./search.js";
+
 // Conductor
 export { startConductor } from "./conductor.js";
