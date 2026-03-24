@@ -146,6 +146,18 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
     data: report as unknown as Record<string, unknown>,
   });
 
+  // Store as message for the TUI chat view
+  const content = report.type === "completed" ? (report as any).summary
+    : report.type === "question" ? (report as any).question
+    : report.type === "error" ? (report as any).error
+    : (report as any).message ?? JSON.stringify(report);
+  store.addMessage({
+    session_id: sessionId,
+    role: "agent",
+    content,
+    type: report.type,
+  });
+
   // Emit to event bus
   eventBus.emit(`agent_${report.type}`, sessionId, {
     stage: report.stage,

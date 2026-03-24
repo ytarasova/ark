@@ -172,6 +172,18 @@ function initSchema(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider);
     CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status);
 
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'text',
+      read INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
+
     CREATE TABLE IF NOT EXISTS groups (
       name TEXT PRIMARY KEY,
       created_at TEXT NOT NULL
@@ -487,4 +499,52 @@ export function deleteGroup(name: string): void {
 
 export function sessionChannelPort(sessionId: string): number {
   return 19200 + parseInt(sessionId.replace("s-", ""), 16) % 1000;
+}
+
+// ── Messages ─────────────────────────────────────────────────────────────────
+
+export interface Message {
+  id: number;
+  session_id: string;
+  role: string;    // "user" | "agent" | "system"
+  content: string;
+  type: string;    // "text" | "progress" | "question" | "completed" | "error"
+  read: boolean;
+  created_at: string;
+}
+
+export function addMessage(opts: {
+  session_id: string;
+  role: string;
+  content: string;
+  type?: string;
+}): Message {
+  const db = getDb();
+  const ts = now();
+  db.prepare(
+    "INSERT INTO messages (session_id, role, content, type, read, created_at) VALUES (?, ?, ?, ?, 0, ?)"
+  ).run(opts.session_id, opts.role, opts.content, opts.type ?? "text", ts);
+  const row = db.prepare("SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT 1").get(opts.session_id) as any;
+  return { ...row, read: !!row.read };
+}
+
+export function getMessages(sessionId: string, opts?: { limit?: number }): Message[] {
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT ?"
+  ).all(sessionId, opts?.limit ?? 50) as any[];
+  return rows.reverse().map(r => ({ ...r, read: !!r.read }));
+}
+
+export function getUnreadCount(sessionId: string): number {
+  const db = getDb();
+  const row = db.prepare(
+    "SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND role = 'agent' AND read = 0"
+  ).get(sessionId) as any;
+  return row?.count ?? 0;
+}
+
+export function markMessagesRead(sessionId: string): void {
+  const db = getDb();
+  db.prepare("UPDATE messages SET read = 1 WHERE session_id = ? AND read = 0").run(sessionId);
 }

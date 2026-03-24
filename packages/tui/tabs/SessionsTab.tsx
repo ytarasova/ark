@@ -192,7 +192,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
               const marker = topLevel.indexOf(s) === sel ? ">" : " ";
-              return ` ${marker} ${icon} ${summary} ${stage} ${age}`;
+              const unread = core.getUnreadCount(s.id);
+              const badge = unread > 0 ? ` (${unread})` : "";
+              return ` ${marker} ${icon} ${summary} ${stage} ${age}${badge}`;
             }}
             renderColoredRow={(s) => {
               const icon = ICON[s.status] ?? "?";
@@ -200,7 +202,13 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
-              return <Text>{" "} <Text color={color}>{icon}</Text>{` ${summary} ${stage} ${age}`}</Text>;
+              const unread = core.getUnreadCount(s.id);
+              return (
+                <Text>
+                  {" "} <Text color={color}>{icon}</Text>{` ${summary} ${stage} ${age}`}
+                  {unread > 0 && <Text color="yellow" bold>{` (${unread})`}</Text>}
+                </Text>
+              );
             }}
             renderChildren={(s) => {
               // fork children
@@ -558,6 +566,19 @@ interface TalkToSessionProps {
 
 function TalkToSession({ session, onDone }: TalkToSessionProps) {
   const [msg, setMsg] = useState("");
+  const [messages, setMessages] = useState<core.Message[]>([]);
+
+  // Load messages and mark as read
+  useEffect(() => {
+    if (!session) return;
+    const load = () => {
+      setMessages(core.getMessages(session.id, { limit: 20 }));
+    };
+    load();
+    core.markMessagesRead(session.id);
+    const t = setInterval(load, 2000);
+    return () => clearInterval(t);
+  }, [session?.id]);
 
   useInput((input, key) => {
     if (key.escape) onDone();
@@ -572,6 +593,11 @@ function TalkToSession({ session, onDone }: TalkToSessionProps) {
 
   const send = async () => {
     if (!msg.trim()) return;
+    // Store outbound message
+    core.addMessage({ session_id: session.id, role: "user", content: msg.trim() });
+    setMessages(core.getMessages(session.id, { limit: 20 }));
+    const text = msg.trim();
+    setMsg("");
     try {
       await fetch(`http://localhost:${channelPort}`, {
         method: "POST",
@@ -579,20 +605,42 @@ function TalkToSession({ session, onDone }: TalkToSessionProps) {
         body: JSON.stringify({
           type: "steer",
           sessionId: session.id,
-          message: msg.trim(),
+          message: text,
           from: "user",
         }),
       });
-      onDone(`Sent to ${session.summary ?? session.id}`);
     } catch {
-      onDone(`Failed to reach session (channel port ${channelPort})`);
+      core.addMessage({ session_id: session.id, role: "system", content: `Failed to deliver (port ${channelPort})`, type: "error" });
+      setMessages(core.getMessages(session.id, { limit: 20 }));
     }
   };
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Text bold color="cyan">{` Message: ${session.summary ?? session.id} `}</Text>
+      <Text bold color="cyan">{` Chat: ${session.summary ?? session.id} `}</Text>
       <Text> </Text>
+
+      {/* Message history */}
+      <Box flexDirection="column" flexGrow={1}>
+        {messages.length === 0 && (
+          <Text dimColor>{"  No messages yet. Type below to send."}</Text>
+        )}
+        {messages.map((m) => {
+          const ts = m.created_at.slice(11, 16);
+          const roleColor = m.role === "user" ? "cyan" : m.role === "agent" ? "green" : "gray";
+          const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
+          return (
+            <Text key={m.id} wrap="truncate">
+              <Text dimColor>{`  ${ts} `}</Text>
+              <Text color={roleColor as any} bold>{m.role === "user" ? "you" : "agent"}</Text>
+              {typeTag && <Text dimColor>{typeTag}</Text>}
+              <Text>{` ${m.content}`}</Text>
+            </Text>
+          );
+        })}
+      </Box>
+
+      {/* Input */}
       <Box>
         <Text color="cyan">{"> "}</Text>
         <TextInputEnhanced
@@ -600,11 +648,10 @@ function TalkToSession({ session, onDone }: TalkToSessionProps) {
           onChange={setMsg}
           onSubmit={send}
           focus={true}
-          placeholder="Type a message to Claude..."
+          placeholder="Type a message..."
         />
       </Box>
-      <Box flexGrow={1} />
-      <Text dimColor>{"  Enter:send  Esc:cancel"}</Text>
+      <Text dimColor>{"  Enter:send  Esc:back"}</Text>
     </Box>
   );
 }

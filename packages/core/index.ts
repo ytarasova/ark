@@ -9,6 +9,8 @@ export {
   logEvent, getEvents, getChildren, getGroups, createGroup, deleteGroup, claimSession,
   createCompute, getCompute, listCompute, updateCompute, mergeComputeConfig, deleteCompute,
   sessionChannelPort,
+  addMessage, getMessages, getUnreadCount, markMessagesRead,
+  type Message,
   createTestContext, setContext, resetContext, closeDb,
   type Session, type Event, type Compute, type TestContext,
 } from "./store.js";
