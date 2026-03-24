@@ -637,7 +637,7 @@ function TalkToSession({ session, onDone }: TalkToSessionProps) {
           const roleColor = m.role === "user" ? "cyan" : m.role === "agent" ? "green" : "gray";
           const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
           return (
-            <Text key={m.id} wrap="truncate">
+            <Text key={m.id} wrap="wrap">
               <Text dimColor>{`  ${ts} `}</Text>
               <Text color={roleColor as any} bold>{m.role === "user" ? "you" : "agent"}</Text>
               {typeTag && <Text dimColor>{typeTag}</Text>}
