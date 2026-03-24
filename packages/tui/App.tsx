@@ -24,6 +24,7 @@ export function App() {
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
   const [selectedSession, setSelectedSession] = useState<any>(null);
   const [pane, setPane] = useState<Pane>("left");
+  const [childInputActive, setChildInputActive] = useState(false);
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;
 
@@ -46,11 +47,11 @@ export function App() {
   }, []);
 
   useInput((input, key) => {
-    // Always available
+    // When a text input is active, only allow Ctrl-based shortcuts
+    if (showForm || childInputActive) return;
+
     if (input === "q") { exit(); return; }
     if (input === "p") { takeSnapshot(); return; }
-
-    if (showForm) return;
 
     // Tab switches pane focus (all tabs with SplitPane)
     if (key.tab) {
@@ -89,6 +90,7 @@ export function App() {
           async={asyncState}
           onShowForm={() => setShowForm("session")}
           onSelectionChange={setSelectedSession}
+          onInputActive={setChildInputActive}
           formOverlay={showForm === "session" ? (
             <NewSessionForm
               store={store}

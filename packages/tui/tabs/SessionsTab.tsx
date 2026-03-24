@@ -24,11 +24,12 @@ interface SessionsTabProps extends StoreData {
   pane: "left" | "right";
   onShowForm: () => void;
   onSelectionChange?: (session: any) => void;
+  onInputActive?: (active: boolean) => void;
   formOverlay?: React.ReactNode;
   refresh: () => void;
 }
 
-export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
+export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, onInputActive, formOverlay }: SessionsTabProps) {
   const [moveMode, setMoveMode] = useState(false);
   const [groupMode, setGroupMode] = useState<false | "menu">(false);
   const [talkMode, setTalkMode] = useState(false);
@@ -41,6 +42,11 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
   const hasOverlay = formOverlay || moveMode || groupMode || talkMode || inboxMode || cloneMode;
   const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !hasOverlay });
+
+  // Signal parent when an overlay with text input is active
+  useEffect(() => {
+    onInputActive?.(!!hasOverlay);
+  }, [!!hasOverlay]);
 
   const selected = topLevel[sel] ?? null;
 

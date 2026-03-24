@@ -150,7 +150,7 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
           const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
           const prefix = isUser && m.sessionId ? `→${(sessions.find(s => s.id === m.sessionId)?.summary ?? m.sessionId).slice(0, 12)}` : "";
           return (
-            <Text key={m.id} wrap="truncate">
+            <Text key={m.id} wrap="wrap">
               <Text dimColor>{`${m.time} `}</Text>
               <Text color={roleColor as any} bold>{sender}</Text>
               {prefix && <Text dimColor>{` ${prefix}`}</Text>}
