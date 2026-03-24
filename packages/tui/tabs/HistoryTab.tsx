@@ -8,7 +8,7 @@ import { SectionHeader } from "../components/SectionHeader.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { KeyValue } from "../components/KeyValue.js";
-import { TextInputEnhanced } from "../components/form/TextInputEnhanced.js";
+import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import type { StoreData } from "../hooks/useStore.js";
