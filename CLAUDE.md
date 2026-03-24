@@ -30,6 +30,11 @@ recipes/     → Flow recipe templates
 
 No workspaces config — packages are coordinated manually via relative imports.
 
+**Core modules** (in dependency order):
+`context.ts` → `store.ts` → `claude.ts` / `flow.ts` / `agent.ts` / `tmux.ts` / `exec.ts` → `session.ts` → `conductor.ts` → `search.ts` / `claude-sessions.ts` / `hooks.ts` / `app.ts` / `config.ts`
+
+**Key entry point:** `session.ts` — all session lifecycle (startSession, dispatch, advance, stop, resume, complete, fork). This is the main orchestration API. `index.ts` re-exports everything.
+
 ## Key Gotchas
 
 **FTS5 table needs manual creation on existing DBs.** The `transcript_index` FTS5 virtual table is in `initSchema()` but `CREATE VIRTUAL TABLE IF NOT EXISTS` only runs when the DB is first created. If you add new tables, existing `~/.ark/ark.db` files won't get them — run the SQL manually or delete the DB.
@@ -60,6 +65,8 @@ If you add a Session field, update the `fieldMap` in `packages/core/store.ts` �
 **Conductor port 19100 is hardcoded** in conductor.ts, channel.ts, and tests. Channel ports are derived deterministically: `19200 + (parseInt(sessionId.replace("s-",""), 16) % 1000)`.
 
 **No ESLint config file.** The `lint` script exists but no `.eslintrc` or `eslint.config.*` — runs with ESLint defaults.
+
+**`package.json` test script is wrong.** It says `"test": "vitest run"` but the project uses `bun:test`. Always run tests with `bun test` or `make test`, never `npm test`.
 
 ## Testing
 
@@ -141,6 +148,33 @@ stages:
     gate: auto
 ```
 
+## TUI Keyboard Shortcuts
+
+**Sessions tab:**
+| Key | Action | Key | Action |
+|-----|--------|-----|--------|
+| `j/k` | Navigate sessions | `n` | New session |
+| `Enter` | Dispatch/restart | `s` | Stop session |
+| `a` | Attach to tmux | `t` | Talk (send message) |
+| `x` | Delete session | `d` | Mark done (press twice) |
+| `c` | Clone session | `m` | Move to group |
+| `i` | Inbox/threads | `g` | Group manager |
+| `I` | Import Claude session | `/` | Rebuild search index |
+| `Tab` | Focus detail pane | `e` | Expand events |
+| `1-5` | Switch tabs | `q` | Quit |
+
+**Compute tab:** `Enter`:provision `s`:start/stop `c`:clean `n`:new `x`:delete
+
+## App Boot System
+
+`app.ts` provides `AppContext` — initializes conductor, metrics polling, and config. CLI creates it with `skipConductor: true` (only TUI runs the conductor). `config.ts` loads `~/.ark/config.yaml` for user preferences.
+
+```ts
+const app = new AppContext(loadConfig());
+await app.boot();   // starts conductor + metrics
+await app.shutdown(); // cleanup on exit
+```
+
 ## TUI Async Rules (CRITICAL)
 
 **Every I/O operation in the TUI MUST be non-blocking.** No exceptions.
@@ -187,7 +221,12 @@ Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/h
 
 ## Architecture Boundaries
 
-- **`claude.ts`** — ALL Claude Code knowledge (model mapping, args, hooks config, launcher, trust, transcript parsing). Session.ts and agent.ts call into it, never the reverse for Claude-specific logic.
+- **`context.ts`** — Dependency injection for DB paths. `createTestContext()` for test isolation. Everything reads paths from here.
+- **`store.ts`** — Pure data CRUD. No imports from claude.ts or session.ts (avoids circular deps). If you need cleanup logic that touches both store and claude, put it in session.ts.
+- **`claude.ts`** — ALL Claude Code knowledge (model mapping, args, hooks config, launcher, trust, transcript parsing). Session.ts and agent.ts call into it, never the reverse.
+- **`session.ts`** — Orchestration. All session lifecycle mutations. Calls into store, claude, tmux, flow, agent. The "controller" layer.
 - **`conductor.ts`** — HTTP server. Channel reports (agent↔human MCP messaging) + hook status (agent status detection). These are SEPARATE concerns — hooks never trigger `session.advance()`.
-- **`store.ts`** — Pure data. No imports from claude.ts or session.ts (avoids circular deps). If you need cleanup logic that touches both store and claude, put it in session.ts.
 - **`search.ts`** — Search + FTS5 indexing. `indexTranscripts()` is async (yields every 5 files). `searchTranscripts()` uses FTS5 when index exists, falls back to file scanning.
+- **`claude-sessions.ts`** — Read-only discovery of Claude Code sessions from `~/.claude/projects/`. No writes.
+- **`hooks.ts`** — Internal event bus (pub/sub). NOT Claude Code hooks — those are in claude.ts.
+- **`app.ts`** — Boot/shutdown lifecycle. Owns conductor and metrics polling. CLI skips conductor; TUI runs it.
