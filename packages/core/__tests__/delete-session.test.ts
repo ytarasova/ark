@@ -1,0 +1,199 @@
+/**
+ * Comprehensive tests for deleteSessionAsync — full session cleanup.
+ *
+ * Tests DB deletion, event cleanup, worktree removal, hook config removal,
+ * and graceful handling of missing tmux/compute.
+ */
+
+import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { join } from "path";
+
+import * as core from "../index.js";
+import * as store from "../store.js";
+import { deleteSessionAsync } from "../session.js";
+import { writeHooksConfig } from "../claude.js";
+import {
+  createTestContext, setContext, resetContext,
+  type TestContext,
+} from "../context.js";
+
+let ctx: TestContext;
+
+beforeEach(() => {
+  if (ctx) ctx.cleanup();
+  ctx = createTestContext();
+  setContext(ctx);
+});
+
+afterAll(() => {
+  if (ctx) ctx.cleanup();
+  resetContext();
+});
+
+// ── Unit tests ──────────────────────────────────────────────────────────────
+
+describe("deleteSessionAsync", () => {
+  it("deletes session from database", async () => {
+    const session = core.startSession({
+      repo: "/tmp/fake-repo",
+      summary: "delete-db-test",
+      flow: "bare",
+    });
+
+    // Verify it exists
+    expect(core.getSession(session.id)).not.toBeNull();
+
+    const result = await deleteSessionAsync(session.id);
+    expect(result.ok).toBe(true);
+    expect(result.message).toBe("Session deleted");
+
+    // Verify it's gone
+    expect(core.getSession(session.id)).toBeNull();
+  });
+
+  it("deletes associated events", async () => {
+    const session = core.startSession({
+      repo: "/tmp/fake-repo",
+      summary: "delete-events-test",
+      flow: "bare",
+    });
+
+    // Log some extra events
+    core.logEvent(session.id, "test_event_1", { actor: "test", data: { foo: 1 } });
+    core.logEvent(session.id, "test_event_2", { actor: "test", data: { bar: 2 } });
+
+    // Verify events exist (session_created + stage_ready + 2 custom)
+    const eventsBefore = core.getEvents(session.id);
+    expect(eventsBefore.length).toBeGreaterThanOrEqual(3);
+
+    await deleteSessionAsync(session.id);
+
+    // Verify events are gone
+    const eventsAfter = core.getEvents(session.id);
+    expect(eventsAfter.length).toBe(0);
+  });
+
+  it("returns ok:false for nonexistent session", async () => {
+    const result = await deleteSessionAsync("s-nonexistent");
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("not found");
+  });
+
+  it("cleans up worktree directory if it exists (no repo — rmSync path)", async () => {
+    // Create session with no repo/workdir so cleanup uses direct rmSync
+    const session = store.createSession({
+      summary: "delete-worktree-test",
+    });
+
+    // Create a fake worktree directory under WORKTREES_DIR
+    const wtPath = join(store.WORKTREES_DIR(), session.id);
+    mkdirSync(wtPath, { recursive: true });
+    writeFileSync(join(wtPath, "dummy.txt"), "test content");
+    expect(existsSync(wtPath)).toBe(true);
+
+    await deleteSessionAsync(session.id);
+
+    // Worktree directory should be gone (rmSync fallback)
+    expect(existsSync(wtPath)).toBe(false);
+    // Session should be gone from DB
+    expect(core.getSession(session.id)).toBeNull();
+  });
+
+  it("does NOT touch filesystem when no worktree exists", async () => {
+    // Use the repo dir as workdir (simulating a direct repo, no worktree)
+    const repoDir = join(ctx.arkDir, "fake-direct-repo");
+    mkdirSync(repoDir, { recursive: true });
+    writeFileSync(join(repoDir, "file.txt"), "important");
+
+    const session = core.startSession({
+      repo: repoDir,
+      workdir: repoDir,
+      summary: "delete-no-worktree-test",
+      flow: "bare",
+    });
+
+    // No worktree dir exists under WORKTREES_DIR
+    const wtPath = join(store.WORKTREES_DIR(), session.id);
+    expect(existsSync(wtPath)).toBe(false);
+
+    await deleteSessionAsync(session.id);
+
+    // The repo dir should still exist and be intact
+    expect(existsSync(repoDir)).toBe(true);
+    expect(readFileSync(join(repoDir, "file.txt"), "utf-8")).toBe("important");
+    // Session should be gone from DB
+    expect(core.getSession(session.id)).toBeNull();
+  });
+
+  it("removes hook config from workdir", async () => {
+    // Create a workdir with hooks written
+    const workdir = join(ctx.arkDir, "hook-test-workdir");
+    mkdirSync(workdir, { recursive: true });
+
+    const session = core.startSession({
+      repo: workdir,
+      workdir,
+      summary: "delete-hooks-test",
+      flow: "bare",
+    });
+
+    // Write hooks config into the workdir
+    writeHooksConfig(session.id, "http://localhost:19100", workdir);
+
+    // Verify hooks file exists and has ark hooks
+    const settingsPath = join(workdir, ".claude", "settings.local.json");
+    expect(existsSync(settingsPath)).toBe(true);
+    const beforeSettings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    expect(beforeSettings.hooks).toBeDefined();
+    expect(Object.keys(beforeSettings.hooks).length).toBeGreaterThan(0);
+
+    await deleteSessionAsync(session.id);
+
+    // After deletion, hooks should be cleaned from settings
+    if (existsSync(settingsPath)) {
+      const afterSettings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+      // All ark hooks should be removed (hooks key should be absent or empty)
+      expect(afterSettings.hooks).toBeUndefined();
+    }
+    // Session should be gone
+    expect(core.getSession(session.id)).toBeNull();
+  });
+
+  // ── Integration patterns ──────────────────────────────────────────────────
+
+  it("works when session has no tmux session (session_id is null)", async () => {
+    const session = core.startSession({
+      repo: "/tmp/fake-repo",
+      summary: "no-tmux-test",
+      flow: "bare",
+    });
+
+    // Verify session_id is null (not dispatched)
+    expect(session.session_id).toBeNull();
+
+    // Should not throw
+    const result = await deleteSessionAsync(session.id);
+    expect(result.ok).toBe(true);
+    expect(result.message).toBe("Session deleted");
+    expect(core.getSession(session.id)).toBeNull();
+  });
+
+  it("works when session has no compute (compute_name is null)", async () => {
+    const session = core.startSession({
+      repo: "/tmp/fake-repo",
+      summary: "no-compute-test",
+      flow: "bare",
+      // No compute_name specified
+    });
+
+    // Verify compute_name is null
+    expect(session.compute_name).toBeNull();
+
+    // Should not throw
+    const result = await deleteSessionAsync(session.id);
+    expect(result.ok).toBe(true);
+    expect(result.message).toBe("Session deleted");
+    expect(core.getSession(session.id)).toBeNull();
+  });
+});
