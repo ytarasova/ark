@@ -12,6 +12,7 @@ import { DetailPanel } from "../components/DetailPanel.js";
 import { KeyValue } from "../components/KeyValue.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
+import { ThreadsPanel } from "../components/ThreadsPanel.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
@@ -31,12 +32,13 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const [moveMode, setMoveMode] = useState(false);
   const [groupMode, setGroupMode] = useState<false | "menu">(false);
   const [talkMode, setTalkMode] = useState(false);
+  const [inboxMode, setInboxMode] = useState(false);
   const status = useStatusMessage();
 
   // Top-level sessions only (exclude fork children from list)
   const topLevel = useMemo(() => sessions.filter((s) => !s.parent_id), [sessions]);
 
-  const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !formOverlay && !moveMode && !groupMode && !talkMode });
+  const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !formOverlay && !moveMode && !groupMode && !talkMode && !inboxMode });
 
   const selected = topLevel[sel] ?? null;
 
@@ -55,7 +57,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   useInput((input, key) => {
     // Don't handle keys when form overlay is active (form owns input)
     if (formOverlay) return;
-    if (moveMode || groupMode || talkMode) return; // let overlay handle input
+    if (moveMode || groupMode || talkMode || inboxMode) return; // let overlay handle input
 
     if (key.return) {
       if (selected && (selected.status === "ready" || selected.status === "blocked")) {
@@ -157,6 +159,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       }
     } else if (input === "t") {
       if (selected?.status === "running" || selected?.status === "waiting") setTalkMode(true);
+    } else if (input === "i") {
+      setInboxMode(true);
     } else if (input === "g") {
       setGroupMode("menu");
     } else if (input === "S") {
@@ -251,6 +255,12 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
             </Box>
           )
           : formOverlay ? formOverlay
+          : inboxMode ? (
+            <ThreadsPanel
+              sessions={topLevel}
+              onDone={() => { setInboxMode(false); refresh(); }}
+            />
+          )
           : talkMode ? (
             <TalkToSession
               session={selected}
