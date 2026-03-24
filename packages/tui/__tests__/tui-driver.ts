@@ -17,6 +17,8 @@
 import { execFileSync } from "child_process";
 import { join } from "path";
 import * as core from "../../core/index.js";
+import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { loadConfig } from "../../core/config.js";
 
 const ARK_BIN = join(import.meta.dir, "..", "..", "..", "ark");
 
@@ -164,6 +166,7 @@ export class TuiDriver {
   private _started = false;
   private _stopped = false;
   private readonly _opts: Required<TuiDriverOptions>;
+  private _app: AppContext | null = null;
 
   /** Session IDs created via core API — cleaned up on stop() */
   private readonly _sessionIds: string[] = [];
@@ -180,6 +183,12 @@ export class TuiDriver {
       startMarker: opts?.startMarker ?? "Sessions",
       env: opts?.env ?? {},
     };
+
+    // Boot the AppContext eagerly — forTest() skips conductor/metrics/signals
+    // so boot() completes synchronously (no real awaits in that path).
+    this._app = AppContext.forTest();
+    this._app.boot(); // intentionally not awaited; sync for test contexts
+    setApp(this._app);
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
@@ -189,7 +198,7 @@ export class TuiDriver {
     if (this._started) throw new Error("TuiDriver already started");
     this._started = true;
 
-    const testDir = process.env.ARK_TEST_DIR ?? "";
+    const testDir = this._app!.config.arkDir;
     const extraEnv = Object.entries(this._opts.env)
       .map(([k, v]) => `${k}=${v}`)
       .join(" ");
@@ -232,6 +241,11 @@ export class TuiDriver {
       } catch { /* gone */ }
     }
     this._sessionIds.length = 0;
+
+    // Shut down the AppContext and clear the global singleton
+    this._app?.shutdown().then(() => {}).catch(() => {});
+    clearApp();
+    this._app = null;
   }
 
   /** Check if the tmux session is still alive. */
