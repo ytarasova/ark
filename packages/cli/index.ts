@@ -668,7 +668,15 @@ program.command("search")
   .argument("<query>", "Search text (case-insensitive)")
   .option("-l, --limit <n>", "Max results", "20")
   .option("-t, --transcripts", "Also search Claude transcripts (slower)")
+  .option("--index", "Rebuild transcript search index before searching")
   .action((query, opts) => {
+    if (opts.index) {
+      console.log(chalk.dim("Indexing transcripts..."));
+      const count = core.indexTranscripts();
+      const stats = core.getIndexStats();
+      console.log(chalk.green(`Indexed ${count} entries from ${stats.sessions} sessions\n`));
+    }
+
     const limit = parseInt(opts.limit);
     const results = core.searchSessions(query, { limit });
 
@@ -691,6 +699,15 @@ program.command("search")
       const match = r.match.length > 120 ? r.match.slice(0, 120) + "..." : r.match;
       console.log(`  ${chalk.dim(r.sessionId)}  ${sourceColor(`[${r.source}]`)}  ${match}`);
     }
+  });
+
+program.command("index")
+  .description("Build or rebuild the transcript search index")
+  .action(() => {
+    console.log(chalk.dim("Indexing transcripts..."));
+    const count = core.indexTranscripts();
+    const stats = core.getIndexStats();
+    console.log(chalk.green(`Indexed ${count} entries from ${stats.sessions} sessions`));
   });
 
 // ── Run ─────────────────────────────────────────────────────────────────────

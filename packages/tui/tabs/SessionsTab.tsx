@@ -73,6 +73,11 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     if (input === "n") { onShowForm(); return; }
     if (input === "i") { setInboxMode(true); return; }
     if (input === "g") { setGroupMode("menu"); return; }
+    if (input === "/") {
+      const count = core.indexTranscripts();
+      status.show(`Indexed ${count} transcript entries`);
+      return;
+    }
 
     // Cancel pending confirm on any non-d key
     if (confirmComplete && input !== "d") {
