@@ -160,6 +160,8 @@ function buildHooksConfig(sessionId: string, conductorUrl: string): Record<strin
     StopFailure: [{ hooks: [hook] }],
     SessionEnd: [{ hooks: [hook] }],
     Notification: [{ matcher: "permission_prompt|idle_prompt", hooks: [hook] }],
+    PreCompact: [{ hooks: [hook] }],
+    PostCompact: [{ hooks: [hook] }],
   };
 }
 

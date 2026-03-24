@@ -161,6 +161,46 @@ describe("Conductor /hooks/status endpoint", () => {
     expect(hookEvent!.data?.event).toBe("SessionStart");
   });
 
+  it("PreCompact is logged but does not change status", async () => {
+    const session = createSession({ summary: "test" });
+    updateSession(session.id, { status: "running" });
+
+    const resp = await postHook(session.id, {
+      hook_event_name: "PreCompact",
+      trigger: "auto",
+    });
+    expect(resp.status).toBe(200);
+    expect(getSession(session.id)!.status).toBe("running");
+  });
+
+  it("PostCompact is logged with compact_summary in event data", async () => {
+    const session = createSession({ summary: "test" });
+    updateSession(session.id, { status: "running" });
+
+    await postHook(session.id, {
+      hook_event_name: "PostCompact",
+      trigger: "auto",
+      compact_summary: "Conversation summarized: working on auth module...",
+    });
+
+    expect(getSession(session.id)!.status).toBe("running");
+  });
+
+  it("StopFailure with max_output_tokens sets failed with specific error", async () => {
+    const session = createSession({ summary: "test" });
+    updateSession(session.id, { status: "running" });
+
+    await postHook(session.id, {
+      hook_event_name: "StopFailure",
+      error: "max_output_tokens",
+      error_details: "Output token limit exceeded",
+    });
+
+    const updated = getSession(session.id);
+    expect(updated!.status).toBe("failed");
+    expect(updated!.error).toContain("max_output_tokens");
+  });
+
   it("returns 400 for missing session param", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status`, {
       method: "POST",

@@ -29,15 +29,26 @@ describe("writeHooksConfig", () => {
     expect(existsSync(join(ctx.arkDir, ".claude", "settings.local.json"))).toBe(true);
   });
 
-  it("contains hooks for all 6 status events", () => {
+  it("contains hooks for all 8 events", () => {
     writeHooksConfig("s-test123", "http://localhost:19100", ctx.arkDir);
     const settings = JSON.parse(readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.hooks.SessionStart).toBeDefined();
-    expect(settings.hooks.UserPromptSubmit).toBeDefined();
-    expect(settings.hooks.Stop).toBeDefined();
-    expect(settings.hooks.StopFailure).toBeDefined();
-    expect(settings.hooks.SessionEnd).toBeDefined();
-    expect(settings.hooks.Notification).toBeDefined();
+    const events = Object.keys(settings.hooks);
+    expect(events).toContain("SessionStart");
+    expect(events).toContain("UserPromptSubmit");
+    expect(events).toContain("Stop");
+    expect(events).toContain("StopFailure");
+    expect(events).toContain("SessionEnd");
+    expect(events).toContain("Notification");
+    expect(events).toContain("PreCompact");
+    expect(events).toContain("PostCompact");
+    expect(events.length).toBe(8);
+  });
+
+  it("PreCompact/PostCompact hooks have no matcher (match all triggers)", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", ctx.arkDir);
+    const settings = JSON.parse(readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.hooks.PreCompact[0].matcher).toBeUndefined();
+    expect(settings.hooks.PostCompact[0].matcher).toBeUndefined();
   });
 
   it("hooks use command type with curl to correct conductor URL", () => {
