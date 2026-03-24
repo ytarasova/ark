@@ -6,25 +6,22 @@
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { mkdirSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
-import {
-  createTestContext, setContext, resetContext,
-  getSession, WORKTREES_DIR,
-} from "../index.js";
+import { getSession, WORKTREES_DIR } from "../index.js";
 import { createSession } from "../store.js";
 import { deleteSessionAsync } from "../session.js";
-import type { TestContext } from "../store.js";
+import { AppContext, setApp, clearApp } from "../app.js";
 
-let ctx: TestContext;
+let app: AppContext;
 
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
+beforeEach(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
 });
 
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
 });
 
 describe("deleteSessionAsync worktree cleanup", () => {

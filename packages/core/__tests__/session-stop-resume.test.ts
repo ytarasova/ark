@@ -4,25 +4,22 @@
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
-import {
-  createTestContext, setContext, resetContext,
-  getSession, updateSession,
-  type TestContext,
-} from "../index.js";
+import { getSession, updateSession } from "../index.js";
 import { createSession } from "../store.js";
 import { stop } from "../session.js";
+import { AppContext, setApp, clearApp } from "../app.js";
 
-let ctx: TestContext;
+let app: AppContext;
 
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
+beforeEach(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
 });
 
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
 });
 
 describe("session stop", () => {

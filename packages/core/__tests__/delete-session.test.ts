@@ -13,22 +13,19 @@ import * as core from "../index.js";
 import * as store from "../store.js";
 import { deleteSessionAsync } from "../session.js";
 import { writeHooksConfig } from "../claude.js";
-import {
-  createTestContext, setContext, resetContext,
-  type TestContext,
-} from "../context.js";
+import { AppContext, setApp, clearApp } from "../app.js";
 
-let ctx: TestContext;
+let app: AppContext;
 
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
+beforeEach(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
 });
 
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
 });
 
 // ── Unit tests ──────────────────────────────────────────────────────────────
@@ -102,7 +99,7 @@ describe("deleteSessionAsync", () => {
 
   it("does NOT touch filesystem when no worktree exists", async () => {
     // Use the repo dir as workdir (simulating a direct repo, no worktree)
-    const repoDir = join(ctx.arkDir, "fake-direct-repo");
+    const repoDir = join(app.config.arkDir, "fake-direct-repo");
     mkdirSync(repoDir, { recursive: true });
     writeFileSync(join(repoDir, "file.txt"), "important");
 
@@ -128,7 +125,7 @@ describe("deleteSessionAsync", () => {
 
   it("removes hook config from workdir", async () => {
     // Create a workdir with hooks written
-    const workdir = join(ctx.arkDir, "hook-test-workdir");
+    const workdir = join(app.config.arkDir, "hook-test-workdir");
     mkdirSync(workdir, { recursive: true });
 
     const session = core.startSession({

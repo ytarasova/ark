@@ -8,8 +8,20 @@
  * Tmux sessions are global - use unique names and clean up in afterEach.
  */
 
-import { describe, it, expect, afterEach } from "bun:test";
+import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import * as core from "../index.js";
+import { AppContext, setApp, clearApp } from "../app.js";
+
+let app: AppContext;
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 // Track resources for cleanup
 const sessionIds: string[] = [];

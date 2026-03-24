@@ -13,6 +13,8 @@ import { tmpdir } from "os";
 
 import { loadConfig, type ArkConfig } from "./config.js";
 import { eventBus } from "./hooks.js";
+import type { ComputeProvider } from "../compute/types.js";
+import type { Compute, Session } from "./store.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -135,6 +137,7 @@ export class AppContext {
 
   private _db: Database | null = null;
   private _eventBus: typeof eventBus | null = null;
+  private _providers = new Map<string, ComputeProvider>();
 
   conductor: { stop(): void } | null = null;
   metricsPoller: { stop(): void } | null = null;
@@ -157,6 +160,30 @@ export class AppContext {
   get eventBus(): typeof eventBus {
     if (!this._eventBus) throw new Error("AppContext not booted — eventBus not available");
     return this._eventBus;
+  }
+
+  // ── Provider registry ──────────────────────────────────────────────────
+
+  registerProvider(provider: ComputeProvider): void {
+    this._providers.set(provider.name, provider);
+  }
+
+  getProvider(name: string): ComputeProvider | null {
+    return this._providers.get(name) ?? null;
+  }
+
+  listProviders(): string[] {
+    return [...this._providers.keys()];
+  }
+
+  /** Resolve the compute provider for a session. Defaults to local. */
+  resolveProvider(session: Session): { provider: ComputeProvider | null; compute: Compute | null } {
+    const computeName = session.compute_name || "local";
+    const { getCompute } = require("./store.js");
+    const compute = getCompute(computeName);
+    if (!compute) return { provider: null, compute: null };
+    const provider = this.getProvider(compute.provider);
+    return { provider: provider ?? null, compute };
   }
 
   // ── Boot ───────────────────────────────────────────────────────────────
@@ -186,11 +213,21 @@ export class AppContext {
     initSchema(this._db);
     seedLocalCompute(this._db);
 
-    // 4. Set up event bus
+    // 4. Register compute providers
+    try {
+      const compute = await import("../compute/index.js");
+      this.registerProvider(new compute.LocalProvider());
+      this.registerProvider(new compute.EC2Provider());
+      this.registerProvider(new compute.DockerProvider());
+    } catch {
+      // compute module may not be available in minimal builds
+    }
+
+    // 5. Set up event bus
     this._eventBus = eventBus;
     this._eventBus.clear();
 
-    // 5. Optionally start conductor (dynamic import to avoid circular deps)
+    // 6. Optionally start conductor (dynamic import to avoid circular deps)
     if (!this.options.skipConductor) {
       try {
         const { startConductor } = await import("./conductor.js");
@@ -200,12 +237,12 @@ export class AppContext {
       }
     }
 
-    // 6. Optionally start metrics poller
+    // 7. Optionally start metrics poller
     if (!this.options.skipMetrics) {
       this.metricsPoller = this._startMetricsPoller();
     }
 
-    // 7. Register signal handlers
+    // 8. Register signal handlers
     if (!this.options.skipSignals) {
       this._registerSignalHandlers();
     }

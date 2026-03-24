@@ -360,13 +360,10 @@ export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boole
 
 import type { ComputeProvider } from "../compute/types.js";
 
-/** Resolve the compute provider for a session. Defaults to local if no compute assigned. */
+/** Resolve the compute provider for a session via AppContext. */
 function resolveProvider(session: store.Session): { provider: ComputeProvider | null; compute: store.Compute | null } {
-  const computeName = session.compute_name || "local";
-  const compute = store.getCompute(computeName);
-  if (!compute) return { provider: null, compute: null };
-  const provider = getProvider(compute.provider);
-  return { provider: provider ?? null, compute };
+  const { getApp } = require("./app.js");
+  return getApp().resolveProvider(session);
 }
 
 // ── Internal ────────────────────────────────────────────────────────────────

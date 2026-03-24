@@ -1,6 +1,19 @@
-import { describe, it, expect, beforeEach } from "bun:test";
-import { registerProvider, getProvider, listProviders, clearProviders } from "../index.js";
+import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import type { ComputeProvider } from "../types.js";
+import { AppContext, setApp, clearApp } from "../../core/app.js";
+
+let app: AppContext;
+
+beforeEach(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 const fakeProvider: ComputeProvider = {
   name: "fake",
@@ -10,6 +23,9 @@ const fakeProvider: ComputeProvider = {
   stop: async () => {},
   launch: async () => "tmux-name",
   attach: async () => {},
+  killAgent: async () => {},
+  captureOutput: async () => "",
+  cleanupSession: async () => {},
   getMetrics: async () => ({
     metrics: { cpu: 0, memUsedGb: 0, memTotalGb: 0, memPct: 0, diskPct: 0, netRxMb: 0, netTxMb: 0, uptime: "", idleTicks: 0 },
     sessions: [], processes: [], docker: [],
@@ -18,57 +34,34 @@ const fakeProvider: ComputeProvider = {
   syncEnvironment: async () => {},
 };
 
-describe("provider registry", () => {
-  beforeEach(() => clearProviders());
-
+describe("provider registry (via AppContext)", () => {
   it("registers and retrieves a provider", () => {
-    registerProvider(fakeProvider);
-    expect(getProvider("fake")).toBe(fakeProvider);
+    app.registerProvider(fakeProvider);
+    expect(app.getProvider("fake")).toBe(fakeProvider);
   });
 
   it("returns null for unknown provider", () => {
-    expect(getProvider("nope")).toBeNull();
+    expect(app.getProvider("nope")).toBeNull();
   });
 
   it("lists registered providers", () => {
-    registerProvider(fakeProvider);
-    registerProvider({ ...fakeProvider, name: "other" });
-    expect(listProviders()).toEqual(["fake", "other"]);
+    app.registerProvider(fakeProvider);
+    app.registerProvider({ ...fakeProvider, name: "other" });
+    expect(app.listProviders()).toContain("fake");
+    expect(app.listProviders()).toContain("other");
   });
 
   it("overwrites on re-register", () => {
-    registerProvider(fakeProvider);
+    app.registerProvider(fakeProvider);
     const updated = { ...fakeProvider };
-    registerProvider(updated);
-    expect(getProvider("fake")).toBe(updated);
+    app.registerProvider(updated);
+    expect(app.getProvider("fake")).toBe(updated);
   });
 
-  it("clearProviders empties the registry", () => {
-    registerProvider(fakeProvider);
-    registerProvider({ ...fakeProvider, name: "second" });
-    clearProviders();
-    expect(getProvider("fake")).toBeNull();
-    expect(getProvider("second")).toBeNull();
-    expect(listProviders()).toEqual([]);
-  });
-
-  it("listProviders preserves insertion order", () => {
-    registerProvider({ ...fakeProvider, name: "zulu" });
-    registerProvider({ ...fakeProvider, name: "alpha" });
-    registerProvider({ ...fakeProvider, name: "mike" });
-    expect(listProviders()).toEqual(["zulu", "alpha", "mike"]);
-  });
-});
-
-describe("auto-registration", () => {
-  it("local provider is auto-registered on import", () => {
-    // The compute index module calls registerProvider(new LocalProvider())
-    // at the top level. Prior tests cleared the registry, so we re-register
-    // the same way the module does to verify the wiring works end-to-end.
-    clearProviders();
-    const { LocalProvider } = require("../providers/local/index.js");
-    registerProvider(new LocalProvider());
-    expect(getProvider("local")).not.toBeNull();
-    expect(getProvider("local")!.name).toBe("local");
+  it("boot auto-registers local, ec2, docker providers", () => {
+    expect(app.getProvider("local")).not.toBeNull();
+    expect(app.getProvider("local")!.name).toBe("local");
+    expect(app.getProvider("ec2")).not.toBeNull();
+    expect(app.getProvider("docker")).not.toBeNull();
   });
 });
