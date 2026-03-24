@@ -64,7 +64,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     [topLevel, selectedGroup],
   );
 
-  const actions = useSessionActions({ asyncState, refresh });
+  const actions = useSessionActions(asyncState);
 
   useInput((input, key) => {
     if (formOverlay || hasOverlay) return;

@@ -1,24 +1,14 @@
 /**
- * Central session action dispatcher. Every mutation goes through here:
- * async wrapper + refresh + error handling. No more forgetting refresh()
- * or wrapping in asyncState.run() manually.
+ * Central session action dispatcher. Every mutation goes through
+ * asyncState.run() which automatically calls refresh() on completion
+ * (configured via useAsync's onComplete callback).
  */
 
 import * as core from "../../core/index.js";
 import type { AsyncState } from "./useAsync.js";
 
-interface SessionActionsOpts {
-  asyncState: AsyncState;
-  refresh: () => void;
-}
-
-export function useSessionActions({ asyncState, refresh }: SessionActionsOpts) {
-  const run = (label: string, action: () => Promise<void> | void) => {
-    asyncState.run(label, async () => {
-      await action();
-      refresh();
-    });
-  };
+export function useSessionActions(asyncState: AsyncState) {
+  const run = asyncState.run;
 
   return {
     dispatch: (id: string) => {
@@ -45,22 +35,21 @@ export function useSessionActions({ asyncState, refresh }: SessionActionsOpts) {
     },
 
     clone: (sourceId: string, name: string, groupName?: string | null) => {
-      run(`Cloning ${sourceId}`, async () => {
+      run(`Cloning → ${name}`, async () => {
         const { ok, cloneId } = core.cloneSession(sourceId, name);
         if (!ok) return;
         if (groupName) core.updateSession(cloneId, { group_name: groupName });
-        refresh(); // show clone in list before dispatch
         await core.dispatch(cloneId);
       });
     },
 
     move: (id: string, group: string | null) => {
       core.updateSession(id, { group_name: group });
-      refresh();
+      asyncState.run("", async () => {}); // trigger refresh via onComplete
     },
 
     stopGroup: (sessions: core.Session[]) => {
-      run(`Stopping group`, () => {
+      run("Stopping group", () => {
         for (const s of sessions) {
           if (!["completed", "failed", "stopped"].includes(s.status)) core.stop(s.id);
         }
@@ -68,7 +57,7 @@ export function useSessionActions({ asyncState, refresh }: SessionActionsOpts) {
     },
 
     resumeGroup: (sessions: core.Session[]) => {
-      run(`Resuming group`, async () => {
+      run("Resuming group", async () => {
         for (const s of sessions) {
           if (["blocked", "waiting", "failed", "stopped", "completed"].includes(s.status)) {
             await core.resume(s.id);
@@ -78,7 +67,7 @@ export function useSessionActions({ asyncState, refresh }: SessionActionsOpts) {
     },
 
     deleteGroup: (sessions: core.Session[]) => {
-      run(`Deleting group`, async () => {
+      run("Deleting group", async () => {
         for (const s of sessions) {
           if (s.session_id) await core.killSessionAsync(s.session_id);
           core.deleteSession(s.id);

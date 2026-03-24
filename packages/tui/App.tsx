@@ -18,7 +18,7 @@ import { NewComputeForm } from "./forms/NewComputeForm.js";
 export function App() {
   const { exit } = useApp();
   const store = useStore();
-  const asyncState = useAsync();
+  const asyncState = useAsync(store.refresh);
   const [tab, setTab] = useState<Tab>("sessions");
   const [showForm, setShowForm] = useState<string | null>(null);
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
