@@ -11,6 +11,7 @@ import {
   resolveModel,
   buildArgs,
   shellQuoteArgs,
+  channelMcpConfig,
   writeChannelConfig,
   buildLauncher,
   trustDirectory,
@@ -225,6 +226,27 @@ describe("writeChannelConfig", () => {
     expect(channelConfig.env.ARK_SESSION_ID).toBe("s-abc123");
     expect(channelConfig.env.ARK_STAGE).toBe("work");
     expect(channelConfig.env.ARK_CHANNEL_PORT).toBe("19300");
+  });
+
+  it("includes ARK_CONDUCTOR_URL in channel config env", () => {
+    const workdir = ctx.arkDir;
+    writeChannelConfig("s-abc123", "work", 19300, workdir);
+
+    const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
+    const channelConfig = content.mcpServers["ark-channel"];
+    expect(channelConfig.env.ARK_CONDUCTOR_URL).toBe("http://localhost:19100");
+  });
+
+  it("passes custom conductor URL to channelMcpConfig", () => {
+    const config = channelMcpConfig("s-abc123", "work", 19300, {
+      conductorUrl: "http://host.docker.internal:19100",
+    });
+    expect((config.env as any).ARK_CONDUCTOR_URL).toBe("http://host.docker.internal:19100");
+  });
+
+  it("channelMcpConfig defaults conductor URL to localhost:19100", () => {
+    const config = channelMcpConfig("s-abc123", "work", 19300);
+    expect((config.env as any).ARK_CONDUCTOR_URL).toBe("http://localhost:19100");
   });
 
   it("preserves existing .mcp.json content", () => {
