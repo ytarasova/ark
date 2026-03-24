@@ -96,6 +96,21 @@ describe("writeHooksConfig", () => {
     expect(settings.hooks.Stop[0].hooks[0].command).toContain("s-myid");
   });
 
+  it("hook command is a single line (no newlines)", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", ctx.arkDir);
+    const settings = JSON.parse(readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    const cmd = settings.hooks.Stop[0].hooks[0].command;
+    expect(cmd).not.toContain("\n");
+    expect(cmd.split("\n").length).toBe(1);
+  });
+
+  it("hook command suppresses curl output", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", ctx.arkDir);
+    const settings = JSON.parse(readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    const cmd = settings.hooks.Stop[0].hooks[0].command;
+    expect(cmd).toContain("> /dev/null 2>&1");
+  });
+
   it("SessionStart has startup|resume matcher", () => {
     writeHooksConfig("s-test", "http://localhost:19100", ctx.arkDir);
     const settings = JSON.parse(readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"));

@@ -145,8 +145,7 @@ export function writeChannelConfig(
 const ARK_HOOK_MARKER = "# ark-status";
 
 function hookCommand(sessionId: string, conductorUrl: string): string {
-  const curlCmd = `curl -sf -X POST -H 'Content-Type: application/json' -d @- '${conductorUrl}/hooks/status?session=${sessionId}' || true`;
-  return `${ARK_HOOK_MARKER} ${sessionId}\n${curlCmd}`;
+  return `curl -sf -X POST -H 'Content-Type: application/json' -d @- '${conductorUrl}/hooks/status?session=${sessionId}' > /dev/null 2>&1 || true ${ARK_HOOK_MARKER}`;
 }
 
 function buildHooksConfig(sessionId: string, conductorUrl: string): Record<string, unknown[]> {
