@@ -37,15 +37,12 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const [inboxMode, setInboxMode] = useState(false);
   const [cloneMode, setCloneMode] = useState(false);
   const [confirmComplete, setConfirmComplete] = useState(false);
-  const [claudeImportMode, setClaudeImportMode] = useState(false);
-  const [claudeSessions, setClaudeSessions] = useState<core.ClaudeSession[]>([]);
-  const [claudeSelectedIdx, setClaudeSelectedIdx] = useState(0);
   const status = useStatusMessage();
 
   // Top-level sessions only (exclude fork children from list)
   const topLevel = useMemo(() => sessions.filter((s) => !s.parent_id), [sessions]);
 
-  const hasOverlay = formOverlay || moveMode || groupMode || talkMode || inboxMode || cloneMode || claudeImportMode;
+  const hasOverlay = formOverlay || moveMode || groupMode || talkMode || inboxMode || cloneMode;
   const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !hasOverlay });
 
   // Signal parent when an overlay with text input is active
@@ -79,30 +76,6 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     if (input === "n") { onShowForm(); return; }
     if (input === "i") { setInboxMode(true); return; }
     if (input === "g") { setGroupMode("menu"); return; }
-    if (input === "I") {
-      asyncState.run("Loading Claude sessions...", async () => {
-        const sessions = core.listClaudeSessions({ limit: 20 });
-        if (sessions.length === 0) {
-          status.show("No Claude sessions found");
-          return;
-        }
-        setClaudeSessions(sessions);
-        setClaudeSelectedIdx(0);
-        setClaudeImportMode(true);
-      });
-      return;
-    }
-    if (input === "/") {
-      asyncState.run("Indexing transcripts...", async () => {
-        const count = await core.indexTranscripts({
-          onProgress: (indexed, files) => {
-            status.show(`Indexing... ${files} files, ${indexed} entries`);
-          },
-        });
-        status.show(`Indexed ${count} transcript entries`);
-      });
-      return;
-    }
 
     // Cancel pending confirm on any non-d key
     if (confirmComplete && input !== "d") {
@@ -195,43 +168,6 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         actions.deleteGroup(groupSessions);
         setSel(0);
       }
-    }
-  });
-
-  useInput((input, key) => {
-    if (!claudeImportMode) return;
-
-    if (key.escape) {
-      setClaudeImportMode(false);
-      return;
-    }
-
-    if (input === "j" || key.downArrow) {
-      setClaudeSelectedIdx(i => Math.min(i + 1, claudeSessions.length - 1));
-      return;
-    }
-    if (input === "k" || key.upArrow) {
-      setClaudeSelectedIdx(i => Math.max(i - 1, 0));
-      return;
-    }
-
-    if (key.return) {
-      const selected = claudeSessions[claudeSelectedIdx];
-      if (!selected) return;
-
-      asyncState.run("Importing session...", () => {
-        const s = core.startSession({
-          summary: selected.summary?.slice(0, 100) || `Import ${selected.sessionId.slice(0, 8)}`,
-          repo: selected.project,
-          workdir: selected.project,
-          flow: "bare",
-        });
-        core.updateSession(s.id, { claude_session_id: selected.sessionId });
-        status.show(`Imported Claude session ${selected.sessionId.slice(0, 8)}`);
-        setClaudeImportMode(false);
-        refresh();
-      });
-      return;
     }
   });
 
@@ -343,18 +279,6 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
                 setMoveMode(false);
               }}
             />
-          )
-          : claudeImportMode ? (
-            <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-              <Text bold color="cyan">Import Claude Session (j/k to navigate, Enter to import, Esc to cancel)</Text>
-              <Text> </Text>
-              {claudeSessions.map((cs, idx) => (
-                <Text key={cs.sessionId} color={idx === claudeSelectedIdx ? "cyan" : undefined}>
-                  {idx === claudeSelectedIdx ? "▸ " : "  "}
-                  {cs.sessionId.slice(0, 8)}  {(cs.lastActivity || cs.timestamp || "").slice(0, 10)}  {cs.project.split("/").slice(-2).join("/")}  {cs.summary?.slice(0, 60) || "(no summary)"}
-                </Text>
-              ))}
-            </Box>
           )
           : <SessionDetail session={selected} sessions={sessions} pane={pane} />
         }

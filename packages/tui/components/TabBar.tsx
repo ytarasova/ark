@@ -1,16 +1,17 @@
 import React from "react";
 import { Box, Text } from "ink";
 
-export type Tab = "sessions" | "compute" | "agents" | "flows" | "recipes";
+export type Tab = "sessions" | "agents" | "tools" | "flows" | "history" | "compute";
 
-export const TABS: Tab[] = ["sessions", "compute", "agents", "flows", "recipes"];
+export const TABS: Tab[] = ["sessions", "agents", "tools", "flows", "history", "compute"];
 
 const TAB_KEYS: Record<Tab, string> = {
   sessions: "1",
-  compute: "2",
-  agents: "3",
+  agents: "2",
+  tools: "3",
   flows: "4",
-  recipes: "5",
+  history: "5",
+  compute: "6",
 };
 
 interface TabBarProps {

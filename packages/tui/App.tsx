@@ -12,6 +12,7 @@ import { SessionsTab } from "./tabs/SessionsTab.js";
 import { ComputeTab } from "./tabs/ComputeTab.js";
 import { AgentsTab } from "./tabs/AgentsTab.js";
 import { FlowsTab } from "./tabs/FlowsTab.js";
+import { HistoryTab } from "./tabs/HistoryTab.js";
 import { NewSessionForm } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
 
@@ -69,13 +70,15 @@ export function App() {
     } else if (input === "1") {
       switchTab("sessions");
     } else if (input === "2") {
-      switchTab("compute");
-    } else if (input === "3") {
       switchTab("agents");
+    } else if (input === "3") {
+      switchTab("tools");
     } else if (input === "4") {
       switchTab("flows");
     } else if (input === "5") {
-      switchTab("recipes");
+      switchTab("history");
+    } else if (input === "6") {
+      switchTab("compute");
     }
   });
 
@@ -99,6 +102,16 @@ export function App() {
             />
           ) : undefined}
         />
+      ) : tab === "agents" ? (
+        <AgentsTab {...store} pane={pane} />
+      ) : tab === "tools" ? (
+        <Box flexGrow={1} justifyContent="center" alignItems="center">
+          <Text dimColor>{"Tools — coming soon (recipes, skills, prompt templates)"}</Text>
+        </Box>
+      ) : tab === "flows" ? (
+        <FlowsTab {...store} pane={pane} />
+      ) : tab === "history" ? (
+        <HistoryTab {...store} pane={pane} async={asyncState} />
       ) : tab === "compute" ? (
         <ComputeTab
           {...store}
@@ -109,15 +122,7 @@ export function App() {
             <NewComputeForm async={asyncState} onDone={() => setShowForm(null)} />
           ) : undefined}
         />
-      ) : tab === "agents" ? (
-        <AgentsTab {...store} pane={pane} />
-      ) : tab === "flows" ? (
-        <FlowsTab {...store} pane={pane} />
-      ) : (
-        <Box flexGrow={1} justifyContent="center" alignItems="center">
-          <Text dimColor>{"Recipes - coming soon"}</Text>
-        </Box>
-      )}
+      ) : null}
 
       <EventLog
         expanded={eventLogExpanded}

@@ -150,7 +150,7 @@ stages:
 
 ## TUI Keyboard Shortcuts
 
-**Sessions tab:**
+**Sessions tab (1):**
 | Key | Action | Key | Action |
 |-----|--------|-----|--------|
 | `j/k` | Navigate sessions | `n` | New session |
@@ -159,11 +159,13 @@ stages:
 | `x` | Delete session | `d` | Mark done (press twice) |
 | `c` | Clone session | `m` | Move to group |
 | `i` | Inbox/threads | `g` | Group manager |
-| `I` | Import Claude session | `/` | Rebuild search index |
 | `Tab` | Focus detail pane | `e` | Expand events |
-| `1-5` | Switch tabs | `q` | Quit |
 
-**Compute tab:** `Enter`:provision `s`:start/stop `c`:clean `n`:new `x`:delete
+**History tab (5):** `Enter`:import `/:index` `r`:refresh `s`:search
+
+**Compute tab (6):** `Enter`:provision `s`:start/stop `c`:clean `n`:new `x`:delete
+
+**Global:** `1-6`:switch tabs `Tab`:toggle pane `e`:events `q`:quit
 
 ## App Boot System
 

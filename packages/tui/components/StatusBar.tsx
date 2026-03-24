@@ -71,8 +71,6 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
   hints.push(<KeyHint key="i" k="i" label="threads" />);
   hints.push(<KeyHint key="g" k="g" label="groups" />);
   hints.push(<KeyHint key="n" k="n" label="new" />);
-  hints.push(<KeyHint key="I" k="I" label="import" />);
-  hints.push(<KeyHint key="/" k="/" label="index" />);
   hints.push(<KeyHint key="q" k="q" label="quit" />);
   return hints;
 }
@@ -83,6 +81,17 @@ function getComputeHints(): React.ReactNode[] {
     <KeyHint key="s" k="s" label="start/stop" />,
     <KeyHint key="c" k="c" label="clean" />,
     <KeyHint key="n" k="n" label="new" />,
+    <KeyHint key="q" k="q" label="quit" />,
+  ];
+}
+
+function getHistoryHints(): React.ReactNode[] {
+  return [
+    <KeyHint key="jk" k="j/k" label="move" />,
+    <KeyHint key="enter" k="Enter" label="import" />,
+    <KeyHint key="/" k="/" label="index" />,
+    <KeyHint key="r" k="r" label="refresh" />,
+    <KeyHint key="s" k="s" label="search" />,
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
@@ -100,6 +109,7 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
   const hints = pane === "right" ? getRightPaneHints()
     : tab === "sessions" ? getSessionHints(selectedSession)
     : tab === "compute" ? getComputeHints()
+    : tab === "history" ? getHistoryHints()
     : getGenericHints();
 
   return (
