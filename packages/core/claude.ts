@@ -221,12 +221,11 @@ const CHANNEL_PROMPT_MARKERS = [
   "I am using this for local",
   "local channel development",
 ];
-// Only exit polling when Claude is actively working (tool use / streaming)
-const SUCCESS_MARKERS = ["Searching", "Reading", "Writing", "⏺", "✳", "✶"];
-
 /**
  * Poll tmux pane for the channel development prompt and auto-accept it.
- * Fire-and-forget — returns a promise but callers don't need to await it.
+ * Keeps polling until it finds the prompt or times out. No early exit —
+ * if Claude is already past the prompt, the markers simply never match
+ * and the poller times out harmlessly.
  */
 export async function autoAcceptChannelPrompt(
   tmuxName: string,
@@ -245,10 +244,7 @@ export async function autoAcceptChannelPrompt(
         tmux.sendKeys(tmuxName, "Enter");
         return;
       }
-      if (SUCCESS_MARKERS.some(m => output.includes(m))) return;
-    } catch {
-      // Pane might not be ready yet — keep trying, don't exit
-    }
+    } catch {}
   }
 }
 
