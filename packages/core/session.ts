@@ -364,13 +364,13 @@ export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boole
   if (existsSync(wtPath)) {
     const repo = session.workdir ?? session.repo;
     if (repo) {
-      try {
-        await new Promise<void>((resolve) => {
-          const { spawn } = require("child_process");
-          const cp = spawn("git", ["-C", repo, "worktree", "remove", "--force", wtPath], { stdio: "pipe" });
-          cp.on("close", () => resolve());
-        });
-      } catch {
+      const ok = await new Promise<boolean>((resolve) => {
+        const { spawn: sp } = require("child_process");
+        const cp = sp("git", ["-C", repo, "worktree", "remove", "--force", wtPath], { stdio: "pipe" });
+        cp.on("close", (code: number | null) => resolve(code === 0));
+        cp.on("error", () => resolve(false));
+      });
+      if (!ok) {
         try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
       }
     } else {
