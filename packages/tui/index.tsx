@@ -1,17 +1,20 @@
 #!/usr/bin/env bun
 import React from "react";
 import { render } from "ink";
-import { appendFileSync, mkdirSync } from "fs";
+import { appendFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { AppContext, setApp } from "../core/app.js";
+import { loadConfig } from "../core/config.js";
 import { App } from "./App.js";
-import { getPostExitAction } from "./post-exit.js";
+import { AppProvider } from "./context/AppProvider.js";
 
-// ── Global logging ──────────────────────────────────────────────────────────
-const ARK_BASE = process.env.ARK_TEST_DIR ?? join(homedir(), ".ark");
-const LOG_DIR = join(ARK_BASE, "logs");
-mkdirSync(LOG_DIR, { recursive: true });
-const LOG_FILE = join(LOG_DIR, "tui.log");
+// ── Boot application ────────────────────────────────────────────────────────
+const app = new AppContext(loadConfig());
+await app.boot();
+setApp(app);
+
+// ── Logging ─────────────────────────────────────────────────────────────────
+const LOG_FILE = join(app.config.logDir, "tui.log");
 
 function log(level: string, msg: string): void {
   const ts = new Date().toISOString();
@@ -25,34 +28,27 @@ process.on("unhandledRejection", (err: any) => {
 process.on("uncaughtException", (err: any) => {
   log("CRASH", `${err?.message ?? err}\n${err?.stack ?? ""}`);
   process.stderr.write(`\nTUI crash: ${err?.message ?? err}\nLog: ${LOG_FILE}\n`);
-  process.exit(1);
+  app.shutdown().then(() => process.exit(1));
 });
 
-log("INFO", "TUI starting");
-
-// ── Start embedded conductor ────────────────────────────────────────────────
-import { startConductor } from "../core/conductor.js";
-const conductorPort = parseInt(process.env.ARK_CONDUCTOR_PORT ?? "19100", 10);
-try {
-  startConductor(conductorPort, { quiet: true });
-  log("INFO", `Conductor started on port ${conductorPort}`);
-} catch (e: any) {
-  log("WARN", `Conductor start failed (may already be running): ${e.message}`);
-}
+log("INFO", `TUI starting (conductor port ${app.config.conductorPort})`);
 
 // ── Terminal check ──────────────────────────────────────────────────────────
 if (!process.stdin.isTTY) {
   log("ERROR", "stdin is not a TTY");
   process.stderr.write("Error: ark tui requires a terminal (TTY)\n");
+  await app.shutdown();
   process.exit(1);
 }
 
 try { process.stdin.setRawMode(true); process.stdin.setRawMode(false); } catch {}
 
-// ── Render ───────────────────────────────────────────────────────────────────
+// ── Render ──────────────────────────────────────────────────────────────────
 try {
   const { waitUntilExit } = render(
-    <App />,
+    <AppProvider app={app}>
+      <App />
+    </AppProvider>,
     { patchConsole: false, exitOnCtrlC: true },
   );
   log("INFO", "TUI rendered");
@@ -61,8 +57,8 @@ try {
 } catch (e: any) {
   log("CRASH", `Render failed: ${e.message}\n${e.stack}`);
   process.stderr.write(`\nTUI failed: ${e.message}\nLog: ${LOG_FILE}\n`);
+  await app.shutdown();
   process.exit(1);
 }
 
-// Post-exit actions (attach/ssh) are now handled inline in components
-// via Bun.Terminal PTY — no need to exit/re-launch the TUI
+await app.shutdown();
