@@ -16,6 +16,12 @@ import { existsSync } from "fs";
 import { execSync } from "child_process";
 import * as core from "../core/index.js";
 import { getProvider } from "../compute/index.js";
+import { AppContext, setApp } from "../core/app.js";
+import { loadConfig } from "../core/config.js";
+
+const app = new AppContext(loadConfig());
+await app.boot();
+setApp(app);
 
 const program = new Command()
   .name("ark")
@@ -657,4 +663,5 @@ program.command("conductor")
 
 // ── Run ─────────────────────────────────────────────────────────────────────
 
-program.parse();
+await program.parseAsync(process.argv);
+await app.shutdown();
