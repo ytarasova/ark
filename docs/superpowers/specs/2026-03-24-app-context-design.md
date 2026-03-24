@@ -75,22 +75,23 @@ function setApp(app: AppContext): void;
 **Constructor:** Zero side effects. Only stores config and options.
 
 **Boot order:**
-1. Ensure directories exist
-2. Open database + run schema migrations
+1. Ensure directories exist (`arkDir`, `tracksDir`, `worktreesDir`, `logDir`)
+2. Open database + run schema migrations + seed local compute row
 3. Create event bus
-4. Start conductor (if opted in)
-5. Start metrics poller (if opted in)
-6. Register SIGINT/SIGTERM handlers
+4. Start conductor (if opted in) — extracted from current `startConductor()`, metrics polling extracted into separate stoppable service
+5. Start metrics poller (if opted in) — extracted from conductor.ts into its own interval with a stored handle
+6. Register SIGINT/SIGTERM handlers (double-signal force-exits if shutdown is already in progress)
 7. Set phase to `ready`, emit `app_ready`
 
 **Shutdown order (reverse):**
-1. Stop metrics poller
-2. Stop conductor
+1. Stop metrics poller (clear interval handle)
+2. Stop conductor (`Bun.serve().stop()`)
 3. Emit `app_shutdown`
 4. Close database
-5. Set phase to `stopped`
+5. Remove temp dir if `env === "test"`
+6. Set phase to `stopped`
 
-Shutdown is idempotent — safe to call multiple times.
+Shutdown is idempotent — safe to call multiple times. `boot()` throws if called when phase is not `created`.
 
 ### Entry Points
 
@@ -99,7 +100,8 @@ Shutdown is idempotent — safe to call multiple times.
 const app = new AppContext();
 await app.boot();
 setApp(app);
-// ... run command via Commander ...
+// ... run command via Commander (use parseAsync() for proper await) ...
+await program.parseAsync();
 await app.shutdown();
 ```
 
@@ -135,12 +137,22 @@ Components access `app.config`, `app.db`, `app.eventBus` via the hook. The `useS
 Existing code keeps working during migration. The current path functions and `getDb()` become thin delegates:
 
 ```ts
-// store.ts shims
-export function ARK_DIR(): string { return getApp().config.arkDir; }
-export function TRACKS_DIR(): string { return getApp().config.tracksDir; }
-export function WORKTREES_DIR(): string { return getApp().config.worktreesDir; }
-export function getDb(): Database { return getApp().db; }
+// store.ts shims — migration-safe, fall back to legacy context if AppContext not yet set
+import { getApp } from "./app.js";
+import { getContext } from "./context.js";
+
+function appOrFallback(): { config: ArkConfig; db: Database } {
+  try { return getApp(); } catch { return legacyFallback(); }
+}
+
+export function ARK_DIR(): string { return appOrFallback().config.arkDir; }
+export function DB_PATH(): string { return appOrFallback().config.dbPath; }
+export function TRACKS_DIR(): string { return appOrFallback().config.tracksDir; }
+export function WORKTREES_DIR(): string { return appOrFallback().config.worktreesDir; }
+export function getDb(): Database { return appOrFallback().db; }
 ```
+
+The `appOrFallback()` pattern prevents breakage during migration — code that runs before `setApp()` still works via the legacy `getContext()` path, but logs a deprecation warning. Once all entry points boot via AppContext, the fallback is removed.
 
 Modules migrate gradually from `import { TRACKS_DIR } from "./store.js"` to `import { getApp } from "./app.js"`. Shims are removed once all consumers are migrated.
 
@@ -152,6 +164,8 @@ After full migration:
 - `_initialized` WeakSet in store.ts
 - Scattered `process.env` reads for paths and ports
 - Manual `ctx.cleanup()` in tests
+
+**Out of scope:** `channel.ts` reads `ARK_SESSION_ID`, `ARK_CONDUCTOR_URL`, `ARK_CHANNEL_PORT` from env vars. These are set per-agent-subprocess (not per-app-instance) and belong outside AppContext. The channel runs as a standalone MCP server process.
 
 ## File Layout
 
@@ -166,7 +180,7 @@ packages/core/app.ts       # AppContext class + getApp()/setApp()
 | File | Change |
 |------|--------|
 | `store.ts` | Path functions become shims. `initSchema()` called by AppContext.boot(). |
-| `conductor.ts` | Returns stoppable handle. Receives config instead of reading env vars. |
+| `conductor.ts` | Returns stoppable handle. Receives config instead of reading env vars. Metrics polling extracted into separate service. `eventBus` accessed via `getApp().eventBus` instead of module-level import. |
 | `session.ts` | Reads paths from `getApp().config`. |
 | `agent.ts` | `USER_DIR()` reads from `getApp().config.arkDir`. |
 | `flow.ts` | Same as agent.ts. |
@@ -182,11 +196,15 @@ packages/core/app.ts       # AppContext class + getApp()/setApp()
 - **Event-driven TUI:** Replace polling with eventBus subscriptions. Store mutations emit events, TUI re-renders on change.
 - **Hierarchical config:** Support `~/.ark/config.yaml` and per-project `.ark.yaml`, env vars override file.
 - **Registry-based container:** If services grow past ~10, add auto-dependency resolution via topological sort.
+- **Provider DI:** Compute providers currently import from store.ts directly. Long-term, pass dependencies (DB, config) through function arguments instead of singleton imports.
 
 ## Testing Strategy
 
 - Unit tests for `loadConfig()` — env var parsing, defaults, overrides.
-- Unit tests for `AppContext` lifecycle — boot order, shutdown order, idempotent shutdown, phase transitions.
-- Integration test: `AppContext.forTest()` creates isolated DB, queries work, shutdown cleans up.
+- Unit tests for `AppContext` lifecycle — boot order, shutdown order, idempotent shutdown, phase transitions, double-boot guard.
+- Boot failure tests — locked DB file, conductor port already in use. Verify partial boot cleans up (if step 4 fails, steps 1-3 are torn down).
+- Integration test: `AppContext.forTest()` creates isolated DB, queries work, shutdown cleans up temp dir.
 - E2e: TuiDriver uses `AppContext.forTest()` for in-process state + passes config to tmux subprocess.
 - Migration: existing tests keep passing through shims during gradual migration.
+
+**`forTest()` specifics:** Creates temp dir, sets `env: "test"`, disables conductor and metrics polling. `shutdown()` closes DB and removes temp dir.
