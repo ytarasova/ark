@@ -35,6 +35,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const [talkMode, setTalkMode] = useState(false);
   const [inboxMode, setInboxMode] = useState(false);
   const [cloneMode, setCloneMode] = useState(false);
+  const [confirmComplete, setConfirmComplete] = useState(false);
   const status = useStatusMessage();
 
   // Top-level sessions only (exclude fork children from list)
@@ -67,13 +68,19 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     if (formOverlay) return;
     if (hasOverlay) return; // let overlay handle input
 
+    // Cancel pending confirm on any non-c key
+    if (confirmComplete && input !== "c") {
+      setConfirmComplete(false);
+      status.clear();
+    }
+
     if (key.return) {
       if (selected && (selected.status === "ready" || selected.status === "blocked")) {
         asyncState.run(`Dispatching ${selected.id}`, async () => {
           await core.dispatch(selected.id);
           refresh();
         });
-      } else if (selected && (selected.status === "failed" || selected.status === "stopped")) {
+      } else if (selected && ["failed", "stopped", "completed"].includes(selected.status)) {
         asyncState.run(`Restarting ${selected.id}`, async () => {
           await core.resume(selected.id);
           refresh();
@@ -87,7 +94,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         });
       }
     } else if (input === "r") {
-      if (selected && ["blocked", "failed", "stopped"].includes(selected.status)) {
+      if (selected && ["blocked", "failed", "stopped", "completed"].includes(selected.status)) {
         asyncState.run(`Resuming ${selected.id}`, async () => {
           await core.resume(selected.id);
           refresh();
@@ -95,10 +102,16 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       }
     } else if (input === "c") {
       if (selected && selected.status === "running") {
-        asyncState.run(`Completing ${selected.id}`, async () => {
-          core.complete(selected.id);
-          refresh();
-        });
+        if (confirmComplete) {
+          asyncState.run(`Completing ${selected.id}`, async () => {
+            core.complete(selected.id);
+            refresh();
+          });
+          setConfirmComplete(false);
+        } else {
+          setConfirmComplete(true);
+          status.show(`Complete '${selected.summary ?? selected.id}'? Press c again to confirm, any other key to cancel`);
+        }
       }
     } else if (input === "x") {
       if (selected) {

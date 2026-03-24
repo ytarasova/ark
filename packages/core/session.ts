@@ -157,7 +157,6 @@ export function stop(sessionId: string): { ok: boolean; message: string } {
 export async function resume(sessionId: string): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
-  if (session.status === "completed") return { ok: false, message: "Already completed" };
   if (session.status === "running" && session.session_id) return { ok: false, message: "Already running" };
 
   if (session.session_id) tmux.killSession(session.session_id);

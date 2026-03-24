@@ -56,6 +56,7 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
         hints.push(<KeyHint key="x" k="x" label="delete" />);
         break;
       case "completed":
+        hints.push(<KeyHint key="enter" k="Enter" label="restart" />);
         hints.push(<KeyHint key="x" k="x" label="delete" />);
         break;
       case "waiting":
