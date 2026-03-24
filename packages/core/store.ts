@@ -10,7 +10,8 @@
 
 import { Database } from "bun:sqlite";
 import { randomBytes } from "crypto";
-import { mkdirSync, existsSync } from "fs";
+import { mkdirSync, existsSync, rmSync } from "fs";
+import { execFileSync } from "child_process";
 import { join } from "path";
 import { homedir } from "os";
 import {
@@ -300,6 +301,27 @@ export function updateSession(id: string, fields: Partial<Session>): Session | n
 
 export function deleteSession(id: string): boolean {
   const db = getDb();
+
+  // Clean up worktree if it exists
+  const wtPath = join(get.WORKTREES_DIR, id);
+  if (existsSync(wtPath)) {
+    // Try proper git worktree remove first, fall back to rm
+    const session = getSession(id);
+    const repo = session?.workdir ?? session?.repo;
+    if (repo) {
+      try {
+        execFileSync("git", ["-C", repo, "worktree", "remove", "--force", wtPath], { stdio: "pipe" });
+      } catch {
+        // git worktree remove failed — remove directory manually and prune
+        try { rmSync(wtPath, { recursive: true, force: true }); } catch { /* ignore */ }
+        try { execFileSync("git", ["-C", repo, "worktree", "prune"], { stdio: "pipe" }); } catch { /* ignore */ }
+      }
+    } else {
+      // No repo context — just remove the directory
+      try { rmSync(wtPath, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
+  }
+
   db.prepare("DELETE FROM events WHERE track_id = ?").run(id);
   const result = db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
   return result.changes > 0;
