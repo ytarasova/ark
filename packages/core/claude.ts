@@ -221,7 +221,8 @@ const CHANNEL_PROMPT_MARKERS = [
   "I am using this for local",
   "local channel development",
 ];
-const SUCCESS_MARKERS = ["Welcome", "╭", "❯ /"];
+// Only exit polling when Claude is actively working (tool use / streaming)
+const SUCCESS_MARKERS = ["Searching", "Reading", "Writing", "⏺", "✳", "✶"];
 
 /**
  * Poll tmux pane for the channel development prompt and auto-accept it.
