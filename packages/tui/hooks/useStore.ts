@@ -56,11 +56,13 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
         continue;
       }
 
-      // Claude's working spinner chars — if none visible in last lines, Claude is idle
-      const workingChars = ["✳", "✶", "✢", "✽", "·"];
-      const lastLines = text.split("\n").slice(-5).join("");
-      const isWorking = workingChars.some(c => lastLines.includes(c));
-      if (!isWorking && text.includes("❯") && text.length > 100) {
+      // Claude's working spinner chars (exclude · which appears in static status bar)
+      const workingChars = ["✳", "✶", "✢", "✽"];
+      // Check lines above the status bar (skip last 2 lines which are static chrome)
+      const lines = text.split("\n");
+      const contentLines = lines.slice(-8, -2).join("");
+      const isWorking = workingChars.some(c => contentLines.includes(c));
+      if (!isWorking && text.includes("❯")) {
         s.status = "waiting";
       }
     } catch {}

@@ -131,29 +131,36 @@ export interface LauncherOpts {
   mcpConfigPath: string;
   claudeSessionId?: string;
   prevClaudeSessionId?: string | null;
+  /** Session name for --remote-control flag */
+  sessionName?: string;
 }
 
 /** Generate launcher bash script content. */
 export function buildLauncher(opts: LauncherOpts): { content: string; claudeSessionId: string } {
   const claudeSessionId = opts.claudeSessionId ?? randomUUID();
   const claudeCmd = shellQuoteArgs(opts.claudeArgs);
-  const channelFlags = `--mcp-config ${shellQuote(opts.mcpConfigPath)} --dangerously-load-development-channels server:ark-channel`;
+  // Channel + remote control flags (mcp-config BEFORE the channel flag)
+  const extraFlags = [
+    `--mcp-config ${shellQuote(opts.mcpConfigPath)}`,
+    `--dangerously-load-development-channels server:ark-channel`,
+    `--remote-control ${opts.sessionName ?? "ark"}`,
+  ].join(" \\\n  ");
 
   let content: string;
   if (opts.prevClaudeSessionId) {
     content = `#!/bin/bash
 cd ${shellQuote(opts.workdir)}
-${claudeCmd} --resume ${shellQuote(opts.prevClaudeSessionId)} --dangerously-skip-permissions \\
-  ${channelFlags} || \\
-${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\
-  ${channelFlags}
+${claudeCmd} --resume ${shellQuote(opts.prevClaudeSessionId)} \\
+  ${extraFlags} || \\
+${claudeCmd} --session-id ${shellQuote(claudeSessionId)} \\
+  ${extraFlags}
 exec bash
 `;
   } else {
     content = `#!/bin/bash
 cd ${shellQuote(opts.workdir)}
-${claudeCmd} --session-id ${shellQuote(claudeSessionId)} --dangerously-skip-permissions \\
-  ${channelFlags}
+${claudeCmd} --session-id ${shellQuote(claudeSessionId)} \\
+  ${extraFlags}
 exec bash
 `;
   }
