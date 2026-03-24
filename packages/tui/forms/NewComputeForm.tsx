@@ -135,7 +135,7 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
   const profileOptions = getAwsProfiles().map((p) => ({ label: p, value: p }));
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+    <Box flexDirection="column" flexGrow={1}>
       <Text bold color="cyan">{" New Compute "}</Text>
       <Text> </Text>
 

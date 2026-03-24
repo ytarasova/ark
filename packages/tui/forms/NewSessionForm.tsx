@@ -153,7 +153,7 @@ export function NewSessionForm({
   });
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+    <Box flexDirection="column" flexGrow={1}>
       <Text bold color="cyan">{" New Session "}</Text>
       <Text> </Text>
 
@@ -235,7 +235,7 @@ export function NewSessionForm({
         )}
       </FormField>
 
-      <Text> </Text>
+      <Box flexGrow={1} />
       <Text dimColor>{"  j/k:navigate  Enter:edit/select  Tab:complete  Esc:back"}</Text>
     </Box>
   );
@@ -250,7 +250,7 @@ function FormField({ label, active, editing, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <Box>
+    <Box marginBottom={1}>
       <Text color={active ? "cyan" : "gray"}>
         {active ? (editing ? "* " : "> ") : "  "}
       </Text>

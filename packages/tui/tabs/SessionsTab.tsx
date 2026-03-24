@@ -428,7 +428,7 @@ function MoveToGroup({ session, onDone }: MoveToGroupProps) {
 
   if (mode === "new") {
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+      <Box flexDirection="column" flexGrow={1}>
         <Text bold color="cyan">{" Move to Group "}</Text>
         <Text> </Text>
         <Text>{`Session: ${session?.summary ?? session?.id}`}</Text>
@@ -443,13 +443,13 @@ function MoveToGroup({ session, onDone }: MoveToGroupProps) {
             placeholder="Enter group name..."
           />
         </Box>
-        <Text dimColor>{"  Enter to confirm, Esc to cancel"}</Text>
+        <Box flexGrow={1} /><Text dimColor>{"  Enter to confirm, Esc to cancel"}</Text>
       </Box>
     );
   }
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+    <Box flexDirection="column" flexGrow={1}>
       <Text bold color="cyan">{" Move to Group "}</Text>
       <Text> </Text>
       <Text>{`Session: ${session?.summary ?? session?.id}`}</Text>
@@ -466,7 +466,7 @@ function MoveToGroup({ session, onDone }: MoveToGroupProps) {
           }
         }}
       />
-      <Text dimColor>{"  Esc to cancel"}</Text>
+      <Box flexGrow={1} /><Text dimColor>{"  Esc to cancel"}</Text>
     </Box>
   );
 }
@@ -492,7 +492,7 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
 
   if (action === "create") {
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+      <Box flexDirection="column" flexGrow={1}>
         <Text bold color="cyan">{" Create Group "}</Text>
         <Text> </Text>
         <Text>{"Group name:"}</Text>
@@ -509,7 +509,7 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
             placeholder="Enter group name..."
           />
         </Box>
-        <Text dimColor>{"  Enter to create, Esc to go back"}</Text>
+        <Box flexGrow={1} /><Text dimColor>{"  Enter to create, Esc to go back"}</Text>
       </Box>
     );
   }
@@ -522,17 +522,17 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
 
     if (deleteChoices.length === 0) {
       return (
-        <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+        <Box flexDirection="column" flexGrow={1}>
           <Text bold color="cyan">{" Delete Group "}</Text>
           <Text> </Text>
           <Text dimColor>{"  No groups to delete."}</Text>
-          <Text dimColor>{"  Esc to go back"}</Text>
+          <Box flexGrow={1} /><Text dimColor>{"  Esc to go back"}</Text>
         </Box>
       );
     }
 
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+      <Box flexDirection="column" flexGrow={1}>
         <Text bold color="red">{" Delete Group "}</Text>
         <Text> </Text>
         <Text>{"Select group to delete:"}</Text>
@@ -552,14 +552,14 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
             onDone(`Deleted group '${item.value}' (${groupSessions.length} sessions removed)`);
           }}
         />
-        <Text dimColor>{"  Esc to go back"}</Text>
+        <Box flexGrow={1} /><Text dimColor>{"  Esc to go back"}</Text>
       </Box>
     );
   }
 
   // Menu
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+    <Box flexDirection="column" flexGrow={1}>
       <Text bold color="cyan">{" Groups "}</Text>
       <Text> </Text>
       <SelectMenu
@@ -580,7 +580,7 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
         </>
       )}
       <Text> </Text>
-      <Text dimColor>{"  Esc to cancel"}</Text>
+      <Box flexGrow={1} /><Text dimColor>{"  Esc to cancel"}</Text>
     </Box>
   );
 }
