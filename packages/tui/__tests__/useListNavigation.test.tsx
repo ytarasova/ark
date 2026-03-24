@@ -74,28 +74,7 @@ describe("useListNavigation", () => {
     unmount();
   });
 
-  it("g jumps to first item", async () => {
-    const { lastFrame, stdin, unmount } = render(
-      <TestList items={["a", "b", "c"]} />
-    );
-    stdin.write("j");
-    stdin.write("j");
-    await new Promise(r => setTimeout(r, 50));
-    stdin.write("g");
-    await new Promise(r => setTimeout(r, 50));
-    expect(lastFrame()!).toContain("[a]");
-    unmount();
-  });
-
-  it("G jumps to last item", async () => {
-    const { lastFrame, stdin, unmount } = render(
-      <TestList items={["a", "b", "c"]} />
-    );
-    stdin.write("G");
-    await new Promise(r => setTimeout(r, 50));
-    expect(lastFrame()!).toContain("[c]");
-    unmount();
-  });
+  // g/G removed from useListNavigation (conflicts with 'g:groups' in SessionsTab)
 
   it("ignores keys when active=false", async () => {
     const { lastFrame, stdin, unmount } = render(

@@ -27,10 +27,6 @@ export function useListNavigation(length: number, opts?: UseListNavigationOpts) 
       setSel(s => Math.min(s + 1, length - 1));
     } else if (input === "k" || key.upArrow) {
       setSel(s => Math.max(s - 1, 0));
-    } else if (input === "g") {
-      setSel(0);
-    } else if (input === "G") {
-      setSel(Math.max(0, length - 1));
     }
   });
 
