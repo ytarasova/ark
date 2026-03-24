@@ -154,38 +154,6 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
 
   if (!opts?.quiet) console.log(`Ark conductor listening on localhost:${port}`);
 
-  // Background metrics polling - every 30 seconds
-  let polling = false;
-  setInterval(async () => {
-    if (polling) return;
-    polling = true;
-    try {
-      const computes = store.listCompute({ status: "running" });
-      for (const compute of computes) {
-        const provider = getProvider(compute.provider);
-        if (!provider) continue;
-        try {
-          // Fetch metrics (results are used by TUI which reads from provider directly)
-          await provider.getMetrics(compute);
-
-          // Probe ports for running sessions on this compute
-          const sessions = store.listSessions({ status: "running" });
-          for (const s of sessions) {
-            if (s.compute_name !== compute.name) continue;
-            const ports = (s.config as any)?.ports ?? [];
-            if (ports.length > 0) {
-              const status = await provider.probePorts(compute, ports);
-              // Update session config with port status
-              store.updateSession(s.id, {
-                config: { ...s.config, ports: status },
-              });
-            }
-          }
-        } catch { /* compute unreachable, skip */ }
-      }
-    } catch { /* ignore polling errors */ } finally { polling = false; }
-  }, 30_000);
-
   return server;
 }
 
