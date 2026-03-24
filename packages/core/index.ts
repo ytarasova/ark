@@ -49,3 +49,6 @@ export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getI
 
 // Conductor
 export { startConductor } from "./conductor.js";
+
+// Claude sessions
+export { listClaudeSessions, getClaudeSession, type ClaudeSession } from "./claude-sessions.js";
