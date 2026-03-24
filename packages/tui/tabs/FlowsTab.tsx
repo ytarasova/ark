@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Text } from "ink";
 import * as core from "../../core/index.js";
 import { SplitPane } from "../components/SplitPane.js";
@@ -51,7 +51,9 @@ function FlowDetail({ flow, pane }: FlowDetailProps) {
     return <Text dimColor>{"  No flow selected"}</Text>;
   }
 
-  const p = core.loadFlow(flow.name);
+  const p = useMemo(() => {
+    try { return core.loadFlow(flow.name); } catch { return null; }
+  }, [flow.name]);
   if (!p) {
     return <Text dimColor>{"  Failed to load flow"}</Text>;
   }

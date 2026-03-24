@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Text } from "ink";
 import * as core from "../../core/index.js";
 import { SplitPane } from "../components/SplitPane.js";
@@ -52,7 +52,9 @@ function AgentDetail({ agent, pane }: AgentDetailProps) {
   }
 
   // Load full agent definition for detail view
-  const a = core.loadAgent(agent.name);
+  const a = useMemo(() => {
+    try { return core.loadAgent(agent.name); } catch { return null; }
+  }, [agent.name]);
   if (!a) {
     return <Text dimColor>{"  Failed to load agent"}</Text>;
   }

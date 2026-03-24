@@ -67,6 +67,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     [topLevel, selectedGroup],
   );
 
+  // Memoize group list — depends on sessions (groups derived from session group_names + groups table)
+  const groups = useMemo(() => core.getGroups(), [sessions]);
+
   const actions = useSessionActions(asyncState);
 
   useInput((input, key) => {
@@ -77,14 +80,16 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     if (input === "i") { setInboxMode(true); return; }
     if (input === "g") { setGroupMode("menu"); return; }
     if (input === "I") {
-      const sessions = core.listClaudeSessions({ limit: 20 });
-      if (sessions.length === 0) {
-        status.show("No Claude sessions found");
-        return;
-      }
-      setClaudeSessions(sessions);
-      setClaudeSelectedIdx(0);
-      setClaudeImportMode(true);
+      asyncState.run("Loading Claude sessions...", async () => {
+        const sessions = core.listClaudeSessions({ limit: 20 });
+        if (sessions.length === 0) {
+          status.show("No Claude sessions found");
+          return;
+        }
+        setClaudeSessions(sessions);
+        setClaudeSelectedIdx(0);
+        setClaudeImportMode(true);
+      });
       return;
     }
     if (input === "/") {
@@ -128,37 +133,40 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       actions.delete(selected.id);
     } else if (input === "a") {
       if (selected?.session_id) {
-        // Verify tmux session exists
-        if (!core.sessionExists(selected.session_id)) {
-          status.show(`No active tmux session for ${selected.id}. Try re-dispatching.`);
-          return;
-        }
-        // Attach: mute Ink, reset terminal for tmux, spawn+wait, restore Ink
         const sid = selected.session_id;
-        const origWrite = process.stdout.write.bind(process.stdout);
-        const origErrWrite = process.stderr.write.bind(process.stderr);
-        process.stdout.write = (() => true) as any;
-        process.stderr.write = (() => true) as any;
-        setTimeout(() => {
-          process.stdout.write = origWrite;
-          process.stderr.write = origErrWrite;
-          // Reset terminal state so tmux gets a clean terminal
-          try { process.stdin.setRawMode(false); } catch {}
-          process.stdout.write("\x1b[?1049l"); // exit alt screen if active
-          process.stdout.write("\x1b[?25h");    // show cursor
-          // Spawn tmux as child, block until detach
-          const result = Bun.spawnSync(["tmux", "attach", "-t", sid], {
-            stdin: "inherit",
-            stdout: "inherit",
-            stderr: "inherit",
-            env: { ...process.env, TERM: "xterm-256color" },
-          });
-          // Restore terminal for Ink
-          try { process.stdin.setRawMode(true); } catch {}
-          process.stdout.write("\x1b[?25l");      // hide cursor
-          process.stdout.write("\x1b[2J\x1b[H");  // clear screen
-          status.show("Detached from session");
-        }, 100);
+        const selectedId = selected.id;
+        asyncState.run("Checking session...", async () => {
+          const exists = await core.sessionExistsAsync(sid);
+          if (!exists) {
+            status.show(`No active tmux session for ${selectedId}. Try re-dispatching.`);
+            return;
+          }
+          // Attach: mute Ink, reset terminal for tmux, spawn+wait, restore Ink
+          const origWrite = process.stdout.write.bind(process.stdout);
+          const origErrWrite = process.stderr.write.bind(process.stderr);
+          process.stdout.write = (() => true) as any;
+          process.stderr.write = (() => true) as any;
+          setTimeout(() => {
+            process.stdout.write = origWrite;
+            process.stderr.write = origErrWrite;
+            // Reset terminal state so tmux gets a clean terminal
+            try { process.stdin.setRawMode(false); } catch {}
+            process.stdout.write("\x1b[?1049l"); // exit alt screen if active
+            process.stdout.write("\x1b[?25h");    // show cursor
+            // Spawn tmux as child, block until detach
+            const result = Bun.spawnSync(["tmux", "attach", "-t", sid], {
+              stdin: "inherit",
+              stdout: "inherit",
+              stderr: "inherit",
+              env: { ...process.env, TERM: "xterm-256color" },
+            });
+            // Restore terminal for Ink
+            try { process.stdin.setRawMode(true); } catch {}
+            process.stdout.write("\x1b[?25l");      // hide cursor
+            process.stdout.write("\x1b[2J\x1b[H");  // clear screen
+            status.show("Detached from session");
+          }, 100);
+        });
       }
     } else if (input === "m") {
       if (selected) setMoveMode(true);
@@ -211,16 +219,18 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       const selected = claudeSessions[claudeSelectedIdx];
       if (!selected) return;
 
-      const s = core.startSession({
-        summary: selected.summary?.slice(0, 100) || `Import ${selected.sessionId.slice(0, 8)}`,
-        repo: selected.project,
-        workdir: selected.project,
-        flow: "bare",
+      asyncState.run("Importing session...", () => {
+        const s = core.startSession({
+          summary: selected.summary?.slice(0, 100) || `Import ${selected.sessionId.slice(0, 8)}`,
+          repo: selected.project,
+          workdir: selected.project,
+          flow: "bare",
+        });
+        core.updateSession(s.id, { claude_session_id: selected.sessionId });
+        status.show(`Imported Claude session ${selected.sessionId.slice(0, 8)}`);
+        setClaudeImportMode(false);
+        refresh();
       });
-      core.updateSession(s.id, { claude_session_id: selected.sessionId });
-      status.show(`Imported Claude session ${selected.sessionId.slice(0, 8)}`);
-      setClaudeImportMode(false);
-      refresh();
       return;
     }
   });
@@ -236,7 +246,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
           <TreeList
             items={topLevel}
             groupBy={s => s.group_name ?? ""}
-            emptyGroups={core.getGroups()}
+            emptyGroups={groups}
             renderRow={(s, selected) => {
               const icon = ICON[s.status] ?? "?";
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
@@ -302,6 +312,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
           : talkMode ? (
             <TalkToSession
               session={selected}
+              asyncState={asyncState}
               onDone={(msg) => {
                 if (msg) status.show(msg);
                 setTalkMode(false);
@@ -311,6 +322,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
           : groupMode ? (
             <GroupManager
               sessions={topLevel}
+              asyncState={asyncState}
               onDone={(msg) => {
                 if (msg) { status.show(msg); refresh(); }
                 setGroupMode(false);
@@ -322,9 +334,11 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               session={selected}
               onDone={(group) => {
                 if (selected && group !== undefined) {
-                  core.updateSession(selected.id, { group_name: group || null });
-                  status.show(group ? `Moved to '${group}'` : "Removed from group");
-                  refresh();
+                  asyncState.run("Moving session...", () => {
+                    core.updateSession(selected.id, { group_name: group || null });
+                    status.show(group ? `Moved to '${group}'` : "Removed from group");
+                    refresh();
+                  });
                 }
                 setMoveMode(false);
               }}
@@ -363,16 +377,21 @@ interface SessionDetailProps {
 }
 
 function SessionDetail({ session: s, pane }: SessionDetailProps) {
+  const [events, setEvents] = useState<core.Event[]>([]);
+
+  useEffect(() => {
+    if (!s) { setEvents([]); return; }
+    try {
+      setEvents(core.getEvents(s.id, { limit: 50 }));
+    } catch {
+      setEvents([]);
+    }
+  }, [s?.id, s?.status]);
+
+  const channelPort = useMemo(() => s ? core.sessionChannelPort(s.id) : 0, [s?.id]);
+
   if (!s) {
     return <Text dimColor>{"  No session selected"}</Text>;
-  }
-
-  // Events
-  let events: core.Event[] = [];
-  try {
-    events = core.getEvents(s.id, { limit: 50 });
-  } catch {
-    // ignore
   }
   // Agent output - live polling via hook
   const agentOutput = useAgentOutput(
@@ -412,7 +431,7 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
       {/* Channel status */}
       {s.session_id && (s.status === "running" || s.status === "waiting") && (
         <Text color="green">
-          {`  ⚡ Channel: port ${core.sessionChannelPort(s.id)}`}
+          {`  ⚡ Channel: port ${channelPort}`}
         </Text>
       )}
 
@@ -465,7 +484,7 @@ interface MoveToGroupProps {
 function MoveToGroup({ session, onDone }: MoveToGroupProps) {
   const [newGroup, setNewGroup] = useState("");
   const [mode, setMode] = useState<"pick" | "new">("pick");
-  const existing = core.getGroups();
+  const existing = useMemo(() => core.getGroups(), []);
 
   useInput((input, key) => {
     if (key.escape) onDone(undefined);
@@ -490,7 +509,7 @@ function MoveToGroup({ session, onDone }: MoveToGroupProps) {
           <TextInputEnhanced
             value={newGroup}
             onChange={setNewGroup}
-            onSubmit={() => { if (newGroup.trim()) { core.createGroup(newGroup.trim()); onDone(newGroup.trim()); } }}
+            onSubmit={() => { if (newGroup.trim()) { onDone(newGroup.trim()); } }}
             placeholder="Enter group name..."
           />
         </Box>
@@ -526,13 +545,14 @@ function MoveToGroup({ session, onDone }: MoveToGroupProps) {
 
 interface GroupManagerProps {
   sessions: core.Session[];
+  asyncState: AsyncState;
   onDone: (message?: string) => void;
 }
 
-function GroupManager({ sessions, onDone }: GroupManagerProps) {
+function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps) {
   const [action, setAction] = useState<"menu" | "create" | "delete">("menu");
   const [newName, setNewName] = useState("");
-  const existing = core.getGroups();
+  const existing = useMemo(() => core.getGroups(), []);
 
   useInput((input, key) => {
     if (key.escape) {
@@ -554,8 +574,10 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
             onChange={setNewName}
             onSubmit={() => {
               if (!newName.trim()) return;
-              core.createGroup(newName.trim());
-              onDone(`Group '${newName.trim()}' created`);
+              asyncState.run("Creating group...", () => {
+                core.createGroup(newName.trim());
+                onDone(`Group '${newName.trim()}' created`);
+              });
             }}
             placeholder="Enter group name..."
           />
@@ -589,18 +611,20 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
         <Text>{"Select group to delete:"}</Text>
         <SelectMenu
           items={deleteChoices}
-          onSelect={async (item) => {
-            // Kill and delete all sessions in the group
-            const groupSessions = sessions.filter(s => s.group_name === item.value);
-            for (const s of groupSessions) {
-              if (s.session_id) {
-                try { await core.killSessionAsync(s.session_id); } catch {}
+          onSelect={(item) => {
+            asyncState.run("Deleting group...", async () => {
+              // Kill and delete all sessions in the group
+              const groupSessions = sessions.filter(s => s.group_name === item.value);
+              for (const s of groupSessions) {
+                if (s.session_id) {
+                  try { await core.killSessionAsync(s.session_id); } catch {}
+                }
+                core.deleteSession(s.id);
               }
-              core.deleteSession(s.id);
-            }
-            // Delete the group itself
-            core.deleteGroup(item.value);
-            onDone(`Deleted group '${item.value}' (${groupSessions.length} sessions removed)`);
+              // Delete the group itself
+              core.deleteGroup(item.value);
+              onDone(`Deleted group '${item.value}' (${groupSessions.length} sessions removed)`);
+            });
           }}
         />
         <Box flexGrow={1} /><Text dimColor>{"  Esc to go back"}</Text>
@@ -640,10 +664,11 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
 
 interface TalkToSessionProps {
   session: core.Session | null;
+  asyncState: AsyncState;
   onDone: (message?: string) => void;
 }
 
-function TalkToSession({ session, onDone }: TalkToSessionProps) {
+function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
   const [msg, setMsg] = useState("");
   const [messages, setMessages] = useState<core.Message[]>([]);
 
@@ -659,6 +684,8 @@ function TalkToSession({ session, onDone }: TalkToSessionProps) {
     return () => clearInterval(t);
   }, [session?.id]);
 
+  const channelPort = useMemo(() => session ? core.sessionChannelPort(session.id) : 0, [session?.id]);
+
   useInput((input, key) => {
     if (key.escape) onDone();
   });
@@ -668,30 +695,30 @@ function TalkToSession({ session, onDone }: TalkToSessionProps) {
     return null;
   }
 
-  const channelPort = core.sessionChannelPort(session.id);
-
-  const send = async () => {
+  const send = () => {
     if (!msg.trim()) return;
-    // Store outbound message
-    core.addMessage({ session_id: session.id, role: "user", content: msg.trim() });
-    setMessages(core.getMessages(session.id, { limit: 20 }));
     const text = msg.trim();
     setMsg("");
-    try {
-      await fetch(`http://localhost:${channelPort}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "steer",
-          sessionId: session.id,
-          message: text,
-          from: "user",
-        }),
-      });
-    } catch {
-      core.addMessage({ session_id: session.id, role: "system", content: `Failed to deliver (port ${channelPort})`, type: "error" });
+    asyncState.run("Sending message...", async () => {
+      // Store outbound message
+      core.addMessage({ session_id: session.id, role: "user", content: text });
       setMessages(core.getMessages(session.id, { limit: 20 }));
-    }
+      try {
+        await fetch(`http://localhost:${channelPort}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "steer",
+            sessionId: session.id,
+            message: text,
+            from: "user",
+          }),
+        });
+      } catch {
+        core.addMessage({ session_id: session.id, role: "system", content: `Failed to deliver (port ${channelPort})`, type: "error" });
+        setMessages(core.getMessages(session.id, { limit: 20 }));
+      }
+    });
   };
 
   return (
