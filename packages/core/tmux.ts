@@ -126,7 +126,7 @@ export async function capturePaneAsync(name: string, opts?: {
 
 /** Send text to a tmux session via load-buffer (handles long text without paste overflow) */
 export function sendText(name: string, text: string): void {
-  const tmpFile = join(TRACKS_DIR, `.msg-${Date.now()}.txt`);
+  const tmpFile = join(TRACKS_DIR(), `.msg-${Date.now()}.txt`);
   writeFileSync(tmpFile, text);
   try {
     execFileSync("tmux", ["load-buffer", "-b", "ark-msg", tmpFile], { stdio: "pipe" });
@@ -172,7 +172,7 @@ export function listArkSessions(): TmuxSession[] {
 
 /** Write a launcher script and return the path */
 export function writeLauncher(sessionId: string, content: string): string {
-  const dir = join(TRACKS_DIR, sessionId);
+  const dir = join(TRACKS_DIR(), sessionId);
   mkdirSync(dir, { recursive: true });
   const path = join(dir, "launch.sh");
   writeFileSync(path, content);

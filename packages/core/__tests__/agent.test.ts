@@ -18,7 +18,7 @@ import {
 import { ARK_DIR } from "../store.js";
 
 let ctx: TestContext;
-const agentDir = () => join(ARK_DIR, "agents");
+const agentDir = () => join(ARK_DIR(), "agents");
 
 function writeAgentYaml(name: string, data: Record<string, unknown>) {
   mkdirSync(agentDir(), { recursive: true });

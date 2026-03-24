@@ -8,7 +8,8 @@ import { App } from "./App.js";
 import { getPostExitAction } from "./post-exit.js";
 
 // ── Global logging ──────────────────────────────────────────────────────────
-const LOG_DIR = join(homedir(), ".ark", "logs");
+const ARK_BASE = process.env.ARK_TEST_DIR ?? join(homedir(), ".ark");
+const LOG_DIR = join(ARK_BASE, "logs");
 mkdirSync(LOG_DIR, { recursive: true });
 const LOG_FILE = join(LOG_DIR, "tui.log");
 
@@ -31,9 +32,10 @@ log("INFO", "TUI starting");
 
 // ── Start embedded conductor ────────────────────────────────────────────────
 import { startConductor } from "../core/conductor.js";
+const conductorPort = parseInt(process.env.ARK_CONDUCTOR_PORT ?? "19100", 10);
 try {
-  startConductor(19100, { quiet: true });
-  log("INFO", "Conductor started on port 19100");
+  startConductor(conductorPort, { quiet: true });
+  log("INFO", `Conductor started on port ${conductorPort}`);
 } catch (e: any) {
   log("WARN", `Conductor start failed (may already be running): ${e.message}`);
 }

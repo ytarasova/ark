@@ -267,8 +267,7 @@ describe("writeChannelConfig", () => {
     const workdir = ctx.arkDir;
     writeChannelConfig("s-abc123", "work", 19300, workdir);
 
-    // writeChannelConfig uses the legacy TRACKS_DIR constant
-    const tracksFile = join(TRACKS_DIR, "s-abc123", "mcp.json");
+    const tracksFile = join(TRACKS_DIR(), "s-abc123", "mcp.json");
     expect(existsSync(tracksFile)).toBe(true);
     const content = JSON.parse(readFileSync(tracksFile, "utf-8"));
     expect(content.mcpServers["ark-channel"]).toBeDefined();

@@ -39,7 +39,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILTIN_DIR = join(__dirname, "..", "..", "flows", "definitions");
-const USER_DIR = join(ARK_DIR, "flows");
+function USER_DIR() { return join(ARK_DIR(), "flows"); }
 
 // ── Loading ─────────────────────────────────────────────────────────────────
 
@@ -49,7 +49,7 @@ function loadYaml(path: string): Record<string, unknown> {
 
 export function loadFlow(name: string): FlowDefinition | null {
   // User overrides builtin
-  for (const dir of [USER_DIR, BUILTIN_DIR]) {
+  for (const dir of [USER_DIR(), BUILTIN_DIR]) {
     const path = join(dir, `${name}.yaml`);
     if (existsSync(path)) return loadYaml(path) as unknown as FlowDefinition;
   }
@@ -59,7 +59,7 @@ export function loadFlow(name: string): FlowDefinition | null {
 export function listFlows(): { name: string; description: string; stages: string[]; source: string }[] {
   const result: Map<string, { name: string; description: string; stages: string[]; source: string }> = new Map();
 
-  for (const [dir, source] of [[BUILTIN_DIR, "builtin"], [USER_DIR, "user"]] as const) {
+  for (const [dir, source] of [[BUILTIN_DIR, "builtin"], [USER_DIR(), "user"]] as const) {
     if (!existsSync(dir)) continue;
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml"))) {
       const p = loadYaml(join(dir, file)) as any;

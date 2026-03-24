@@ -27,20 +27,28 @@ export interface StoreContext {
 
 // ── Default context ──────────────────────────────────────────────────────────
 
-const defaultBase = process.env.ARK_TEST_DIR ?? join(homedir(), ".ark");
+/** Resolve the base directory. Re-reads ARK_TEST_DIR each time so the env var
+ *  can be set after module load (e.g., by test-setup.ts preload). */
+function resolveBase(): string {
+  return process.env.ARK_TEST_DIR ?? join(homedir(), ".ark");
+}
 
-const defaultCtx: StoreContext = {
-  arkDir: defaultBase,
-  dbPath: join(defaultBase, "ark.db"),
-  tracksDir: join(defaultBase, "tracks"),
-  worktreesDir: join(defaultBase, "worktrees"),
-  db: null,
-};
+function makeDefaultCtx(): StoreContext {
+  const base = resolveBase();
+  return {
+    arkDir: base,
+    dbPath: join(base, "ark.db"),
+    tracksDir: join(base, "tracks"),
+    worktreesDir: join(base, "worktrees"),
+    db: null,
+  };
+}
 
-let _current: StoreContext = defaultCtx;
+let _current: StoreContext | null = null;
 
-/** Get the active store context. */
+/** Get the active store context. Lazy-initializes from ARK_TEST_DIR / ~/.ark. */
 export function getContext(): StoreContext {
+  if (!_current) _current = makeDefaultCtx();
   return _current;
 }
 
@@ -49,9 +57,9 @@ export function setContext(ctx: StoreContext): void {
   _current = ctx;
 }
 
-/** Reset to the default context. */
+/** Reset to the default context (re-reads ARK_TEST_DIR). */
 export function resetContext(): void {
-  _current = defaultCtx;
+  _current = null;
 }
 
 // ── Database access ──────────────────────────────────────────────────────────
@@ -64,7 +72,7 @@ function ensureDirs(ctx: StoreContext): void {
 
 /** Get (or create) the database for the current context. */
 export function getDb(): Database {
-  const ctx = _current;
+  const ctx = getContext();
   if (ctx.db) return ctx.db;
   ensureDirs(ctx);
   ctx.db = new Database(ctx.dbPath);
@@ -76,9 +84,10 @@ export function getDb(): Database {
 
 /** Close and release the database for the current context. */
 export function closeDb(): void {
-  if (_current.db) {
-    try { _current.db.close(); } catch {}
-    _current.db = null;
+  const ctx = getContext();
+  if (ctx.db) {
+    try { ctx.db.close(); } catch {}
+    ctx.db = null;
   }
 }
 

@@ -13,31 +13,21 @@ import { randomBytes } from "crypto";
 import { mkdirSync, existsSync, rmSync } from "fs";
 import { execFileSync } from "child_process";
 import { join } from "path";
-import { homedir } from "os";
+
 import {
   getContext, getDb as getDbFromContext, closeDb,
   createTestContext, setContext, resetContext,
   type StoreContext, type TestContext,
 } from "./context.js";
 
-// ── Paths (derived from active context) ─────────────────────────────────────
+// ── Paths ───────────────────────────────────────────────────────────────────
+// Functions (not constants) so they respect ARK_TEST_DIR and setContext()
+// at call time rather than freezing at import time.
 
-export const get = {
-  get ARK_DIR() { return getContext().arkDir; },
-  get DB_PATH() { return getContext().dbPath; },
-  get TRACKS_DIR() { return getContext().tracksDir; },
-  get WORKTREES_DIR() { return getContext().worktreesDir; },
-};
-
-// Backward-compat: direct exports that read from context at call time
-export function getArkDir() { return getContext().arkDir; }
-
-// Legacy constants — still work via env var for existing code
-const baseDir = process.env.ARK_TEST_DIR ?? join(homedir(), ".ark");
-export const ARK_DIR = baseDir;
-export const DB_PATH = join(ARK_DIR, "ark.db");
-export const TRACKS_DIR = join(ARK_DIR, "tracks");
-export const WORKTREES_DIR = join(ARK_DIR, "worktrees");
+export function ARK_DIR(): string { return getContext().arkDir; }
+export function DB_PATH(): string { return getContext().dbPath; }
+export function TRACKS_DIR(): string { return getContext().tracksDir; }
+export function WORKTREES_DIR(): string { return getContext().worktreesDir; }
 
 // Re-export context utilities for tests
 export { createTestContext, setContext, resetContext, closeDb, type TestContext };
@@ -303,7 +293,7 @@ export function deleteSession(id: string): boolean {
   const db = getDb();
 
   // Clean up worktree if it exists
-  const wtPath = join(get.WORKTREES_DIR, id);
+  const wtPath = join(WORKTREES_DIR(), id);
   if (existsSync(wtPath)) {
     // Try proper git worktree remove first, fall back to rm
     const session = getSession(id);

@@ -149,10 +149,17 @@ export interface TuiDriverOptions {
   env?: Record<string, string>;
 }
 
+/** Allocate a random port in the ephemeral range for test conductor. */
+function randomPort(): number {
+  return 19200 + Math.floor(Math.random() * 800);
+}
+
 export class TuiDriver {
   readonly name: string;
   readonly width: number;
   readonly height: number;
+  /** Isolated conductor port for this test instance. */
+  readonly conductorPort: number;
 
   private _started = false;
   private _stopped = false;
@@ -165,6 +172,7 @@ export class TuiDriver {
     this.name = `ark-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     this.width = opts?.width ?? 200;
     this.height = opts?.height ?? 50;
+    this.conductorPort = randomPort();
     this._opts = {
       width: this.width,
       height: this.height,
@@ -189,7 +197,8 @@ export class TuiDriver {
     execFileSync("tmux", [
       "new-session", "-d", "-s", this.name,
       "-x", String(this.width), "-y", String(this.height),
-      "bash", "-c", `ARK_TEST_DIR=${testDir} ${extraEnv} ${ARK_BIN} tui`,
+      "bash", "-c",
+      `ARK_TEST_DIR='${testDir}' ARK_CONDUCTOR_PORT=${this.conductorPort} ${extraEnv} ${ARK_BIN} tui`,
     ], { stdio: "pipe" });
 
     const ready = await this.waitFor(this._opts.startMarker, this._opts.startTimeout);

@@ -51,12 +51,12 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILTIN_DIR = join(__dirname, "..", "..", "agents");
-const USER_DIR = join(ARK_DIR, "agents");
+function USER_DIR() { return join(ARK_DIR(), "agents"); }
 
 // ── Loading ─────────────────────────────────────────────────────────────────
 
 export function loadAgent(name: string): AgentDefinition | null {
-  for (const [dir, source] of [[USER_DIR, "user"], [BUILTIN_DIR, "builtin"]] as const) {
+  for (const [dir, source] of [[USER_DIR(), "user"], [BUILTIN_DIR, "builtin"]] as const) {
     const path = join(dir, `${name}.yaml`);
     if (existsSync(path)) {
       const raw = YAML.parse(readFileSync(path, "utf-8")) ?? {};
@@ -69,7 +69,7 @@ export function loadAgent(name: string): AgentDefinition | null {
 export function listAgents(): AgentDefinition[] {
   const agents = new Map<string, AgentDefinition>();
 
-  for (const [dir, source] of [[BUILTIN_DIR, "builtin"], [USER_DIR, "user"]] as const) {
+  for (const [dir, source] of [[BUILTIN_DIR, "builtin"], [USER_DIR(), "user"]] as const) {
     if (!existsSync(dir)) continue;
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml"))) {
       const raw = YAML.parse(readFileSync(join(dir, file), "utf-8")) ?? {};
@@ -81,13 +81,13 @@ export function listAgents(): AgentDefinition[] {
 }
 
 export function saveAgent(agent: AgentDefinition): void {
-  mkdirSync(USER_DIR, { recursive: true });
+  mkdirSync(USER_DIR(), { recursive: true });
   const { _source, _path, ...data } = agent;
-  writeFileSync(join(USER_DIR, `${agent.name}.yaml`), YAML.stringify(data));
+  writeFileSync(join(USER_DIR(), `${agent.name}.yaml`), YAML.stringify(data));
 }
 
 export function deleteAgent(name: string): boolean {
-  const path = join(USER_DIR, `${name}.yaml`);
+  const path = join(USER_DIR(), `${name}.yaml`);
   if (existsSync(path)) { unlinkSync(path); return true; }
   return false;
 }

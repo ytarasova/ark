@@ -69,15 +69,21 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   useInput((input, key) => {
     if (formOverlay || hasOverlay) return;
 
-    // Cancel pending confirm on any non-c key
+    // Global keys — work regardless of selection
+    if (input === "n") { onShowForm(); return; }
+    if (input === "i") { setInboxMode(true); return; }
+    if (input === "g") { setGroupMode("menu"); return; }
+
+    // Cancel pending confirm on any non-d key
     if (confirmComplete && input !== "d") {
       setConfirmComplete(false);
       status.clear();
     }
 
-    if (!selected) {
-      // No selection — only allow n/i/g
-    } else if (key.return) {
+    // Everything below requires a selected session
+    if (!selected) return;
+
+    if (key.return) {
       if (selected.status === "ready" || selected.status === "blocked") {
         actions.dispatch(selected.id);
       } else if (["failed", "stopped", "completed"].includes(selected.status)) {
@@ -143,10 +149,6 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       }
     } else if (input === "t") {
       if (selected?.status === "running" || selected?.status === "waiting") setTalkMode(true);
-    } else if (input === "i") {
-      setInboxMode(true);
-    } else if (input === "g") {
-      setGroupMode("menu");
     } else if (input === "S") {
       if (selectedGroup && groupSessions.length > 0) {
         actions.stopGroup(groupSessions);
@@ -160,8 +162,6 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         actions.deleteGroup(groupSessions);
         setSel(0);
       }
-    } else if (input === "n") {
-      onShowForm();
     }
   });
 

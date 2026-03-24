@@ -26,7 +26,7 @@ import { ARK_DIR } from "../store.js";
 let ctx: TestContext;
 
 /** Directory where flow.ts looks for user flows (module-level constant). */
-const flowDir = () => join(ARK_DIR, "flows");
+const flowDir = () => join(ARK_DIR(), "flows");
 
 /** Write a YAML flow definition to the user flows directory. */
 function writeUserFlow(name: string, def: Record<string, unknown>): void {

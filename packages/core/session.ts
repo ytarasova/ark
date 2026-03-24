@@ -356,7 +356,7 @@ async function launchAgentTmux(
   const launcher = tmux.writeLauncher(session.id, launchContent);
 
   // Save task for reference
-  const sessionDir = join(store.TRACKS_DIR, session.id);
+  const sessionDir = join(store.TRACKS_DIR(), session.id);
   mkdirSync(sessionDir, { recursive: true });
   writeFileSync(join(sessionDir, "task.txt"), task);
 
@@ -452,7 +452,7 @@ function buildTaskWithHandoff(session: store.Session, stage: string, agentName: 
   }
 
   // Check for PLAN.md
-  const wtDir = join(store.WORKTREES_DIR, session.id);
+  const wtDir = join(store.WORKTREES_DIR(), session.id);
   const planPath = join(wtDir, "PLAN.md");
   if (existsSync(planPath)) {
     let plan = readFileSync(planPath, "utf-8");
@@ -474,7 +474,7 @@ function buildTaskWithHandoff(session: store.Session, stage: string, agentName: 
 }
 
 function extractSubtasks(session: store.Session): { name: string; task: string }[] {
-  const wtDir = join(store.WORKTREES_DIR, session.id);
+  const wtDir = join(store.WORKTREES_DIR(), session.id);
   const planPath = join(wtDir, "PLAN.md");
 
   if (existsSync(planPath)) {
@@ -496,7 +496,7 @@ function extractSubtasks(session: store.Session): { name: string; task: string }
 }
 
 function setupWorktree(repoPath: string, sessionId: string, branch?: string): string | null {
-  const wtPath = join(store.WORKTREES_DIR, sessionId);
+  const wtPath = join(store.WORKTREES_DIR(), sessionId);
   if (existsSync(wtPath)) return wtPath;
 
   const branchName = branch ?? `ark-${sessionId}`;

@@ -15,6 +15,7 @@ import { dirname } from "path";
 
 import * as tmux from "./tmux.js";
 import { TRACKS_DIR } from "./store.js";
+// TRACKS_DIR is now a function — call it at usage sites, not module level
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -132,7 +133,7 @@ export function writeChannelConfig(
   writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));
 
   // Also write a copy to tracks dir for reference
-  const sessionDir = join(TRACKS_DIR, sessionId);
+  const sessionDir = join(TRACKS_DIR(), sessionId);
   mkdirSync(sessionDir, { recursive: true });
   writeFileSync(join(sessionDir, "mcp.json"), JSON.stringify({ mcpServers: { "ark-channel": channelMcpConfig(sessionId, stage, channelPort, channelOpts) } }, null, 2));
 
