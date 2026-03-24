@@ -226,6 +226,50 @@ export function removeHooksConfig(workdir: string): void {
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 }
 
+// ── Transcript usage parsing ────────────────────────────────────────────────
+
+export interface TranscriptUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  total_tokens: number;
+}
+
+export function parseTranscriptUsage(transcriptPath: string): TranscriptUsage {
+  const usage: TranscriptUsage = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_read_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+    total_tokens: 0,
+  };
+
+  if (!existsSync(transcriptPath)) return usage;
+
+  let content: string;
+  try { content = readFileSync(transcriptPath, "utf-8"); } catch { return usage; }
+
+  for (const line of content.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line);
+      if (entry.type !== "assistant") continue;
+      const u = entry.message?.usage;
+      if (!u) continue;
+      usage.input_tokens += u.input_tokens ?? 0;
+      usage.output_tokens += u.output_tokens ?? 0;
+      usage.cache_read_input_tokens += u.cache_read_input_tokens ?? 0;
+      usage.cache_creation_input_tokens += u.cache_creation_input_tokens ?? 0;
+    } catch {}
+  }
+
+  usage.total_tokens = usage.input_tokens + usage.output_tokens
+    + usage.cache_read_input_tokens + usage.cache_creation_input_tokens;
+
+  return usage;
+}
+
 // ── Launcher script ─────────────────────────────────────────────────────────
 
 export interface LauncherOpts {
