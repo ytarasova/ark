@@ -136,8 +136,27 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       }
     } else if (input === "m") {
       if (selected) setMoveMode(true);
+    } else if (input === "d") {
+      if (selected) {
+        asyncState.run(`Cloning ${selected.id}`, async () => {
+          const { ok, cloneId } = core.cloneSession(selected.id);
+          if (ok) {
+            // Copy group assignment
+            if (selected.group_name) {
+              core.updateSession(cloneId, { group_name: selected.group_name });
+            }
+            refresh();
+            status.show(`Cloned → ${cloneId}`);
+            // Auto-dispatch the clone
+            await core.dispatch(cloneId);
+            refresh();
+          } else {
+            status.show(`Clone failed: ${cloneId}`);
+          }
+        });
+      }
     } else if (input === "t") {
-      if (selected?.status === "running") setTalkMode(true);
+      if (selected?.status === "running" || selected?.status === "waiting") setTalkMode(true);
     } else if (input === "g") {
       setGroupMode("menu");
     } else if (input === "S") {
