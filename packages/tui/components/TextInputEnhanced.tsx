@@ -133,8 +133,8 @@ export function TextInputEnhanced({
       return;
     }
 
-    // Regular character input
-    if (input && !key.ctrl && !key.meta && input.length === 1) {
+    // Regular character input (exclude control chars like \n \r \t)
+    if (input && !key.ctrl && !key.meta && input.length === 1 && input.charCodeAt(0) >= 32) {
       internalEdit.current = true;
       onChange(value.slice(0, cursor) + input + value.slice(cursor));
       setCursor(c => c + 1);

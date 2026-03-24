@@ -5,9 +5,9 @@ import { existsSync } from "fs";
 import { resolve as resolvePath, basename } from "path";
 import * as core from "../../core/index.js";
 import { SelectMenu } from "../components/SelectMenu.js";
-import { PathInput, getPathCompletions } from "../components/PathInput.js";
+import { getPathCompletions } from "../components/PathInput.js";
 import { submitForm } from "./submitForm.js";
-import { getRecentRepos, addRecentRepo } from "../helpers/recentRepos.js";
+import { addRecentRepo } from "../helpers/recentRepos.js";
 import { generateName } from "../helpers.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
@@ -21,6 +21,7 @@ interface NewSessionFormProps {
 }
 
 const FIELDS: Field[] = ["name", "repo", "isolation", "group", "compute", "flow"];
+const TEXT_FIELDS: Field[] = ["name", "repo"];
 
 const ISOLATION_CHOICES = [
   { label: "Git worktree (isolated)", value: "worktree" },
@@ -33,6 +34,7 @@ export function NewSessionForm({
   onDone,
 }: NewSessionFormProps) {
   const [active, setActive] = useState<Field>("name");
+  const [editing, setEditing] = useState(false);
   const [name, setName] = useState(generateName());
   const [repoPath, setRepoPath] = useState(process.cwd());
   const [isolation, setIsolation] = useState("worktree");
@@ -45,11 +47,12 @@ export function NewSessionForm({
     return existsSync(rp) && existsSync(resolvePath(rp, ".git"));
   }, [repoPath]);
 
-  // Available fields (skip isolation for non-git repos)
   const fields = useMemo(
     () => isGitRepo ? FIELDS : FIELDS.filter(f => f !== "isolation"),
     [isGitRepo],
   );
+
+  const isTextField = TEXT_FIELDS.includes(active);
 
   const computeChoices = useMemo(() =>
     store.computes.map(h => ({
@@ -72,27 +75,14 @@ export function NewSessionForm({
     ];
   }, []);
 
-  // Navigation
   const moveField = (dir: 1 | -1) => {
     const idx = fields.indexOf(active);
     const next = idx + dir;
-    if (next >= 0 && next < fields.length) setActive(fields[next]);
-  };
-
-  useInput((input, key) => {
-    if (key.escape) { onDone(); return; }
-
-    // Ctrl+J / Ctrl+K to move between fields
-    if (input === "j" && key.ctrl) { moveField(1); return; }
-    if (input === "k" && key.ctrl) { moveField(-1); return; }
-
-    // Tab completion for repo path
-    if (active === "repo" && key.tab) {
-      const completions = getPathCompletions(repoPath);
-      if (completions.length > 0) setRepoPath(completions[0] + "/");
-      return;
+    if (next >= 0 && next < fields.length) {
+      setEditing(false);
+      setActive(fields[next]);
     }
-  });
+  };
 
   const submit = () => {
     let workdir: string | undefined;
@@ -127,15 +117,40 @@ export function NewSessionForm({
     });
   };
 
-  // Submit on Enter when on last field
-  const handleFieldSubmit = () => {
-    const idx = fields.indexOf(active);
-    if (idx === fields.length - 1) {
-      submit();
-    } else {
-      moveField(1);
+  useInput((input, key) => {
+    // Esc: exit edit mode, or close form
+    if (key.escape) {
+      if (editing) { setEditing(false); return; }
+      onDone();
+      return;
     }
-  };
+
+    // When editing a text field, only handle Tab (completion) and Enter (done editing)
+    if (editing) {
+      if (key.tab && active === "repo") {
+        const completions = getPathCompletions(repoPath);
+        if (completions.length > 0) setRepoPath(completions[0] + "/");
+      }
+      // Enter exits edit mode (handled by TextInputEnhanced onSubmit)
+      return;
+    }
+
+    // Not editing — navigation mode
+    if (key.tab && !key.shift) { moveField(1); return; }
+    if (key.tab && key.shift) { moveField(-1); return; }
+    if (input === "j" || key.downArrow) { moveField(1); return; }
+    if (input === "k" || key.upArrow) { moveField(-1); return; }
+
+    // Enter: on text fields → start editing. On last field → submit.
+    if (key.return) {
+      if (isTextField) {
+        setEditing(true);
+      } else if (fields.indexOf(active) === fields.length - 1) {
+        submit();
+      }
+      return;
+    }
+  });
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
@@ -143,22 +158,26 @@ export function NewSessionForm({
       <Text> </Text>
 
       {/* Name */}
-      <FormField label="Name" active={active === "name"}>
-        <TextInputEnhanced
-          value={name}
-          onChange={setName}
-          onSubmit={handleFieldSubmit}
-          focus={active === "name"}
-        />
+      <FormField label="Name" active={active === "name"} editing={editing && active === "name"}>
+        {editing && active === "name" ? (
+          <TextInputEnhanced
+            value={name}
+            onChange={setName}
+            onSubmit={() => setEditing(false)}
+            focus={true}
+          />
+        ) : (
+          <Text>{name}</Text>
+        )}
       </FormField>
 
       {/* Repo */}
-      <FormField label="Repo" active={active === "repo"}>
-        {active === "repo" ? (
+      <FormField label="Repo" active={active === "repo"} editing={editing && active === "repo"}>
+        {editing && active === "repo" ? (
           <TextInputEnhanced
             value={repoPath}
             onChange={setRepoPath}
-            onSubmit={handleFieldSubmit}
+            onSubmit={() => setEditing(false)}
             focus={true}
           />
         ) : (
@@ -217,22 +236,23 @@ export function NewSessionForm({
       </FormField>
 
       <Text> </Text>
-      <Text dimColor>{"  Ctrl+J/K:navigate  Enter:next/submit  Esc:cancel"}</Text>
+      <Text dimColor>{"  j/k:navigate  Enter:edit/select  Tab:complete  Esc:back"}</Text>
     </Box>
   );
 }
 
-// -- Form Field --------------------------------------------------------------
+// ── Form Field ──────────────────────────────────────────────────────────────
 
-function FormField({ label, active, children }: {
+function FormField({ label, active, editing, children }: {
   label: string;
   active: boolean;
+  editing?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <Box>
       <Text color={active ? "cyan" : "gray"}>
-        {active ? "> " : "  "}
+        {active ? (editing ? "* " : "> ") : "  "}
       </Text>
       <Text color={active ? "white" : "gray"} bold={active}>
         {`${label.padEnd(10)} `}
