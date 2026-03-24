@@ -42,19 +42,15 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
       continue;
     }
 
-    // Tmux alive — check if Claude is asking the user a question
+    // Tmux alive — check if Claude needs user attention.
+    // Only flag unambiguous signals — we can't reliably detect idle vs working.
     try {
-      const output = await core.capturePaneAsync(s.session_id, { lines: 15 });
+      const output = await core.capturePaneAsync(s.session_id, { lines: 20 });
       const text = output.trim();
-      // Claude explicitly asks user questions via AskUserQuestion tool
-      // or shows permission prompts. These are the only reliable "waiting" signals.
-      const needsAttention =
+      if (
         text.includes("AskUserQuestion") ||
-        text.includes("Allow") && text.includes("Deny") ||
-        text.includes("Do you want to") ||
-        text.includes("? (y/n)") ||
-        text.includes("Y/n");
-      if (needsAttention) {
+        (text.includes("Allow") && text.includes("Deny"))
+      ) {
         s.status = "waiting";
       }
     } catch {}
