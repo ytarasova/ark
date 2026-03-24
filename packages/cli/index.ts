@@ -42,6 +42,7 @@ session.command("start")
   .option("-g, --group <name>", "Group name")
   .option("-d, --dispatch", "Auto-dispatch the first stage agent")
   .option("-a, --attach", "Dispatch and attach to the session")
+  .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
   .action(async (ticket, opts) => {
     let workdir: string | undefined;
     let repo = opts.repo;
@@ -53,11 +54,31 @@ session.command("start")
       }
     }
 
+    // Import from Claude session if specified
+    let claudeSessionId: string | undefined;
+    if (opts.claudeSession) {
+      const cs = core.getClaudeSession(opts.claudeSession);
+      if (!cs) {
+        console.log(chalk.red(`Claude session '${opts.claudeSession}' not found. Run 'ark claude list' to see available sessions.`));
+        return;
+      }
+      claudeSessionId = cs.sessionId;
+      if (!opts.summary) opts.summary = cs.summary?.slice(0, 100) || `Imported from ${cs.sessionId.slice(0, 8)}`;
+      if (!repo) { repo = cs.project; }
+      if (!workdir) { workdir = cs.project; }
+      console.log(chalk.dim(`Importing Claude session ${cs.sessionId.slice(0, 8)} from ${cs.project}`));
+    }
+
     const s = core.startSession({
       ticket, summary: opts.summary ?? ticket,
       repo, flow: opts.flow, compute_name: opts.compute,
       workdir, group_name: opts.group,
     });
+
+    if (claudeSessionId) {
+      core.updateSession(s.id, { claude_session_id: claudeSessionId });
+      console.log(chalk.dim(`  Bound to Claude session: ${claudeSessionId.slice(0, 8)} (will use --resume on dispatch)`));
+    }
 
     console.log(chalk.green(`Session ${s.id} created`));
     console.log(`  Summary:  ${s.summary ?? "-"}`);
@@ -641,6 +662,36 @@ computeCmd.command("ssh")
     } catch (e: any) {
       console.log(chalk.red(`SSH failed: ${e.message}`));
     }
+  });
+
+// ── Claude session discovery ────────────────────────────────────────────────
+
+const claudeCmd = program.command("claude").description("Interact with Claude Code sessions");
+
+claudeCmd.command("list")
+  .description("List Claude Code sessions found on disk")
+  .option("-p, --project <filter>", "Filter by project path")
+  .option("-l, --limit <n>", "Max results", "20")
+  .action((opts) => {
+    const sessions = core.listClaudeSessions({
+      project: opts.project,
+      limit: parseInt(opts.limit),
+    });
+
+    if (sessions.length === 0) {
+      console.log(chalk.yellow("No Claude sessions found."));
+      return;
+    }
+
+    console.log(chalk.bold(`Found ${sessions.length} Claude session(s):\n`));
+    for (const s of sessions) {
+      const date = (s.lastActivity || s.timestamp || "").slice(0, 10);
+      const msgs = chalk.dim(`${s.messageCount} msgs`);
+      const proj = chalk.cyan(s.project.split("/").slice(-2).join("/"));
+      const summary = s.summary ? s.summary.slice(0, 80) : chalk.dim("(no summary)");
+      console.log(`  ${chalk.dim(s.sessionId.slice(0, 8))}  ${date}  ${proj}  ${msgs}  ${summary}`);
+    }
+    console.log(chalk.dim(`\nUse: ark session start --claude-session <id> --flow bare`));
   });
 
 // ── TUI command ─────────────────────────────────────────────────────────────
