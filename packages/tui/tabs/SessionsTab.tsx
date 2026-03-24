@@ -268,15 +268,6 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
     return <Text dimColor>{"  No session selected"}</Text>;
   }
 
-  // Flow bar
-  let stages: ReturnType<typeof core.getStages> = [];
-  try {
-    stages = core.getStages(s.flow);
-  } catch {
-    // ignore — DB may be locked
-  }
-  let passed = false;
-
   // Events
   let events: core.Event[] = [];
   try {
@@ -294,62 +285,17 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
 
   return (
     <DetailPanel active={pane === "right"}>
-      {/* Header */}
-      <Text bold>{` ${s.ticket ?? s.id}  ${s.summary ?? ""}`}</Text>
-      <Text> </Text>
-
-      {/* Flow bar — only show for multi-stage flows */}
-      {stages.length > 1 && <Box>
-        <Text>{" "}</Text>
-        {stages.map((stg, i) => {
-          const isFork = stg.type === "fork";
-          const isCurrentStage = stg.name === s.stage;
-          let element: React.ReactNode;
-
-          if (isCurrentStage) {
-            passed = true;
-            const c = (COLOR[s.status] ?? "white") as any;
-            element = (
-              <Text key={stg.name} color={c} bold>
-                {isFork ? "Y" : (ICON[s.status] ?? "●")}{` ${stg.name}`}
-              </Text>
-            );
-          } else if (!passed) {
-            element = (
-              <Text key={stg.name} color="green">
-                {`✓ ${stg.name}`}
-              </Text>
-            );
-          } else {
-            element = (
-              <Text key={stg.name} dimColor>
-                {isFork ? "Y" : "○"}{` ${stg.name}`}
-              </Text>
-            );
-          }
-
-          return (
-            <React.Fragment key={stg.name}>
-              {element}
-              {i < stages.length - 1 && <Text dimColor>{"  >  "}</Text>}
-            </React.Fragment>
-          );
-        })}
-      </Box>}
-
-      {/* Status line — single source of truth */}
-      <Text> </Text>
-      <Text color={(COLOR[s.status] ?? "white") as any} bold>
-        {` ${ICON[s.status] ?? "?"} ${s.error ? s.error : s.status}`}
-      </Text>
-      {s.breakpoint_reason && (
-        <Text color="yellow" bold>{` ⏸ ${s.breakpoint_reason}`}</Text>
-      )}
-
       {/* Info */}
-      <Text> </Text>
       <SectionHeader title="Info" />
-      <KeyValue label="ID">{s.id}</KeyValue>
+      <KeyValue label="Session">{`${s.id}  ${s.summary ?? ""}`}</KeyValue>
+      <KeyValue label="Status">
+        <Text color={(COLOR[s.status] ?? "white") as any} bold>
+          {`${ICON[s.status] ?? "?"} ${s.error ? s.error : s.status}`}
+        </Text>
+      </KeyValue>
+      {s.breakpoint_reason && (
+        <KeyValue label=""><Text color="yellow" bold>{`⏸ ${s.breakpoint_reason}`}</Text></KeyValue>
+      )}
       <KeyValue label="Compute">{s.compute_name || "local"}</KeyValue>
       {s.repo && <KeyValue label="Repo">{s.repo}</KeyValue>}
       {s.branch && <KeyValue label="Branch">{s.branch}</KeyValue>}

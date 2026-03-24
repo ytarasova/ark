@@ -56,18 +56,20 @@ export function useFormNavigation({ fields: allFields, onCancel, onSubmit }: Use
       return;
     }
 
-    // Tab / Shift+Tab: always navigate (even during editing — exits edit first)
-    if (key.tab && !key.shift) {
-      if (activeIndex === fields.length - 1 && onSubmit) {
-        onSubmit();
-      } else {
-        moveField(1);
+    // Tab / Shift+Tab: navigate between fields (skip when editing — field owns Tab)
+    if (!editingRef.current) {
+      if (key.tab && !key.shift) {
+        if (activeIndex === fields.length - 1 && onSubmit) {
+          onSubmit();
+        } else {
+          moveField(1);
+        }
+        return;
       }
-      return;
-    }
-    if (key.tab && key.shift) {
-      moveField(-1);
-      return;
+      if (key.tab && key.shift) {
+        moveField(-1);
+        return;
+      }
     }
 
   });
