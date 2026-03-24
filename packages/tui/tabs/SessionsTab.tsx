@@ -291,7 +291,7 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
   const agentOutput = useAgentOutput(
     s.id,
     s.session_id,
-    s.status === "running",
+    s.status === "running" || s.status === "waiting",
     500, // refresh every 500ms for near-real-time
   );
 
@@ -323,7 +323,7 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
       {s.group_name && <KeyValue label="Group">{s.group_name}</KeyValue>}
 
       {/* Channel status */}
-      {s.session_id && s.status === "running" && (
+      {s.session_id && (s.status === "running" || s.status === "waiting") && (
         <Text color="green">
           {`  ⚡ Channel: port ${core.sessionChannelPort(s.id)}`}
         </Text>

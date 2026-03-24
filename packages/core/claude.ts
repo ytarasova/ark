@@ -107,19 +107,30 @@ export function channelMcpConfig(
   };
 }
 
-/** Write MCP config file for a session's channel server. */
+/**
+ * Write channel MCP config to the worktree's .mcp.json.
+ * Claude Code reads .mcp.json from the project directory at startup.
+ * --dangerously-load-development-channels server:NAME looks up NAME
+ * in the loaded MCP config, so the server must be in .mcp.json.
+ */
 export function writeChannelConfig(
   sessionId: string, stage: string, channelPort: number,
+  workdir: string,
 ): string {
+  // Write to worktree .mcp.json so Claude finds it
+  const mcpConfigPath = join(workdir, ".mcp.json");
+  const existing = existsSync(mcpConfigPath)
+    ? JSON.parse(readFileSync(mcpConfigPath, "utf-8"))
+    : {};
+  if (!existing.mcpServers) existing.mcpServers = {};
+  existing.mcpServers["ark-channel"] = channelMcpConfig(sessionId, stage, channelPort);
+  writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));
+
+  // Also write a copy to tracks dir for reference
   const sessionDir = join(TRACKS_DIR, sessionId);
   mkdirSync(sessionDir, { recursive: true });
-  const mcpConfigPath = join(sessionDir, "mcp.json");
-  const config = {
-    mcpServers: {
-      "ark-channel": channelMcpConfig(sessionId, stage, channelPort),
-    },
-  };
-  writeFileSync(mcpConfigPath, JSON.stringify(config, null, 2));
+  writeFileSync(join(sessionDir, "mcp.json"), JSON.stringify({ mcpServers: { "ark-channel": channelMcpConfig(sessionId, stage, channelPort) } }, null, 2));
+
   return mcpConfigPath;
 }
 
@@ -139,11 +150,11 @@ export interface LauncherOpts {
 export function buildLauncher(opts: LauncherOpts): { content: string; claudeSessionId: string } {
   const claudeSessionId = opts.claudeSessionId ?? randomUUID();
   const claudeCmd = shellQuoteArgs(opts.claudeArgs);
-  // Channel + remote control flags (mcp-config BEFORE the channel flag)
+  // Channel + remote control flags
+  // Channel config is in .mcp.json (project level), Claude reads it automatically
   const extraFlags = [
-    `--mcp-config ${shellQuote(opts.mcpConfigPath)}`,
     `--dangerously-load-development-channels server:ark-channel`,
-    `--remote-control ${opts.sessionName ?? "ark"}`,
+    `--remote-control ${shellQuote(opts.sessionName ?? "ark")}`,
   ].join(" \\\n  ");
 
   let content: string;

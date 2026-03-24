@@ -332,7 +332,7 @@ async function launchAgentTmux(
 
   // Channel config + launcher
   const channelPort = store.sessionChannelPort(session.id);
-  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort);
+  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir);
 
   const { content: launchContent, claudeSessionId } = claude.buildLauncher({
     workdir: effectiveWorkdir,
