@@ -171,6 +171,11 @@ function initSchema(db: Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider);
     CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status);
+
+    CREATE TABLE IF NOT EXISTS groups (
+      name TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL
+    );
   `);
 }
 
@@ -456,12 +461,28 @@ export function getChildren(parentId: string): Session[] {
   return listSessions({ parent_id: parentId });
 }
 
+/** List all groups (union of groups table + session group_names). */
 export function getGroups(): string[] {
   const db = getDb();
-  const rows = db.prepare(
-    "SELECT DISTINCT group_name FROM sessions WHERE group_name IS NOT NULL ORDER BY group_name"
-  ).all() as any[];
-  return rows.map((r) => r.group_name);
+  const rows = db.prepare(`
+    SELECT name FROM groups
+    UNION
+    SELECT DISTINCT group_name FROM sessions WHERE group_name IS NOT NULL
+    ORDER BY 1
+  `).all() as any[];
+  return rows.map((r) => r.name ?? r.group_name);
+}
+
+export function createGroup(name: string): void {
+  const db = getDb();
+  db.prepare("INSERT OR IGNORE INTO groups (name, created_at) VALUES (?, ?)").run(name, now());
+}
+
+export function deleteGroup(name: string): void {
+  const db = getDb();
+  db.prepare("DELETE FROM groups WHERE name = ?").run(name);
+  // Also unassign any sessions in this group
+  db.prepare("UPDATE sessions SET group_name = NULL WHERE group_name = ?").run(name);
 }
 
 export function sessionChannelPort(sessionId: string): number {

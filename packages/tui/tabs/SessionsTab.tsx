@@ -438,7 +438,7 @@ function MoveToGroup({ session, onDone }: MoveToGroupProps) {
           <TextInputEnhanced
             value={newGroup}
             onChange={setNewGroup}
-            onSubmit={() => { if (newGroup.trim()) onDone(newGroup.trim()); }}
+            onSubmit={() => { if (newGroup.trim()) { core.createGroup(newGroup.trim()); onDone(newGroup.trim()); } }}
             placeholder="Enter group name..."
           />
         </Box>
@@ -483,7 +483,10 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
   const existing = core.getGroups();
 
   useInput((input, key) => {
-    if (key.escape) onDone();
+    if (key.escape) {
+      if (action !== "menu") { setAction("menu"); return; }
+      onDone();
+    }
   });
 
   if (action === "create") {
@@ -499,14 +502,13 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
             onChange={setNewName}
             onSubmit={() => {
               if (!newName.trim()) return;
-              // Create group by making a placeholder — groups are implicit,
-              // so we just confirm the name exists for future use
-              onDone(`Group '${newName.trim()}' ready — assign sessions with 'm'`);
+              core.createGroup(newName.trim());
+              onDone(`Group '${newName.trim()}' created`);
             }}
             placeholder="Enter group name..."
           />
         </Box>
-        <Text dimColor>{"  Enter to create, Esc to cancel"}</Text>
+        <Text dimColor>{"  Enter to create, Esc to go back"}</Text>
       </Box>
     );
   }
@@ -514,7 +516,7 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
   if (action === "delete") {
     const deleteChoices = existing.map(g => {
       const count = sessions.filter(s => s.group_name === g).length;
-      return { label: `${g} (${count} sessions)`, value: g };
+      return { label: `${g} (${count} session${count !== 1 ? "s" : ""})`, value: g };
     });
 
     if (deleteChoices.length === 0) {
@@ -532,10 +534,11 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
       <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
         <Text bold color="red">{" Delete Group "}</Text>
         <Text> </Text>
-        <Text>{"Select group to delete (all sessions will be removed):"}</Text>
+        <Text>{"Select group to delete:"}</Text>
         <SelectMenu
           items={deleteChoices}
           onSelect={async (item) => {
+            // Kill and delete all sessions in the group
             const groupSessions = sessions.filter(s => s.group_name === item.value);
             for (const s of groupSessions) {
               if (s.session_id) {
@@ -543,10 +546,12 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
               }
               core.deleteSession(s.id);
             }
-            onDone(`Deleted group '${item.value}' (${groupSessions.length} sessions)`);
+            // Delete the group itself
+            core.deleteGroup(item.value);
+            onDone(`Deleted group '${item.value}' (${groupSessions.length} sessions removed)`);
           }}
         />
-        <Text dimColor>{"  Esc to cancel"}</Text>
+        <Text dimColor>{"  Esc to go back"}</Text>
       </Box>
     );
   }

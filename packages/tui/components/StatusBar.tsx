@@ -37,37 +37,33 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
     <KeyHint key="tab" k="Tab" label="detail" />,
   ];
 
-  if (!s) {
-    hints.push(<KeyHint key="n" k="n" label="new" />);
-    hints.push(<KeyHint key="q" k="q" label="quit" />);
-    return hints;
+  if (s) {
+    switch (s.status) {
+      case "ready":
+      case "blocked":
+        hints.push(<KeyHint key="enter" k="Enter" label="dispatch" />);
+        hints.push(<KeyHint key="x" k="x" label="delete" />);
+        break;
+      case "running":
+        hints.push(<KeyHint key="a" k="a" label="attach" />);
+        hints.push(<KeyHint key="s" k="s" label="stop" />);
+        hints.push(<KeyHint key="c" k="c" label="done" />);
+        break;
+      case "failed":
+        hints.push(<KeyHint key="enter" k="Enter" label="retry" />);
+        hints.push(<KeyHint key="x" k="x" label="delete" />);
+        break;
+      case "completed":
+        hints.push(<KeyHint key="x" k="x" label="delete" />);
+        break;
+      case "waiting":
+        hints.push(<KeyHint key="r" k="r" label="resume" />);
+        hints.push(<KeyHint key="s" k="s" label="stop" />);
+        break;
+    }
+    hints.push(<KeyHint key="m" k="m" label="move" />);
   }
 
-  switch (s.status) {
-    case "ready":
-    case "blocked":
-      hints.push(<KeyHint key="enter" k="Enter" label="dispatch" />);
-      hints.push(<KeyHint key="x" k="x" label="delete" />);
-      break;
-    case "running":
-      hints.push(<KeyHint key="a" k="a" label="attach" />);
-      hints.push(<KeyHint key="s" k="s" label="stop" />);
-      hints.push(<KeyHint key="c" k="c" label="done" />);
-      break;
-    case "failed":
-      hints.push(<KeyHint key="enter" k="Enter" label="retry" />);
-      hints.push(<KeyHint key="x" k="x" label="delete" />);
-      break;
-    case "completed":
-      hints.push(<KeyHint key="x" k="x" label="delete" />);
-      break;
-    case "waiting":
-      hints.push(<KeyHint key="r" k="r" label="resume" />);
-      hints.push(<KeyHint key="s" k="s" label="stop" />);
-      break;
-  }
-
-  hints.push(<KeyHint key="m" k="m" label="move" />);
   hints.push(<KeyHint key="g" k="g" label="groups" />);
   hints.push(<KeyHint key="n" k="n" label="new" />);
   hints.push(<KeyHint key="q" k="q" label="quit" />);

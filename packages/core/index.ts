@@ -6,7 +6,7 @@
 export {
   ARK_DIR, DB_PATH, TRACKS_DIR, WORKTREES_DIR,
   getDb, getSession, listSessions, updateSession, deleteSession,
-  logEvent, getEvents, getChildren, getGroups, claimSession,
+  logEvent, getEvents, getChildren, getGroups, createGroup, deleteGroup, claimSession,
   createCompute, getCompute, listCompute, updateCompute, mergeComputeConfig, deleteCompute,
   sessionChannelPort,
   createTestContext, setContext, resetContext, closeDb,
