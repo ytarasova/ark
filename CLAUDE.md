@@ -29,6 +29,10 @@ No workspaces config — packages are coordinated manually via relative imports.
 
 ## Key Gotchas
 
+**FTS5 table needs manual creation on existing DBs.** The `transcript_index` FTS5 virtual table is in `initSchema()` but `CREATE VIRTUAL TABLE IF NOT EXISTS` only runs when the DB is first created. If you add new tables, existing `~/.ark/ark.db` files won't get them — run the SQL manually or delete the DB.
+
+**ARK_DIR is static at module load.** `store.ts` sets `ARK_DIR = process.env.ARK_TEST_DIR ?? ~/.ark` once at import time. `createTestContext()` + `setContext()` isolates the DB but NOT filesystem paths like `join(ARK_DIR, "agents")`. For tests writing files to ARK_DIR, clean up in `beforeEach`.
+
 **Bun-only.** Uses `bun:sqlite`, `Bun.serve()`, `Bun.sleep()`, Bun FFI. Will not run under Node.
 
 **Tmux required.** Sessions launch agents in tmux sessions (`ark-s-<id>`). No fallback if tmux is missing.
@@ -57,6 +61,10 @@ If you add a Session field, update the `fieldMap` in `packages/core/store.ts` �
 ## Testing
 
 Tests use `bun:test`, not vitest. Run with `bun test` or `make test`.
+
+**E2E tests need `dist/` built.** CLI E2E tests (`e2e-cli.test.ts`) and TUI real tests (`e2e-tui-real.test.ts`) import from `dist/` — run `make dev` or `tsc` first. Unit tests run from source.
+
+**Pre-existing flaky tests.** `session-stop-resume.test.ts:182` ("resume returns ok: false for completed session") and `useStore.test.tsx` ("refresh() picks up new data immediately") are known flakes. Don't chase them.
 
 ```bash
 bun test                        # all tests
@@ -95,6 +103,8 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 | `~/.ark/ark.db` | SQLite database (WAL mode, 10s busy timeout) |
 | `~/.ark/tracks/<sessionId>/` | Launcher scripts, channel configs |
 | `~/.ark/worktrees/<sessionId>/` | Git worktrees for isolated sessions |
+| `~/.claude/projects/` | Claude Code session transcripts (JSONL) — read by search and import |
+| `.claude/settings.local.json` | Per-session hook config (written at dispatch, cleaned on stop) |
 
 ## Adding an Agent
 
@@ -192,3 +202,10 @@ Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/h
 - React + Ink for TUI components
 - YAML for agent/flow definitions
 - SQLite for persistence (no ORM)
+
+## Architecture Boundaries
+
+- **`claude.ts`** — ALL Claude Code knowledge (model mapping, args, hooks config, launcher, trust, transcript parsing). Session.ts and agent.ts call into it, never the reverse for Claude-specific logic.
+- **`conductor.ts`** — HTTP server. Channel reports (agent↔human MCP messaging) + hook status (agent status detection). These are SEPARATE concerns — hooks never trigger `session.advance()`.
+- **`store.ts`** — Pure data. No imports from claude.ts or session.ts (avoids circular deps). If you need cleanup logic that touches both store and claude, put it in session.ts.
+- **`search.ts`** — Search + FTS5 indexing. `indexTranscripts()` is async (yields every 5 files). `searchTranscripts()` uses FTS5 when index exists, falls back to file scanning.
