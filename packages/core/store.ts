@@ -207,6 +207,20 @@ function initSchema(db: Database): void {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS claude_sessions_cache (
+      session_id TEXT PRIMARY KEY,
+      project TEXT NOT NULL,
+      project_dir TEXT NOT NULL,
+      transcript_path TEXT NOT NULL,
+      summary TEXT DEFAULT '',
+      message_count INTEGER DEFAULT 0,
+      timestamp TEXT DEFAULT '',
+      last_activity TEXT DEFAULT '',
+      cached_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_claude_cache_activity ON claude_sessions_cache(last_activity DESC);
+
     CREATE VIRTUAL TABLE IF NOT EXISTS transcript_index USING fts5(
       session_id UNINDEXED,
       project,

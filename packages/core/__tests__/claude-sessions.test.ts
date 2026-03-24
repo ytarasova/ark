@@ -9,7 +9,7 @@ import {
   createTestContext, setContext, resetContext,
   type TestContext,
 } from "../index.js";
-import { listClaudeSessions, getClaudeSession } from "../claude-sessions.js";
+import { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache } from "../claude-sessions.js";
 
 let ctx: TestContext;
 
@@ -27,10 +27,15 @@ const MIN_MSGS = [
 function writeTranscript(projectDirName: string, filename: string, lines: object[]) {
   const dir = join(baseDir(), projectDirName);
   mkdirSync(dir, { recursive: true });
-  // Ensure at least 2 user/assistant messages so session passes filter
   const hasEnoughMsgs = lines.filter((l: any) => l.type === "user" || l.type === "assistant").length > 1;
   const allLines = hasEnoughMsgs ? lines : [...lines, ...MIN_MSGS];
   writeFileSync(join(dir, filename), allLines.map(l => JSON.stringify(l)).join("\n"));
+}
+
+/** Write transcripts and refresh the cache so listClaudeSessions can read them */
+async function writeAndRefresh(projectDirName: string, filename: string, lines: object[]) {
+  writeTranscript(projectDirName, filename, lines);
+  await refreshClaudeSessionsCache({ baseDir: baseDir() });
 }
 
 beforeEach(() => {
@@ -48,13 +53,15 @@ afterAll(() => {
 
 describe("listClaudeSessions", () => {
   it("returns empty array when baseDir does not exist", async () => {
-    const sessions = await listClaudeSessions({ baseDir: join(ctx.arkDir, "nonexistent") });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions).toEqual([]);
   });
 
   it("returns empty array for an empty directory", async () => {
     mkdirSync(baseDir(), { recursive: true });
-    const sessions = await listClaudeSessions({ baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions).toEqual([]);
   });
 
@@ -65,7 +72,8 @@ describe("listClaudeSessions", () => {
       { type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "I'll fix it" }] }, timestamp: "2026-03-24T10:02:00Z" },
     ]);
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions.length).toBe(1);
 
     const s = sessions[0];
@@ -82,7 +90,8 @@ describe("listClaudeSessions", () => {
       { type: "system", sessionId: "s1", timestamp: "2026-01-01T00:00:00Z" },
     ]);
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions[0].project).toBe("/Users/yana/Projects/ark");
     expect(sessions[0].projectDir).toBe("-Users-yana-Projects-ark");
   });
@@ -95,7 +104,8 @@ describe("listClaudeSessions", () => {
       { type: "user", message: { role: "user", content: "bye" }, timestamp: "2026-01-01T00:03:00Z" },
     ]);
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions[0].messageCount).toBe(3); // 2 user + 1 assistant
   });
 
@@ -104,7 +114,8 @@ describe("listClaudeSessions", () => {
       { type: "user", message: { role: "user", content: "refactor the auth module" }, timestamp: "2026-01-01T00:00:00Z" },
     ]);
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions[0].summary).toBe("refactor the auth module");
   });
 
@@ -113,7 +124,8 @@ describe("listClaudeSessions", () => {
       { type: "user", message: { role: "user", content: [{ type: "text", text: "deploy to staging" }] }, timestamp: "2026-01-01T00:00:00Z" },
     ]);
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions[0].summary).toBe("deploy to staging");
   });
 
@@ -129,7 +141,8 @@ describe("listClaudeSessions", () => {
       { type: "assistant", message: { role: "assistant", content: "ok" }, timestamp: "2026-12-01T12:01:00Z" },
     ]);
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions.length).toBe(2);
     expect(sessions[0].sessionId).toBe("new");
     expect(sessions[1].sessionId).toBe("old");
@@ -149,7 +162,8 @@ describe("listClaudeSessions", () => {
       type: "user", message: { role: "user", content: "subagent task" }, timestamp: "2026-01-01T00:02:00Z",
     }));
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions.length).toBe(1);
     expect(sessions[0].sessionId).toBe("main-session");
   });
@@ -162,7 +176,8 @@ describe("listClaudeSessions", () => {
       ]);
     }
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir(), limit: 3 });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions({ limit: 3 });
     expect(sessions.length).toBe(3);
   });
 
@@ -174,7 +189,8 @@ describe("listClaudeSessions", () => {
       { type: "system", sessionId: "other-s", timestamp: "2026-01-01T00:00:00Z" },
     ]);
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir(), project: "ark" });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions({ project: "ark" });
     expect(sessions.length).toBe(1);
     expect(sessions[0].sessionId).toBe("ark-s");
   });
@@ -184,7 +200,8 @@ describe("listClaudeSessions", () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "empty.jsonl"), "");
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions).toEqual([]);
   });
 
@@ -193,7 +210,8 @@ describe("listClaudeSessions", () => {
       { type: "user", message: { role: "user", content: "<context>some xml</context> fix this" }, timestamp: "2026-01-01T00:00:00Z" },
     ]);
 
-    const sessions = await listClaudeSessions({ baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
     expect(sessions[0].summary).not.toContain("<context>");
     expect(sessions[0].summary).toContain("fix this");
   });
@@ -208,7 +226,8 @@ describe("getClaudeSession", () => {
       { type: "user", message: { role: "user", content: "found it" }, timestamp: "2026-01-01T00:01:00Z" },
     ]);
 
-    const session = await getClaudeSession("abc-def-123", { baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const session = getClaudeSession("abc-def-123", { baseDir: baseDir() });
     expect(session).not.toBeNull();
     expect(session!.sessionId).toBe("abc-def-123");
     expect(session!.summary).toBe("found it");
@@ -219,7 +238,8 @@ describe("getClaudeSession", () => {
       { type: "system", sessionId: "xyz-long-id-456", timestamp: "2026-01-01T00:00:00Z" },
     ]);
 
-    const session = await getClaudeSession("xyz-long", { baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const session = getClaudeSession("xyz-long", { baseDir: baseDir() });
     expect(session).not.toBeNull();
     expect(session!.sessionId).toBe("xyz-long-id-456");
   });
@@ -229,7 +249,8 @@ describe("getClaudeSession", () => {
       { type: "system", sessionId: "exists", timestamp: "2026-01-01T00:00:00Z" },
     ]);
 
-    const session = await getClaudeSession("does-not-exist", { baseDir: baseDir() });
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const session = getClaudeSession("does-not-exist", { baseDir: baseDir() });
     expect(session).toBeNull();
   });
 });

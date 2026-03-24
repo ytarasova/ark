@@ -110,11 +110,19 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
     });
   }, [selectedItem?.id]);
 
+  // Load from cache (instant), then refresh in background
   useEffect(() => {
-    asyncState.run("Loading sessions...", async () => {
-      const sessions = await core.listClaudeSessions({ limit: RECENT_LIMIT });
-      setClaudeSessions(sessions);
-    });
+    // Instant read from SQLite cache
+    const cached = core.listClaudeSessions({ limit: RECENT_LIMIT });
+    setClaudeSessions(cached);
+
+    // Background refresh if cache is empty
+    if (cached.length === 0) {
+      asyncState.run("Scanning Claude sessions...", async () => {
+        await core.refreshClaudeSessionsCache();
+        setClaudeSessions(core.listClaudeSessions({ limit: RECENT_LIMIT }));
+      });
+    }
   }, []);
 
   useInput((input, key) => {
@@ -152,10 +160,11 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
     if (key.escape && mode === "search") { setMode("recent"); return; }
 
     if (input === "r" && mode !== "search") {
-      asyncState.run("Reloading...", async () => {
-        const sessions = await core.listClaudeSessions({ limit: RECENT_LIMIT });
+      asyncState.run("Refreshing Claude sessions...", async () => {
+        const count = await core.refreshClaudeSessionsCache();
+        const sessions = core.listClaudeSessions({ limit: RECENT_LIMIT });
         setClaudeSessions(sessions);
-        status.show(`Loaded ${sessions.length} sessions`);
+        status.show(`Refreshed ${count} sessions`);
       });
       return;
     }

@@ -51,4 +51,4 @@ export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getI
 export { startConductor } from "./conductor.js";
 
 // Claude sessions
-export { listClaudeSessions, getClaudeSession, type ClaudeSession } from "./claude-sessions.js";
+export { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache, type ClaudeSession } from "./claude-sessions.js";
