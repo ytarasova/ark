@@ -236,6 +236,8 @@ export interface LauncherOpts {
   prevClaudeSessionId?: string | null;
   /** Session name for --remote-control flag */
   sessionName?: string;
+  /** Environment variables to export before launching Claude */
+  env?: Record<string, string>;
 }
 
 /** Generate launcher bash script content. */
@@ -249,11 +251,16 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
     `--remote-control ${shellQuote(opts.sessionName ?? "ark")}`,
   ].join(" \\\n  ");
 
+  const envExports = Object.entries(opts.env ?? {})
+    .map(([k, v]) => `export ${k}=${shellQuote(v)}`)
+    .join("\n");
+  const envBlock = envExports ? envExports + "\n" : "";
+
   let content: string;
   if (opts.prevClaudeSessionId) {
     content = `#!/bin/bash
 cd ${shellQuote(opts.workdir)}
-${claudeCmd} --resume ${shellQuote(opts.prevClaudeSessionId)} \\
+${envBlock}${claudeCmd} --resume ${shellQuote(opts.prevClaudeSessionId)} \\
   ${extraFlags} || \\
 ${claudeCmd} --session-id ${shellQuote(claudeSessionId)} \\
   ${extraFlags}
@@ -262,7 +269,7 @@ exec bash
   } else {
     content = `#!/bin/bash
 cd ${shellQuote(opts.workdir)}
-${claudeCmd} --session-id ${shellQuote(claudeSessionId)} \\
+${envBlock}${claudeCmd} --session-id ${shellQuote(claudeSessionId)} \\
   ${extraFlags}
 exec bash
 `;

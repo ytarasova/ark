@@ -381,6 +381,37 @@ describe("buildLauncher", () => {
     expect(content).toContain("--model");
     expect(content).toContain("'claude-opus-4-6'");
   });
+
+  it("includes env var exports when env provided", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      env: { CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80", MY_VAR: "hello world" },
+    });
+    expect(content).toContain("export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE='80'");
+    expect(content).toContain("export MY_VAR='hello world'");
+  });
+
+  it("does not include env block when env is empty", () => {
+    const { content } = buildLauncher({ ...baseOpts, env: {} });
+    expect(content).not.toContain("export ");
+  });
+
+  it("does not include env block when env is undefined", () => {
+    const { content } = buildLauncher(baseOpts);
+    expect(content).not.toContain("export ");
+  });
+
+  it("env vars appear after cd and before claude command", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      env: { FOO: "bar" },
+    });
+    const cdIndex = content.indexOf("cd ");
+    const exportIndex = content.indexOf("export FOO=");
+    const claudeIndex = content.indexOf("claude");
+    expect(exportIndex).toBeGreaterThan(cdIndex);
+    expect(claudeIndex).toBeGreaterThan(exportIndex);
+  });
 });
 
 // ── trustDirectory ────────────────────────────────────────────────────────────

@@ -358,6 +358,7 @@ async function launchAgentTmux(
     mcpConfigPath,
     prevClaudeSessionId: session.claude_session_id,
     sessionName: session.summary ?? session.id,
+    env: agent.env,
   });
 
   let finalLaunchContent = launchContent;
