@@ -27,6 +27,15 @@ function decodeProjectDir(dirName: string): string {
   return dirName.replace(/^-/, "/").replace(/-/g, "/");
 }
 
+/** Junk prefixes in user messages that aren't real prompts */
+const JUNK_PREFIXES = ["Caveat:", "<local-command", "<command-", "<system-reminder", "<channel"];
+
+function isRealUserMessage(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length < 3) return false;
+  return !JUNK_PREFIXES.some(p => trimmed.startsWith(p));
+}
+
 function parseTranscriptMeta(filePath: string): Omit<ClaudeSession, "project" | "projectDir" | "transcriptPath"> | null {
   let content: string;
   try { content = readFileSync(filePath, "utf-8"); } catch { return null; }
@@ -40,9 +49,12 @@ function parseTranscriptMeta(filePath: string): Omit<ClaudeSession, "project" | 
   let summary = "";
   let messageCount = 0;
 
-  for (const line of lines) {
+  // Only scan first 100 lines for header info + summary (don't read entire 50MB file)
+  const scanLimit = Math.min(lines.length, 100);
+
+  for (let i = 0; i < lines.length; i++) {
     try {
-      const entry = JSON.parse(line);
+      const entry = JSON.parse(lines[i]);
       if (!timestamp) {
         sessionId = entry.sessionId ?? sessionId;
         timestamp = entry.timestamp ?? "";
@@ -53,16 +65,22 @@ function parseTranscriptMeta(filePath: string): Omit<ClaudeSession, "project" | 
         messageCount++;
       }
 
-      if (entry.type === "user" && !summary) {
+      // Only look for summary in first 100 lines
+      if (i < scanLimit && entry.type === "user" && !summary) {
         const msg = entry.message;
         if (msg) {
+          let text = "";
           const c = msg.content;
           if (typeof c === "string") {
-            summary = c;
+            text = c;
           } else if (Array.isArray(c)) {
-            summary = c.filter((x: any) => x.type === "text").map((x: any) => x.text).join(" ");
+            text = c.filter((x: any) => x.type === "text").map((x: any) => x.text).join(" ");
           }
-          summary = summary.replace(/<[^>]+>/g, " ").trim().slice(0, 200);
+          // Strip HTML/XML tags, then check if it's a real message
+          text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+          if (isRealUserMessage(text)) {
+            summary = text.slice(0, 200);
+          }
         }
       }
     } catch {}
@@ -85,6 +103,13 @@ export async function listClaudeSessions(opts?: ListOpts): Promise<ClaudeSession
     try { if (!statSync(projectPath).isDirectory()) continue; } catch { continue; }
 
     const decodedProject = decodeProjectDir(projectDir);
+
+    // Skip temp dirs, worktrees, and test artifacts
+    if (decodedProject.includes("/var/folders/") ||
+        decodedProject.includes("/tmp/") ||
+        decodedProject.includes("/worktrees/") ||
+        decodedProject.includes("/subagents/")) continue;
+
     if (opts?.project && !decodedProject.toLowerCase().includes(opts.project.toLowerCase())) continue;
 
     let files: string[];
