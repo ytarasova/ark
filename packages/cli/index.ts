@@ -195,8 +195,8 @@ session.command("output")
   .description("Show live output from a running session")
   .argument("<id>")
   .option("-n, --lines <n>", "Number of lines", "30")
-  .action((id, opts) => {
-    const output = core.getOutput(id, { lines: Number(opts.lines) });
+  .action(async (id, opts) => {
+    const output = await core.getOutput(id, { lines: Number(opts.lines) });
     console.log(output || chalk.dim("No output"));
   });
 

@@ -288,6 +288,48 @@ export class EC2Provider implements ComputeProvider {
     return opts.tmuxName;
   }
 
+  // ── Session lifecycle ─────────────────────────────────────────────────
+
+  async killAgent(compute: Compute, session: Session): Promise<void> {
+    // EC2: kill the remote tmux session via ssh
+    if (!session.session_id) return;
+    const cfg = compute.config as EC2HostConfig;
+    const ip = cfg.ip;
+    if (!ip) return;
+    const key = sshKeyPath(compute.name);
+    try {
+      await sshExecAsync(key, ip, `tmux kill-session -t '${session.session_id}'`, { timeout: 10_000 });
+    } catch { /* session may already be dead */ }
+  }
+
+  async captureOutput(compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
+    // EC2: capture remote tmux pane via ssh
+    if (!session.session_id) return "";
+    const cfg = compute.config as EC2HostConfig;
+    const ip = cfg.ip;
+    if (!ip) return "";
+    const key = sshKeyPath(compute.name);
+    const lines = opts?.lines ?? 50;
+    try {
+      return await sshExecAsync(key, ip,
+        `tmux capture-pane -t '${session.session_id}' -p -S -${lines}`,
+        { timeout: 10_000 });
+    } catch { return ""; }
+  }
+
+  async cleanupSession(compute: Compute, session: Session): Promise<void> {
+    // EC2: remove remote checkout only — don't touch the instance
+    const remoteWorkdir = (session.config as any)?.remoteWorkdir;
+    if (!remoteWorkdir) return;
+    const cfg = compute.config as EC2HostConfig;
+    const ip = cfg.ip;
+    if (!ip) return;
+    const key = sshKeyPath(compute.name);
+    try {
+      await sshExecAsync(key, ip, `rm -rf '${remoteWorkdir}'`, { timeout: 15_000 });
+    } catch { /* best effort */ }
+  }
+
   async attach(compute: Compute, session: Session): Promise<void> {
     const cfg = compute.config as EC2HostConfig;
     const ip = cfg.ip;

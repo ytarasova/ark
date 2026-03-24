@@ -140,15 +140,22 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
   return { ok: true, message: `Advanced to ${nextStage}` };
 }
 
-export function stop(sessionId: string): { ok: boolean; message: string } {
+export async function stop(sessionId: string): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  if (session.session_id) tmux.killSession(session.session_id);
+  // Kill agent via provider
+  const { provider, compute } = resolveProvider(session);
+  if (provider && compute) {
+    await provider.killAgent(compute, session);
+  } else if (session.session_id) {
+    // Fallback: direct tmux kill (no compute assigned)
+    await tmux.killSessionAsync(session.session_id);
+  }
 
   // Clean up hook config from working directory
   if (session.workdir) {
-    claude.removeHooksConfig(session.workdir);
+    try { claude.removeHooksConfig(session.workdir); } catch {}
   }
 
   store.updateSession(sessionId, { status: "stopped", error: null, session_id: null, claude_session_id: null });
@@ -317,21 +324,19 @@ export function joinFork(parentId: string, force = false): { ok: boolean; messag
 // ── Delete ──────────────────────────────────────────────────────────────────
 
 /**
- * Fully delete a session: kill tmux, clean up provider resources, remove
- * worktree (if applicable), clean hooks, delete DB rows. Non-blocking.
- *
- * Cleanup per provider:
- *   local (worktree):  git worktree remove (async)
- *   local (direct):    noop
- *   docker:            docker rm -f (via provider.destroy)
- *   ec2:               rm remote checkout (ssh); instance NOT touched
+ * Fully delete a session: kill agent, clean up provider resources, clean
+ * hooks, delete DB rows. All provider-specific logic delegated to the provider.
  */
 export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  // 1. Kill tmux session
-  if (session.session_id) {
+  const { provider, compute } = resolveProvider(session);
+
+  // 1. Kill agent process via provider
+  if (provider && compute) {
+    try { await provider.killAgent(compute, session); } catch {}
+  } else if (session.session_id) {
     await tmux.killSessionAsync(session.session_id);
   }
 
@@ -340,48 +345,28 @@ export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boole
     try { claude.removeHooksConfig(session.workdir); } catch {}
   }
 
-  // 3. Provider-specific cleanup (background, best-effort)
-  const compute = session.compute_name ? store.getCompute(session.compute_name) : null;
-  const provider = compute ? getProvider(compute.provider) : null;
-
-  if (compute && provider && compute.provider === "docker") {
-    // Docker: destroy the container
-    try { await provider.destroy(compute); } catch {}
-  } else if (compute && provider && compute.provider === "ec2") {
-    // EC2: remove the remote repo checkout only (don't touch the instance)
-    const remoteWorkdir = (session.config as any)?.remoteWorkdir;
-    if (remoteWorkdir) {
-      try {
-        const cfg = compute.config as any;
-        const { sshExecAsync } = await import("../compute/providers/ec2/ssh.js");
-        await sshExecAsync(cfg.ssh_key_path, cfg.public_ip, `rm -rf '${remoteWorkdir}'`, { timeout: 10_000 });
-      } catch {}
-    }
+  // 3. Provider-specific session cleanup (worktree, remote checkout, container stop)
+  if (provider && compute) {
+    try { await provider.cleanupSession(compute, session); } catch {}
   }
 
-  // 4. Local worktree cleanup (only if worktree was created — skip direct repos)
-  const wtPath = join(store.WORKTREES_DIR(), sessionId);
-  if (existsSync(wtPath)) {
-    const repo = session.workdir ?? session.repo;
-    if (repo) {
-      const ok = await new Promise<boolean>((resolve) => {
-        const { spawn: sp } = require("child_process");
-        const cp = sp("git", ["-C", repo, "worktree", "remove", "--force", wtPath], { stdio: "pipe" });
-        cp.on("close", (code: number | null) => resolve(code === 0));
-        cp.on("error", () => resolve(false));
-      });
-      if (!ok) {
-        try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
-      }
-    } else {
-      try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
-    }
-  }
-
-  // 5. Delete DB rows (instant)
+  // 4. Delete DB rows (instant)
   store.deleteSession(sessionId);
 
   return { ok: true, message: "Session deleted" };
+}
+
+// ── Provider resolution ──────────────────────────────────────────────────────
+
+import type { ComputeProvider } from "../compute/types.js";
+
+/** Resolve the compute provider for a session. Defaults to local if no compute assigned. */
+function resolveProvider(session: store.Session): { provider: ComputeProvider | null; compute: store.Compute | null } {
+  const computeName = session.compute_name || "local";
+  const compute = store.getCompute(computeName);
+  if (!compute) return { provider: null, compute: null };
+  const provider = getProvider(compute.provider);
+  return { provider: provider ?? null, compute };
 }
 
 // ── Internal ────────────────────────────────────────────────────────────────
@@ -615,9 +600,15 @@ function setupWorktree(repoPath: string, sessionId: string, branch?: string): st
 
 // ── Output ──────────────────────────────────────────────────────────────────
 
-export function getOutput(sessionId: string, opts?: { lines?: number; ansi?: boolean }): string {
+export async function getOutput(sessionId: string, opts?: { lines?: number; ansi?: boolean }): Promise<string> {
   const session = store.getSession(sessionId);
   if (!session?.session_id) return "";
+
+  const { provider, compute } = resolveProvider(session);
+  if (provider && compute) {
+    return provider.captureOutput(compute, session, opts);
+  }
+  // Fallback: direct tmux capture
   return tmux.capturePane(session.session_id, opts);
 }
 

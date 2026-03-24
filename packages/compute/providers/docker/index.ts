@@ -241,6 +241,33 @@ export class DockerProvider implements ComputeProvider {
     // No tunnels needed for local Docker — tmux attach handled by CLI layer
   }
 
+  // ── Session lifecycle ─────────────────────────────────────────────────
+
+  async killAgent(_compute: Compute, session: Session): Promise<void> {
+    // Docker sessions run via tmux wrapping docker exec
+    if (session.session_id) {
+      const { killSessionAsync } = await import("../../../core/tmux.js");
+      await killSessionAsync(session.session_id);
+    }
+  }
+
+  async captureOutput(_compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
+    if (!session.session_id) return "";
+    const { capturePane } = await import("../../../core/tmux.js");
+    return capturePane(session.session_id, opts);
+  }
+
+  async cleanupSession(compute: Compute, _session: Session): Promise<void> {
+    // Docker: stop the container (don't destroy — that's a compute-level op)
+    const name = containerName(compute.name);
+    try {
+      execFileSync("docker", ["stop", name], {
+        timeout: 15_000,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } catch { /* already stopped */ }
+  }
+
   // ── Metrics ──────────────────────────────────────────────────────────────
 
   async getMetrics(compute: Compute): Promise<ComputeSnapshot> {

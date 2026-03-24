@@ -20,7 +20,7 @@ export function useSessionActions(asyncState: AsyncState) {
     },
 
     stop: (id: string) => {
-      run(`Stopping ${id}`, () => { core.stop(id); });
+      run(`Stopping ${id}`, () => core.stop(id));
     },
 
     complete: (id: string) => {

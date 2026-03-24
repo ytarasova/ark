@@ -33,14 +33,26 @@ export interface SyncOpts {
 export interface ComputeProvider {
   readonly name: string;
 
+  // ── Compute lifecycle ───────────────────────────────────────────────────
   provision(compute: Compute, opts?: ProvisionOpts): Promise<void>;
   destroy(compute: Compute): Promise<void>;
   start(compute: Compute): Promise<void>;
   stop(compute: Compute): Promise<void>;
 
+  // ── Session lifecycle ───────────────────────────────────────────────────
   launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string>;
   attach(compute: Compute, session: Session): Promise<void>;
 
+  /** Kill the agent process for a session. */
+  killAgent(compute: Compute, session: Session): Promise<void>;
+
+  /** Capture live output from the agent process. */
+  captureOutput(compute: Compute, session: Session, opts?: { lines?: number }): Promise<string>;
+
+  /** Clean up session resources (worktrees, remote checkouts, etc). */
+  cleanupSession(compute: Compute, session: Session): Promise<void>;
+
+  // ── Monitoring ──────────────────────────────────────────────────────────
   getMetrics(compute: Compute): Promise<ComputeSnapshot>;
   probePorts(compute: Compute, ports: PortDecl[]): Promise<PortStatus[]>;
 

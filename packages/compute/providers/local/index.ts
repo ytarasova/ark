@@ -3,12 +3,15 @@
  * No provisioning needed. Uses existing tmux module for session management.
  */
 
-import { execFileSync } from "child_process";
+import { execFileSync, spawn } from "child_process";
+import { existsSync, rmSync } from "fs";
+import { join } from "path";
 import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
   ComputeSnapshot, PortDecl, PortStatus,
 } from "../../types.js";
 import type { Compute, Session } from "../../../core/store.js";
+import { WORKTREES_DIR } from "../../../core/store.js";
 import * as tmux from "../../../core/tmux.js";
 import { collectLocalMetrics } from "./metrics.js";
 
@@ -38,6 +41,37 @@ export class LocalProvider implements ComputeProvider {
 
   async attach(_compute: Compute, _session: Session): Promise<void> {
     // Local attach: no tunnels needed, tmux attach handled by CLI layer
+  }
+
+  async killAgent(_compute: Compute, session: Session): Promise<void> {
+    if (session.session_id) {
+      await tmux.killSessionAsync(session.session_id);
+    }
+  }
+
+  async captureOutput(_compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
+    if (!session.session_id) return "";
+    return tmux.capturePane(session.session_id, opts);
+  }
+
+  async cleanupSession(_compute: Compute, session: Session): Promise<void> {
+    // Only clean up worktree if one exists — direct repos are a noop
+    const wtPath = join(WORKTREES_DIR(), session.id);
+    if (!existsSync(wtPath)) return;
+
+    const repo = session.workdir ?? session.repo;
+    if (repo) {
+      const ok = await new Promise<boolean>((resolve) => {
+        const cp = spawn("git", ["-C", repo!, "worktree", "remove", "--force", wtPath], { stdio: "pipe" });
+        cp.on("close", (code: number | null) => resolve(code === 0));
+        cp.on("error", () => resolve(false));
+      });
+      if (!ok) {
+        try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
+      }
+    } else {
+      try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
+    }
   }
 
   async getMetrics(_compute: Compute): Promise<ComputeSnapshot> {

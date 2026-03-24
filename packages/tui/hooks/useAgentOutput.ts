@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import * as core from "../../core/index.js";
 
 /**
- * Poll tmux pane output for a running session.
+ * Poll agent output for a running session via the provider-aware getOutput().
  * Returns the latest captured output, refreshed every pollMs.
  */
 export function useAgentOutput(sessionId: string | null, tmuxName: string | null, isRunning: boolean, pollMs = 2000): string {
@@ -16,11 +16,10 @@ export function useAgentOutput(sessionId: string | null, tmuxName: string | null
 
     const poll = async () => {
       try {
-        const { capturePaneAsync } = await import("../../core/tmux.js");
-        const text = await capturePaneAsync(tmuxName, { lines: 15 });
+        const text = await core.getOutput(sessionId, { lines: 15 });
         setOutput(text.trim());
       } catch {
-        // tmux session may be gone
+        // session may be gone
       }
     };
 

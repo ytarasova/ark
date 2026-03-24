@@ -188,7 +188,7 @@ describe("e2e attach flow", () => {
     expect(result.message).toContain("Already completed");
   }, 30_000);
 
-  it("getOutput returns empty string for undispatched session", () => {
+  it("getOutput returns empty string for undispatched session", async () => {
     const s = core.startSession({
       summary: "output-empty-test",
       repo: process.cwd(),
@@ -196,7 +196,7 @@ describe("e2e attach flow", () => {
     });
     sessionIds.push(s.id);
 
-    const output = core.getOutput(s.id);
+    const output = await core.getOutput(s.id);
     expect(output).toBe("");
   });
 
@@ -209,7 +209,7 @@ describe("e2e attach flow", () => {
     sessionIds.push(s.id);
 
     await core.dispatch(s.id);
-    const output = core.getOutput(s.id, { lines: 10 });
+    const output = await core.getOutput(s.id, { lines: 10 });
     expect(typeof output).toBe("string");
 
     core.stop(s.id);

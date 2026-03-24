@@ -91,7 +91,7 @@ describe("core lifecycle: dispatch", () => {
     expect(core.sessionExists(dispatched.session_id!)).toBe(true);
 
     // Clean up tmux
-    core.stop(session.id);
+    await core.stop(session.id);
   }, 30_000);
 
   it("rejects dispatch on non-ready session", async () => {
@@ -111,7 +111,7 @@ describe("core lifecycle: dispatch", () => {
       expect(result2.message).toContain("Already running");
     }
 
-    core.stop(session.id);
+    await core.stop(session.id);
   }, 30_000);
 
   it("returns error for nonexistent session", async () => {
@@ -135,13 +135,13 @@ describe("core lifecycle: getOutput", () => {
     await core.dispatch(session.id);
 
     // getOutput should return a string (possibly empty right after dispatch)
-    const output = core.getOutput(session.id, { lines: 10 });
+    const output = await core.getOutput(session.id, { lines: 10 });
     expect(typeof output).toBe("string");
 
-    core.stop(session.id);
+    await core.stop(session.id);
   }, 30_000);
 
-  it("returns empty string for session without tmux", () => {
+  it("returns empty string for session without tmux", async () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-no-output-test",
@@ -150,7 +150,7 @@ describe("core lifecycle: getOutput", () => {
     sessionIds.push(session.id);
 
     // Not dispatched yet, so no tmux session
-    const output = core.getOutput(session.id);
+    const output = await core.getOutput(session.id);
     expect(output).toBe("");
   });
 });
@@ -158,7 +158,7 @@ describe("core lifecycle: getOutput", () => {
 // ── stop ───────────────────────────────────────────────────────────────────
 
 describe("core lifecycle: stop", () => {
-  it("transitions running session to failed", async () => {
+  it("transitions running session to stopped", async () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-stop-test",
@@ -170,12 +170,12 @@ describe("core lifecycle: stop", () => {
     const dispatched = core.getSession(session.id)!;
     expect(dispatched.status).toBe("running");
 
-    const result = core.stop(session.id);
+    const result = await core.stop(session.id);
     expect(result.ok).toBe(true);
 
     const stopped = core.getSession(session.id)!;
-    expect(stopped.status).toBe("failed");
-    expect(stopped.error).toContain("Stopped by user");
+    expect(stopped.status).toBe("stopped");
+    expect(stopped.error).toBeNull();
     expect(stopped.session_id).toBeNull();
 
     // Verify tmux is dead
@@ -200,7 +200,7 @@ describe("core lifecycle: resume", () => {
 
     // Dispatch, then stop
     await core.dispatch(session.id);
-    core.stop(session.id);
+    await core.stop(session.id);
 
     const stopped = core.getSession(session.id)!;
     expect(stopped.status).toBe("failed");
@@ -218,7 +218,7 @@ describe("core lifecycle: resume", () => {
     expect(events.length).toBeGreaterThanOrEqual(1);
 
     // Clean up
-    core.stop(session.id);
+    await core.stop(session.id);
   }, 30_000);
 });
 
@@ -299,7 +299,7 @@ describe("core lifecycle: full round-trip", () => {
     expect(core.getSession(session.id)!.status).toBe("running");
 
     // 3. Stop
-    core.stop(session.id);
+    await core.stop(session.id);
     expect(core.getSession(session.id)!.status).toBe("failed");
 
     // 4. Resume (re-dispatches)
