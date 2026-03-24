@@ -28,8 +28,8 @@ import { getProvider } from "../compute/index.js";
 
 const DEFAULT_PORT = 19100;
 
-export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }): void {
-  Bun.serve({
+export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }): { stop(): void } {
+  const server = Bun.serve({
     port,
     hostname: "127.0.0.1",
     async fetch(req) {
@@ -136,6 +136,8 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
       }
     } catch { /* ignore polling errors */ } finally { polling = false; }
   }, 30_000);
+
+  return server;
 }
 
 function handleReport(sessionId: string, report: OutboundMessage): void {
