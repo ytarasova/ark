@@ -203,7 +203,7 @@ const CHANNEL_PROMPT_MARKERS = [
   "I am using this for local",
   "local channel development",
 ];
-const SUCCESS_MARKERS = ["Welcome", "Claude Code v", "$"];
+const SUCCESS_MARKERS = ["Welcome", "╭", "❯ /"];
 
 /**
  * Poll tmux pane for the channel development prompt and auto-accept it.
@@ -213,7 +213,7 @@ export async function autoAcceptChannelPrompt(
   tmuxName: string,
   opts?: { maxAttempts?: number; delayMs?: number },
 ): Promise<void> {
-  const max = opts?.maxAttempts ?? 30;
+  const max = opts?.maxAttempts ?? 45;
   const delay = opts?.delayMs ?? 1000;
 
   for (let i = 0; i < max; i++) {

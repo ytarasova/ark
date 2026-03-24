@@ -35,7 +35,7 @@ export function SplitPane({ left, right, leftTitle, rightTitle, leftWidth = "30%
       <Box flexDirection="column" width={rightWidth}
         borderStyle="single"
         borderColor={focus === "right" ? "cyan" : "gray"}
-        paddingX={1}>
+        paddingLeft={1} paddingRight={2}>
         {rightTitle && (
           <>
             <Text color={focus === "right" ? "cyan" : "white"} bold={focus === "right"}>
