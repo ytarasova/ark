@@ -126,6 +126,65 @@ stages:
     gate: auto
 ```
 
+## TUI Async Rules (CRITICAL)
+
+**Every I/O operation in the TUI MUST be non-blocking.** No exceptions.
+
+The TUI uses `useAsync` hook which provides `asyncState.run(label, fn)` — it queues work, shows a spinner with the label, and keeps the UI responsive.
+
+**In `useInput` handlers:**
+```ts
+// WRONG — blocks the event loop, freezes UI
+if (input === "x") {
+  core.doSomething(); // ← NEVER do this
+}
+
+// CORRECT — non-blocking with spinner
+if (input === "x") {
+  asyncState.run("Doing something...", async () => {
+    await core.doSomethingAsync();  // or sync wrapped in run()
+    status.show("Done");
+    refresh();
+  });
+}
+```
+
+**In component render bodies:**
+```ts
+// WRONG — I/O during render
+function MyComponent({ id }) {
+  const data = core.loadData(id); // ← NEVER do this in render
+
+// CORRECT — memoized or in useEffect
+function MyComponent({ id }) {
+  const data = useMemo(() => core.loadData(id), [id]);
+  // or
+  const [data, setData] = useState(null);
+  useEffect(() => { setData(core.loadData(id)); }, [id]);
+```
+
+**Rules:**
+- `useInput` handlers: wrap ALL `core.*` calls in `asyncState.run(label, fn)`
+- Render bodies: wrap ALL `core.*` calls in `useMemo` or `useEffect`
+- Never use `execFileSync` in handlers — use async variants (`sessionExistsAsync`, `capturePaneAsync`)
+- After mutations inside `asyncState.run()`, call `refresh()` to update the TUI
+- Use `status.show(msg)` for user feedback inside async operations
+- Long operations (file scanning, indexing): use `async` fn with periodic `await new Promise(r => setTimeout(r, 0))` to yield to the event loop
+
+**Existing async infrastructure:**
+- `useAsync` hook: `packages/tui/hooks/useAsync.ts` — queued action runner with spinner
+- `useSessionActions`: `packages/tui/hooks/useSessionActions.ts` — all session mutations (dispatch, stop, restart, delete, clone, complete)
+- `useComputeActions`: `packages/tui/hooks/useComputeActions.ts` — all compute mutations (provision, stop, start, delete, clean)
+- `useStatusMessage`: `packages/tui/hooks/useStatusMessage.ts` — temporary status messages with auto-clear
+
+## Hook-Based Agent Status
+
+Ark uses Claude Code hooks for agent status detection. At dispatch time, `claude.writeHooksConfig()` writes `.claude/settings.local.json` to the session working directory with HTTP hooks that POST status events to the conductor.
+
+**Hooks are ONLY for status detection** (busy/idle/error/done). They are NOT part of the channel/conductor communication system. Channels handle agent↔human messaging via MCP.
+
+Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/hooks/status endpoint), `session.ts` (wiring).
+
 ## Code Style
 
 - TypeScript with `strict: false`
