@@ -42,13 +42,19 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
       continue;
     }
 
-    // Tmux alive — check if Claude is waiting for user input
+    // Tmux alive — check if Claude is asking the user a question
     try {
-      const output = await core.capturePaneAsync(s.session_id, { lines: 5 });
-      const lastLines = output.trim().split("\n").slice(-3).join("\n");
-      // Claude shows ❯ prompt when waiting for input, or AskUserQuestion
-      const isWaiting = lastLines.includes("❯") && !lastLines.includes("⏺");
-      if (isWaiting && s.status === "running") {
+      const output = await core.capturePaneAsync(s.session_id, { lines: 15 });
+      const text = output.trim();
+      // Claude explicitly asks user questions via AskUserQuestion tool
+      // or shows permission prompts. These are the only reliable "waiting" signals.
+      const needsAttention =
+        text.includes("AskUserQuestion") ||
+        text.includes("Allow") && text.includes("Deny") ||
+        text.includes("Do you want to") ||
+        text.includes("? (y/n)") ||
+        text.includes("Y/n");
+      if (needsAttention) {
         s.status = "waiting";
       }
     } catch {}
