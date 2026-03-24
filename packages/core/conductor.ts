@@ -28,7 +28,7 @@ import { getProvider } from "../compute/index.js";
 
 const DEFAULT_PORT = 19100;
 
-export function startConductor(port = DEFAULT_PORT): void {
+export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }): void {
   Bun.serve({
     port,
     hostname: "127.0.0.1",
@@ -103,7 +103,7 @@ export function startConductor(port = DEFAULT_PORT): void {
     },
   });
 
-  console.log(`Ark conductor listening on localhost:${port}`);
+  if (!opts?.quiet) console.log(`Ark conductor listening on localhost:${port}`);
 
   // Background metrics polling - every 30 seconds
   let polling = false;

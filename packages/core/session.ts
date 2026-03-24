@@ -330,9 +330,20 @@ async function launchAgentTmux(
   // Trust worktree for Claude
   claude.trustWorktree(workdir, effectiveWorkdir);
 
+  // Determine conductor URL based on compute type
+  // For devcontainer (local or remote): channel runs inside Docker, needs host.docker.internal
+  // For EC2 bare metal: SSH reverse tunnel maps localhost:19100 back to user's machine
+  // For local bare metal: localhost:19100 works directly
+  const compute = session.compute_name ? getCompute(session.compute_name) : null;
+  const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
+  const usesDevcontainer = arcJson?.devcontainer ?? false;
+  const conductorUrl = usesDevcontainer
+    ? "http://host.docker.internal:19100"
+    : "http://localhost:19100";
+
   // Channel config + launcher
   const channelPort = store.sessionChannelPort(session.id);
-  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir);
+  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl });
 
   const { content: launchContent, claudeSessionId } = claude.buildLauncher({
     workdir: effectiveWorkdir,
@@ -351,8 +362,6 @@ async function launchAgentTmux(
   writeFileSync(join(sessionDir, "task.txt"), task);
 
   // Check for remote compute
-  const compute = session.compute_name ? getCompute(session.compute_name) : null;
-
   if (compute && compute.provider !== "local") {
     const provider = getProvider(compute.provider);
     if (!provider) {

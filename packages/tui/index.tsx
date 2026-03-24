@@ -29,6 +29,15 @@ process.on("uncaughtException", (err: any) => {
 
 log("INFO", "TUI starting");
 
+// ── Start embedded conductor ────────────────────────────────────────────────
+import { startConductor } from "../core/conductor.js";
+try {
+  startConductor(19100, { quiet: true });
+  log("INFO", "Conductor started on port 19100");
+} catch (e: any) {
+  log("WARN", `Conductor start failed (may already be running): ${e.message}`);
+}
+
 // ── Terminal check ──────────────────────────────────────────────────────────
 if (!process.stdin.isTTY) {
   log("ERROR", "stdin is not a TTY");
