@@ -661,6 +661,38 @@ program.command("conductor")
     setInterval(() => {}, 60_000);
   });
 
+// ── Search ──────────────────────────────────────────────────────────────────
+
+program.command("search")
+  .description("Search across sessions, events, messages, and transcripts")
+  .argument("<query>", "Search text (case-insensitive)")
+  .option("-l, --limit <n>", "Max results", "20")
+  .option("-t, --transcripts", "Also search Claude transcripts (slower)")
+  .action((query, opts) => {
+    const limit = parseInt(opts.limit);
+    const results = core.searchSessions(query, { limit });
+
+    if (opts.transcripts) {
+      const transcriptResults = core.searchTranscripts(query, { limit });
+      results.push(...transcriptResults);
+    }
+
+    if (results.length === 0) {
+      console.log(chalk.yellow("No results found."));
+      return;
+    }
+
+    console.log(chalk.bold(`Found ${results.length} result(s) for "${query}":\n`));
+    for (const r of results) {
+      const sourceColor = r.source === "metadata" ? chalk.blue
+        : r.source === "event" ? chalk.cyan
+        : r.source === "message" ? chalk.green
+        : chalk.magenta;
+      const match = r.match.length > 120 ? r.match.slice(0, 120) + "..." : r.match;
+      console.log(`  ${chalk.dim(r.sessionId)}  ${sourceColor(`[${r.source}]`)}  ${match}`);
+    }
+  });
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 
 await program.parseAsync(process.argv);
