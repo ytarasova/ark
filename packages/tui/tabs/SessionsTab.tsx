@@ -88,8 +88,10 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       return;
     }
     if (input === "/") {
-      const count = core.indexTranscripts();
-      status.show(`Indexed ${count} transcript entries`);
+      asyncState.run("Indexing transcripts", () => {
+        const count = core.indexTranscripts();
+        status.show(`Indexed ${count} transcript entries`);
+      });
       return;
     }
 
