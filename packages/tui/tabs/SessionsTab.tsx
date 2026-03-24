@@ -33,12 +33,14 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const [groupMode, setGroupMode] = useState<false | "menu">(false);
   const [talkMode, setTalkMode] = useState(false);
   const [inboxMode, setInboxMode] = useState(false);
+  const [cloneMode, setCloneMode] = useState(false);
   const status = useStatusMessage();
 
   // Top-level sessions only (exclude fork children from list)
   const topLevel = useMemo(() => sessions.filter((s) => !s.parent_id), [sessions]);
 
-  const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !formOverlay && !moveMode && !groupMode && !talkMode && !inboxMode });
+  const hasOverlay = formOverlay || moveMode || groupMode || talkMode || inboxMode || cloneMode;
+  const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !hasOverlay });
 
   const selected = topLevel[sel] ?? null;
 
@@ -57,7 +59,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   useInput((input, key) => {
     // Don't handle keys when form overlay is active (form owns input)
     if (formOverlay) return;
-    if (moveMode || groupMode || talkMode || inboxMode) return; // let overlay handle input
+    if (hasOverlay) return; // let overlay handle input
 
     if (key.return) {
       if (selected && (selected.status === "ready" || selected.status === "blocked")) {
@@ -139,24 +141,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     } else if (input === "m") {
       if (selected) setMoveMode(true);
     } else if (input === "d") {
-      if (selected) {
-        asyncState.run(`Cloning ${selected.id}`, async () => {
-          const { ok, cloneId } = core.cloneSession(selected.id);
-          if (ok) {
-            // Copy group assignment
-            if (selected.group_name) {
-              core.updateSession(cloneId, { group_name: selected.group_name });
-            }
-            refresh();
-            status.show(`Cloned → ${cloneId}`);
-            // Auto-dispatch the clone
-            await core.dispatch(cloneId);
-            refresh();
-          } else {
-            status.show(`Clone failed: ${cloneId}`);
-          }
-        });
-      }
+      if (selected) setCloneMode(true);
     } else if (input === "t") {
       if (selected?.status === "running" || selected?.status === "waiting") setTalkMode(true);
     } else if (input === "i") {
@@ -255,6 +240,24 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
             </Box>
           )
           : formOverlay ? formOverlay
+          : cloneMode ? (
+            <CloneSession
+              session={selected}
+              onDone={async (name) => {
+                setCloneMode(false);
+                if (!selected || !name) return;
+                const { ok, cloneId } = core.cloneSession(selected.id, name);
+                if (ok) {
+                  if (selected.group_name) core.updateSession(cloneId, { group_name: selected.group_name });
+                  refresh();
+                  asyncState.run(`Dispatching ${cloneId}`, async () => {
+                    await core.dispatch(cloneId);
+                    refresh();
+                  });
+                }
+              }}
+            />
+          )
           : inboxMode ? (
             <ThreadsPanel
               sessions={topLevel}
@@ -681,6 +684,46 @@ function TalkToSession({ session, onDone }: TalkToSessionProps) {
         />
       </Box>
       <Text dimColor>{"  Enter:send  Esc:back"}</Text>
+    </Box>
+  );
+}
+
+// ── Clone Session ──────────────────────────────────────────────────────────
+
+interface CloneSessionProps {
+  session: core.Session | null;
+  onDone: (name: string | null) => void;
+}
+
+function CloneSession({ session, onDone }: CloneSessionProps) {
+  const [name, setName] = useState(session ? `${session.summary ?? session.id}-clone` : "");
+
+  useInput((input, key) => {
+    if (key.escape) onDone(null);
+  });
+
+  if (!session) { onDone(null); return null; }
+
+  return (
+    <Box flexDirection="column" flexGrow={1}>
+      <Text bold color="cyan">{" Clone Session "}</Text>
+      <Text> </Text>
+      <Text dimColor>{`  Cloning: ${session.summary ?? session.id}`}</Text>
+      <Text dimColor>{`  Repo: ${session.repo}`}</Text>
+      <Text dimColor>{`  Claude conversation will be resumed`}</Text>
+      <Text> </Text>
+      <Text>{"  New session name:"}</Text>
+      <Box>
+        <Text color="cyan">{"> "}</Text>
+        <TextInputEnhanced
+          value={name}
+          onChange={setName}
+          onSubmit={() => { if (name.trim()) onDone(name.trim()); }}
+          focus={true}
+        />
+      </Box>
+      <Box flexGrow={1} />
+      <Text dimColor>{"  Enter:clone  Esc:cancel"}</Text>
     </Box>
   );
 }
