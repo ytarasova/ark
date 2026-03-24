@@ -67,11 +67,9 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
       break;
   }
 
-  hints.push(<KeyHint key="m" k="m" label="group" />);
+  hints.push(<KeyHint key="m" k="m" label="move" />);
+  hints.push(<KeyHint key="g" k="g" label="groups" />);
   hints.push(<KeyHint key="n" k="n" label="new" />);
-  if (s.group_name) {
-    hints.push(<KeyHint key="X" k="X" label="del-group" />);
-  }
   hints.push(<KeyHint key="q" k="q" label="quit" />);
   return hints;
 }

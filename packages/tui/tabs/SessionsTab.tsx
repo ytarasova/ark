@@ -29,12 +29,13 @@ interface SessionsTabProps extends StoreData {
 
 export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
   const [moveMode, setMoveMode] = useState(false);
+  const [groupMode, setGroupMode] = useState<false | "menu">(false);
   const status = useStatusMessage();
 
   // Top-level sessions only (exclude fork children from list)
   const topLevel = useMemo(() => sessions.filter((s) => !s.parent_id), [sessions]);
 
-  const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !formOverlay && !moveMode });
+  const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !formOverlay && !moveMode && !groupMode });
 
   const selected = topLevel[sel] ?? null;
 
@@ -53,7 +54,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
   useInput((input, key) => {
     // Don't handle keys when form overlay is active (form owns input)
     if (formOverlay) return;
-    if (moveMode) return; // let SelectMenu handle input
+    if (moveMode || groupMode) return; // let overlay handle input
 
     if (key.return) {
       if (selected && (selected.status === "ready" || selected.status === "blocked")) {
@@ -134,6 +135,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
       }
     } else if (input === "m") {
       if (selected) setMoveMode(true);
+    } else if (input === "g") {
+      setGroupMode("menu");
     } else if (input === "S") {
       if (selectedGroup && groupSessions.length > 0) {
         asyncState.run(`Stopping group '${selectedGroup}'`, async () => {
@@ -212,6 +215,15 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
         }
         right={
           formOverlay ? formOverlay
+          : groupMode ? (
+            <GroupManager
+              sessions={topLevel}
+              onDone={(msg) => {
+                if (msg) { status.show(msg); refresh(); }
+                setGroupMode(false);
+              }}
+            />
+          )
           : moveMode ? (
             <MoveToGroup
               session={selected}
@@ -453,6 +465,115 @@ function MoveToGroup({ session, onDone }: MoveToGroupProps) {
           }
         }}
       />
+      <Text dimColor>{"  Esc to cancel"}</Text>
+    </Box>
+  );
+}
+
+// ── Group Manager ──────────────────────────────────────────────────────────
+
+interface GroupManagerProps {
+  sessions: core.Session[];
+  onDone: (message?: string) => void;
+}
+
+function GroupManager({ sessions, onDone }: GroupManagerProps) {
+  const [action, setAction] = useState<"menu" | "create" | "delete">("menu");
+  const [newName, setNewName] = useState("");
+  const existing = core.getGroups();
+
+  useInput((input, key) => {
+    if (key.escape) onDone();
+  });
+
+  if (action === "create") {
+    return (
+      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+        <Text bold color="cyan">{" Create Group "}</Text>
+        <Text> </Text>
+        <Text>{"Group name:"}</Text>
+        <Box>
+          <Text color="cyan">{"> "}</Text>
+          <TextInputEnhanced
+            value={newName}
+            onChange={setNewName}
+            onSubmit={() => {
+              if (!newName.trim()) return;
+              // Create group by making a placeholder — groups are implicit,
+              // so we just confirm the name exists for future use
+              onDone(`Group '${newName.trim()}' ready — assign sessions with 'm'`);
+            }}
+            placeholder="Enter group name..."
+          />
+        </Box>
+        <Text dimColor>{"  Enter to create, Esc to cancel"}</Text>
+      </Box>
+    );
+  }
+
+  if (action === "delete") {
+    const deleteChoices = existing.map(g => {
+      const count = sessions.filter(s => s.group_name === g).length;
+      return { label: `${g} (${count} sessions)`, value: g };
+    });
+
+    if (deleteChoices.length === 0) {
+      return (
+        <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+          <Text bold color="cyan">{" Delete Group "}</Text>
+          <Text> </Text>
+          <Text dimColor>{"  No groups to delete."}</Text>
+          <Text dimColor>{"  Esc to go back"}</Text>
+        </Box>
+      );
+    }
+
+    return (
+      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+        <Text bold color="red">{" Delete Group "}</Text>
+        <Text> </Text>
+        <Text>{"Select group to delete (all sessions will be removed):"}</Text>
+        <SelectMenu
+          items={deleteChoices}
+          onSelect={async (item) => {
+            const groupSessions = sessions.filter(s => s.group_name === item.value);
+            for (const s of groupSessions) {
+              if (s.session_id) {
+                try { await core.killSessionAsync(s.session_id); } catch {}
+              }
+              core.deleteSession(s.id);
+            }
+            onDone(`Deleted group '${item.value}' (${groupSessions.length} sessions)`);
+          }}
+        />
+        <Text dimColor>{"  Esc to cancel"}</Text>
+      </Box>
+    );
+  }
+
+  // Menu
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+      <Text bold color="cyan">{" Groups "}</Text>
+      <Text> </Text>
+      <SelectMenu
+        items={[
+          { label: "Create new group", value: "create" },
+          { label: "Delete group", value: "delete" },
+        ]}
+        onSelect={(item) => setAction(item.value as any)}
+      />
+      {existing.length > 0 && (
+        <>
+          <Text> </Text>
+          <Text dimColor>{"  Existing groups:"}</Text>
+          {existing.map(g => {
+            const count = sessions.filter(s => s.group_name === g).length;
+            return <Text key={g} dimColor>{`    ${g} (${count})`}</Text>;
+          })}
+        </>
+      )}
+      <Text> </Text>
       <Text dimColor>{"  Esc to cancel"}</Text>
     </Box>
   );
