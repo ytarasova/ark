@@ -189,14 +189,13 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
               ) : (
                 historyItems.map((item, idx) => {
                   const marker = idx === sel ? ">" : " ";
-                  const tag = item.type === "ark" ? "ARK" : "   ";
-                  const proj = item.project.slice(0, 18).padEnd(18);
-                  const summary = item.summary.slice(0, 40);
+                  const tag = item.type === "ark" ? "A" : " ";
+                  const summary = item.summary.slice(0, 50);
                   return (
-                    <Text key={item.id + idx}>
-                      {`${marker} `}
+                    <Text key={item.id + idx} wrap="truncate">
+                      {`${marker}`}
                       <Text color={item.type === "ark" ? "green" : "dim"}>{tag}</Text>
-                      {` ${item.date}  ${proj}  ${summary}`}
+                      {` ${item.date} ${summary}`}
                     </Text>
                   );
                 })
