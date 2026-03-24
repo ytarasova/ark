@@ -194,7 +194,7 @@ export class AppContext {
     if (!this.options.skipConductor) {
       try {
         const { startConductor } = await import("./conductor.js");
-        this.conductor = startConductor?.(this) ?? null;
+        this.conductor = startConductor(this.config.conductorPort, { quiet: true });
       } catch {
         // conductor module may not exist yet — that's fine
       }

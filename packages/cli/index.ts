@@ -19,7 +19,7 @@ import { getProvider } from "../compute/index.js";
 import { AppContext, setApp } from "../core/app.js";
 import { loadConfig } from "../core/config.js";
 
-const app = new AppContext(loadConfig());
+const app = new AppContext(loadConfig(), { skipConductor: true, skipMetrics: true });
 await app.boot();
 setApp(app);
 
