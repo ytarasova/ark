@@ -26,6 +26,7 @@ import { eventBus } from "./hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../compute/index.js";
 import { parseTranscriptUsage } from "./claude.js";
+import { indexSession } from "./search.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -158,6 +159,11 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
                 }
               }
             } catch { /* transcript parsing failure shouldn't block status update */ }
+
+              // Index transcript for FTS5 search
+              try {
+                indexSession(transcriptPath, sessionId);
+              } catch { /* indexing failure shouldn't block status update */ }
           }
 
           return Response.json({ status: "ok", mapped: newStatus ?? "no-op" });
