@@ -18,26 +18,40 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
   for (const s of sessions) {
     if (s.status !== "running" || !s.session_id) continue;
     const exists = await core.sessionExistsAsync(s.session_id);
-    if (exists) continue;
 
-    let lastOutput = "";
+    if (!exists) {
+      // Tmux session gone — agent crashed or exited
+      let lastOutput = "";
+      try {
+        lastOutput = (await core.capturePaneAsync(s.session_id, { lines: 30 })).trim();
+      } catch {}
+
+      const error = lastOutput
+        ? `Agent exited. Last output: ${lastOutput.split("\n").pop()?.slice(0, 100) ?? "unknown"}`
+        : "Agent process exited";
+
+      core.updateSession(s.id, { status: "failed", error, session_id: null });
+      core.logEvent(s.id, "agent_exited", {
+        stage: s.stage ?? undefined,
+        actor: "system",
+        data: { last_output: lastOutput.slice(0, 500) },
+      });
+      s.status = "failed";
+      s.error = error;
+      s.session_id = null;
+      continue;
+    }
+
+    // Tmux alive — check if Claude is waiting for user input
     try {
-      lastOutput = (await core.capturePaneAsync(s.session_id, { lines: 30 })).trim();
+      const output = await core.capturePaneAsync(s.session_id, { lines: 5 });
+      const lastLines = output.trim().split("\n").slice(-3).join("\n");
+      // Claude shows ❯ prompt when waiting for input, or AskUserQuestion
+      const isWaiting = lastLines.includes("❯") && !lastLines.includes("⏺");
+      if (isWaiting && s.status === "running") {
+        s.status = "waiting";
+      }
     } catch {}
-
-    const error = lastOutput
-      ? `Agent exited. Last output: ${lastOutput.split("\n").pop()?.slice(0, 100) ?? "unknown"}`
-      : "Agent process exited";
-
-    core.updateSession(s.id, { status: "failed", error, session_id: null });
-    core.logEvent(s.id, "agent_exited", {
-      stage: s.stage ?? undefined,
-      actor: "system",
-      data: { last_output: lastOutput.slice(0, 500) },
-    });
-    s.status = "failed";
-    s.error = error;
-    s.session_id = null;
   }
 }
 
