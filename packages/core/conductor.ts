@@ -96,6 +96,55 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
           }
         }
 
+        // Hook-based agent status (separate from channel protocol)
+        if (req.method === "POST" && path === "/hooks/status") {
+          const sessionId = url.searchParams.get("session");
+          if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
+
+          const s = store.getSession(sessionId);
+          if (!s) return Response.json({ error: "session not found" }, { status: 404 });
+
+          const payload = await req.json() as Record<string, unknown>;
+          const event = String(payload.hook_event_name ?? "");
+
+          const statusMap: Record<string, string> = {
+            SessionStart: "running",
+            UserPromptSubmit: "running",
+            Stop: "ready",
+            StopFailure: "failed",
+            SessionEnd: "completed",
+          };
+
+          let newStatus = statusMap[event];
+
+          if (event === "Notification") {
+            const matcher = String(payload.matcher ?? "");
+            if (matcher.includes("permission_prompt") || matcher.includes("idle_prompt")) {
+              newStatus = "waiting";
+            }
+          }
+
+          // Log the hook event
+          store.logEvent(sessionId, "hook_status", {
+            actor: "hook",
+            data: { event, ...payload } as Record<string, unknown>,
+          });
+
+          if (newStatus) {
+            const updates: Partial<store.Session> = { status: newStatus as any };
+            if (newStatus === "failed") {
+              updates.error = String(payload.error ?? payload.error_details ?? "unknown error");
+            }
+            store.updateSession(sessionId, updates);
+
+            eventBus.emit("hook_status", sessionId, {
+              data: { event, status: newStatus, ...payload } as Record<string, unknown>,
+            });
+          }
+
+          return Response.json({ status: "ok", mapped: newStatus ?? "no-op" });
+        }
+
         return new Response("Not found", { status: 404 });
       } catch (e) {
         return Response.json({ error: String(e) }, { status: 500 });
