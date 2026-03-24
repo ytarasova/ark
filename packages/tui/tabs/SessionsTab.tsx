@@ -14,6 +14,7 @@ import { SelectMenu } from "../components/SelectMenu.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { ThreadsPanel } from "../components/ThreadsPanel.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
+import { useSessionActions } from "../hooks/useSessionActions.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
 import type { StoreData } from "../hooks/useStore.js";
@@ -63,10 +64,10 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     [topLevel, selectedGroup],
   );
 
+  const actions = useSessionActions({ asyncState, refresh });
+
   useInput((input, key) => {
-    // Don't handle keys when form overlay is active (form owns input)
-    if (formOverlay) return;
-    if (hasOverlay) return; // let overlay handle input
+    if (formOverlay || hasOverlay) return;
 
     // Cancel pending confirm on any non-c key
     if (confirmComplete && input !== "c") {
@@ -74,55 +75,34 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       status.clear();
     }
 
-    if (key.return) {
-      if (selected && (selected.status === "ready" || selected.status === "blocked")) {
-        asyncState.run(`Dispatching ${selected.id}`, async () => {
-          await core.dispatch(selected.id);
-          refresh();
-        });
-      } else if (selected && ["failed", "stopped", "completed"].includes(selected.status)) {
-        asyncState.run(`Restarting ${selected.id}`, async () => {
-          await core.resume(selected.id);
-          refresh();
-        });
+    if (!selected) {
+      // No selection — only allow n/i/g
+    } else if (key.return) {
+      if (selected.status === "ready" || selected.status === "blocked") {
+        actions.dispatch(selected.id);
+      } else if (["failed", "stopped", "completed"].includes(selected.status)) {
+        actions.restart(selected.id);
       }
     } else if (input === "s") {
-      if (selected && !["completed", "failed", "stopped"].includes(selected.status)) {
-        asyncState.run(`Stopping ${selected.id}`, async () => {
-          core.stop(selected.id);
-          refresh();
-        });
+      if (!["completed", "failed", "stopped"].includes(selected.status)) {
+        actions.stop(selected.id);
       }
     } else if (input === "r") {
-      if (selected && ["blocked", "failed", "stopped", "completed"].includes(selected.status)) {
-        asyncState.run(`Resuming ${selected.id}`, async () => {
-          await core.resume(selected.id);
-          refresh();
-        });
+      if (["blocked", "failed", "stopped", "completed"].includes(selected.status)) {
+        actions.restart(selected.id);
       }
     } else if (input === "c") {
-      if (selected && selected.status === "running") {
+      if (selected.status === "running") {
         if (confirmComplete) {
-          asyncState.run(`Completing ${selected.id}`, async () => {
-            core.complete(selected.id);
-            refresh();
-          });
+          actions.complete(selected.id);
           setConfirmComplete(false);
         } else {
           setConfirmComplete(true);
-          status.show(`Complete '${selected.summary ?? selected.id}'? Press c again to confirm, any other key to cancel`);
+          status.show(`Complete '${selected.summary ?? selected.id}'? Press c again to confirm`);
         }
       }
     } else if (input === "x") {
-      if (selected) {
-        asyncState.run(`Deleting ${selected.id}`, async () => {
-          if (selected.session_id) {
-            await core.killSessionAsync(selected.session_id);
-          }
-          core.deleteSession(selected.id);
-          refresh();
-        });
-      }
+      actions.delete(selected.id, selected.session_id);
     } else if (input === "a") {
       if (selected?.session_id) {
         // Verify tmux session exists
@@ -169,32 +149,16 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       setGroupMode("menu");
     } else if (input === "S") {
       if (selectedGroup && groupSessions.length > 0) {
-        asyncState.run(`Stopping group '${selectedGroup}'`, async () => {
-          for (const s of groupSessions) {
-            if (!["completed", "failed"].includes(s.status)) core.stop(s.id);
-          }
-          refresh();
-        });
+        actions.stopGroup(groupSessions);
       }
     } else if (input === "R") {
       if (selectedGroup && groupSessions.length > 0) {
-        asyncState.run(`Resuming group '${selectedGroup}'`, async () => {
-          for (const s of groupSessions) {
-            if (["blocked", "waiting", "failed", "stopped"].includes(s.status)) await core.resume(s.id);
-          }
-          refresh();
-        });
+        actions.resumeGroup(groupSessions);
       }
     } else if (input === "X") {
       if (selectedGroup && groupSessions.length > 0) {
-        asyncState.run(`Deleting group '${selectedGroup}'`, async () => {
-          for (const s of groupSessions) {
-            if (s.session_id) await core.killSessionAsync(s.session_id);
-            core.deleteSession(s.id);
-          }
-          setSel(0);
-          refresh();
-        });
+        actions.deleteGroup(groupSessions);
+        setSel(0);
       }
     } else if (input === "n") {
       onShowForm();
@@ -262,18 +226,10 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
           : cloneMode ? (
             <CloneSession
               session={selected}
-              onDone={async (name) => {
+              onDone={(name) => {
                 setCloneMode(false);
                 if (!selected || !name) return;
-                const { ok, cloneId } = core.cloneSession(selected.id, name);
-                if (ok) {
-                  if (selected.group_name) core.updateSession(cloneId, { group_name: selected.group_name });
-                  refresh();
-                  asyncState.run(`Dispatching ${cloneId}`, async () => {
-                    await core.dispatch(cloneId);
-                    refresh();
-                  });
-                }
+                actions.clone(selected.id, name, selected.group_name);
               }}
             />
           )
