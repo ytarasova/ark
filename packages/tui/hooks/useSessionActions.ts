@@ -27,11 +27,8 @@ export function useSessionActions(asyncState: AsyncState) {
       run(`Completing ${id}`, () => { core.complete(id); });
     },
 
-    delete: (id: string, tmuxName: string | null) => {
-      run(`Deleting ${id}`, async () => {
-        if (tmuxName) await core.killSessionAsync(tmuxName);
-        core.deleteSession(id);
-      });
+    delete: (id: string) => {
+      run(`Deleting ${id}`, () => core.deleteSessionAsync(id));
     },
 
     clone: (sourceId: string, name: string, groupName?: string | null) => {
@@ -68,8 +65,7 @@ export function useSessionActions(asyncState: AsyncState) {
     deleteGroup: (sessions: core.Session[]) => {
       run("Deleting group", async () => {
         for (const s of sessions) {
-          if (s.session_id) await core.killSessionAsync(s.session_id);
-          core.deleteSession(s.id);
+          await core.deleteSessionAsync(s.id);
         }
       });
     },

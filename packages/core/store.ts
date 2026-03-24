@@ -11,7 +11,7 @@
 import { Database } from "bun:sqlite";
 import { randomBytes } from "crypto";
 import { mkdirSync, existsSync, rmSync } from "fs";
-import { execFileSync, spawn } from "child_process";
+import { execFileSync } from "child_process";
 import { join } from "path";
 
 import {
@@ -316,40 +316,12 @@ export function updateSession(id: string, fields: Partial<Session>): Session | n
   return getSession(id);
 }
 
+/** Delete session DB rows only. Use session.deleteSessionAsync() for full cleanup. */
 export function deleteSession(id: string): boolean {
   const db = getDb();
-
-  // Capture info needed for cleanup before deleting the DB row
-  const session = getSession(id);
-  const repo = session?.workdir ?? session?.repo;
-  const wtPath = join(WORKTREES_DIR(), id);
-
-  // Delete DB rows first (instant, non-blocking)
   db.prepare("DELETE FROM events WHERE track_id = ?").run(id);
   const result = db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
-
-  // Clean up worktree in the background (git worktree remove can be slow)
-  if (existsSync(wtPath)) {
-    cleanupWorktreeAsync(wtPath, repo ?? null);
-  }
-
   return result.changes > 0;
-}
-
-/** Remove a git worktree without blocking the caller. */
-function cleanupWorktreeAsync(wtPath: string, repo: string | null): void {
-  if (repo) {
-    const cp = spawn("git", ["-C", repo, "worktree", "remove", "--force", wtPath], { stdio: "pipe" });
-    cp.on("close", (code) => {
-      if (code !== 0) {
-        // git worktree remove failed — remove directory and prune
-        try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
-        spawn("git", ["-C", repo!, "worktree", "prune"], { stdio: "pipe" });
-      }
-    });
-  } else {
-    try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
-  }
 }
 
 // ── Atomic claim (CAS) ─────────────────────────────────────────────────────

@@ -100,7 +100,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     } else if (input === "c") {
       if (selected) setCloneMode(true);
     } else if (input === "x") {
-      actions.delete(selected.id, selected.session_id);
+      actions.delete(selected.id);
     } else if (input === "a") {
       if (selected?.session_id) {
         // Verify tmux session exists

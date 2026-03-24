@@ -5,7 +5,7 @@
  * Direct interaction with the store is for reads only - writes go through these functions.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { execFileSync } from "child_process";
 import { homedir } from "os";
@@ -312,6 +312,76 @@ export function joinFork(parentId: string, force = false): { ok: boolean; messag
   store.logEvent(parentId, "fork_joined", { actor: "user", data: { children: children.length } });
   store.updateSession(parentId, { status: "ready", fork_group: null });
   return advance(parentId, true);
+}
+
+// ── Delete ──────────────────────────────────────────────────────────────────
+
+/**
+ * Fully delete a session: kill tmux, clean up provider resources, remove
+ * worktree (if applicable), clean hooks, delete DB rows. Non-blocking.
+ *
+ * Cleanup per provider:
+ *   local (worktree):  git worktree remove (async)
+ *   local (direct):    noop
+ *   docker:            docker rm -f (via provider.destroy)
+ *   ec2:               rm remote checkout (ssh); instance NOT touched
+ */
+export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boolean; message: string }> {
+  const session = store.getSession(sessionId);
+  if (!session) return { ok: false, message: `Session ${sessionId} not found` };
+
+  // 1. Kill tmux session
+  if (session.session_id) {
+    await tmux.killSessionAsync(session.session_id);
+  }
+
+  // 2. Clean up hook config
+  if (session.workdir) {
+    try { claude.removeHooksConfig(session.workdir); } catch {}
+  }
+
+  // 3. Provider-specific cleanup (background, best-effort)
+  const compute = session.compute_name ? store.getCompute(session.compute_name) : null;
+  const provider = compute ? getProvider(compute.provider) : null;
+
+  if (compute && provider && compute.provider === "docker") {
+    // Docker: destroy the container
+    try { await provider.destroy(compute); } catch {}
+  } else if (compute && provider && compute.provider === "ec2") {
+    // EC2: remove the remote repo checkout only (don't touch the instance)
+    const remoteWorkdir = (session.config as any)?.remoteWorkdir;
+    if (remoteWorkdir) {
+      try {
+        const cfg = compute.config as any;
+        const { sshExecAsync } = await import("../compute/providers/ec2/ssh.js");
+        await sshExecAsync(cfg.ssh_key_path, cfg.public_ip, `rm -rf '${remoteWorkdir}'`, { timeout: 10_000 });
+      } catch {}
+    }
+  }
+
+  // 4. Local worktree cleanup (only if worktree was created — skip direct repos)
+  const wtPath = join(store.WORKTREES_DIR(), sessionId);
+  if (existsSync(wtPath)) {
+    const repo = session.workdir ?? session.repo;
+    if (repo) {
+      try {
+        await new Promise<void>((resolve) => {
+          const { spawn } = require("child_process");
+          const cp = spawn("git", ["-C", repo, "worktree", "remove", "--force", wtPath], { stdio: "pipe" });
+          cp.on("close", () => resolve());
+        });
+      } catch {
+        try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
+      }
+    } else {
+      try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
+    }
+  }
+
+  // 5. Delete DB rows (instant)
+  store.deleteSession(sessionId);
+
+  return { ok: true, message: "Session deleted" };
 }
 
 // ── Internal ────────────────────────────────────────────────────────────────

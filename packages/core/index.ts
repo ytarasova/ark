@@ -26,6 +26,7 @@ export { loadConfig, type ArkConfig } from "./config.js";
 export {
   startSession, dispatch, advance, stop, resume, complete, pause,
   cloneSession, handoff, fork, joinFork, getOutput, send,
+  deleteSessionAsync,
 } from "./session.js";
 
 // Flow
