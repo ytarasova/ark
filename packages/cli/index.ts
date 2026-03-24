@@ -57,7 +57,7 @@ session.command("start")
     // Import from Claude session if specified
     let claudeSessionId: string | undefined;
     if (opts.claudeSession) {
-      const cs = core.getClaudeSession(opts.claudeSession);
+      const cs = await core.getClaudeSession(opts.claudeSession);
       if (!cs) {
         console.log(chalk.red(`Claude session '${opts.claudeSession}' not found. Run 'ark claude list' to see available sessions.`));
         return;
@@ -672,8 +672,8 @@ claudeCmd.command("list")
   .description("List Claude Code sessions found on disk")
   .option("-p, --project <filter>", "Filter by project path")
   .option("-l, --limit <n>", "Max results", "20")
-  .action((opts) => {
-    const sessions = core.listClaudeSessions({
+  .action(async (opts) => {
+    const sessions = await core.listClaudeSessions({
       project: opts.project,
       limit: parseInt(opts.limit),
     });

@@ -71,13 +71,14 @@ function parseTranscriptMeta(filePath: string): Omit<ClaudeSession, "project" | 
   return { sessionId, timestamp, lastActivity, summary, messageCount };
 }
 
-export function listClaudeSessions(opts?: ListOpts): ClaudeSession[] {
+export async function listClaudeSessions(opts?: ListOpts): Promise<ClaudeSession[]> {
   const baseDir = opts?.baseDir ?? join(homedir(), ".claude", "projects");
   const limit = opts?.limit ?? 100;
 
   if (!existsSync(baseDir)) return [];
 
   const sessions: ClaudeSession[] = [];
+  let fileCount = 0;
 
   for (const projectDir of readdirSync(baseDir)) {
     const projectPath = join(baseDir, projectDir);
@@ -104,6 +105,12 @@ export function listClaudeSessions(opts?: ListOpts): ClaudeSession[] {
         projectDir,
         transcriptPath: filePath,
       });
+
+      fileCount++;
+      // Yield to event loop every 5 files so TUI stays responsive
+      if (fileCount % 5 === 0) {
+        await new Promise(r => setTimeout(r, 0));
+      }
     }
   }
 
@@ -111,7 +118,7 @@ export function listClaudeSessions(opts?: ListOpts): ClaudeSession[] {
   return sessions.slice(0, limit);
 }
 
-export function getClaudeSession(sessionId: string, opts?: ListOpts): ClaudeSession | null {
-  const all = listClaudeSessions({ ...opts, limit: 10000 });
+export async function getClaudeSession(sessionId: string, opts?: ListOpts): Promise<ClaudeSession | null> {
+  const all = await listClaudeSessions({ ...opts, limit: 10000 });
   return all.find(s => s.sessionId === sessionId || s.sessionId.startsWith(sessionId)) ?? null;
 }
