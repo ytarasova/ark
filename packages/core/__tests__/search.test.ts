@@ -228,7 +228,7 @@ describe("searchTranscripts", () => {
 // ── indexTranscripts ─────────────────────────────────────────────────────────
 
 describe("indexTranscripts", () => {
-  it("indexes JSONL files and returns count", () => {
+  it("indexes JSONL files and returns count", async () => {
     const projectDir = join(ctx.arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "sess-1.jsonl"), [
@@ -236,33 +236,32 @@ describe("indexTranscripts", () => {
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "I'll fix the authentication issue" }] } }),
     ].join("\n"));
 
-    const count = indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
     expect(count).toBe(2); // 1 user + 1 assistant message
   });
 
-  it("FTS5 search returns matches after indexing", () => {
+  it("FTS5 search returns matches after indexing", async () => {
     const projectDir = join(ctx.arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "sess-fts.jsonl"), [
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "fixed the SQL injection vulnerability in the login handler" }] } }),
     ].join("\n"));
 
-    indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
     const results = searchTranscripts("SQL injection");
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].source).toBe("transcript");
   });
 
-  it("is fast — sub-100ms for indexed search", () => {
+  it("is fast — sub-100ms for indexed search", async () => {
     const projectDir = join(ctx.arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
-    // Write enough data to be meaningful
     const lines = [];
     for (let i = 0; i < 100; i++) {
       lines.push(JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: `Working on task ${i}: implementing feature ${i % 10}` }] } }));
     }
     writeFileSync(join(projectDir, "sess-perf.jsonl"), lines.join("\n"));
-    indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
 
     const start = performance.now();
     searchTranscripts("implementing feature");

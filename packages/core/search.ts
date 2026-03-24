@@ -154,7 +154,7 @@ function searchTranscriptsFiles(query: string, opts?: SearchOpts): SearchResult[
 
 // ── Indexing ──────────────────────────────────────────────────────────────────
 
-export function indexTranscripts(opts?: { transcriptsDir?: string; onProgress?: (indexed: number, total: number) => void }): number {
+export async function indexTranscripts(opts?: { transcriptsDir?: string; onProgress?: (indexed: number, total: number) => void }): Promise<number> {
   const transcriptsDir = opts?.transcriptsDir ?? join(homedir(), ".claude", "projects");
   if (!existsSync(transcriptsDir)) return 0;
 
@@ -168,6 +168,7 @@ export function indexTranscripts(opts?: { transcriptsDir?: string; onProgress?: 
   );
 
   let indexed = 0;
+  let fileCount = 0;
   const projectDirs = readdirSync(transcriptsDir);
 
   for (const projectDir of projectDirs) {
@@ -193,7 +194,13 @@ export function indexTranscripts(opts?: { transcriptsDir?: string; onProgress?: 
         } catch {}
       }
 
-      opts?.onProgress?.(indexed, 0); // total unknown during indexing
+      fileCount++;
+      opts?.onProgress?.(indexed, fileCount);
+
+      // Yield to event loop every 5 files so TUI can render
+      if (fileCount % 5 === 0) {
+        await new Promise(r => setTimeout(r, 0));
+      }
     }
   }
 

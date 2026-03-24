@@ -720,10 +720,15 @@ program.command("search")
   .option("-l, --limit <n>", "Max results", "20")
   .option("-t, --transcripts", "Also search Claude transcripts (slower)")
   .option("--index", "Rebuild transcript search index before searching")
-  .action((query, opts) => {
+  .action(async (query, opts) => {
     if (opts.index) {
       console.log(chalk.dim("Indexing transcripts..."));
-      const count = core.indexTranscripts();
+      const count = await core.indexTranscripts({
+        onProgress: (indexed, files) => {
+          process.stdout.write(`\r  ${chalk.dim(`${files} files, ${indexed} entries...`)}`);
+        },
+      });
+      process.stdout.write("\r" + " ".repeat(60) + "\r");
       const stats = core.getIndexStats();
       console.log(chalk.green(`Indexed ${count} entries from ${stats.sessions} sessions\n`));
     }
@@ -754,9 +759,14 @@ program.command("search")
 
 program.command("index")
   .description("Build or rebuild the transcript search index")
-  .action(() => {
+  .action(async () => {
     console.log(chalk.dim("Indexing transcripts..."));
-    const count = core.indexTranscripts();
+    const count = await core.indexTranscripts({
+      onProgress: (indexed, files) => {
+        process.stdout.write(`\r  ${chalk.dim(`${files} files, ${indexed} entries...`)}`);
+      },
+    });
+    process.stdout.write("\r" + " ".repeat(60) + "\r");
     const stats = core.getIndexStats();
     console.log(chalk.green(`Indexed ${count} entries from ${stats.sessions} sessions`));
   });
