@@ -11,6 +11,9 @@ export interface StoreData {
   refresh: () => void;
 }
 
+/** Track pane snapshots for diff-based idle detection. */
+const paneSnapshots = new Map<string, { text: string; time: number }>();
+
 /**
  * Reconcile DB sessions with tmux reality.
  */
@@ -42,12 +45,15 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
       continue;
     }
 
-    // Tmux alive — check if Claude needs attention or is idle
+    // Tmux alive — diff-based idle detection
+    // If pane output hasn't changed since last poll, Claude is idle/waiting
     try {
-      const output = await core.capturePaneAsync(s.session_id, { lines: 10 });
+      const output = await core.capturePaneAsync(s.session_id, { lines: 15 });
       const text = output.trim();
+      const prev = paneSnapshots.get(s.id);
+      paneSnapshots.set(s.id, { text, time: Date.now() });
 
-      // Explicit signals — Claude is asking for something
+      // Explicit signals always win
       if (
         text.includes("AskUserQuestion") ||
         (text.includes("Allow") && text.includes("Deny"))
@@ -56,13 +62,8 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
         continue;
       }
 
-      // Claude's working spinner chars (exclude · which appears in static status bar)
-      const workingChars = ["✳", "✶", "✢", "✽"];
-      // Check lines above the status bar (skip last 2 lines which are static chrome)
-      const lines = text.split("\n");
-      const contentLines = lines.slice(-8, -2).join("");
-      const isWorking = workingChars.some(c => contentLines.includes(c));
-      if (!isWorking && text.includes("❯")) {
+      // If output is same as last poll and >2s have passed, Claude is idle
+      if (prev && prev.text === text && Date.now() - prev.time > 2000) {
         s.status = "waiting";
       }
     } catch {}
