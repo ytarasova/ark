@@ -30,12 +30,13 @@ interface SessionsTabProps extends StoreData {
 export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
   const [moveMode, setMoveMode] = useState(false);
   const [groupMode, setGroupMode] = useState<false | "menu">(false);
+  const [talkMode, setTalkMode] = useState(false);
   const status = useStatusMessage();
 
   // Top-level sessions only (exclude fork children from list)
   const topLevel = useMemo(() => sessions.filter((s) => !s.parent_id), [sessions]);
 
-  const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !formOverlay && !moveMode && !groupMode });
+  const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !formOverlay && !moveMode && !groupMode && !talkMode });
 
   const selected = topLevel[sel] ?? null;
 
@@ -54,7 +55,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
   useInput((input, key) => {
     // Don't handle keys when form overlay is active (form owns input)
     if (formOverlay) return;
-    if (moveMode || groupMode) return; // let overlay handle input
+    if (moveMode || groupMode || talkMode) return; // let overlay handle input
 
     if (key.return) {
       if (selected && (selected.status === "ready" || selected.status === "blocked")) {
@@ -135,6 +136,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
       }
     } else if (input === "m") {
       if (selected) setMoveMode(true);
+    } else if (input === "t") {
+      if (selected?.status === "running") setTalkMode(true);
     } else if (input === "g") {
       setGroupMode("menu");
     } else if (input === "S") {
@@ -221,6 +224,15 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
             </Box>
           )
           : formOverlay ? formOverlay
+          : talkMode ? (
+            <TalkToSession
+              session={selected}
+              onDone={(msg) => {
+                if (msg) status.show(msg);
+                setTalkMode(false);
+              }}
+            />
+          )
           : groupMode ? (
             <GroupManager
               sessions={topLevel}
@@ -533,6 +545,66 @@ function GroupManager({ sessions, onDone }: GroupManagerProps) {
       )}
       <Text> </Text>
       <Box flexGrow={1} /><Text dimColor>{"  Esc to cancel"}</Text>
+    </Box>
+  );
+}
+
+// ── Talk to Session ────────────────────────────────────────────────────────
+
+interface TalkToSessionProps {
+  session: core.Session | null;
+  onDone: (message?: string) => void;
+}
+
+function TalkToSession({ session, onDone }: TalkToSessionProps) {
+  const [msg, setMsg] = useState("");
+
+  useInput((input, key) => {
+    if (key.escape) onDone();
+  });
+
+  if (!session) {
+    onDone();
+    return null;
+  }
+
+  const channelPort = core.sessionChannelPort(session.id);
+
+  const send = async () => {
+    if (!msg.trim()) return;
+    try {
+      await fetch(`http://localhost:${channelPort}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "steer",
+          sessionId: session.id,
+          message: msg.trim(),
+          from: "user",
+        }),
+      });
+      onDone(`Sent to ${session.summary ?? session.id}`);
+    } catch {
+      onDone(`Failed to reach session (channel port ${channelPort})`);
+    }
+  };
+
+  return (
+    <Box flexDirection="column" flexGrow={1}>
+      <Text bold color="cyan">{` Message: ${session.summary ?? session.id} `}</Text>
+      <Text> </Text>
+      <Box>
+        <Text color="cyan">{"> "}</Text>
+        <TextInputEnhanced
+          value={msg}
+          onChange={setMsg}
+          onSubmit={send}
+          focus={true}
+          placeholder="Type a message to Claude..."
+        />
+      </Box>
+      <Box flexGrow={1} />
+      <Text dimColor>{"  Enter:send  Esc:cancel"}</Text>
     </Box>
   );
 }

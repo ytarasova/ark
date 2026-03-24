@@ -46,6 +46,7 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
         break;
       case "running":
         hints.push(<KeyHint key="a" k="a" label="attach" />);
+        hints.push(<KeyHint key="t" k="t" label="talk" />);
         hints.push(<KeyHint key="s" k="s" label="stop" />);
         hints.push(<KeyHint key="c" k="c" label="done" />);
         break;
