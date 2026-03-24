@@ -146,6 +146,11 @@ export function stop(sessionId: string): { ok: boolean; message: string } {
 
   if (session.session_id) tmux.killSession(session.session_id);
 
+  // Clean up hook config from working directory
+  if (session.workdir) {
+    claude.removeHooksConfig(session.workdir);
+  }
+
   store.updateSession(sessionId, { status: "stopped", error: null, session_id: null, claude_session_id: null });
   store.logEvent(sessionId, "session_stopped", {
     stage: session.stage, actor: "user",
@@ -343,6 +348,9 @@ async function launchAgentTmux(
   // Channel config + launcher
   const channelPort = store.sessionChannelPort(session.id);
   const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl });
+
+  // Status hooks — write .claude/settings.local.json for agent status detection
+  claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir);
 
   const { content: launchContent, claudeSessionId } = claude.buildLauncher({
     workdir: effectiveWorkdir,
