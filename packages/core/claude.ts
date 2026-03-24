@@ -223,9 +223,12 @@ const CHANNEL_PROMPT_MARKERS = [
 ];
 /**
  * Poll tmux pane for the channel development prompt and auto-accept it.
- * Keeps polling until it finds the prompt or times out. No early exit —
- * if Claude is already past the prompt, the markers simply never match
- * and the poller times out harmlessly.
+ *
+ * Three outcomes per poll:
+ * 1. Prompt found → send "1" + Enter, done
+ * 2. No prompt but Claude is working (tool use visible) → stop, prompt was
+ *    already accepted or skipped. Don't send rogue keystrokes.
+ * 3. Neither → keep polling (Claude still starting up)
  */
 export async function autoAcceptChannelPrompt(
   tmuxName: string,
@@ -238,10 +241,18 @@ export async function autoAcceptChannelPrompt(
     await Bun.sleep(delay);
     try {
       const output = tmux.capturePane(tmuxName, { lines: 30 });
+
+      // Found the prompt — accept it
       if (CHANNEL_PROMPT_MARKERS.some(m => output.includes(m))) {
         tmux.sendKeys(tmuxName, "1");
         await Bun.sleep(300);
         tmux.sendKeys(tmuxName, "Enter");
+        return;
+      }
+
+      // Claude is already working — safe to stop polling.
+      // These only appear after Claude has fully started and is past any prompts.
+      if (output.includes("ctrl+o to expand") || output.includes("esc to interrupt")) {
         return;
       }
     } catch {}
