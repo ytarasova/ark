@@ -27,7 +27,7 @@ export function TabBar({ active }: TabBarProps) {
         return (
           <Box key={tab} marginRight={1}>
             {isActive ? (
-              <Text backgroundColor="cyan" color="black" bold>{` ${label} `}</Text>
+              <Text backgroundColor="cyan" color="white" bold>{` ${label} `}</Text>
             ) : (
               <Text dimColor>{` ${label} `}</Text>
             )}

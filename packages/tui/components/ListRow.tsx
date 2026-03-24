@@ -7,14 +7,13 @@ interface ListRowProps {
 }
 
 /**
- * A list row that highlights the full panel width when selected.
- * Pass plain text as children — colors are not supported in selected state
- * (inverse flattens them). Use colored Text in unselected state by
- * rendering ListRow only for selected and custom Text for unselected.
+ * A list row with inverse highlight when selected.
+ * Truncates at panel edge instead of wrapping.
  */
 export function ListRow({ selected, children }: ListRowProps) {
-  if (selected) {
-    return <Text bold inverse>{children.padEnd(200)}</Text>;
-  }
-  return <Text>{children}</Text>;
+  return (
+    <Text bold={selected} inverse={selected} wrap="truncate">
+      {children}
+    </Text>
+  );
 }
