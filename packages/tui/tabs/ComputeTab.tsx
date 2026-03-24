@@ -14,7 +14,6 @@ import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { KeyValue } from "../components/KeyValue.js";
 import { DataTable } from "../components/DataTable.js";
-import { useComputeMetrics } from "../hooks/useComputeMetrics.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
@@ -28,11 +27,10 @@ interface ComputeTabProps extends StoreData {
   refresh: () => void;
 }
 
-export function ComputeTab({ computes, sessions, refreshing, refresh, pane, async: asyncState, onShowForm, formOverlay }: ComputeTabProps) {
+export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snapshots, computeLogs, addComputeLog, async: asyncState, onShowForm, formOverlay }: ComputeTabProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { sel } = useListNavigation(computes.length, { active: pane === "left" && !formOverlay && !confirmDelete });
   const status = useStatusMessage();
-  const { snapshots, logs, addLog } = useComputeMetrics(computes, true);
 
   const selected = computes[sel] ?? null;
 
@@ -57,23 +55,23 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, asyn
         const provider = getProvider(selected.provider);
         if (!provider) return;
 
-        addLog(selected.name, "Starting provisioning...");
+        addComputeLog(selected.name, "Starting provisioning...");
         core.updateCompute(selected.name, { status: "provisioning" });
 
         asyncState.run(`Provisioning ${selected.name}`, async () => {
-          addLog(selected.name, `Provider: ${selected.provider}, size: ${(selected.config as any)?.size ?? "default"}`);
+          addComputeLog(selected.name, `Provider: ${selected.provider}, size: ${(selected.config as any)?.size ?? "default"}`);
 
           const timeout = new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error("Provisioning timed out after 20 minutes")), 1_200_000)
           );
           await Promise.race([
             provider.provision(selected, {
-              onLog: (msg: string) => addLog(selected.name, msg),
+              onLog: (msg: string) => addComputeLog(selected.name, msg),
             }),
             timeout,
           ]);
           core.updateCompute(selected.name, { status: "running" });
-          addLog(selected.name, "Provisioning complete - compute is running");
+          addComputeLog(selected.name, "Provisioning complete - compute is running");
           refresh();
         });
       }
@@ -83,26 +81,26 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, asyn
       if (!provider) return;
 
       if (selected.status === "running") {
-        addLog(selected.name, "Stopping compute...");
+        addComputeLog(selected.name, "Stopping compute...");
         asyncState.run(`Stopping ${selected.name}`, async () => {
           await provider.stop(selected);
           core.updateCompute(selected.name, { status: "stopped" });
-          addLog(selected.name, "Compute stopped");
+          addComputeLog(selected.name, "Compute stopped");
           refresh();
         });
       } else if (selected.status === "stopped") {
-        addLog(selected.name, "Starting compute...");
+        addComputeLog(selected.name, "Starting compute...");
         asyncState.run(`Starting ${selected.name}`, async () => {
           await provider.start(selected);
           core.updateCompute(selected.name, { status: "running" });
-          addLog(selected.name, "Compute started");
+          addComputeLog(selected.name, "Compute started");
           refresh();
         });
       }
     } else if (input === "x") {
       if (!selected) return;
       if (selected.status !== "stopped" && selected.status !== "destroyed") {
-        addLog(selected.name, `Cannot delete: compute is ${selected.status}`);
+        addComputeLog(selected.name, `Cannot delete: compute is ${selected.status}`);
         return;
       }
       setConfirmDelete(true);
@@ -179,7 +177,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, asyn
           <ComputeDetail
             compute={selected}
             snapshot={selected ? snapshots.get(selected.name) : undefined}
-            computeLogs={selected ? logs.get(selected.name) : undefined}
+            computeLogs={selected ? computeLogs.get(selected.name) : undefined}
             sessions={sessions}
             pane={pane}
           />

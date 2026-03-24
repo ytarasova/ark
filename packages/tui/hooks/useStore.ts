@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as core from "../../core/index.js";
+import { getProvider } from "../../compute/index.js";
+import type { ComputeSnapshot } from "../../compute/types.js";
 
 export interface StoreData {
   sessions: core.Session[];
@@ -8,6 +10,12 @@ export interface StoreData {
   flows: ReturnType<typeof core.listFlows>;
   /** Unread message counts per session ID. */
   unreadCounts: Map<string, number>;
+  /** Compute metrics snapshots by compute name. */
+  snapshots: Map<string, ComputeSnapshot>;
+  /** Activity logs per compute name. */
+  computeLogs: Map<string, string[]>;
+  /** Add a log entry for a compute. */
+  addComputeLog: (name: string, message: string) => void;
   refreshing: boolean;
   /** Force an immediate refresh (call after mutations like delete/stop). */
   refresh: () => void;
@@ -68,19 +76,35 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
   }
 }
 
-type Payload = Omit<StoreData, "refreshing" | "refresh">;
+type Payload = Omit<StoreData, "refreshing" | "refresh" | "addComputeLog">;
 
 /** Fetch all store data in one shot. */
-async function fetchAll(): Promise<Payload> {
+async function fetchAll(prev: Payload, metricsThisCycle: boolean): Promise<Payload> {
   const sessions = core.listSessions({ limit: 50 });
   await reconcileSessions(sessions);
   const computes = core.listCompute();
 
-  // Batch unread counts — one query per session, but only once per poll
+  // Batch unread counts
   const unreadCounts = new Map<string, number>();
   for (const s of sessions) {
     const count = core.getUnreadCount(s.id);
     if (count > 0) unreadCounts.set(s.id, count);
+  }
+
+  // Metrics — only fetch every few cycles (expensive)
+  let snapshots = prev.snapshots;
+  if (metricsThisCycle) {
+    const next = new Map<string, ComputeSnapshot>();
+    for (const c of computes) {
+      if (c.status !== "running") continue;
+      const provider = getProvider(c.provider);
+      if (!provider) continue;
+      try {
+        const snap = await provider.getMetrics(c);
+        if (snap) next.set(c.name, snap);
+      } catch {}
+    }
+    snapshots = next;
   }
 
   return {
@@ -89,6 +113,8 @@ async function fetchAll(): Promise<Payload> {
     agents: core.listAgents(),
     flows: core.listFlows(),
     unreadCounts,
+    snapshots,
+    computeLogs: prev.computeLogs,
   };
 }
 
@@ -97,7 +123,9 @@ function fingerprint(data: Payload): string {
   const s = data.sessions.map(s => `${s.id}:${s.status}:${s.session_id}:${s.error ?? ""}`).join("|");
   const h = data.computes.map(h => `${h.name}:${h.status}`).join("|");
   const u = [...data.unreadCounts.entries()].map(([k, v]) => `${k}=${v}`).join(",");
-  return `${s};${h};${u}`;
+  // Include a simple metrics hash (cpu values change → fingerprint changes)
+  const m = [...data.snapshots.entries()].map(([k, v]) => `${k}:${v.metrics.cpu.toFixed(0)}`).join(",");
+  return `${s};${h};${u};${m}`;
 }
 
 /**
@@ -107,18 +135,23 @@ function fingerprint(data: Payload): string {
  */
 export function useStore(refreshMs = 3000): StoreData {
   const [ver, setVer] = useState(0);
-  const dataRef = useRef<Payload>({
+  const emptyPayload: Payload = {
     sessions: [], computes: [], agents: [], flows: [],
-    unreadCounts: new Map(),
-  });
+    unreadCounts: new Map(), snapshots: new Map(), computeLogs: new Map(),
+  };
+  const dataRef = useRef<Payload>(emptyPayload);
   const fpRef = useRef("");
   const running = useRef(false);
+  const pollCount = useRef(0);
 
   const doRefresh = useCallback(async () => {
     if (running.current) return;
     running.current = true;
     try {
-      const data = await fetchAll();
+      pollCount.current++;
+      // Fetch metrics every 3rd cycle (~9s) to avoid hammering
+      const metricsThisCycle = pollCount.current % 3 === 1;
+      const data = await fetchAll(dataRef.current, metricsThisCycle);
       const fp = fingerprint(data);
       if (fp !== fpRef.current) {
         fpRef.current = fp;
@@ -135,7 +168,7 @@ export function useStore(refreshMs = 3000): StoreData {
     return () => clearInterval(t);
   }, [doRefresh, refreshMs]);
 
-  // Sync refresh: re-read DB immediately, skip reconciliation (fast path)
+  // Sync refresh: re-read DB immediately, skip reconciliation + metrics
   const refresh = useCallback(() => {
     const sessions = core.listSessions({ limit: 50 });
     const computes = core.listCompute();
@@ -149,11 +182,26 @@ export function useStore(refreshMs = 3000): StoreData {
       agents: core.listAgents(),
       flows: core.listFlows(),
       unreadCounts,
+      snapshots: dataRef.current.snapshots, // keep existing metrics
+      computeLogs: dataRef.current.computeLogs,
     };
     fpRef.current = fingerprint(data);
     dataRef.current = data;
     setVer(v => v + 1);
   }, []);
 
-  return { ...dataRef.current, refreshing: false, refresh };
+  // addComputeLog: append a log entry for a compute (for provisioning output etc.)
+  const addComputeLog = useCallback((name: string, message: string) => {
+    const logs = dataRef.current.computeLogs;
+    const entries = [...(logs.get(name) ?? [])];
+    const ts = new Date().toISOString().slice(11, 19);
+    entries.push(`${ts}  ${message}`);
+    if (entries.length > 50) entries.splice(0, entries.length - 50);
+    const next = new Map(logs);
+    next.set(name, entries);
+    dataRef.current = { ...dataRef.current, computeLogs: next };
+    setVer(v => v + 1);
+  }, []);
+
+  return { ...dataRef.current, refreshing: false, refresh, addComputeLog };
 }
