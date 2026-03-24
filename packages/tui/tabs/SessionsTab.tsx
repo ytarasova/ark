@@ -70,7 +70,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     if (formOverlay || hasOverlay) return;
 
     // Cancel pending confirm on any non-c key
-    if (confirmComplete && input !== "c") {
+    if (confirmComplete && input !== "d") {
       setConfirmComplete(false);
       status.clear();
     }
@@ -92,15 +92,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         actions.restart(selected.id);
       }
     } else if (input === "c") {
-      if (selected.status === "running") {
-        if (confirmComplete) {
-          actions.complete(selected.id);
-          setConfirmComplete(false);
-        } else {
-          setConfirmComplete(true);
-          status.show(`Complete '${selected.summary ?? selected.id}'? Press c again to confirm`);
-        }
-      }
+      if (selected) setCloneMode(true);
     } else if (input === "x") {
       actions.delete(selected.id, selected.session_id);
     } else if (input === "a") {
@@ -140,7 +132,15 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     } else if (input === "m") {
       if (selected) setMoveMode(true);
     } else if (input === "d") {
-      if (selected) setCloneMode(true);
+      if (selected && selected.status === "running") {
+        if (confirmComplete) {
+          actions.complete(selected.id);
+          setConfirmComplete(false);
+        } else {
+          setConfirmComplete(true);
+          status.show(`Done with '${selected.summary ?? selected.id}'? Press d again to confirm`);
+        }
+      }
     } else if (input === "t") {
       if (selected?.status === "running" || selected?.status === "waiting") setTalkMode(true);
     } else if (input === "i") {

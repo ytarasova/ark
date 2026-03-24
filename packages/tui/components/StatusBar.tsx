@@ -48,7 +48,7 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
         hints.push(<KeyHint key="a" k="a" label="attach" />);
         hints.push(<KeyHint key="t" k="t" label="talk" />);
         hints.push(<KeyHint key="s" k="s" label="stop" />);
-        hints.push(<KeyHint key="c" k="c" label="done" />);
+        hints.push(<KeyHint key="d" k="d" label="done" />);
         break;
       case "stopped":
       case "failed":
@@ -64,7 +64,7 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
         hints.push(<KeyHint key="s" k="s" label="stop" />);
         break;
     }
-    hints.push(<KeyHint key="d" k="d" label="clone" />);
+    hints.push(<KeyHint key="c" k="c" label="clone" />);
     hints.push(<KeyHint key="m" k="m" label="move" />);
   }
 

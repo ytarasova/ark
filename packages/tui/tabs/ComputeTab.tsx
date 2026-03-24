@@ -15,6 +15,7 @@ import { DetailPanel } from "../components/DetailPanel.js";
 import { KeyValue } from "../components/KeyValue.js";
 import { DataTable } from "../components/DataTable.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
+import { useComputeActions } from "../hooks/useComputeActions.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
@@ -31,6 +32,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { sel } = useListNavigation(computes.length, { active: pane === "left" && !formOverlay && !confirmDelete });
   const status = useStatusMessage();
+  const actions = useComputeActions(asyncState, addComputeLog);
 
   const selected = computes[sel] ?? null;
 
@@ -38,64 +40,22 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
     if (formOverlay) return;
     if (pane === "right") return;
 
-    // If in confirm-delete mode, only respond to x or cancel
     if (confirmDelete) {
-      if (input === "x" && selected) {
-        asyncState.run(`Deleting compute ${selected.name}`, async () => {
-          core.deleteCompute(selected.name);
-          refresh();
-        });
-      }
+      if (input === "x" && selected) actions.delete(selected.name);
       setConfirmDelete(false);
       return;
     }
 
     if (key.return) {
       if (selected && (selected.status === "stopped" || selected.status === "destroyed")) {
-        const provider = getProvider(selected.provider);
-        if (!provider) return;
-
-        addComputeLog(selected.name, "Starting provisioning...");
-        core.updateCompute(selected.name, { status: "provisioning" });
-
-        asyncState.run(`Provisioning ${selected.name}`, async () => {
-          addComputeLog(selected.name, `Provider: ${selected.provider}, size: ${(selected.config as any)?.size ?? "default"}`);
-
-          const timeout = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Provisioning timed out after 20 minutes")), 1_200_000)
-          );
-          await Promise.race([
-            provider.provision(selected, {
-              onLog: (msg: string) => addComputeLog(selected.name, msg),
-            }),
-            timeout,
-          ]);
-          core.updateCompute(selected.name, { status: "running" });
-          addComputeLog(selected.name, "Provisioning complete - compute is running");
-          refresh();
-        });
+        actions.provision(selected);
       }
     } else if (input === "s") {
       if (!selected) return;
-      const provider = getProvider(selected.provider);
-      if (!provider) return;
-
       if (selected.status === "running") {
-        addComputeLog(selected.name, "Stopping compute...");
-        asyncState.run(`Stopping ${selected.name}`, async () => {
-          await provider.stop(selected);
-          core.updateCompute(selected.name, { status: "stopped" });
-          addComputeLog(selected.name, "Compute stopped");
-          refresh();
-        });
+        actions.stop(selected);
       } else if (selected.status === "stopped") {
-        addComputeLog(selected.name, "Starting compute...");
-        asyncState.run(`Starting ${selected.name}`, async () => {
-          await provider.start(selected);
-          core.updateCompute(selected.name, { status: "running" });
-          addComputeLog(selected.name, "Compute started");
-          refresh();
-        });
+        actions.start(selected);
       }
     } else if (input === "x") {
       if (!selected) return;
@@ -104,7 +64,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
         return;
       }
       setConfirmDelete(true);
-      status.show(`Delete compute '${selected.name}'? Press x to confirm, any key to cancel`);
+      status.show(`Delete '${selected.name}'? Press x to confirm`);
     } else if (input === "a") {
       if (selected?.status === "running") {
         const ip = (selected.config as any)?.ip;
@@ -119,30 +79,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
         }
       }
     } else if (input === "c") {
-      // Clean orphaned/zombie tmux sessions
-      asyncState.run("Cleaning zombie sessions", async () => {
-        const { listArkSessions, killSession } = await import("../../core/tmux.js");
-        const tmuxSessions = listArkSessions();
-        let cleaned = 0;
-        for (const ts of tmuxSessions) {
-          const sessionId = ts.name.replace("ark-", "");
-          const dbSession = core.getSession(sessionId);
-          // Kill if: no DB entry, or DB says it's dead but tmux still lives
-          if (!dbSession || ["failed", "completed"].includes(dbSession.status)) {
-            killSession(ts.name);
-            if (dbSession) {
-              core.updateSession(dbSession.id, { session_id: null });
-            }
-            cleaned++;
-          }
-        }
-        if (cleaned > 0) {
-          status.show(`Killed ${cleaned} zombie session(s)`);
-          refresh();
-        } else {
-          status.show("No zombie sessions found");
-        }
-      });
+      actions.clean();
     } else if (input === "n") {
       onShowForm();
     }
