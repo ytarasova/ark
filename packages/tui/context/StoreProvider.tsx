@@ -41,6 +41,7 @@ export function createMockStore(overrides?: Partial<StoreData>): StoreData {
     computes: [],
     agents: [],
     flows: [],
+    unreadCounts: new Map(),
     refreshing: false,
     refresh: () => {},
     ...overrides,

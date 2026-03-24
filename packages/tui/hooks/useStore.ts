@@ -6,6 +6,8 @@ export interface StoreData {
   computes: core.Compute[];
   agents: ReturnType<typeof core.listAgents>;
   flows: ReturnType<typeof core.listFlows>;
+  /** Unread message counts per session ID. */
+  unreadCounts: Map<string, number>;
   refreshing: boolean;
   /** Force an immediate refresh (call after mutations like delete/stop). */
   refresh: () => void;
@@ -23,7 +25,6 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
     const exists = await core.sessionExistsAsync(s.session_id);
 
     if (!exists) {
-      // Tmux session gone — agent crashed or exited
       let lastOutput = "";
       try {
         lastOutput = (await core.capturePaneAsync(s.session_id, { lines: 30 })).trim();
@@ -45,15 +46,13 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
       continue;
     }
 
-    // Tmux alive — diff-based idle detection
-    // If pane output hasn't changed since last poll, Claude is idle/waiting
+    // Diff-based idle detection
     try {
       const output = await core.capturePaneAsync(s.session_id, { lines: 15 });
       const text = output.trim();
       const prev = paneSnapshots.get(s.id);
       paneSnapshots.set(s.id, { text, time: Date.now() });
 
-      // Explicit signals always win
       if (
         text.includes("AskUserQuestion") ||
         (text.includes("Allow") && text.includes("Deny"))
@@ -62,7 +61,6 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
         continue;
       }
 
-      // If output is same as last poll and >2s have passed, Claude is idle
       if (prev && prev.text === text && Date.now() - prev.time > 2000) {
         s.status = "waiting";
       }
@@ -70,11 +68,36 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
   }
 }
 
-/** Shallow fingerprint: only re-render when session/compute list actually changes. */
-function fingerprint(sessions: core.Session[], computes: core.Compute[]): string {
-  const s = sessions.map(s => `${s.id}:${s.status}:${s.session_id}:${s.error ?? ""}`).join("|");
-  const h = computes.map(h => `${h.name}:${h.status}`).join("|");
-  return s + ";" + h;
+type Payload = Omit<StoreData, "refreshing" | "refresh">;
+
+/** Fetch all store data in one shot. */
+async function fetchAll(): Promise<Payload> {
+  const sessions = core.listSessions({ limit: 50 });
+  await reconcileSessions(sessions);
+  const computes = core.listCompute();
+
+  // Batch unread counts — one query per session, but only once per poll
+  const unreadCounts = new Map<string, number>();
+  for (const s of sessions) {
+    const count = core.getUnreadCount(s.id);
+    if (count > 0) unreadCounts.set(s.id, count);
+  }
+
+  return {
+    sessions,
+    computes,
+    agents: core.listAgents(),
+    flows: core.listFlows(),
+    unreadCounts,
+  };
+}
+
+/** Shallow fingerprint: only re-render when data actually changes. */
+function fingerprint(data: Payload): string {
+  const s = data.sessions.map(s => `${s.id}:${s.status}:${s.session_id}:${s.error ?? ""}`).join("|");
+  const h = data.computes.map(h => `${h.name}:${h.status}`).join("|");
+  const u = [...data.unreadCounts.entries()].map(([k, v]) => `${k}=${v}`).join(",");
+  return `${s};${h};${u}`;
 }
 
 /**
@@ -84,8 +107,9 @@ function fingerprint(sessions: core.Session[], computes: core.Compute[]): string
  */
 export function useStore(refreshMs = 3000): StoreData {
   const [ver, setVer] = useState(0);
-  const dataRef = useRef<Omit<StoreData, "refreshing" | "refresh">>({
+  const dataRef = useRef<Payload>({
     sessions: [], computes: [], agents: [], flows: [],
+    unreadCounts: new Map(),
   });
   const fpRef = useRef("");
   const running = useRef(false);
@@ -94,18 +118,11 @@ export function useStore(refreshMs = 3000): StoreData {
     if (running.current) return;
     running.current = true;
     try {
-      const sessions = core.listSessions({ limit: 50 });
-      await reconcileSessions(sessions);
-      const computes = core.listCompute();
-      const fp = fingerprint(sessions, computes);
+      const data = await fetchAll();
+      const fp = fingerprint(data);
       if (fp !== fpRef.current) {
         fpRef.current = fp;
-        dataRef.current = {
-          sessions,
-          computes,
-          agents: core.listAgents(),
-          flows: core.listFlows(),
-        };
+        dataRef.current = data;
         setVer(v => v + 1);
       }
     } catch {}
@@ -122,13 +139,19 @@ export function useStore(refreshMs = 3000): StoreData {
   const refresh = useCallback(() => {
     const sessions = core.listSessions({ limit: 50 });
     const computes = core.listCompute();
-    fpRef.current = fingerprint(sessions, computes);
-    dataRef.current = {
-      sessions,
-      computes,
+    const unreadCounts = new Map<string, number>();
+    for (const s of sessions) {
+      const count = core.getUnreadCount(s.id);
+      if (count > 0) unreadCounts.set(s.id, count);
+    }
+    const data: Payload = {
+      sessions, computes,
       agents: core.listAgents(),
       flows: core.listFlows(),
+      unreadCounts,
     };
+    fpRef.current = fingerprint(data);
+    dataRef.current = data;
     setVer(v => v + 1);
   }, []);
 

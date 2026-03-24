@@ -27,7 +27,7 @@ interface SessionsTabProps extends StoreData {
   refresh: () => void;
 }
 
-export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
+export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
   const [moveMode, setMoveMode] = useState(false);
   const [groupMode, setGroupMode] = useState<false | "menu">(false);
   const [talkMode, setTalkMode] = useState(false);
@@ -192,7 +192,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
               const marker = topLevel.indexOf(s) === sel ? ">" : " ";
-              const unread = core.getUnreadCount(s.id);
+              const unread = unreadCounts.get(s.id) ?? 0;
               const badge = unread > 0 ? ` (${unread})` : "";
               return ` ${marker} ${icon} ${summary} ${stage} ${age}${badge}`;
             }}
@@ -202,7 +202,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
-              const unread = core.getUnreadCount(s.id);
+              const unread = unreadCounts.get(s.id) ?? 0;
               return (
                 <Text>
                   {" "} <Text color={color}>{icon}</Text>{` ${summary} ${stage} ${age}`}
