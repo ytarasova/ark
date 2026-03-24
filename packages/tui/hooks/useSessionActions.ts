@@ -44,8 +44,7 @@ export function useSessionActions(asyncState: AsyncState) {
     },
 
     move: (id: string, group: string | null) => {
-      core.updateSession(id, { group_name: group });
-      asyncState.run("", async () => {}); // trigger refresh via onComplete
+      run("Moving session", () => { core.updateSession(id, { group_name: group }); });
     },
 
     stopGroup: (sessions: core.Session[]) => {
