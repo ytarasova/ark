@@ -167,6 +167,16 @@ stages:
 
 **Global:** `1-6`:switch tabs `Tab`:toggle pane `e`:events `q`:quit
 
+## TUI Design System
+
+**Status bar = single source of truth for shortcuts.** Hints update based on active tab + pane + overlay. No shortcut text inside panels, overlays, or forms.
+
+**Spinners:**
+- Status bar: icon only (no label) — signals "system is busy"
+- Panel: detailed progress text ("Indexing... 50 files") — shows what's happening
+
+**Overlay hints:** When a form/overlay is active, status bar shows form controls (`Enter:confirm Esc:cancel`) instead of tab hints. Overlay state flows up via `onOverlayChange` callbacks from tabs to App.tsx to StatusBar.
+
 ## App Boot System
 
 `app.ts` provides `AppContext` — initializes conductor, metrics polling, and config. CLI creates it with `skipConductor: true` (only TUI runs the conductor). `config.ts` loads `~/.ark/config.yaml` for user preferences.
