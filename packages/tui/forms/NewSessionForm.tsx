@@ -83,11 +83,15 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
           config: { worktree: isolation === "worktree" },
         });
         sessionId = s.id;
+        store.refresh();
       },
       onDone,
       asyncFollowUp: {
         label: "Dispatching session",
-        action: () => core.dispatch(sessionId).then(() => {}),
+        action: async () => {
+          await core.dispatch(sessionId);
+          store.refresh();
+        },
       },
       asyncState,
     });
@@ -165,7 +169,7 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
       />
 
       <Box flexGrow={1} />
-      <Text dimColor>{"  j/k:navigate  Enter:edit/select  Tab:next  Esc:cancel"}</Text>
+      <Text dimColor>{"  Tab/Shift+Tab:navigate  Enter:edit/select  Esc:cancel"}</Text>
     </Box>
   );
 }

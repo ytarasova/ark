@@ -70,14 +70,6 @@ export function useFormNavigation({ fields: allFields, onCancel, onSubmit }: Use
       return;
     }
 
-    // Don't intercept keys when a text field is being edited
-    if (editingRef.current) return;
-
-    // j/k: only for text-type fields (select fields need j/k for their options)
-    if (isActiveTextField) {
-      if (input === "j" || key.downArrow) { moveField(1); return; }
-      if (input === "k" || key.upArrow) { moveField(-1); return; }
-    }
   });
 
   return {
