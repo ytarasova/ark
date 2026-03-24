@@ -76,7 +76,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
         });
       }
     } else if (input === "r") {
-      if (selected && ["blocked", "waiting", "failed"].includes(selected.status)) {
+      if (selected && ["blocked", "failed"].includes(selected.status)) {
         asyncState.run(`Resuming ${selected.id}`, async () => {
           await core.resume(selected.id);
           refresh();
