@@ -49,8 +49,9 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
         hints.push(<KeyHint key="s" k="s" label="stop" />);
         hints.push(<KeyHint key="c" k="c" label="done" />);
         break;
+      case "stopped":
       case "failed":
-        hints.push(<KeyHint key="enter" k="Enter" label="retry" />);
+        hints.push(<KeyHint key="enter" k="Enter" label="restart" />);
         hints.push(<KeyHint key="x" k="x" label="delete" />);
         break;
       case "completed":
@@ -72,21 +73,16 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
 
 function getComputeHints(): React.ReactNode[] {
   return [
-    <KeyHint key="jk" k="j/k" label="move" />,
-    <KeyHint key="tab" k="Tab" label="detail" />,
     <KeyHint key="enter" k="Enter" label="provision" />,
     <KeyHint key="s" k="s" label="start/stop" />,
     <KeyHint key="c" k="c" label="clean" />,
     <KeyHint key="n" k="n" label="new" />,
-    <KeyHint key="x" k="x" label="delete" />,
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
 
 function getGenericHints(): React.ReactNode[] {
   return [
-    <KeyHint key="jk" k="j/k" label="move" />,
-    <KeyHint key="tab" k="Tab" label="detail" />,
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
@@ -118,9 +114,9 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
         ) : (
           <Text bold>{` ${sessions.length} sessions`}</Text>
         )}
-        {!loading && nRun > 0 && <Text color="green">{`  ●${nRun} running`}</Text>}
-        {nErr > 0 && <Text color="red">{`  ✕${nErr} failed`}</Text>}
-        <Text>{"  "}</Text>
+        {!loading && nRun > 0 && <Text color="green">{`  ● ${nRun} running`}</Text>}
+        {nErr > 0 && <Text color="red">{`  ✕ ${nErr} failed`}</Text>}
+        <Text>{"   "}</Text>
         {hints}
       </Box>
     </Box>

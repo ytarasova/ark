@@ -62,21 +62,21 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
           await core.dispatch(selected.id);
           refresh();
         });
-      } else if (selected && selected.status === "failed") {
-        asyncState.run(`Retrying ${selected.id}`, async () => {
+      } else if (selected && (selected.status === "failed" || selected.status === "stopped")) {
+        asyncState.run(`Restarting ${selected.id}`, async () => {
           await core.resume(selected.id);
           refresh();
         });
       }
     } else if (input === "s") {
-      if (selected && !["completed", "failed"].includes(selected.status)) {
+      if (selected && !["completed", "failed", "stopped"].includes(selected.status)) {
         asyncState.run(`Stopping ${selected.id}`, async () => {
           core.stop(selected.id);
           refresh();
         });
       }
     } else if (input === "r") {
-      if (selected && ["blocked", "waiting", "failed"].includes(selected.status)) {
+      if (selected && ["blocked", "waiting", "failed", "stopped"].includes(selected.status)) {
         asyncState.run(`Resuming ${selected.id}`, async () => {
           await core.resume(selected.id);
           refresh();
@@ -150,7 +150,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
       if (selectedGroup && groupSessions.length > 0) {
         asyncState.run(`Resuming group '${selectedGroup}'`, async () => {
           for (const s of groupSessions) {
-            if (["blocked", "waiting", "failed"].includes(s.status)) await core.resume(s.id);
+            if (["blocked", "waiting", "failed", "stopped"].includes(s.status)) await core.resume(s.id);
           }
           refresh();
         });
