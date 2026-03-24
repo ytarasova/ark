@@ -12,6 +12,7 @@ interface StatusBarProps {
   error: string | null;
   label: string | null;
   pane?: "left" | "right";
+  overlay?: string | null;
 }
 
 function KeyHint({ k, label }: { k: string; label: string }) {
@@ -21,6 +22,41 @@ function KeyHint({ k, label }: { k: string; label: string }) {
       <Text color="gray">:{label}  </Text>
     </Text>
   );
+}
+
+function getOverlayHints(overlay: string): React.ReactNode[] {
+  switch (overlay) {
+    case "form":
+      return [
+        <KeyHint key="enter" k="Enter" label="next" />,
+        <KeyHint key="esc" k="Esc" label="cancel" />,
+      ];
+    case "move":
+    case "clone":
+    case "group":
+      return [
+        <KeyHint key="enter" k="Enter" label="confirm" />,
+        <KeyHint key="esc" k="Esc" label="cancel" />,
+      ];
+    case "talk":
+      return [
+        <KeyHint key="enter" k="Enter" label="send" />,
+        <KeyHint key="esc" k="Esc" label="close" />,
+      ];
+    case "search":
+      return [
+        <KeyHint key="enter" k="Enter" label="search" />,
+        <KeyHint key="esc" k="Esc" label="cancel" />,
+      ];
+    case "inbox":
+      return [
+        <KeyHint key="esc" k="Esc" label="close" />,
+      ];
+    default:
+      return [
+        <KeyHint key="esc" k="Esc" label="cancel" />,
+      ];
+  }
 }
 
 function getRightPaneHints(): React.ReactNode[] {
@@ -102,11 +138,12 @@ function getGenericHints(): React.ReactNode[] {
   ];
 }
 
-export function StatusBar({ tab, sessions, selectedSession, loading, error, label, pane }: StatusBarProps) {
+export function StatusBar({ tab, sessions, selectedSession, loading, error, label, pane, overlay }: StatusBarProps) {
   const nRun = sessions.filter((s) => s.status === "running").length;
   const nErr = sessions.filter((s) => s.status === "failed").length;
 
-  const hints = pane === "right" ? getRightPaneHints()
+  const hints = overlay ? getOverlayHints(overlay)
+    : pane === "right" ? getRightPaneHints()
     : tab === "sessions" ? getSessionHints(selectedSession)
     : tab === "compute" ? getComputeHints()
     : tab === "history" ? getHistoryHints()
@@ -120,10 +157,10 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
         </Box>
       )}
       <Box>
-        {loading && label ? (
+        {loading ? (
           <>
             <Text color="yellow">
-              <Spinner type="dots" />{` ${label}`}
+              <Spinner type="dots" />
             </Text>
             <Text>{"  "}</Text>
           </>

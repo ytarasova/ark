@@ -26,6 +26,7 @@ export function App() {
   const [selectedSession, setSelectedSession] = useState<any>(null);
   const [pane, setPane] = useState<Pane>("left");
   const [childInputActive, setChildInputActive] = useState(false);
+  const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;
 
@@ -94,6 +95,7 @@ export function App() {
           onShowForm={() => setShowForm("session")}
           onSelectionChange={setSelectedSession}
           onInputActive={setChildInputActive}
+          onOverlayChange={setActiveOverlay}
           formOverlay={showForm === "session" ? (
             <NewSessionForm
               store={store}
@@ -111,7 +113,7 @@ export function App() {
       ) : tab === "flows" ? (
         <FlowsTab {...store} pane={pane} />
       ) : tab === "history" ? (
-        <HistoryTab {...store} pane={pane} async={asyncState} />
+        <HistoryTab {...store} pane={pane} async={asyncState} onOverlayChange={setActiveOverlay} />
       ) : tab === "compute" ? (
         <ComputeTab
           {...store}
@@ -137,6 +139,7 @@ export function App() {
         error={asyncState.error}
         label={asyncState.label}
         pane={pane}
+        overlay={showForm ? "form" : activeOverlay}
       />
     </Box>
   );

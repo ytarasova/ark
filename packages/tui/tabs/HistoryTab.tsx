@@ -16,6 +16,7 @@ import type { AsyncState } from "../hooks/useAsync.js";
 interface HistoryTabProps extends StoreData {
   pane: "left" | "right";
   async: AsyncState;
+  onOverlayChange?: (overlay: string | null) => void;
 }
 
 const RECENT_LIMIT = 20;
@@ -56,12 +57,17 @@ function buildHistoryItems(arkSessions: any[], claudeSessions: core.ClaudeSessio
   return items;
 }
 
-export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, refresh }: HistoryTabProps) {
+export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, refresh, onOverlayChange }: HistoryTabProps) {
   const [claudeSessions, setClaudeSessions] = useState<core.ClaudeSession[]>([]);
   const [searchResults, setSearchResults] = useState<core.SearchResult[]>([]);
   const [mode, setMode] = useState<"recent" | "search">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const status = useStatusMessage();
+
+  // Signal parent which overlay is active (for status bar hints)
+  useEffect(() => {
+    onOverlayChange?.(mode === "search" ? "search" : null);
+  }, [mode]);
 
   const historyItems = buildHistoryItems(arkSessions, claudeSessions);
   const { sel } = useListNavigation(
@@ -88,7 +94,7 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
         const lines = content.split("\n").filter(l => l.trim());
         const msgs: string[] = [];
         // Read last 20 lines, extract user/assistant messages
-        const recent = lines.slice(-40);
+        const recent = lines.slice(-200);
         for (const line of recent) {
           try {
             const entry = JSON.parse(line);
@@ -105,7 +111,7 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
             msgs.push(`${role}: ${text.slice(0, 150)}`);
           } catch {}
         }
-        setConversationPreview(msgs.slice(-10)); // last 10 messages
+        setConversationPreview(msgs.slice(-15)); // last 15 messages
       } catch { setConversationPreview([]); }
     });
   }, [selectedItem?.id]);
@@ -195,7 +201,7 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
                   value={searchQuery}
                   onChange={setSearchQuery}
                   onSubmit={() => doSearch(searchQuery)}
-                  placeholder="search, Enter to go, Esc to cancel"
+                  placeholder="search transcripts..."
                 />
               </Box>
             )}
@@ -276,8 +282,6 @@ function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null;
         </>
       )}
 
-      <Text> </Text>
-      <Text dimColor>Enter to import into Ark</Text>
     </DetailPanel>
   );
 }

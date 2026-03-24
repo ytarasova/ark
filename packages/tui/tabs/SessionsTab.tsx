@@ -26,11 +26,12 @@ interface SessionsTabProps extends StoreData {
   onShowForm: () => void;
   onSelectionChange?: (session: any) => void;
   onInputActive?: (active: boolean) => void;
+  onOverlayChange?: (overlay: string | null) => void;
   formOverlay?: React.ReactNode;
   refresh: () => void;
 }
 
-export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, onInputActive, formOverlay }: SessionsTabProps) {
+export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, onInputActive, onOverlayChange, formOverlay }: SessionsTabProps) {
   const [moveMode, setMoveMode] = useState(false);
   const [groupMode, setGroupMode] = useState<false | "menu">(false);
   const [talkMode, setTalkMode] = useState(false);
@@ -49,6 +50,12 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   useEffect(() => {
     onInputActive?.(!!hasOverlay);
   }, [!!hasOverlay]);
+
+  // Signal parent which overlay is active (for status bar hints)
+  useEffect(() => {
+    const ov = moveMode ? "move" : talkMode ? "talk" : groupMode ? "group" : inboxMode ? "inbox" : cloneMode ? "clone" : null;
+    onOverlayChange?.(ov);
+  }, [moveMode, talkMode, groupMode, inboxMode, cloneMode]);
 
   const selected = topLevel[sel] ?? null;
 
@@ -368,11 +375,6 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
             <Text key={i} wrap="truncate">{`  ${line}`}</Text>
           ))}
         </>
-      ) : !s.session_id && (s.status === "ready" || s.status === "blocked") ? (
-        <>
-          <Text> </Text>
-          <Text dimColor>{" Press Enter to dispatch agent"}</Text>
-        </>
       ) : null}
 
       {/* Events - visual separator */}
@@ -437,7 +439,7 @@ function MoveToGroup({ session, onDone }: MoveToGroupProps) {
             placeholder="Enter group name..."
           />
         </Box>
-        <Box flexGrow={1} /><Text dimColor>{"  Enter to confirm, Esc to cancel"}</Text>
+        <Box flexGrow={1} />
       </Box>
     );
   }
@@ -460,7 +462,7 @@ function MoveToGroup({ session, onDone }: MoveToGroupProps) {
           }
         }}
       />
-      <Box flexGrow={1} /><Text dimColor>{"  Esc to cancel"}</Text>
+      <Box flexGrow={1} />
     </Box>
   );
 }
@@ -506,7 +508,7 @@ function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps) {
             placeholder="Enter group name..."
           />
         </Box>
-        <Box flexGrow={1} /><Text dimColor>{"  Enter to create, Esc to go back"}</Text>
+        <Box flexGrow={1} />
       </Box>
     );
   }
@@ -523,7 +525,7 @@ function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps) {
           <Text bold color="cyan">{" Delete Group "}</Text>
           <Text> </Text>
           <Text dimColor>{"  No groups to delete."}</Text>
-          <Box flexGrow={1} /><Text dimColor>{"  Esc to go back"}</Text>
+          <Box flexGrow={1} />
         </Box>
       );
     }
@@ -551,7 +553,7 @@ function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps) {
             });
           }}
         />
-        <Box flexGrow={1} /><Text dimColor>{"  Esc to go back"}</Text>
+        <Box flexGrow={1} />
       </Box>
     );
   }
@@ -579,7 +581,7 @@ function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps) {
         </>
       )}
       <Text> </Text>
-      <Box flexGrow={1} /><Text dimColor>{"  Esc to cancel"}</Text>
+      <Box flexGrow={1} />
     </Box>
   );
 }
@@ -681,7 +683,6 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
           placeholder="Type a message..."
         />
       </Box>
-      <Text dimColor>{"  Enter:send  Esc:back"}</Text>
     </Box>
   );
 }
@@ -721,7 +722,6 @@ function CloneSession({ session, onDone }: CloneSessionProps) {
         />
       </Box>
       <Box flexGrow={1} />
-      <Text dimColor>{"  Enter:clone  Esc:cancel"}</Text>
     </Box>
   );
 }
