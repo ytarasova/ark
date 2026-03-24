@@ -24,10 +24,32 @@ import {
 // Functions (not constants) so they respect ARK_TEST_DIR and setContext()
 // at call time rather than freezing at import time.
 
-export function ARK_DIR(): string { return getContext().arkDir; }
-export function DB_PATH(): string { return getContext().dbPath; }
-export function TRACKS_DIR(): string { return getContext().tracksDir; }
-export function WORKTREES_DIR(): string { return getContext().worktreesDir; }
+// Migration shims — delegate to AppContext if available, fall back to legacy context
+function appOrFallback(): { config: { arkDir: string; dbPath: string; tracksDir: string; worktreesDir: string } } | null {
+  try {
+    const { getApp } = require("./app.js") as typeof import("./app.js");
+    return getApp();
+  } catch {
+    return null;
+  }
+}
+
+export function ARK_DIR(): string {
+  const app = appOrFallback();
+  return app ? app.config.arkDir : getContext().arkDir;
+}
+export function DB_PATH(): string {
+  const app = appOrFallback();
+  return app ? app.config.dbPath : getContext().dbPath;
+}
+export function TRACKS_DIR(): string {
+  const app = appOrFallback();
+  return app ? app.config.tracksDir : getContext().tracksDir;
+}
+export function WORKTREES_DIR(): string {
+  const app = appOrFallback();
+  return app ? app.config.worktreesDir : getContext().worktreesDir;
+}
 
 // Re-export context utilities for tests
 export { createTestContext, setContext, resetContext, closeDb, type TestContext };
@@ -89,6 +111,11 @@ function now(): string {
 const _initialized = new WeakSet<Database>();
 
 export function getDb(): Database {
+  // Use AppContext if available
+  const app = appOrFallback();
+  if (app && (app as any).db) return (app as any).db;
+
+  // Legacy path
   const db = getDbFromContext();
   if (!_initialized.has(db)) {
     _initialized.add(db); // mark BEFORE init to prevent recursion

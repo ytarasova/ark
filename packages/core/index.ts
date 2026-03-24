@@ -18,6 +18,10 @@ export {
 // Context (DI)
 export { getContext, type StoreContext } from "./context.js";
 
+// App context
+export { AppContext, getApp, setApp, clearApp } from "./app.js";
+export { loadConfig, type ArkConfig } from "./config.js";
+
 // Session lifecycle (the main API)
 export {
   startSession, dispatch, advance, stop, resume, complete, pause,
