@@ -221,14 +221,15 @@ export async function autoAcceptChannelPrompt(
     try {
       const output = tmux.capturePane(tmuxName, { lines: 30 });
       if (CHANNEL_PROMPT_MARKERS.some(m => output.includes(m))) {
-        // Send "1" first (selects option 1), then Enter to confirm
         tmux.sendKeys(tmuxName, "1");
-        await Bun.sleep(200);
+        await Bun.sleep(300);
         tmux.sendKeys(tmuxName, "Enter");
         return;
       }
       if (SUCCESS_MARKERS.some(m => output.includes(m))) return;
-    } catch { return; }
+    } catch {
+      // Pane might not be ready yet — keep trying, don't exit
+    }
   }
 }
 

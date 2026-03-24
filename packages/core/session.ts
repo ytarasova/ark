@@ -146,7 +146,7 @@ export function stop(sessionId: string): { ok: boolean; message: string } {
 
   if (session.session_id) tmux.killSession(session.session_id);
 
-  store.updateSession(sessionId, { status: "failed", error: "Stopped by user", session_id: null });
+  store.updateSession(sessionId, { status: "failed", error: "Stopped by user", session_id: null, claude_session_id: null });
   store.logEvent(sessionId, "session_stopped", {
     stage: session.stage, actor: "user",
     data: { session_id: session.session_id, agent: session.agent },
