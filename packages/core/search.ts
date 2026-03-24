@@ -1,11 +1,12 @@
 /**
  * Session search — grep across metadata, events, messages, and Claude transcripts.
+ * Supports FTS5-indexed transcript search for sub-100ms queries.
  */
 
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { getDb } from "./context.js";
+import { getDb } from "./store.js";
 
 export interface SearchResult {
   sessionId: string;
@@ -74,6 +75,44 @@ export function searchSessions(query: string, opts?: SearchOpts): SearchResult[]
 
 export function searchTranscripts(query: string, opts?: SearchOpts): SearchResult[] {
   const limit = opts?.limit ?? 50;
+
+  // Try FTS5 index first
+  const db = getDb();
+  try {
+    const count = (db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as any)?.c ?? 0;
+    if (count > 0) {
+      return searchTranscriptsFTS(query, limit);
+    }
+  } catch { /* FTS5 table may not exist yet */ }
+
+  // Fallback to file scanning
+  return searchTranscriptsFiles(query, opts);
+}
+
+function searchTranscriptsFTS(query: string, limit: number): SearchResult[] {
+  const db = getDb();
+  // FTS5 match query — escape special chars, use quoted terms
+  const ftsQuery = query.replace(/['"*()]/g, "").split(/\s+/).map(w => `"${w}"`).join(" ");
+
+  const rows = db.prepare(
+    `SELECT session_id, role, content, timestamp,
+            snippet(transcript_index, 3, '>>>','<<<', '...', 30) as snippet
+     FROM transcript_index
+     WHERE transcript_index MATCH ?
+     ORDER BY rank
+     LIMIT ?`
+  ).all(ftsQuery, limit) as any[];
+
+  return rows.map(r => ({
+    sessionId: r.session_id,
+    source: "transcript" as const,
+    match: r.snippet || r.content?.slice(0, 120) || "",
+    timestamp: r.timestamp,
+  }));
+}
+
+function searchTranscriptsFiles(query: string, opts?: SearchOpts): SearchResult[] {
+  const limit = opts?.limit ?? 50;
   const transcriptsDir = opts?.transcriptsDir ?? join(homedir(), ".claude", "projects");
   const results: SearchResult[] = [];
   const lowerQuery = query.toLowerCase();
@@ -112,6 +151,98 @@ export function searchTranscripts(query: string, opts?: SearchOpts): SearchResul
 
   return results.slice(0, limit);
 }
+
+// ── Indexing ──────────────────────────────────────────────────────────────────
+
+export function indexTranscripts(opts?: { transcriptsDir?: string; onProgress?: (indexed: number, total: number) => void }): number {
+  const transcriptsDir = opts?.transcriptsDir ?? join(homedir(), ".claude", "projects");
+  if (!existsSync(transcriptsDir)) return 0;
+
+  const db = getDb();
+
+  // Clear existing index
+  db.exec("DELETE FROM transcript_index");
+
+  const insert = db.prepare(
+    "INSERT INTO transcript_index (session_id, project, role, content, timestamp) VALUES (?, ?, ?, ?, ?)"
+  );
+
+  let indexed = 0;
+  const projectDirs = readdirSync(transcriptsDir);
+
+  for (const projectDir of projectDirs) {
+    const projectPath = join(transcriptsDir, projectDir);
+    let files: string[];
+    try { files = readdirSync(projectPath).filter(f => f.endsWith(".jsonl")); } catch { continue; }
+
+    for (const file of files) {
+      const filePath = join(projectPath, file);
+      const sessionId = file.replace(".jsonl", "");
+      let content: string;
+      try { content = readFileSync(filePath, "utf-8"); } catch { continue; }
+
+      for (const line of content.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const entry = JSON.parse(line);
+          if (entry.type !== "user" && entry.type !== "assistant") continue;
+          const text = extractText(entry);
+          if (!text.trim()) continue;
+          insert.run(sessionId, projectDir, entry.type, text, entry.timestamp ?? null);
+          indexed++;
+        } catch {}
+      }
+
+      opts?.onProgress?.(indexed, 0); // total unknown during indexing
+    }
+  }
+
+  return indexed;
+}
+
+export function indexSession(transcriptPath: string, sessionId: string, project?: string): number {
+  if (!existsSync(transcriptPath)) return 0;
+
+  const db = getDb();
+
+  // Remove existing entries for this session (parameterized to avoid injection)
+  db.prepare("DELETE FROM transcript_index WHERE session_id = ?").run(sessionId);
+
+  const insert = db.prepare(
+    "INSERT INTO transcript_index (session_id, project, role, content, timestamp) VALUES (?, ?, ?, ?, ?)"
+  );
+
+  let indexed = 0;
+  let content: string;
+  try { content = readFileSync(transcriptPath, "utf-8"); } catch { return 0; }
+
+  for (const line of content.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line);
+      if (entry.type !== "user" && entry.type !== "assistant") continue;
+      const text = extractText(entry);
+      if (!text.trim()) continue;
+      insert.run(sessionId, project ?? "", entry.type, text, entry.timestamp ?? null);
+      indexed++;
+    } catch {}
+  }
+
+  return indexed;
+}
+
+export function getIndexStats(): { entries: number; sessions: number } {
+  const db = getDb();
+  try {
+    const entries = (db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as any)?.c ?? 0;
+    const sessions = (db.prepare("SELECT COUNT(DISTINCT session_id) as c FROM transcript_index").get() as any)?.c ?? 0;
+    return { entries, sessions };
+  } catch {
+    return { entries: 0, sessions: 0 };
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function extractText(entry: any): string {
   const msg = entry.message;

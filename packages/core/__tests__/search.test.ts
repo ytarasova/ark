@@ -11,7 +11,7 @@ import {
   type TestContext,
 } from "../index.js";
 import { createSession, logEvent, addMessage } from "../store.js";
-import { searchSessions, searchTranscripts } from "../search.js";
+import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats } from "../search.js";
 
 let ctx: TestContext;
 
@@ -222,5 +222,88 @@ describe("searchTranscripts", () => {
 
     const results = searchTranscripts("repeated term", { transcriptsDir });
     expect(results.length).toBe(1);
+  });
+});
+
+// ── indexTranscripts ─────────────────────────────────────────────────────────
+
+describe("indexTranscripts", () => {
+  it("indexes JSONL files and returns count", () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-test-project");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "sess-1.jsonl"), [
+      JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: "fix the auth bug" }] } }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "I'll fix the authentication issue" }] } }),
+    ].join("\n"));
+
+    const count = indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    expect(count).toBe(2); // 1 user + 1 assistant message
+  });
+
+  it("FTS5 search returns matches after indexing", () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-test-project");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "sess-fts.jsonl"), [
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "fixed the SQL injection vulnerability in the login handler" }] } }),
+    ].join("\n"));
+
+    indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    const results = searchTranscripts("SQL injection");
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].source).toBe("transcript");
+  });
+
+  it("is fast — sub-100ms for indexed search", () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-test-project");
+    mkdirSync(projectDir, { recursive: true });
+    // Write enough data to be meaningful
+    const lines = [];
+    for (let i = 0; i < 100; i++) {
+      lines.push(JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: `Working on task ${i}: implementing feature ${i % 10}` }] } }));
+    }
+    writeFileSync(join(projectDir, "sess-perf.jsonl"), lines.join("\n"));
+    indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+
+    const start = performance.now();
+    searchTranscripts("implementing feature");
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(100);
+  });
+});
+
+// ── indexSession ─────────────────────────────────────────────────────────────
+
+describe("indexSession", () => {
+  it("indexes a single transcript file", () => {
+    const transcriptPath = join(ctx.arkDir, "single.jsonl");
+    writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: "hello world" } }));
+
+    const count = indexSession(transcriptPath, "s-single", "test-project");
+    expect(count).toBe(1);
+  });
+
+  it("replaces existing entries for same session", () => {
+    const transcriptPath = join(ctx.arkDir, "replace.jsonl");
+    writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: "first version" } }));
+    indexSession(transcriptPath, "s-replace");
+
+    writeFileSync(transcriptPath, [
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "first version" } }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "second version" } }),
+    ].join("\n"));
+    indexSession(transcriptPath, "s-replace");
+
+    const stats = getIndexStats();
+    expect(stats.entries).toBe(2); // Not 3 (1 old + 2 new)
+  });
+});
+
+// ── getIndexStats ────────────────────────────────────────────────────────────
+
+describe("getIndexStats", () => {
+  it("returns zeros when index is empty", () => {
+    const stats = getIndexStats();
+    expect(stats.entries).toBe(0);
+    expect(stats.sessions).toBe(0);
   });
 });

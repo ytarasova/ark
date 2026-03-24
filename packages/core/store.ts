@@ -206,6 +206,14 @@ function initSchema(db: Database): void {
       name TEXT PRIMARY KEY,
       created_at TEXT NOT NULL
     );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS transcript_index USING fts5(
+      session_id UNINDEXED,
+      project,
+      role,
+      content,
+      timestamp UNINDEXED
+    );
   `);
 }
 
