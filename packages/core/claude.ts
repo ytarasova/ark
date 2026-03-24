@@ -7,7 +7,7 @@
  */
 
 import { randomUUID } from "crypto";
-import { existsSync, readFileSync, writeFileSync, symlinkSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, symlinkSync, mkdirSync, renameSync } from "fs";
 import { join, resolve } from "path";
 import { homedir } from "os";
 import { fileURLToPath } from "url";
@@ -138,6 +138,90 @@ export function writeChannelConfig(
   writeFileSync(join(sessionDir, "mcp.json"), JSON.stringify({ mcpServers: { "ark-channel": channelMcpConfig(sessionId, stage, channelPort, channelOpts) } }, null, 2));
 
   return mcpConfigPath;
+}
+
+// ── Hook-based status config ────────────────────────────────────────────────
+
+const ARK_HOOK_MARKER = "# ark-status";
+
+function hookCommand(sessionId: string, conductorUrl: string): string {
+  const curlCmd = `curl -sf -X POST -H 'Content-Type: application/json' -d @- '${conductorUrl}/hooks/status?session=${sessionId}' || true`;
+  return `${ARK_HOOK_MARKER} ${sessionId}\n${curlCmd}`;
+}
+
+function buildHooksConfig(sessionId: string, conductorUrl: string): Record<string, unknown[]> {
+  const cmd = hookCommand(sessionId, conductorUrl);
+  const hook = { type: "command" as const, command: cmd, async: true };
+
+  return {
+    SessionStart: [{ matcher: "startup|resume", hooks: [hook] }],
+    UserPromptSubmit: [{ hooks: [hook] }],
+    Stop: [{ hooks: [hook] }],
+    StopFailure: [{ hooks: [hook] }],
+    SessionEnd: [{ hooks: [hook] }],
+    Notification: [{ matcher: "permission_prompt|idle_prompt", hooks: [hook] }],
+  };
+}
+
+export function writeHooksConfig(
+  sessionId: string, conductorUrl: string, workdir: string,
+): string {
+  const claudeDir = join(workdir, ".claude");
+  mkdirSync(claudeDir, { recursive: true });
+  const settingsPath = join(claudeDir, "settings.local.json");
+
+  let existing: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try { existing = JSON.parse(readFileSync(settingsPath, "utf-8")); } catch {}
+  }
+
+  // Remove previous ark hooks (idempotent)
+  if (existing.hooks && typeof existing.hooks === "object") {
+    const hooks = existing.hooks as Record<string, unknown[]>;
+    for (const [event, matchers] of Object.entries(hooks)) {
+      hooks[event] = (matchers as any[]).filter(
+        (m: any) => !m.hooks?.some((h: any) => h.command?.includes(ARK_HOOK_MARKER))
+      );
+      if (hooks[event].length === 0) delete hooks[event];
+    }
+    if (Object.keys(hooks).length === 0) delete existing.hooks;
+  }
+
+  // Merge new hooks
+  const newHooks = buildHooksConfig(sessionId, conductorUrl);
+  const existingHooks = (existing.hooks ?? {}) as Record<string, unknown[]>;
+  for (const [event, matchers] of Object.entries(newHooks)) {
+    existingHooks[event] = [...(existingHooks[event] ?? []), ...matchers];
+  }
+  existing.hooks = existingHooks;
+
+  // Atomic write
+  const tmpPath = settingsPath + ".tmp";
+  writeFileSync(tmpPath, JSON.stringify(existing, null, 2));
+  renameSync(tmpPath, settingsPath);
+
+  return settingsPath;
+}
+
+export function removeHooksConfig(workdir: string): void {
+  const settingsPath = join(workdir, ".claude", "settings.local.json");
+  if (!existsSync(settingsPath)) return;
+
+  let settings: Record<string, unknown>;
+  try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")); } catch { return; }
+
+  if (!settings.hooks || typeof settings.hooks !== "object") return;
+
+  const hooks = settings.hooks as Record<string, unknown[]>;
+  for (const [event, matchers] of Object.entries(hooks)) {
+    hooks[event] = (matchers as any[]).filter(
+      (m: any) => !m.hooks?.some((h: any) => h.command?.includes(ARK_HOOK_MARKER))
+    );
+    if (hooks[event].length === 0) delete hooks[event];
+  }
+  if (Object.keys(hooks).length === 0) delete settings.hooks;
+
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 }
 
 // ── Launcher script ─────────────────────────────────────────────────────────
