@@ -21,7 +21,7 @@ import {
 import type { OutboundMessage } from "./channel-types.js";
 
 const SESSION_ID = process.env.ARK_SESSION_ID ?? "unknown";
-const CONDUCTOR_PORT = parseInt(process.env.ARK_CONDUCTOR_PORT ?? "19100");
+const CONDUCTOR_URL = process.env.ARK_CONDUCTOR_URL ?? `http://localhost:${process.env.ARK_CONDUCTOR_PORT ?? "19100"}`;
 const HTTP_PORT = parseInt(process.env.ARK_CHANNEL_PORT ?? "0");
 
 // ── MCP Server with channel capability ──────────────────────────────────────
@@ -39,6 +39,7 @@ const mcp = new Server(
       "When you have a question for the human, call `report` with type='question'.",
       "When you encounter an error, call `report` with type='error'.",
       "Periodically call `report` with type='progress' to update on your work.",
+      "When you receive a steer message from a user, always call `report` with type='progress' to acknowledge and respond — this is how your replies appear in the chat UI.",
     ].join("\n"),
   },
 );
@@ -123,7 +124,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     })();
 
     try {
-      await fetch(`http://localhost:${CONDUCTOR_PORT}/api/channel/${SESSION_ID}`, {
+      await fetch(`${CONDUCTOR_URL}/api/channel/${SESSION_ID}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(report),
@@ -135,7 +136,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 
   if (req.params.name === "send_to_agent") {
     try {
-      await fetch(`http://localhost:${CONDUCTOR_PORT}/api/relay`, {
+      await fetch(`${CONDUCTOR_URL}/api/relay`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

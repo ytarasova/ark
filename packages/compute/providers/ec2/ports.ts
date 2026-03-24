@@ -66,6 +66,20 @@ export function teardownTunnels(ports: PortDecl[]): void {
 }
 
 /**
+ * Spawn a background SSH reverse tunnel (-R) so the remote host
+ * can reach a service on the local machine (e.g. the conductor).
+ * Remote localhost:port → local localhost:port.
+ */
+export function setupReverseTunnel(key: string, ip: string, port: number): void {
+  const args = ["ssh", "-i", key, ...SSH_OPTS, "-N", "-f",
+    "-R", `${port}:localhost:${port}`,
+    `ubuntu@${ip}`];
+  const [bin, ...rest] = args;
+  const child = spawn(bin, rest, { detached: true, stdio: "ignore" });
+  child.unref();
+}
+
+/**
  * SSH into the remote host, run `ss -tln`, and check which declared ports
  * are actually listening. Returns a PortStatus[] with listening: true/false.
  */

@@ -28,7 +28,7 @@ import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
 import { syncToHost, syncProjectFiles } from "./sync.js";
 import { fetchMetrics, fetchMetricsAsync } from "./metrics.js";
-import { setupTunnels, probeRemotePorts } from "./ports.js";
+import { setupTunnels, setupReverseTunnel, probeRemotePorts } from "./ports.js";
 import { hourlyRate } from "./cost.js";
 import { sleep, poll } from "../../util.js";
 import { resolveRepoUrl, getRepoName, cloneRepoOnRemote, trustRemoteDirectory, autoAcceptChannelPrompt } from "./remote-setup.js";
@@ -271,12 +271,15 @@ export class EC2Provider implements ComputeProvider {
     // 8. Auto-accept channel prompt
     await autoAcceptChannelPrompt(key, ip, opts.tmuxName);
 
-    // 9. Setup port tunnels
+    // 9. Setup port tunnels (local forward for app ports)
     if (opts.ports.length > 0) {
       setupTunnels(key, ip, opts.ports);
     }
 
-    // 10. Store remote workdir in session config for display
+    // 10. Reverse tunnel: let remote channel reach local conductor
+    setupReverseTunnel(key, ip, 19100);
+
+    // 11. Store remote workdir in session config for display
     const { updateSession } = await import("../../../core/store.js");
     updateSession(session.id, {
       config: { ...(session.config ?? {}), remoteWorkdir },
@@ -296,6 +299,9 @@ export class EC2Provider implements ComputeProvider {
     if (ports.length > 0) {
       setupTunnels(key, ip, ports);
     }
+
+    // Re-establish reverse tunnel for conductor
+    setupReverseTunnel(key, ip, 19100);
   }
 
   async getMetrics(compute: Compute): Promise<ComputeSnapshot> {

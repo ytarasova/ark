@@ -94,6 +94,7 @@ export function shellQuoteArgs(claudeArgs: string[]): string {
 
 export function channelMcpConfig(
   sessionId: string, stage: string, channelPort: number,
+  opts?: { conductorUrl?: string },
 ): Record<string, unknown> {
   const bunPath = join(homedir(), ".bun", "bin", "bun");
   return {
@@ -103,6 +104,7 @@ export function channelMcpConfig(
       ARK_SESSION_ID: sessionId,
       ARK_STAGE: stage,
       ARK_CHANNEL_PORT: String(channelPort),
+      ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
     },
   };
 }
@@ -116,20 +118,23 @@ export function channelMcpConfig(
 export function writeChannelConfig(
   sessionId: string, stage: string, channelPort: number,
   workdir: string,
+  opts?: { conductorUrl?: string },
 ): string {
+  const channelOpts = opts?.conductorUrl ? { conductorUrl: opts.conductorUrl } : undefined;
+
   // Write to worktree .mcp.json so Claude finds it
   const mcpConfigPath = join(workdir, ".mcp.json");
   const existing = existsSync(mcpConfigPath)
     ? JSON.parse(readFileSync(mcpConfigPath, "utf-8"))
     : {};
   if (!existing.mcpServers) existing.mcpServers = {};
-  existing.mcpServers["ark-channel"] = channelMcpConfig(sessionId, stage, channelPort);
+  existing.mcpServers["ark-channel"] = channelMcpConfig(sessionId, stage, channelPort, channelOpts);
   writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));
 
   // Also write a copy to tracks dir for reference
   const sessionDir = join(TRACKS_DIR, sessionId);
   mkdirSync(sessionDir, { recursive: true });
-  writeFileSync(join(sessionDir, "mcp.json"), JSON.stringify({ mcpServers: { "ark-channel": channelMcpConfig(sessionId, stage, channelPort) } }, null, 2));
+  writeFileSync(join(sessionDir, "mcp.json"), JSON.stringify({ mcpServers: { "ark-channel": channelMcpConfig(sessionId, stage, channelPort, channelOpts) } }, null, 2));
 
   return mcpConfigPath;
 }
