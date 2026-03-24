@@ -215,7 +215,7 @@ describe("core lifecycle: resume", () => {
     await core.stop(session.id);
 
     const stopped = core.getSession(session.id)!;
-    expect(stopped.status).toBe("failed");
+    expect(stopped.status).toBe("stopped");
 
     // Resume
     const result = await core.resume(session.id);
@@ -312,7 +312,7 @@ describe("core lifecycle: full round-trip", () => {
 
     // 3. Stop
     await core.stop(session.id);
-    expect(core.getSession(session.id)!.status).toBe("failed");
+    expect(core.getSession(session.id)!.status).toBe("stopped");
 
     // 4. Resume (re-dispatches)
     await core.resume(session.id);
