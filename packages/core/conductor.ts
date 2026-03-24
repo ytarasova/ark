@@ -25,6 +25,7 @@ import * as flow from "./flow.js";
 import { eventBus } from "./hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../compute/index.js";
+import { parseTranscriptUsage } from "./claude.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -140,6 +141,23 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
             eventBus.emit("hook_status", sessionId, {
               data: { event, status: newStatus, ...payload } as Record<string, unknown>,
             });
+          }
+
+          // Track token usage from transcript on Stop and SessionEnd
+          const transcriptPath = payload.transcript_path as string | undefined;
+          if (transcriptPath && (event === "Stop" || event === "SessionEnd")) {
+            try {
+              const usage = parseTranscriptUsage(transcriptPath);
+              if (usage.total_tokens > 0) {
+                const currentSession = store.getSession(sessionId);
+                if (currentSession) {
+                  const config = typeof currentSession.config === "string"
+                    ? JSON.parse(currentSession.config) : (currentSession.config ?? {});
+                  config.usage = usage;
+                  store.updateSession(sessionId, { config });
+                }
+              }
+            } catch { /* transcript parsing failure shouldn't block status update */ }
           }
 
           return Response.json({ status: "ok", mapped: newStatus ?? "no-op" });

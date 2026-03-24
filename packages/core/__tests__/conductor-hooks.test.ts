@@ -201,6 +201,64 @@ describe("Conductor /hooks/status endpoint", () => {
     expect(updated!.error).toContain("max_output_tokens");
   });
 
+  it("Stop with transcript_path stores token usage on session config", async () => {
+    const session = createSession({ summary: "test" });
+    updateSession(session.id, { status: "running" });
+
+    // Write a fake transcript
+    const { writeFileSync: wf } = await import("fs");
+    const { join: j } = await import("path");
+    const transcriptPath = j(ctx.arkDir, "transcript-stop.jsonl");
+    wf(transcriptPath, [
+      JSON.stringify({ type: "assistant", message: { role: "assistant", usage: { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 5000, cache_creation_input_tokens: 100 } } }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", usage: { input_tokens: 2000, output_tokens: 800, cache_read_input_tokens: 3000, cache_creation_input_tokens: 50 } } }),
+    ].join("\n"));
+
+    await postHook(session.id, {
+      hook_event_name: "Stop",
+      transcript_path: transcriptPath,
+    });
+
+    const updated = getSession(session.id);
+    const config = typeof updated!.config === "string" ? JSON.parse(updated!.config) : updated!.config;
+    expect(config.usage).toBeDefined();
+    expect(config.usage.input_tokens).toBe(3000);
+    expect(config.usage.output_tokens).toBe(1300);
+    expect(config.usage.total_tokens).toBe(12450);
+  });
+
+  it("SessionEnd with transcript_path stores final token usage", async () => {
+    const session = createSession({ summary: "test" });
+    updateSession(session.id, { status: "running" });
+
+    const { writeFileSync: wf } = await import("fs");
+    const { join: j } = await import("path");
+    const transcriptPath = j(ctx.arkDir, "transcript-end.jsonl");
+    wf(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", usage: { input_tokens: 500, output_tokens: 200 } } }));
+
+    await postHook(session.id, {
+      hook_event_name: "SessionEnd",
+      transcript_path: transcriptPath,
+      reason: "prompt_input_exit",
+    });
+
+    const updated = getSession(session.id);
+    const config = typeof updated!.config === "string" ? JSON.parse(updated!.config) : updated!.config;
+    expect(config.usage).toBeDefined();
+    expect(config.usage.input_tokens).toBe(500);
+  });
+
+  it("hook without transcript_path skips usage tracking", async () => {
+    const session = createSession({ summary: "test" });
+    updateSession(session.id, { status: "running" });
+
+    await postHook(session.id, { hook_event_name: "Stop" });
+
+    const updated = getSession(session.id);
+    const config = typeof updated!.config === "string" ? JSON.parse(updated!.config) : updated!.config;
+    expect(config.usage).toBeUndefined();
+  });
+
   it("returns 400 for missing session param", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status`, {
       method: "POST",
