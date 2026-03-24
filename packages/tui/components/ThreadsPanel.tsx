@@ -7,7 +7,7 @@
  * Messages are stored in the messages table and persist across restarts.
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import * as core from "../../core/index.js";
 import { TextInputEnhanced } from "./TextInputEnhanced.js";
@@ -27,9 +27,32 @@ interface ThreadMessage {
   time: string;
 }
 
+/** Extract the @mention being typed (if any) from text that starts with @ */
+export function extractMentionPrefix(text: string): string | null {
+  const match = text.match(/^@(\S*)$/);
+  return match ? match[1] : null;
+}
+
+/** Filter sessions matching a prefix (case-insensitive, matches name or id) */
+export function filterSessionCompletions(
+  sessions: core.Session[],
+  prefix: string,
+): { label: string; id: string }[] {
+  const lower = prefix.toLowerCase();
+  const results: { label: string; id: string }[] = [];
+  for (const s of sessions) {
+    const name = s.summary ?? s.id;
+    if (name.toLowerCase().startsWith(lower) || s.id.toLowerCase().startsWith(lower)) {
+      results.push({ label: name, id: s.id });
+    }
+  }
+  return results;
+}
+
 export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
   const [msg, setMsg] = useState("");
   const [allMessages, setAllMessages] = useState<ThreadMessage[]>([]);
+  const [completionIndex, setCompletionIndex] = useState(0);
 
   // Build a name→id lookup
   const sessionMap = useMemo(() => {
@@ -41,6 +64,20 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
     }
     return m;
   }, [sessions]);
+
+  // Compute autocomplete candidates
+  const mentionPrefix = extractMentionPrefix(msg);
+  const completions = useMemo(() => {
+    if (mentionPrefix === null) return [];
+    return filterSessionCompletions(sessions, mentionPrefix);
+  }, [sessions, mentionPrefix]);
+
+  const showCompletions = completions.length > 0;
+
+  // Reset completion index when candidates change
+  useEffect(() => {
+    setCompletionIndex(0);
+  }, [completions.length, mentionPrefix]);
 
   // Load all messages across all sessions
   useEffect(() => {
@@ -78,6 +115,24 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
   useInput((input, key) => {
     if (key.escape) onDone();
   });
+
+  const handleTab = useCallback(() => {
+    if (!showCompletions) return;
+    const selected = completions[completionIndex];
+    if (selected) {
+      setMsg(`@${selected.label} `);
+    }
+  }, [showCompletions, completions, completionIndex]);
+
+  const handleUpArrow = useCallback(() => {
+    if (!showCompletions) return;
+    setCompletionIndex(i => (i <= 0 ? completions.length - 1 : i - 1));
+  }, [showCompletions, completions.length]);
+
+  const handleDownArrow = useCallback(() => {
+    if (!showCompletions) return;
+    setCompletionIndex(i => (i >= completions.length - 1 ? 0 : i + 1));
+  }, [showCompletions, completions.length]);
 
   const send = async () => {
     const text = msg.trim();
@@ -161,6 +216,24 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
         })}
       </Box>
 
+      {/* Autocomplete dropdown */}
+      {showCompletions && (
+        <Box flexDirection="column" marginLeft={2}>
+          {completions.slice(0, 8).map((c, i) => (
+            <Text key={c.id}>
+              <Text color={i === completionIndex ? "cyan" : undefined} bold={i === completionIndex}>
+                {i === completionIndex ? "❯ " : "  "}
+              </Text>
+              <Text color={i === completionIndex ? "cyan" : "white"} bold={i === completionIndex}>
+                {c.label}
+              </Text>
+              <Text dimColor>{` (${c.id})`}</Text>
+            </Text>
+          ))}
+          <Text dimColor>{"  Tab:complete  ↑↓:navigate"}</Text>
+        </Box>
+      )}
+
       {/* Input */}
       <Box>
         <Text color="cyan">{"> "}</Text>
@@ -168,6 +241,9 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
           value={msg}
           onChange={setMsg}
           onSubmit={send}
+          onTab={showCompletions ? handleTab : undefined}
+          onUpArrow={showCompletions ? handleUpArrow : undefined}
+          onDownArrow={showCompletions ? handleDownArrow : undefined}
           focus={true}
           placeholder="@session-name message..."
         />

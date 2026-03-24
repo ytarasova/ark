@@ -16,6 +16,9 @@ interface TextInputEnhancedProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit?: (value: string) => void;
+  onTab?: () => void;
+  onUpArrow?: () => void;
+  onDownArrow?: () => void;
   placeholder?: string;
   focus?: boolean;
 }
@@ -24,6 +27,9 @@ export function TextInputEnhanced({
   value,
   onChange,
   onSubmit,
+  onTab,
+  onUpArrow,
+  onDownArrow,
   placeholder,
   focus = true,
 }: TextInputEnhancedProps) {
@@ -41,6 +47,21 @@ export function TextInputEnhanced({
 
   useInput((input, key) => {
     if (!focus) return;
+
+    if (key.tab && onTab) {
+      onTab();
+      return;
+    }
+
+    if (key.upArrow && onUpArrow) {
+      onUpArrow();
+      return;
+    }
+
+    if (key.downArrow && onDownArrow) {
+      onDownArrow();
+      return;
+    }
 
     if (key.return) {
       onSubmit?.(value);
