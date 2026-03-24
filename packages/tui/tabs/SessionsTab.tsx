@@ -186,7 +186,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
             renderRow={(s, selected) => {
               const icon = ICON[s.status] ?? "?";
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
-              const stage = (s.stage ?? "---").padEnd(10);
+              const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
               const marker = topLevel.indexOf(s) === sel ? ">" : " ";
               return ` ${marker} ${icon} ${summary} ${stage} ${age}`;
@@ -195,7 +195,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, async: asyncS
               const icon = ICON[s.status] ?? "?";
               const color = (COLOR[s.status] ?? "white") as any;
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
-              const stage = (s.stage ?? "---").padEnd(10);
+              const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
               return <Text>{" "} <Text color={color}>{icon}</Text>{` ${summary} ${stage} ${age}`}</Text>;
             }}
@@ -306,6 +306,7 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
         <KeyValue label="Remote">{(s.config as any).remoteWorkdir}</KeyValue>
       )}
       <KeyValue label="Flow">{s.flow}</KeyValue>
+      {s.stage && <KeyValue label="Stage">{s.stage}</KeyValue>}
       {s.agent && <KeyValue label="Agent">{s.agent}</KeyValue>}
       {s.group_name && <KeyValue label="Group">{s.group_name}</KeyValue>}
 

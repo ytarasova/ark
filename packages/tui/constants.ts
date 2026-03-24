@@ -1,11 +1,21 @@
 // ── Icons & Colors ───────────────────────────────────────────────────────────
 
 export const ICON: Record<string, string> = {
-  running: "●", waiting: "⏸", pending: "○", ready: "◎",
-  completed: "✓", failed: "✕", blocked: "■",
+  running: "●",    // filled = active
+  ready: "○",      // empty = ready to start
+  pending: "○",    // empty = waiting
+  waiting: "◐",    // half = paused/waiting
+  blocked: "◐",    // half = needs attention
+  completed: "✓",  // check = done
+  failed: "✕",     // x = error
 };
 
 export const COLOR: Record<string, string> = {
-  running: "blue", waiting: "yellow", completed: "green",
-  failed: "red", blocked: "yellow", ready: "cyan",
+  running: "green",
+  ready: "cyan",
+  pending: "gray",
+  waiting: "yellow",
+  blocked: "yellow",
+  completed: "green",
+  failed: "red",
 };

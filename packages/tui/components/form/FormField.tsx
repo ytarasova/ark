@@ -16,7 +16,7 @@ interface FormFieldProps {
 
 export function FormField({ label, active, editing, children }: FormFieldProps) {
   return (
-    <Box marginBottom={1}>
+    <Box>
       <Text color={active ? "cyan" : "gray"}>
         {active ? (editing ? "* " : "> ") : "  "}
       </Text>
