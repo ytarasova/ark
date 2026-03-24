@@ -5,7 +5,7 @@
  * Direct interaction with the store is for reads only - writes go through these functions.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { execFileSync } from "child_process";
 import { homedir } from "os";
@@ -446,8 +446,21 @@ async function launchAgentTmux(
 }
 
 function buildTaskWithHandoff(session: store.Session, stage: string, agentName: string): string {
-  const parts = [`Work on ${session.ticket ?? session.id}: ${session.summary ?? "the task"}`];
-  parts.push(`\nYou are the ${agentName} agent, running the '${stage}' stage.`);
+  const parts: string[] = [];
+  const isBare = session.flow === "bare";
+
+  if (isBare) {
+    // Bare flow: interactive session — no predefined task pipeline
+    parts.push(`Session ${session.id}${session.summary ? ` — ${session.summary}` : ""}`);
+    parts.push(`\nYou are the ${agentName} agent in an interactive session.`);
+    parts.push(`You will receive instructions from the user via steer messages.`);
+  } else {
+    parts.push(`Work on ${session.ticket ?? session.id}: ${session.summary ?? "the task"}`);
+    parts.push(`\nYou are the ${agentName} agent, running the '${stage}' stage.`);
+  }
+
+  // Readiness announcement — agent should report it's online
+  parts.push(`\nWhen you start up, immediately call the \`report\` tool with type='progress' to announce you are online and ready for work.`);
 
   // Previous stage context
   const events = store.getEvents(session.id);

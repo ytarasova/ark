@@ -35,6 +35,7 @@ const mcp = new Server(
     },
     instructions: [
       "You are an Ark agent session. Tasks and messages from the Ark conductor arrive as <channel> tags.",
+      "When you first receive your initial task, immediately call `report` with type='progress' to announce you are online and ready for work.",
       "When you complete a stage, call the `report` tool with type='completed' and a summary.",
       "When you have a question for the human, call `report` with type='question'.",
       "When you encounter an error, call `report` with type='error'.",
