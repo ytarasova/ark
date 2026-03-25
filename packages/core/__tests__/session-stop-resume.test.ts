@@ -35,18 +35,18 @@ describe("session stop", () => {
     expect(updated.status).not.toBe("failed");
   });
 
-  it("clears claude_session_id", async () => {
+  it("preserves claude_session_id for resume", async () => {
     const session = createSession({ summary: "stop-claude" });
     updateSession(session.id, {
       status: "running",
       stage: "work",
-      claude_session_id: "uuid-to-clear",
+      claude_session_id: "uuid-to-preserve",
     });
 
     await stop(session.id);
 
     const updated = getSession(session.id)!;
-    expect(updated.claude_session_id).toBeNull();
+    expect(updated.claude_session_id).toBe("uuid-to-preserve");
   });
 
   it("clears session_id (tmux name)", async () => {
@@ -133,7 +133,7 @@ describe("session stop", () => {
     expect(updated.stage).toBe("work");
   });
 
-  it("clears all runtime fields at once", async () => {
+  it("clears runtime fields but preserves claude_session_id", async () => {
     const session = createSession({ summary: "clear-all" });
     updateSession(session.id, {
       status: "running",
@@ -148,7 +148,7 @@ describe("session stop", () => {
     const updated = getSession(session.id)!;
     expect(updated.status).toBe("stopped");
     expect(updated.session_id).toBeNull();
-    expect(updated.claude_session_id).toBeNull();
+    expect(updated.claude_session_id).toBe("claude-uuid");
     expect(updated.error).toBeNull();
   });
 });

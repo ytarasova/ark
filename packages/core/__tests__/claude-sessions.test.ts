@@ -231,6 +231,49 @@ describe("listClaudeSessions", () => {
   });
 });
 
+// ── incremental refresh ─────────────────────────────────────────────────────
+
+describe("incremental refresh", () => {
+  it("skips unmodified files on second refresh (returns 0 new)", async () => {
+    writeTranscript("-incr-proj", "sess-incr.jsonl", [
+      { type: "system", sessionId: "sess-incr", timestamp: "2026-03-24T10:00:00Z" },
+      { type: "user", message: { role: "user", content: "first pass" }, timestamp: "2026-03-24T10:01:00Z" },
+    ]);
+
+    const first = await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    expect(first).toBeGreaterThanOrEqual(1);
+
+    // Second refresh with no file changes — should return 0 new entries
+    const second = await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    expect(second).toBe(0);
+  });
+
+  it("picks up new files added after first refresh", async () => {
+    writeTranscript("-incr2-proj", "existing.jsonl", [
+      { type: "system", sessionId: "existing", timestamp: "2026-03-24T10:00:00Z" },
+      { type: "user", message: { role: "user", content: "old session" }, timestamp: "2026-03-24T10:01:00Z" },
+    ]);
+
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const before = listClaudeSessions();
+    const countBefore = before.length;
+
+    // Small delay so mtime is different
+    await new Promise(r => setTimeout(r, 50));
+
+    writeTranscript("-incr2-proj", "brand-new.jsonl", [
+      { type: "system", sessionId: "brand-new", timestamp: "2026-03-24T11:00:00Z" },
+      { type: "user", message: { role: "user", content: "new session" }, timestamp: "2026-03-24T11:01:00Z" },
+    ]);
+
+    const added = await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    expect(added).toBeGreaterThanOrEqual(1);
+
+    const after = listClaudeSessions();
+    expect(after.length).toBeGreaterThan(countBefore);
+  });
+});
+
 // ── getClaudeSession ────────────────────────────────────────────────────────
 
 describe("getClaudeSession", () => {

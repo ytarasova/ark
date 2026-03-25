@@ -271,6 +271,82 @@ describe("indexTranscripts", () => {
   });
 });
 
+// ── indexTranscripts filtering ────────────────────────────────────────────────
+
+describe("indexTranscripts filtering", () => {
+  it("does NOT index tool_result entries", async () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-filter-project");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "sess-filter.jsonl"), [
+      JSON.stringify({
+        type: "user",
+        message: { role: "user", content: [{ type: "tool_result", tool_use_id: "abc", content: "tool output here that is long enough" }] },
+      }),
+    ].join("\n"));
+
+    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    expect(count).toBe(0);
+  });
+
+  it("does NOT index tool_use-only entries", async () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-tooluse-project");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "sess-tooluse.jsonl"), [
+      JSON.stringify({
+        type: "assistant",
+        message: { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Read", input: { path: "/foo" } }] },
+      }),
+    ].join("\n"));
+
+    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    expect(count).toBe(0);
+  });
+
+  it("does NOT index short messages under 10 chars", async () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-short-project");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "sess-short.jsonl"), [
+      JSON.stringify({ type: "user", message: { role: "user", content: "ok" } }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "done" } }),
+    ].join("\n"));
+
+    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    expect(count).toBe(0);
+  });
+
+  it("DOES index real user/assistant text", async () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-real-project");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "sess-real.jsonl"), [
+      JSON.stringify({ type: "user", message: { role: "user", content: "Please refactor the authentication module" } }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will refactor the authentication module now" } }),
+    ].join("\n"));
+
+    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    expect(count).toBe(2);
+  });
+
+  it("indexes text blocks alongside tool_use blocks", async () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-mixed-project");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "sess-mixed.jsonl"), [
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "text", text: "I will read the file and fix the issue in the handler" },
+            { type: "tool_use", id: "t1", name: "Read", input: { path: "/foo" } },
+          ],
+        },
+      }),
+    ].join("\n"));
+
+    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    expect(count).toBe(1); // text block present, so it's indexed
+  });
+});
+
 // ── indexSession ─────────────────────────────────────────────────────────────
 
 describe("indexSession", () => {
