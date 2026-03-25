@@ -31,7 +31,12 @@ export function App() {
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;
 
-  const switchTab = (t: Tab) => { setTab(t); setPane("left"); };
+  const switchTab = (t: Tab) => {
+    setTab(t);
+    setPane("left");
+    // Force full repaint — Ink sometimes keeps stale content from previous tab's right pane
+    process.stdout.write("\x1b[2J\x1b[H");
+  };
 
   const takeSnapshot = useCallback(() => {
     try {
