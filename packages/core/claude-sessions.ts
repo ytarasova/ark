@@ -33,13 +33,22 @@ function decodeProjectDir(dirName: string): string {
 
 /** Junk prefixes in user messages that aren't real prompts */
 const JUNK_PREFIXES = [
+  // System/channel noise
   "Caveat:", "<local-command", "<command-", "<system-reminder", "<channel",
-  "Session s-", "Work on s-", "/effort", "/remote-control", "/resume", "/clear",
+  "Listening for channel", '"""', "Base directory for this skill",
+  // Ark agent task assignments
+  "Session s-", "Work on s-",
   "You are the worker agent", "You are the implementer agent",
   "You are the planner agent", "You are the reviewer agent",
   "You are a healing agent",
-  "[Request interrupted", "Listening for channel", '"""',
-  "Base directory for this skill",
+  // Slash commands
+  "/effort", "/remote-control", "/resume", "/clear", "/plugin",
+  "/compact", "/help", "/init",
+  // Interrupted/error states
+  "[Request interrupted",
+  // Repetitive automated prompts
+  "Describe this image", "Read the image at",
+  "say hello",
 ];
 
 function isRealUserMessage(text: string): boolean {
@@ -164,6 +173,10 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string }): P
   if (!existsSync(baseDir)) return 0;
 
   const db = getDb();
+
+  // Clear stale cache before rebuild
+  db.exec("DELETE FROM claude_sessions_cache");
+
   const insert = db.prepare(
     `INSERT OR REPLACE INTO claude_sessions_cache
      (session_id, project, project_dir, transcript_path, summary, message_count, timestamp, last_activity, cached_at)
@@ -195,7 +208,8 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string }): P
 
       const meta = parseTranscriptMeta(filePath);
       if (!meta) continue;
-      if (meta.messageCount < 5) continue;
+      // Skip trivial sessions — need real conversations (10+ messages)
+      if (meta.messageCount < 10) continue;
 
       insert.run(
         meta.sessionId, decodedProject, projectDir, filePath,
