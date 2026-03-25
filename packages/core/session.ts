@@ -377,9 +377,11 @@ async function launchAgentTmux(
   const tmuxName = `ark-${session.id}`;
   const workdir = session.workdir ?? ".";
 
-  // Setup worktree (unless session explicitly chose in-place)
+  // Setup worktree — only for local compute with git repos
   let effectiveWorkdir = workdir;
-  const wantWorktree = session.config?.worktree !== false;
+  const compute = session.compute_name ? store.getCompute(session.compute_name) : null;
+  const isLocal = !compute || compute.provider === "local";
+  const wantWorktree = isLocal && session.config?.worktree !== false;
   if (wantWorktree && workdir !== "." && existsSync(join(workdir, ".git"))) {
     const wt = setupWorktree(workdir, session.id, session.branch ?? undefined);
     if (wt) effectiveWorkdir = wt;

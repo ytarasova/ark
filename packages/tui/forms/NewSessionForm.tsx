@@ -97,7 +97,7 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
           workdir,
           compute_name: computeName || undefined,
           group_name: groupName || undefined,
-          config: { worktree: isLocalCompute && isolation === "worktree" },
+          config: { worktree: isolation === "worktree" },
         });
         sessionId = s.id;
         if (prefill?.claudeSessionId) {
