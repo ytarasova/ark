@@ -46,6 +46,9 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
     return existsSync(rp) && existsSync(resolvePath(rp, ".git"));
   }, [repoPath]);
 
+  const isLocalCompute = computeName === "local" || computeName === "";
+  const showIsolation = isGitRepo && isLocalCompute;
+
   const computeChoices = useMemo(() =>
     store.computes.map(c => ({
       label: c.provider === "local" ? "local" : `${c.name} (${c.provider})`,
@@ -94,7 +97,7 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
           workdir,
           compute_name: computeName || undefined,
           group_name: groupName || undefined,
-          config: { worktree: isolation === "worktree" },
+          config: { worktree: isLocalCompute && isolation === "worktree" },
         });
         sessionId = s.id;
         if (prefill?.claudeSessionId) {
@@ -118,9 +121,9 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
     fields: [
       { name: "name", type: "text" },
       { name: "repo", type: "path" },
-      { name: "isolation", type: "select", visible: isGitRepo },
-      { name: "group", type: "select" },
       { name: "compute", type: "select" },
+      { name: "isolation", type: "select", visible: showIsolation },
+      { name: "group", type: "select" },
       { name: "flow", type: "select" },
     ],
     onCancel: onDone,
@@ -148,7 +151,16 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
         onEditChange={setEditing}
       />
 
-      {isGitRepo && (
+      <FormSelectField
+        label="Compute"
+        value={computeName}
+        items={computeChoices}
+        onSelect={(v) => { setComputeName(v); advance(); }}
+        active={active === "compute"}
+        displayValue={computeName || "local"}
+      />
+
+      {showIsolation && (
         <FormSelectField
           label="Isolation"
           value={isolation}
@@ -166,15 +178,6 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
         onSelect={(v) => { setGroupName(v); advance(); }}
         active={active === "group"}
         displayValue={groupName || "(none)"}
-      />
-
-      <FormSelectField
-        label="Compute"
-        value={computeName}
-        items={computeChoices}
-        onSelect={(v) => { setComputeName(v); advance(); }}
-        active={active === "compute"}
-        displayValue={computeName || "local"}
       />
 
       <FormSelectField
