@@ -321,16 +321,17 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
 
   const channelPort = useMemo(() => s ? core.sessionChannelPort(s.id) : 0, [s?.id]);
 
+  // Hooks must be called unconditionally (before any early return)
+  const agentOutput = useAgentOutput(
+    s?.id ?? null,
+    s?.session_id ?? null,
+    s?.status === "running" || s?.status === "waiting",
+    500,
+  );
+
   if (!s) {
     return <Text dimColor>{"  No session selected"}</Text>;
   }
-  // Agent output - live polling via hook
-  const agentOutput = useAgentOutput(
-    s.id,
-    s.session_id,
-    s.status === "running" || s.status === "waiting",
-    500, // refresh every 500ms for near-real-time
-  );
 
   return (
     <DetailPanel active={pane === "right"}>
