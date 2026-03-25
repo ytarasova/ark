@@ -18,6 +18,9 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Install tmux
+        run: brew install tmux
+
       - name: Install dependencies
         run: bun install
 
