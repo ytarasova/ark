@@ -27,6 +27,7 @@ import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../compute/index.js";
 import { parseTranscriptUsage } from "./claude.js";
 import { indexSession } from "./search.js";
+import { listSchedules, cronMatches, updateScheduleLastRun } from "./schedule.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -177,6 +178,40 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
   });
 
   if (!opts?.quiet) console.log(`Ark conductor listening on localhost:${port}`);
+
+  // Schedule poller — check every 60 seconds
+  setInterval(async () => {
+    try {
+      const schedules = listSchedules().filter(s => s.enabled);
+      const now = new Date();
+      for (const sched of schedules) {
+        if (!cronMatches(sched.cron, now)) continue;
+        // Skip if already ran this minute
+        if (sched.last_run) {
+          const lastRun = new Date(sched.last_run);
+          if (lastRun.getMinutes() === now.getMinutes() &&
+              lastRun.getHours() === now.getHours() &&
+              lastRun.getDate() === now.getDate()) continue;
+        }
+        try {
+          const s = session.startSession({
+            summary: sched.summary ?? `Scheduled: ${sched.id}`,
+            repo: sched.repo ?? undefined,
+            workdir: sched.workdir ?? undefined,
+            flow: sched.flow,
+            compute_name: sched.compute_name ?? undefined,
+            group_name: sched.group_name ?? undefined,
+          });
+          await session.dispatch(s.id);
+          updateScheduleLastRun(sched.id);
+          store.logEvent(s.id, "scheduled_dispatch", {
+            actor: "scheduler",
+            data: { schedule_id: sched.id, cron: sched.cron },
+          });
+        } catch { /* dispatch failure shouldn't crash the poller */ }
+      }
+    } catch { /* ignore polling errors */ }
+  }, 60_000);
 
   return server;
 }
