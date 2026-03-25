@@ -53,7 +53,8 @@ describe("compute CRUD", () => {
     createCompute({ name: "h2" });
     createCompute({ name: "h3" });
     const computes = listCompute();
-    expect(computes.length).toBe(3);
+    // +1 for the auto-created "local" compute from ensureLocalCompute()
+    expect(computes.length).toBe(4);
   });
 
   it("filters by provider", () => {
@@ -70,8 +71,9 @@ describe("compute CRUD", () => {
     createCompute({ name: "b", provider: "ec2" });
     updateCompute("b", { status: "running" });
     const running = listCompute({ status: "running" });
-    expect(running.length).toBe(1);
-    expect(running[0].name).toBe("b");
+    // "local" is auto-created as running + "b" was set to running
+    expect(running.length).toBe(2);
+    expect(running.some(c => c.name === "b")).toBe(true);
   });
 
   it("updates compute fields including config as JSON", () => {

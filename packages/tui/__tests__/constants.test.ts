@@ -21,8 +21,8 @@ describe("ICON constant", () => {
     expect(ICON.running).toBe("●");
   });
 
-  it("ready icon is empty circle", () => {
-    expect(ICON.ready).toBe("○");
+  it("ready icon is target circle", () => {
+    expect(ICON.ready).toBe("◎");
   });
 
   it("pending icon is empty circle", () => {
@@ -34,7 +34,7 @@ describe("ICON constant", () => {
   });
 
   it("waiting icon is half circle", () => {
-    expect(ICON.waiting).toBe("◐");
+    expect(ICON.waiting).toBe("◑");
   });
 
   it("blocked icon is half circle", () => {
@@ -42,11 +42,11 @@ describe("ICON constant", () => {
   });
 
   it("completed icon is checkmark", () => {
-    expect(ICON.completed).toBe("✓");
+    expect(ICON.completed).toBe("✔");
   });
 
   it("failed icon is x-mark", () => {
-    expect(ICON.failed).toBe("✕");
+    expect(ICON.failed).toBe("✖");
   });
 
   it("has exactly 8 entries", () => {
