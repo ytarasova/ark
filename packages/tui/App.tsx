@@ -85,7 +85,7 @@ export function App() {
 
   return (
     <Box flexDirection="column" height={termHeight}>
-      <TabBar active={tab} />
+      <TabBar active={tab} loading={asyncState.loading} loadingLabel={asyncState.label} />
 
       {tab === "sessions" ? (
         <SessionsTab

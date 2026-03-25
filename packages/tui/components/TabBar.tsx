@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import Spinner from "ink-spinner";
 
 export type Tab = "sessions" | "agents" | "tools" | "flows" | "history" | "compute";
 
@@ -16,9 +17,11 @@ const TAB_KEYS: Record<Tab, string> = {
 
 interface TabBarProps {
   active: Tab;
+  loading?: boolean;
+  loadingLabel?: string | null;
 }
 
-export function TabBar({ active }: TabBarProps) {
+export function TabBar({ active, loading, loadingLabel }: TabBarProps) {
   return (
     <Box>
       {TABS.map((tab) => {
@@ -35,6 +38,13 @@ export function TabBar({ active }: TabBarProps) {
           </Box>
         );
       })}
+      <Box flexGrow={1} />
+      {loading && (
+        <Text color="yellow">
+          <Spinner type="dots" />
+          {loadingLabel ? ` ${loadingLabel}` : ""}
+        </Text>
+      )}
     </Box>
   );
 }
