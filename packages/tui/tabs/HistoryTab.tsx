@@ -256,11 +256,13 @@ function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null;
     const s = item.arkSession;
     return (
       <DetailPanel active={pane === "right"}>
+        <KeyValue label="Name">{s.summary || s.ticket || "(unnamed)"}</KeyValue>
+        <KeyValue label="ID">{s.id}</KeyValue>
         <KeyValue label="Status">{s.status}</KeyValue>
         <KeyValue label="Flow">{s.flow}{s.stage ? ` / ${s.stage}` : ""}</KeyValue>
         {s.repo && <KeyValue label="Repo">{s.repo}</KeyValue>}
+        {s.claude_session_id && <KeyValue label="Claude ID">{s.claude_session_id}</KeyValue>}
         <KeyValue label="Age">{ago(s.updated_at || s.created_at)}</KeyValue>
-        {s.summary && <Text wrap="wrap">{s.summary}</Text>}
       </DetailPanel>
     );
   }
@@ -268,9 +270,11 @@ function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null;
   const cs = item.claudeSession!;
   return (
     <DetailPanel active={pane === "right"}>
+      <KeyValue label="Session ID">{cs.sessionId}</KeyValue>
       <KeyValue label="Project">{cs.project}</KeyValue>
       <KeyValue label="Messages">{String(cs.messageCount)}</KeyValue>
       <KeyValue label="Active">{ago(cs.lastActivity || cs.timestamp)}</KeyValue>
+      <KeyValue label="File">{cs.transcriptPath}</KeyValue>
 
       {conversation.length > 0 && (
         <>
