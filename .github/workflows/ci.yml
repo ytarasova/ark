@@ -7,6 +7,7 @@ on:
     branches: [main]
 
 jobs:
+  # Full test suite on macOS (primary platform, has tmux)
   test:
     runs-on: macos-latest
     timeout-minutes: 15
@@ -28,3 +29,35 @@ jobs:
         run: |
           bun test --timeout 30000 \
             $(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | sort)
+
+  # Build verification across platforms — catches bun install failures
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-13
+            name: macOS x64
+          - os: macos-latest
+            name: macOS arm64
+          - os: ubuntu-latest
+            name: Linux x64
+          - os: ubuntu-24.04-arm
+            name: Linux arm64
+
+    runs-on: ${{ matrix.os }}
+    name: build (${{ matrix.name }})
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Smoke test — CLI loads
+        run: bun packages/cli/index.ts --help
