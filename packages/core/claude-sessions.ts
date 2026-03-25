@@ -5,9 +5,10 @@
  * results in claude_sessions_cache table. Subsequent reads are instant SQLite queries.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync, openSync, readSync, closeSync } from "fs";
 import { join, basename } from "path";
 import { homedir } from "os";
+import { execFileSync } from "child_process";
 import { getDb } from "./store.js";
 
 export interface ClaudeSession {
@@ -57,50 +58,80 @@ function isRealUserMessage(text: string): boolean {
   return !JUNK_PREFIXES.some(p => trimmed.startsWith(p));
 }
 
+/**
+ * Fast metadata extraction — reads only first 8KB + last 2KB of the file,
+ * NOT the entire 100MB transcript. Uses grep -c for message counting.
+ */
 function parseTranscriptMeta(filePath: string): Omit<ClaudeSession, "project" | "projectDir" | "transcriptPath"> | null {
-  let content: string;
-  try { content = readFileSync(filePath, "utf-8"); } catch { return null; }
-
-  const lines = content.split("\n").filter(l => l.trim());
-  if (lines.length === 0) return null;
-
   let sessionId = basename(filePath, ".jsonl");
   let timestamp = "";
   let lastActivity = "";
   let summary = "";
   let messageCount = 0;
 
-  const scanLimit = Math.min(lines.length, 100);
+  try {
+    const stat = statSync(filePath);
+    if (stat.size === 0) return null;
 
-  for (let i = 0; i < lines.length; i++) {
-    try {
-      const entry = JSON.parse(lines[i]);
-      if (!timestamp) {
-        sessionId = entry.sessionId ?? sessionId;
-        timestamp = entry.timestamp ?? "";
-      }
-      lastActivity = entry.timestamp ?? lastActivity;
+    // Read first 8KB for header + summary
+    const fd = openSync(filePath, "r");
+    const headBuf = Buffer.alloc(Math.min(8192, stat.size));
+    readSync(fd, headBuf, 0, headBuf.length, 0);
 
-      if (entry.type === "user" || entry.type === "assistant") {
-        messageCount++;
-      }
+    // Read last 2KB for lastActivity timestamp
+    const tailSize = Math.min(2048, stat.size);
+    const tailBuf = Buffer.alloc(tailSize);
+    readSync(fd, tailBuf, 0, tailSize, Math.max(0, stat.size - tailSize));
+    closeSync(fd);
 
-      if (i < scanLimit && entry.type === "user" && !summary) {
-        const msg = entry.message;
-        if (msg) {
-          let text = "";
-          const c = msg.content;
-          if (typeof c === "string") text = c;
-          else if (Array.isArray(c)) {
-            text = c.filter((x: any) => x.type === "text").map((x: any) => x.text).join(" ");
-          }
-          text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-          if (isRealUserMessage(text)) {
-            summary = text.slice(0, 200);
+    // Parse head lines for sessionId, timestamp, summary
+    const headLines = headBuf.toString("utf-8").split("\n").filter(l => l.trim());
+    for (const line of headLines) {
+      try {
+        const entry = JSON.parse(line);
+        if (!timestamp) {
+          sessionId = entry.sessionId ?? sessionId;
+          timestamp = entry.timestamp ?? "";
+        }
+        if (entry.type === "user" && !summary) {
+          const msg = entry.message;
+          if (msg) {
+            let text = "";
+            const c = msg.content;
+            if (typeof c === "string") text = c;
+            else if (Array.isArray(c)) {
+              text = c.filter((x: any) => x.type === "text").map((x: any) => x.text).join(" ");
+            }
+            text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+            if (isRealUserMessage(text)) {
+              summary = text.slice(0, 200);
+            }
           }
         }
-      }
-    } catch {}
+      } catch {}
+    }
+
+    // Parse tail lines for lastActivity
+    const tailLines = tailBuf.toString("utf-8").split("\n").filter(l => l.trim());
+    for (let i = tailLines.length - 1; i >= 0; i--) {
+      try {
+        const entry = JSON.parse(tailLines[i]);
+        if (entry.timestamp) { lastActivity = entry.timestamp; break; }
+      } catch {}
+    }
+
+    // Fast message count via grep -c (counts lines matching "user" or "assistant")
+    try {
+      const out = execFileSync("grep", ["-c", '"type":"user"\\|"type":"assistant"', filePath], {
+        encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+      messageCount = parseInt(out) || 0;
+    } catch {
+      // grep returns exit 1 if no matches — that's 0 messages
+      messageCount = 0;
+    }
+  } catch {
+    return null;
   }
 
   return { sessionId, timestamp, lastActivity, summary, messageCount };
@@ -218,9 +249,8 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string }): P
       count++;
 
       fileCount++;
-      if (fileCount % 5 === 0) {
-        await new Promise(r => setTimeout(r, 0));
-      }
+      // Yield after every file so TUI stays responsive
+      await new Promise(r => setTimeout(r, 0));
     }
   }
 
