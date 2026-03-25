@@ -313,6 +313,7 @@ interface SessionDetailProps {
 
 function SessionDetail({ session: s, pane }: SessionDetailProps) {
   const [events, setEvents] = useState<core.Event[]>([]);
+  const [conversation, setConversation] = useState<{ role: string; content: string; timestamp: string }[]>([]);
 
   useEffect(() => {
     if (!s) { setEvents([]); return; }
@@ -322,6 +323,17 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
       setEvents([]);
     }
   }, [s?.id, s?.status]);
+
+  // Load conversation history from FTS5
+  useEffect(() => {
+    if (!s) { setConversation([]); return; }
+    const convId = s.claude_session_id || s.id;
+    try {
+      setConversation(core.getSessionConversation(convId, { limit: 100 }));
+    } catch {
+      setConversation([]);
+    }
+  }, [s?.id, s?.claude_session_id, s?.status]);
 
   const channelPort = useMemo(() => s ? core.sessionChannelPort(s.id) : 0, [s?.id]);
 
@@ -376,6 +388,25 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
         <Text color="green">
           {`  ⚡ Channel: port ${channelPort}`}
         </Text>
+      )}
+
+      {/* Conversation history (from FTS5) */}
+      {conversation.length > 0 && (
+        <>
+          <Text> </Text>
+          <SectionHeader title="Conversation" />
+          {conversation.map((turn, i) => {
+            const label = turn.role === "user" ? "You" : turn.role === "assistant" ? "Claude" : turn.role;
+            const color = turn.role === "user" ? "cyan" : undefined;
+            const dim = turn.role !== "user";
+            return (
+              <Text key={i} wrap="wrap">
+                {"  "}<Text color={color as any} dimColor={dim} bold>{label}:</Text>
+                <Text color={color as any} dimColor={dim}>{` ${turn.content}`}</Text>
+              </Text>
+            );
+          })}
+        </>
       )}
 
       {/* Agent output (live tmux capture) */}
