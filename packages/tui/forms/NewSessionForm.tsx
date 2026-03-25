@@ -99,10 +99,10 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
     let workdir: string | undefined;
     let repo = repoPath || process.cwd();
     const rp = resolvePath(repo);
-    if (existsSync(rp)) {
-      workdir = rp;
-      if (repo === "." || repo === "./") repo = basename(rp);
-    }
+    if (!existsSync(rp)) return;
+    if (!existsSync(resolvePath(rp, ".git"))) return;
+    workdir = rp;
+    if (repo === "." || repo === "./") repo = basename(rp);
     addRecentRepo(repoPath);
 
     // Sanitize name: alphanumeric, dash, underscore only
@@ -175,6 +175,9 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
         active={active === "repo"}
         onEditChange={setEditing}
       />
+      {repoPath && !isGitRepo && (
+        <Text color="red">{"  Not a git repository"}</Text>
+      )}
 
       <FormSelectField
         label="Compute"
