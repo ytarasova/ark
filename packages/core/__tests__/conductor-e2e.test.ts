@@ -10,7 +10,7 @@ import {
   createTestContext, setContext, resetContext,
   getMessages, getUnreadCount, listSessions,
 } from "../index.js";
-import { createSession } from "../store.js";
+import { createSession, updateSession, getSession } from "../store.js";
 import { startConductor } from "../conductor.js";
 import type { TestContext } from "../context.js";
 
@@ -185,6 +185,58 @@ describe("Conductor E2E — report pipeline", () => {
     expect(msgs2.length).toBe(1);
     expect(msgs1[0].content).toBe("For session 1");
     expect(msgs2[0].content).toBe("For session 2");
+  });
+
+  it("progress report resets waiting status to running", async () => {
+    const session = createSession({ summary: "waiting → running" });
+    // Simulate: dispatch sets running, then Notification hook sets waiting
+    // (e.g. channel trust dialog triggers permission_prompt hook)
+    updateSession(session.id, { status: "waiting" });
+
+    await postReport(session.id, {
+      type: "progress", sessionId: session.id, stage: "work",
+      message: "I am online and ready for work",
+    });
+
+    const updated = getSession(session.id);
+    expect(updated?.status).toBe("running");
+
+    // Message should still be stored
+    const msgs = getMessages(session.id);
+    expect(msgs.length).toBe(1);
+    expect(msgs[0].content).toBe("I am online and ready for work");
+  });
+
+  it("progress report does not override non-waiting statuses", async () => {
+    // stopped — agent may send a stale report before being killed
+    const s1 = createSession({ summary: "stopped session" });
+    updateSession(s1.id, { status: "stopped" });
+
+    await postReport(s1.id, {
+      type: "progress", sessionId: s1.id, stage: "work",
+      message: "still alive",
+    });
+    expect(getSession(s1.id)?.status).toBe("stopped");
+
+    // running — should stay running (no-op)
+    const s2 = createSession({ summary: "running session" });
+    updateSession(s2.id, { status: "running" });
+
+    await postReport(s2.id, {
+      type: "progress", sessionId: s2.id, stage: "work",
+      message: "update",
+    });
+    expect(getSession(s2.id)?.status).toBe("running");
+
+    // completed — should stay completed
+    const s3 = createSession({ summary: "completed session" });
+    updateSession(s3.id, { status: "completed" });
+
+    await postReport(s3.id, {
+      type: "progress", sessionId: s3.id, stage: "work",
+      message: "ghost report",
+    });
+    expect(getSession(s3.id)?.status).toBe("completed");
   });
 
   it("health endpoint returns ok", async () => {

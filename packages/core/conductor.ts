@@ -294,8 +294,17 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
         error: (report as any).error ?? (report as any).message,
       });
       break;
-    case "progress":
-      // Just log, no state change
+    case "progress": {
+      // Agent is actively reporting — ensure status reflects that.
+      // The Notification hook can set status to "waiting" (e.g. for the
+      // channel trust dialog) before the agent's first progress report.
+      // In channel-driven sessions UserPromptSubmit never fires, so
+      // without this reset the session stays "waiting" permanently.
+      const current = store.getSession(sessionId);
+      if (current && current.status === "waiting") {
+        store.updateSession(sessionId, { status: "running" });
+      }
       break;
+    }
   }
 }
