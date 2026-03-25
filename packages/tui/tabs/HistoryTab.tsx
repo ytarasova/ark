@@ -18,6 +18,7 @@ interface HistoryTabProps extends StoreData {
   pane: "left" | "right";
   async: AsyncState;
   onOverlayChange?: (overlay: string | null) => void;
+  onImport?: (prefill: { name?: string; repo?: string; claudeSessionId?: string }) => void;
 }
 
 const RECENT_LIMIT = 100;
@@ -58,7 +59,7 @@ function buildHistoryItems(arkSessions: any[], claudeSessions: core.ClaudeSessio
   return items;
 }
 
-export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, refresh, onOverlayChange }: HistoryTabProps) {
+export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, refresh, onOverlayChange, onImport }: HistoryTabProps) {
   const [claudeSessions, setClaudeSessions] = useState<core.ClaudeSession[]>([]);
   const [searchResults, setSearchResults] = useState<core.SearchResult[]>([]);
   const [mode, setMode] = useState<"recent" | "search">("recent");
@@ -137,14 +138,10 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
 
     if (key.return && mode === "recent" && selectedItem?.type === "claude" && selectedItem.claudeSession) {
       const cs = selectedItem.claudeSession;
-      asyncState.run("Importing session...", () => {
-        const s = core.startSession({
-          summary: cs.summary?.slice(0, 100) || `Import ${cs.sessionId.slice(0, 8)}`,
-          repo: cs.project, workdir: cs.project, flow: "bare",
-        });
-        core.updateSession(s.id, { claude_session_id: cs.sessionId });
-        status.show(`Imported ${cs.sessionId.slice(0, 8)}`);
-        refresh();
+      onImport?.({
+        name: cs.summary?.slice(0, 100) || `Import ${cs.sessionId.slice(0, 8)}`,
+        repo: cs.project,
+        claudeSessionId: cs.sessionId,
       });
       return;
     }

@@ -13,7 +13,7 @@ import { ComputeTab } from "./tabs/ComputeTab.js";
 import { AgentsTab } from "./tabs/AgentsTab.js";
 import { FlowsTab } from "./tabs/FlowsTab.js";
 import { HistoryTab } from "./tabs/HistoryTab.js";
-import { NewSessionForm } from "./forms/NewSessionForm.js";
+import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
 
 export function App() {
@@ -22,6 +22,7 @@ export function App() {
   const asyncState = useAsync(store.refresh);
   const [tab, setTab] = useState<Tab>("sessions");
   const [showForm, setShowForm] = useState<string | null>(null);
+  const [sessionPrefill, setSessionPrefill] = useState<SessionPrefill | undefined>();
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
   const [selectedSession, setSelectedSession] = useState<any>(null);
   const [pane, setPane] = useState<Pane>("left");
@@ -100,7 +101,8 @@ export function App() {
             <NewSessionForm
               store={store}
               async={asyncState}
-              onDone={() => setShowForm(null)}
+              onDone={() => { setShowForm(null); setSessionPrefill(undefined); }}
+              prefill={sessionPrefill}
             />
           ) : undefined}
         />
@@ -113,7 +115,17 @@ export function App() {
       ) : tab === "flows" ? (
         <FlowsTab {...store} pane={pane} />
       ) : tab === "history" ? (
-        <HistoryTab {...store} pane={pane} async={asyncState} onOverlayChange={setActiveOverlay} />
+        <HistoryTab
+          {...store}
+          pane={pane}
+          async={asyncState}
+          onOverlayChange={setActiveOverlay}
+          onImport={(prefill) => {
+            setSessionPrefill(prefill);
+            setShowForm("session");
+            switchTab("sessions");
+          }}
+        />
       ) : tab === "compute" ? (
         <ComputeTab
           {...store}

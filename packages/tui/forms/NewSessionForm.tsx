@@ -15,10 +15,17 @@ import {
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
+export interface SessionPrefill {
+  name?: string;
+  repo?: string;
+  claudeSessionId?: string;
+}
+
 interface NewSessionFormProps {
   store: StoreData;
   async: AsyncState;
   onDone: () => void;
+  prefill?: SessionPrefill;
 }
 
 const ISOLATION_CHOICES = [
@@ -26,9 +33,9 @@ const ISOLATION_CHOICES = [
   { label: "In-place (direct)", value: "inplace" },
 ];
 
-export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionFormProps) {
-  const [name, setName] = useState(generateName());
-  const [repoPath, setRepoPath] = useState(process.cwd());
+export function NewSessionForm({ store, async: asyncState, onDone, prefill }: NewSessionFormProps) {
+  const [name, setName] = useState(prefill?.name || generateName());
+  const [repoPath, setRepoPath] = useState(prefill?.repo || process.cwd());
   const [isolation, setIsolation] = useState("worktree");
   const [groupName, setGroupName] = useState("");
   const [computeName, setComputeName] = useState("local");
@@ -83,6 +90,9 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
           config: { worktree: isolation === "worktree" },
         });
         sessionId = s.id;
+        if (prefill?.claudeSessionId) {
+          core.updateSession(s.id, { claude_session_id: prefill.claudeSessionId });
+        }
         store.refresh();
       },
       onDone,
