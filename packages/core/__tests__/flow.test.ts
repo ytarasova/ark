@@ -16,6 +16,7 @@ import {
   getNextStage,
   evaluateGate,
   getStageAction,
+  resolveFlow,
 } from "../flow.js";
 import {
   createTestContext, setContext, resetContext,
@@ -333,5 +334,81 @@ describe("getStageAction", () => {
     const action = getStageAction("default", "pr");
     expect(action.on_failure).toBeUndefined();
     expect(action.optional).toBeUndefined();
+  });
+});
+
+// ── resolveFlow ─────────────────────────────────────────────────────────────
+
+describe("resolveFlow", () => {
+  it("substitutes variables in stage task field", () => {
+    writeUserFlow("task-flow", {
+      name: "task-flow",
+      stages: [
+        { name: "plan", agent: "planner", gate: "auto", task: "Plan work for {ticket}: {summary}" },
+        { name: "impl", agent: "worker", gate: "auto", task: "Implement {ticket} in {repo}" },
+      ],
+    });
+
+    const flow = resolveFlow("task-flow", { ticket: "PROJ-1", summary: "Fix bug", repo: "/code" });
+    expect(flow).not.toBeNull();
+    expect(flow!.stages[0].task).toBe("Plan work for PROJ-1: Fix bug");
+    expect(flow!.stages[1].task).toBe("Implement PROJ-1 in /code");
+  });
+
+  it("substitutes variables in description", () => {
+    writeUserFlow("desc-flow", {
+      name: "desc-flow",
+      description: "Flow for {ticket} on {branch}",
+      stages: [{ name: "s1", agent: "a", gate: "auto" }],
+    });
+
+    const flow = resolveFlow("desc-flow", { ticket: "T-1", branch: "main" });
+    expect(flow!.description).toBe("Flow for T-1 on main");
+  });
+
+  it("substitutes variables in on_failure", () => {
+    writeUserFlow("fail-flow", {
+      name: "fail-flow",
+      stages: [
+        { name: "s1", agent: "a", gate: "auto", on_failure: "notify({ticket})" },
+      ],
+    });
+
+    const flow = resolveFlow("fail-flow", { ticket: "BUG-99" });
+    expect(flow!.stages[0].on_failure).toBe("notify(BUG-99)");
+  });
+
+  it("preserves stages without templates", () => {
+    writeUserFlow("plain-flow", {
+      name: "plain-flow",
+      stages: [
+        { name: "s1", agent: "planner", gate: "auto" },
+        { name: "s2", agent: "worker", gate: "manual" },
+      ],
+    });
+
+    const flow = resolveFlow("plain-flow", { ticket: "X-1" });
+    expect(flow).not.toBeNull();
+    expect(flow!.stages[0].task).toBeUndefined();
+    expect(flow!.stages[0].on_failure).toBeUndefined();
+    expect(flow!.stages[0].name).toBe("s1");
+    expect(flow!.stages[1].name).toBe("s2");
+  });
+
+  it("returns null for unknown flow", () => {
+    expect(resolveFlow("nonexistent", { ticket: "X-1" })).toBeNull();
+  });
+
+  it("stage task field appears in loaded flow definition", () => {
+    writeUserFlow("task-field-flow", {
+      name: "task-field-flow",
+      stages: [
+        { name: "do-it", agent: "worker", gate: "auto", task: "Do the thing" },
+      ],
+    });
+
+    const flow = loadFlow("task-field-flow");
+    expect(flow).not.toBeNull();
+    expect(flow!.stages[0].task).toBe("Do the thing");
   });
 });

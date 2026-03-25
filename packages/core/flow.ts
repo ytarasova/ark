@@ -10,6 +10,7 @@ import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { ARK_DIR } from "./store.js";
+import { substituteVars } from "./template.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ export interface StageDefinition {
   type?: "agent" | "action" | "fork";
   agent?: string;
   action?: string;
+  task?: string;  // Template for agent task prompt — supports {variable} substitution
   gate: "auto" | "manual" | "condition";
   on_failure?: string;
   optional?: boolean;
@@ -148,4 +150,22 @@ export function getStageAction(flowName: string, stageName: string): StageAction
     return { type: "agent", agent: stage.agent, on_failure: stage.on_failure, optional: stage.optional };
   }
   return { type: "unknown" };
+}
+
+// ── Template substitution ────────────────────────────────────────────────────
+
+/** Resolve a flow by substituting {variables} in stage fields. */
+export function resolveFlow(flowName: string, vars: Record<string, string>): FlowDefinition | null {
+  const flow = loadFlow(flowName);
+  if (!flow) return null;
+
+  return {
+    ...flow,
+    description: flow.description ? substituteVars(flow.description, vars) : undefined,
+    stages: flow.stages.map(stage => ({
+      ...stage,
+      task: stage.task ? substituteVars(stage.task, vars) : undefined,
+      on_failure: stage.on_failure ? substituteVars(stage.on_failure, vars) : undefined,
+    })),
+  };
 }
