@@ -2,12 +2,13 @@
  * Tests for useComputeMetrics — polling metrics hook with log management.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import { useComputeMetrics } from "../hooks/useComputeMetrics.js";
 import { registerProvider, clearProviders } from "../../compute/index.js";
+import { AppContext, setApp, clearApp } from "../../core/index.js";
 import type { Compute } from "../../core/index.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -77,13 +78,20 @@ function mockProvider(name = "mock") {
 
 // ── Setup ────────────────────────────────────────────────────────────────────
 
-beforeEach(() => {
+let app: AppContext;
+
+beforeEach(async () => {
   captured = null;
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
   clearProviders();
 });
 
-afterEach(() => {
+afterEach(async () => {
   clearProviders();
+  if (app) await app.shutdown();
+  clearApp();
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import {
   createTestContext, setContext, resetContext,
   createCompute, getCompute, deleteCompute,
+  AppContext, setApp, clearApp,
 } from "../../core/index.js";
 import type { TestContext } from "../../core/store.js";
 import type { Compute } from "../../core/store.js";
@@ -52,15 +53,21 @@ function mockProvider(name = "mock") {
 // ── Setup ────────────────────────────────────────────────────────────────────
 
 let ctx: TestContext;
+let app: AppContext;
 
-beforeEach(() => {
+beforeEach(async () => {
   if (ctx) ctx.cleanup();
   ctx = createTestContext();
   setContext(ctx);
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
   clearProviders();
 });
 
-afterAll(() => {
+afterAll(async () => {
+  if (app) await app.shutdown();
+  clearApp();
   if (ctx) ctx.cleanup();
   resetContext();
   clearProviders();
