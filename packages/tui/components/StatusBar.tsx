@@ -13,6 +13,8 @@ interface StatusBarProps {
   label: string | null;
   pane?: "left" | "right";
   overlay?: string | null;
+  /** Number of items in the active tab's left pane list (for conditional scroll hints) */
+  listLength?: number;
 }
 
 function KeyHint({ k, label }: { k: string; label: string }) {
@@ -68,9 +70,19 @@ function getRightPaneHints(): React.ReactNode[] {
   ];
 }
 
-function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
+/** Navigation hints shared by all left panes. Page/top/end only when scrollable. */
+function navHints(listLength: number): React.ReactNode[] {
+  const hints = [<KeyHint key="jk" k="j/k" label="move" />];
+  if (listLength > 20) {
+    hints.push(<KeyHint key="fb" k="f/b" label="page" />);
+    hints.push(<KeyHint key="gG" k="g/G" label="top/end" />);
+  }
+  return hints;
+}
+
+function getSessionHints(s: Session | null | undefined, listLength: number): React.ReactNode[] {
   const hints: React.ReactNode[] = [
-    <KeyHint key="jk" k="j/k" label="move" />,
+    ...navHints(listLength),
     <KeyHint key="tab" k="Tab" label="detail" />,
   ];
 
@@ -112,8 +124,9 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
   return hints;
 }
 
-function getComputeHints(): React.ReactNode[] {
+function getComputeHints(listLength: number): React.ReactNode[] {
   return [
+    ...navHints(listLength),
     <KeyHint key="enter" k="Enter" label="provision" />,
     <KeyHint key="s" k="s" label="start/stop" />,
     <KeyHint key="c" k="c" label="clean" />,
@@ -122,9 +135,9 @@ function getComputeHints(): React.ReactNode[] {
   ];
 }
 
-function getHistoryHints(): React.ReactNode[] {
+function getHistoryHints(listLength: number): React.ReactNode[] {
   return [
-    <KeyHint key="jk" k="j/k" label="move" />,
+    ...navHints(listLength),
     <KeyHint key="enter" k="Enter" label="import" />,
     <KeyHint key="r" k="r" label="refresh" />,
     <KeyHint key="R" k="R" label="rebuild" />,
@@ -139,15 +152,15 @@ function getGenericHints(): React.ReactNode[] {
   ];
 }
 
-export function StatusBar({ tab, sessions, selectedSession, loading, error, label, pane, overlay }: StatusBarProps) {
+export function StatusBar({ tab, sessions, selectedSession, loading, error, label, pane, overlay, listLength = 0 }: StatusBarProps) {
   const nRun = sessions.filter((s) => s.status === "running").length;
   const nErr = sessions.filter((s) => s.status === "failed").length;
 
   const hints = overlay ? getOverlayHints(overlay)
     : pane === "right" ? getRightPaneHints()
-    : tab === "sessions" ? getSessionHints(selectedSession)
-    : tab === "compute" ? getComputeHints()
-    : tab === "history" ? getHistoryHints()
+    : tab === "sessions" ? getSessionHints(selectedSession, listLength)
+    : tab === "compute" ? getComputeHints(listLength)
+    : tab === "history" ? getHistoryHints(listLength)
     : getGenericHints();
 
   return (

@@ -152,6 +152,14 @@ export function App() {
         label={asyncState.label}
         pane={pane}
         overlay={showForm ? "form" : activeOverlay}
+        listLength={
+          tab === "sessions" ? store.sessions.length
+          : tab === "compute" ? store.computes.length
+          : tab === "agents" ? store.agents.length
+          : tab === "flows" ? store.flows.length
+          : tab === "history" ? 50 // approximate — exact count not available here
+          : 0
+        }
       />
     </Box>
   );
