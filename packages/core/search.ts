@@ -3,7 +3,7 @@
  * Supports FTS5-indexed transcript search for sub-100ms queries.
  */
 
-import { existsSync, readdirSync, readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync, openSync, readSync, closeSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { getDb } from "./store.js";
@@ -180,8 +180,23 @@ export async function indexTranscripts(opts?: { transcriptsDir?: string; onProgr
     for (const file of files) {
       const filePath = join(projectPath, file);
       const sessionId = file.replace(".jsonl", "");
+
+      // For large files, read only the last 64KB (recent conversation)
+      // For small files, read the whole thing
       let content: string;
-      try { content = readFileSync(filePath, "utf-8"); } catch { continue; }
+      try {
+        const fstat = statSync(filePath);
+        if (fstat.size > 65536) {
+          // Large file — read tail only (recent conversation)
+          const fd = openSync(filePath, "r");
+          const buf = Buffer.alloc(65536);
+          readSync(fd, buf, 0, 65536, fstat.size - 65536);
+          closeSync(fd);
+          content = buf.toString("utf-8");
+        } else {
+          content = readFileSync(filePath, "utf-8");
+        }
+      } catch { continue; }
 
       for (const line of content.split("\n")) {
         if (!line.trim()) continue;
@@ -198,10 +213,8 @@ export async function indexTranscripts(opts?: { transcriptsDir?: string; onProgr
       fileCount++;
       opts?.onProgress?.(indexed, fileCount);
 
-      // Yield to event loop every 5 files so TUI can render
-      if (fileCount % 5 === 0) {
-        await new Promise(r => setTimeout(r, 0));
-      }
+      // Yield after every file so TUI stays responsive
+      await new Promise(r => setTimeout(r, 0));
     }
   }
 

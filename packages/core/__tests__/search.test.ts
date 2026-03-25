@@ -134,8 +134,8 @@ describe("searchTranscripts", () => {
     mkdirSync(projectDir, { recursive: true });
 
     const jsonl = [
-      JSON.stringify({ message: { content: "Hello world" }, timestamp: "2025-01-01T00:00:00Z" }),
-      JSON.stringify({ message: { content: "Implementing the frobnicator module" }, timestamp: "2025-01-01T00:01:00Z" }),
+      JSON.stringify({ type: "user", message: { content: "Hello world" }, timestamp: "2025-01-01T00:00:00Z" }),
+      JSON.stringify({ type: "assistant", message: { content: "Implementing the frobnicator module" }, timestamp: "2025-01-01T00:01:00Z" }),
     ].join("\n");
 
     writeFileSync(join(projectDir, "session-abc.jsonl"), jsonl);
@@ -153,6 +153,7 @@ describe("searchTranscripts", () => {
     mkdirSync(projectDir, { recursive: true });
 
     const jsonl = JSON.stringify({
+      type: "assistant",
       message: { content: [{ type: "text", text: "analyzing the zygomorphic pattern" }] },
       timestamp: "2025-02-01T00:00:00Z",
     });
@@ -169,7 +170,7 @@ describe("searchTranscripts", () => {
     const projectDir = join(transcriptsDir, "empty-project");
     mkdirSync(projectDir, { recursive: true });
 
-    const jsonl = JSON.stringify({ message: { content: "nothing relevant here" }, timestamp: "2025-01-01T00:00:00Z" });
+    const jsonl = JSON.stringify({ type: "assistant", message: { content: "nothing relevant here" }, timestamp: "2025-01-01T00:00:00Z" });
     writeFileSync(join(projectDir, "session-no.jsonl"), jsonl);
 
     const results = searchTranscripts("zzz_impossible_zzz", { transcriptsDir });
@@ -187,7 +188,7 @@ describe("searchTranscripts", () => {
     mkdirSync(projectDir, { recursive: true });
 
     for (let i = 0; i < 10; i++) {
-      const jsonl = JSON.stringify({ message: { content: `match keyword-${i}` }, timestamp: "2025-01-01T00:00:00Z" });
+      const jsonl = JSON.stringify({ type: "assistant", message: { content: `match keyword-${i}` }, timestamp: "2025-01-01T00:00:00Z" });
       writeFileSync(join(projectDir, `session-${i}.jsonl`), jsonl);
     }
 
@@ -200,7 +201,7 @@ describe("searchTranscripts", () => {
     const projectDir = join(transcriptsDir, "case-project");
     mkdirSync(projectDir, { recursive: true });
 
-    const jsonl = JSON.stringify({ message: { content: "CamelCase search Target" }, timestamp: "2025-01-01T00:00:00Z" });
+    const jsonl = JSON.stringify({ type: "assistant", message: { content: "CamelCase search Target" }, timestamp: "2025-01-01T00:00:00Z" });
     writeFileSync(join(projectDir, "session-case.jsonl"), jsonl);
 
     const results = searchTranscripts("camelcase search target", { transcriptsDir });
@@ -213,9 +214,9 @@ describe("searchTranscripts", () => {
     mkdirSync(projectDir, { recursive: true });
 
     const jsonl = [
-      JSON.stringify({ message: { content: "first repeated term" }, timestamp: "2025-01-01T00:00:00Z" }),
-      JSON.stringify({ message: { content: "second repeated term" }, timestamp: "2025-01-01T00:01:00Z" }),
-      JSON.stringify({ message: { content: "third repeated term" }, timestamp: "2025-01-01T00:02:00Z" }),
+      JSON.stringify({ type: "assistant", message: { content: "first repeated term" }, timestamp: "2025-01-01T00:00:00Z" }),
+      JSON.stringify({ type: "assistant", message: { content: "second repeated term" }, timestamp: "2025-01-01T00:01:00Z" }),
+      JSON.stringify({ type: "assistant", message: { content: "third repeated term" }, timestamp: "2025-01-01T00:02:00Z" }),
     ].join("\n");
 
     writeFileSync(join(projectDir, "session-dedup.jsonl"), jsonl);
