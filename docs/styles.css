@@ -147,6 +147,7 @@ code {
 }
 
 pre {
+  position: relative;
   background: #111827;
   border: 1px solid #1e293b;
   border-radius: 10px;
@@ -155,6 +156,25 @@ pre {
   overflow-x: auto;
   line-height: 1.5;
 }
+
+pre .copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, sans-serif;
+  transition: all 0.15s;
+  opacity: 0;
+}
+
+pre:hover .copy-btn { opacity: 1; }
+pre .copy-btn:hover { background: #334155; color: #e2e8f0; }
 
 pre code {
   background: none;

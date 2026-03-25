@@ -288,9 +288,10 @@
       </div>
 
       <div class="code-box">
+        <button class="copy-btn" onclick="copy(this, 'curl -fsSL https://ytarasova.github.io/ark/install.sh | ARK_VERSION=v0.1.0 bash')">Copy</button>
         <code>
           <span class="comment"># Pin to a specific version</span><br>
-          <span class="prompt">$</span> curl -fsSL https://ytarasova.github.io/ark/install.sh | ARK_VERSION=v0.2.0 bash
+          <span class="prompt">$</span> curl -fsSL https://ytarasova.github.io/ark/install.sh | ARK_VERSION=v0.1.0 bash
         </code>
       </div>
     </div>
@@ -298,6 +299,7 @@
     <div class="install-section">
       <h2>Quick Start</h2>
       <div class="code-box">
+        <button class="copy-btn" onclick="copy(this, 'ark tui')">Copy</button>
         <code>
           <span class="prompt">$</span> ark tui<span class="comment">              # terminal dashboard</span><br>
           <span class="prompt">$</span> ark exec --repo . --summary "Fix auth bug"<br>
