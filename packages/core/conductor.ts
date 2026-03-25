@@ -265,6 +265,12 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
   // Handle by type
   switch (report.type) {
     case "completed": {
+      // Save completion summary to session config for display in detail pane
+      const existing = store.getSession(sessionId);
+      if (existing) {
+        const cfg = { ...(existing.config as any), completion_summary: (report as any).summary };
+        store.updateSession(sessionId, { config: cfg });
+      }
       store.updateSession(sessionId, { status: "ready", session_id: null });
       const advResult = session.advance(sessionId);
       if (advResult.ok) {

@@ -558,8 +558,9 @@ async function buildTaskWithHandoff(session: store.Session, stage: string, agent
     parts.push(`\nYou are the ${agentName} agent, running the '${stage}' stage.`);
   }
 
-  // Readiness announcement — agent should report it's online
+  // Readiness + completion reporting
   parts.push(`\nWhen you start up, immediately call the \`report\` tool with type='progress' to announce you are online and ready for work.`);
+  parts.push(`When you finish your work, call \`report\` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.`);
 
   // Previous stage context
   const events = store.getEvents(session.id);

@@ -411,7 +411,12 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
         </Text>
       </KeyValue>
       {s.status === "completed" && (
-        <Text color="green" bold>{`  ✓ Agent completed successfully`}</Text>
+        <>
+          <Text color="green" bold>{`  ✓ Agent completed successfully`}</Text>
+          {(s.config as any)?.completion_summary && (
+            <Text color="green" wrap="wrap">{`  ${(s.config as any).completion_summary}`}</Text>
+          )}
+        </>
       )}
       {s.status === "stopped" && (
         <Text color="gray">{`  ■ Session stopped by user`}</Text>
