@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quick Start - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Quick Start</h1>
+      <p class="subtitle">Get up and running in under 2 minutes.</p>
+
+      <h2>Prerequisites</h2>
+      <ul>
+        <li>macOS (arm64 or x64)</li>
+        <li>tmux (<code>brew install tmux</code>)</li>
+        <li>Bun is installed automatically by the install script</li>
+      </ul>
+
+      <h2>Install</h2>
+      <pre><code><span class="prompt">$</span> curl -fsSL https://ytarasova.github.io/ark/install.sh | bash</code></pre>
+
+      <p>Or clone and install manually:</p>
+      <pre><code><span class="prompt">$</span> git clone https://github.com/ytarasova/ark.git
+<span class="prompt">$</span> cd ark
+<span class="prompt">$</span> make install</code></pre>
+
+      <h2>Your First Session</h2>
+
+      <h3>1. Launch the TUI</h3>
+      <pre><code><span class="prompt">$</span> ark tui</code></pre>
+      <p>This opens the terminal dashboard with 6 tabs: Sessions, Agents, Tools, Flows, History, Compute.</p>
+
+      <h3>2. Create a Session</h3>
+      <p>Press <code>n</code> in the Sessions tab. Fill in:</p>
+      <ul>
+        <li><strong>Name</strong>: A short description (e.g., "add-auth")</li>
+        <li><strong>Repo</strong>: Path to your repository</li>
+        <li><strong>Compute</strong>: <code>local</code> (default)</li>
+        <li><strong>Flow</strong>: <code>bare</code> for a single agent, <code>default</code> for full SDLC pipeline</li>
+      </ul>
+
+      <h3>3. Dispatch</h3>
+      <p>Press <code>Enter</code> on the session to dispatch the agent. The agent launches in a tmux session and starts working.</p>
+
+      <h3>4. Monitor</h3>
+      <ul>
+        <li>Watch live output in the detail pane (right side)</li>
+        <li>Press <code>a</code> to attach directly to the agent's terminal</li>
+        <li>Press <code>t</code> to send messages to the running agent</li>
+      </ul>
+
+      <h3>5. Headless Mode (CI/CD)</h3>
+      <pre><code><span class="prompt">$</span> ark exec --repo . --summary "Fix the auth bug" --flow bare
+<span class="prompt">$</span> ark exec --repo . --summary "Add tests" --timeout 600 --output json</code></pre>
+
+      <div class="callout info">
+        <strong>Note:</strong> The <code>bare</code> flow runs a single worker agent with no planning or review stages. Use <code>default</code> for the full planner → implementer → reviewer pipeline.
+      </div>
+
+      <h2>What's Next?</h2>
+      <ul>
+        <li>Read <a href="concepts.html">Core Concepts</a> to understand flows, agents, and stages</li>
+        <li>See the <a href="tui.html">TUI Guide</a> for all keyboard shortcuts</li>
+        <li>Check <a href="cli.html">CLI Reference</a> for full command documentation</li>
+        <li>Set up <a href="compute.html">Compute Providers</a> for Docker or EC2</li>
+      </ul>
+
+      <div class="callout tip">
+        <strong>Tip:</strong> Run <code>ark tui</code> alongside your editor. The detail pane streams agent output in real time so you can watch the agent work without leaving your terminal.
+      </div>
+
+      <div class="doc-footer">
+        <a href="./">&larr; Home</a>
+        <a href="concepts.html">Core Concepts &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

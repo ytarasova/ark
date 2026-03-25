@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Core Concepts - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Core Concepts</h1>
+      <p class="subtitle">How Ark orchestrates autonomous agents.</p>
+
+      <h2>Sessions</h2>
+      <p>A session is a unit of work. It binds a task (summary/ticket) to a repository, a flow, and a compute target. Sessions track status, events, agent output, and conversation history.</p>
+      <p>Session statuses: <code>ready</code>, <code>running</code>, <code>waiting</code>, <code>blocked</code>, <code>stopped</code>, <code>failed</code>, <code>completed</code>.</p>
+
+      <h2>Flows</h2>
+      <p>A flow is a YAML-defined pipeline of stages. Each stage has an agent (or action), a gate, and optional configuration.</p>
+      <p>Example flow (<code>default</code>):</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">default</span>
+<span class="yaml-key">stages</span>:
+  - <span class="yaml-key">name</span>: <span class="yaml-value">plan</span>
+    <span class="yaml-key">agent</span>: <span class="yaml-value">planner</span>
+    <span class="yaml-key">gate</span>: <span class="yaml-value">manual</span>
+  - <span class="yaml-key">name</span>: <span class="yaml-value">implement</span>
+    <span class="yaml-key">agent</span>: <span class="yaml-value">implementer</span>
+    <span class="yaml-key">gate</span>: <span class="yaml-value">auto</span>
+    <span class="yaml-key">on_failure</span>: <span class="yaml-value">"retry(3)"</span>
+  - <span class="yaml-key">name</span>: <span class="yaml-value">review</span>
+    <span class="yaml-key">agent</span>: <span class="yaml-value">reviewer</span>
+    <span class="yaml-key">gate</span>: <span class="yaml-value">auto</span></code></pre>
+      <p>The <code>bare</code> flow is a single stage with one agent — use it for quick tasks.</p>
+
+      <h2>Stages and Gates</h2>
+      <p>Each stage has a <strong>gate</strong> that controls advancement:</p>
+      <ul>
+        <li><strong>auto</strong>: advances when the agent completes without errors</li>
+        <li><strong>manual</strong>: waits for human approval (press Enter in TUI or <code>ark session advance</code>)</li>
+        <li><strong>review</strong>: waits for GitHub PR approval (via webhook)</li>
+        <li><strong>condition</strong>: evaluates an expression</li>
+      </ul>
+
+      <h2>Agents</h2>
+      <p>An agent is a YAML-defined Claude Code configuration. It specifies:</p>
+      <ul>
+        <li><strong>model</strong>: opus, sonnet, or haiku</li>
+        <li><strong>system_prompt</strong>: with template variables (<code>{repo}</code>, <code>{summary}</code>, <code>{ticket}</code>, <code>{workdir}</code>, <code>{branch}</code>)</li>
+        <li><strong>tools</strong>: which Claude tools the agent can use</li>
+        <li><strong>permission_mode</strong>: bypassPermissions, default</li>
+        <li><strong>max_turns</strong>: conversation turn limit</li>
+      </ul>
+      <p>Built-in agents: <code>planner</code>, <code>implementer</code>, <code>reviewer</code>, <code>documenter</code>, <code>worker</code>.</p>
+
+      <h2>Autonomy Levels</h2>
+      <p>Each stage can set an autonomy level:</p>
+      <ul>
+        <li><strong>full</strong>: agent can do anything (<code>bypassPermissions</code>)</li>
+        <li><strong>execute</strong>: can read, write, edit, and run commands</li>
+        <li><strong>edit</strong>: can read, write, edit but not execute</li>
+        <li><strong>read-only</strong>: can only read files</li>
+      </ul>
+
+      <h2>Channels</h2>
+      <p>Channels are the communication layer between you and running agents. The conductor runs an HTTP server; each session gets a dedicated MCP channel on a deterministic port. You can send messages via the TUI (press <code>t</code>) or CLI (<code>ark session send</code>).</p>
+
+      <h2>Hooks</h2>
+      <p>Ark uses Claude Code hooks for agent status detection. At dispatch time, hooks config is written to the session's working directory. Hooks POST status events (<code>busy</code>/<code>idle</code>/<code>error</code>/<code>done</code>) to the conductor.</p>
+      <div class="callout info">
+        <p>Hooks are ONLY for status detection. Channels handle agent-human messaging.</p>
+      </div>
+
+      <h2>The Conductor</h2>
+      <p>The conductor is the central HTTP server that:</p>
+      <ul>
+        <li>Receives hook status reports from agents</li>
+        <li>Routes channel messages between humans and agents</li>
+        <li>Serves the GitHub webhook endpoint for PR monitoring</li>
+        <li>Polls scheduled sessions</li>
+      </ul>
+      <p>It runs automatically when you use <code>ark tui</code> or <code>ark exec</code>.</p>
+
+      <h2>PR Monitoring</h2>
+      <p>Ark can monitor GitHub PRs via webhooks. When a reviewer leaves comments:</p>
+      <ul>
+        <li><strong>changes_requested</strong>: the agent is steered with the review feedback</li>
+        <li><strong>approved</strong>: the review gate opens and the flow advances</li>
+      </ul>
+      <p>Set up by pointing a GitHub webhook at your conductor's <code>/api/webhook/github</code> endpoint.</p>
+
+      <div class="doc-footer">
+        <a href="quickstart.html">&larr; Quick Start</a>
+        <a href="tui.html">TUI Guide &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>
