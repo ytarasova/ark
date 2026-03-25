@@ -42,7 +42,12 @@ export function useComputeActions(
       if (!provider) return;
       addLog(compute.name, "Stopping...");
       run(`Stopping ${compute.name}`, async () => {
-        await provider.stop(compute);
+        try {
+          await provider.stop(compute);
+        } catch (e: any) {
+          // Instance may already be terminated externally
+          addLog(compute.name, `Provider stop failed: ${e?.message ?? e}`);
+        }
         core.updateCompute(compute.name, { status: "stopped" });
         addLog(compute.name, "Stopped");
       });
@@ -60,7 +65,16 @@ export function useComputeActions(
     },
 
     delete: (name: string) => {
-      run(`Deleting ${name}`, () => { core.deleteCompute(name); });
+      run(`Deleting ${name}`, async () => {
+        const compute = core.getCompute(name);
+        if (compute && compute.provider !== "local") {
+          const provider = getProvider(compute.provider);
+          if (provider) {
+            try { await provider.stop(compute); } catch { /* already gone */ }
+          }
+        }
+        core.deleteCompute(name);
+      });
     },
 
     clean: () => {
