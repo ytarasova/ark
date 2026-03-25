@@ -2,7 +2,7 @@ import type { AsyncState } from "../hooks/useAsync.js";
 
 /**
  * Submit a form: run a sync action (create resource), close the form,
- * then run async follow-up (dispatch) after a yield so React can render the spinner.
+ * then run async follow-up (dispatch) via the standard async runner.
  */
 export function submitForm(opts: {
   create: () => void;
@@ -22,10 +22,8 @@ export function submitForm(opts: {
   // Close form BEFORE async work so React unmount doesn't cancel it
   onDone();
 
-  // Yield to let React render the form close, THEN start async work
+  // Async follow-up via standard runner — useAsync yields before executing
   if (asyncFollowUp) {
-    setTimeout(() => {
-      asyncState.run(asyncFollowUp.label, asyncFollowUp.action);
-    }, 50);
+    asyncState.run(asyncFollowUp.label, asyncFollowUp.action);
   }
 }

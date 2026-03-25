@@ -41,6 +41,9 @@ export function useAsync(onComplete?: () => void): AsyncState {
     setLabel(next.label);
     setError(null);
 
+    // Yield so React can render the spinner before heavy work starts
+    await new Promise(r => setTimeout(r, 0));
+
     try {
       await Promise.resolve(next.action());
       onCompleteRef.current?.();
