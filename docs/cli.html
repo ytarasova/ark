@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CLI Reference - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>CLI Reference</h1>
+      <p class="subtitle">Complete command reference for the <code>ark</code> CLI.</p>
+
+      <!-- ── ark tui ─────────────────────────────────────────────────────── -->
+      <h2>ark tui</h2>
+      <p>Launch the interactive TUI dashboard.</p>
+      <pre><code><span class="prompt">$</span> ark tui</code></pre>
+      <p>Opens the terminal dashboard with 6 tabs: Sessions, Agents, Tools, Flows, History, Compute. See the <a href="tui.html">TUI Guide</a> for keyboard shortcuts.</p>
+
+      <!-- ── ark exec ────────────────────────────────────────────────────── -->
+      <h2>ark exec</h2>
+      <p>Run a session non-interactively. Designed for CI/CD pipelines — blocks until the session completes, fails, or times out.</p>
+      <pre><code><span class="prompt">$</span> ark exec --repo . --summary "Fix the login bug" --flow bare
+<span class="prompt">$</span> ark exec --repo /path/to/repo --summary "Add tests" --timeout 600 --output json</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--repo</code></td><td>—</td><td>Path to the repository</td></tr>
+          <tr><td><code>--summary</code></td><td>—</td><td>Task description for the agent</td></tr>
+          <tr><td><code>--ticket</code></td><td>—</td><td>Ticket identifier (e.g. JIRA key)</td></tr>
+          <tr><td><code>--flow</code></td><td><code>bare</code></td><td>Flow to run</td></tr>
+          <tr><td><code>--compute</code></td><td>—</td><td>Compute target name</td></tr>
+          <tr><td><code>--group</code></td><td>—</td><td>Assign to a group</td></tr>
+          <tr><td><code>--autonomy</code></td><td>—</td><td>Permission level: <code>full</code>, <code>execute</code>, <code>edit</code>, <code>read-only</code></td></tr>
+          <tr><td><code>--output</code></td><td><code>text</code></td><td>Output format: <code>text</code> or <code>json</code></td></tr>
+          <tr><td><code>--timeout</code></td><td>—</td><td>Maximum runtime in seconds</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Exit codes:</strong> <code>0</code> = completed, <code>1</code> = failed, <code>2</code> = timeout.</p>
+
+      <!-- ── ark session ─────────────────────────────────────────────────── -->
+      <h2>ark session</h2>
+      <p>Manage sessions across their full lifecycle.</p>
+
+      <h3>ark session start [ticket]</h3>
+      <p>Create a new session.</p>
+      <pre><code><span class="prompt">$</span> ark session start
+<span class="prompt">$</span> ark session start PROJ-123 --repo . --summary "Add OAuth" --dispatch</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-r, --repo</code></td><td>Repository path</td></tr>
+          <tr><td><code>-s, --summary</code></td><td>Task summary</td></tr>
+          <tr><td><code>-p, --flow</code></td><td>Flow name (default: <code>default</code>)</td></tr>
+          <tr><td><code>-c, --compute</code></td><td>Compute target name</td></tr>
+          <tr><td><code>-g, --group</code></td><td>Group name</td></tr>
+          <tr><td><code>-d, --dispatch</code></td><td>Dispatch immediately after creation</td></tr>
+          <tr><td><code>-a, --attach</code></td><td>Attach to tmux after dispatch</td></tr>
+          <tr><td><code>--claude-session</code></td><td>Import from an existing Claude Code session</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark session list</h3>
+      <p>List all sessions.</p>
+      <pre><code><span class="prompt">$</span> ark session list
+<span class="prompt">$</span> ark session list --status running --repo /path/to/repo</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-s, --status</code></td><td>Filter by status (e.g. <code>running</code>, <code>waiting</code>, <code>stopped</code>)</td></tr>
+          <tr><td><code>-r, --repo</code></td><td>Filter by repository path</td></tr>
+          <tr><td><code>-g, --group</code></td><td>Filter by group</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark session show &lt;id&gt;</h3>
+      <p>Show full details for a session including status, stage, flow, and recent events.</p>
+      <pre><code><span class="prompt">$</span> ark session show s-1a2b</code></pre>
+
+      <h3>ark session dispatch &lt;id&gt;</h3>
+      <p>Dispatch the agent for the current stage. Launches a new Claude Code process in a tmux session.</p>
+      <pre><code><span class="prompt">$</span> ark session dispatch s-1a2b</code></pre>
+
+      <h3>ark session stop &lt;id&gt;</h3>
+      <p>Stop a running session. Kills the agent process and tmux session.</p>
+      <pre><code><span class="prompt">$</span> ark session stop s-1a2b</code></pre>
+
+      <h3>ark session resume &lt;id&gt;</h3>
+      <p>Resume a stopped or paused session by re-dispatching the agent.</p>
+      <pre><code><span class="prompt">$</span> ark session resume s-1a2b</code></pre>
+
+      <h3>ark session advance &lt;id&gt;</h3>
+      <p>Advance to the next flow stage. Used to pass a manual gate.</p>
+      <pre><code><span class="prompt">$</span> ark session advance s-1a2b
+<span class="prompt">$</span> ark session advance s-1a2b --force</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-f, --force</code></td><td>Force advancement past a gate even if not satisfied</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark session complete &lt;id&gt;</h3>
+      <p>Mark the current stage as done and automatically advance to the next stage.</p>
+      <pre><code><span class="prompt">$</span> ark session complete s-1a2b</code></pre>
+
+      <h3>ark session pause &lt;id&gt;</h3>
+      <p>Pause a session without stopping the agent process.</p>
+      <pre><code><span class="prompt">$</span> ark session pause s-1a2b --reason "waiting for PR review"</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-r, --reason</code></td><td>Human-readable reason for the pause</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark session attach &lt;id&gt;</h3>
+      <p>Attach to a running agent's tmux session. If the agent is not yet running, dispatches first.</p>
+      <pre><code><span class="prompt">$</span> ark session attach s-1a2b</code></pre>
+
+      <h3>ark session output &lt;id&gt;</h3>
+      <p>Show live output from the agent's tmux pane.</p>
+      <pre><code><span class="prompt">$</span> ark session output s-1a2b
+<span class="prompt">$</span> ark session output s-1a2b --lines 100</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-n, --lines</code></td><td>Number of lines to show (default: <code>30</code>)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark session send &lt;id&gt; &lt;message&gt;</h3>
+      <p>Send a message to a running agent via the MCP channel.</p>
+      <pre><code><span class="prompt">$</span> ark session send s-1a2b "Focus on the login flow only"</code></pre>
+
+      <h3>ark session clone &lt;id&gt;</h3>
+      <p>Clone a session, resuming the existing Claude Code conversation in a new session.</p>
+      <pre><code><span class="prompt">$</span> ark session clone s-1a2b
+<span class="prompt">$</span> ark session clone s-1a2b --task "Now add tests" --dispatch</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-t, --task</code></td><td>Override the task summary for the cloned session</td></tr>
+          <tr><td><code>-d, --dispatch</code></td><td>Dispatch immediately after cloning</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark session handoff &lt;id&gt; &lt;agent&gt;</h3>
+      <p>Hand off the current session to a different agent (e.g. from implementer to reviewer).</p>
+      <pre><code><span class="prompt">$</span> ark session handoff s-1a2b reviewer
+<span class="prompt">$</span> ark session handoff s-1a2b documenter --instructions "Focus on public API"</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-i, --instructions</code></td><td>Additional instructions for the receiving agent</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark session fork &lt;parent-id&gt; &lt;task&gt;</h3>
+      <p>Fork a child session from a parent for parallel work. The child inherits the parent's repo and compute.</p>
+      <pre><code><span class="prompt">$</span> ark session fork s-1a2b "Write unit tests for the auth module"</code></pre>
+
+      <h3>ark session join &lt;parent-id&gt;</h3>
+      <p>Join all forked child sessions back into the parent.</p>
+      <pre><code><span class="prompt">$</span> ark session join s-1a2b
+<span class="prompt">$</span> ark session join s-1a2b --force</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-f, --force</code></td><td>Join even if some children have not completed</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark session events &lt;id&gt;</h3>
+      <p>Show the full event history for a session (dispatches, completions, messages, errors).</p>
+      <pre><code><span class="prompt">$</span> ark session events s-1a2b</code></pre>
+
+      <h3>ark session delete &lt;ids...&gt;</h3>
+      <p>Delete one or more sessions and their associated data.</p>
+      <pre><code><span class="prompt">$</span> ark session delete s-1a2b
+<span class="prompt">$</span> ark session delete s-1a2b s-3c4d s-5e6f</code></pre>
+
+      <h3>ark session group &lt;id&gt; &lt;group&gt;</h3>
+      <p>Assign a session to a group.</p>
+      <pre><code><span class="prompt">$</span> ark session group s-1a2b my-feature</code></pre>
+
+      <!-- ── ark search ───────────────────────────────────────────────────── -->
+      <h2>ark search &lt;query&gt;</h2>
+      <p>Full-text search across sessions, events, messages, and Claude Code transcripts. Uses FTS5 when the index is available; falls back to file scanning otherwise.</p>
+      <pre><code><span class="prompt">$</span> ark search "authentication bug"
+<span class="prompt">$</span> ark search "OAuth" --transcripts --limit 50
+<span class="prompt">$</span> ark search "login" --index</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-l, --limit</code></td><td><code>20</code></td><td>Maximum number of results</td></tr>
+          <tr><td><code>-t, --transcripts</code></td><td>—</td><td>Also search Claude Code JSONL transcripts</td></tr>
+          <tr><td><code>--index</code></td><td>—</td><td>Rebuild the FTS5 index before searching</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark index ───────────────────────────────────────────────────── -->
+      <h2>ark index</h2>
+      <p>Build or rebuild the FTS5 full-text search index over Claude Code transcripts in <code>~/.claude/projects/</code>.</p>
+      <pre><code><span class="prompt">$</span> ark index</code></pre>
+
+      <div class="callout info">
+        <strong>Note:</strong> The index is stored in <code>~/.ark/ark.db</code>. Run this after importing many sessions or when search results seem stale.
+      </div>
+
+      <!-- ── ark agent ───────────────────────────────────────────────────── -->
+      <h2>ark agent</h2>
+      <p>Inspect available agents.</p>
+
+      <h3>ark agent list</h3>
+      <p>List all agents with their model, tool count, and MCP server count.</p>
+      <pre><code><span class="prompt">$</span> ark agent list</code></pre>
+
+      <h3>ark agent show &lt;name&gt;</h3>
+      <p>Show full agent configuration including system prompt, tools, and environment variables.</p>
+      <pre><code><span class="prompt">$</span> ark agent show implementer</code></pre>
+
+      <!-- ── ark flow ────────────────────────────────────────────────────── -->
+      <h2>ark flow</h2>
+      <p>Inspect available flows.</p>
+
+      <h3>ark flow list</h3>
+      <p>List all flows with their stage names.</p>
+      <pre><code><span class="prompt">$</span> ark flow list</code></pre>
+
+      <h3>ark flow show &lt;name&gt;</h3>
+      <p>Show full flow definition including stage breakdown, agents, and gates.</p>
+      <pre><code><span class="prompt">$</span> ark flow show default</code></pre>
+
+      <!-- ── ark compute ─────────────────────────────────────────────────── -->
+      <h2>ark compute</h2>
+      <p>Manage compute resources (local, Docker, EC2). See <a href="compute.html">Compute Providers</a> for setup details.</p>
+
+      <h3>ark compute create &lt;name&gt;</h3>
+      <p>Create a compute resource record.</p>
+      <pre><code><span class="prompt">$</span> ark compute create my-ec2 --provider ec2 --size m --region us-east-1
+<span class="prompt">$</span> ark compute create dev-box --provider docker --image ubuntu:22.04 --devcontainer</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--provider</code></td><td>Provider: <code>local</code>, <code>ec2</code>, or <code>docker</code></td></tr>
+          <tr><td><code>--size</code></td><td>Instance size: <code>xs</code>, <code>s</code>, <code>m</code>, <code>l</code>, <code>xl</code>, <code>xxl</code>, <code>xxxl</code></td></tr>
+          <tr><td><code>--arch</code></td><td>Architecture: <code>x64</code> or <code>arm</code></td></tr>
+          <tr><td><code>--region</code></td><td>AWS region (EC2 only)</td></tr>
+          <tr><td><code>--profile</code></td><td>AWS CLI profile (EC2 only)</td></tr>
+          <tr><td><code>--image</code></td><td>Docker image name (Docker only)</td></tr>
+          <tr><td><code>--devcontainer</code></td><td>Use devcontainer configuration (Docker only)</td></tr>
+          <tr><td><code>--volume</code></td><td>Docker volume mount (Docker only)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark compute provision &lt;name&gt;</h3>
+      <p>Provision the infrastructure for a compute resource (e.g. launch an EC2 instance).</p>
+      <pre><code><span class="prompt">$</span> ark compute provision my-ec2</code></pre>
+
+      <h3>ark compute start &lt;name&gt; / ark compute stop &lt;name&gt;</h3>
+      <p>Start or stop a compute resource without destroying it.</p>
+      <pre><code><span class="prompt">$</span> ark compute start my-ec2
+<span class="prompt">$</span> ark compute stop my-ec2</code></pre>
+
+      <h3>ark compute destroy &lt;name&gt;</h3>
+      <p>Destroy the provisioned infrastructure (e.g. terminate the EC2 instance). The compute record remains in the database.</p>
+      <pre><code><span class="prompt">$</span> ark compute destroy my-ec2</code></pre>
+
+      <h3>ark compute delete &lt;name&gt;</h3>
+      <p>Delete the compute record from the database. Destroy first if still provisioned.</p>
+      <pre><code><span class="prompt">$</span> ark compute delete my-ec2</code></pre>
+
+      <h3>ark compute list</h3>
+      <p>List all compute resources with their provider, status, and size.</p>
+      <pre><code><span class="prompt">$</span> ark compute list</code></pre>
+
+      <h3>ark compute status &lt;name&gt;</h3>
+      <p>Show detailed status and live metrics for a compute resource.</p>
+      <pre><code><span class="prompt">$</span> ark compute status my-ec2</code></pre>
+
+      <h3>ark compute ssh &lt;name&gt;</h3>
+      <p>Open an SSH session into a running compute resource.</p>
+      <pre><code><span class="prompt">$</span> ark compute ssh my-ec2</code></pre>
+
+      <h3>ark compute sync &lt;name&gt;</h3>
+      <p>Sync the environment between local and remote compute.</p>
+      <pre><code><span class="prompt">$</span> ark compute sync my-ec2 --direction push
+<span class="prompt">$</span> ark compute sync my-ec2 --direction pull</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--direction</code></td><td><code>push</code> (local → remote) or <code>pull</code> (remote → local)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark compute metrics &lt;name&gt;</h3>
+      <p>Show CPU, memory, disk, and network metrics for a running compute resource.</p>
+      <pre><code><span class="prompt">$</span> ark compute metrics my-ec2</code></pre>
+
+      <h3>ark compute update &lt;name&gt;</h3>
+      <p>Update the configuration of a compute resource.</p>
+      <pre><code><span class="prompt">$</span> ark compute update my-ec2 --size l
+<span class="prompt">$</span> ark compute update my-ec2 --idle-minutes 30 --set tag=production</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--size</code></td><td>New instance size</td></tr>
+          <tr><td><code>--arch</code></td><td>New architecture</td></tr>
+          <tr><td><code>--region</code></td><td>New AWS region</td></tr>
+          <tr><td><code>--profile</code></td><td>New AWS CLI profile</td></tr>
+          <tr><td><code>--ingress</code></td><td>Ingress rule (CIDR or security group)</td></tr>
+          <tr><td><code>--idle-minutes</code></td><td>Auto-stop after N minutes of inactivity</td></tr>
+          <tr><td><code>--set key=value</code></td><td>Set an arbitrary metadata key</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark pr ──────────────────────────────────────────────────────── -->
+      <h2>ark pr</h2>
+      <p>Work with sessions bound to pull requests.</p>
+
+      <h3>ark pr list</h3>
+      <p>List all sessions that have an associated pull request.</p>
+      <pre><code><span class="prompt">$</span> ark pr list</code></pre>
+
+      <h3>ark pr status &lt;pr-url&gt;</h3>
+      <p>Show the session bound to a given pull request URL.</p>
+      <pre><code><span class="prompt">$</span> ark pr status https://github.com/org/repo/pull/42</code></pre>
+
+      <!-- ── ark schedule ─────────────────────────────────────────────────── -->
+      <h2>ark schedule</h2>
+      <p>Create and manage recurring sessions driven by a cron expression.</p>
+
+      <h3>ark schedule add</h3>
+      <p>Create a new recurring session schedule.</p>
+      <pre><code><span class="prompt">$</span> ark schedule add --cron "0 9 * * 1-5" --repo . --summary "Daily standup sync" --flow bare</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--cron</code></td><td><strong>Required.</strong> Cron expression (e.g. <code>"0 9 * * 1-5"</code>)</td></tr>
+          <tr><td><code>-f, --flow</code></td><td>Flow name</td></tr>
+          <tr><td><code>-r, --repo</code></td><td>Repository path</td></tr>
+          <tr><td><code>-s, --summary</code></td><td>Task summary for each spawned session</td></tr>
+          <tr><td><code>-c, --compute</code></td><td>Compute target name</td></tr>
+          <tr><td><code>-g, --group</code></td><td>Group for spawned sessions</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark schedule list</h3>
+      <p>List all schedules with their cron expression and enabled state.</p>
+      <pre><code><span class="prompt">$</span> ark schedule list</code></pre>
+
+      <h3>ark schedule delete &lt;id&gt;</h3>
+      <p>Delete a schedule.</p>
+      <pre><code><span class="prompt">$</span> ark schedule delete sch-1a2b</code></pre>
+
+      <h3>ark schedule enable &lt;id&gt; / ark schedule disable &lt;id&gt;</h3>
+      <p>Enable or disable a schedule without deleting it.</p>
+      <pre><code><span class="prompt">$</span> ark schedule enable sch-1a2b
+<span class="prompt">$</span> ark schedule disable sch-1a2b</code></pre>
+
+      <!-- ── ark claude ───────────────────────────────────────────────────── -->
+      <h2>ark claude</h2>
+      <p>Inspect Claude Code sessions stored on disk at <code>~/.claude/projects/</code>.</p>
+
+      <h3>ark claude list</h3>
+      <p>List Claude Code sessions discovered on disk.</p>
+      <pre><code><span class="prompt">$</span> ark claude list
+<span class="prompt">$</span> ark claude list --project my-repo --limit 50</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-p, --project</code></td><td>Filter by project name</td></tr>
+          <tr><td><code>-l, --limit</code></td><td>Maximum number of results to show</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark conductor ───────────────────────────────────────────────── -->
+      <h2>ark conductor</h2>
+      <p>Start the conductor HTTP server. The TUI runs the conductor automatically; use this command when running the conductor as a standalone process.</p>
+      <pre><code><span class="prompt">$</span> ark conductor
+<span class="prompt">$</span> ark conductor --port 19200</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-p, --port</code></td><td><code>19100</code></td><td>Port for the conductor HTTP server</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout info">
+        <strong>Note:</strong> The conductor port is used by agent hooks and MCP channels to report status back to Ark. All sessions on the same machine must point to the same conductor port.
+      </div>
+
+      <div class="doc-footer">
+        <a href="tui.html">&larr; TUI Guide</a>
+        <a href="configuration.html">Configuration &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

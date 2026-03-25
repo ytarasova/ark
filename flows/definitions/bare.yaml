@@ -1,0 +1,6 @@
+name: bare
+description: "Single agent session — no flow stages, just work"
+stages:
+  - name: work
+    agent: worker
+    gate: auto

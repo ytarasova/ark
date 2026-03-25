@@ -1,0 +1,19 @@
+name: worker
+description: "General-purpose agent — no assumptions, no special prompt"
+model: opus
+max_turns: 200
+system_prompt: ""
+tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
+  - WebSearch
+mcp_servers: []
+skills: []
+memories: []
+context: []
+permission_mode: bypassPermissions
+env: {}

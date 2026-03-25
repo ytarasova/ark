@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compute Providers - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Compute Providers</h1>
+      <p class="subtitle">Run agents on local tmux, Docker containers, or EC2 instances.</p>
+
+      <h2>Overview</h2>
+      <p>Ark supports three compute providers. Each provider handles how agent sessions are launched, monitored, and cleaned up. The <code>local</code> provider is always available; Docker and EC2 require additional setup.</p>
+      <p>Providers declare their own <strong>isolation modes</strong>:</p>
+      <ul>
+        <li><strong>Local</strong>: worktree (git worktree per session) or inplace (use repo directly)</li>
+        <li><strong>EC2</strong>: inplace (remote workspace)</li>
+        <li><strong>Docker</strong>: container (isolated container per session)</li>
+      </ul>
+
+      <h2>Local Provider</h2>
+      <p>The default. Agents run in local tmux sessions. No setup required beyond having tmux installed.</p>
+      <p>Auto-created on first boot. Sessions launch as <code>ark-s-&lt;id&gt;</code> tmux sessions.</p>
+      <pre><code>ark compute list
+# Shows: local  local  running</code></pre>
+
+      <h3>Isolation</h3>
+      <ul>
+        <li><strong>Worktree</strong> (default): creates a git worktree at <code>~/.ark/worktrees/&lt;session-id&gt;/</code> so the agent works on an isolated copy</li>
+        <li><strong>Inplace</strong>: agent works directly in the repo directory (faster, but no isolation)</li>
+      </ul>
+
+      <h2>Docker Provider</h2>
+      <p>Run agents in Docker containers. Each session gets its own container.</p>
+
+      <h3>Setup</h3>
+      <pre><code>ark compute create my-docker --provider docker --image ubuntu:22.04
+ark compute provision my-docker</code></pre>
+      <p>Options:</p>
+      <ul>
+        <li><code>--image</code>: Docker image (default: ubuntu:22.04)</li>
+        <li><code>--devcontainer</code>: use the repo's devcontainer.json</li>
+        <li><code>--volume</code>: extra volume mounts (repeatable)</li>
+      </ul>
+
+      <h3>How it works</h3>
+      <ol>
+        <li>Container is created from the specified image</li>
+        <li>Your repo is mounted into the container</li>
+        <li>Bun and Claude Code are installed inside the container</li>
+        <li>Agent launches in a tmux session inside the container</li>
+      </ol>
+
+      <h2>EC2 Provider</h2>
+      <p>Run agents on AWS EC2 instances. Good for heavy workloads or when you need isolation from your dev machine.</p>
+
+      <h3>Setup</h3>
+      <pre><code>ark compute create dev-box --provider ec2 --size m --arch x64 --region us-east-1
+ark compute provision dev-box</code></pre>
+
+      <div class="callout warn">
+        <p>EC2 instances incur AWS charges while running. Use <code>--idle-minutes</code> to enable auto-shutdown, and always run <code>ark compute stop</code> when work is done.</p>
+      </div>
+
+      <h3>Instance Sizes</h3>
+      <table>
+        <thead>
+          <tr><th>Size</th><th>vCPU</th><th>RAM</th><th>Label</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>xs</code></td><td>2</td><td>8 GB</td><td>Extra Small</td></tr>
+          <tr><td><code>s</code></td><td>4</td><td>16 GB</td><td>Small</td></tr>
+          <tr><td><code>m</code></td><td>8</td><td>32 GB</td><td>Medium</td></tr>
+          <tr><td><code>l</code></td><td>16</td><td>64 GB</td><td>Large</td></tr>
+          <tr><td><code>xl</code></td><td>32</td><td>128 GB</td><td>Extra Large</td></tr>
+          <tr><td><code>xxl</code></td><td>48</td><td>192 GB</td><td>2X Large</td></tr>
+          <tr><td><code>xxxl</code></td><td>64</td><td>256 GB</td><td>3X Large</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Configuration</h3>
+      <pre><code>ark compute update dev-box --ingress "1.2.3.4/32" --idle-minutes 30</code></pre>
+      <p>Options:</p>
+      <ul>
+        <li><code>--size</code>: instance size</li>
+        <li><code>--arch</code>: x64 or arm</li>
+        <li><code>--region</code>: AWS region</li>
+        <li><code>--profile</code>: AWS CLI profile</li>
+        <li><code>--subnet-id</code>: VPC subnet</li>
+        <li><code>--ingress</code>: SSH CIDR (or <code>"open"</code> for 0.0.0.0/0)</li>
+        <li><code>--idle-minutes</code>: auto-shutdown after idle</li>
+      </ul>
+
+      <h3>Operations</h3>
+      <pre><code>ark compute start dev-box     # start a stopped instance
+ark compute stop dev-box      # stop (preserves data)
+ark compute destroy dev-box   # terminate instance
+ark compute ssh dev-box       # SSH into the instance
+ark compute sync dev-box      # sync environment (push/pull)
+ark compute metrics dev-box   # show CPU, memory, disk, network</code></pre>
+
+      <h2>Monitoring</h2>
+      <p>The TUI Compute tab (press <kbd>6</kbd>) shows real-time metrics for running computes:</p>
+      <ul>
+        <li>CPU, memory, disk usage</li>
+        <li>Network I/O</li>
+        <li>Running sessions</li>
+        <li>Active processes</li>
+      </ul>
+      <p>Metrics are polled every ~9 seconds.</p>
+
+      <h2>Dispatching to Remote Compute</h2>
+      <p>When creating a session, specify the compute target:</p>
+      <pre><code>ark session start --repo . --summary "Deploy" --compute dev-box</code></pre>
+      <p>Or select it in the TUI's New Session form.</p>
+      <p>The agent will be launched on the remote compute. Attach via <kbd>a</kbd> in the TUI to get a remote tmux session.</p>
+
+      <div class="doc-footer">
+        <a href="configuration.html">&larr; Configuration</a>
+        <a href="./">Home &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

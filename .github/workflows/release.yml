@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: bun-darwin-arm64
+            name: darwin-arm64
+          - target: bun-darwin-x64
+            name: darwin-x64
+          - target: bun-linux-arm64
+            name: linux-arm64
+          - target: bun-linux-x64
+            name: linux-x64
+
+    runs-on: macos-latest
+    name: build (${{ matrix.name }})
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build binary
+        run: |
+          bun build --compile --target ${{ matrix.target }} \
+            --external react-devtools-core \
+            packages/cli/index.ts --outfile ark-${{ matrix.name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-${{ matrix.name }}
+          path: ark-${{ matrix.name }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p dist
+          for d in artifacts/ark-*/; do
+            cp "$d"* dist/
+          done
+          chmod +x dist/ark-*
+          ls -lh dist/
+
+      - name: Determine release type
+        id: release-type
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create tagged release
+        if: steps.release-type.outputs.is_tag == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "${{ steps.release-type.outputs.tag }}" \
+            --title "${{ steps.release-type.outputs.tag }}" \
+            --generate-notes \
+            dist/ark-*
+
+      - name: Update latest release
+        if: steps.release-type.outputs.is_tag == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest \
+            --title "Latest (rolling)" \
+            --notes "Rolling release from main. Updated on every push.
+
+          Install: \`curl -fsSL https://ytarasova.github.io/ark/install.sh | bash\`
+
+          Commit: ${{ github.sha }}" \
+            --prerelease \
+            --target ${{ github.sha }} \
+            dist/ark-*

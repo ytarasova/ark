@@ -1,0 +1,13 @@
+name: new-feature
+description: "Implement a new feature"
+parameters:
+  - name: ticket
+    type: string
+    required: true
+  - name: repo
+    type: string
+    required: true
+flow: default
+agent_overrides: {}
+config:
+  auto_merge: false

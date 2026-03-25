@@ -1,0 +1,188 @@
+/**
+ * Tests for tiered autonomy — full/execute/edit/read-only per flow stage.
+ *
+ * Covers: buildArgs permission gating, writeHooksConfig permission deny rules,
+ * flow YAML loading with autonomy field, and resolveFlow preservation.
+ */
+
+import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from "fs";
+import { join } from "path";
+import YAML from "yaml";
+import {
+  createTestContext, setContext, resetContext,
+  type TestContext,
+} from "../context.js";
+import { buildArgs, writeHooksConfig } from "../claude.js";
+import { loadFlow, resolveFlow } from "../flow.js";
+import { ARK_DIR } from "../store.js";
+
+let ctx: TestContext;
+
+const flowDir = () => join(ARK_DIR(), "flows");
+
+function writeUserFlow(name: string, def: Record<string, unknown>): void {
+  const dir = flowDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(def));
+}
+
+beforeEach(() => {
+  if (ctx) ctx.cleanup();
+  ctx = createTestContext();
+  setContext(ctx);
+  rmSync(flowDir(), { recursive: true, force: true });
+});
+
+afterAll(() => {
+  rmSync(flowDir(), { recursive: true, force: true });
+  if (ctx) ctx.cleanup();
+  resetContext();
+});
+
+// ── buildArgs autonomy ───────────────────────────────────────────────────────
+
+describe("buildArgs autonomy", () => {
+  it("no autonomy (default) includes --dangerously-skip-permissions", () => {
+    const args = buildArgs({});
+    expect(args).toContain("--dangerously-skip-permissions");
+  });
+
+  it("autonomy 'full' includes --dangerously-skip-permissions", () => {
+    const args = buildArgs({ autonomy: "full" });
+    expect(args).toContain("--dangerously-skip-permissions");
+  });
+
+  it("autonomy 'execute' includes --dangerously-skip-permissions", () => {
+    const args = buildArgs({ autonomy: "execute" });
+    expect(args).toContain("--dangerously-skip-permissions");
+  });
+
+  it("autonomy 'edit' does NOT include --dangerously-skip-permissions", () => {
+    const args = buildArgs({ autonomy: "edit" });
+    expect(args).not.toContain("--dangerously-skip-permissions");
+  });
+
+  it("autonomy 'read-only' does NOT include --dangerously-skip-permissions", () => {
+    const args = buildArgs({ autonomy: "read-only" });
+    expect(args).not.toContain("--dangerously-skip-permissions");
+  });
+
+  it("autonomy 'edit' in headless mode also omits --dangerously-skip-permissions", () => {
+    const args = buildArgs({ autonomy: "edit", headless: true, task: "test task" });
+    expect(args).not.toContain("--dangerously-skip-permissions");
+    expect(args).toContain("-p");
+    expect(args).toContain("--verbose");
+  });
+
+  it("autonomy 'read-only' in headless mode also omits --dangerously-skip-permissions", () => {
+    const args = buildArgs({ autonomy: "read-only", headless: true, task: "test task" });
+    expect(args).not.toContain("--dangerously-skip-permissions");
+  });
+
+  it("autonomy 'full' in headless mode includes --dangerously-skip-permissions", () => {
+    const args = buildArgs({ autonomy: "full", headless: true, task: "test task" });
+    expect(args).toContain("--dangerously-skip-permissions");
+  });
+});
+
+// ── writeHooksConfig autonomy ────────────────────────────────────────────────
+
+describe("writeHooksConfig autonomy", () => {
+  it("autonomy 'edit' adds permissions.deny: ['Bash']", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", ctx.arkDir, { autonomy: "edit" });
+    const settings = JSON.parse(readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions).toBeDefined();
+    expect(settings.permissions.deny).toEqual(["Bash"]);
+  });
+
+  it("autonomy 'read-only' adds permissions.deny: ['Bash', 'Write', 'Edit']", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", ctx.arkDir, { autonomy: "read-only" });
+    const settings = JSON.parse(readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions).toBeDefined();
+    expect(settings.permissions.deny).toEqual(["Bash", "Write", "Edit"]);
+  });
+
+  it("autonomy 'full' does NOT add permissions.deny", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", ctx.arkDir, { autonomy: "full" });
+    const settings = JSON.parse(readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions).toBeUndefined();
+  });
+
+  it("no autonomy does NOT add permissions.deny", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", ctx.arkDir);
+    const settings = JSON.parse(readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions).toBeUndefined();
+  });
+
+  it("autonomy 'execute' does NOT add permissions.deny", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", ctx.arkDir, { autonomy: "execute" });
+    const settings = JSON.parse(readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions).toBeUndefined();
+  });
+
+  it("autonomy 'edit' preserves existing settings alongside deny rules", () => {
+    const claudeDir = join(ctx.arkDir, ".claude");
+    mkdirSync(claudeDir, { recursive: true });
+    writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
+      permissions: { allow: ["Read"] },
+    }));
+
+    writeHooksConfig("s-test", "http://localhost:19100", ctx.arkDir, { autonomy: "edit" });
+    const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
+    expect(settings.permissions.allow).toEqual(["Read"]);
+    expect(settings.permissions.deny).toEqual(["Bash"]);
+    expect(settings.hooks).toBeDefined();
+  });
+});
+
+// ── Flow YAML with autonomy ──────────────────────────────────────────────────
+
+describe("flow autonomy field", () => {
+  it("loads flow YAML with autonomy 'read-only' on a stage", () => {
+    writeUserFlow("autonomy-flow", {
+      name: "autonomy-flow",
+      stages: [
+        { name: "review", agent: "reviewer", gate: "auto", autonomy: "read-only" },
+        { name: "implement", agent: "worker", gate: "auto", autonomy: "full" },
+      ],
+    });
+
+    const flow = loadFlow("autonomy-flow");
+    expect(flow).not.toBeNull();
+    expect(flow!.stages[0].autonomy).toBe("read-only");
+    expect(flow!.stages[1].autonomy).toBe("full");
+  });
+
+  it("autonomy field is undefined when not set in YAML", () => {
+    writeUserFlow("no-autonomy-flow", {
+      name: "no-autonomy-flow",
+      stages: [
+        { name: "work", agent: "worker", gate: "auto" },
+      ],
+    });
+
+    const flow = loadFlow("no-autonomy-flow");
+    expect(flow).not.toBeNull();
+    expect(flow!.stages[0].autonomy).toBeUndefined();
+  });
+
+  it("resolveFlow preserves autonomy field after variable substitution", () => {
+    writeUserFlow("resolve-autonomy", {
+      name: "resolve-autonomy",
+      stages: [
+        { name: "plan", agent: "planner", gate: "auto", autonomy: "edit", task: "Plan {ticket}" },
+        { name: "impl", agent: "worker", gate: "auto", autonomy: "execute", task: "Build {ticket}" },
+        { name: "review", agent: "reviewer", gate: "auto", autonomy: "read-only" },
+      ],
+    });
+
+    const flow = resolveFlow("resolve-autonomy", { ticket: "PROJ-1" });
+    expect(flow).not.toBeNull();
+    expect(flow!.stages[0].autonomy).toBe("edit");
+    expect(flow!.stages[0].task).toBe("Plan PROJ-1");
+    expect(flow!.stages[1].autonomy).toBe("execute");
+    expect(flow!.stages[1].task).toBe("Build PROJ-1");
+    expect(flow!.stages[2].autonomy).toBe("read-only");
+  });
+});

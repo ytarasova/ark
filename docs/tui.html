@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TUI Guide - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>TUI Dashboard</h1>
+      <p class="subtitle">Keyboard-driven terminal interface for managing agents.</p>
+
+      <h2>Layout</h2>
+      <p>The TUI has 6 tabs accessible via number keys <kbd>1</kbd>&ndash;<kbd>6</kbd>:</p>
+      <ol>
+        <li><strong>Sessions</strong> &mdash; manage agent sessions</li>
+        <li><strong>Agents</strong> &mdash; view agent definitions</li>
+        <li><strong>Tools</strong> &mdash; (coming soon)</li>
+        <li><strong>Flows</strong> &mdash; view flow definitions</li>
+        <li><strong>History</strong> &mdash; browse and import Claude Code sessions</li>
+        <li><strong>Compute</strong> &mdash; manage compute resources</li>
+      </ol>
+      <p>Each tab has a split pane: left (list) and right (detail). Press <kbd>Tab</kbd> to switch focus between panes.</p>
+
+      <h2>Global Shortcuts</h2>
+      <p>These shortcuts work from any tab.</p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>1</kbd>&ndash;<kbd>6</kbd></td><td>Switch to tab</td></tr>
+          <tr><td><kbd>Tab</kbd></td><td>Toggle pane focus (list / detail)</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Back to list pane</td></tr>
+          <tr><td><kbd>e</kbd></td><td>Toggle event log</td></tr>
+          <tr><td><kbd>q</kbd></td><td>Quit</td></tr>
+          <tr><td><kbd>p</kbd></td><td>Screenshot / copy</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Navigation</h2>
+      <p>These keys work in all list panes.</p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>Move down / up</td></tr>
+          <tr><td><kbd>f</kbd> / <kbd>b</kbd></td><td>Page down / page up</td></tr>
+          <tr><td><kbd>g</kbd></td><td>Jump to top</td></tr>
+          <tr><td><kbd>G</kbd></td><td>Jump to bottom</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Sessions Tab (1)</h2>
+      <p>This is the main tab. The left pane shows sessions grouped by group name. The right pane shows session details, token usage, channel status, conversation history, live agent output, and events.</p>
+
+      <h3>Session Actions</h3>
+      <p>Available actions depend on the current session status.</p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>n</kbd></td><td>New session</td><td>Any</td></tr>
+          <tr><td><kbd>i</kbd></td><td>Threads / inbox</td><td>Any</td></tr>
+          <tr><td><kbd>o</kbd></td><td>Groups</td><td>Any</td></tr>
+          <tr><td><kbd>c</kbd></td><td>Clone session</td><td>Any</td></tr>
+          <tr><td><kbd>m</kbd></td><td>Move to group</td><td>Any</td></tr>
+          <tr><td><kbd>x</kbd></td><td>Delete session</td><td>Any</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Dispatch session</td><td>Ready / Blocked</td></tr>
+          <tr><td><kbd>a</kbd></td><td>Attach to tmux</td><td>Running</td></tr>
+          <tr><td><kbd>t</kbd></td><td>Talk / send message</td><td>Running</td></tr>
+          <tr><td><kbd>s</kbd></td><td>Stop session</td><td>Running</td></tr>
+          <tr><td><kbd>d</kbd></td><td>Mark done (press twice)</td><td>Running</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Restart session</td><td>Stopped / Failed / Completed</td></tr>
+          <tr><td><kbd>S</kbd></td><td>Stop group</td><td>Group</td></tr>
+          <tr><td><kbd>R</kbd></td><td>Resume group</td><td>Group</td></tr>
+          <tr><td><kbd>X</kbd></td><td>Delete group</td><td>Group</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Detail Pane</h3>
+      <p>The detail pane shows session metadata, token usage, channel status, and a live view of agent output. Press <kbd>/</kbd> to search within the conversation history. Use the scroll box to navigate long content.</p>
+
+      <h2>History Tab (5)</h2>
+      <p>Shows both Ark sessions and native Claude Code sessions from <code>~/.claude/projects/</code>.</p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>Enter</kbd></td><td>Import a Claude session into Ark</td></tr>
+          <tr><td><kbd>s</kbd></td><td>Search across all transcripts</td></tr>
+          <tr><td><kbd>R</kbd></td><td>Full rebuild of session cache and search index</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Compute Tab (6)</h2>
+      <p>Manage local, Docker, and EC2 compute resources.</p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>Enter</kbd></td><td>Provision a compute resource</td></tr>
+          <tr><td><kbd>n</kbd></td><td>Create new compute</td></tr>
+          <tr><td><kbd>s</kbd></td><td>Start / stop</td></tr>
+          <tr><td><kbd>a</kbd></td><td>SSH into running compute</td></tr>
+          <tr><td><kbd>x</kbd></td><td>Delete (with confirmation)</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Status Bar</h2>
+      <p>The status bar at the bottom is the single source of truth for available actions. It shows context-sensitive shortcuts that update based on the active tab, pane, and overlay state. When a form or overlay is open, the status bar switches to show form controls (<kbd>Enter</kbd> confirm, <kbd>Esc</kbd> cancel) instead of tab shortcuts.</p>
+
+      <h2>Tips</h2>
+      <div class="callout tip">
+        <p>All I/O operations are async &mdash; the UI never freezes. A spinner in the status bar indicates background activity.</p>
+      </div>
+      <div class="callout tip">
+        <p>Sessions display live tmux output in the detail pane. Press <kbd>a</kbd> to attach directly to the tmux session for full terminal access.</p>
+      </div>
+      <div class="callout tip">
+        <p>Unread message counts appear as badges next to session names in the list pane. Press <kbd>i</kbd> to open the inbox and reply.</p>
+      </div>
+      <div class="callout tip">
+        <p>The detail pane uses a scroll box for long content. Switch focus with <kbd>Tab</kbd>, then use <kbd>j</kbd>/<kbd>k</kbd> to scroll.</p>
+      </div>
+
+      <div class="doc-footer">
+        <a href="concepts.html">&larr; Core Concepts</a>
+        <a href="cli.html">CLI Reference &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

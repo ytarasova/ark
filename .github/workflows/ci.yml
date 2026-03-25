@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install tmux
+        run: brew install tmux
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Unit tests (excludes E2E)
+        run: |
+          bun test --timeout 30000 \
+            $(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | sort)
+
+  # Build binaries for all 4 platforms
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: bun-darwin-arm64
+            name: darwin-arm64
+          - target: bun-darwin-x64
+            name: darwin-x64
+          - target: bun-linux-arm64
+            name: linux-arm64
+          - target: bun-linux-x64
+            name: linux-x64
+
+    runs-on: macos-latest
+    name: build (${{ matrix.name }})
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build binary
+        run: |
+          bun build --compile --target ${{ matrix.target }} \
+            --external react-devtools-core \
+            packages/cli/index.ts --outfile ark-${{ matrix.name }}
+
+      - name: Verify binary exists
+        run: ls -lh ark-${{ matrix.name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-${{ matrix.name }}
+          path: ark-${{ matrix.name }}
