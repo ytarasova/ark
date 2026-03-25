@@ -89,54 +89,22 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
   );
   const selectedItem = mode === "recent" ? historyItems[sel] ?? null : null;
 
-  // Load conversation preview for selected Claude session
+  // Load conversation preview from FTS5 index (fast SQLite read, no file I/O)
   const [conversationPreview, setConversationPreview] = useState<string[]>([]);
   useEffect(() => {
-    if (!selectedItem?.claudeSession?.transcriptPath) {
+    if (!selectedItem) {
       setConversationPreview([]);
       return;
     }
-    // Load last few messages — read only tail of file (not entire 100MB)
-    asyncState.run("Loading preview...", async () => {
-      await new Promise(r => setTimeout(r, 0));
-      const { existsSync, statSync: fstat, openSync, readSync, closeSync } = await import("fs");
-      const path = selectedItem.claudeSession!.transcriptPath;
-      if (!existsSync(path)) { setConversationPreview([]); return; }
-      try {
-        const stat = fstat(path);
-        // Read last 64KB — enough for ~500 recent lines
-        const tailSize = Math.min(65536, stat.size);
-        const fd = openSync(path, "r");
-        const buf = Buffer.alloc(tailSize);
-        readSync(fd, buf, 0, tailSize, Math.max(0, stat.size - tailSize));
-        closeSync(fd);
-
-        const lines = buf.toString("utf-8").split("\n").filter(l => l.trim());
-        const msgs: string[] = [];
-        for (const line of lines) {
-          try {
-            const entry = JSON.parse(line);
-            if (entry.type !== "user" && entry.type !== "assistant") continue;
-            const msg = entry.message;
-            // Skip tool_result entries (user messages that are just tool output)
-            if (Array.isArray(msg?.content) && msg.content.some((c: any) => c.type === "tool_result")) continue;
-            // Skip tool_use entries (assistant messages that are just tool calls)
-            if (Array.isArray(msg?.content) && msg.content.every((c: any) => c.type === "tool_use")) continue;
-            let text = "";
-            if (typeof msg?.content === "string") text = msg.content;
-            else if (Array.isArray(msg?.content)) {
-              text = msg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ");
-            }
-            text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-            if (text.length < 10) continue;
-            if (text.startsWith("Caveat:") || text.startsWith("<") || text.startsWith("task-notification")) continue;
-            const role = entry.type === "user" ? "You" : "Claude";
-            msgs.push(`${role}: ${text}`);
-          } catch {}
-        }
-        setConversationPreview(msgs.slice(-15));
-      } catch { setConversationPreview([]); }
-    });
+    // Use claude session ID for Claude sessions, ark session ID for ark sessions
+    const convId = selectedItem.claudeSession?.sessionId || selectedItem.arkSession?.claude_session_id || selectedItem.id;
+    try {
+      const turns = core.getSessionConversation(convId, { limit: 20 });
+      setConversationPreview(turns.map(t => {
+        const role = t.role === "user" ? "You" : "Claude";
+        return `${role}: ${t.content}`;
+      }));
+    } catch { setConversationPreview([]); }
   }, [selectedItem?.id]);
 
   // Load from cache (instant), then always refresh in background
