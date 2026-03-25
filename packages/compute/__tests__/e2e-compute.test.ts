@@ -6,7 +6,7 @@
  * and sessionChannelPort.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -30,6 +30,21 @@ import {
   EC2Provider,
   DockerProvider,
 } from "../index.js";
+
+import { AppContext, setApp, clearApp } from "../../core/app.js";
+
+let app: AppContext;
+
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+
+afterAll(async () => {
+  if (app) await app.shutdown();
+  clearApp();
+});
 
 // Ensure providers are registered (may be cleared by provider-registry.test.ts)
 function ensureProviders() {
