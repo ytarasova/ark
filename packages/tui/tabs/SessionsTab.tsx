@@ -39,12 +39,15 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const [inboxMode, setInboxMode] = useState(false);
   const [cloneMode, setCloneMode] = useState(false);
   const [confirmComplete, setConfirmComplete] = useState(false);
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<core.SearchResult[] | null>(null);
   const status = useStatusMessage();
 
   // Top-level sessions only (exclude fork children from list)
   const topLevel = useMemo(() => sessions.filter((s) => !s.parent_id), [sessions]);
 
-  const hasOverlay = formOverlay || moveMode || groupMode || talkMode || inboxMode || cloneMode;
+  const hasOverlay = formOverlay || moveMode || groupMode || talkMode || inboxMode || cloneMode || searchMode;
   const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !hasOverlay });
 
   // Signal parent when an overlay with text input is active
@@ -54,9 +57,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
   // Signal parent which overlay is active (for status bar hints)
   useEffect(() => {
-    const ov = moveMode ? "move" : talkMode ? "talk" : groupMode ? "group" : inboxMode ? "inbox" : cloneMode ? "clone" : null;
+    const ov = moveMode ? "move" : talkMode ? "talk" : groupMode ? "group" : inboxMode ? "inbox" : cloneMode ? "clone" : searchMode ? "search" : null;
     onOverlayChange?.(ov);
-  }, [moveMode, talkMode, groupMode, inboxMode, cloneMode]);
+  }, [moveMode, talkMode, groupMode, inboxMode, cloneMode, searchMode]);
 
   const selected = topLevel[sel] ?? null;
 
@@ -291,7 +294,25 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               }}
             />
           )
-          : <SessionDetail session={selected} sessions={sessions} pane={pane} />
+          : <SessionDetail
+              session={selected}
+              sessions={sessions}
+              pane={pane}
+              searchMode={searchMode}
+              searchQuery={searchQuery}
+              searchResults={searchResults}
+              onSearchToggle={(on) => {
+                setSearchMode(on);
+                if (!on) { setSearchQuery(""); setSearchResults(null); }
+              }}
+              onSearchQueryChange={setSearchQuery}
+              onSearchSubmit={(q) => {
+                if (!selected || !q.trim()) return;
+                const convId = selected.claude_session_id || selected.id;
+                const results = core.searchSessionConversation(convId, q.trim());
+                setSearchResults(results);
+              }}
+            />
         }
       />
       {status.message && (
@@ -309,9 +330,15 @@ interface SessionDetailProps {
   session: core.Session | null;
   sessions: core.Session[];
   pane: "left" | "right";
+  searchMode: boolean;
+  searchQuery: string;
+  searchResults: core.SearchResult[] | null;
+  onSearchToggle: (on: boolean) => void;
+  onSearchQueryChange: (q: string) => void;
+  onSearchSubmit: (q: string) => void;
 }
 
-function SessionDetail({ session: s, pane }: SessionDetailProps) {
+function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResults, onSearchToggle, onSearchQueryChange, onSearchSubmit }: SessionDetailProps) {
   const [events, setEvents] = useState<core.Event[]>([]);
   const [conversation, setConversation] = useState<{ role: string; content: string; timestamp: string }[]>([]);
 
@@ -337,6 +364,16 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
 
   const channelPort = useMemo(() => s ? core.sessionChannelPort(s.id) : 0, [s?.id]);
 
+  // Search mode: / to enter, Esc to exit
+  useInput((input, key) => {
+    if (pane !== "right") return;
+    if (searchMode) {
+      if (key.escape) onSearchToggle(false);
+      return;
+    }
+    if (input === "/") onSearchToggle(true);
+  });
+
   // Hooks must be called unconditionally (before any early return)
   const agentOutput = useAgentOutput(
     s?.id ?? null,
@@ -351,6 +388,20 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
 
   return (
     <DetailPanel active={pane === "right"}>
+      {/* Search bar */}
+      {searchMode && (
+        <Box marginBottom={1}>
+          <Text color="cyan">{" / "}</Text>
+          <TextInputEnhanced
+            value={searchQuery}
+            onChange={onSearchQueryChange}
+            onSubmit={(q: string) => onSearchSubmit(q)}
+            focus={true}
+            placeholder="Search conversation..."
+          />
+        </Box>
+      )}
+
       {/* Info */}
       <SectionHeader title="Info" />
       <KeyValue label="Session">{`${s.id}  ${s.summary ?? ""}`}</KeyValue>
@@ -390,8 +441,22 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
         </Text>
       )}
 
-      {/* Conversation history (from FTS5) */}
-      {conversation.length > 0 && (
+      {/* Conversation history or search results */}
+      {searchMode && searchResults !== null ? (
+        <>
+          <Text> </Text>
+          <SectionHeader title={`Search Results (${searchResults.length})`} />
+          {searchResults.length === 0 && (
+            <Text dimColor>{"  No matches found."}</Text>
+          )}
+          {searchResults.map((r, i) => (
+            <Text key={i} wrap="wrap">
+              {"  "}<Text dimColor>{r.timestamp?.slice(0, 16) ?? ""}</Text>
+              <Text>{` ${r.match}`}</Text>
+            </Text>
+          ))}
+        </>
+      ) : conversation.length > 0 ? (
         <>
           <Text> </Text>
           <SectionHeader title="Conversation" />
@@ -407,7 +472,7 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
             );
           })}
         </>
-      )}
+      ) : null}
 
       {/* Agent output (live tmux capture) */}
       {agentOutput.trim() ? (

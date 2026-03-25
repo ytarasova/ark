@@ -60,13 +60,17 @@ function getOverlayHints(overlay: string): React.ReactNode[] {
   }
 }
 
-function getRightPaneHints(): React.ReactNode[] {
-  return [
+function getRightPaneHints(tab?: Tab): React.ReactNode[] {
+  const hints: React.ReactNode[] = [
     <KeyHint key="jk" k="j/k" label="scroll" />,
     <KeyHint key="fb" k="f/b" label="page" />,
     <KeyHint key="gG" k="g/G" label="top/end" />,
-    <KeyHint key="tab" k="Tab" label="back" />,
   ];
+  if (tab === "sessions") {
+    hints.push(<KeyHint key="/" k="/" label="search" />);
+  }
+  hints.push(<KeyHint key="tab" k="Tab" label="back" />);
+  return hints;
 }
 
 /** Navigation hints shared by all left panes */
@@ -154,7 +158,7 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
   const nErr = sessions.filter((s) => s.status === "failed").length;
 
   const hints = overlay ? getOverlayHints(overlay)
-    : pane === "right" ? getRightPaneHints()
+    : pane === "right" ? getRightPaneHints(tab)
     : tab === "sessions" ? getSessionHints(selectedSession)
     : tab === "compute" ? getComputeHints()
     : tab === "history" ? getHistoryHints()
