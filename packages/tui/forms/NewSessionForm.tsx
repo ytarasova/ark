@@ -80,10 +80,12 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
     [store.computes],
   );
 
-  const flowChoices = useMemo(() =>
-    store.flows.map(f => ({ label: f.name, value: f.name })),
-    [store.flows],
-  );
+  const flowChoices = useMemo(() => {
+    const fromStore = store.flows.map(f => ({ label: f.name, value: f.name }));
+    // Always include "bare" as a fallback even if flows aren't loaded
+    if (fromStore.length === 0) return [{ label: "bare", value: "bare" }];
+    return fromStore;
+  }, [store.flows]);
 
   const groupChoices = useMemo(() => {
     const existing = core.getGroups();
