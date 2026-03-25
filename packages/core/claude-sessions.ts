@@ -34,10 +34,12 @@ function decodeProjectDir(dirName: string): string {
 /** Junk prefixes in user messages that aren't real prompts */
 const JUNK_PREFIXES = [
   "Caveat:", "<local-command", "<command-", "<system-reminder", "<channel",
-  "Session s-", "Work on s-", "/effort", "/remote-control",
+  "Session s-", "Work on s-", "/effort", "/remote-control", "/resume", "/clear",
   "You are the worker agent", "You are the implementer agent",
   "You are the planner agent", "You are the reviewer agent",
-  "[Request interrupted",
+  "You are a healing agent",
+  "[Request interrupted", "Listening for channel", '"""',
+  "Base directory for this skill",
 ];
 
 function isRealUserMessage(text: string): boolean {
@@ -193,7 +195,7 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string }): P
 
       const meta = parseTranscriptMeta(filePath);
       if (!meta) continue;
-      if (meta.messageCount < 2) continue;
+      if (meta.messageCount < 5) continue;
 
       insert.run(
         meta.sessionId, decodedProject, projectDir, filePath,
