@@ -21,11 +21,10 @@ export interface StoreData {
   refresh: () => void;
 }
 
-/** Track pane snapshots for diff-based idle detection. */
-const paneSnapshots = new Map<string, { text: string; time: number }>();
-
 /**
  * Reconcile DB sessions with tmux reality.
+ * Only checks for dead tmux sessions — status detection is handled by hooks
+ * (SessionStart→running, Stop→ready, StopFailure→failed, Notification→waiting).
  */
 async function reconcileSessions(sessions: core.Session[]): Promise<void> {
   for (const s of sessions) {
@@ -33,46 +32,16 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
     const exists = await core.sessionExistsAsync(s.session_id);
 
     if (!exists) {
-      let lastOutput = "";
-      try {
-        lastOutput = (await core.capturePaneAsync(s.session_id, { lines: 30 })).trim();
-      } catch {}
-
-      const error = lastOutput
-        ? `Agent exited. Last output: ${lastOutput.split("\n").pop()?.slice(0, 100) ?? "unknown"}`
-        : "Agent process exited";
-
-      core.updateSession(s.id, { status: "failed", error, session_id: null });
+      // Tmux session is gone — agent crashed or exited without hook firing
+      core.updateSession(s.id, { status: "failed", error: "Agent process exited", session_id: null });
       core.logEvent(s.id, "agent_exited", {
         stage: s.stage ?? undefined,
         actor: "system",
-        data: { last_output: lastOutput.slice(0, 500) },
       });
       s.status = "failed";
-      s.error = error;
+      s.error = "Agent process exited";
       s.session_id = null;
-      continue;
     }
-
-    // Diff-based idle detection
-    try {
-      const output = await core.capturePaneAsync(s.session_id, { lines: 15 });
-      const text = output.trim();
-      const prev = paneSnapshots.get(s.id);
-      paneSnapshots.set(s.id, { text, time: Date.now() });
-
-      if (
-        text.includes("AskUserQuestion") ||
-        (text.includes("Allow") && text.includes("Deny"))
-      ) {
-        s.status = "waiting";
-        continue;
-      }
-
-      if (prev && prev.text === text && Date.now() - prev.time > 2000) {
-        s.status = "waiting";
-      }
-    } catch {}
   }
 }
 
