@@ -150,7 +150,6 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
               onSubmit={handleSubmitName}
             />
           </Box>
-          <Text dimColor>{"  Enter to continue, Esc to cancel"}</Text>
         </Box>
       )}
 
@@ -160,7 +159,6 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
           <Text>{""}</Text>
           <Text>{"Provider:"}</Text>
           <SelectMenu items={PROVIDER_OPTIONS} onSelect={handleSelectProvider} />
-          <Text dimColor>{"  Esc to cancel"}</Text>
         </Box>
       )}
 
@@ -177,7 +175,6 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
               onSubmit={handleSubmitImage}
             />
           </Box>
-          <Text dimColor>{"  Enter to create (default: ubuntu:22.04), Esc to cancel"}</Text>
         </Box>
       )}
 
@@ -187,7 +184,6 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
           <Text>{""}</Text>
           <Text>{"Instance size:"}</Text>
           <SelectMenu items={SIZE_OPTIONS} onSelect={handleSelectSize} />
-          <Text dimColor>{"  Esc to cancel"}</Text>
         </Box>
       )}
 
@@ -197,7 +193,6 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
           <Text>{""}</Text>
           <Text>{"Architecture:"}</Text>
           <SelectMenu items={ARCH_OPTIONS} onSelect={handleSelectArch} />
-          <Text dimColor>{"  Esc to cancel"}</Text>
         </Box>
       )}
 
@@ -207,7 +202,6 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
           <Text>{""}</Text>
           <Text>{"AWS Region:"}</Text>
           <SelectMenu items={REGION_OPTIONS} onSelect={handleSelectRegion} limit={10} />
-          <Text dimColor>{"  Esc to cancel"}</Text>
         </Box>
       )}
 
@@ -217,7 +211,6 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
           <Text>{""}</Text>
           <Text>{"AWS Profile:"}</Text>
           <SelectMenu items={profileOptions} onSelect={handleSelectProfile} />
-          <Text dimColor>{"  Esc to cancel"}</Text>
         </Box>
       )}
     </Box>

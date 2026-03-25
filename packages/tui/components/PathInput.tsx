@@ -62,7 +62,6 @@ export function PathInput({ value, onChange, onSubmit }: PathInputProps) {
           ))}
         </Box>
       )}
-      <Text dimColor>{"  Tab:complete  Enter:select  Esc:cancel"}</Text>
     </Box>
   );
 }

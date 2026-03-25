@@ -72,7 +72,6 @@ export function FormTextArea({
               {i === lines.length - 1 && <Text inverse>{" "}</Text>}
             </Text>
           ))}
-          <Text dimColor>{"  Ctrl+D:done  Enter:newline"}</Text>
         </Box>
       ) : (
         <Text>

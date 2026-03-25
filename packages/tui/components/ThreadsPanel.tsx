@@ -230,7 +230,6 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
               <Text dimColor>{` (${c.id})`}</Text>
             </Text>
           ))}
-          <Text dimColor>{"  Tab:complete  ↑↓:navigate"}</Text>
         </Box>
       )}
 
@@ -248,7 +247,6 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
           placeholder="@session-name message..."
         />
       </Box>
-      <Text dimColor>{"  @name:target agent  Enter:send  Esc:back"}</Text>
     </Box>
   );
 }

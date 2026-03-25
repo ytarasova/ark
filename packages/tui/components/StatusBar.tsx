@@ -28,7 +28,8 @@ function getOverlayHints(overlay: string): React.ReactNode[] {
   switch (overlay) {
     case "form":
       return [
-        <KeyHint key="enter" k="Enter" label="next" />,
+        <KeyHint key="tab" k="Tab" label="navigate" />,
+        <KeyHint key="enter" k="Enter" label="edit/select" />,
         <KeyHint key="esc" k="Esc" label="cancel" />,
       ];
     case "move":

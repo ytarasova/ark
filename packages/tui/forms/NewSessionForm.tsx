@@ -169,7 +169,6 @@ export function NewSessionForm({ store, async: asyncState, onDone }: NewSessionF
       />
 
       <Box flexGrow={1} />
-      <Text dimColor>{"  Tab/Shift+Tab:navigate  Enter:edit/select  Esc:cancel"}</Text>
     </Box>
   );
 }
