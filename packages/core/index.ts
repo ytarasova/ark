@@ -32,6 +32,9 @@ export {
 // Flow
 export * from "./flow.js";
 
+// Template
+export { substituteVars, buildSessionVars } from "./template.js";
+
 // Agent
 export { loadAgent, listAgents, saveAgent, deleteAgent, resolveAgent, buildClaudeArgs } from "./agent.js";
 

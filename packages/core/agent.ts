@@ -11,6 +11,7 @@ import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync, mkdir
 import { join } from "path";
 import YAML from "yaml";
 import { ARK_DIR } from "./store.js";
+import { substituteVars, buildSessionVars } from "./template.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -98,24 +99,9 @@ export function resolveAgent(name: string, session: Record<string, unknown>): Ag
   const agent = loadAgent(name);
   if (!agent) return null;
 
-  const vars: Record<string, string> = {
-    ticket: String(session.ticket ?? ""),
-    summary: String(session.summary ?? ""),
-    // Backward compat: agent YAML templates may still use {jira_key}/{jira_summary}
-    jira_key: String(session.ticket ?? ""),
-    jira_summary: String(session.summary ?? ""),
-    repo: String(session.repo ?? ""),
-    branch: String(session.branch ?? ""),
-    workdir: String(session.workdir ?? "."),
-    track_id: String(session.id ?? ""),
-    stage: String(session.stage ?? ""),
-  };
-
+  const vars = buildSessionVars(session);
   if (agent.system_prompt) {
-    agent.system_prompt = agent.system_prompt.replace(
-      /\{(\w+)\}/g,
-      (_, key) => vars[key] ?? `{${key}}`,
-    );
+    agent.system_prompt = substituteVars(agent.system_prompt, vars);
   }
   return agent;
 }
