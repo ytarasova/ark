@@ -364,6 +364,13 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
       {s.agent && <KeyValue label="Agent">{s.agent}</KeyValue>}
       {s.group_name && <KeyValue label="Group">{s.group_name}</KeyValue>}
 
+      {/* Token usage from hooks */}
+      {(s.config as any)?.usage && (
+        <KeyValue label="Tokens">
+          {`${((s.config as any).usage.total_tokens / 1000).toFixed(1)}K (in:${((s.config as any).usage.input_tokens / 1000).toFixed(1)}K out:${((s.config as any).usage.output_tokens / 1000).toFixed(1)}K cache:${((s.config as any).usage.cache_read_input_tokens / 1000).toFixed(1)}K)`}
+        </KeyValue>
+      )}
+
       {/* Channel status */}
       {s.session_id && (s.status === "running" || s.status === "waiting") && (
         <Text color="green">
