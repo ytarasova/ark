@@ -154,11 +154,15 @@ export function TextInputEnhanced({
       return;
     }
 
-    // Regular character input (exclude control chars like \n \r \t)
-    if (input && !key.ctrl && !key.meta && input.length === 1 && input.charCodeAt(0) >= 32) {
-      internalEdit.current = true;
-      onChange(value.slice(0, cursor) + input + value.slice(cursor));
-      setCursor(c => c + 1);
+    // Regular character input — supports single chars and pasted text (multi-char)
+    if (input && !key.ctrl && !key.meta) {
+      // Strip control characters (keep printable chars, including unicode)
+      const clean = input.replace(/[\x00-\x1f]/g, "");
+      if (clean.length > 0) {
+        internalEdit.current = true;
+        onChange(value.slice(0, cursor) + clean + value.slice(cursor));
+        setCursor(c => c + clean.length);
+      }
     }
   });
 

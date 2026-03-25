@@ -52,9 +52,11 @@ export function FormTextArea({
       return;
     }
 
-    // Regular character
-    if (input && !key.ctrl && !key.meta && input.length === 1 && input.charCodeAt(0) >= 32) {
-      onChange(value + input);
+    // Regular character or pasted text
+    if (input && !key.ctrl && !key.meta) {
+      // For textarea, keep newlines from pasted text but strip other control chars
+      const clean = input.replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, "");
+      if (clean.length > 0) onChange(value + clean);
     }
   });
 
