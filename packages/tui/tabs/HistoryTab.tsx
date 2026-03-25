@@ -131,7 +131,7 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
             if (text.length < 10) continue;
             if (text.startsWith("Caveat:") || text.startsWith("<") || text.startsWith("task-notification")) continue;
             const role = entry.type === "user" ? "You" : "Claude";
-            msgs.push(`${role}: ${text.slice(0, 150)}`);
+            msgs.push(`${role}: ${text}`);
           } catch {}
         }
         setConversationPreview(msgs.slice(-15));

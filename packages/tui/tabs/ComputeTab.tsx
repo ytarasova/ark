@@ -275,7 +275,7 @@ function ComputeDetail({ compute: h, snapshot, computeLogs, sessions, pane }: Co
           <Text> </Text>
           <SectionHeader title="Activity Log" />
           {computeLogs.slice(-15).map((entry, i) => (
-            <Text key={i} dimColor>{`  ${entry}`}</Text>
+            <Text key={i} dimColor wrap="truncate">{`  ${entry}`}</Text>
           ))}
         </>
       )}
