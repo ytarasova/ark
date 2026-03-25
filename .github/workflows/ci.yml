@@ -58,10 +58,15 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Shim optional deps
+        run: |
+          mkdir -p node_modules/react-devtools-core
+          cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js
+          echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json
+
       - name: Build binary
         run: |
           bun build --compile --target ${{ matrix.target }} \
-            --external react-devtools-core \
             packages/cli/index.ts --outfile ark-${{ matrix.name }}
 
       - name: Verify binary exists
