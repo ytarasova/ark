@@ -30,8 +30,16 @@ export interface SyncOpts {
   projectDir?: string;
 }
 
+export interface IsolationMode {
+  value: string;
+  label: string;
+}
+
 export interface ComputeProvider {
   readonly name: string;
+
+  /** Isolation modes this provider supports. Empty = no isolation choice needed. */
+  readonly isolationModes: IsolationMode[];
 
   // ── Compute lifecycle ───────────────────────────────────────────────────
   provision(compute: Compute, opts?: ProvisionOpts): Promise<void>;

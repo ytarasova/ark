@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { existsSync } from "fs";
 import { resolve as resolvePath, basename } from "path";
 import * as core from "../../core/index.js";
+import { getIsolationModes } from "../../compute/index.js";
 import { submitForm } from "./submitForm.js";
 import { addRecentRepo } from "../helpers/recentRepos.js";
 import { generateName } from "../helpers.js";
@@ -28,10 +29,7 @@ interface NewSessionFormProps {
   prefill?: SessionPrefill;
 }
 
-const ISOLATION_CHOICES = [
-  { label: "Git worktree (isolated)", value: "worktree" },
-  { label: "In-place (direct)", value: "inplace" },
-];
+// Isolation choices are provider-driven — see ComputeProvider.isolationModes
 
 export function NewSessionForm({ store, async: asyncState, onDone, prefill }: NewSessionFormProps) {
   const [name, setName] = useState(prefill?.name || generateName());
@@ -46,8 +44,14 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
     return existsSync(rp) && existsSync(resolvePath(rp, ".git"));
   }, [repoPath]);
 
-  const isLocalCompute = computeName === "local" || computeName === "";
-  const showIsolation = isGitRepo && isLocalCompute;
+  // Provider-driven isolation modes
+  const isolationChoices = useMemo(() => {
+    const compute = store.computes.find(c => c.name === computeName);
+    const providerName = compute?.provider ?? "local";
+    try { return getIsolationModes(providerName); } catch { return []; }
+  }, [computeName, store.computes]);
+
+  const showIsolation = isGitRepo && isolationChoices.length > 1;
 
   const computeChoices = useMemo(() =>
     store.computes.map(c => ({
@@ -164,10 +168,10 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
         <FormSelectField
           label="Isolation"
           value={isolation}
-          items={ISOLATION_CHOICES}
+          items={isolationChoices}
           onSelect={(v) => { setIsolation(v); advance(); }}
           active={active === "isolation"}
-          displayValue={isolation === "worktree" ? "worktree" : "in-place"}
+          displayValue={isolationChoices.find(c => c.value === isolation)?.label ?? isolation}
         />
       )}
 

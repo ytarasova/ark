@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
-import { execFileSync } from "child_process";
+import { execFile } from "child_process";
 import { join } from "path";
 import { homedir } from "os";
 import * as core from "../../core/index.js";
@@ -71,12 +71,14 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
         if (!ip) return;
         const keyPath = join(homedir(), ".ssh", `ark-${selected.name}`);
         const sshCmd = `ssh -i ${keyPath} -o StrictHostKeyChecking=no ubuntu@${ip}`;
-        try {
-          execFileSync("tmux", ["new-window", "-n", `ssh-${selected.name}`, "bash", "-c", sshCmd], { stdio: "pipe" });
-          status.show(`Opened SSH to ${selected.name} in new tmux window`);
-        } catch {
-          status.show(`Run: ${sshCmd}`);
-        }
+        asyncState.run("Opening SSH...", async () => {
+          await new Promise<void>((resolve, reject) => {
+            execFile("tmux", ["new-window", "-n", `ssh-${selected.name}`, "bash", "-c", sshCmd], { stdio: "pipe" }, (err) => {
+              if (err) { status.show(`Run: ${sshCmd}`); reject(err); }
+              else { status.show(`Opened SSH to ${selected.name}`); resolve(); }
+            });
+          });
+        });
       }
     } else if (input === "c") {
       actions.clean();

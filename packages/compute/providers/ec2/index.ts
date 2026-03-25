@@ -61,6 +61,9 @@ function createEc2Client(cfg: EC2HostConfig): EC2Client {
 
 export class EC2Provider implements ComputeProvider {
   readonly name = "ec2";
+  readonly isolationModes = [
+    { value: "inplace", label: "Remote checkout (in-place)" },
+  ];
 
   async provision(compute: Compute, opts?: ProvisionOpts): Promise<void> {
     const log = opts?.onLog ?? (() => {});

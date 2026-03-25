@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
-import { execFileSync } from "child_process";
+import { execFile } from "child_process";
 import { useStore } from "./hooks/useStore.js";
 import { useAsync } from "./hooks/useAsync.js";
 import { TabBar } from "./components/TabBar.js";
@@ -34,20 +34,22 @@ export function App() {
   const switchTab = (t: Tab) => { setTab(t); setPane("left"); };
 
   const takeSnapshot = useCallback(() => {
-    try {
-      if (process.env.TMUX) {
-        execFileSync("tmux", ["capture-pane", "-S", "-"], { stdio: "pipe" });
-        execFileSync("tmux", ["save-buffer", "-"], { stdio: ["pipe", "pipe", "pipe"] });
-        // Pipe buffer to clipboard
-        const content = execFileSync("tmux", ["save-buffer", "-"], {
-          encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+    if (!process.env.TMUX) return;
+    // Run snapshot async to not block TUI
+    asyncState.run("Copying screen...", async () => {
+      await new Promise<void>((resolve) => {
+        execFile("tmux", ["capture-pane", "-S", "-"], { stdio: "pipe" }, () => {
+          execFile("tmux", ["save-buffer", "-"], { encoding: "utf-8" }, (err, content) => {
+            if (!err && content) {
+              execFile("pbcopy", [], { stdio: ["pipe", "pipe", "pipe"] }, () => resolve()).stdin?.end(content);
+            } else {
+              resolve();
+            }
+          });
         });
-        execFileSync("pbcopy", { input: content, stdio: ["pipe", "pipe", "pipe"] });
-      } else {
-        // No tmux — not much we can capture
-      }
-    } catch {}
-  }, []);
+      });
+    });
+  }, [asyncState]);
 
   useInput((input, key) => {
     // When a text input is active, only allow Ctrl-based shortcuts

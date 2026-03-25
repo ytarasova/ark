@@ -77,6 +77,9 @@ function assertDockerAvailable(): void {
 
 export class DockerProvider implements ComputeProvider {
   readonly name = "docker";
+  readonly isolationModes = [
+    { value: "container", label: "Docker container (isolated)" },
+  ];
 
   // ── Provision ────────────────────────────────────────────────────────────
 

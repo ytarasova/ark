@@ -17,8 +17,11 @@ import { collectLocalMetrics } from "./metrics.js";
 
 export class LocalProvider implements ComputeProvider {
   readonly name = "local";
-  /** Local compute is a singleton - it's your machine, always running */
   readonly singleton = true;
+  readonly isolationModes = [
+    { value: "worktree", label: "Git worktree (isolated)" },
+    { value: "inplace", label: "In-place (direct)" },
+  ];
 
   async provision(_compute: Compute, _opts?: ProvisionOpts): Promise<void> {
     // No-op: your machine is already provisioned

@@ -10,10 +10,15 @@ import type { ComputeProvider } from "./types.js";
 
 // Re-export types
 export type {
-  ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
+  ComputeProvider, IsolationMode, ProvisionOpts, LaunchOpts, SyncOpts,
   ComputeSnapshot, ComputeMetrics, ComputeSession, ComputeProcess, DockerContainer,
   PortDecl, PortStatus, ArcJson,
 } from "./types.js";
+
+export function getIsolationModes(providerName: string): { value: string; label: string }[] {
+  const provider = getProvider(providerName);
+  return provider?.isolationModes ?? [];
+}
 
 // ── Provider registry (delegates to AppContext) ─────────────────────────────
 
