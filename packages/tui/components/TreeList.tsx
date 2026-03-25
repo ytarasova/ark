@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { ListRow } from "./ListRow.js";
+import { ScrollBox } from "./ScrollBox.js";
 
 interface TreeListProps<T> {
   items: T[];
@@ -23,7 +24,7 @@ interface TreeListProps<T> {
 /**
  * Grouped or flat list for left panels. Items are grouped by a key,
  * each group gets a header. Flat lists = single unnamed group.
- * Empty groups from emptyGroups prop are shown with "(empty)" label.
+ * Uses ScrollBox with followIndex for automatic scrolling.
  */
 export function TreeList<T>({
   items,
@@ -57,36 +58,42 @@ export function TreeList<T>({
     return <Text dimColor>{`  ${emptyMessage}`}</Text>;
   }
 
+  // Build flat list of renderable rows for ScrollBox
+  // Track which row index corresponds to the selected item
+  const rows: React.ReactNode[] = [];
+  let selRow = 0;
+
+  for (const groupName of sortedKeys) {
+    const entries = groups.get(groupName)!;
+    if (groupName) {
+      rows.push(
+        <Text key={`grp-${groupName}`} backgroundColor="gray" color="white">{` ${groupName} `}</Text>
+      );
+    }
+    if (entries.length === 0 && groupName) {
+      rows.push(<Text key={`empty-${groupName}`} dimColor>{"    (empty)"}</Text>);
+    }
+    for (const { item, flatIndex } of entries) {
+      const isSel = flatIndex === sel;
+      if (isSel) selRow = rows.length;
+      rows.push(
+        <Box key={`item-${flatIndex}`} flexDirection="column">
+          {isSel ? (
+            <ListRow selected>{renderRow(item, true)}</ListRow>
+          ) : (
+            renderColoredRow
+              ? renderColoredRow(item)
+              : <Text>{renderRow(item, false)}</Text>
+          )}
+          {renderChildren?.(item)}
+        </Box>
+      );
+    }
+  }
+
   return (
-    <Box flexDirection="column">
-      {sortedKeys.map(groupName => {
-        const entries = groups.get(groupName)!;
-        return (
-          <Box key={groupName || "__ungrouped"} flexDirection="column">
-            {groupName ? (
-              <Text backgroundColor="gray" color="white">{` ${groupName} `}</Text>
-            ) : null}
-            {entries.length === 0 && groupName ? (
-              <Text dimColor>{"    (empty)"}</Text>
-            ) : null}
-            {entries.map(({ item, flatIndex }) => {
-              const isSel = flatIndex === sel;
-              return (
-                <Box key={flatIndex} flexDirection="column">
-                  {isSel ? (
-                    <ListRow selected>{renderRow(item, true)}</ListRow>
-                  ) : (
-                    renderColoredRow
-                      ? renderColoredRow(item)
-                      : <Text>{renderRow(item, false)}</Text>
-                  )}
-                  {renderChildren?.(item)}
-                </Box>
-              );
-            })}
-          </Box>
-        );
-      })}
-    </Box>
+    <ScrollBox followIndex={selRow} active={false}>
+      {rows}
+    </ScrollBox>
   );
 }

@@ -1,20 +1,29 @@
-import React, { useState, Children, useMemo } from "react";
+import React, { useState, useEffect, Children, useMemo } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 
 interface ScrollBoxProps {
   children: React.ReactNode;
   /** Reserve this many rows for chrome outside the scroll area (tabs, status bar, etc.) */
   reserveRows?: number;
-  /** Whether this scroll box should respond to scroll keys */
+  /** Whether this scroll box should respond to its own j/k scroll keys */
   active?: boolean;
+  /**
+   * Follow an external selection index (for list panes).
+   * When set, the scroll box auto-scrolls to keep this index visible
+   * and does NOT handle j/k internally (the parent owns navigation).
+   */
+  followIndex?: number;
 }
 
 /**
- * Scrollable container for detail panels. Clips children to the
- * available terminal height and scrolls with j/k when focused.
- * Shows a scroll position indicator when content overflows.
+ * Scrollable container that clips children to terminal height.
+ *
+ * Two modes:
+ * 1. Self-managed (default): responds to j/k for scrolling. Used by right/detail panes.
+ * 2. Follow mode (followIndex set): auto-scrolls to keep the followed index visible.
+ *    Used by left/list panes where useListNavigation owns j/k.
  */
-export function ScrollBox({ children, reserveRows = 6, active = true }: ScrollBoxProps) {
+export function ScrollBox({ children, reserveRows = 6, active = true, followIndex }: ScrollBoxProps) {
   const { stdout } = useStdout();
   const maxHeight = (stdout?.rows ?? 40) - reserveRows;
   const [offset, setOffset] = useState(0);
@@ -39,10 +48,22 @@ export function ScrollBox({ children, reserveRows = 6, active = true }: ScrollBo
   }, [children]);
 
   const total = items.length;
-  const maxOffset = Math.max(0, total - maxHeight);
+  const displayHeight = maxHeight - (total > maxHeight ? 1 : 0); // reserve 1 row for scroll indicator
+  const maxOffset = Math.max(0, total - displayHeight);
 
+  // Follow mode: auto-scroll to keep followIndex visible
+  useEffect(() => {
+    if (followIndex === undefined) return;
+    setOffset(prev => {
+      if (followIndex < prev) return followIndex;
+      if (followIndex >= prev + displayHeight) return followIndex - displayHeight + 1;
+      return prev;
+    });
+  }, [followIndex, displayHeight]);
+
+  // Self-managed scroll (only when not in follow mode)
   useInput((input, key) => {
-    if (!active) return;
+    if (!active || followIndex !== undefined) return;
     if (input === "j" || key.downArrow) {
       setOffset(o => Math.min(o + 1, maxOffset));
     } else if (input === "k" || key.upArrow) {
@@ -58,11 +79,8 @@ export function ScrollBox({ children, reserveRows = 6, active = true }: ScrollBo
     }
   });
 
-  // Reset offset when content changes significantly (different item selected)
-  useMemo(() => setOffset(0), [total]);
-
   const canScroll = total > maxHeight;
-  const visible = items.slice(offset, offset + maxHeight - (canScroll ? 1 : 0));
+  const visible = items.slice(offset, offset + displayHeight);
 
   return (
     <Box flexDirection="column" height={maxHeight} overflow="hidden">
@@ -72,7 +90,7 @@ export function ScrollBox({ children, reserveRows = 6, active = true }: ScrollBo
       {canScroll && (
         <Text dimColor>
           {offset > 0 ? " ▲" : "  "}
-          {` ${offset + 1}–${Math.min(offset + maxHeight, total)}/${total} `}
+          {` ${offset + 1}–${Math.min(offset + displayHeight, total)}/${total} `}
           {offset < maxOffset ? "▼" : " "}
         </Text>
       )}

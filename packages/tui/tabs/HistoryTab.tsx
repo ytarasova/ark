@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Box, Text, useInput, useStdout } from "ink";
+import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import * as core from "../../core/index.js";
 import { ago } from "../helpers.js";
 import { SplitPane } from "../components/SplitPane.js";
+import { ScrollBox } from "../components/ScrollBox.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { KeyValue } from "../components/KeyValue.js";
@@ -63,8 +64,6 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
   const [mode, setMode] = useState<"recent" | "search">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const status = useStatusMessage();
-  const { stdout } = useStdout();
-  const visibleRows = (stdout?.rows ?? 40) - 8; // reserve for tabs, status bar, events, borders
 
   // Signal parent which overlay is active (for status bar hints)
   useEffect(() => {
@@ -213,41 +212,29 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
               historyItems.length === 0 ? (
                 <Text dimColor>{"No sessions found"}</Text>
               ) : (
-                (() => {
-                  // Windowed rendering — show items around sel
-                  const start = Math.max(0, Math.min(sel - Math.floor(visibleRows / 2), historyItems.length - visibleRows));
-                  const end = Math.min(start + visibleRows, historyItems.length);
-                  const window = historyItems.slice(Math.max(0, start), end);
-                  return (
-                    <>
-                      {start > 0 && <Text dimColor>{` ▲ ${start} more`}</Text>}
-                      {window.map((item, i) => {
-                        const idx = Math.max(0, start) + i;
-                        const summary = item.summary || "(no summary)";
-                        return (
-                          <Text key={item.id + idx} wrap="truncate">
-                            {idx === sel ? ">" : " "}
-                            <Text color={item.type === "ark" ? "green" : "dim"}>{item.date.slice(5)}</Text>
-                            {` ${summary}`}
-                          </Text>
-                        );
-                      })}
-                      {end < historyItems.length && <Text dimColor>{` ▼ ${historyItems.length - end} more`}</Text>}
-                    </>
-                  );
-                })()
+                <ScrollBox followIndex={sel} active={false}>
+                  {historyItems.map((item, idx) => (
+                    <Text key={item.id + idx} wrap="truncate">
+                      {idx === sel ? ">" : " "}
+                      <Text color={item.type === "ark" ? "green" : "dim"}>{item.date.slice(5)}</Text>
+                      {` ${item.summary || "(no summary)"}`}
+                    </Text>
+                  ))}
+                </ScrollBox>
               )
             ) : (
               searchResults.length === 0 ? (
                 <Text dimColor>{"No results"}</Text>
               ) : (
-                searchResults.slice(0, visibleRows).map((r, idx) => (
-                  <Text key={`${r.sessionId}-${idx}`} wrap="truncate">
-                    {idx === sel ? ">" : " "}
-                    <Text color={r.source === "transcript" ? "magenta" : "cyan"}>{r.source.slice(0, 4).padEnd(4)}</Text>
-                    {` ${r.match?.slice(0, 50) || ""}`}
-                  </Text>
-                ))
+                <ScrollBox followIndex={sel} active={false}>
+                  {searchResults.map((r, idx) => (
+                    <Text key={`${r.sessionId}-${idx}`} wrap="truncate">
+                      {idx === sel ? ">" : " "}
+                      <Text color={r.source === "transcript" ? "magenta" : "cyan"}>{r.source.slice(0, 4).padEnd(4)}</Text>
+                      {` ${r.match?.slice(0, 50) || ""}`}
+                    </Text>
+                  ))}
+                </ScrollBox>
               )
             )}
           </Box>
