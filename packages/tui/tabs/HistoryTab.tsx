@@ -19,7 +19,7 @@ interface HistoryTabProps extends StoreData {
   onOverlayChange?: (overlay: string | null) => void;
 }
 
-const RECENT_LIMIT = 20;
+const RECENT_LIMIT = 100;
 
 interface HistoryItem {
   type: "ark" | "claude";
@@ -211,13 +211,17 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
               historyItems.length === 0 ? (
                 <Text dimColor>{"No sessions found"}</Text>
               ) : (
-                historyItems.map((item, idx) => (
-                  <Text key={item.id + idx} wrap="truncate">
-                    {idx === sel ? ">" : " "}
-                    <Text color={item.type === "ark" ? "green" : "dim"}>{item.type === "ark" ? "A" : " "}</Text>
-                    {` ${item.date.slice(5)} ${item.summary.slice(0, 45)}`}
-                  </Text>
-                ))
+                historyItems.map((item, idx) => {
+                  const sel_ = idx === sel;
+                  const summary = item.summary || "(no summary)";
+                  return (
+                    <Text key={item.id + idx} wrap="truncate">
+                      {sel_ ? ">" : " "}
+                      <Text color={item.type === "ark" ? "green" : "dim"}>{item.date.slice(5)}</Text>
+                      {` ${summary}`}
+                    </Text>
+                  );
+                })
               )
             ) : (
               searchResults.length === 0 ? (

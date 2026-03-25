@@ -32,7 +32,13 @@ function decodeProjectDir(dirName: string): string {
 }
 
 /** Junk prefixes in user messages that aren't real prompts */
-const JUNK_PREFIXES = ["Caveat:", "<local-command", "<command-", "<system-reminder", "<channel"];
+const JUNK_PREFIXES = [
+  "Caveat:", "<local-command", "<command-", "<system-reminder", "<channel",
+  "Session s-", "Work on s-", "/effort", "/remote-control",
+  "You are the worker agent", "You are the implementer agent",
+  "You are the planner agent", "You are the reviewer agent",
+  "[Request interrupted",
+];
 
 function isRealUserMessage(text: string): boolean {
   const trimmed = text.trim();
