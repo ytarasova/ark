@@ -77,3 +77,50 @@ jobs:
         with:
           name: ark-${{ matrix.name }}
           path: ark-${{ matrix.name }}
+
+  # Smoke-test binaries on native platforms
+  smoke-test:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: darwin-arm64
+            os: macos-latest
+          - name: darwin-x64
+            os: macos-13
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+          - name: linux-x64
+            os: ubuntu-latest
+
+    runs-on: ${{ matrix.os }}
+    name: smoke-test (${{ matrix.name }})
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ark-${{ matrix.name }}
+
+      - name: Make executable
+        run: chmod +x ark-${{ matrix.name }}
+
+      - name: Test CLI (--help)
+        run: ./ark-${{ matrix.name }} --help
+
+      - name: Test CLI (--version)
+        run: ./ark-${{ matrix.name }} --version
+
+      - name: Test TUI starts without crash
+        run: |
+          timeout 3 ./ark-${{ matrix.name }} tui 2>&1 || code=$?
+          # timeout exits 124 when it kills the process — that means the TUI started and ran
+          # exit code 0 means it exited cleanly (also fine)
+          # anything else is a real crash
+          if [ "${code:-0}" -eq 124 ] || [ "${code:-0}" -eq 0 ]; then
+            echo "TUI smoke test passed (exit code: ${code:-0})"
+          else
+            echo "TUI smoke test FAILED (exit code: $code)"
+            exit 1
+          fi
