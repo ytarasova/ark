@@ -160,7 +160,26 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
 
     if (key.escape && mode === "search") { setMode("recent"); return; }
 
-    // r — refresh cache + reindex transcripts
+    // R (shift) — force full rebuild (clear cache first)
+    if (input === "R" && mode !== "search") {
+      asyncState.run("Full rebuild...", async () => {
+        const db = (await import("../../core/store.js")).getDb();
+        db.exec("DELETE FROM claude_sessions_cache");
+        db.exec("DELETE FROM transcript_index");
+        const sessionCount = await core.refreshClaudeSessionsCache({
+          onProgress: (done, total) => { status.show(`Scanning ${done}/${total} files...`); },
+        });
+        const indexCount = await core.indexTranscripts({
+          onProgress: (indexed, files) => { status.show(`Indexing ${files} files, ${indexed} entries...`); },
+        });
+        const sessions = core.listClaudeSessions({ limit: RECENT_LIMIT });
+        setClaudeSessions(sessions);
+        status.show(`Rebuilt: ${sessionCount} sessions, ${indexCount} indexed`);
+      });
+      return;
+    }
+
+    // r — incremental refresh + reindex
     if (input === "r" && mode !== "search") {
       asyncState.run("Refreshing...", async () => {
         const sessionCount = await core.refreshClaudeSessionsCache({
