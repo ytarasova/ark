@@ -199,7 +199,7 @@ export function getClaudeSession(sessionId: string, opts?: ListOpts): ClaudeSess
  * Refresh the cache by scanning ~/.claude/projects/.
  * Async with periodic yields so the TUI stays responsive.
  */
-export async function refreshClaudeSessionsCache(opts?: { baseDir?: string }): Promise<number> {
+export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onProgress?: (processed: number, total: number) => void }): Promise<number> {
   const baseDir = opts?.baseDir ?? join(homedir(), ".claude", "projects");
   if (!existsSync(baseDir)) return 0;
 
@@ -217,6 +217,16 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string }): P
   let count = 0;
   let fileCount = 0;
   const now = new Date().toISOString();
+
+  // Count total files first for progress reporting
+  let totalFiles = 0;
+  for (const pd of readdirSync(baseDir)) {
+    const pp = join(baseDir, pd);
+    try { if (!statSync(pp).isDirectory()) continue; } catch { continue; }
+    const decoded = decodeProjectDir(pd);
+    if (decoded.includes("/var/folders/") || decoded.includes("/tmp/") || decoded.includes("/worktrees/") || decoded.includes("/subagents/")) continue;
+    try { totalFiles += readdirSync(pp).filter(f => f.endsWith(".jsonl")).length; } catch {}
+  }
 
   for (const projectDir of readdirSync(baseDir)) {
     const projectPath = join(baseDir, projectDir);
@@ -249,6 +259,7 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string }): P
       count++;
 
       fileCount++;
+      opts?.onProgress?.(fileCount, totalFiles);
       // Yield after every file so TUI stays responsive
       await new Promise(r => setTimeout(r, 0));
     }

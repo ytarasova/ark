@@ -159,9 +159,12 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
     // r — refresh cache + reindex transcripts
     if (input === "r" && mode !== "search") {
       asyncState.run("Refreshing...", async () => {
-        const sessionCount = await core.refreshClaudeSessionsCache();
+        const sessionCount = await core.refreshClaudeSessionsCache({
+          onProgress: (done, total) => { status.show(`Scanning ${done}/${total} files...`); },
+        });
+        status.show(`Scanned ${sessionCount} sessions, indexing...`);
         const indexCount = await core.indexTranscripts({
-          onProgress: (indexed, files) => { status.show(`Indexing... ${files} files, ${indexed} entries`); },
+          onProgress: (indexed, files) => { status.show(`Indexing ${files} files, ${indexed} entries...`); },
         });
         const sessions = core.listClaudeSessions({ limit: RECENT_LIMIT });
         setClaudeSessions(sessions);

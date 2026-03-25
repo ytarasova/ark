@@ -68,10 +68,12 @@ export function ScrollBox({ children, reserveRows = 6, active = true, followInde
       setOffset(o => Math.min(o + 1, maxOffset));
     } else if (input === "k" || key.upArrow) {
       setOffset(o => Math.max(o - 1, 0));
-    } else if (input === "J" || (key.downArrow && key.shift)) {
-      setOffset(o => Math.min(o + 5, maxOffset));
-    } else if (input === "K" || (key.upArrow && key.shift)) {
-      setOffset(o => Math.max(o - 5, 0));
+    } else if (input === "f" || key.pageDown) {
+      // Page down
+      setOffset(o => Math.min(o + displayHeight, maxOffset));
+    } else if (input === "b" || key.pageUp) {
+      // Page up
+      setOffset(o => Math.max(o - displayHeight, 0));
     } else if (input === "g") {
       setOffset(0);
     } else if (input === "G") {
