@@ -58,3 +58,6 @@ export { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache, type 
 
 // Repo-scoped config
 export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
+
+// Schedules
+export { createSchedule, listSchedules, getSchedule, deleteSchedule, enableSchedule, updateScheduleLastRun, cronMatches, type Schedule } from "./schedule.js";

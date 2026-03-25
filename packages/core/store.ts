@@ -227,6 +227,20 @@ function initSchema(db: Database): void {
       content,
       timestamp UNINDEXED
     );
+
+    CREATE TABLE IF NOT EXISTS schedules (
+      id TEXT PRIMARY KEY,
+      cron TEXT NOT NULL,
+      flow TEXT NOT NULL DEFAULT 'bare',
+      repo TEXT,
+      workdir TEXT,
+      summary TEXT,
+      compute_name TEXT,
+      group_name TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      last_run TEXT,
+      created_at TEXT NOT NULL
+    );
   `);
 }
 
