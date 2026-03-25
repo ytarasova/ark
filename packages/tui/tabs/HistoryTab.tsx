@@ -128,19 +128,16 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
     });
   }, [selectedItem?.id]);
 
-  // Load from cache (instant), then refresh in background
+  // Load from cache (instant), then always refresh in background
   useEffect(() => {
-    // Instant read from SQLite cache
     const cached = core.listClaudeSessions({ limit: RECENT_LIMIT });
     setClaudeSessions(cached);
 
-    // Background refresh if cache is empty
-    if (cached.length === 0) {
-      asyncState.run("Scanning Claude sessions...", async () => {
-        await core.refreshClaudeSessionsCache();
-        setClaudeSessions(core.listClaudeSessions({ limit: RECENT_LIMIT }));
-      });
-    }
+    // Always refresh cache in background — picks up new sessions + fixes summaries
+    asyncState.run("Refreshing...", async () => {
+      await core.refreshClaudeSessionsCache();
+      setClaudeSessions(core.listClaudeSessions({ limit: RECENT_LIMIT }));
+    });
   }, []);
 
   useInput((input, key) => {
