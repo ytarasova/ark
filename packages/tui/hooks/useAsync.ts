@@ -64,7 +64,12 @@ export function useAsync(onComplete?: () => void): AsyncState {
 
   const run = useCallback((actionLabel: string, action: () => Promise<void> | void) => {
     queue.current.push({ label: actionLabel, action });
-    if (!running.current) processQueue();
+    // Set loading state immediately so spinner renders in the same cycle
+    if (!running.current) {
+      setLoading(true);
+      setLabel(actionLabel);
+      processQueue();
+    }
   }, [processQueue]);
 
   const clearError = useCallback(() => setError(null), []);

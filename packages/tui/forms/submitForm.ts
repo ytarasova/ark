@@ -3,6 +3,8 @@ import type { AsyncState } from "../hooks/useAsync.js";
 /**
  * Submit a form: run a sync action (create resource), close the form,
  * then run async follow-up (dispatch) via the standard async runner.
+ *
+ * Shows a spinner immediately so the user sees feedback after submitting.
  */
 export function submitForm(opts: {
   create: () => void;
@@ -22,7 +24,8 @@ export function submitForm(opts: {
   // Close form BEFORE async work so React unmount doesn't cancel it
   onDone();
 
-  // Async follow-up via standard runner — useAsync yields before executing
+  // Async follow-up via standard runner
+  // useAsync.run() now sets loading/label immediately for instant feedback
   if (asyncFollowUp) {
     asyncState.run(asyncFollowUp.label, asyncFollowUp.action);
   }

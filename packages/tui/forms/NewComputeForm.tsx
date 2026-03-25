@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import * as core from "../../core/index.js";
 import { generateName, getAwsProfiles } from "../helpers.js";
+import { submitForm } from "./submitForm.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
@@ -75,28 +76,22 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
       setStep("image");
     } else {
       // Create non-EC2/non-Docker compute directly
-      try {
-        core.createCompute({ name: name.trim(), provider: item.value, config: {} });
-      } catch (e: any) {
-        asyncState.run("Create failed", async () => { throw e; });
-      }
-      onDone();
+      submitForm({
+        create: () => core.createCompute({ name: name.trim(), provider: item.value, config: {} }),
+        onDone,
+        asyncState,
+      });
     }
   };
 
   // Docker: submit image name
   const handleSubmitImage = () => {
     const img = image.trim() || "ubuntu:22.04";
-    try {
-      core.createCompute({
-        name: name.trim(),
-        provider: "docker",
-        config: { image: img },
-      });
-    } catch (e: any) {
-      asyncState.run("Create failed", async () => { throw e; });
-    }
-    onDone();
+    submitForm({
+      create: () => core.createCompute({ name: name.trim(), provider: "docker", config: { image: img } }),
+      onDone,
+      asyncState,
+    });
   };
 
   const handleSelectSize = (item: { label: string; value: string }) => {
@@ -115,21 +110,23 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
   };
 
   const handleSelectProfile = (item: { label: string; value: string }) => {
-    try {
-      core.createCompute({
-        name: name.trim(),
-        provider,
-        config: {
-          size,
-          arch,
-          region,
-          ...(item.value ? { aws_profile: item.value } : {}),
-        },
-      });
-    } catch (e: any) {
-      asyncState.run("Create failed", async () => { throw e; });
-    }
-    onDone();
+    const trimmedName = name.trim();
+    submitForm({
+      create: () => {
+        core.createCompute({
+          name: trimmedName,
+          provider,
+          config: {
+            size,
+            arch,
+            region,
+            ...(item.value ? { aws_profile: item.value } : {}),
+          },
+        });
+      },
+      onDone,
+      asyncState,
+    });
   };
 
   const profileOptions = getAwsProfiles().map((p) => ({ label: p, value: p }));
