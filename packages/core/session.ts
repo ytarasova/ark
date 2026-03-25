@@ -23,6 +23,7 @@ import { getProvider } from "../compute/index.js";
 import { resolvePortDecls, parseArcJson } from "../compute/arc-json.js";
 import { buildSessionVars } from "./template.js";
 import { resolveFlow } from "./flow.js";
+import { loadRepoConfig } from "./repo-config.js";
 
 // ── Session lifecycle ───────────────────────────────────────────────────────
 
@@ -36,12 +37,22 @@ export function startSession(opts: {
   group_name?: string;
   config?: Record<string, unknown>;
 }): store.Session {
-  const session = store.createSession(opts);
+  const repoDir = opts.workdir ?? opts.repo;
+  const repoConfig = repoDir ? loadRepoConfig(repoDir) : {};
+
+  const mergedOpts = {
+    ...opts,
+    flow: opts.flow ?? repoConfig.flow,
+    compute_name: opts.compute_name ?? repoConfig.compute,
+    group_name: opts.group_name ?? repoConfig.group,
+  };
+
+  const session = store.createSession(mergedOpts);
 
   // Set first stage
-  const firstStage = flow.getFirstStage(opts.flow ?? "default");
+  const firstStage = flow.getFirstStage(mergedOpts.flow ?? "default");
   if (firstStage) {
-    const action = flow.getStageAction(opts.flow ?? "default", firstStage);
+    const action = flow.getStageAction(mergedOpts.flow ?? "default", firstStage);
     store.updateSession(session.id, { stage: firstStage, status: "ready" });
     store.logEvent(session.id, "stage_ready", {
       stage: firstStage, actor: "system",

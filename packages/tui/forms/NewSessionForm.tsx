@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text } from "ink";
 import { existsSync } from "fs";
 import { resolve as resolvePath, basename } from "path";
 import * as core from "../../core/index.js";
+import { loadRepoConfig } from "../../core/repo-config.js";
 import { getIsolationModes } from "../../compute/index.js";
 import { submitForm } from "./submitForm.js";
 import { addRecentRepo } from "../helpers/recentRepos.js";
@@ -43,6 +44,24 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
     const rp = resolvePath(repoPath);
     return existsSync(rp) && existsSync(resolvePath(rp, ".git"));
   }, [repoPath]);
+
+  // Load repo-scoped config (.ark.yaml) when repo path changes
+  const repoConfig = useMemo(() => {
+    try {
+      const rp = resolvePath(repoPath);
+      return existsSync(rp) ? loadRepoConfig(rp) : {};
+    } catch { return {}; }
+  }, [repoPath]);
+
+  // Apply repo config defaults once per repoPath change (don't override user edits)
+  const [repoConfigApplied, setRepoConfigApplied] = useState("");
+  useEffect(() => {
+    if (repoPath === repoConfigApplied) return;
+    if (repoConfig.flow) setFlowName(repoConfig.flow);
+    if (repoConfig.compute) setComputeName(repoConfig.compute);
+    if (repoConfig.group) setGroupName(repoConfig.group);
+    setRepoConfigApplied(repoPath);
+  }, [repoPath, repoConfig]);
 
   // Provider-driven isolation modes
   const isolationChoices = useMemo(() => {
