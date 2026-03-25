@@ -209,16 +209,22 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
 
   const db = getDb();
 
-  // Clear stale cache before rebuild
-  db.exec("DELETE FROM claude_sessions_cache");
-
   const insert = db.prepare(
     `INSERT OR REPLACE INTO claude_sessions_cache
      (session_id, project, project_dir, transcript_path, summary, message_count, timestamp, last_activity, cached_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
+  // Get the most recent cached_at timestamp for incremental refresh
+  let lastCachedAt = "";
+  try {
+    const row = db.prepare("SELECT MAX(cached_at) as max_ts FROM claude_sessions_cache").get() as any;
+    lastCachedAt = row?.max_ts ?? "";
+  } catch {}
+  const lastCachedTime = lastCachedAt ? new Date(lastCachedAt).getTime() : 0;
+
   let count = 0;
+  let skipped = 0;
   let fileCount = 0;
   const now = new Date().toISOString();
 
@@ -249,11 +255,20 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
 
     for (const file of files) {
       const filePath = join(projectPath, file);
-      try { if (!statSync(filePath).isFile()) continue; } catch { continue; }
+      let fileStat;
+      try { fileStat = statSync(filePath); if (!fileStat.isFile()) continue; } catch { continue; }
+
+      fileCount++;
+
+      // Incremental: skip files not modified since last cache
+      if (lastCachedTime > 0 && fileStat.mtimeMs <= lastCachedTime) {
+        skipped++;
+        opts?.onProgress?.(fileCount, totalFiles);
+        continue;
+      }
 
       const meta = parseTranscriptMeta(filePath);
       if (!meta) continue;
-      // Skip trivial sessions — need real conversations (10+ messages)
       if (meta.messageCount < 10) continue;
 
       insert.run(
@@ -262,7 +277,6 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
       );
       count++;
 
-      fileCount++;
       opts?.onProgress?.(fileCount, totalFiles);
       // Yield after every file so TUI stays responsive
       await new Promise(r => setTimeout(r, 0));
