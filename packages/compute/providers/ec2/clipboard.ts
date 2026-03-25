@@ -4,10 +4,13 @@
  * session's working directory via rsync.
  */
 
-import { execFileSync } from "child_process";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { readFileSync } from "fs";
 import { createHash } from "crypto";
 import { rsyncPush } from "./ssh.js";
+
+const execFileAsync = promisify(execFile);
 
 const CLIPBOARD_TMP = "/tmp/ark-clipboard.png";
 
@@ -16,19 +19,18 @@ const CLIPBOARD_TMP = "/tmp/ark-clipboard.png";
  * If yes, save to a temp file and return the path.
  * If no, return null.
  */
-export function getClipboardImage(): string | null {
+export async function getClipboardImage(): Promise<string | null> {
   try {
-    const info = execFileSync("osascript", ["-e", "clipboard info"], {
+    const { stdout: info } = await execFileAsync("osascript", ["-e", "clipboard info"], {
       encoding: "utf-8",
       timeout: 5_000,
-      stdio: ["pipe", "pipe", "pipe"],
     });
 
     const hasImage =
       info.includes("«class PNGf»") || info.includes("public.png");
     if (!hasImage) return null;
 
-    execFileSync(
+    await execFileAsync(
       "osascript",
       [
         "-e",
@@ -37,7 +39,6 @@ export function getClipboardImage(): string | null {
       {
         encoding: "utf-8",
         timeout: 5_000,
-        stdio: ["pipe", "pipe", "pipe"],
       },
     );
 
@@ -50,13 +51,13 @@ export function getClipboardImage(): string | null {
 /**
  * Upload an image file to the remote session's working directory via rsync.
  */
-export function uploadToSession(
+export async function uploadToSession(
   key: string,
   ip: string,
   localPath: string,
   remoteWorkdir: string,
-): void {
-  rsyncPush(key, ip, localPath, remoteWorkdir);
+): Promise<void> {
+  await rsyncPush(key, ip, localPath, remoteWorkdir);
 }
 
 /**
@@ -76,8 +77,8 @@ export function watchClipboard(
   const intervalMs = opts?.intervalMs ?? 5000;
   let lastHash: string | null = null;
 
-  const timer = setInterval(() => {
-    const imgPath = getClipboardImage();
+  const timer = setInterval(async () => {
+    const imgPath = await getClipboardImage();
     if (!imgPath) return;
 
     try {
@@ -92,7 +93,7 @@ export function watchClipboard(
         ? `${remoteWorkdir}${filename}`
         : `${remoteWorkdir}/${filename}`;
 
-      uploadToSession(key, ip, imgPath, remoteDest);
+      await uploadToSession(key, ip, imgPath, remoteDest);
       opts?.onUpload?.(filename);
     } catch {
       // best-effort - skip this tick

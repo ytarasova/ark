@@ -14,14 +14,14 @@ describe("EC2 remote setup", () => {
   // getGitRemoteUrl
   // -----------------------------------------------------------------------
   describe("getGitRemoteUrl", () => {
-    it("returns URL for a git repo (ark repo itself)", () => {
-      const url = getGitRemoteUrl(process.cwd());
+    it("returns URL for a git repo (ark repo itself)", async () => {
+      const url = await getGitRemoteUrl(process.cwd());
       expect(url).not.toBeNull();
       expect(typeof url).toBe("string");
     });
 
-    it("returns null for non-git directory", () => {
-      const url = getGitRemoteUrl("/tmp");
+    it("returns null for non-git directory", async () => {
+      const url = await getGitRemoteUrl("/tmp");
       expect(url).toBeNull();
     });
   });
@@ -30,20 +30,20 @@ describe("EC2 remote setup", () => {
   // resolveRepoUrl
   // -----------------------------------------------------------------------
   describe("resolveRepoUrl", () => {
-    it("converts org/repo to git@github.com:org/repo.git", () => {
-      expect(resolveRepoUrl("org/repo")).toBe("git@github.com:org/repo.git");
+    it("converts org/repo to git@github.com:org/repo.git", async () => {
+      expect(await resolveRepoUrl("org/repo")).toBe("git@github.com:org/repo.git");
     });
 
-    it("returns https:// URLs as-is", () => {
-      expect(resolveRepoUrl("https://github.com/org/repo")).toBe("https://github.com/org/repo");
+    it("returns https:// URLs as-is", async () => {
+      expect(await resolveRepoUrl("https://github.com/org/repo")).toBe("https://github.com/org/repo");
     });
 
-    it("returns git@ URLs as-is", () => {
-      expect(resolveRepoUrl("git@github.com:org/repo.git")).toBe("git@github.com:org/repo.git");
+    it("returns git@ URLs as-is", async () => {
+      expect(await resolveRepoUrl("git@github.com:org/repo.git")).toBe("git@github.com:org/repo.git");
     });
 
-    it("extracts git remote from local path", () => {
-      const url = resolveRepoUrl(process.cwd());
+    it("extracts git remote from local path", async () => {
+      const url = await resolveRepoUrl(process.cwd());
       expect(url).not.toBeNull();
       expect(typeof url).toBe("string");
     });

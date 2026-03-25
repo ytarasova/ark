@@ -3,12 +3,15 @@
  * Syncs credentials and project files between local machine and remote EC2 host.
  */
 
-import { execFileSync } from "child_process";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import { homedir, tmpdir, userInfo } from "os";
 import { join } from "path";
 
 import { rsyncPush, rsyncPull, sshExec } from "./ssh.js";
+
+const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
 // Path rewriting
@@ -37,124 +40,122 @@ export function rewritePaths(content: string, direction: "push" | "pull"): strin
 
 export interface SyncStep {
   name: string;
-  push: (key: string, ip: string) => void;
-  pull: (key: string, ip: string) => void;
+  push: (key: string, ip: string) => Promise<void>;
+  pull: (key: string, ip: string) => Promise<void>;
 }
 
-function syncSshPush(key: string, ip: string): void {
+async function syncSshPush(key: string, ip: string): Promise<void> {
   const sshDir = join(homedir(), ".ssh");
   if (!existsSync(sshDir)) return;
 
-  sshExec(key, ip, "mkdir -p ~/.ssh && chmod 700 ~/.ssh");
+  await sshExec(key, ip, "mkdir -p ~/.ssh && chmod 700 ~/.ssh");
 
   // rsync the whole directory, excluding ark-* keys to avoid recursive key problem
-  rsyncPush(key, ip, sshDir + "/", "~/.ssh/");
+  await rsyncPush(key, ip, sshDir + "/", "~/.ssh/");
 
   // Remove any ark-* keys that may have slipped through (belt and suspenders)
-  sshExec(key, ip, "rm -f ~/.ssh/ark-* 2>/dev/null");
+  await sshExec(key, ip, "rm -f ~/.ssh/ark-* 2>/dev/null");
 
   // Fix permissions and populate known_hosts for github.com
-  sshExec(key, ip,
+  await sshExec(key, ip,
     "chmod 600 ~/.ssh/id_* 2>/dev/null; " +
     "ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null",
   );
 }
 
-function syncSshPull(_key: string, _ip: string): void {
+async function syncSshPull(_key: string, _ip: string): Promise<void> {
   // SSH keys are push-only - we never pull remote keys to local
 }
 
-function syncAwsPush(key: string, ip: string): void {
+async function syncAwsPush(key: string, ip: string): Promise<void> {
   const awsDir = join(homedir(), ".aws");
-  sshExec(key, ip, "mkdir -p ~/.aws");
+  await sshExec(key, ip, "mkdir -p ~/.aws");
   if (existsSync(join(awsDir, "config"))) {
-    rsyncPush(key, ip, join(awsDir, "config"), "~/.aws/");
+    await rsyncPush(key, ip, join(awsDir, "config"), "~/.aws/");
   }
   if (existsSync(join(awsDir, "credentials"))) {
-    rsyncPush(key, ip, join(awsDir, "credentials"), "~/.aws/");
+    await rsyncPush(key, ip, join(awsDir, "credentials"), "~/.aws/");
   }
 }
 
-function syncAwsPull(_key: string, _ip: string): void {
+async function syncAwsPull(_key: string, _ip: string): Promise<void> {
   // AWS credentials are push-only
 }
 
-function syncGitPush(key: string, ip: string): void {
+async function syncGitPush(key: string, ip: string): Promise<void> {
   const gitconfig = join(homedir(), ".gitconfig");
   if (existsSync(gitconfig)) {
-    rsyncPush(key, ip, gitconfig, "~/");
+    await rsyncPush(key, ip, gitconfig, "~/");
   }
 }
 
-function syncGitPull(_key: string, _ip: string): void {
+async function syncGitPull(_key: string, _ip: string): Promise<void> {
   // Git config is push-only
 }
 
-function syncGhPush(key: string, ip: string): void {
+async function syncGhPush(key: string, ip: string): Promise<void> {
   try {
-    const token = execFileSync("gh", ["auth", "token"], {
+    const { stdout } = await execFileAsync("gh", ["auth", "token"], {
       encoding: "utf-8",
       timeout: 10_000,
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    });
+    const token = stdout.trim();
     if (token) {
-      sshExec(key, ip, `echo '${token}' | gh auth login --with-token 2>/dev/null`);
+      await sshExec(key, ip, `echo '${token}' | gh auth login --with-token 2>/dev/null`);
     }
   } catch {
     // gh CLI not installed or not authenticated - skip
   }
 }
 
-function syncGhPull(_key: string, _ip: string): void {
+async function syncGhPull(_key: string, _ip: string): Promise<void> {
   // GH token is push-only
 }
 
-function syncClaudePush(key: string, ip: string): void {
+async function syncClaudePush(key: string, ip: string): Promise<void> {
   const claudeDir = join(homedir(), ".claude");
   if (!existsSync(claudeDir)) return;
 
-  sshExec(key, ip, "mkdir -p ~/.claude");
+  await sshExec(key, ip, "mkdir -p ~/.claude");
 
   // Copy to a temp dir so we can rewrite paths without modifying local files
   const tmp = mkdtempSync(join(tmpdir(), "ark-claude-push-"));
   try {
     // rsync local .claude/ into temp
-    execFileSync("rsync", ["-a", claudeDir + "/", tmp + "/"], {
+    await execFileAsync("rsync", ["-a", claudeDir + "/", tmp + "/"], {
       encoding: "utf-8",
       timeout: 30_000,
-      stdio: ["pipe", "pipe", "pipe"],
     });
 
     // Rewrite paths in all JSON files within temp
     rewriteJsonFiles(tmp, "push");
 
     // Push rewritten temp dir to remote
-    rsyncPush(key, ip, tmp + "/", "~/.claude/");
+    await rsyncPush(key, ip, tmp + "/", "~/.claude/");
   } finally {
-    execFileSync("rm", ["-rf", tmp]);
+    await execFileAsync("rm", ["-rf", tmp]);
   }
 }
 
-function syncClaudePull(key: string, ip: string): void {
+async function syncClaudePull(key: string, ip: string): Promise<void> {
   const claudeDir = join(homedir(), ".claude");
   mkdirSync(claudeDir, { recursive: true });
 
   // Pull into a temp dir first so we can rewrite paths
   const tmp = mkdtempSync(join(tmpdir(), "ark-claude-pull-"));
   try {
-    rsyncPull(key, ip, "~/.claude/", tmp + "/");
+    await rsyncPull(key, ip, "~/.claude/", tmp + "/");
 
     // Rewrite paths in all JSON files within temp (reverse direction)
     rewriteJsonFiles(tmp, "pull");
 
     // Copy rewritten files to local .claude/
-    execFileSync("rsync", ["-a", tmp + "/", claudeDir + "/"], {
+    await execFileAsync("rsync", ["-a", tmp + "/", claudeDir + "/"], {
       encoding: "utf-8",
       timeout: 30_000,
-      stdio: ["pipe", "pipe", "pipe"],
     });
   } finally {
-    execFileSync("rm", ["-rf", tmp]);
+    await execFileAsync("rm", ["-rf", tmp]);
   }
 }
 
@@ -194,11 +195,11 @@ export const SYNC_STEPS: SyncStep[] = [
 /**
  * Execute sync steps by category. Returns which succeeded and which failed.
  */
-export function syncToHost(
+export async function syncToHost(
   key: string,
   ip: string,
   opts: { direction: "push" | "pull"; categories?: string[] },
-): { synced: string[]; failed: string[] } {
+): Promise<{ synced: string[]; failed: string[] }> {
   const synced: string[] = [];
   const failed: string[] = [];
 
@@ -209,9 +210,9 @@ export function syncToHost(
   for (const step of steps) {
     try {
       if (opts.direction === "push") {
-        step.push(key, ip);
+        await step.push(key, ip);
       } else {
-        step.pull(key, ip);
+        await step.pull(key, ip);
       }
       synced.push(step.name);
     } catch {
@@ -226,14 +227,14 @@ export function syncToHost(
  * Push specific project files from a local directory to a remote working directory.
  * These are typically the arc.json "sync" files (.env, terraform.tfvars, etc.)
  */
-export function syncProjectFiles(
+export async function syncProjectFiles(
   key: string,
   ip: string,
   files: string[],
   localDir: string,
   remoteDir: string,
-): void {
-  sshExec(key, ip, `mkdir -p ${remoteDir}`);
+): Promise<void> {
+  await sshExec(key, ip, `mkdir -p ${remoteDir}`);
   for (const file of files) {
     const localPath = join(localDir, file);
     if (existsSync(localPath)) {
@@ -241,9 +242,9 @@ export function syncProjectFiles(
       const parts = file.split("/");
       if (parts.length > 1) {
         const subdir = parts.slice(0, -1).join("/");
-        sshExec(key, ip, `mkdir -p ${remoteDir}/${subdir}`);
+        await sshExec(key, ip, `mkdir -p ${remoteDir}/${subdir}`);
       }
-      rsyncPush(key, ip, localPath, `${remoteDir}/${file}`);
+      await rsyncPush(key, ip, localPath, `${remoteDir}/${file}`);
     }
   }
 }

@@ -281,15 +281,18 @@ function makePulumiProgram(
  * Creates or selects a Pulumi stack named "ark-compute-{hostName}", defines
  * the EC2 resources inline, and runs `stack.up()` to deploy.
  */
-export function ensurePulumi(onLog?: (msg: string) => void): void {
-  const { execFileSync } = require("child_process");
+export async function ensurePulumi(onLog?: (msg: string) => void): Promise<void> {
+  const { execFile } = require("child_process");
+  const { promisify } = require("util");
   const { existsSync } = require("fs");
   const { join } = require("path");
   const { homedir: home } = require("os");
 
+  const execFileAsync = promisify(execFile);
+
   // Check PATH first
   try {
-    execFileSync("pulumi", ["version"], { stdio: "pipe", timeout: 5000 });
+    await execFileAsync("pulumi", ["version"], { timeout: 5000 });
     return;
   } catch { /* not in PATH */ }
 
@@ -301,19 +304,18 @@ export function ensurePulumi(onLog?: (msg: string) => void): void {
     return;
   }
 
-  // Auto-install using curl + sh via execFileSync
+  // Auto-install using curl + sh
   const log = onLog ?? (() => {});
   log("Pulumi CLI not found - installing...");
   try {
     // Download installer script, then run it
-    execFileSync("bash", ["-c", "curl -fsSL https://get.pulumi.com | sh"], {
-      stdio: "pipe",
+    await execFileAsync("bash", ["-c", "curl -fsSL https://get.pulumi.com | sh"], {
       timeout: 120_000,
       env: { ...process.env, PULUMI_SKIP_UPDATE_CHECK: "true" },
     });
     process.env.PATH = `${pulumiBin}:${process.env.PATH}`;
-    const version = execFileSync(pulumiPath, ["version"], { encoding: "utf-8", timeout: 5000 }).trim();
-    log(`Pulumi ${version} installed`);
+    const { stdout } = await execFileAsync(pulumiPath, ["version"], { encoding: "utf-8", timeout: 5000 });
+    log(`Pulumi ${stdout.trim()} installed`);
   } catch (e: any) {
     throw new Error(`Failed to install Pulumi: ${e.message ?? e}`);
   }

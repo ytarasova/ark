@@ -5,18 +5,21 @@
  * in Claude's config, and handles the development-channels acceptance prompt.
  */
 
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { sshExecAsync } from "./ssh.js";
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Extract git remote URL from a local repo path.
  */
-export function getGitRemoteUrl(localPath: string): string | null {
-  // Use execFileSync since this runs locally, not on remote
-  const { execFileSync } = require("child_process");
+export async function getGitRemoteUrl(localPath: string): Promise<string | null> {
   try {
-    return execFileSync("git", ["-C", localPath, "remote", "get-url", "origin"], {
-      encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
-    }).trim() || null;
+    const { stdout } = await execFileAsync("git", ["-C", localPath, "remote", "get-url", "origin"], {
+      encoding: "utf-8",
+    });
+    return stdout.trim() || null;
   } catch { return null; }
 }
 
@@ -24,7 +27,7 @@ export function getGitRemoteUrl(localPath: string): string | null {
  * Resolve a repo reference to a git clone URL.
  * Handles: "org/repo", "https://github.com/...", "/local/path", "git@github.com:..."
  */
-export function resolveRepoUrl(repo: string): string | null {
+export async function resolveRepoUrl(repo: string): Promise<string | null> {
   if (repo.startsWith("git@") || repo.startsWith("https://")) return repo;
   if (repo.includes("/") && !repo.startsWith("/")) return `git@github.com:${repo}.git`;
   // Local path - extract remote

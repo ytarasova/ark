@@ -71,11 +71,11 @@ export class EC2Provider implements ComputeProvider {
     updateCompute(compute.name, { status: "provisioning" });
 
     // Ensure Pulumi CLI is available (auto-installs if missing)
-    ensurePulumi(log);
+    await ensurePulumi(log);
 
     // Generate SSH key pair for this compute
     log("Generating SSH key pair...");
-    const { privateKeyPath } = generateSshKey(compute.name);
+    const { privateKeyPath } = await generateSshKey(compute.name);
 
     // Build cloud-init user data
     log("Building cloud-init script...");
@@ -229,7 +229,7 @@ export class EC2Provider implements ComputeProvider {
     const key = sshKeyPath(compute.name);
 
     // 1. Resolve repo URL
-    const repoUrl = resolveRepoUrl(session.repo ?? opts.workdir);
+    const repoUrl = await resolveRepoUrl(session.repo ?? opts.workdir);
     if (!repoUrl) throw new Error("Cannot determine git repo URL. Provide org/repo or a git repo path.");
     const repoName = getRepoName(repoUrl);
 
@@ -243,7 +243,7 @@ export class EC2Provider implements ComputeProvider {
     const { parseArcJson } = await import("../../arc-json.js");
     const arcJson = opts.workdir ? parseArcJson(opts.workdir) : null;
     if (arcJson?.sync?.length && opts.workdir) {
-      syncProjectFiles(key, ip, arcJson.sync, opts.workdir, remoteWorkdir);
+      await syncProjectFiles(key, ip, arcJson.sync, opts.workdir, remoteWorkdir);
     }
 
     // 4. Trust remote directory
@@ -360,7 +360,7 @@ export class EC2Provider implements ComputeProvider {
     const cfg = compute.config as EC2HostConfig;
     const ip = cfg.ip;
     if (!ip) return ports.map((p) => ({ ...p, listening: false }));
-    return probeRemotePorts(sshKeyPath(compute.name), ip, ports);
+    return await probeRemotePorts(sshKeyPath(compute.name), ip, ports);
   }
 
   async syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void> {
@@ -369,13 +369,13 @@ export class EC2Provider implements ComputeProvider {
     if (!ip) throw new Error(`Compute '${compute.name}' has no IP`);
     const key = sshKeyPath(compute.name);
 
-    syncToHost(key, ip, {
+    await syncToHost(key, ip, {
       direction: opts.direction,
       categories: opts.categories,
     });
 
     if (opts.projectFiles?.length && opts.projectDir) {
-      syncProjectFiles(
+      await syncProjectFiles(
         key,
         ip,
         opts.projectFiles,

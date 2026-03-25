@@ -2,10 +2,13 @@
  * SSH tunnel management for forwarding ports from remote EC2 hosts.
  */
 
-import { execFileSync, spawn } from "child_process";
+import { execFile, spawn } from "child_process";
+import { promisify } from "util";
 import type { PortDecl, PortStatus } from "../../types.js";
-import { SSH_OPTS } from "./ssh.js";
+import { SSH_OPTS, sshExec } from "./ssh.js";
 import { sshBaseArgs } from "./ssh.js";
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Build SSH args for a background tunnel process.
@@ -41,13 +44,13 @@ export function setupTunnels(key: string, ip: string, ports: PortDecl[]): void {
  * Kill SSH processes that are forwarding the given ports.
  * Uses lsof to find PIDs listening on each port, then kills them.
  */
-export function teardownTunnels(ports: PortDecl[]): void {
+export async function teardownTunnels(ports: PortDecl[]): Promise<void> {
   for (const p of ports) {
     try {
-      const output = execFileSync("lsof", ["-ti", `:${p.port}`], {
+      const { stdout } = await execFileAsync("lsof", ["-ti", `:${p.port}`], {
         encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-      }).trim();
+      });
+      const output = stdout.trim();
 
       if (output) {
         const pids = output.split("\n").filter(Boolean);
@@ -83,21 +86,12 @@ export function setupReverseTunnel(key: string, ip: string, port: number): void 
  * SSH into the remote host, run `ss -tln`, and check which declared ports
  * are actually listening. Returns a PortStatus[] with listening: true/false.
  */
-export function probeRemotePorts(key: string, ip: string, ports: PortDecl[]): PortStatus[] {
+export async function probeRemotePorts(key: string, ip: string, ports: PortDecl[]): Promise<PortStatus[]> {
   if (ports.length === 0) return [];
 
-  let ssOutput = "";
-  const args = sshBaseArgs(key, ip);
-  const [bin, ...rest] = args;
-  rest.push("ss -tln");
+  const { stdout: ssOutput } = await sshExec(key, ip, "ss -tln", { timeout: 15_000 });
 
-  try {
-    ssOutput = execFileSync(bin, rest, {
-      encoding: "utf-8",
-      timeout: 15_000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-  } catch {
+  if (!ssOutput) {
     // If SSH fails, mark all ports as not listening
     return ports.map((p) => ({ ...p, listening: false }));
   }

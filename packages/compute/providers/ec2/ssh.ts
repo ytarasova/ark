@@ -1,9 +1,9 @@
 /**
  * SSH, rsync, and key-generation primitives for EC2 hosts.
- * Ported from BigBox's Python ssh.py to TypeScript.
+ * ALL operations are async — no sync exec calls.
  */
 
-import { execFile, execFileSync } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import { poll } from "../../util.js";
 import { existsSync, mkdirSync } from "fs";
@@ -36,41 +36,10 @@ export function sshBaseArgs(key: string, ip: string, ports?: number[]): string[]
 }
 
 /**
- * Execute a command on a remote host via SSH.
- * Uses execFileSync; never throws. Returns stdout, stderr, and exitCode.
+ * Execute a command on a remote host via SSH (async).
+ * Never throws. Returns stdout, stderr, and exitCode.
  */
-export function sshExec(
-  key: string,
-  ip: string,
-  cmd: string,
-  opts?: { timeout?: number },
-): { stdout: string; stderr: string; exitCode: number } {
-  const args = sshBaseArgs(key, ip);
-  // First element is "ssh" - that's the binary, rest are args.
-  const [bin, ...rest] = args;
-  rest.push(cmd);
-
-  try {
-    const stdout = execFileSync(bin, rest, {
-      encoding: "utf-8",
-      timeout: opts?.timeout ?? 30_000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    return { stdout, stderr: "", exitCode: 0 };
-  } catch (err: any) {
-    return {
-      stdout: err.stdout?.toString() ?? "",
-      stderr: err.stderr?.toString() ?? "",
-      exitCode: typeof err.status === "number" ? err.status : 1,
-    };
-  }
-}
-
-/**
- * Execute a command on a remote host via SSH (async / non-blocking).
- * Uses promisified execFile; never throws. Returns stdout, stderr, and exitCode.
- */
-export async function sshExecAsync(
+export async function sshExec(
   key: string,
   ip: string,
   cmd: string,
@@ -94,6 +63,9 @@ export async function sshExecAsync(
     };
   }
 }
+
+/** Alias for backward compatibility */
+export const sshExecAsync = sshExec;
 
 // ---------------------------------------------------------------------------
 // rsync helpers
@@ -121,21 +93,21 @@ export function rsyncPullArgs(key: string, ip: string, remote: string, local: st
   ];
 }
 
-/** Push local path to remote via rsync. */
-export function rsyncPush(key: string, ip: string, local: string, remote: string): void {
+/** Push local path to remote via rsync (async). */
+export async function rsyncPush(key: string, ip: string, local: string, remote: string): Promise<void> {
   const [bin, ...rest] = rsyncPushArgs(key, ip, local, remote);
   try {
-    execFileSync(bin, rest, { encoding: "utf-8", timeout: 300_000, stdio: ["pipe", "pipe", "pipe"] });
+    await execFileAsync(bin, rest, { encoding: "utf-8", timeout: 300_000 });
   } catch {
     // best-effort - caller may retry
   }
 }
 
-/** Pull remote path to local via rsync. */
-export function rsyncPull(key: string, ip: string, remote: string, local: string): void {
+/** Pull remote path to local via rsync (async). */
+export async function rsyncPull(key: string, ip: string, remote: string, local: string): Promise<void> {
   const [bin, ...rest] = rsyncPullArgs(key, ip, remote, local);
   try {
-    execFileSync(bin, rest, { encoding: "utf-8", timeout: 300_000, stdio: ["pipe", "pipe", "pipe"] });
+    await execFileAsync(bin, rest, { encoding: "utf-8", timeout: 300_000 });
   } catch {
     // best-effort - caller may retry
   }
@@ -146,39 +118,26 @@ export function rsyncPull(key: string, ip: string, remote: string, local: string
 // ---------------------------------------------------------------------------
 
 /**
- * Poll SSH readiness with 5 s sleep between attempts.
+ * Poll SSH readiness (async).
  * Returns true as soon as a connection succeeds.
  */
-export function waitForSsh(key: string, ip: string, maxAttempts = 30): boolean {
-  for (let i = 0; i < maxAttempts; i++) {
-    const { exitCode } = sshExec(key, ip, "echo ok", { timeout: 10_000 });
-    if (exitCode === 0) return true;
-    if (i < maxAttempts - 1) {
-      execFileSync("sleep", ["5"]);
-    }
-  }
-  return false;
-}
-
-/**
- * Poll SSH readiness (async / non-blocking).
- * Returns true as soon as a connection succeeds.
- */
-export async function waitForSshAsync(key: string, ip: string, maxAttempts = 30): Promise<boolean> {
+export async function waitForSsh(key: string, ip: string, maxAttempts = 30): Promise<boolean> {
   return poll(
     async () => {
-      const { exitCode } = await sshExecAsync(key, ip, "echo ok", { timeout: 10_000 });
+      const { exitCode } = await sshExec(key, ip, "echo ok", { timeout: 10_000 });
       return exitCode === 0;
     },
     { maxAttempts, delayMs: 5000 },
   );
 }
 
+/** Alias for backward compatibility */
+export const waitForSshAsync = waitForSsh;
+
 /**
- * Generate an ed25519 SSH key pair at sshKeyPath(hostName) if it does not
- * already exist. Returns the public and private key paths.
+ * Generate an ed25519 SSH key pair (async).
  */
-export function generateSshKey(hostName: string): { publicKeyPath: string; privateKeyPath: string } {
+export async function generateSshKey(hostName: string): Promise<{ publicKeyPath: string; privateKeyPath: string }> {
   const privateKeyPath = sshKeyPath(hostName);
   const publicKeyPath = `${privateKeyPath}.pub`;
 
@@ -192,12 +151,12 @@ export function generateSshKey(hostName: string): { publicKeyPath: string; priva
   }
 
   try {
-    execFileSync("ssh-keygen", [
+    await execFileAsync("ssh-keygen", [
       "-t", "ed25519",
       "-f", privateKeyPath,
       "-N", "",
       "-C", `ark-${hostName}`,
-    ], { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+    ], { encoding: "utf-8" });
   } catch (err: any) {
     throw new Error(`Failed to generate SSH key: ${err.stderr ?? err.message}`);
   }

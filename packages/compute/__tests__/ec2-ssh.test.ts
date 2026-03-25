@@ -84,10 +84,10 @@ describe("EC2 SSH primitives", () => {
   // sshExec - graceful failure
   // -----------------------------------------------------------------------
   describe("sshExec", () => {
-    it("handles failure gracefully (unreachable host, nonexistent key)", () => {
+    it("handles failure gracefully (unreachable host, nonexistent key)", async () => {
       // 192.0.2.1 is TEST-NET-1 (RFC 5737) - guaranteed unreachable.
       // Use a very short timeout so the test doesn't block.
-      const result = sshExec("/nonexistent/key", "192.0.2.1", "echo hi", { timeout: 3_000 });
+      const result = await sshExec("/nonexistent/key", "192.0.2.1", "echo hi", { timeout: 3_000 });
       expect(result).toHaveProperty("stdout");
       expect(result).toHaveProperty("stderr");
       expect(result).toHaveProperty("exitCode");

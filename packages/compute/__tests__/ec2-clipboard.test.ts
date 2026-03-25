@@ -11,8 +11,8 @@ describe("EC2 clipboard sync", () => {
   // getClipboardImage
   // -----------------------------------------------------------------------
   describe("getClipboardImage", () => {
-    it("returns string or null without crashing", () => {
-      const result = getClipboardImage();
+    it("returns string or null without crashing", async () => {
+      const result = await getClipboardImage();
       expect(result === null || typeof result === "string").toBe(true);
     });
   });
