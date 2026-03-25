@@ -149,16 +149,6 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
       return;
     }
 
-    if (input === "/" && mode !== "search") {
-      asyncState.run("Indexing transcripts...", async () => {
-        const count = await core.indexTranscripts({
-          onProgress: (indexed, files) => { status.show(`Indexing... ${files} files, ${indexed} entries`); },
-        });
-        status.show(`Indexed ${count} transcript entries`);
-      });
-      return;
-    }
-
     if (input === "s" && mode !== "search") {
       setMode("search"); setSearchQuery(""); setSearchResults([]);
       return;
@@ -166,12 +156,16 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
 
     if (key.escape && mode === "search") { setMode("recent"); return; }
 
+    // r — refresh cache + reindex transcripts
     if (input === "r" && mode !== "search") {
-      asyncState.run("Refreshing Claude sessions...", async () => {
-        const count = await core.refreshClaudeSessionsCache();
+      asyncState.run("Refreshing...", async () => {
+        const sessionCount = await core.refreshClaudeSessionsCache();
+        const indexCount = await core.indexTranscripts({
+          onProgress: (indexed, files) => { status.show(`Indexing... ${files} files, ${indexed} entries`); },
+        });
         const sessions = core.listClaudeSessions({ limit: RECENT_LIMIT });
         setClaudeSessions(sessions);
-        status.show(`Refreshed ${count} sessions`);
+        status.show(`${sessionCount} sessions, ${indexCount} indexed`);
       });
       return;
     }

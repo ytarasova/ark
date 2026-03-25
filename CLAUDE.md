@@ -161,7 +161,7 @@ stages:
 | `i` | Inbox/threads | `g` | Group manager |
 | `Tab` | Focus detail pane | `e` | Expand events |
 
-**History tab (5):** `Enter`:import `/:index` `r`:refresh `s`:search
+**History tab (5):** `Enter`:import `r`:refresh+reindex `s`:search
 
 **Compute tab (6):** `Enter`:provision `s`:start/stop `c`:clean `n`:new `x`:delete
 

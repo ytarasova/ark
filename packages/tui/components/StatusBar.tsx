@@ -126,7 +126,6 @@ function getHistoryHints(): React.ReactNode[] {
   return [
     <KeyHint key="jk" k="j/k" label="move" />,
     <KeyHint key="enter" k="Enter" label="import" />,
-    <KeyHint key="/" k="/" label="index" />,
     <KeyHint key="r" k="r" label="refresh" />,
     <KeyHint key="s" k="s" label="search" />,
     <KeyHint key="q" k="q" label="quit" />,
