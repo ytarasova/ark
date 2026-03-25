@@ -101,7 +101,7 @@ export function formatReviewPrompt(
 export function findSessionByPR(prUrl: string): store.Session | null {
   const db = getDb();
   const row = db.prepare(
-    "SELECT * FROM sessions WHERE pr_url = ? ORDER BY created_at DESC LIMIT 1"
+    "SELECT * FROM sessions WHERE pr_url = ? ORDER BY rowid DESC LIMIT 1"
   ).get(prUrl) as any;
   if (!row) return null;
   return {
