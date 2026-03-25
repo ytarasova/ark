@@ -491,26 +491,21 @@ async function launchAgentTmux(
       });
     } catch { /* sync failure shouldn't block launch */ }
 
-    // Docker Compose - start services if compose file exists
+    // Docker Compose - only when explicitly enabled in arc.json { "compose": true }
     if (effectiveWorkdir) {
-      const { detectComposeFile } = await import("../compute/providers/docker/compose.js");
-      const composeFile = detectComposeFile(effectiveWorkdir);
       const arcJson = parseArcJson(effectiveWorkdir);
-      const shouldCompose = arcJson?.compose ?? !!composeFile;
-      if (shouldCompose && compute.config?.ip) {
+      if (arcJson?.compose === true && compute.config?.ip) {
         const { sshExec, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
         sshExec(sshKeyPath(compute.name), compute.config.ip as string,
           `cd ${effectiveWorkdir} && docker compose up -d`);
       }
     }
 
-    // Devcontainer - wrap launch command if devcontainer is detected
+    // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }
     if (effectiveWorkdir) {
-      const { detectDevcontainer, buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
-      const dcPath = detectDevcontainer(effectiveWorkdir);
       const arcJson = parseArcJson(effectiveWorkdir);
-      const shouldDevcontainer = arcJson?.devcontainer ?? !!dcPath;
-      if (shouldDevcontainer) {
+      if (arcJson?.devcontainer === true) {
+        const { buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
         finalLaunchContent = buildLaunchCommand(effectiveWorkdir, finalLaunchContent);
       }
     }

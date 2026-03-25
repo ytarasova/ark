@@ -175,9 +175,6 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
         active={active === "repo"}
         onEditChange={setEditing}
       />
-      {repoPath && !isGitRepo && (
-        <Text color="red">{"  Not a git repository"}</Text>
-      )}
 
       <FormSelectField
         label="Compute"
@@ -216,6 +213,11 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
         active={active === "flow"}
       />
 
+      {repoPath && !isGitRepo && (
+        <Box marginTop={1}>
+          <Text color="red">{" ⚠ Not a git repository — select a folder with .git"}</Text>
+        </Box>
+      )}
       <Box flexGrow={1} />
     </Box>
   );
