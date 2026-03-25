@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ark — Autonomous Agent Ecosystem</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0e17;
+      color: #e2e8f0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Subtle animated gradient background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(56, 189, 248, 0.08), transparent),
+        radial-gradient(ellipse 60% 40% at 80% 20%, rgba(139, 92, 246, 0.06), transparent),
+        radial-gradient(ellipse 50% 60% at 50% 80%, rgba(16, 185, 129, 0.05), transparent);
+      z-index: -1;
+      animation: glow 20s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow {
+      0% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 6rem 2rem 4rem;
+    }
+
+    /* Header */
+    .logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 4.5rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.75rem;
+    }
+
+    .tagline {
+      font-size: 1.25rem;
+      color: #94a3b8;
+      line-height: 1.6;
+      max-width: 500px;
+    }
+
+    .tagline strong {
+      color: #cbd5e1;
+      font-weight: 600;
+    }
+
+    /* Feature pills */
+    .features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 2rem 0 3rem;
+    }
+
+    .pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.35rem 0.75rem;
+      border-radius: 100px;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+      color: #7dd3fc;
+    }
+
+    .pill.green {
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+    }
+
+    .pill.purple {
+      background: rgba(139, 92, 246, 0.08);
+      border-color: rgba(139, 92, 246, 0.15);
+      color: #c4b5fd;
+    }
+
+    /* Install boxes */
+    .install-section {
+      margin: 2.5rem 0;
+    }
+
+    .install-section h2 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #64748b;
+      margin-bottom: 0.75rem;
+    }
+
+    .code-box {
+      position: relative;
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+      overflow-x: auto;
+      transition: border-color 0.2s;
+    }
+
+    .code-box:hover {
+      border-color: #334155;
+    }
+
+    .code-box code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      color: #a5f3fc;
+      line-height: 1.6;
+    }
+
+    .code-box .prompt {
+      color: #6366f1;
+      user-select: none;
+    }
+
+    .code-box .comment {
+      color: #475569;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #94a3b8;
+      font-size: 0.75rem;
+      padding: 0.3rem 0.6rem;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.15s;
+    }
+
+    .copy-btn:hover {
+      background: #334155;
+      color: #e2e8f0;
+    }
+
+    /* Divider */
+    .divider {
+      border: none;
+      height: 1px;
+      background: linear-gradient(to right, transparent, #1e293b, transparent);
+      margin: 3rem 0;
+    }
+
+    /* What you get section */
+    .what-you-get h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #f1f5f9;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: 1fr; }
+      .logo { font-size: 3rem; }
+    }
+
+    .card {
+      background: rgba(17, 24, 39, 0.6);
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 1.25rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .card:hover {
+      border-color: #334155;
+      transform: translateY(-1px);
+    }
+
+    .card .icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 0.35rem;
+    }
+
+    .card p {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .footer a {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: #64748b;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer a:hover {
+      color: #38bdf8;
+    }
+
+    /* Requirements note */
+    .requirements {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: rgba(250, 204, 21, 0.04);
+      border: 1px solid rgba(250, 204, 21, 0.1);
+      border-radius: 10px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    .requirements strong {
+      color: #fbbf24;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">ark</div>
+    <p class="tagline">
+      <strong>Autonomous agent ecosystem.</strong><br>
+      Orchestrate Claude agents through multi-stage flows with local, Docker, and EC2 compute.
+    </p>
+
+    <div class="features">
+      <span class="pill">multi-stage flows</span>
+      <span class="pill green">hook-based status</span>
+      <span class="pill purple">TUI dashboard</span>
+      <span class="pill">tiered autonomy</span>
+      <span class="pill green">FTS5 search</span>
+      <span class="pill purple">PR monitoring</span>
+      <span class="pill">headless CI mode</span>
+    </div>
+
+    <div class="install-section">
+      <h2>Install</h2>
+      <div class="code-box">
+        <button class="copy-btn" onclick="copy(this, 'curl -fsSL https://ytarasova.github.io/ark/install.sh | bash')">Copy</button>
+        <code><span class="prompt">$</span> curl -fsSL https://ytarasova.github.io/ark/install.sh | bash</code>
+      </div>
+
+      <div class="code-box">
+        <code>
+          <span class="comment"># Pin to a specific version</span><br>
+          <span class="prompt">$</span> curl -fsSL https://ytarasova.github.io/ark/install.sh | ARK_VERSION=v0.2.0 bash
+        </code>
+      </div>
+    </div>
+
+    <div class="install-section">
+      <h2>Quick Start</h2>
+      <div class="code-box">
+        <code>
+          <span class="prompt">$</span> ark tui<span class="comment">              # terminal dashboard</span><br>
+          <span class="prompt">$</span> ark exec --repo . --summary "Fix auth bug"<br>
+          <span class="prompt">$</span> ark search "authentication"
+        </code>
+      </div>
+    </div>
+
+    <div class="requirements">
+      <strong>Requires:</strong> macOS &middot; tmux (<code>brew install tmux</code>) &middot; Bun is installed automatically
+    </div>
+
+    <hr class="divider">
+
+    <div class="what-you-get">
+      <h2>What you get</h2>
+      <div class="grid">
+        <div class="card">
+          <div class="icon">&#9881;</div>
+          <h3>Multi-Stage Flows</h3>
+          <p>YAML-defined pipelines with plan, implement, review, and deploy stages. Gates control advancement.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#9000;</div>
+          <h3>TUI Dashboard</h3>
+          <p>React + Ink terminal UI. 6 tabs, live agent output, conversation search, keyboard-driven.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#9889;</div>
+          <h3>Multi-Compute</h3>
+          <p>Run agents on local tmux, Docker containers, or EC2 instances. Provider-driven isolation.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128269;</div>
+          <h3>Session Intelligence</h3>
+          <p>FTS5-indexed transcripts, cost tracking, conversation history, and Claude session import.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128274;</div>
+          <h3>Tiered Autonomy</h3>
+          <p>Per-stage permission levels: full, execute, edit, or read-only. Control what agents can do.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128232;</div>
+          <h3>PR Monitoring</h3>
+          <p>GitHub webhook integration. Review comments auto-steer agents. Approval opens flow gates.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+      <a href="https://github.com/ytarasova/ark/issues">Issues</a>
+    </div>
+  </div>
+
+  <script>
+    function copy(btn, text) {
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+      });
+    }
+  </script>
+</body>
+</html>
