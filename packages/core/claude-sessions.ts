@@ -93,7 +93,8 @@ function parseTranscriptMeta(filePath: string): Omit<ClaudeSession, "project" | 
           sessionId = entry.sessionId ?? sessionId;
           timestamp = entry.timestamp ?? "";
         }
-        if (entry.type === "user" && !summary) {
+        // Try user messages first, fall back to first assistant response
+        if ((entry.type === "user" || entry.type === "assistant") && !summary) {
           const msg = entry.message;
           if (msg) {
             let text = "";
@@ -103,7 +104,10 @@ function parseTranscriptMeta(filePath: string): Omit<ClaudeSession, "project" | 
               text = c.filter((x: any) => x.type === "text").map((x: any) => x.text).join(" ");
             }
             text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-            if (isRealUserMessage(text)) {
+            if (entry.type === "user" && isRealUserMessage(text)) {
+              summary = text.slice(0, 200);
+            } else if (entry.type === "assistant" && text.length > 10) {
+              // Use assistant response as fallback summary
               summary = text.slice(0, 200);
             }
           }

@@ -85,19 +85,24 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
       setConversationPreview([]);
       return;
     }
-    // Load last few messages from transcript (async to not block)
+    // Load last few messages — read only tail of file (not entire 100MB)
     asyncState.run("Loading preview...", async () => {
       await new Promise(r => setTimeout(r, 0));
-      const { readFileSync, existsSync } = await import("fs");
+      const { existsSync, statSync: fstat, openSync, readSync, closeSync } = await import("fs");
       const path = selectedItem.claudeSession!.transcriptPath;
       if (!existsSync(path)) { setConversationPreview([]); return; }
       try {
-        const content = readFileSync(path, "utf-8");
-        const lines = content.split("\n").filter(l => l.trim());
+        const stat = fstat(path);
+        // Read last 32KB — enough for ~200 recent lines
+        const tailSize = Math.min(32768, stat.size);
+        const fd = openSync(path, "r");
+        const buf = Buffer.alloc(tailSize);
+        readSync(fd, buf, 0, tailSize, Math.max(0, stat.size - tailSize));
+        closeSync(fd);
+
+        const lines = buf.toString("utf-8").split("\n").filter(l => l.trim());
         const msgs: string[] = [];
-        // Read last 20 lines, extract user/assistant messages
-        const recent = lines.slice(-200);
-        for (const line of recent) {
+        for (const line of lines) {
           try {
             const entry = JSON.parse(line);
             if (entry.type !== "user" && entry.type !== "assistant") continue;
@@ -108,12 +113,12 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
               text = msg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ");
             }
             text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-            if (!text || text.startsWith("Caveat:")) continue;
+            if (!text || text.startsWith("Caveat:") || text.startsWith("<")) continue;
             const role = entry.type === "user" ? "You" : "Claude";
             msgs.push(`${role}: ${text.slice(0, 150)}`);
           } catch {}
         }
-        setConversationPreview(msgs.slice(-15)); // last 15 messages
+        setConversationPreview(msgs.slice(-15));
       } catch { setConversationPreview([]); }
     });
   }, [selectedItem?.id]);
