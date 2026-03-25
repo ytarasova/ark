@@ -229,8 +229,8 @@ session.command("send")
   .description("Send a message to a running Claude session")
   .argument("<id>")
   .argument("<message>")
-  .action((id, message) => {
-    const r = core.send(id, message);
+  .action(async (id, message) => {
+    const r = await core.send(id, message);
     console.log(r.ok ? chalk.green("Sent") : chalk.red(r.message));
   });
 

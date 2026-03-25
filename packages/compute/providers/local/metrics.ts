@@ -1,10 +1,10 @@
 /**
  * Local host metrics collection (macOS).
  *
- * Every shell command uses execFileSync (never exec) to avoid shell injection.
+ * Every shell command uses async execFile (never exec) to avoid shell injection.
  */
 
-import { execFile, execFileSync } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import type {
   ComputeSnapshot,
@@ -18,21 +18,8 @@ const execFileAsync = promisify(execFile);
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Run a command synchronously - for backward compatibility */
-function run(cmd: string, args: string[]): string {
-  try {
-    return execFileSync(cmd, args, {
-      timeout: 10_000,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
-  } catch {
-    return "";
-  }
-}
-
 /** Run a command asynchronously - non-blocking */
-async function runAsync(cmd: string, args: string[]): Promise<string> {
+async function run(cmd: string, args: string[]): Promise<string> {
   try {
     const { stdout } = await execFileAsync(cmd, args, {
       timeout: 10_000,
@@ -54,12 +41,8 @@ function parseCpuOutput(out: string): number {
   return Math.round((parseFloat(match[1]) + parseFloat(match[2])) * 100) / 100;
 }
 
-function getCpu(): number {
-  return parseCpuOutput(run("top", ["-l", "1", "-n", "0", "-s", "0"]));
-}
-
-async function getCpuAsync(): Promise<number> {
-  return parseCpuOutput(await runAsync("top", ["-l", "1", "-n", "0", "-s", "0"]));
+async function getCpu(): Promise<number> {
+  return parseCpuOutput(await run("top", ["-l", "1", "-n", "0", "-s", "0"]));
 }
 
 // ── Memory ──────────────────────────────────────────────────────────────────
@@ -94,14 +77,10 @@ function parseMemoryOutput(totalStr: string, vmOut: string): { totalGb: number; 
   return { totalGb, usedGb, pct };
 }
 
-function getMemory(): { totalGb: number; usedGb: number; pct: number } {
-  return parseMemoryOutput(run("sysctl", ["-n", "hw.memsize"]), run("vm_stat", []));
-}
-
-async function getMemoryAsync(): Promise<{ totalGb: number; usedGb: number; pct: number }> {
+async function getMemory(): Promise<{ totalGb: number; usedGb: number; pct: number }> {
   const [totalStr, vmOut] = await Promise.all([
-    runAsync("sysctl", ["-n", "hw.memsize"]),
-    runAsync("vm_stat", []),
+    run("sysctl", ["-n", "hw.memsize"]),
+    run("vm_stat", []),
   ]);
   return parseMemoryOutput(totalStr, vmOut);
 }
@@ -115,12 +94,8 @@ function parseDiskOutput(out: string): number {
   return match ? parseInt(match[1], 10) : 0;
 }
 
-function getDisk(): number {
-  return parseDiskOutput(run("df", ["-h", "/"]));
-}
-
-async function getDiskAsync(): Promise<number> {
-  return parseDiskOutput(await runAsync("df", ["-h", "/"]));
+async function getDisk(): Promise<number> {
+  return parseDiskOutput(await run("df", ["-h", "/"]));
 }
 
 // ── Uptime ──────────────────────────────────────────────────────────────────
@@ -136,25 +111,20 @@ function parseUptimeOutput(out: string): string {
   return upIdx >= 0 ? out.slice(upIdx + 3).trim() : out;
 }
 
-function getUptime(): string {
-  return parseUptimeOutput(run("uptime", []));
-}
-
-async function getUptimeAsync(): Promise<string> {
-  return parseUptimeOutput(await runAsync("uptime", []));
+async function getUptime(): Promise<string> {
+  return parseUptimeOutput(await run("uptime", []));
 }
 
 // ── Tmux sessions ───────────────────────────────────────────────────────────
 
-function getTmuxSessions(): ComputeSession[] {
-  const listOut = run("tmux", ["list-sessions"]);
+async function getTmuxSessions(): Promise<ComputeSession[]> {
+  const listOut = await run("tmux", ["list-sessions"]);
   if (!listOut) return [];
 
   const sessions: ComputeSession[] = [];
 
   for (const line of listOut.split("\n")) {
     if (!line.trim()) continue;
-    // e.g. "my-session: 1 windows (created ...)"  or  "my-session: 1 windows (created ...) (attached)"
     const nameMatch = line.match(/^([^:]+):/);
     if (!nameMatch) continue;
 
@@ -162,8 +132,7 @@ function getTmuxSessions(): ComputeSession[] {
     const attached = line.includes("(attached)");
     const status = attached ? "attached" : "detached";
 
-    // Get pane PID for this session
-    const panePid = run("tmux", [
+    const panePid = await run("tmux", [
       "list-panes",
       "-t",
       name,
@@ -179,15 +148,14 @@ function getTmuxSessions(): ComputeSession[] {
     if (panePid) {
       const firstPid = panePid.split("\n")[0].trim();
       if (firstPid) {
-        // Get child processes via pgrep (macOS ps lacks --ppid)
-        const childrenOut = run("pgrep", ["-P", firstPid]);
+        const childrenOut = await run("pgrep", ["-P", firstPid]);
         const childPids = childrenOut
           .split("\n")
           .filter((p) => p.trim())
           .map((p) => p.trim());
 
         for (const cpid of childPids) {
-          const info = run("ps", ["-p", cpid, "-o", "pcpu,pmem,args"]);
+          const info = await run("ps", ["-p", cpid, "-o", "pcpu,pmem,args"]);
           if (info.toLowerCase().includes("claude")) {
             const statsMatch = info.match(
               /\s*([\d.]+)\s+([\d.]+)\s+(.+)/m,
@@ -202,78 +170,7 @@ function getTmuxSessions(): ComputeSession[] {
           }
         }
 
-        // Try to get working directory from pane
-        const paneDir = run("tmux", [
-          "display-message",
-          "-t",
-          name,
-          "-p",
-          "#{pane_current_path}",
-        ]);
-        if (paneDir) projectPath = paneDir;
-      }
-    }
-
-    sessions.push({ name, status, mode, projectPath, cpu, mem });
-  }
-
-  return sessions;
-}
-
-async function getTmuxSessionsAsync(): Promise<ComputeSession[]> {
-  const listOut = await runAsync("tmux", ["list-sessions"]);
-  if (!listOut) return [];
-
-  const sessions: ComputeSession[] = [];
-
-  for (const line of listOut.split("\n")) {
-    if (!line.trim()) continue;
-    const nameMatch = line.match(/^([^:]+):/);
-    if (!nameMatch) continue;
-
-    const name = nameMatch[1].trim();
-    const attached = line.includes("(attached)");
-    const status = attached ? "attached" : "detached";
-
-    const panePid = await runAsync("tmux", [
-      "list-panes",
-      "-t",
-      name,
-      "-F",
-      "#{pane_pid}",
-    ]);
-
-    let cpu = 0;
-    let mem = 0;
-    let mode = "unknown";
-    let projectPath = "";
-
-    if (panePid) {
-      const firstPid = panePid.split("\n")[0].trim();
-      if (firstPid) {
-        const childrenOut = await runAsync("pgrep", ["-P", firstPid]);
-        const childPids = childrenOut
-          .split("\n")
-          .filter((p) => p.trim())
-          .map((p) => p.trim());
-
-        for (const cpid of childPids) {
-          const info = await runAsync("ps", ["-p", cpid, "-o", "pcpu,pmem,args"]);
-          if (info.toLowerCase().includes("claude")) {
-            const statsMatch = info.match(
-              /\s*([\d.]+)\s+([\d.]+)\s+(.+)/m,
-            );
-            if (statsMatch) {
-              cpu = parseFloat(statsMatch[1]) || 0;
-              mem = parseFloat(statsMatch[2]) || 0;
-              const args = statsMatch[3];
-              mode = args.includes("dangerously") ? "development" : "normal";
-            }
-            break;
-          }
-        }
-
-        const paneDir = await runAsync("tmux", [
+        const paneDir = await run("tmux", [
           "display-message",
           "-t",
           name,
@@ -291,41 +188,6 @@ async function getTmuxSessionsAsync(): Promise<ComputeSession[]> {
 }
 
 // ── Top processes ───────────────────────────────────────────────────────────
-
-function getTopProcesses(): ComputeProcess[] {
-  const out = run("ps", ["aux"]);
-  if (!out) return [];
-
-  const lines = out.split("\n");
-  if (lines.length < 2) return [];
-
-  const procs: ComputeProcess[] = [];
-
-  // Skip header (first line)
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    // Fields: USER PID %CPU %MEM VSZ RSS TT STAT STARTED TIME COMMAND...
-    const parts = line.split(/\s+/);
-    if (parts.length < 11) continue;
-
-    const cpuVal = parseFloat(parts[2]);
-    if (cpuVal <= 0.1) continue;
-
-    const pid = parts[1];
-    const cpuStr = parts[2];
-    const memStr = parts[3];
-    const command = parts.slice(10).join(" ");
-
-    procs.push({ pid, cpu: cpuStr, mem: memStr, command, workingDir: "" });
-  }
-
-  // Sort by CPU descending
-  procs.sort((a, b) => parseFloat(b.cpu) - parseFloat(a.cpu));
-
-  return procs.slice(0, 8);
-}
 
 function parseTopProcesses(out: string): ComputeProcess[] {
   if (!out) return [];
@@ -361,67 +223,11 @@ function parseTopProcesses(out: string): ComputeProcess[] {
   return procs.slice(0, 8);
 }
 
-async function getTopProcessesAsync(): Promise<ComputeProcess[]> {
-  return parseTopProcesses(await runAsync("ps", ["aux"]));
+async function getTopProcesses(): Promise<ComputeProcess[]> {
+  return parseTopProcesses(await run("ps", ["aux"]));
 }
 
 // ── Docker containers ───────────────────────────────────────────────────────
-
-function getDockerContainers(): DockerContainer[] {
-  const statsOut = run("docker", [
-    "stats",
-    "--no-stream",
-    "--format",
-    "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}",
-  ]);
-  if (!statsOut) return [];
-
-  // Get image mapping from docker ps
-  const psOut = run("docker", [
-    "ps",
-    "--format",
-    "{{.Names}}\t{{.Image}}\t{{.Labels}}",
-  ]);
-  const imageMap = new Map<string, { image: string; project: string }>();
-  if (psOut) {
-    for (const line of psOut.split("\n")) {
-      const parts = line.split("\t");
-      if (parts.length >= 2) {
-        const name = parts[0].trim();
-        const image = parts[1].trim();
-        // Try to extract compose project from labels
-        const labels = parts[2] || "";
-        const projectMatch = labels.match(
-          /com\.docker\.compose\.project=([^,]+)/,
-        );
-        const project = projectMatch ? projectMatch[1] : "";
-        imageMap.set(name, { image, project });
-      }
-    }
-  }
-
-  const containers: DockerContainer[] = [];
-  for (const line of statsOut.split("\n")) {
-    if (!line.trim()) continue;
-    const parts = line.split("\t");
-    if (parts.length < 3) continue;
-
-    const name = parts[0].trim();
-    const cpu = parts[1].trim();
-    const memory = parts[2].trim();
-    const info = imageMap.get(name) || { image: "", project: "" };
-
-    containers.push({
-      name,
-      cpu,
-      memory,
-      image: info.image,
-      project: info.project,
-    });
-  }
-
-  return containers;
-}
 
 function parseDockerContainers(statsOut: string, psOut: string): DockerContainer[] {
   if (!statsOut) return [];
@@ -466,15 +272,15 @@ function parseDockerContainers(statsOut: string, psOut: string): DockerContainer
   return containers;
 }
 
-async function getDockerContainersAsync(): Promise<DockerContainer[]> {
+async function getDockerContainers(): Promise<DockerContainer[]> {
   const [statsOut, psOut] = await Promise.all([
-    runAsync("docker", [
+    run("docker", [
       "stats",
       "--no-stream",
       "--format",
       "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}",
     ]),
-    runAsync("docker", [
+    run("docker", [
       "ps",
       "--format",
       "{{.Names}}\t{{.Image}}\t{{.Labels}}",
@@ -488,13 +294,13 @@ async function getDockerContainersAsync(): Promise<DockerContainer[]> {
 export async function collectLocalMetrics(): Promise<ComputeSnapshot> {
   // Run all async collectors in parallel - non-blocking
   const [cpu, mem, diskPct, uptime, sessions, processes, docker] = await Promise.all([
-    getCpuAsync(),
-    getMemoryAsync(),
-    getDiskAsync(),
-    getUptimeAsync(),
-    getTmuxSessionsAsync(),
-    getTopProcessesAsync(),
-    getDockerContainersAsync(),
+    getCpu(),
+    getMemory(),
+    getDisk(),
+    getUptime(),
+    getTmuxSessions(),
+    getTopProcesses(),
+    getDockerContainers(),
   ]);
 
   const metrics: ComputeMetrics = {

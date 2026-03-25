@@ -65,14 +65,14 @@ export function useComputeActions(
 
     clean: () => {
       run("Cleaning zombie sessions", async () => {
-        const { listArkSessions, killSession } = await import("../../core/tmux.js");
-        const tmuxSessions = listArkSessions();
+        const { listArkSessionsAsync, killSessionAsync } = await import("../../core/tmux.js");
+        const tmuxSessions = await listArkSessionsAsync();
         let cleaned = 0;
         for (const ts of tmuxSessions) {
           const sessionId = ts.name.replace("ark-", "");
           const dbSession = core.getSession(sessionId);
           if (!dbSession || ["failed", "completed"].includes(dbSession.status)) {
-            killSession(ts.name);
+            await killSessionAsync(ts.name);
             if (dbSession) core.updateSession(dbSession.id, { session_id: null });
             cleaned++;
           }

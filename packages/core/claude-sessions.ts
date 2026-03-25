@@ -8,8 +8,11 @@
 import { existsSync, readdirSync, readFileSync, statSync, openSync, readSync, closeSync } from "fs";
 import { join, basename } from "path";
 import { homedir } from "os";
-import { execFileSync } from "child_process";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { getDb } from "./store.js";
+
+const execFileAsync = promisify(execFile);
 
 export interface ClaudeSession {
   sessionId: string;
@@ -62,7 +65,7 @@ function isRealUserMessage(text: string): boolean {
  * Fast metadata extraction — reads only first 8KB + last 2KB of the file,
  * NOT the entire 100MB transcript. Uses grep -c for message counting.
  */
-function parseTranscriptMeta(filePath: string): Omit<ClaudeSession, "project" | "projectDir" | "transcriptPath"> | null {
+async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession, "project" | "projectDir" | "transcriptPath"> | null> {
   let sessionId = basename(filePath, ".jsonl");
   let timestamp = "";
   let lastActivity = "";
@@ -126,10 +129,10 @@ function parseTranscriptMeta(filePath: string): Omit<ClaudeSession, "project" | 
 
     // Fast message count via grep -c (counts lines matching "user" or "assistant")
     try {
-      const out = execFileSync("grep", ["-c", '"type":"user"\\|"type":"assistant"', filePath], {
-        encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
-      }).trim();
-      messageCount = parseInt(out) || 0;
+      const { stdout: out } = await execFileAsync("grep", ["-c", '"type":"user"\\|"type":"assistant"', filePath], {
+        encoding: "utf-8",
+      });
+      messageCount = parseInt(out.trim()) || 0;
     } catch {
       // grep returns exit 1 if no matches — that's 0 messages
       messageCount = 0;
@@ -267,7 +270,7 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
         continue;
       }
 
-      const meta = parseTranscriptMeta(filePath);
+      const meta = await parseTranscriptMeta(filePath);
       if (!meta) continue;
       if (meta.messageCount < 10) continue;
 

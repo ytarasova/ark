@@ -11,7 +11,6 @@
 import { Database } from "bun:sqlite";
 import { randomBytes } from "crypto";
 import { mkdirSync, existsSync, rmSync } from "fs";
-import { execFileSync } from "child_process";
 import { join } from "path";
 
 import {

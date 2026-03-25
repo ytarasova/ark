@@ -3,9 +3,12 @@
  * project sessions. Wraps the `devcontainer` CLI.
  */
 
-import { execFileSync } from "child_process";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+
+const execFileAsync = promisify(execFile);
 
 // ── Detection ───────────────────────────────────────────────────────────────
 
@@ -32,11 +35,9 @@ export function detectDevcontainer(repoDir: string): string | null {
  * Runs `devcontainer up --workspace-folder <workdir>`.
  * Returns success/failure.
  */
-export function buildDevcontainer(workdir: string): { ok: boolean; error?: string } {
+export async function buildDevcontainer(workdir: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    execFileSync("devcontainer", ["up", "--workspace-folder", workdir], {
-      stdio: "pipe",
-    });
+    await execFileAsync("devcontainer", ["up", "--workspace-folder", workdir]);
     return { ok: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -48,17 +49,16 @@ export function buildDevcontainer(workdir: string): { ok: boolean; error?: strin
  * Runs `devcontainer exec --workspace-folder <workdir> -- <command>`.
  * Returns stdout and exit code.
  */
-export function execInDevcontainer(
+export async function execInDevcontainer(
   workdir: string,
   command: string,
-): { stdout: string; exitCode: number } {
+): Promise<{ stdout: string; exitCode: number }> {
   try {
-    const output = execFileSync(
+    const { stdout } = await execFileAsync(
       "devcontainer",
       ["exec", "--workspace-folder", workdir, "--", "bash", "-c", command],
-      { stdio: "pipe" },
     );
-    return { stdout: output.toString(), exitCode: 0 };
+    return { stdout, exitCode: 0 };
   } catch (err: unknown) {
     const exitCode =
       err && typeof err === "object" && "status" in err

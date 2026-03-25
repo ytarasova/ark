@@ -7,8 +7,11 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
-import { execFileSync } from "child_process";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { homedir } from "os";
+
+const execFileAsync = promisify(execFile);
 
 import * as store from "./store.js";
 import { getCompute } from "./store.js";
@@ -84,7 +87,7 @@ export async function dispatch(sessionId: string): Promise<{ ok: boolean; messag
   if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
 
   // Build task with handoff context
-  const task = buildTaskWithHandoff(session, stage, agentName);
+  const task = await buildTaskWithHandoff(session, stage, agentName);
   const claudeArgs = agentRegistry.buildClaudeArgs(agent);
 
   // Launch in tmux
@@ -173,7 +176,7 @@ export async function resume(sessionId: string): Promise<{ ok: boolean; message:
   if (session.status === "running" && session.session_id) return { ok: false, message: "Already running" };
   if (session.status === "completed") return { ok: false, message: "Session already completed — clone it instead" };
 
-  if (session.session_id) tmux.killSession(session.session_id);
+  if (session.session_id) await tmux.killSessionAsync(session.session_id);
 
   store.updateSession(sessionId, {
     status: "ready", error: null, breakpoint_reason: null,
@@ -383,7 +386,7 @@ async function launchAgentTmux(
   const isLocal = !compute || compute.provider === "local";
   const wantWorktree = isLocal && session.config?.worktree !== false;
   if (wantWorktree && workdir !== "." && existsSync(join(workdir, ".git"))) {
-    const wt = setupWorktree(workdir, session.id, session.branch ?? undefined);
+    const wt = await setupWorktree(workdir, session.id, session.branch ?? undefined);
     if (wt) effectiveWorkdir = wt;
   }
 
@@ -489,7 +492,7 @@ async function launchAgentTmux(
   }
 
   // Local launch
-  tmux.createSession(tmuxName, `bash ${launcher}`);
+  await tmux.createSessionAsync(tmuxName, `bash ${launcher}`);
   claude.autoAcceptChannelPrompt(tmuxName);
   claude.deliverTask(session.id, channelPort, task, stage);
   store.updateSession(session.id, { claude_session_id: claudeSessionId });
@@ -497,7 +500,7 @@ async function launchAgentTmux(
   return tmuxName;
 }
 
-function buildTaskWithHandoff(session: store.Session, stage: string, agentName: string): string {
+async function buildTaskWithHandoff(session: store.Session, stage: string, agentName: string): Promise<string> {
   const parts: string[] = [];
   const isBare = session.flow === "bare";
 
@@ -537,10 +540,10 @@ function buildTaskWithHandoff(session: store.Session, stage: string, agentName: 
   // Git log
   if (existsSync(wtDir)) {
     try {
-      const log = execFileSync("git", ["-C", wtDir, "log", "--oneline", "-10", "--no-decorate"], {
-        encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
-      }).trim();
-      if (log) parts.push(`\n## Recent commits:\n${log}`);
+      const { stdout: log } = await execFileAsync("git", ["-C", wtDir, "log", "--oneline", "-10", "--no-decorate"], {
+        encoding: "utf-8",
+      });
+      if (log.trim()) parts.push(`\n## Recent commits:\n${log.trim()}`);
     } catch { /* ignore */ }
   }
 
@@ -569,26 +572,26 @@ function extractSubtasks(session: store.Session): { name: string; task: string }
   ];
 }
 
-function setupWorktree(repoPath: string, sessionId: string, branch?: string): string | null {
+async function setupWorktree(repoPath: string, sessionId: string, branch?: string): Promise<string | null> {
   const wtPath = join(store.WORKTREES_DIR(), sessionId);
   if (existsSync(wtPath)) return wtPath;
 
   const branchName = branch ?? `ark-${sessionId}`;
   try {
-    execFileSync("git", ["-C", repoPath, "worktree", "prune"], { stdio: "pipe" });
+    await execFileAsync("git", ["-C", repoPath, "worktree", "prune"], { stdio: "pipe" });
     // Try with new branch
     try {
-      execFileSync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], { stdio: "pipe" });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], { stdio: "pipe" });
       return wtPath;
     } catch { /* branch exists */ }
     // Try existing branch
     try {
-      execFileSync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], { stdio: "pipe" });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], { stdio: "pipe" });
       return wtPath;
     } catch { /* checked out elsewhere */ }
     // Unique branch
     try {
-      execFileSync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], { stdio: "pipe" });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], { stdio: "pipe" });
       return wtPath;
     } catch { /* give up */ }
   } catch { /* ignore */ }
@@ -609,9 +612,9 @@ export async function getOutput(sessionId: string, opts?: { lines?: number; ansi
   return tmux.capturePane(session.session_id, opts);
 }
 
-export function send(sessionId: string, message: string): { ok: boolean; message: string } {
+export async function send(sessionId: string, message: string): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session?.session_id) return { ok: false, message: "No active session" };
-  tmux.sendText(session.session_id, message);
+  await tmux.sendTextAsync(session.session_id, message);
   return { ok: true, message: "Sent" };
 }

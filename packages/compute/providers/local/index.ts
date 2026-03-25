@@ -3,9 +3,12 @@
  * No provisioning needed. Uses existing tmux module for session management.
  */
 
-import { execFileSync, spawn } from "child_process";
+import { execFile, spawn } from "child_process";
+import { promisify } from "util";
 import { existsSync, rmSync } from "fs";
 import { join } from "path";
+
+const execFileAsync = promisify(execFile);
 import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
   ComputeSnapshot, PortDecl, PortStatus,
@@ -38,7 +41,7 @@ export class LocalProvider implements ComputeProvider {
 
   async launch(_compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
     const launcher = tmux.writeLauncher(opts.tmuxName, opts.launcherContent);
-    tmux.createSession(opts.tmuxName, `bash ${launcher}`);
+    await tmux.createSessionAsync(opts.tmuxName, `bash ${launcher}`);
     return opts.tmuxName;
   }
 
@@ -82,17 +85,16 @@ export class LocalProvider implements ComputeProvider {
   }
 
   async probePorts(_compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
-    return ports.map((decl) => {
+    return Promise.all(ports.map(async (decl) => {
       let listening = false;
       try {
-        const out = execFileSync("lsof", ["-i", `:${decl.port}`, "-sTCP:LISTEN"], {
+        const { stdout } = await execFileAsync("lsof", ["-i", `:${decl.port}`, "-sTCP:LISTEN"], {
           encoding: "utf-8", timeout: 5000,
-          stdio: ["pipe", "pipe", "pipe"],
         });
-        listening = out.trim().length > 0;
+        listening = stdout.trim().length > 0;
       } catch { /* not listening */ }
       return { ...decl, listening };
-    });
+    }));
   }
 
   async syncEnvironment(_compute: Compute, _opts: SyncOpts): Promise<void> {

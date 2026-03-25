@@ -5,7 +5,7 @@
  * a clean API over tmux CLI commands. No sleeps - uses tmux primitives.
  */
 
-import { execSync, execFile, execFileSync, spawn } from "child_process";
+import { execFile, execFileSync, spawn } from "child_process";
 import { promisify } from "util";
 import { existsSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
@@ -81,6 +81,20 @@ export function createSession(name: string, command: string, opts?: {
   ], { stdio: "pipe" });
 }
 
+/** Create a new tmux session running a command directly (async - non-blocking) */
+export async function createSessionAsync(name: string, command: string, opts?: {
+  width?: number;
+  height?: number;
+}): Promise<void> {
+  await killSessionAsync(name); // clean up any existing
+  await execFileAsync("tmux", [
+    "new-session", "-d", "-s", name,
+    "-x", String(opts?.width ?? 220),
+    "-y", String(opts?.height ?? 50),
+    "bash", "-c", command,
+  ]);
+}
+
 /** Create a tmux session with a shell, then send a command via send-keys */
 export function createSessionWithSendKeys(name: string, command: string, opts?: {
   width?: number;
@@ -93,6 +107,20 @@ export function createSessionWithSendKeys(name: string, command: string, opts?: 
     "-y", String(opts?.height ?? 50),
   ], { stdio: "pipe" });
   execFileSync("tmux", ["send-keys", "-t", name, command, "Enter"], { stdio: "pipe" });
+}
+
+/** Create a tmux session with a shell, then send a command via send-keys (async - non-blocking) */
+export async function createSessionWithSendKeysAsync(name: string, command: string, opts?: {
+  width?: number;
+  height?: number;
+}): Promise<void> {
+  await killSessionAsync(name);
+  await execFileAsync("tmux", [
+    "new-session", "-d", "-s", name,
+    "-x", String(opts?.width ?? 220),
+    "-y", String(opts?.height ?? 50),
+  ]);
+  await execFileAsync("tmux", ["send-keys", "-t", name, command, "Enter"]);
 }
 
 /** Capture pane output (plain text or with ANSI codes) */
@@ -137,9 +165,27 @@ export function sendText(name: string, text: string): void {
   }
 }
 
+/** Send text to a tmux session via load-buffer (async - non-blocking) */
+export async function sendTextAsync(name: string, text: string): Promise<void> {
+  const tmpFile = join(TRACKS_DIR(), `.msg-${Date.now()}.txt`);
+  writeFileSync(tmpFile, text);
+  try {
+    await execFileAsync("tmux", ["load-buffer", "-b", "ark-msg", tmpFile]);
+    await execFileAsync("tmux", ["paste-buffer", "-b", "ark-msg", "-t", name]);
+    await execFileAsync("tmux", ["send-keys", "-t", name, "Enter"]);
+  } finally {
+    try { unlinkSync(tmpFile); } catch { /* ignore */ }
+  }
+}
+
 /** Send keys to a tmux session (for short text or special keys) */
 export function sendKeys(name: string, ...keys: string[]): void {
   execFileSync("tmux", ["send-keys", "-t", name, ...keys], { stdio: "pipe" });
+}
+
+/** Send keys to a tmux session (async - non-blocking) */
+export async function sendKeysAsync(name: string, ...keys: string[]): Promise<void> {
+  await execFileAsync("tmux", ["send-keys", "-t", name, ...keys]);
 }
 
 /** Get the attach command for a session */
@@ -163,6 +209,20 @@ export function listArkSessions(): TmuxSession[] {
       encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
     });
     return output.split("\n")
+      .filter((s) => s.startsWith("ark-") || s.startsWith("s-"))
+      .map((name) => ({ name, alive: true }));
+  } catch {
+    return [];
+  }
+}
+
+/** List all ark tmux sessions (async - non-blocking) */
+export async function listArkSessionsAsync(): Promise<TmuxSession[]> {
+  try {
+    const { stdout } = await execFileAsync("tmux", ["list-sessions", "-F", "#{session_name}"], {
+      encoding: "utf-8",
+    });
+    return stdout.split("\n")
       .filter((s) => s.startsWith("ark-") || s.startsWith("s-"))
       .map((name) => ({ name, alive: true }));
   } catch {

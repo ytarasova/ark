@@ -5,9 +5,12 @@
 
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { execFileSync } from "child_process";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { parse as parseYaml } from "yaml";
 import { COMPOSE_FILE_NAMES } from "../../arc-json.js";
+
+const execFileAsync = promisify(execFile);
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -21,11 +24,10 @@ export function detectComposeFile(repoDir: string): string | null {
 }
 
 /** Runs `docker compose up -d` in the workdir. Returns success/failure. */
-export function composeUp(workdir: string): { ok: boolean; error?: string } {
+export async function composeUp(workdir: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    execFileSync("docker", ["compose", "up", "-d"], {
+    await execFileAsync("docker", ["compose", "up", "-d"], {
       cwd: workdir,
-      stdio: "pipe",
     });
     return { ok: true };
   } catch (err: unknown) {
@@ -35,11 +37,10 @@ export function composeUp(workdir: string): { ok: boolean; error?: string } {
 }
 
 /** Runs `docker compose down` in the workdir. Returns success/failure. */
-export function composeDown(workdir: string): { ok: boolean; error?: string } {
+export async function composeDown(workdir: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    execFileSync("docker", ["compose", "down"], {
+    await execFileAsync("docker", ["compose", "down"], {
       cwd: workdir,
-      stdio: "pipe",
     });
     return { ok: true };
   } catch (err: unknown) {
@@ -49,11 +50,10 @@ export function composeDown(workdir: string): { ok: boolean; error?: string } {
 }
 
 /** Runs `docker compose ps --format json` and returns container names. */
-export function composePs(workdir: string): string[] {
+export async function composePs(workdir: string): Promise<string[]> {
   try {
-    const output = execFileSync("docker", ["compose", "ps", "--format", "json"], {
+    const { stdout: output } = await execFileAsync("docker", ["compose", "ps", "--format", "json"], {
       cwd: workdir,
-      stdio: "pipe",
       encoding: "utf-8",
     });
 

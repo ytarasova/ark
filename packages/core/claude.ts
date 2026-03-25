@@ -386,9 +386,9 @@ export async function autoAcceptChannelPrompt(
 
       // Found the prompt — accept it
       if (CHANNEL_PROMPT_MARKERS.some(m => output.includes(m))) {
-        tmux.sendKeys(tmuxName, "1");
+        await tmux.sendKeysAsync(tmuxName, "1");
         await Bun.sleep(300);
-        tmux.sendKeys(tmuxName, "Enter");
+        await tmux.sendKeysAsync(tmuxName, "Enter");
         return;
       }
 

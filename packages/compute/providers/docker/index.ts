@@ -10,10 +10,11 @@
  *   destroy   → docker rm -f
  */
 
-import { execFile, execFileSync } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import { homedir } from "os";
 import { join } from "path";
+import { existsSync } from "fs";
 
 const execFileAsync = promisify(execFile);
 import type {
@@ -30,21 +31,8 @@ const DEFAULT_IMAGE = "ubuntu:22.04";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Run a command, return trimmed stdout or "" on failure. */
-function run(cmd: string, args: string[]): string {
-  try {
-    return execFileSync(cmd, args, {
-      timeout: 30_000,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
-  } catch {
-    return "";
-  }
-}
-
 /** Run a command asynchronously, return trimmed stdout or "" on failure. */
-async function runA(cmd: string, args: string[]): Promise<string> {
+async function run(cmd: string, args: string[]): Promise<string> {
   try {
     const { stdout } = await execFileAsync(cmd, args, {
       timeout: 30_000,
@@ -62,11 +50,10 @@ export function containerName(hostName: string): string {
 }
 
 /** Check whether Docker daemon is reachable. */
-function assertDockerAvailable(): void {
+async function assertDockerAvailable(): Promise<void> {
   try {
-    execFileSync("docker", ["info"], {
+    await execFileAsync("docker", ["info"], {
       timeout: 10_000,
-      stdio: ["pipe", "pipe", "pipe"],
     });
   } catch {
     throw new Error("Docker is not available. Is the Docker daemon running?");
@@ -84,7 +71,7 @@ export class DockerProvider implements ComputeProvider {
   // ── Provision ────────────────────────────────────────────────────────────
 
   async provision(compute: Compute, _opts?: ProvisionOpts): Promise<void> {
-    assertDockerAvailable();
+    await assertDockerAvailable();
 
     const cfg = compute.config as Record<string, unknown>;
     const name = containerName(compute.name);
@@ -101,7 +88,7 @@ export class DockerProvider implements ComputeProvider {
         if (!detectDevcontainer(workdir)) {
           throw new Error(`No devcontainer.json found in ${workdir}`);
         }
-        const result = buildDevcontainer(workdir);
+        const result = await buildDevcontainer(workdir);
         if (!result.ok) {
           throw new Error(`devcontainer up failed: ${result.error}`);
         }
@@ -112,9 +99,8 @@ export class DockerProvider implements ComputeProvider {
         });
       } else {
         // Plain Docker path — pull image, create persistent container
-        execFileSync("docker", ["pull", image], {
+        await execFileAsync("docker", ["pull", image], {
           timeout: 300_000, // images can be large
-          stdio: ["pipe", "pipe", "pipe"],
         });
 
         const home = homedir();
@@ -129,10 +115,9 @@ export class DockerProvider implements ComputeProvider {
 
         // Optional AWS creds
         const awsDir = join(home, ".aws");
-        try {
-          execFileSync("test", ["-d", awsDir], { stdio: "pipe" });
+        if (existsSync(awsDir)) {
           createArgs.push("-v", `${awsDir}:/root/.aws:ro`);
-        } catch { /* no .aws directory */ }
+        }
 
         // Extra volumes from config
         for (const vol of extraVolumes) {
@@ -141,19 +126,17 @@ export class DockerProvider implements ComputeProvider {
 
         createArgs.push(image, "bash");
 
-        execFileSync("docker", createArgs, {
+        await execFileAsync("docker", createArgs, {
           timeout: 30_000,
-          stdio: ["pipe", "pipe", "pipe"],
         });
 
         // Start the container
-        execFileSync("docker", ["start", name], {
+        await execFileAsync("docker", ["start", name], {
           timeout: 15_000,
-          stdio: ["pipe", "pipe", "pipe"],
         });
 
         // Read back the real container ID
-        const containerId = run("docker", [
+        const containerId = await run("docker", [
           "inspect", "--format", "{{.Id}}", name,
         ]);
 
@@ -178,9 +161,8 @@ export class DockerProvider implements ComputeProvider {
   async start(compute: Compute): Promise<void> {
     const name = containerName(compute.name);
     try {
-      execFileSync("docker", ["start", name], {
+      await execFileAsync("docker", ["start", name], {
         timeout: 15_000,
-        stdio: ["pipe", "pipe", "pipe"],
       });
     } catch (err) {
       throw new Error(`Failed to start container ${name}: ${err instanceof Error ? err.message : err}`);
@@ -191,9 +173,8 @@ export class DockerProvider implements ComputeProvider {
   async stop(compute: Compute): Promise<void> {
     const name = containerName(compute.name);
     try {
-      execFileSync("docker", ["stop", name], {
+      await execFileAsync("docker", ["stop", name], {
         timeout: 15_000,
-        stdio: ["pipe", "pipe", "pipe"],
       });
     } catch { /* container may already be stopped */ }
     updateCompute(compute.name, { status: "stopped" });
@@ -204,9 +185,8 @@ export class DockerProvider implements ComputeProvider {
   async destroy(compute: Compute): Promise<void> {
     const name = containerName(compute.name);
     try {
-      execFileSync("docker", ["rm", "-f", name], {
+      await execFileAsync("docker", ["rm", "-f", name], {
         timeout: 15_000,
-        stdio: ["pipe", "pipe", "pipe"],
       });
     } catch { /* container may not exist */ }
     updateCompute(compute.name, { status: "destroyed" });
@@ -215,7 +195,7 @@ export class DockerProvider implements ComputeProvider {
   // ── Launch ───────────────────────────────────────────────────────────────
 
   async launch(_compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
-    const { createSession, writeLauncher } = await import("../../../core/tmux.js");
+    const { createSessionAsync, writeLauncher } = await import("../../../core/tmux.js");
 
     const cfg = _compute.config as Record<string, unknown>;
     const name = (cfg.container_name as string) || containerName(_compute.name);
@@ -234,7 +214,7 @@ export class DockerProvider implements ComputeProvider {
       shellCmd = `docker exec -it ${name} bash ${launcherPath}`;
     }
 
-    createSession(opts.tmuxName, shellCmd);
+    await createSessionAsync(opts.tmuxName, shellCmd);
     return opts.tmuxName;
   }
 
@@ -264,9 +244,8 @@ export class DockerProvider implements ComputeProvider {
     // Docker: stop the container (don't destroy — that's a compute-level op)
     const name = containerName(compute.name);
     try {
-      execFileSync("docker", ["stop", name], {
+      await execFileAsync("docker", ["stop", name], {
         timeout: 15_000,
-        stdio: ["pipe", "pipe", "pipe"],
       });
     } catch { /* already stopped */ }
   }
@@ -278,17 +257,17 @@ export class DockerProvider implements ComputeProvider {
 
     // Run all independent docker commands in parallel - non-blocking
     const [statsOut, dfOut, startedAt, psOut, dockerStatsOut] = await Promise.all([
-      runA("docker", [
+      run("docker", [
         "stats", "--no-stream", "--format",
         "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}",
         name,
       ]),
-      runA("docker", ["exec", name, "df", "-h", "/"]),
-      runA("docker", [
+      run("docker", ["exec", name, "df", "-h", "/"]),
+      run("docker", [
         "inspect", "--format", "{{.State.StartedAt}}", name,
       ]),
-      runA("docker", ["exec", name, "ps", "aux"]),
-      runA("docker", [
+      run("docker", ["exec", name, "ps", "aux"]),
+      run("docker", [
         "stats", "--no-stream", "--format",
         "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}",
         name,
@@ -397,11 +376,11 @@ export class DockerProvider implements ComputeProvider {
   async probePorts(compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
     const name = containerName(compute.name);
 
-    return ports.map((decl) => {
+    return Promise.all(ports.map(async (decl) => {
       let listening = false;
       try {
         // Try inside the container first (common for containerized services)
-        const out = run("docker", [
+        const out = await run("docker", [
           "exec", name, "bash", "-c",
           `cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk '{print $2}' | grep -i ':${decl.port.toString(16).padStart(4, "0").toUpperCase()}'`,
         ]);
@@ -411,16 +390,15 @@ export class DockerProvider implements ComputeProvider {
       if (!listening) {
         // Fallback: check on the host side (port mapping)
         try {
-          const out = execFileSync("lsof", ["-i", `:${decl.port}`, "-sTCP:LISTEN"], {
+          const { stdout } = await execFileAsync("lsof", ["-i", `:${decl.port}`, "-sTCP:LISTEN"], {
             encoding: "utf-8", timeout: 5000,
-            stdio: ["pipe", "pipe", "pipe"],
           });
-          listening = out.trim().length > 0;
+          listening = stdout.trim().length > 0;
         } catch { /* not listening */ }
       }
 
       return { ...decl, listening };
-    });
+    }));
   }
 
   // ── Sync ─────────────────────────────────────────────────────────────────
