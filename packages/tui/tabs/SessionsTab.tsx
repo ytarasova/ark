@@ -27,11 +27,12 @@ interface SessionsTabProps extends StoreData {
   onSelectionChange?: (session: any) => void;
   onInputActive?: (active: boolean) => void;
   onOverlayChange?: (overlay: string | null) => void;
+  onListLength?: (length: number) => void;
   formOverlay?: React.ReactNode;
   refresh: () => void;
 }
 
-export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, onInputActive, onOverlayChange, formOverlay }: SessionsTabProps) {
+export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, onInputActive, onOverlayChange, onListLength, formOverlay }: SessionsTabProps) {
   const [moveMode, setMoveMode] = useState(false);
   const [groupMode, setGroupMode] = useState<false | "menu">(false);
   const [talkMode, setTalkMode] = useState(false);
@@ -58,6 +59,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   }, [moveMode, talkMode, groupMode, inboxMode, cloneMode]);
 
   const selected = topLevel[sel] ?? null;
+
+  // Report list length for conditional scroll hints
+  useEffect(() => { onListLength?.(topLevel.length); }, [topLevel.length]);
 
   // Notify parent of selection/pane changes for status bar
   useEffect(() => {

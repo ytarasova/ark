@@ -18,6 +18,7 @@ interface HistoryTabProps extends StoreData {
   pane: "left" | "right";
   async: AsyncState;
   onOverlayChange?: (overlay: string | null) => void;
+  onListLength?: (length: number) => void;
   onImport?: (prefill: { name?: string; repo?: string; claudeSessionId?: string }) => void;
 }
 
@@ -66,7 +67,7 @@ function buildHistoryItems(arkSessions: any[], claudeSessions: core.ClaudeSessio
   return items;
 }
 
-export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, refresh, onOverlayChange, onImport }: HistoryTabProps) {
+export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, refresh, onOverlayChange, onListLength, onImport }: HistoryTabProps) {
   const [claudeSessions, setClaudeSessions] = useState<core.ClaudeSession[]>([]);
   const [searchResults, setSearchResults] = useState<core.SearchResult[]>([]);
   const [mode, setMode] = useState<"recent" | "search">("recent");
@@ -79,6 +80,9 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
   }, [mode]);
 
   const historyItems = buildHistoryItems(arkSessions, claudeSessions);
+
+  // Report list length to parent for conditional scroll hints
+  useEffect(() => { onListLength?.(historyItems.length); }, [historyItems.length]);
   const { sel } = useListNavigation(
     mode === "recent" ? historyItems.length : searchResults.length,
     { active: pane === "left" && mode !== "search" },

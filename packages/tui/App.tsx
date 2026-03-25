@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import { execFileSync } from "child_process";
 import { useStore } from "./hooks/useStore.js";
@@ -28,10 +28,18 @@ export function App() {
   const [pane, setPane] = useState<Pane>("left");
   const [childInputActive, setChildInputActive] = useState(false);
   const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
+  const [activeListLength, setActiveListLength] = useState(0);
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;
 
-  const switchTab = (t: Tab) => { setTab(t); setPane("left"); };
+  const switchTab = (t: Tab) => { setTab(t); setPane("left"); setActiveListLength(0); };
+
+  // For tabs that don't report their own list length, derive from store
+  useEffect(() => {
+    if (tab === "agents") setActiveListLength(store.agents.length);
+    else if (tab === "flows") setActiveListLength(store.flows.length);
+    else if (tab === "compute") setActiveListLength(store.computes.length);
+  }, [tab, store.agents.length, store.flows.length, store.computes.length]);
 
   const takeSnapshot = useCallback(() => {
     try {
@@ -97,6 +105,7 @@ export function App() {
           onSelectionChange={setSelectedSession}
           onInputActive={setChildInputActive}
           onOverlayChange={setActiveOverlay}
+          onListLength={setActiveListLength}
           formOverlay={showForm === "session" ? (
             <NewSessionForm
               store={store}
@@ -120,6 +129,7 @@ export function App() {
           pane={pane}
           async={asyncState}
           onOverlayChange={setActiveOverlay}
+          onListLength={setActiveListLength}
           onImport={(prefill) => {
             setSessionPrefill(prefill);
             setShowForm("session");
@@ -152,14 +162,7 @@ export function App() {
         label={asyncState.label}
         pane={pane}
         overlay={showForm ? "form" : activeOverlay}
-        listLength={
-          tab === "sessions" ? store.sessions.length
-          : tab === "compute" ? store.computes.length
-          : tab === "agents" ? store.agents.length
-          : tab === "flows" ? store.flows.length
-          : tab === "history" ? 50 // approximate — exact count not available here
-          : 0
-        }
+        listLength={activeListLength}
       />
     </Box>
   );
