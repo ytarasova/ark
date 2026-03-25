@@ -16,15 +16,16 @@ describe("TUI App rendering", () => {
     unmount();
   });
 
-  it("renders tab bar with all 5 tabs", () => {
+  it("renders tab bar with all 6 tabs", () => {
     const { lastFrame, unmount } = render(<App />);
     const frame = lastFrame()!;
 
     expect(frame).toContain("Sessions");
-    expect(frame).toContain("Compute");
     expect(frame).toContain("Agents");
+    expect(frame).toContain("Tools");
     expect(frame).toContain("Flows");
-    expect(frame).toContain("Recipes");
+    expect(frame).toContain("History");
+    expect(frame).toContain("Compute");
     unmount();
   });
 
@@ -40,8 +41,8 @@ describe("TUI App rendering", () => {
   it("tab switching works via key press", async () => {
     const { lastFrame, stdin, unmount } = render(<App />);
 
-    // Press "2" to switch to Compute tab
-    stdin.write("2");
+    // Press "6" to switch to Compute tab (key 6 in new layout)
+    stdin.write("6");
 
     // Allow React to re-render
     await new Promise((r) => setTimeout(r, 50));

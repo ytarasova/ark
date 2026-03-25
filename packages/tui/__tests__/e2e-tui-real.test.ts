@@ -23,10 +23,11 @@ describe("e2e TUI (real tmux)", () => {
       await tui.start();
       tui.expectRegion("tabBar", "Sessions");
       const raw = tui.text();
-      expect(raw).toContain("Compute");
       expect(raw).toContain("Agents");
+      expect(raw).toContain("Tools");
       expect(raw).toContain("Flows");
-      expect(raw).toContain("Recipes");
+      expect(raw).toContain("History");
+      expect(raw).toContain("Compute");
     } finally {
       tui.stop();
     }
@@ -39,10 +40,10 @@ describe("e2e TUI (real tmux)", () => {
       await tui.start();
 
       await tui.switchTab(2);
-      tui.expectRegion("tabBar", "Compute");
+      tui.expectRegion("tabBar", "Agents");
 
       await tui.switchTab(3);
-      tui.expectRegion("tabBar", "Agents");
+      tui.expectRegion("tabBar", "Tools");
 
       await tui.switchTab(1);
       tui.expectRegion("tabBar", "Sessions");
@@ -86,7 +87,7 @@ describe("e2e TUI (real tmux)", () => {
     const tui = new TuiDriver();
     try {
       await tui.start();
-      await tui.switchTab(2);
+      await tui.switchTab(6);
       await tui.waitFor("local");
       expect(tui.text()).toContain("local");
       expect(tui.text()).toContain("running");
@@ -163,7 +164,7 @@ describe("e2e TUI (real tmux)", () => {
 
   // Test 9: Orphan tmux session cleanup
   it("cleans orphan tmux sessions that have no DB record", async () => {
-    const { listArkSessions, killSession } = await import("../../core/tmux.js");
+    const { listArkSessionsAsync, killSession } = await import("../../core/tmux.js");
     const orphanName = `ark-s-orphan-test-${Date.now()}`;
 
     try {
@@ -173,15 +174,15 @@ describe("e2e TUI (real tmux)", () => {
         "bash", "-c", "sleep 300",
       ], { stdio: "pipe" });
 
-      let found = listArkSessions().some((s) => s.name === orphanName);
+      let sessions = await listArkSessionsAsync();
+      let found = sessions.some((s) => s.name === orphanName);
       expect(found).toBe(true);
 
       const sessionId = orphanName.replace("ark-", "");
       expect(core.getSession(sessionId)).toBeNull();
 
-      const tmuxSessions = listArkSessions();
       let cleaned = 0;
-      for (const ts of tmuxSessions) {
+      for (const ts of sessions) {
         const sid = ts.name.replace("ark-", "");
         if (!core.getSession(sid)) {
           killSession(ts.name);
@@ -190,7 +191,8 @@ describe("e2e TUI (real tmux)", () => {
       }
 
       expect(cleaned).toBeGreaterThanOrEqual(1);
-      found = listArkSessions().some((s) => s.name === orphanName);
+      sessions = await listArkSessionsAsync();
+      found = sessions.some((s) => s.name === orphanName);
       expect(found).toBe(false);
     } finally {
       try { execFileSync("tmux", ["kill-session", "-t", orphanName], { stdio: "pipe" }); } catch { /* already gone */ }
@@ -208,7 +210,7 @@ describe("e2e TUI (real tmux)", () => {
       tui.expectRegion("statusBar", "quit");
 
       // Compute tab hints
-      await tui.switchTab(2);
+      await tui.switchTab(6);
       await tui.waitFor("provision", 3000, { region: "statusBar" });
       tui.expectRegion("statusBar", "provision");
       tui.expectRegion("statusBar", "new");

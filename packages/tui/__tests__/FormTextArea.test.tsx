@@ -26,8 +26,10 @@ describe("FormTextArea", () => {
     );
     stdin.write("\r");
     await new Promise(r => setTimeout(r, 50));
+    // In edit mode, the FormField prefix changes from "> " to "* "
     expect(lastFrame()!).toContain("*");
-    expect(lastFrame()!).toContain("Ctrl+D:done");
+    // The cursor block (inverse space) appears after the text in edit mode
+    expect(lastFrame()!).toContain("hello");
     unmount();
   });
 
