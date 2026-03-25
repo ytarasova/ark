@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine release type
+        id: release-type
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create tagged release
+        if: steps.release-type.outputs.is_tag == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.release-type.outputs.tag }}" \
+            --title "${{ steps.release-type.outputs.tag }}" \
+            --generate-notes
+
+      - name: Update latest release
+        if: steps.release-type.outputs.is_tag == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest \
+            --title "Latest (rolling)" \
+            --notes "Rolling release from main branch. Updated on every push.
+
+          Install: curl -fsSL https://ytarasova.github.io/ark/install.sh | bash
+
+          Commit: ${{ github.sha }}" \
+            --prerelease \
+            --target ${{ github.sha }}
