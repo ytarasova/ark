@@ -44,12 +44,22 @@ export function useComputeActions(
       run(`Stopping ${compute.name}`, async () => {
         try {
           await provider.stop(compute);
+          core.updateCompute(compute.name, { status: "stopped" });
+          addLog(compute.name, "Stopped");
         } catch (e: any) {
-          // Instance may already be terminated externally
-          addLog(compute.name, `Provider stop failed: ${e?.message ?? e}`);
+          // Instance may already be terminated externally — check real status
+          if (provider.checkStatus) {
+            const real = await provider.checkStatus(compute).catch(() => null);
+            if (real === "destroyed" || real === "terminated") {
+              core.updateCompute(compute.name, { status: "destroyed" });
+              core.mergeComputeConfig(compute.name, { ip: null });
+              addLog(compute.name, "Instance no longer exists — marked as destroyed");
+              return;
+            }
+          }
+          addLog(compute.name, `Stop failed: ${e?.message ?? e}`);
+          throw e;
         }
-        core.updateCompute(compute.name, { status: "stopped" });
-        addLog(compute.name, "Stopped");
       });
     },
 

@@ -349,6 +349,32 @@ export class EC2Provider implements ComputeProvider {
     setupReverseTunnel(key, ip, 19100);
   }
 
+  async checkStatus(compute: Compute): Promise<string | null> {
+    const cfg = compute.config as EC2HostConfig;
+    const instanceId = cfg.instance_id;
+    if (!instanceId) return "destroyed";
+
+    const ec2 = createEc2Client(cfg);
+    try {
+      const desc = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
+      const state = desc.Reservations?.[0]?.Instances?.[0]?.State?.Name;
+      if (!state) return "destroyed";
+
+      // Map AWS states to ark statuses
+      if (state === "terminated" || state === "shutting-down") return "destroyed";
+      if (state === "stopped" || state === "stopping") return "stopped";
+      if (state === "running") return "running";
+      if (state === "pending") return "provisioning";
+      return state;
+    } catch (e: any) {
+      // InvalidInstanceID.NotFound means the instance is gone
+      if (e?.name === "InvalidInstanceID.NotFound" || e?.Code === "InvalidInstanceID.NotFound") {
+        return "destroyed";
+      }
+      return null; // can't determine — network error etc
+    }
+  }
+
   async getMetrics(compute: Compute): Promise<ComputeSnapshot> {
     const cfg = compute.config as EC2HostConfig;
     const ip = cfg.ip;

@@ -64,6 +64,9 @@ export interface ComputeProvider {
   getMetrics(compute: Compute): Promise<ComputeSnapshot>;
   probePorts(compute: Compute, ports: PortDecl[]): Promise<PortStatus[]>;
 
+  /** Check the actual provider status and reconcile with DB. Returns null if not applicable. */
+  checkStatus?(compute: Compute): Promise<string | null>;
+
   syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void>;
 }
 

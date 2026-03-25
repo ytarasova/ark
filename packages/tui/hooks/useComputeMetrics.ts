@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { getProvider } from "../../compute/index.js";
+import { updateCompute, mergeComputeConfig } from "../../core/store.js";
 import type { Compute } from "../../core/index.js";
 import type { ComputeSnapshot } from "../../compute/types.js";
 
@@ -40,7 +41,23 @@ export function useComputeMetrics(computes: Compute[], active: boolean, pollMs =
         try {
           const snap = await provider.getMetrics(h);
           if (snap) next.set(h.name, snap);
-        } catch {}
+        } catch {
+          // Metrics failed — check if the instance still exists
+          if (provider.checkStatus) {
+            try {
+              const realStatus = await provider.checkStatus(h);
+              if (realStatus && realStatus !== h.status) {
+                updateCompute(h.name, { status: realStatus });
+                if (realStatus === "destroyed") {
+                  mergeComputeConfig(h.name, { ip: null });
+                  addLog(h.name, "Instance no longer exists — marked as destroyed");
+                } else {
+                  addLog(h.name, `Status changed: ${h.status} → ${realStatus}`);
+                }
+              }
+            } catch { /* checkStatus itself failed, skip */ }
+          }
+        }
       }
       setSnapshots(next);
       running.current = false;
