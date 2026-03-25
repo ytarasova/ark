@@ -42,14 +42,18 @@ export interface ClaudeArgsOpts {
   task?: string;
   sessionId?: string;
   headless?: boolean;
+  autonomy?: string;
 }
 
 export function buildArgs(opts: ClaudeArgsOpts): string[] {
   const args = ["claude"];
+  const skipPerms = !opts.autonomy || opts.autonomy === "full" || opts.autonomy === "execute";
 
   if (opts.headless && opts.task) {
-    args.push("-p", opts.task, "--verbose", "--output-format", "stream-json",
-      "--dangerously-skip-permissions");
+    args.push("-p", opts.task, "--verbose", "--output-format", "stream-json");
+    if (skipPerms) {
+      args.push("--dangerously-skip-permissions");
+    }
   }
 
   if (opts.sessionId) {
@@ -63,7 +67,9 @@ export function buildArgs(opts: ClaudeArgsOpts): string[] {
   if (opts.systemPrompt) args.push("--append-system-prompt", opts.systemPrompt);
 
   if (!opts.headless) {
-    args.push("--dangerously-skip-permissions");
+    if (skipPerms) {
+      args.push("--dangerously-skip-permissions");
+    }
   }
 
   for (const mcp of opts.mcpServers ?? []) {
@@ -166,6 +172,7 @@ function buildHooksConfig(sessionId: string, conductorUrl: string): Record<strin
 
 export function writeHooksConfig(
   sessionId: string, conductorUrl: string, workdir: string,
+  opts?: { autonomy?: string },
 ): string {
   const claudeDir = join(workdir, ".claude");
   mkdirSync(claudeDir, { recursive: true });
@@ -195,6 +202,15 @@ export function writeHooksConfig(
     existingHooks[event] = [...(existingHooks[event] ?? []), ...matchers];
   }
   existing.hooks = existingHooks;
+
+  // Add permission restrictions based on autonomy level
+  if (opts?.autonomy === "edit") {
+    existing.permissions = existing.permissions ?? {};
+    (existing.permissions as any).deny = ["Bash"];
+  } else if (opts?.autonomy === "read-only") {
+    existing.permissions = existing.permissions ?? {};
+    (existing.permissions as any).deny = ["Bash", "Write", "Edit"];
+  }
 
   // Atomic write
   const tmpPath = settingsPath + ".tmp";

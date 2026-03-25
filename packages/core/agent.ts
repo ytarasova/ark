@@ -114,6 +114,7 @@ export function buildClaudeArgs(agent: AgentDefinition, opts?: {
   task?: string;
   sessionId?: string;
   headless?: boolean;
+  autonomy?: string;
 }): string[] {
   return claude.buildArgs({
     model: agent.model,
@@ -123,6 +124,7 @@ export function buildClaudeArgs(agent: AgentDefinition, opts?: {
     task: opts?.task,
     sessionId: opts?.sessionId,
     headless: opts?.headless,
+    autonomy: opts?.autonomy,
   });
 }
 

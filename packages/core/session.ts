@@ -99,12 +99,15 @@ export async function dispatch(sessionId: string): Promise<{ ok: boolean; messag
   const agent = agentRegistry.resolveAgent(agentName, session as unknown as Record<string, unknown>);
   if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
 
+  // Resolve autonomy level from flow stage definition
+  const autonomy = stageDef?.autonomy ?? "full";
+
   // Build task with handoff context
   const task = await buildTaskWithHandoff(session, stage, agentName);
-  const claudeArgs = agentRegistry.buildClaudeArgs(agent);
+  const claudeArgs = agentRegistry.buildClaudeArgs(agent, { autonomy });
 
   // Launch in tmux
-  const tmuxName = await launchAgentTmux(session, stage, claudeArgs, task, agent);
+  const tmuxName = await launchAgentTmux(session, stage, claudeArgs, task, agent, { autonomy });
 
   store.updateSession(sessionId, { status: "running", agent: agentName, session_id: tmuxName });
   store.logEvent(sessionId, "stage_started", {
@@ -389,6 +392,7 @@ function resolveProvider(session: store.Session): { provider: ComputeProvider | 
 async function launchAgentTmux(
   session: store.Session, stage: string,
   claudeArgs: string[], task: string, agent: agentRegistry.AgentDefinition,
+  opts?: { autonomy?: string },
 ): Promise<string> {
   const tmuxName = `ark-${session.id}`;
   const workdir = session.workdir ?? ".";
@@ -418,7 +422,7 @@ async function launchAgentTmux(
   const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl });
 
   // Status hooks — write .claude/settings.local.json for agent status detection
-  claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir);
+  claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts?.autonomy });
 
   const { content: launchContent, claudeSessionId } = claude.buildLauncher({
     workdir: effectiveWorkdir,

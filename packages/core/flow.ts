@@ -21,6 +21,7 @@ export interface StageDefinition {
   action?: string;
   task?: string;  // Template for agent task prompt — supports {variable} substitution
   gate: "auto" | "manual" | "condition";
+  autonomy?: "full" | "execute" | "edit" | "read-only";
   on_failure?: string;
   optional?: boolean;
   // Fork-specific
