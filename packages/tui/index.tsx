@@ -54,11 +54,11 @@ try {
   log("INFO", "TUI rendered");
   await waitUntilExit();
   log("INFO", "TUI exited");
+  await app.shutdown();
+  process.exit(0);
 } catch (e: any) {
   log("CRASH", `Render failed: ${e.message}\n${e.stack}`);
   process.stderr.write(`\nTUI failed: ${e.message}\nLog: ${LOG_FILE}\n`);
   await app.shutdown();
   process.exit(1);
 }
-
-await app.shutdown();
