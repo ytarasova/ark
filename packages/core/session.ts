@@ -21,6 +21,8 @@ import * as agentRegistry from "./agent.js";
 import * as claude from "./claude.js";
 import { getProvider } from "../compute/index.js";
 import { resolvePortDecls, parseArcJson } from "../compute/arc-json.js";
+import { buildSessionVars } from "./template.js";
+import { resolveFlow } from "./flow.js";
 
 // ── Session lifecycle ───────────────────────────────────────────────────────
 
@@ -504,7 +506,16 @@ async function buildTaskWithHandoff(session: store.Session, stage: string, agent
   const parts: string[] = [];
   const isBare = session.flow === "bare";
 
-  if (isBare) {
+  // Get resolved stage with substituted variables
+  const vars = buildSessionVars(session as unknown as Record<string, unknown>);
+  const resolved = resolveFlow(session.flow, vars);
+  const stageDef = resolved?.stages.find(s => s.name === stage);
+
+  // If stage has a task template, use it as the primary prompt
+  if (stageDef?.task) {
+    parts.push(stageDef.task);
+    parts.push(`\nYou are the ${agentName} agent, running the '${stage}' stage.`);
+  } else if (isBare) {
     // Bare flow: interactive session — no predefined task pipeline
     parts.push(`Session ${session.id}${session.summary ? ` — ${session.summary}` : ""}`);
     parts.push(`\nYou are the ${agentName} agent in an interactive session.`);
