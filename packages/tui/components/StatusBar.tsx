@@ -157,16 +157,7 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
         </Box>
       )}
       <Box>
-        {loading ? (
-          <>
-            <Text color="yellow">
-              <Spinner type="dots" />
-            </Text>
-            <Text>{"  "}</Text>
-          </>
-        ) : (
-          <Text bold>{` ${sessions.length} sessions`}</Text>
-        )}
+        <Text bold>{` ${sessions.length} sessions`}</Text>
         {!loading && nRun > 0 && <Text color="green">{`  ● ${nRun} running`}</Text>}
         {nErr > 0 && <Text color="red">{`  ✕ ${nErr} failed`}</Text>}
         <Text>{"   "}</Text>
