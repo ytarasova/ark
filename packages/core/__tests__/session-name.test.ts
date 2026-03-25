@@ -1,9 +1,14 @@
 /**
  * Tests for session name sanitization logic.
  * The sanitize function is extracted from NewSessionForm.tsx submit handler.
+ *
+ * Also includes E2E tests verifying that the core layer stores names as-is
+ * (sanitization happens at the form/CLI level, not in core).
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { AppContext, setApp, clearApp } from "../app.js";
+import { startSession, getSession } from "../index.js";
 
 /** Same sanitization regex as in NewSessionForm.tsx submit */
 const sanitize = (name: string) =>
@@ -51,5 +56,61 @@ describe("session name sanitization", () => {
 
   it("handles consecutive special chars as single dash", () => {
     expect(sanitize("a!!!b")).toBe("a-b");
+  });
+});
+
+// ── E2E: core stores names as-is ─────────────────────────────────────────────
+
+let app: AppContext;
+
+beforeEach(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
+
+describe("session name in core (E2E)", () => {
+  it("stores name with spaces as-is in the DB", () => {
+    const session = startSession({
+      summary: "my test session",
+      flow: "bare",
+    });
+
+    const stored = getSession(session.id)!;
+    expect(stored.summary).toBe("my test session");
+  });
+
+  it("stores name with special characters as-is in the DB", () => {
+    const session = startSession({
+      summary: "fix: auth module (v2)",
+      flow: "bare",
+    });
+
+    const stored = getSession(session.id)!;
+    expect(stored.summary).toBe("fix: auth module (v2)");
+  });
+
+  it("stores empty summary as null", () => {
+    const session = startSession({ flow: "bare" });
+
+    const stored = getSession(session.id)!;
+    expect(stored.summary).toBeNull();
+  });
+
+  it("stores long names without truncation in core", () => {
+    const longName = "a".repeat(200);
+    const session = startSession({
+      summary: longName,
+      flow: "bare",
+    });
+
+    const stored = getSession(session.id)!;
+    expect(stored.summary).toBe(longName);
+    expect(stored.summary!.length).toBe(200);
   });
 });

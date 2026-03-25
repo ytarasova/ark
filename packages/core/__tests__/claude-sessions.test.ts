@@ -311,3 +311,120 @@ describe("getClaudeSession", () => {
     expect(session).toBeNull();
   });
 });
+
+// ── Filtering ────────────────────────────────────────────────────────────────
+
+describe("claude sessions filtering", () => {
+  it("sessions with <10 messages are filtered out", async () => {
+    // Write a session with only 4 user+assistant messages (8 total lines with system)
+    const fewMsgs: object[] = [
+      { type: "system", sessionId: "few-msgs", timestamp: "2026-03-24T10:00:00Z" },
+    ];
+    for (let i = 0; i < 4; i++) {
+      fewMsgs.push(
+        { type: "user", message: { role: "user", content: `q${i}: ${"x".repeat(500)}` }, timestamp: `2026-03-24T10:0${i + 1}:00Z` },
+        { type: "assistant", message: { role: "assistant", content: `a${i}: ${"y".repeat(500)}` }, timestamp: `2026-03-24T10:0${i + 1}:30Z` },
+      );
+    }
+    const dir = join(baseDir(), "-filter-few");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "few-msgs.jsonl"), fewMsgs.map(l => JSON.stringify(l)).join("\n"));
+
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
+    const found = sessions.find(s => s.sessionId === "few-msgs");
+    expect(found).toBeUndefined();
+  });
+
+  it("sessions with >=10 messages are included", async () => {
+    await writeAndRefresh("-filter-many", "many-msgs.jsonl", [
+      { type: "system", sessionId: "many-msgs", timestamp: "2026-03-24T10:00:00Z" },
+      { type: "user", message: { role: "user", content: "hello" }, timestamp: "2026-03-24T10:01:00Z" },
+    ]);
+
+    const sessions = listClaudeSessions();
+    const found = sessions.find(s => s.sessionId === "many-msgs");
+    expect(found).toBeTruthy();
+    expect(found!.messageCount).toBeGreaterThanOrEqual(10);
+  });
+
+  it("sessions from /var/folders/ paths are filtered", async () => {
+    // Write a transcript under a dir name that decodes to /var/folders/...
+    const varFolderDir = join(baseDir(), "-var-folders-ab-cd-T-test");
+    mkdirSync(varFolderDir, { recursive: true });
+    const msgs: object[] = [
+      { type: "system", sessionId: "var-folder-session", timestamp: "2026-03-24T10:00:00Z" },
+    ];
+    // Add enough messages to pass the 10+ filter
+    for (let i = 0; i < 12; i++) {
+      msgs.push(
+        { type: "user", message: { role: "user", content: `q${i}: ${"x".repeat(500)}` }, timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:00Z` },
+        { type: "assistant", message: { role: "assistant", content: `a${i}: ${"y".repeat(500)}` }, timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:30Z` },
+      );
+    }
+    writeFileSync(join(varFolderDir, "var-folder-session.jsonl"), msgs.map(l => JSON.stringify(l)).join("\n"));
+
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
+    const found = sessions.find(s => s.sessionId === "var-folder-session");
+    expect(found).toBeUndefined();
+  });
+
+  it("sessions from /worktrees/ paths are filtered", async () => {
+    // Write a transcript under a dir name that decodes to .../worktrees/...
+    const worktreeDir = join(baseDir(), "-Users-yana-.ark-worktrees-s-abc123");
+    mkdirSync(worktreeDir, { recursive: true });
+    const msgs: object[] = [
+      { type: "system", sessionId: "worktree-session", timestamp: "2026-03-24T10:00:00Z" },
+    ];
+    for (let i = 0; i < 12; i++) {
+      msgs.push(
+        { type: "user", message: { role: "user", content: `q${i}: ${"x".repeat(500)}` }, timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:00Z` },
+        { type: "assistant", message: { role: "assistant", content: `a${i}: ${"y".repeat(500)}` }, timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:30Z` },
+      );
+    }
+    writeFileSync(join(worktreeDir, "worktree-session.jsonl"), msgs.map(l => JSON.stringify(l)).join("\n"));
+
+    await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    const sessions = listClaudeSessions();
+    const found = sessions.find(s => s.sessionId === "worktree-session");
+    expect(found).toBeUndefined();
+  });
+
+  it("full refresh then incremental refresh flow", async () => {
+    // Write first file
+    writeTranscript("-refresh-flow", "first.jsonl", [
+      { type: "system", sessionId: "first-session", timestamp: "2026-03-24T10:00:00Z" },
+      { type: "user", message: { role: "user", content: "first task" }, timestamp: "2026-03-24T10:01:00Z" },
+    ]);
+
+    // Full refresh
+    const firstCount = await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    expect(firstCount).toBeGreaterThanOrEqual(1);
+
+    // Verify cache has the session
+    let sessions = listClaudeSessions();
+    expect(sessions.find(s => s.sessionId === "first-session")).toBeTruthy();
+
+    // Second refresh with no changes - incremental should return 0
+    const secondCount = await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    expect(secondCount).toBe(0);
+
+    // Small delay so mtime differs
+    await new Promise(r => setTimeout(r, 50));
+
+    // Write a second file and refresh incrementally
+    writeTranscript("-refresh-flow", "second.jsonl", [
+      { type: "system", sessionId: "second-session", timestamp: "2026-03-24T11:00:00Z" },
+      { type: "user", message: { role: "user", content: "second task" }, timestamp: "2026-03-24T11:01:00Z" },
+    ]);
+
+    const thirdCount = await refreshClaudeSessionsCache({ baseDir: baseDir() });
+    expect(thirdCount).toBeGreaterThanOrEqual(1);
+
+    // Both sessions should now be in cache
+    sessions = listClaudeSessions();
+    expect(sessions.find(s => s.sessionId === "first-session")).toBeTruthy();
+    expect(sessions.find(s => s.sessionId === "second-session")).toBeTruthy();
+  });
+});
