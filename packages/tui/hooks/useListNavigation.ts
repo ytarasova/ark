@@ -18,27 +18,26 @@ export function useListNavigation(length: number, opts?: UseListNavigationOpts) 
   const active = opts?.active ?? true;
   const pageSize = PAGE_SIZE;
 
-  // Clamp selection when list shrinks (e.g. after deletion)
+  // Clamp selection when list shrinks or empties
   useEffect(() => {
-    if (length > 0) {
-      setSel(s => Math.min(s, length - 1));
-    }
+    setSel(s => length > 0 ? Math.min(s, length - 1) : 0);
   }, [length]);
 
   useInput((input, key) => {
-    if (!active) return;
+    if (!active || length === 0) return;
+    const max = length - 1;
     if (input === "j" || key.downArrow) {
-      setSel(s => Math.min(s + 1, length - 1));
+      setSel(s => Math.min(s + 1, max));
     } else if (input === "k" || key.upArrow) {
       setSel(s => Math.max(s - 1, 0));
     } else if (input === "f" || key.pageDown) {
-      setSel(s => Math.min(s + pageSize, length - 1));
+      setSel(s => Math.min(s + pageSize, max));
     } else if (input === "b" || key.pageUp) {
       setSel(s => Math.max(s - pageSize, 0));
     } else if (input === "g") {
       setSel(0);
     } else if (input === "G") {
-      setSel(Math.max(0, length - 1));
+      setSel(max);
     }
   });
 

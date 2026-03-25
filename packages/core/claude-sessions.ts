@@ -73,9 +73,9 @@ function parseTranscriptMeta(filePath: string): Omit<ClaudeSession, "project" | 
     const stat = statSync(filePath);
     if (stat.size === 0) return null;
 
-    // Read first 8KB for header + summary
+    // Read first 16KB for header + summary (8KB may miss real messages in tool-heavy sessions)
     const fd = openSync(filePath, "r");
-    const headBuf = Buffer.alloc(Math.min(8192, stat.size));
+    const headBuf = Buffer.alloc(Math.min(16384, stat.size));
     readSync(fd, headBuf, 0, headBuf.length, 0);
 
     // Read last 2KB for lastActivity timestamp
