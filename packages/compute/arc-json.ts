@@ -87,11 +87,15 @@ function parseDevcontainerPorts(repoDir: string): number[] {
 
   for (const filePath of candidates) {
     if (!existsSync(filePath)) continue;
-    const raw = readFileSync(filePath, "utf-8");
-    const json = JSON.parse(raw);
-    if (Array.isArray(json.forwardPorts)) {
-      return json.forwardPorts.filter((p: unknown): p is number => typeof p === "number");
-    }
+    try {
+      const raw = readFileSync(filePath, "utf-8");
+      // devcontainer.json is JSONC (allows comments) — strip them before parsing
+      const stripped = raw.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+      const json = JSON.parse(stripped);
+      if (Array.isArray(json.forwardPorts)) {
+        return json.forwardPorts.filter((p: unknown): p is number => typeof p === "number");
+      }
+    } catch { /* invalid JSON — skip */ }
   }
 
   return [];

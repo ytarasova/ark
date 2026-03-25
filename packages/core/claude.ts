@@ -131,9 +131,11 @@ export function writeChannelConfig(
 
   // Write to worktree .mcp.json so Claude finds it
   const mcpConfigPath = join(workdir, ".mcp.json");
-  const existing = existsSync(mcpConfigPath)
-    ? JSON.parse(readFileSync(mcpConfigPath, "utf-8"))
-    : {};
+  let existing: Record<string, any> = {};
+  if (existsSync(mcpConfigPath)) {
+    try { existing = JSON.parse(readFileSync(mcpConfigPath, "utf-8")); }
+    catch { /* corrupted .mcp.json — start fresh */ }
+  }
   if (!existing.mcpServers) existing.mcpServers = {};
   existing.mcpServers["ark-channel"] = channelMcpConfig(sessionId, stage, channelPort, channelOpts);
   writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));
