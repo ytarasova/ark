@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Ark installer — downloads source from GitHub, installs via Bun.
+# Ark installer - downloads pre-built binary from GitHub.
 # Usage: curl -fsSL https://ytarasova.github.io/ark/install.sh | bash
 # Pin version: curl ... | ARK_VERSION=v0.2.0 bash
 
@@ -14,85 +14,65 @@ info()  { printf "\033[36m%s\033[0m\n" "$*"; }
 warn()  { printf "\033[33m%s\033[0m\n" "$*"; }
 error() { printf "\033[31m%s\033[0m\n" "$*" >&2; exit 1; }
 
+# ── Detect platform ─────────────────────────────────────────────────────────
+
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+
+case "$OS" in
+  darwin) OS="darwin" ;;
+  linux)  OS="linux" ;;
+  *)      error "Unsupported OS: $OS. Ark supports macOS and Linux." ;;
+esac
+
+case "$ARCH" in
+  x86_64|amd64)  ARCH="x64" ;;
+  arm64|aarch64) ARCH="arm64" ;;
+  *)             error "Unsupported architecture: $ARCH. Ark supports x64 and arm64." ;;
+esac
+
+BINARY="ark-${OS}-${ARCH}"
+info "Detected platform: ${OS}/${ARCH}"
+
 # ── Preflight checks ────────────────────────────────────────────────────────
 
-if command -v curl &>/dev/null; then
-  FETCH="curl -fsSL"
-elif command -v wget &>/dev/null; then
-  FETCH="wget -qO-"
-else
-  error "Neither curl nor wget found. Install one and retry."
-fi
-
-command -v tar &>/dev/null || error "tar is required but not found."
-
 if ! command -v git &>/dev/null; then
-  warn "git not found — some features (worktrees, cloning) won't work."
+  warn "git not found - some features (worktrees, cloning) won't work."
 fi
 
 if ! command -v tmux &>/dev/null; then
-  warn "tmux not found — required for running agent sessions."
-  warn "Install it: brew install tmux"
+  warn "tmux not found - required for running agent sessions."
+  if [ "$OS" = "darwin" ]; then
+    warn "Install it: brew install tmux"
+  else
+    warn "Install it: sudo apt install tmux (or your package manager)"
+  fi
 fi
 
-# ── Install Bun if missing ──────────────────────────────────────────────────
-
-if ! command -v bun &>/dev/null; then
-  info "Bun not found. Installing..."
-  curl -fsSL https://bun.sh/install | bash
-  export BUN_INSTALL="$HOME/.bun"
-  export PATH="$BUN_INSTALL/bin:$PATH"
-  command -v bun &>/dev/null || error "Bun installation failed."
-  info "Bun installed: $(bun --version)"
-fi
-
-# ── Download source ─────────────────────────────────────────────────────────
+# ── Download binary ─────────────────────────────────────────────────────────
 
 info "Installing Ark ($VERSION) to $INSTALL_DIR..."
 
-if [ "$VERSION" = "latest" ]; then
-  TARBALL_URL=$($FETCH "https://api.github.com/repos/$REPO/releases/tags/latest" \
-    | grep '"tarball_url"' | head -1 | cut -d'"' -f4)
-else
-  TARBALL_URL="https://api.github.com/repos/$REPO/tarball/$VERSION"
-fi
-
-[ -z "${TARBALL_URL:-}" ] && error "Could not resolve download URL for $VERSION"
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$BINARY"
 
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-info "Downloading from GitHub..."
-$FETCH "$TARBALL_URL" > "$TMPDIR/ark.tar.gz"
+info "Downloading $BINARY..."
+if command -v curl &>/dev/null; then
+  curl -fsSL -o "$TMPDIR/ark" "$DOWNLOAD_URL" || error "Download failed. Check version '$VERSION' exists at https://github.com/$REPO/releases"
+elif command -v wget &>/dev/null; then
+  wget -q -O "$TMPDIR/ark" "$DOWNLOAD_URL" || error "Download failed. Check version '$VERSION' exists."
+else
+  error "Neither curl nor wget found."
+fi
 
-info "Extracting..."
-mkdir -p "$TMPDIR/extract"
-tar -xzf "$TMPDIR/ark.tar.gz" -C "$TMPDIR/extract" --strip-components=1
+chmod +x "$TMPDIR/ark"
 
 # ── Install ─────────────────────────────────────────────────────────────────
 
-if [ -d "$INSTALL_DIR/packages" ]; then
-  info "Removing previous installation..."
-  rm -rf "$INSTALL_DIR/packages" "$INSTALL_DIR/node_modules" \
-         "$INSTALL_DIR/agents" "$INSTALL_DIR/flows" "$INSTALL_DIR/recipes"
-fi
-
-mkdir -p "$INSTALL_DIR"
-cp -r "$TMPDIR/extract/packages" "$INSTALL_DIR/"
-cp -r "$TMPDIR/extract/agents" "$INSTALL_DIR/" 2>/dev/null || true
-cp -r "$TMPDIR/extract/flows" "$INSTALL_DIR/" 2>/dev/null || true
-cp -r "$TMPDIR/extract/recipes" "$INSTALL_DIR/" 2>/dev/null || true
-cp "$TMPDIR/extract/package.json" "$INSTALL_DIR/"
-cp "$TMPDIR/extract/tsconfig.json" "$INSTALL_DIR/"
-cp "$TMPDIR/extract/bunfig.toml" "$INSTALL_DIR/" 2>/dev/null || true
-cp "$TMPDIR/extract/ark" "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/ark"
-
-info "Installing dependencies..."
-cd "$INSTALL_DIR" && bun install --production 2>/dev/null || bun install
-
 mkdir -p "$BIN_DIR"
-ln -sf "$INSTALL_DIR/ark" "$BIN_DIR/ark"
+mv "$TMPDIR/ark" "$BIN_DIR/ark"
 
 # ── PATH setup ──────────────────────────────────────────────────────────────
 

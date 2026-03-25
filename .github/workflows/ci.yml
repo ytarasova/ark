@@ -7,7 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  # Full test suite on macOS (primary platform, has tmux)
   test:
     runs-on: macos-latest
     timeout-minutes: 15
@@ -25,15 +24,28 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Unit tests (excludes E2E — those need real tmux + Claude)
+      - name: Unit tests (excludes E2E)
         run: |
           bun test --timeout 30000 \
             $(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | sort)
 
-  # Build verification on Linux arm64 — catches install failures
-  build-linux:
-    runs-on: ubuntu-24.04-arm
-    name: build (Linux arm64)
+  # Build binaries for all 4 platforms
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: bun-darwin-arm64
+            name: darwin-arm64
+          - target: bun-darwin-x64
+            name: darwin-x64
+          - target: bun-linux-arm64
+            name: linux-arm64
+          - target: bun-linux-x64
+            name: linux-x64
+
+    runs-on: macos-latest
+    name: build (${{ matrix.name }})
     timeout-minutes: 10
 
     steps:
@@ -46,5 +58,16 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Smoke test — CLI loads
-        run: bun packages/cli/index.ts --help
+      - name: Build binary
+        run: |
+          bun build --compile --target ${{ matrix.target }} \
+            packages/cli/index.ts --outfile ark-${{ matrix.name }}
+
+      - name: Verify binary exists
+        run: ls -lh ark-${{ matrix.name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-${{ matrix.name }}
+          path: ark-${{ matrix.name }}
