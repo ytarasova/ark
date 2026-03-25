@@ -211,7 +211,7 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
               historyItems.length === 0 ? (
                 <Text dimColor>{"No sessions found"}</Text>
               ) : (
-                <ScrollBox followIndex={sel} active={false}>
+                <ScrollBox followIndex={sel} active={false} reserveRows={9}>
                   {historyItems.map((item, idx) => {
                     const label = item.summary || (item.claudeSession?.project.split("/").pop() ?? item.id.slice(0, 8));
                     const tag = item.type === "ark" ? " ARK " : "     ";
@@ -230,7 +230,7 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
               searchResults.length === 0 ? (
                 <Text dimColor>{"No results"}</Text>
               ) : (
-                <ScrollBox followIndex={sel} active={false}>
+                <ScrollBox followIndex={sel} active={false} reserveRows={9}>
                   {searchResults.map((r, idx) => (
                     <Text key={`${r.sessionId}-${idx}`} wrap="truncate">
                       {idx === sel ? ">" : " "}
