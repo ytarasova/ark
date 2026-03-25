@@ -61,6 +61,7 @@ jobs:
       - name: Build binary
         run: |
           bun build --compile --target ${{ matrix.target }} \
+            --external react-devtools-core \
             packages/cli/index.ts --outfile ark-${{ matrix.name }}
 
       - name: Verify binary exists
