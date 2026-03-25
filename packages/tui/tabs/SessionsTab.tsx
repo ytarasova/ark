@@ -122,7 +122,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       if (selected?.session_id) {
         const sid = selected.session_id;
         const selectedId = selected.id;
-        asyncState.run("Checking session...", async () => {
+        asyncState.run("Attaching...", async () => {
           // Determine if this is a remote session
           const compute = selected?.compute_name ? core.getCompute(selected.compute_name) : null;
           const isRemote = compute && compute.provider !== "local";
@@ -132,7 +132,15 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
             const ip = (compute.config as any)?.ip;
             if (!ip) { status.show("No IP for remote compute"); return; }
             const keyPath = `${process.env.HOME}/.ssh/ark-${compute.name}`;
-            attachCmd = ["ssh", "-i", keyPath, "-o", "StrictHostKeyChecking=no", "-t",
+            // Quick connectivity check before trying to attach
+            const { sshExecAsync } = await import("../../core/tmux.js").then(() => import("../../compute/providers/ec2/ssh.js"));
+            const { exitCode } = await sshExecAsync(keyPath, ip, "tmux has-session -t " + sid, { timeout: 10_000 });
+            if (exitCode !== 0) {
+              status.show(`Cannot reach ${compute.name} or session not found`);
+              return;
+            }
+            attachCmd = ["ssh", "-i", keyPath, "-o", "StrictHostKeyChecking=no",
+              "-o", "ConnectTimeout=10", "-t",
               `ubuntu@${ip}`, `tmux attach -t ${sid}`];
           } else {
             const exists = await core.sessionExistsAsync(sid);
