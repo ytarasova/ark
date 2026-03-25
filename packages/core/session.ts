@@ -158,7 +158,8 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
     try { claude.removeHooksConfig(session.workdir); } catch {}
   }
 
-  store.updateSession(sessionId, { status: "stopped", error: null, session_id: null, claude_session_id: null });
+  // Preserve claude_session_id so restart can --resume the conversation
+  store.updateSession(sessionId, { status: "stopped", error: null, session_id: null });
   store.logEvent(sessionId, "session_stopped", {
     stage: session.stage, actor: "user",
     data: { session_id: session.session_id, agent: session.agent },
