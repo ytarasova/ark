@@ -107,13 +107,16 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
             const entry = JSON.parse(line);
             if (entry.type !== "user" && entry.type !== "assistant") continue;
             const msg = entry.message;
+            // Skip tool_result entries (user messages that are just tool output)
+            if (Array.isArray(msg?.content) && msg.content.some((c: any) => c.type === "tool_result")) continue;
+            // Skip tool_use entries (assistant messages that are just tool calls)
+            if (Array.isArray(msg?.content) && msg.content.every((c: any) => c.type === "tool_use")) continue;
             let text = "";
             if (typeof msg?.content === "string") text = msg.content;
             else if (Array.isArray(msg?.content)) {
               text = msg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ");
             }
             text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-            // Skip noise: empty, tiny, system junk, task notifications, XML tags
             if (text.length < 10) continue;
             if (text.startsWith("Caveat:") || text.startsWith("<") || text.startsWith("task-notification")) continue;
             const role = entry.type === "user" ? "You" : "Claude";

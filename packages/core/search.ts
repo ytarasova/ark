@@ -203,8 +203,14 @@ export async function indexTranscripts(opts?: { transcriptsDir?: string; onProgr
         try {
           const entry = JSON.parse(line);
           if (entry.type !== "user" && entry.type !== "assistant") continue;
+          // Skip tool_result (user) and tool_use-only (assistant) entries
+          const content = entry.message?.content;
+          if (Array.isArray(content)) {
+            if (content.some((c: any) => c.type === "tool_result")) continue;
+            if (content.every((c: any) => c.type === "tool_use")) continue;
+          }
           const text = extractText(entry);
-          if (!text.trim()) continue;
+          if (!text.trim() || text.length < 10) continue;
           insert.run(sessionId, projectDir, entry.type, text, entry.timestamp ?? null);
           indexed++;
         } catch {}
