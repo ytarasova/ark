@@ -4,7 +4,7 @@
 
 ## Status Summary
 
-**Shipped (12 of 25 original items):**
+**Shipped (15 items):**
 1. ✅ Hook-based agent status
 2. ✅ Context compaction hooks
 3. ✅ Headless CI mode (`ark exec`)
@@ -16,6 +16,7 @@
 15. ✅ Tiered autonomy (full/execute/edit/read-only)
 17. ✅ Session search + FTS5 indexing
 18. ✅ Import Claude sessions
+33. ✅ PR monitoring — review gate + GitHub webhook (approve opens gate, changes_requested steers agent)
 
 **Also shipped (not in original plan):**
 - Tab restructure (6 tabs: Sessions|Agents|Tools|Flows|History|Compute)
@@ -26,6 +27,7 @@
 - Provider-driven isolation modes
 - Session name sanitization
 - Preserved claude_session_id on stop
+- Token usage display in session detail
 
 ---
 
@@ -52,7 +54,7 @@
 | 29 | **Checkpoint & crash recovery** | Mission Control | 2d | Save structured state snapshots at stage boundaries (files modified, current step). On crash/re-dispatch, inject checkpoint context so agent resumes where it left off |
 | 30 | **Auto-rollback pipeline** | Mission Control | 3d | GitHub webhook monitors merged PRs. Post-merge health check. Auto-creates revert PR on failure. Demotes session to supervised autonomy. New action type: `health_check` |
 
-| 33 | **PR monitoring + comment resolution** | (user request) | 3d | GitHub webhook watches PRs. When review comments arrive, dispatch an agent session to address them. GitHub-first, Bitbucket later |
+| ~~33~~ | ~~PR monitoring~~ | ~~done~~ | ~~3d~~ | ✅ Shipped as review gate + GitHub webhook |
 | 34 | **QMD-powered hybrid memory** | QMD (tobi/qmd) | 3d | Replace or augment FTS5 with QMD's hybrid search (BM25 + vector + LLM reranking). Local-only, runs on Bun. MCP server mode for shared access. 95% token reduction vs full-context dumps |
 
 ### Tier 3 — Future (P3)
@@ -79,7 +81,7 @@
 4. **#13 Structured review output** (2d) — feeds into fail-loopback
 
 ### Phase 2: CI/CD Integration
-5. **#33 PR monitoring** (3d) — GitHub webhook → agent addresses review comments
+5. ~~#33 PR monitoring~~ ✅ DONE
 6. **#30 Auto-rollback** (3d) — post-merge health check, auto-revert
 7. **#4 OTEL observability** (2d) — visibility into the system
 
