@@ -1,14 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#38bdf8"/>
       <stop offset="100%" stop-color="#a78bfa"/>
     </linearGradient>
   </defs>
-  <!-- Stylized "A" as an arch/gateway -->
-  <path d="M10 52 L28 12 H36 L54 52 H44 L40 40 H24 L20 52 Z" fill="url(#g)"/>
-  <!-- Cutout inner arch -->
-  <path d="M27 36 L32 20 L37 36 Z" fill="#0a0e17"/>
-  <!-- Flow dot at the apex -->
-  <circle cx="32" cy="14" r="3" fill="#7dd3fc"/>
+  <text x="32" y="52" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="56" fill="url(#g)">A</text>
 </svg>
