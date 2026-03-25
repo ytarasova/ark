@@ -1,7 +1,7 @@
 /**
  * Tests for tmux.ts — pure/deterministic helpers.
  *
- * Covers: hasTmux, attachCommand, writeLauncher, sessionExists, listArkSessions.
+ * Covers: hasTmux, attachCommand, writeLauncher, sessionExists, listArkSessionsAsync.
  * Skips functions that create/kill real tmux sessions (covered by E2E tests).
  */
 
@@ -13,7 +13,7 @@ import {
   attachCommand,
   writeLauncher,
   sessionExists,
-  listArkSessions,
+  listArkSessionsAsync,
 } from "../tmux.js";
 import { TRACKS_DIR } from "../store.js";
 
@@ -145,23 +145,23 @@ describe("sessionExists", () => {
   });
 });
 
-// ── listArkSessions ─────────────────────────────────────────────────────────
+// ── listArkSessionsAsync ─────────────────────────────────────────────────────────
 
-describe("listArkSessions", () => {
-  it("returns an array", () => {
-    const sessions = listArkSessions();
+describe("listArkSessionsAsync", () => {
+  it("returns an array", async () => {
+    const sessions = await listArkSessionsAsync();
     expect(Array.isArray(sessions)).toBe(true);
   });
 
-  it("only includes sessions with ark- or s- prefix", () => {
-    const sessions = listArkSessions();
+  it("only includes sessions with ark- or s- prefix", async () => {
+    const sessions = await listArkSessionsAsync();
     for (const s of sessions) {
       expect(s.name.startsWith("ark-") || s.name.startsWith("s-")).toBe(true);
     }
   });
 
-  it("each session has name and alive fields", () => {
-    const sessions = listArkSessions();
+  it("each session has name and alive fields", async () => {
+    const sessions = await listArkSessionsAsync();
     for (const s of sessions) {
       expect(typeof s.name).toBe("string");
       expect(s.alive).toBe(true);

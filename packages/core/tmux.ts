@@ -2,7 +2,10 @@
  * tmux session management - create, attach, capture, send, kill.
  *
  * Each agent session runs in a tmux session. This module provides
- * a clean API over tmux CLI commands. No sleeps - uses tmux primitives.
+ * a clean API over tmux CLI commands.
+ *
+ * Most functions are async. A few fast sync versions are kept for
+ * startup checks and test guards (hasTmux, sessionExists, killSession).
  */
 
 import { execFile, execFileSync, spawn } from "child_process";
@@ -18,7 +21,7 @@ export interface TmuxSession {
   alive: boolean;
 }
 
-/** Check if tmux is available */
+/** Check if tmux is available (sync — one-shot startup check) */
 export function hasTmux(): boolean {
   try {
     execFileSync("tmux", ["-V"], { stdio: "pipe" });
@@ -28,7 +31,7 @@ export function hasTmux(): boolean {
   }
 }
 
-/** Check if a tmux session exists */
+/** Check if a tmux session exists (sync — fast guard) */
 export function sessionExists(name: string): boolean {
   try {
     execFileSync("tmux", ["has-session", "-t", name], { stdio: "pipe" });
@@ -38,7 +41,7 @@ export function sessionExists(name: string): boolean {
   }
 }
 
-/** Check if a tmux session exists (async - non-blocking) */
+/** Check if a tmux session exists (async) */
 export async function sessionExistsAsync(name: string): Promise<boolean> {
   try {
     await execFileAsync("tmux", ["has-session", "-t", name], { stdio: ["pipe", "pipe", "pipe"] });
@@ -48,7 +51,7 @@ export async function sessionExistsAsync(name: string): Promise<boolean> {
   }
 }
 
-/** Kill a tmux session */
+/** Kill a tmux session (sync — fast, used in cleanup) */
 export function killSession(name: string): boolean {
   try {
     execFileSync("tmux", ["kill-session", "-t", name], { stdio: "pipe" });
@@ -58,7 +61,7 @@ export function killSession(name: string): boolean {
   }
 }
 
-/** Kill a tmux session (async - non-blocking) */
+/** Kill a tmux session (async) */
 export function killSessionAsync(name: string): Promise<boolean> {
   return new Promise((resolve) => {
     const cp = spawn("tmux", ["kill-session", "-t", name], { stdio: "pipe" });
@@ -67,26 +70,12 @@ export function killSessionAsync(name: string): Promise<boolean> {
   });
 }
 
-/** Create a new tmux session running a command directly (no shell prompt) */
-export function createSession(name: string, command: string, opts?: {
-  width?: number;
-  height?: number;
-}): void {
-  killSession(name); // clean up any existing
-  execFileSync("tmux", [
-    "new-session", "-d", "-s", name,
-    "-x", String(opts?.width ?? 220),
-    "-y", String(opts?.height ?? 50),
-    "bash", "-c", command,
-  ], { stdio: "pipe" });
-}
-
-/** Create a new tmux session running a command directly (async - non-blocking) */
+/** Create a new tmux session running a command (async) */
 export async function createSessionAsync(name: string, command: string, opts?: {
   width?: number;
   height?: number;
 }): Promise<void> {
-  await killSessionAsync(name); // clean up any existing
+  await killSessionAsync(name);
   await execFileAsync("tmux", [
     "new-session", "-d", "-s", name,
     "-x", String(opts?.width ?? 220),
@@ -95,21 +84,7 @@ export async function createSessionAsync(name: string, command: string, opts?: {
   ]);
 }
 
-/** Create a tmux session with a shell, then send a command via send-keys */
-export function createSessionWithSendKeys(name: string, command: string, opts?: {
-  width?: number;
-  height?: number;
-}): void {
-  killSession(name);
-  execFileSync("tmux", [
-    "new-session", "-d", "-s", name,
-    "-x", String(opts?.width ?? 220),
-    "-y", String(opts?.height ?? 50),
-  ], { stdio: "pipe" });
-  execFileSync("tmux", ["send-keys", "-t", name, command, "Enter"], { stdio: "pipe" });
-}
-
-/** Create a tmux session with a shell, then send a command via send-keys (async - non-blocking) */
+/** Create a tmux session with a shell, then send a command via send-keys (async) */
 export async function createSessionWithSendKeysAsync(name: string, command: string, opts?: {
   width?: number;
   height?: number;
@@ -123,21 +98,7 @@ export async function createSessionWithSendKeysAsync(name: string, command: stri
   await execFileAsync("tmux", ["send-keys", "-t", name, command, "Enter"]);
 }
 
-/** Capture pane output (plain text or with ANSI codes) */
-export function capturePane(name: string, opts?: {
-  lines?: number;
-  ansi?: boolean;
-}): string {
-  try {
-    const args = ["capture-pane", "-t", name, "-p", "-S", `-${opts?.lines ?? 50}`];
-    if (opts?.ansi) args.splice(4, 0, "-e");
-    return execFileSync("tmux", args, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
-  } catch {
-    return "";
-  }
-}
-
-/** Capture pane output (async - non-blocking) */
+/** Capture pane output (async) */
 export async function capturePaneAsync(name: string, opts?: {
   lines?: number;
   ansi?: boolean;
@@ -152,20 +113,7 @@ export async function capturePaneAsync(name: string, opts?: {
   }
 }
 
-/** Send text to a tmux session via load-buffer (handles long text without paste overflow) */
-export function sendText(name: string, text: string): void {
-  const tmpFile = join(TRACKS_DIR(), `.msg-${Date.now()}.txt`);
-  writeFileSync(tmpFile, text);
-  try {
-    execFileSync("tmux", ["load-buffer", "-b", "ark-msg", tmpFile], { stdio: "pipe" });
-    execFileSync("tmux", ["paste-buffer", "-b", "ark-msg", "-t", name], { stdio: "pipe" });
-    execFileSync("tmux", ["send-keys", "-t", name, "Enter"], { stdio: "pipe" });
-  } finally {
-    try { unlinkSync(tmpFile); } catch { /* ignore */ }
-  }
-}
-
-/** Send text to a tmux session via load-buffer (async - non-blocking) */
+/** Send text to a tmux session via load-buffer (async) */
 export async function sendTextAsync(name: string, text: string): Promise<void> {
   const tmpFile = join(TRACKS_DIR(), `.msg-${Date.now()}.txt`);
   writeFileSync(tmpFile, text);
@@ -178,12 +126,7 @@ export async function sendTextAsync(name: string, text: string): Promise<void> {
   }
 }
 
-/** Send keys to a tmux session (for short text or special keys) */
-export function sendKeys(name: string, ...keys: string[]): void {
-  execFileSync("tmux", ["send-keys", "-t", name, ...keys], { stdio: "pipe" });
-}
-
-/** Send keys to a tmux session (async - non-blocking) */
+/** Send keys to a tmux session (async) */
 export async function sendKeysAsync(name: string, ...keys: string[]): Promise<void> {
   await execFileAsync("tmux", ["send-keys", "-t", name, ...keys]);
 }
@@ -202,21 +145,7 @@ export function attachCommand(name: string, opts?: {
   return `tmux attach -t ${name}`;
 }
 
-/** List all ark tmux sessions */
-export function listArkSessions(): TmuxSession[] {
-  try {
-    const output = execFileSync("tmux", ["list-sessions", "-F", "#{session_name}"], {
-      encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
-    });
-    return output.split("\n")
-      .filter((s) => s.startsWith("ark-") || s.startsWith("s-"))
-      .map((name) => ({ name, alive: true }));
-  } catch {
-    return [];
-  }
-}
-
-/** List all ark tmux sessions (async - non-blocking) */
+/** List all ark tmux sessions (async) */
 export async function listArkSessionsAsync(): Promise<TmuxSession[]> {
   try {
     const { stdout } = await execFileAsync("tmux", ["list-sessions", "-F", "#{session_name}"], {
@@ -239,4 +168,3 @@ export function writeLauncher(sessionId: string, content: string): string {
   chmodSync(path, 0o755);
   return path;
 }
-

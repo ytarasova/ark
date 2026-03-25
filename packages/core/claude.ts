@@ -382,7 +382,7 @@ export async function autoAcceptChannelPrompt(
   for (let i = 0; i < max; i++) {
     await Bun.sleep(delay);
     try {
-      const output = tmux.capturePane(tmuxName, { lines: 30 });
+      const output = await tmux.capturePaneAsync(tmuxName, { lines: 30 });
 
       // Found the prompt — accept it
       if (CHANNEL_PROMPT_MARKERS.some(m => output.includes(m))) {

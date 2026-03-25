@@ -57,7 +57,7 @@ export class LocalProvider implements ComputeProvider {
 
   async captureOutput(_compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
     if (!session.session_id) return "";
-    return tmux.capturePane(session.session_id, opts);
+    return tmux.capturePaneAsync(session.session_id, opts);
   }
 
   async cleanupSession(_compute: Compute, session: Session): Promise<void> {

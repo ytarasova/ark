@@ -608,8 +608,8 @@ export async function getOutput(sessionId: string, opts?: { lines?: number; ansi
   if (provider && compute) {
     return provider.captureOutput(compute, session, opts);
   }
-  // Fallback: direct tmux capture
-  return tmux.capturePane(session.session_id, opts);
+  // Fallback: direct tmux capture (async)
+  return tmux.capturePaneAsync(session.session_id, opts);
 }
 
 export async function send(sessionId: string, message: string): Promise<{ ok: boolean; message: string }> {
