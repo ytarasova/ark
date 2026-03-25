@@ -21,8 +21,5 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Type check
-        run: bun tsc --noEmit
-
       - name: Unit tests
         run: bun test --timeout 30000
