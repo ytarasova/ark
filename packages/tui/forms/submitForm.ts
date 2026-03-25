@@ -9,7 +9,7 @@ import type { AsyncState } from "../hooks/useAsync.js";
 export function submitForm(opts: {
   create: () => void;
   onDone: () => void;
-  asyncFollowUp?: { label: string; action: () => Promise<void> };
+  asyncFollowUp?: { label: string; action: (updateLabel: (msg: string) => void) => Promise<void> };
   asyncState: AsyncState;
 }): void {
   const { create, onDone, asyncFollowUp, asyncState } = opts;
@@ -27,6 +27,6 @@ export function submitForm(opts: {
   // Async follow-up via standard runner
   // useAsync.run() now sets loading/label immediately for instant feedback
   if (asyncFollowUp) {
-    asyncState.run(asyncFollowUp.label, asyncFollowUp.action);
+    asyncState.run(asyncFollowUp.label, (updateLabel) => asyncFollowUp.action(updateLabel));
   }
 }

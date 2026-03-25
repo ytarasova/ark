@@ -62,7 +62,8 @@ export function startSession(opts: {
   return store.getSession(session.id)!;
 }
 
-export async function dispatch(sessionId: string): Promise<{ ok: boolean; message: string }> {
+export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<{ ok: boolean; message: string }> {
+  const log = opts?.onLog ?? (() => {});
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -96,6 +97,7 @@ export async function dispatch(sessionId: string): Promise<{ ok: boolean; messag
   }
 
   const agentName = action.agent!;
+  log(`Resolving agent: ${agentName}`);
   const agent = agentRegistry.resolveAgent(agentName, session as unknown as Record<string, unknown>);
   if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
 
@@ -103,11 +105,13 @@ export async function dispatch(sessionId: string): Promise<{ ok: boolean; messag
   const autonomy = stageDef?.autonomy ?? "full";
 
   // Build task with handoff context
+  log("Building task...");
   const task = await buildTaskWithHandoff(session, stage, agentName);
   const claudeArgs = agentRegistry.buildClaudeArgs(agent, { autonomy });
 
   // Launch in tmux
-  const tmuxName = await launchAgentTmux(session, stage, claudeArgs, task, agent, { autonomy });
+  log("Launching agent...");
+  const tmuxName = await launchAgentTmux(session, stage, claudeArgs, task, agent, { autonomy, onLog: log });
 
   store.updateSession(sessionId, { status: "running", agent: agentName, session_id: tmuxName });
   store.logEvent(sessionId, "stage_started", {
@@ -410,8 +414,9 @@ function resolveProvider(session: store.Session): { provider: ComputeProvider | 
 async function launchAgentTmux(
   session: store.Session, stage: string,
   claudeArgs: string[], task: string, agent: agentRegistry.AgentDefinition,
-  opts?: { autonomy?: string },
+  opts?: { autonomy?: string; onLog?: (msg: string) => void },
 ): Promise<string> {
+  const log = opts?.onLog ?? (() => {});
   const tmuxName = `ark-${session.id}`;
   const workdir = session.workdir ?? ".";
 
@@ -421,11 +426,13 @@ async function launchAgentTmux(
   const isLocal = !compute || compute.provider === "local";
   const wantWorktree = isLocal && session.config?.worktree !== false;
   if (wantWorktree && workdir !== "." && existsSync(join(workdir, ".git"))) {
+    log("Setting up git worktree...");
     const wt = await setupWorktree(workdir, session.id, session.branch ?? undefined);
     if (wt) effectiveWorkdir = wt;
   }
 
   // Trust worktree for Claude
+  log("Configuring Claude trust + channel...");
   claude.trustWorktree(workdir, effectiveWorkdir);
 
   // Determine conductor URL based on compute type
@@ -468,6 +475,7 @@ async function launchAgentTmux(
 
     // Auto-start stopped computes
     if (compute.status === "stopped") {
+      log(`Starting compute '${compute.name}'...`);
       await provider.start(compute);
     }
 
@@ -482,6 +490,7 @@ async function launchAgentTmux(
     }
 
     // Sync environment to compute
+    log("Syncing credentials to remote...");
     try {
       const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
       await provider.syncEnvironment(compute, {
@@ -489,12 +498,14 @@ async function launchAgentTmux(
         projectFiles: arcJson?.sync,
         projectDir: effectiveWorkdir,
       });
-    } catch { /* sync failure shouldn't block launch */ }
+      log("Credentials synced");
+    } catch { log("Credential sync failed (continuing)"); }
 
     // Docker Compose - only when explicitly enabled in arc.json { "compose": true }
     if (effectiveWorkdir) {
       const arcJson = parseArcJson(effectiveWorkdir);
       if (arcJson?.compose === true && compute.config?.ip) {
+        log("Starting Docker Compose services...");
         const { sshExec, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
         sshExec(sshKeyPath(compute.name), compute.config.ip as string,
           `cd ${effectiveWorkdir} && docker compose up -d`);
@@ -505,12 +516,14 @@ async function launchAgentTmux(
     if (effectiveWorkdir) {
       const arcJson = parseArcJson(effectiveWorkdir);
       if (arcJson?.devcontainer === true) {
+        log("Building devcontainer...");
         const { buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
         finalLaunchContent = buildLaunchCommand(effectiveWorkdir, finalLaunchContent);
       }
     }
 
     // Launch via provider
+    log("Launching on remote...");
     const result = await provider.launch(compute, session, {
       tmuxName,
       workdir: effectiveWorkdir,
@@ -522,8 +535,10 @@ async function launchAgentTmux(
   }
 
   // Local launch
+  log("Starting local tmux session...");
   await tmux.createSessionAsync(tmuxName, `bash ${launcher}`);
   claude.autoAcceptChannelPrompt(tmuxName);
+  log("Delivering task...");
   claude.deliverTask(session.id, channelPort, task, stage);
   store.updateSession(session.id, { claude_session_id: claudeSessionId });
 

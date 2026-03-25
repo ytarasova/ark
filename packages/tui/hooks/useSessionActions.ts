@@ -12,7 +12,9 @@ export function useSessionActions(asyncState: AsyncState) {
 
   return {
     dispatch: (id: string) => {
-      run(`Dispatching ${id}`, () => core.dispatch(id));
+      run(`Dispatching ${id}`, (updateLabel) =>
+        core.dispatch(id, { onLog: (msg) => updateLabel(msg) }),
+      );
     },
 
     restart: (id: string) => {
@@ -32,11 +34,11 @@ export function useSessionActions(asyncState: AsyncState) {
     },
 
     clone: (sourceId: string, name: string, groupName?: string | null) => {
-      run(`Cloning → ${name}`, async () => {
+      run(`Cloning → ${name}`, async (updateLabel) => {
         const { ok, cloneId } = core.cloneSession(sourceId, name);
         if (!ok) return;
         if (groupName) core.updateSession(cloneId, { group_name: groupName });
-        await core.dispatch(cloneId);
+        await core.dispatch(cloneId, { onLog: (msg) => updateLabel(msg) });
       });
     },
 

@@ -4,13 +4,13 @@ export interface AsyncState {
   loading: boolean;
   error: string | null;
   label: string | null;
-  run: (label: string, action: () => Promise<void> | void) => void;
+  run: (label: string, action: (updateLabel: (msg: string) => void) => Promise<void> | void) => void;
   clearError: () => void;
 }
 
 interface QueuedAction {
   label: string;
-  action: () => Promise<void> | void;
+  action: (updateLabel: (msg: string) => void) => Promise<void> | void;
 }
 
 /**
@@ -44,8 +44,9 @@ export function useAsync(onComplete?: () => void): AsyncState {
     // Yield so React can render the spinner before heavy work starts
     await new Promise(r => setTimeout(r, 0));
 
+    const updateLabel = (msg: string) => setLabel(msg);
     try {
-      await Promise.resolve(next.action());
+      await Promise.resolve(next.action(updateLabel));
       onCompleteRef.current?.();
     } catch (e: any) {
       setError(`${next.label} failed: ${e?.message ?? String(e)}`);
@@ -62,7 +63,7 @@ export function useAsync(onComplete?: () => void): AsyncState {
     }
   }, []);
 
-  const run = useCallback((actionLabel: string, action: () => Promise<void> | void) => {
+  const run = useCallback((actionLabel: string, action: ((updateLabel: (msg: string) => void) => Promise<void> | void) | (() => Promise<void> | void)) => {
     queue.current.push({ label: actionLabel, action });
     // Set loading state immediately so spinner renders in the same cycle
     if (!running.current) {

@@ -133,8 +133,8 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
       onDone,
       asyncFollowUp: {
         label: "Dispatching session",
-        action: async () => {
-          await core.dispatch(sessionId);
+        action: async (updateLabel) => {
+          await core.dispatch(sessionId, { onLog: (msg) => updateLabel(msg) });
           store.refresh();
         },
       },
