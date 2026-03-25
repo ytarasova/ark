@@ -65,7 +65,8 @@ function getOverlayHints(overlay: string): React.ReactNode[] {
 function getRightPaneHints(): React.ReactNode[] {
   return [
     <KeyHint key="jk" k="j/k" label="scroll" />,
-    <KeyHint key="gg" k="g/G" label="top/bottom" />,
+    <KeyHint key="fb" k="f/b" label="page" />,
+    <KeyHint key="gG" k="g/G" label="top/end" />,
     <KeyHint key="tab" k="Tab" label="back" />,
   ];
 }
