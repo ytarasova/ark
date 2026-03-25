@@ -6,6 +6,7 @@
 
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import stripJsonComments from "strip-json-comments";
 import type { ArcJson, PortDecl } from "./types.js";
 
 /** Compose file name candidates in priority order (shared with compose.ts). */
@@ -89,9 +90,7 @@ function parseDevcontainerPorts(repoDir: string): number[] {
     if (!existsSync(filePath)) continue;
     try {
       const raw = readFileSync(filePath, "utf-8");
-      // devcontainer.json is JSONC (allows comments) — strip them before parsing
-      const stripped = raw.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
-      const json = JSON.parse(stripped);
+      const json = JSON.parse(stripJsonComments(raw));
       if (Array.isArray(json.forwardPorts)) {
         return json.forwardPorts.filter((p: unknown): p is number => typeof p === "number");
       }
