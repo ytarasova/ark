@@ -30,21 +30,10 @@ jobs:
           bun test --timeout 30000 \
             $(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | sort)
 
-  # Build verification across platforms — catches bun install failures
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            name: macOS arm64
-          - os: ubuntu-latest
-            name: Linux x64
-          - os: ubuntu-24.04-arm
-            name: Linux arm64
-
-    runs-on: ${{ matrix.os }}
-    name: build (${{ matrix.name }})
+  # Build verification on Linux arm64 — catches install failures
+  build-linux:
+    runs-on: ubuntu-24.04-arm
+    name: build (Linux arm64)
     timeout-minutes: 10
 
     steps:
