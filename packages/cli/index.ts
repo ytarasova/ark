@@ -311,6 +311,42 @@ session.command("group")
     console.log(chalk.green(`${id} → group '${group}'`));
   });
 
+// ── PR commands ──────────────────────────────────────────────────────────────
+
+const pr = program.command("pr").description("Manage PR-bound sessions");
+
+pr.command("list")
+  .description("List sessions bound to PRs")
+  .action(() => {
+    const sessions = core.listSessions({ limit: 50 });
+    const prSessions = sessions.filter((s: any) => s.pr_url);
+    if (prSessions.length === 0) {
+      console.log(chalk.yellow("No PR-bound sessions."));
+      return;
+    }
+    for (const s of prSessions) {
+      const icon = s.status === "running" ? "●" : s.status === "completed" ? "✓" : s.status === "failed" ? "✕" : "○";
+      console.log(`  ${icon} ${chalk.dim(s.id)}  ${s.pr_url}  ${s.summary || ""}`);
+    }
+  });
+
+pr.command("status")
+  .description("Show session bound to a PR URL")
+  .argument("<pr-url>", "GitHub PR URL")
+  .action((prUrl) => {
+    const { findSessionByPR } = require("../core/github-webhook.js");
+    const session = findSessionByPR(prUrl);
+    if (!session) {
+      console.log(chalk.yellow(`No session for ${prUrl}`));
+      return;
+    }
+    console.log(`  Session: ${session.id}`);
+    console.log(`  Status:  ${session.status}`);
+    console.log(`  Flow:    ${session.flow}`);
+    console.log(`  Stage:   ${session.stage || "-"}`);
+    console.log(`  Summary: ${session.summary || "-"}`);
+  });
+
 // ── Agent commands ──────────────────────────────────────────────────────────
 
 const agent = program.command("agent").description("Manage agent definitions");

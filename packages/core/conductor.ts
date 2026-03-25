@@ -28,6 +28,7 @@ import { getProvider } from "../compute/index.js";
 import { parseTranscriptUsage } from "./claude.js";
 import { indexSession } from "./search.js";
 import { listSchedules, cronMatches, updateScheduleLastRun } from "./schedule.js";
+import { validateSignature, handleGitHubWebhook } from "./github-webhook.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -168,6 +169,25 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
           }
 
           return Response.json({ status: "ok", mapped: newStatus ?? "no-op" });
+        }
+
+        // GitHub webhook for PR review events
+        if (req.method === "POST" && path === "/api/webhook/github") {
+          const secret = process.env.ARK_GITHUB_WEBHOOK_SECRET;
+          if (!secret) return Response.json({ error: "ARK_GITHUB_WEBHOOK_SECRET not set" }, { status: 500 });
+
+          const body = await req.text();
+          const sig = req.headers.get("x-hub-signature-256") ?? "";
+
+          if (!validateSignature(body, sig, secret)) {
+            return Response.json({ error: "invalid signature" }, { status: 401 });
+          }
+
+          const event = req.headers.get("x-github-event") ?? "";
+          const payload = JSON.parse(body);
+          const result = await handleGitHubWebhook(event, payload);
+
+          return Response.json(result);
         }
 
         return new Response("Not found", { status: 404 });
