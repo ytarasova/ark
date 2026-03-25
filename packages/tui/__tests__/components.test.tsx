@@ -148,6 +148,41 @@ describe("StatusBar", () => {
     // ink may truncate, so check prefix of "provision"
     expect(f2()!).toContain("provis");
   });
+
+  it("shows navigation hints for agents tab", () => {
+    const sessions = makeSessions([]);
+    const { lastFrame } = render(
+      <StatusBar tab="agents" sessions={sessions} loading={false} error={null} label={null} />
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("j/k");
+    expect(frame).toContain("move");
+    expect(frame).toContain("Tab");
+    expect(frame).toContain("detail");
+    expect(frame).toContain("quit");
+  });
+
+  it("shows navigation hints for flows tab", () => {
+    const sessions = makeSessions([]);
+    const { lastFrame } = render(
+      <StatusBar tab="flows" sessions={sessions} loading={false} error={null} label={null} />
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("j/k");
+    expect(frame).toContain("move");
+    expect(frame).toContain("Tab");
+    expect(frame).toContain("detail");
+    expect(frame).toContain("quit");
+  });
+
+  it("shows quit hint for tools tab", () => {
+    const sessions = makeSessions([]);
+    const { lastFrame } = render(
+      <StatusBar tab="tools" sessions={sessions} loading={false} error={null} label={null} />
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("quit");
+  });
 });
 
 // ── MetricBar ───────────────────────────────────────────────────────────────

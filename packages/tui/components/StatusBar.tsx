@@ -147,6 +147,28 @@ function getHistoryHints(): React.ReactNode[] {
   ];
 }
 
+function getAgentsHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS,
+    <KeyHint key="tab" k="Tab" label="detail" />,
+    <KeyHint key="q" k="q" label="quit" />,
+  ];
+}
+
+function getToolsHints(): React.ReactNode[] {
+  return [
+    <KeyHint key="q" k="q" label="quit" />,
+  ];
+}
+
+function getFlowsHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS,
+    <KeyHint key="tab" k="Tab" label="detail" />,
+    <KeyHint key="q" k="q" label="quit" />,
+  ];
+}
+
 function getGenericHints(): React.ReactNode[] {
   return [
     <KeyHint key="q" k="q" label="quit" />,
@@ -160,6 +182,9 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
   const hints = overlay ? getOverlayHints(overlay)
     : pane === "right" ? getRightPaneHints(tab)
     : tab === "sessions" ? getSessionHints(selectedSession)
+    : tab === "agents" ? getAgentsHints()
+    : tab === "tools" ? getToolsHints()
+    : tab === "flows" ? getFlowsHints()
     : tab === "compute" ? getComputeHints()
     : tab === "history" ? getHistoryHints()
     : getGenericHints();
