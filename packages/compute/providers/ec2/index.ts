@@ -5,6 +5,8 @@
  * Provision/destroy are stubbed until the Pulumi-based provision module lands.
  */
 
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
 import {
   EC2Client,
   StartInstancesCommand,
@@ -239,17 +241,34 @@ export class EC2Provider implements ComputeProvider {
       sessionId: session.id,
     });
 
-    // 3. Sync project files from arc.json
+    // 3. Upload Claude configs (.mcp.json, .claude/settings.local.json) to remote clone
+    //    These are written locally during dispatch but needed on the remote for Claude to work.
+    const localMcpJson = join(opts.workdir, ".mcp.json");
+    if (existsSync(localMcpJson)) {
+      const encoded = Buffer.from(readFileSync(localMcpJson, "utf-8")).toString("base64");
+      await sshExecAsync(key, ip,
+        `echo '${encoded}' | base64 -d > ${remoteWorkdir}/.mcp.json`,
+        { timeout: 15_000 });
+    }
+    const localHooksConfig = join(opts.workdir, ".claude", "settings.local.json");
+    if (existsSync(localHooksConfig)) {
+      const encoded = Buffer.from(readFileSync(localHooksConfig, "utf-8")).toString("base64");
+      await sshExecAsync(key, ip,
+        `mkdir -p ${remoteWorkdir}/.claude && echo '${encoded}' | base64 -d > ${remoteWorkdir}/.claude/settings.local.json`,
+        { timeout: 15_000 });
+    }
+
+    // 4. Sync project files from arc.json
     const { parseArcJson } = await import("../../arc-json.js");
     const arcJson = opts.workdir ? parseArcJson(opts.workdir) : null;
     if (arcJson?.sync?.length && opts.workdir) {
       await syncProjectFiles(key, ip, arcJson.sync, opts.workdir, remoteWorkdir);
     }
 
-    // 4. Trust remote directory
+    // 5. Trust remote directory
     await trustRemoteDirectory(key, ip, remoteWorkdir);
 
-    // 5. Build launcher with REMOTE paths
+    // 6. Build launcher with REMOTE paths
     let remoteLauncher = opts.launcherContent;
     if (opts.workdir) {
       // Replace all occurrences of the local workdir with the remote one
@@ -259,30 +278,30 @@ export class EC2Provider implements ComputeProvider {
     // Also fix the cd command to use remote path
     remoteLauncher = remoteLauncher.replace(/^cd .*$/m, `cd '${remoteWorkdir}'`);
 
-    // 6. Upload launcher
+    // 7. Upload launcher
     const encoded = Buffer.from(remoteLauncher).toString("base64");
     const remoteDir = `~/.ark/tracks/${session.id}`;
     await sshExecAsync(key, ip,
       `mkdir -p ${remoteDir} && echo '${encoded}' | base64 -d > ${remoteDir}/launch.sh && chmod +x ${remoteDir}/launch.sh`,
       { timeout: 15_000 });
 
-    // 7. Create remote tmux session
+    // 8. Create remote tmux session
     await sshExecAsync(key, ip,
       `tmux new-session -d -s ${opts.tmuxName} -c ${remoteWorkdir} 'bash ${remoteDir}/launch.sh'`,
       { timeout: 15_000 });
 
-    // 8. Auto-accept channel prompt
+    // 9. Auto-accept channel prompt
     await autoAcceptChannelPrompt(key, ip, opts.tmuxName);
 
-    // 9. Setup port tunnels (local forward for app ports)
+    // 10. Setup port tunnels (local forward for app ports)
     if (opts.ports.length > 0) {
       setupTunnels(key, ip, opts.ports);
     }
 
-    // 10. Reverse tunnel: let remote channel reach local conductor
+    // 11. Reverse tunnel: let remote channel reach local conductor
     setupReverseTunnel(key, ip, 19100);
 
-    // 11. Store remote workdir in session config for display
+    // 12. Store remote workdir in session config for display
     const { updateSession } = await import("../../../core/store.js");
     updateSession(session.id, {
       config: { ...(session.config ?? {}), remoteWorkdir },

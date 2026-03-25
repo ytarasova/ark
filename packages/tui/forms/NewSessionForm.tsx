@@ -98,7 +98,7 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
   const submit = () => {
     let workdir: string | undefined;
     let repo = repoPath || process.cwd();
-    const rp = resolvePath(repo);
+    const rp = resolvePath(repo).replace(/\/+$/, "");
     if (!existsSync(rp)) return;
     if (!existsSync(resolvePath(rp, ".git"))) return;
     workdir = rp;
