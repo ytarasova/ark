@@ -1,0 +1,192 @@
+/**
+ * GitHub webhook handler — HMAC validation, comment extraction, session binding.
+ *
+ * Handles `pull_request_review` and `pull_request_review_comment` events.
+ * Validates webhook signatures, extracts review comments, and either
+ * approves review gates or steers active agents with feedback.
+ */
+
+import { createHmac } from "crypto";
+import { getDb } from "./store.js";
+import * as store from "./store.js";
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+export interface ReviewComment {
+  author: string;
+  body: string;
+  path?: string;
+  line?: number;
+}
+
+export interface WebhookResult {
+  action: "steer" | "approve" | "ignore";
+  sessionId?: string;
+  message?: string;
+}
+
+// ── Signature validation ────────────────────────────────────────────────────
+
+export function validateSignature(payload: string, signature: string, secret: string): boolean {
+  const expected = "sha256=" + createHmac("sha256", secret).update(payload).digest("hex");
+  // Constant-time comparison
+  if (signature.length !== expected.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < signature.length; i++) {
+    mismatch |= signature.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+// ── Comment extraction ──────────────────────────────────────────────────────
+
+export function extractComments(payload: Record<string, any>): ReviewComment[] {
+  const comments: ReviewComment[] = [];
+
+  // pull_request_review: top-level review body
+  if (payload.review?.body && payload.review?.user?.login) {
+    comments.push({
+      author: payload.review.user.login,
+      body: payload.review.body,
+    });
+  }
+
+  // pull_request_review_comment: inline comment with path/line
+  if (payload.comment?.body && payload.comment?.user?.login) {
+    comments.push({
+      author: payload.comment.user.login,
+      body: payload.comment.body,
+      path: payload.comment.path ?? undefined,
+      line: payload.comment.line ?? payload.comment.original_line ?? undefined,
+    });
+  }
+
+  return comments;
+}
+
+// ── Prompt formatting ───────────────────────────────────────────────────────
+
+export function formatReviewPrompt(
+  prTitle: string,
+  prNumber: number,
+  comments: ReviewComment[],
+  state?: string,
+): string {
+  const parts: string[] = [];
+  parts.push(`## PR Review — #${prNumber}: ${prTitle}`);
+
+  if (state) {
+    parts.push(`Review state: ${state}`);
+  }
+
+  parts.push("");
+  for (const c of comments) {
+    if (c.path && c.line) {
+      parts.push(`**${c.author}** on \`${c.path}:${c.line}\`:`);
+    } else if (c.path) {
+      parts.push(`**${c.author}** on \`${c.path}\`:`);
+    } else {
+      parts.push(`**${c.author}**:`);
+    }
+    parts.push(c.body);
+    parts.push("");
+  }
+
+  parts.push("Address the review feedback above, then push your changes.");
+  return parts.join("\n");
+}
+
+// ── Session lookup ──────────────────────────────────────────────────────────
+
+export function findSessionByPR(prUrl: string): store.Session | null {
+  const db = getDb();
+  const row = db.prepare(
+    "SELECT * FROM sessions WHERE pr_url = ? ORDER BY created_at DESC LIMIT 1"
+  ).get(prUrl) as any;
+  if (!row) return null;
+  return {
+    ...row,
+    ticket: row.jira_key,
+    summary: row.jira_summary,
+    flow: row.pipeline,
+    config: JSON.parse(row.config ?? "{}"),
+  };
+}
+
+// ── Main handler ────────────────────────────────────────────────────────────
+
+export function handleGitHubWebhook(event: string, payload: Record<string, any>): WebhookResult {
+  // Only handle review-related events
+  if (event !== "pull_request_review" && event !== "pull_request_review_comment") {
+    return { action: "ignore", message: `Unhandled event: ${event}` };
+  }
+
+  // Extract PR URL
+  const prUrl = payload.pull_request?.html_url;
+  if (!prUrl) {
+    return { action: "ignore", message: "No PR URL in payload" };
+  }
+
+  // Find matching session
+  const session = findSessionByPR(prUrl);
+  if (!session) {
+    return { action: "ignore", message: `No session for PR: ${prUrl}` };
+  }
+
+  const prTitle = payload.pull_request?.title ?? "";
+  const prNumber = payload.pull_request?.number ?? 0;
+  const comments = extractComments(payload);
+
+  // Handle approved reviews
+  if (event === "pull_request_review" && payload.review?.state === "approved") {
+    store.logEvent(session.id, "webhook_review_approved", {
+      actor: "github",
+      data: { pr_url: prUrl, reviewer: payload.review?.user?.login },
+    });
+    return { action: "approve", sessionId: session.id, message: "Review approved" };
+  }
+
+  // Handle changes_requested or inline comments — steer the agent
+  if (comments.length > 0) {
+    const prompt = formatReviewPrompt(prTitle, prNumber, comments, payload.review?.state);
+
+    // Store as a message so TUI shows it
+    store.addMessage({
+      session_id: session.id,
+      role: "system",
+      content: prompt,
+      type: "text",
+    });
+
+    store.logEvent(session.id, "webhook_review_steer", {
+      actor: "github",
+      data: {
+        pr_url: prUrl,
+        event,
+        reviewer: comments[0]?.author,
+        comment_count: comments.length,
+      },
+    });
+
+    // Steer via channel if session is running
+    if (session.status === "running") {
+      const channelPort = store.sessionChannelPort(session.id);
+      try {
+        fetch(`http://localhost:${channelPort}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "steer",
+            sessionId: session.id,
+            message: prompt,
+            from: "github-review",
+          }),
+        }).catch(() => { /* channel not reachable — message saved in DB */ });
+      } catch { /* ignore fetch errors */ }
+    }
+
+    return { action: "steer", sessionId: session.id, message: prompt };
+  }
+
+  return { action: "ignore", sessionId: session.id, message: "No actionable comments" };
+}
