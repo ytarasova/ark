@@ -55,3 +55,6 @@ export { startConductor } from "./conductor.js";
 
 // Claude sessions
 export { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache, type ClaudeSession } from "./claude-sessions.js";
+
+// Repo-scoped config
+export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
