@@ -77,11 +77,18 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
     }
     addRecentRepo(repoPath);
 
+    // Sanitize name: alphanumeric, dash, underscore only
+    const sanitized = (name.trim() || generateName())
+      .replace(/[^a-zA-Z0-9_-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 60) || generateName();
+
     let sessionId = "";
     submitForm({
       create: () => {
         const s = core.startSession({
-          summary: name.trim() || generateName(),
+          summary: sanitized,
           repo,
           flow: flowName,
           workdir,

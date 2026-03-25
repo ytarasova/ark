@@ -139,7 +139,7 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
     if (key.return && mode === "recent" && selectedItem?.type === "claude" && selectedItem.claudeSession) {
       const cs = selectedItem.claudeSession;
       onImport?.({
-        name: cs.summary?.slice(0, 100) || `Import ${cs.sessionId.slice(0, 8)}`,
+        name: cs.summary?.slice(0, 100) || `import-${cs.sessionId.slice(0, 8)}`,
         repo: cs.project,
         claudeSessionId: cs.sessionId,
       });

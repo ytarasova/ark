@@ -69,8 +69,12 @@ session.command("start")
       console.log(chalk.dim(`Importing Claude session ${cs.sessionId.slice(0, 8)} from ${cs.project}`));
     }
 
+    // Sanitize session name: alphanumeric, dash, underscore only
+    const rawName = opts.summary ?? ticket ?? "";
+    const summary = rawName.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || rawName;
+
     const s = core.startSession({
-      ticket, summary: opts.summary ?? ticket,
+      ticket, summary,
       repo, flow: opts.flow, compute_name: opts.compute,
       workdir, group_name: opts.group,
     });
