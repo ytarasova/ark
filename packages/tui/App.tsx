@@ -19,7 +19,9 @@ import { NewComputeForm } from "./forms/NewComputeForm.js";
 export function App() {
   const { exit } = useApp();
   const store = useStore();
-  const asyncState = useAsync(store.refresh);
+  const sessionsAsync = useAsync(store.refresh);
+  const historyAsync = useAsync(store.refresh);
+  const computeAsync = useAsync(store.refresh);
   const [tab, setTab] = useState<Tab>("sessions");
   const [showForm, setShowForm] = useState<string | null>(null);
   const [sessionPrefill, setSessionPrefill] = useState<SessionPrefill | undefined>();
@@ -33,10 +35,13 @@ export function App() {
 
   const switchTab = (t: Tab) => { setTab(t); setPane("left"); };
 
+  // Active tab's async state — used for TabBar/StatusBar indicators
+  const asyncState = tab === "history" ? historyAsync : tab === "compute" ? computeAsync : sessionsAsync;
+
   const takeSnapshot = useCallback(() => {
     if (!process.env.TMUX) return;
     // Run snapshot async to not block TUI
-    asyncState.run("Copying screen...", async () => {
+    sessionsAsync.run("Copying screen...", async () => {
       await new Promise<void>((resolve) => {
         execFile("tmux", ["capture-pane", "-S", "-"], { stdio: "pipe" }, () => {
           execFile("tmux", ["save-buffer", "-"], { encoding: "utf-8" }, (err, content) => {
@@ -49,7 +54,7 @@ export function App() {
         });
       });
     });
-  }, [asyncState]);
+  }, [sessionsAsync]);
 
   useInput((input, key) => {
     // When a text input is active, only allow Ctrl-based shortcuts
@@ -94,7 +99,7 @@ export function App() {
         <SessionsTab
           {...store}
           pane={pane}
-          async={asyncState}
+          async={sessionsAsync}
           onShowForm={() => setShowForm("session")}
           onSelectionChange={setSelectedSession}
           onInputActive={setChildInputActive}
@@ -103,7 +108,7 @@ export function App() {
           formOverlay={showForm === "session" ? (
             <NewSessionForm
               store={store}
-              async={asyncState}
+              async={sessionsAsync}
               onDone={() => { setShowForm(null); setSessionPrefill(undefined); }}
               prefill={sessionPrefill}
             />
@@ -121,7 +126,7 @@ export function App() {
         <HistoryTab
           {...store}
           pane={pane}
-          async={asyncState}
+          async={historyAsync}
           onOverlayChange={setActiveOverlay}
 
           onImport={(prefill) => {
@@ -134,10 +139,10 @@ export function App() {
         <ComputeTab
           {...store}
           pane={pane}
-          async={asyncState}
+          async={computeAsync}
           onShowForm={() => setShowForm("compute")}
           formOverlay={showForm === "compute" ? (
-            <NewComputeForm async={asyncState} onDone={() => setShowForm(null)} />
+            <NewComputeForm async={computeAsync} onDone={() => setShowForm(null)} />
           ) : undefined}
         />
       ) : null}
