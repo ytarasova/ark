@@ -29,6 +29,14 @@ export interface StoreData {
 async function reconcileSessions(sessions: core.Session[]): Promise<void> {
   for (const s of sessions) {
     if (s.status !== "running" || !s.session_id) continue;
+
+    // Remote compute sessions have tmux on the EC2 host, not locally — skip local check.
+    // Their status is tracked via hooks (conductor /hooks/status endpoint).
+    if (s.compute_name) {
+      const compute = core.getCompute(s.compute_name);
+      if (compute && compute.provider !== "local") continue;
+    }
+
     const exists = await core.sessionExistsAsync(s.session_id);
 
     if (!exists) {
