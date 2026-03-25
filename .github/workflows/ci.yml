@@ -88,7 +88,7 @@ jobs:
           - name: darwin-arm64
             os: macos-latest
           - name: darwin-x64
-            os: macos-13
+            os: macos-latest
           - name: linux-arm64
             os: ubuntu-24.04-arm
           - name: linux-x64
@@ -114,13 +114,22 @@ jobs:
 
       - name: Test TUI starts without crash
         run: |
-          timeout 3 ./ark-${{ matrix.name }} tui 2>&1 || code=$?
-          # timeout exits 124 when it kills the process — that means the TUI started and ran
-          # exit code 0 means it exited cleanly (also fine)
-          # anything else is a real crash
-          if [ "${code:-0}" -eq 124 ] || [ "${code:-0}" -eq 0 ]; then
-            echo "TUI smoke test passed (exit code: ${code:-0})"
+          ./ark-${{ matrix.name }} tui &
+          PID=$!
+          sleep 3
+          # If process is still running after 3s, TUI started successfully
+          if kill -0 $PID 2>/dev/null; then
+            echo "TUI smoke test passed — process running after 3s"
+            kill $PID 2>/dev/null || true
+            wait $PID 2>/dev/null || true
           else
-            echo "TUI smoke test FAILED (exit code: $code)"
-            exit 1
+            # Process exited — check if it crashed
+            wait $PID 2>/dev/null
+            code=$?
+            if [ "$code" -eq 0 ]; then
+              echo "TUI smoke test passed — exited cleanly"
+            else
+              echo "TUI smoke test FAILED (exit code: $code)"
+              exit 1
+            fi
           fi
