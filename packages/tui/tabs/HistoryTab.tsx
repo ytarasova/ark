@@ -93,8 +93,8 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
       if (!existsSync(path)) { setConversationPreview([]); return; }
       try {
         const stat = fstat(path);
-        // Read last 32KB — enough for ~200 recent lines
-        const tailSize = Math.min(32768, stat.size);
+        // Read last 64KB — enough for ~500 recent lines
+        const tailSize = Math.min(65536, stat.size);
         const fd = openSync(path, "r");
         const buf = Buffer.alloc(tailSize);
         readSync(fd, buf, 0, tailSize, Math.max(0, stat.size - tailSize));
@@ -113,7 +113,9 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
               text = msg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ");
             }
             text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-            if (!text || text.startsWith("Caveat:") || text.startsWith("<")) continue;
+            // Skip noise: empty, tiny, system junk, task notifications, XML tags
+            if (text.length < 10) continue;
+            if (text.startsWith("Caveat:") || text.startsWith("<") || text.startsWith("task-notification")) continue;
             const role = entry.type === "user" ? "You" : "Claude";
             msgs.push(`${role}: ${text.slice(0, 150)}`);
           } catch {}
