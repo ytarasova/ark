@@ -41,7 +41,7 @@ export function App() {
   const takeSnapshot = useCallback(() => {
     if (!process.env.TMUX) return;
     // Run snapshot async to not block TUI
-    sessionsAsync.run("Copying screen...", async () => {
+    asyncState.run("Copying screen...", async () => {
       await new Promise<void>((resolve) => {
         execFile("tmux", ["capture-pane", "-S", "-"], { stdio: "pipe" }, () => {
           execFile("tmux", ["save-buffer", "-"], { encoding: "utf-8" }, (err, content) => {
@@ -54,7 +54,7 @@ export function App() {
         });
       });
     });
-  }, [sessionsAsync]);
+  }, [asyncState]);
 
   useInput((input, key) => {
     // When a text input is active, only allow Ctrl-based shortcuts
