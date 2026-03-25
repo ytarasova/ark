@@ -52,18 +52,21 @@
 | 29 | **Checkpoint & crash recovery** | Mission Control | 2d | Save structured state snapshots at stage boundaries (files modified, current step). On crash/re-dispatch, inject checkpoint context so agent resumes where it left off |
 | 30 | **Auto-rollback pipeline** | Mission Control | 3d | GitHub webhook monitors merged PRs. Post-merge health check. Auto-creates revert PR on failure. Demotes session to supervised autonomy. New action type: `health_check` |
 
+| 33 | **PR monitoring + comment resolution** | (user request) | 3d | GitHub webhook watches PRs. When review comments arrive, dispatch an agent session to address them. GitHub-first, Bitbucket later |
+| 34 | **QMD-powered hybrid memory** | QMD (tobi/qmd) | 3d | Replace or augment FTS5 with QMD's hybrid search (BM25 + vector + LLM reranking). Local-only, runs on Bun. MCP server mode for shared access. 95% token reduction vs full-context dumps |
+
 ### Tier 3 — Future (P3)
 
 | # | Item | Source | Effort | Description |
 |---|------|--------|--------|-------------|
-| 19 | **Web UI** | DeerFlow, Agent-Deck, Goose, Mission Control | Large | Browser dashboard. Mission Control is a full Next.js app — useful reference |
+| 19 | **Web UI** | DeerFlow, Agent-Deck, Goose, Mission Control | Large | Browser dashboard |
 | 21 | **MicroVM sandboxing** | E2B | V.Large | Firecracker VMs |
 | 22 | **MCP socket pool** | Agent-Deck | Medium | Share MCP servers across sessions |
 | 23 | **In-VM daemon (gRPC)** | E2B | Large | Replace SSH with purpose-built daemon |
-| 24 | **Cross-session memory** | DeerFlow, Goose, Pi, Mission Control | Medium | Persistent knowledge base. Mission Control's "Learner agent" (#28) is the structured version of this |
+| 24 | **Cross-session memory** | DeerFlow, Goose, Pi, Mission Control, QMD | Medium | Persistent knowledge base. QMD as retrieval layer, Learner agent (#28) as extraction layer |
 | 25 | **Chat platform bridges** | Agent-Deck, DeerFlow, Pi | Medium | Slack/Telegram/Discord |
-| 31 | **Preference learning** | Mission Control | Medium | Human feedback (approve/reject) adjusts future agent prompts. Bayesian confidence on learned preferences |
-| 32 | **Idea dedup / similarity** | Mission Control | Medium | Embedding-based deduplication. Auto-suppress similar items |
+| 31 | **Preference learning** | Mission Control | Medium | Human feedback adjusts future prompts |
+| 32 | **Idea dedup / similarity** | Mission Control | Medium | Embedding-based deduplication |
 
 ---
 
@@ -75,20 +78,24 @@
 3. **#28 Learner agent** (3d) — institutional memory from pass/fail transitions
 4. **#13 Structured review output** (2d) — feeds into fail-loopback
 
-### Phase 2: Robustness
-5. **#29 Checkpoint recovery** (2d) — resilience for long-running sessions
-6. **#16 Guardrails** (2d) — safety for autonomous agents
+### Phase 2: CI/CD Integration
+5. **#33 PR monitoring** (3d) — GitHub webhook → agent addresses review comments
+6. **#30 Auto-rollback** (3d) — post-merge health check, auto-revert
 7. **#4 OTEL observability** (2d) — visibility into the system
 
-### Phase 3: Scale
-8. **#6 Sub-agent fan-out** (5d) — parallel execution with DAG
-9. **#30 Auto-rollback** (3d) — safety net for auto-merge
-10. **#10 Plugin system** (2-5d) — extensibility
+### Phase 3: Memory & Robustness
+8. **#34 QMD-powered hybrid memory** (3d) — BM25 + vector + reranking for agent recall
+9. **#29 Checkpoint recovery** (2d) — resilience for long-running sessions
+10. **#16 Guardrails** (2d) — safety for autonomous agents
 
-### Phase 4: Platform
-11. **#12 Session forking** (2d)
-12. **#19 Web UI** (large)
-13. **#25 Chat bridges** (medium)
+### Phase 4: Scale
+11. **#6 Sub-agent fan-out** (5d) — parallel execution with DAG
+12. **#10 Plugin system** (2-5d) — extensibility
+
+### Phase 5: Platform
+13. **#12 Session forking** (2d)
+14. **#19 Web UI** (large)
+15. **#25 Chat bridges** (medium)
 
 ---
 
