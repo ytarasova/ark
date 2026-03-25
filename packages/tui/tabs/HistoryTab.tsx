@@ -217,13 +217,16 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
                 <Text dimColor>{"No sessions found"}</Text>
               ) : (
                 <ScrollBox followIndex={sel} active={false}>
-                  {historyItems.map((item, idx) => (
-                    <Text key={item.id + idx} wrap="truncate">
-                      {idx === sel ? ">" : " "}
-                      <Text color={item.type === "ark" ? "green" : "dim"}>{item.date.slice(5)}</Text>
-                      {` ${item.summary || "(no summary)"}`}
-                    </Text>
-                  ))}
+                  {historyItems.map((item, idx) => {
+                    const label = item.summary || (item.claudeSession?.project.split("/").pop() ?? item.id.slice(0, 8));
+                    return (
+                      <Text key={item.id} wrap="truncate">
+                        {idx === sel ? ">" : " "}
+                        <Text color={item.type === "ark" ? "green" : "dim"}>{item.date.slice(5)}</Text>
+                        {` ${label}`}
+                      </Text>
+                    );
+                  })}
                 </ScrollBox>
               )
             ) : (
