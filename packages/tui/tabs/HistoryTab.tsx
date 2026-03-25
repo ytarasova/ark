@@ -27,6 +27,7 @@ interface HistoryItem {
   type: "ark" | "claude";
   id: string;
   date: string;
+  sortKey: string; // full ISO timestamp for sorting
   summary: string;
   messageCount: number;
   arkSession?: any;
@@ -38,24 +39,30 @@ function buildHistoryItems(arkSessions: any[], claudeSessions: core.ClaudeSessio
   const boundClaudeIds = new Set(arkSessions.map(s => s.claude_session_id).filter(Boolean));
 
   for (const s of arkSessions) {
+    const ts = s.updated_at || s.created_at || "";
     items.push({
       type: "ark", id: s.id,
-      date: (s.updated_at || s.created_at || "").slice(0, 10),
-      summary: s.summary || s.ticket || "(no summary)",
+      date: ts.slice(0, 10),
+      sortKey: ts,
+      summary: s.summary || s.ticket || "",
       messageCount: 0, arkSession: s,
     });
   }
 
   for (const cs of claudeSessions) {
     if (boundClaudeIds.has(cs.sessionId)) continue;
+    const ts = cs.lastActivity || cs.timestamp || "";
     items.push({
       type: "claude", id: cs.sessionId,
-      date: (cs.lastActivity || cs.timestamp || "").slice(0, 10),
-      summary: cs.summary || "(no summary)",
+      date: ts.slice(0, 10),
+      sortKey: ts,
+      summary: cs.summary || "",
       messageCount: cs.messageCount, claudeSession: cs,
     });
   }
 
+  // Sort all items by timestamp, most recent first
+  items.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
   return items;
 }
 
@@ -235,11 +242,13 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
                 <ScrollBox followIndex={sel} active={false}>
                   {historyItems.map((item, idx) => {
                     const label = item.summary || (item.claudeSession?.project.split("/").pop() ?? item.id.slice(0, 8));
+                    const tag = item.type === "ark" ? " ARK " : "     ";
                     return (
                       <Text key={item.id} wrap="truncate">
                         {idx === sel ? ">" : " "}
                         <Text color={item.type === "ark" ? "green" : "dim"}>{item.date.slice(5)}</Text>
-                        {` ${label}`}
+                        <Text color={item.type === "ark" ? "green" : undefined} bold={item.type === "ark"}>{tag}</Text>
+                        {label}
                       </Text>
                     );
                   })}
