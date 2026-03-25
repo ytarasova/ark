@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Text } from "ink";
+import { Box, Text } from "ink";
 import * as core from "../../core/index.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
