@@ -469,6 +469,7 @@ export function listCompute(opts?: {
   status?: string;
   limit?: number;
 }): Compute[] {
+  ensureLocalCompute();
   const db = getDb();
   let sql = "SELECT * FROM compute WHERE 1=1";
   const params: any[] = [];
@@ -517,6 +518,7 @@ export function mergeComputeConfig(name: string, patch: Record<string, unknown>)
 }
 
 export function deleteCompute(name: string): boolean {
+  if (name === "local") return false; // local compute cannot be deleted
   const db = getDb();
   const result = db.prepare("DELETE FROM compute WHERE name = ?").run(name);
   return result.changes > 0;
