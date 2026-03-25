@@ -2,10 +2,7 @@ import type { AsyncState } from "../hooks/useAsync.js";
 
 /**
  * Submit a form: run a sync action (create resource), close the form,
- * then optionally run an async follow-up (dispatch).
- *
- * This ensures the form unmounts cleanly before any async work starts,
- * preventing the useEffect/setPending race where unmount cancels the action.
+ * then run async follow-up (dispatch) after a yield so React can render the spinner.
  */
 export function submitForm(opts: {
   create: () => void;
@@ -25,8 +22,10 @@ export function submitForm(opts: {
   // Close form BEFORE async work so React unmount doesn't cancel it
   onDone();
 
-  // Async follow-up runs after form is gone
+  // Yield to let React render the form close, THEN start async work
   if (asyncFollowUp) {
-    asyncState.run(asyncFollowUp.label, asyncFollowUp.action);
+    setTimeout(() => {
+      asyncState.run(asyncFollowUp.label, asyncFollowUp.action);
+    }, 50);
   }
 }
