@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { useInput, useStdout } from "ink";
+import { useInput } from "ink";
 
 interface UseListNavigationOpts {
   /** Skip key handling (e.g. when right pane is focused or form is open) */
   active?: boolean;
 }
 
-const PAGE_SIZE_RESERVE = 8; // rows reserved for tabs, status bar, events, borders
+const PAGE_SIZE = 20;
 
 /**
  * Reusable list navigation with selection clamping.
@@ -16,8 +16,7 @@ const PAGE_SIZE_RESERVE = 8; // rows reserved for tabs, status bar, events, bord
 export function useListNavigation(length: number, opts?: UseListNavigationOpts) {
   const [sel, setSel] = useState(0);
   const active = opts?.active ?? true;
-  const { stdout } = useStdout();
-  const pageSize = Math.max(1, (stdout?.rows ?? 40) - PAGE_SIZE_RESERVE);
+  const pageSize = PAGE_SIZE;
 
   // Clamp selection when list shrinks (e.g. after deletion)
   useEffect(() => {
