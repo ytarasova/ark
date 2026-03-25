@@ -479,6 +479,17 @@ async function launchAgentTmux(
       await provider.start(compute);
     }
 
+    // Verify host is reachable before starting expensive sync/clone chain
+    const ip = (compute.config as any)?.ip;
+    if (ip) {
+      log("Checking host connectivity...");
+      const { sshExecAsync, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
+      const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), ip, "echo ok", { timeout: 15_000 });
+      if (exitCode !== 0) {
+        throw new Error(`Cannot reach compute '${compute.name}' at ${ip}`);
+      }
+    }
+
     // Resolve ports from arc.json / devcontainer / compose
     const ports = effectiveWorkdir ? resolvePortDecls(effectiveWorkdir) : [];
 
