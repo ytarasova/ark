@@ -59,8 +59,8 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
       }
     } else if (input === "x") {
       if (!selected) return;
-      if (selected.status !== "stopped" && selected.status !== "destroyed") {
-        addComputeLog(selected.name, `Cannot delete: compute is ${selected.status}`);
+      if (selected.name === "local") {
+        status.show("Cannot delete local compute");
         return;
       }
       setConfirmDelete(true);
