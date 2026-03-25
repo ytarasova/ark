@@ -153,6 +153,42 @@ function searchTranscriptsFiles(query: string, opts?: SearchOpts): SearchResult[
   return results.slice(0, limit);
 }
 
+// ── Per-session conversation ─────────────────────────────────────────────────
+
+/** Get conversation turns for a specific session, ordered chronologically */
+export function getSessionConversation(sessionId: string, opts?: { limit?: number }): { role: string; content: string; timestamp: string }[] {
+  const db = getDb();
+  const limit = opts?.limit ?? 100;
+  try {
+    return db.prepare(
+      `SELECT role, content, timestamp FROM transcript_index
+       WHERE session_id = ? ORDER BY rowid DESC LIMIT ?`
+    ).all(sessionId, limit).reverse() as any[];
+  } catch { return []; }
+}
+
+/** Search within a specific session's conversation */
+export function searchSessionConversation(sessionId: string, query: string, opts?: { limit?: number }): SearchResult[] {
+  const db = getDb();
+  const limit = opts?.limit ?? 20;
+  const ftsQuery = query.replace(/['"*()]/g, "").split(/\s+/).map(w => `"${w}"`).join(" ");
+  try {
+    const rows = db.prepare(
+      `SELECT role, content, timestamp,
+              snippet(transcript_index, 3, '>>>','<<<', '...', 30) as snippet
+       FROM transcript_index
+       WHERE session_id = ? AND transcript_index MATCH ?
+       ORDER BY rank LIMIT ?`
+    ).all(sessionId, ftsQuery, limit) as any[];
+    return rows.map(r => ({
+      sessionId,
+      source: "transcript" as const,
+      match: r.snippet || r.content?.slice(0, 120) || "",
+      timestamp: r.timestamp,
+    }));
+  } catch { return []; }
+}
+
 // ── Indexing ──────────────────────────────────────────────────────────────────
 
 export async function indexTranscripts(opts?: { transcriptsDir?: string; onProgress?: (indexed: number, total: number) => void }): Promise<number> {

@@ -45,7 +45,7 @@ export * from "./tmux.js";
 export * from "./hooks.js";
 
 // Search
-export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, type SearchResult, type SearchOpts } from "./search.js";
+export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, type SearchResult, type SearchOpts } from "./search.js";
 
 // Conductor
 export { startConductor } from "./conductor.js";

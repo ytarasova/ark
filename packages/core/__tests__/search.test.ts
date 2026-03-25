@@ -11,7 +11,7 @@ import {
   type TestContext,
 } from "../index.js";
 import { createSession, logEvent, addMessage } from "../store.js";
-import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats } from "../search.js";
+import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation } from "../search.js";
 
 let ctx: TestContext;
 
@@ -371,6 +371,90 @@ describe("indexSession", () => {
 
     const stats = getIndexStats();
     expect(stats.entries).toBe(2); // Not 3 (1 old + 2 new)
+  });
+});
+
+// ── getSessionConversation ────────────────────────────────────────────────────
+
+describe("getSessionConversation", () => {
+  it("returns turns for a known session", async () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-conv-proj");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "conv-sess.jsonl"), [
+      JSON.stringify({ type: "user", message: { role: "user", content: "hello there friend" }, timestamp: "2026-01-01T00:01:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "hi there how are you" }, timestamp: "2026-01-01T00:02:00Z" }),
+      JSON.stringify({ type: "user", message: { role: "user", content: "fix the auth bug please" }, timestamp: "2026-01-01T00:03:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will fix the authentication issue now" }, timestamp: "2026-01-01T00:04:00Z" }),
+    ].join("\n"));
+    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+
+    const turns = getSessionConversation("conv-sess");
+    expect(turns.length).toBe(4);
+    expect(turns[0].role).toBe("user");
+    expect(turns[0].content).toBe("hello there friend");
+    expect(turns[3].content).toContain("authentication");
+  });
+
+  it("returns empty for unknown session", () => {
+    expect(getSessionConversation("nonexistent")).toEqual([]);
+  });
+
+  it("respects limit", async () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-conv-proj2");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "conv-sess2.jsonl"), [
+      JSON.stringify({ type: "user", message: { role: "user", content: "hello there friend" }, timestamp: "2026-01-01T00:01:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "hi there how are you" }, timestamp: "2026-01-01T00:02:00Z" }),
+      JSON.stringify({ type: "user", message: { role: "user", content: "fix the auth bug please" }, timestamp: "2026-01-01T00:03:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will fix the authentication issue now" }, timestamp: "2026-01-01T00:04:00Z" }),
+    ].join("\n"));
+    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+
+    const turns = getSessionConversation("conv-sess2", { limit: 2 });
+    expect(turns.length).toBe(2);
+  });
+});
+
+// ── searchSessionConversation ────────────────────────────────────────────────
+
+describe("searchSessionConversation", () => {
+  it("finds matches within a session", async () => {
+    const projectDir = join(ctx.arkDir, "claude-projects", "-search-conv-proj");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "search-conv-sess.jsonl"), [
+      JSON.stringify({ type: "user", message: { role: "user", content: "fix the auth bug please" }, timestamp: "2026-01-01T00:01:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will fix the authentication issue now" }, timestamp: "2026-01-01T00:02:00Z" }),
+    ].join("\n"));
+    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+
+    const results = searchSessionConversation("search-conv-sess", "authentication");
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].sessionId).toBe("search-conv-sess");
+  });
+
+  it("does NOT return results from other sessions", async () => {
+    const projectDir1 = join(ctx.arkDir, "claude-projects", "-iso-proj1");
+    mkdirSync(projectDir1, { recursive: true });
+    writeFileSync(join(projectDir1, "iso-sess1.jsonl"), [
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "authentication is handled here in the module" }, timestamp: "2026-01-01T00:01:00Z" }),
+    ].join("\n"));
+
+    const projectDir2 = join(ctx.arkDir, "claude-projects", "-iso-proj2");
+    mkdirSync(projectDir2, { recursive: true });
+    writeFileSync(join(projectDir2, "iso-sess2.jsonl"), [
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "authentication is fixed in this version" }, timestamp: "2026-01-01T00:01:00Z" }),
+    ].join("\n"));
+
+    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+
+    const results = searchSessionConversation("iso-sess1", "authentication");
+    for (const r of results) {
+      expect(r.sessionId).toBe("iso-sess1");
+    }
+  });
+
+  it("returns empty for no matches", () => {
+    expect(searchSessionConversation("iso-sess1", "zzz_impossible_zzz")).toEqual([]);
   });
 });
 
