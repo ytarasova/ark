@@ -123,11 +123,26 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         const sid = selected.session_id;
         const selectedId = selected.id;
         asyncState.run("Checking session...", async () => {
-          const exists = await core.sessionExistsAsync(sid);
-          if (!exists) {
-            status.show(`No active tmux session for ${selectedId}. Try re-dispatching.`);
-            return;
+          // Determine if this is a remote session
+          const compute = selected?.compute_name ? core.getCompute(selected.compute_name) : null;
+          const isRemote = compute && compute.provider !== "local";
+          let attachCmd: string[];
+
+          if (isRemote) {
+            const ip = (compute.config as any)?.ip;
+            if (!ip) { status.show("No IP for remote compute"); return; }
+            const keyPath = `${process.env.HOME}/.ssh/ark-${compute.name}`;
+            attachCmd = ["ssh", "-i", keyPath, "-o", "StrictHostKeyChecking=no", "-t",
+              `ubuntu@${ip}`, `tmux attach -t ${sid}`];
+          } else {
+            const exists = await core.sessionExistsAsync(sid);
+            if (!exists) {
+              status.show(`No active tmux session for ${selectedId}. Try re-dispatching.`);
+              return;
+            }
+            attachCmd = ["tmux", "attach", "-t", sid];
           }
+
           // Attach: mute Ink, reset terminal for tmux, spawn+wait, restore Ink
           const origWrite = process.stdout.write.bind(process.stdout);
           const origErrWrite = process.stderr.write.bind(process.stderr);
@@ -140,8 +155,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
             try { process.stdin.setRawMode(false); } catch {}
             process.stdout.write("\x1b[?1049l"); // exit alt screen if active
             process.stdout.write("\x1b[?25h");    // show cursor
-            // Spawn tmux as child, block until detach
-            const result = Bun.spawnSync(["tmux", "attach", "-t", sid], {
+            // Spawn attach command — local tmux or SSH+tmux for remote
+            const result = Bun.spawnSync(attachCmd, {
               stdin: "inherit",
               stdout: "inherit",
               stderr: "inherit",
