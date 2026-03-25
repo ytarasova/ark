@@ -20,7 +20,7 @@ export interface StageDefinition {
   agent?: string;
   action?: string;
   task?: string;  // Template for agent task prompt — supports {variable} substitution
-  gate: "auto" | "manual" | "condition";
+  gate: "auto" | "manual" | "condition" | "review";
   autonomy?: "full" | "execute" | "edit" | "read-only";
   on_failure?: string;
   optional?: boolean;
@@ -116,6 +116,8 @@ export function evaluateGate(
       return { canProceed: false, reason: "manual gate: awaiting human approval" };
     case "condition":
       return { canProceed: true, reason: "condition evaluated" };
+    case "review":
+      return { canProceed: false, reason: "review gate: awaiting PR approval" };
     default:
       return { canProceed: false, reason: `Unknown gate: ${stage.gate}` };
   }

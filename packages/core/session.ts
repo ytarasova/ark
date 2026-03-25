@@ -231,6 +231,21 @@ export function pause(sessionId: string, reason?: string): { ok: boolean; messag
   return { ok: true, message: "Paused" };
 }
 
+// ── Review gate ─────────────────────────────────────────────────────────────
+
+/** Open a review gate — called when PR is approved via webhook. */
+export function approveReviewGate(sessionId: string): { ok: boolean; message: string } {
+  const s = store.getSession(sessionId);
+  if (!s) return { ok: false, message: "Session not found" };
+
+  store.logEvent(sessionId, "review_approved", {
+    stage: s.stage ?? undefined, actor: "github",
+  });
+
+  // Force-advance past the review gate
+  return advance(sessionId, true);
+}
+
 // ── Clone & Handoff ─────────────────────────────────────────────────────────
 
 export function cloneSession(sessionId: string, newTask?: string): { ok: boolean; cloneId: string } {

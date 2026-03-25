@@ -26,7 +26,7 @@ export { loadConfig, type ArkConfig } from "./config.js";
 export {
   startSession, dispatch, advance, stop, resume, complete, pause,
   cloneSession, handoff, fork, joinFork, getOutput, send,
-  deleteSessionAsync, waitForCompletion,
+  deleteSessionAsync, waitForCompletion, approveReviewGate,
 } from "./session.js";
 
 // Flow
@@ -61,3 +61,6 @@ export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
 
 // Schedules
 export { createSchedule, listSchedules, getSchedule, deleteSchedule, enableSchedule, updateScheduleLastRun, cronMatches, type Schedule } from "./schedule.js";
+
+// GitHub webhook
+export { validateSignature, handleGitHubWebhook, findSessionByPR, formatReviewPrompt, extractComments } from "./github-webhook.js";

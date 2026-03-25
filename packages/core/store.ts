@@ -176,6 +176,7 @@ function initSchema(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_sessions_repo ON sessions(repo);
     CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_name);
+    CREATE INDEX IF NOT EXISTS idx_sessions_pr_url ON sessions(pr_url);
 
     CREATE TABLE IF NOT EXISTS compute (
       name TEXT PRIMARY KEY,

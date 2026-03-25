@@ -252,6 +252,24 @@ describe("evaluateGate", () => {
     expect(result.reason).toContain("condition");
   });
 
+  it("review gate always blocks", () => {
+    writeUserFlow("review-flow", {
+      name: "review-flow",
+      stages: [{ name: "await-pr", agent: "reviewer", gate: "review" }],
+    });
+    const result = evaluateGate("review-flow", "await-pr", {});
+    expect(result.canProceed).toBe(false);
+  });
+
+  it("review gate reason contains 'awaiting PR approval'", () => {
+    writeUserFlow("review-flow2", {
+      name: "review-flow2",
+      stages: [{ name: "await-pr", agent: "reviewer", gate: "review" }],
+    });
+    const result = evaluateGate("review-flow2", "await-pr", {});
+    expect(result.reason).toContain("awaiting PR approval");
+  });
+
   it("returns canProceed false for unknown stage", () => {
     const result = evaluateGate("default", "nonexistent", {});
     expect(result.canProceed).toBe(false);
