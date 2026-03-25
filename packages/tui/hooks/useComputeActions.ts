@@ -87,6 +87,88 @@ export function useComputeActions(
       });
     },
 
+    reboot: (compute: core.Compute) => {
+      if (compute.provider === "local") return;
+      const cfg = compute.config as any;
+      if (!cfg?.instance_id) return;
+      addLog(compute.name, "Rebooting...");
+      run(`Rebooting ${compute.name}`, async (updateLabel) => {
+        const { EC2Client, RebootInstancesCommand, DescribeInstancesCommand } = await import("@aws-sdk/client-ec2");
+        const { fromIni } = await import("@aws-sdk/credential-providers");
+        const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
+
+        const ec2 = new EC2Client({
+          region: cfg.region ?? "us-east-1",
+          ...(cfg.aws_profile ? { credentials: fromIni({ profile: cfg.aws_profile }) } : {}),
+        });
+        await ec2.send(new RebootInstancesCommand({ InstanceIds: [cfg.instance_id] }));
+        addLog(compute.name, "Reboot initiated — waiting for host...");
+
+        // Wait up to 3 minutes for SSH to come back
+        const deadline = Date.now() + 180_000;
+        let attempt = 0;
+        while (Date.now() < deadline) {
+          attempt++;
+          updateLabel(`Rebooting ${compute.name} (${attempt}...)`);
+          await new Promise(r => setTimeout(r, 10_000));
+
+          // Check if IP changed (stop/start assigns new IP)
+          const desc = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [cfg.instance_id] }));
+          const inst = desc.Reservations?.[0]?.Instances?.[0];
+          const newIp = inst?.PublicIpAddress;
+          if (newIp && newIp !== cfg.ip) {
+            core.mergeComputeConfig(compute.name, { ip: newIp });
+            addLog(compute.name, `IP changed: ${cfg.ip} → ${newIp}`);
+            cfg.ip = newIp;
+          }
+
+          if (!cfg.ip) continue;
+          const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), cfg.ip, "echo ok", { timeout: 10_000 });
+          if (exitCode === 0) {
+            addLog(compute.name, "Host is back online");
+            core.updateCompute(compute.name, { status: "running" });
+            return;
+          }
+        }
+
+        // Timed out
+        addLog(compute.name, "Host did not come back after 3 minutes");
+        core.updateCompute(compute.name, { status: "stopped" });
+        core.mergeComputeConfig(compute.name, { last_error: "Reboot timeout — host unreachable" });
+      });
+    },
+
+    ping: (compute: core.Compute) => {
+      if (compute.provider === "local") {
+        addLog(compute.name, "Local compute — always reachable");
+        return;
+      }
+      const cfg = compute.config as any;
+      const ip = cfg?.ip;
+      if (!ip) { addLog(compute.name, "No IP configured"); return; }
+      addLog(compute.name, `Checking connectivity to ${ip}...`);
+      run(`Pinging ${compute.name}`, async () => {
+        const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
+        const { exitCode, stdout } = await sshExecAsync(sshKeyPath(compute.name), ip, "echo ok && uptime", { timeout: 10_000 });
+        if (exitCode === 0) {
+          addLog(compute.name, `Reachable — ${stdout.trim()}`);
+        } else {
+          addLog(compute.name, "Unreachable — SSH connection failed");
+          // Check real AWS status
+          const provider = getProvider(compute.provider);
+          if (provider?.checkStatus) {
+            const real = await provider.checkStatus(compute).catch(() => null);
+            if (real) {
+              addLog(compute.name, `AWS status: ${real}`);
+              if (real !== compute.status) {
+                core.updateCompute(compute.name, { status: real });
+              }
+            }
+          }
+        }
+      });
+    },
+
     clean: () => {
       run("Cleaning zombie sessions", async () => {
         const { listArkSessionsAsync, killSessionAsync } = await import("../../core/tmux.js");

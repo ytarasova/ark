@@ -80,6 +80,14 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
           });
         });
       }
+    } else if (input === "r") {
+      if (selected && selected.provider !== "local") {
+        actions.reboot(selected);
+      }
+    } else if (input === "t") {
+      if (selected) {
+        actions.ping(selected);
+      }
     } else if (input === "c") {
       actions.clean();
     } else if (input === "n") {
