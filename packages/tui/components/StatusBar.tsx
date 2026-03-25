@@ -118,7 +118,7 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
   }
 
   hints.push(<KeyHint key="i" k="i" label="threads" />);
-  hints.push(<KeyHint key="g" k="g" label="groups" />);
+  hints.push(<KeyHint key="o" k="o" label="groups" />);
   hints.push(<KeyHint key="n" k="n" label="new" />);
   hints.push(<KeyHint key="q" k="q" label="quit" />);
   return hints;

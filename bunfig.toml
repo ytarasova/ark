@@ -1,2 +1,4 @@
 [test]
 preload = ["./packages/test-setup.ts"]
+# Never run stale compiled tests from dist/
+root = ["./packages"]

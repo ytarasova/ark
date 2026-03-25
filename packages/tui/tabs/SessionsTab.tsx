@@ -89,7 +89,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     // Global keys — work regardless of selection
     if (input === "n") { onShowForm(); return; }
     if (input === "i") { setInboxMode(true); return; }
-    if (input === "g") { setGroupMode("menu"); return; }
+    if (input === "o") { setGroupMode("menu"); return; }
 
     // Cancel pending confirm on any non-d key
     if (confirmComplete && input !== "d") {
