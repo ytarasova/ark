@@ -2,13 +2,36 @@
 set -euo pipefail
 
 # Ark installer - downloads pre-built binary from GitHub.
-# Usage: curl -fsSL https://ytarasova.github.io/ark/install.sh | bash
-# Pin version: curl ... | ARK_VERSION=v0.2.0 bash
+# Usage:
+#   curl -fsSL https://ytarasova.github.io/ark/install.sh | bash              # latest stable release
+#   curl -fsSL https://ytarasova.github.io/ark/install.sh | bash -s -- --latest  # bleeding edge from main
+#   ARK_VERSION=v0.1.0 curl ... | bash                                        # pin specific version
 
 REPO="ytarasova/ark"
-VERSION="${ARK_VERSION:-latest}"
 INSTALL_DIR="${ARK_HOME:-$HOME/.ark}"
 BIN_DIR="$INSTALL_DIR/bin"
+
+# Parse --latest flag
+USE_MAIN=false
+for arg in "$@"; do
+  case "$arg" in
+    --latest) USE_MAIN=true ;;
+  esac
+done
+
+if [ -n "${ARK_VERSION:-}" ]; then
+  VERSION="$ARK_VERSION"
+elif [ "$USE_MAIN" = true ]; then
+  VERSION="latest"
+else
+  # Resolve latest tagged release via GitHub API
+  VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases" \
+    | grep -o '"tag_name": *"v[^"]*"' | head -1 | cut -d'"' -f4) \
+    || true
+  if [ -z "$VERSION" ]; then
+    error "Could not determine latest release. Use ARK_VERSION=v0.1.0 to pin."
+  fi
+fi
 
 info()  { printf "\033[36m%s\033[0m\n" "$*"; }
 warn()  { printf "\033[33m%s\033[0m\n" "$*"; }
@@ -109,6 +132,7 @@ info ""
 info "  Run:     ark --help"
 info "  TUI:     ark tui"
 info "  Update:  curl -fsSL https://ytarasova.github.io/ark/install.sh | bash"
+info "  Edge:    curl -fsSL https://ytarasova.github.io/ark/install.sh | bash -s -- --latest"
 info ""
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
   info "  Restart your shell or run: export PATH=\"\$HOME/.ark/bin:\$PATH\""
