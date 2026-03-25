@@ -268,25 +268,57 @@ export function indexSession(transcriptPath: string, sessionId: string, project?
 
   const db = getDb();
 
-  // Remove existing entries for this session (parameterized to avoid injection)
-  db.prepare("DELETE FROM transcript_index WHERE session_id = ?").run(sessionId);
+  // Incremental: find the max timestamp already indexed for this session
+  let maxTs: string | null = null;
+  try {
+    const row = db.prepare(
+      "SELECT MAX(timestamp) as ts FROM transcript_index WHERE session_id = ?"
+    ).get(sessionId) as any;
+    maxTs = row?.ts ?? null;
+  } catch {}
 
   const insert = db.prepare(
     "INSERT INTO transcript_index (session_id, project, role, content, timestamp) VALUES (?, ?, ?, ?, ?)"
   );
 
   let indexed = 0;
+
+  // For large files, read only the last 64KB (recent conversation)
   let content: string;
-  try { content = readFileSync(transcriptPath, "utf-8"); } catch { return 0; }
+  try {
+    const fstat = statSync(transcriptPath);
+    if (fstat.size > 65536) {
+      const fd = openSync(transcriptPath, "r");
+      const buf = Buffer.alloc(65536);
+      readSync(fd, buf, 0, 65536, fstat.size - 65536);
+      closeSync(fd);
+      content = buf.toString("utf-8");
+    } else {
+      content = readFileSync(transcriptPath, "utf-8");
+    }
+  } catch { return 0; }
 
   for (const line of content.split("\n")) {
     if (!line.trim()) continue;
     try {
       const entry = JSON.parse(line);
       if (entry.type !== "user" && entry.type !== "assistant") continue;
+
+      // Skip entries we've already indexed (incremental)
+      const ts = entry.timestamp ?? null;
+      if (maxTs && ts && ts <= maxTs) continue;
+
+      // Skip tool_result (user) and tool_use-only (assistant) entries
+      const msgContent = entry.message?.content;
+      if (Array.isArray(msgContent)) {
+        if (msgContent.some((c: any) => c.type === "tool_result")) continue;
+        if (msgContent.every((c: any) => c.type === "tool_use")) continue;
+      }
+
       const text = extractText(entry);
-      if (!text.trim()) continue;
-      insert.run(sessionId, project ?? "", entry.type, text, entry.timestamp ?? null);
+      if (!text.trim() || text.length < 10) continue;
+
+      insert.run(sessionId, project ?? "", entry.type, text, ts);
       indexed++;
     } catch {}
   }

@@ -358,19 +358,19 @@ describe("indexSession", () => {
     expect(count).toBe(1);
   });
 
-  it("replaces existing entries for same session", () => {
+  it("incremental — does not duplicate on second call", () => {
     const transcriptPath = join(ctx.arkDir, "replace.jsonl");
-    writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: "first version" } }));
+    writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: "first version here" }, timestamp: "2026-01-01T00:01:00Z" }));
     indexSession(transcriptPath, "s-replace");
 
     writeFileSync(transcriptPath, [
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "first version" } }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "second version" } }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "first version here" }, timestamp: "2026-01-01T00:01:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "second version here" }, timestamp: "2026-01-01T00:02:00Z" }),
     ].join("\n"));
     indexSession(transcriptPath, "s-replace");
 
-    const stats = getIndexStats();
-    expect(stats.entries).toBe(2); // Not 3 (1 old + 2 new)
+    const turns = getSessionConversation("s-replace");
+    expect(turns.length).toBe(2); // Not 3 (no duplicate of first)
   });
 });
 
@@ -455,6 +455,46 @@ describe("searchSessionConversation", () => {
 
   it("returns empty for no matches", () => {
     expect(searchSessionConversation("iso-sess1", "zzz_impossible_zzz")).toEqual([]);
+  });
+});
+
+// ── indexSession improvements ────────────────────────────────────────────────
+
+describe("indexSession improvements", () => {
+  it("skips tool_result entries", () => {
+    const path = join(ctx.arkDir, "tool-test.jsonl");
+    writeFileSync(path, [
+      JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "x", content: "big output here" }] }, timestamp: "2026-01-01T00:01:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I see the output clearly now" }, timestamp: "2026-01-01T00:02:00Z" }),
+    ].join("\n"));
+    const count = indexSession(path, "tool-test");
+    expect(count).toBe(1); // only the assistant message
+  });
+
+  it("skips tool_use-only entries", () => {
+    const path = join(ctx.arkDir, "tooluse-test.jsonl");
+    writeFileSync(path, [
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "x", name: "Read", input: {} }] }, timestamp: "2026-01-01T00:01:00Z" }),
+      JSON.stringify({ type: "user", message: { role: "user", content: "what did you find in there" }, timestamp: "2026-01-01T00:02:00Z" }),
+    ].join("\n"));
+    const count = indexSession(path, "tooluse-test");
+    expect(count).toBe(1); // only the user message
+  });
+
+  it("incremental — second call adds only new entries", () => {
+    const path = join(ctx.arkDir, "incr-test.jsonl");
+    writeFileSync(path, JSON.stringify({ type: "user", message: { role: "user", content: "first message here" }, timestamp: "2026-01-01T00:01:00Z" }));
+    indexSession(path, "incr-test");
+
+    // Add more content
+    writeFileSync(path, [
+      JSON.stringify({ type: "user", message: { role: "user", content: "first message here" }, timestamp: "2026-01-01T00:01:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "second message here" }, timestamp: "2026-01-01T00:02:00Z" }),
+    ].join("\n"));
+    indexSession(path, "incr-test");
+
+    const turns = getSessionConversation("incr-test");
+    expect(turns.length).toBe(2); // not 3 (no duplicate)
   });
 });
 
