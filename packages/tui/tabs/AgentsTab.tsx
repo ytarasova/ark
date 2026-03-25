@@ -48,7 +48,7 @@ interface AgentDetailProps {
 
 function AgentDetail({ agent, pane }: AgentDetailProps) {
   if (!agent) {
-    return <Text dimColor>{"  No agent selected"}</Text>;
+    return <Box flexGrow={1}><Text dimColor>{"  No agent selected"}</Text></Box>;
   }
 
   // Load full agent definition for detail view

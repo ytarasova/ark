@@ -48,7 +48,7 @@ interface FlowDetailProps {
 
 function FlowDetail({ flow, pane }: FlowDetailProps) {
   if (!flow) {
-    return <Text dimColor>{"  No flow selected"}</Text>;
+    return <Box flexGrow={1}><Text dimColor>{"  No flow selected"}</Text></Box>;
   }
 
   const p = useMemo(() => {

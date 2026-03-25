@@ -254,7 +254,7 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
 // -- Detail ------------------------------------------------------------------
 
 function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null; pane: string; conversation: string[] }) {
-  if (!item) return <Text dimColor>{"Select a session"}</Text>;
+  if (!item) return <Box flexGrow={1}><Text dimColor>{"Select a session"}</Text></Box>;
 
   if (item.type === "ark") {
     const s = item.arkSession;

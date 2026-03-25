@@ -330,7 +330,7 @@ function SessionDetail({ session: s, pane }: SessionDetailProps) {
   );
 
   if (!s) {
-    return <Text dimColor>{"  No session selected"}</Text>;
+    return <Box flexGrow={1}><Text dimColor>{"  No session selected"}</Text></Box>;
   }
 
   return (

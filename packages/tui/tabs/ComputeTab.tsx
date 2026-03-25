@@ -141,7 +141,7 @@ interface ComputeDetailProps {
 
 function ComputeDetail({ compute: h, snapshot, computeLogs, sessions, pane }: ComputeDetailProps) {
   if (!h) {
-    return <Text dimColor>{"  No compute selected"}</Text>;
+    return <Box flexGrow={1}><Text dimColor>{"  No compute selected"}</Text></Box>;
   }
 
   const cfg = h.config as Record<string, unknown>;
