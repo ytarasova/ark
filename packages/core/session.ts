@@ -142,6 +142,8 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
       stage, actor: "system",
       data: { final_stage: stage, flow: flowName },
     });
+    // Auto-clear unread badge so completed sessions don't show stale notifications
+    store.markMessagesRead(sessionId);
     return { ok: true, message: "Flow completed" };
   }
 
@@ -215,6 +217,7 @@ export function complete(sessionId: string): { ok: boolean; message: string } {
     stage: session.stage, actor: "user",
     data: { note: "Manually completed" },
   });
+  store.markMessagesRead(sessionId);
   store.updateSession(sessionId, { status: "ready", session_id: null });
   return advance(sessionId, true);
 }

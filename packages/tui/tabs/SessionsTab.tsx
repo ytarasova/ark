@@ -410,6 +410,15 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
           {`${ICON[s.status] ?? "?"} ${s.error ? s.error : s.status}`}
         </Text>
       </KeyValue>
+      {s.status === "completed" && (
+        <Text color="green" bold>{`  ✓ Agent completed successfully`}</Text>
+      )}
+      {s.status === "stopped" && (
+        <Text color="gray">{`  ■ Session stopped by user`}</Text>
+      )}
+      {s.status === "failed" && !s.error && (
+        <Text color="red">{`  ✕ Session failed`}</Text>
+      )}
       {s.breakpoint_reason && (
         <KeyValue label=""><Text color="yellow" bold>{`⏸ ${s.breakpoint_reason}`}</Text></KeyValue>
       )}

@@ -1,14 +1,14 @@
 // ── Icons & Colors ───────────────────────────────────────────────────────────
 
 export const ICON: Record<string, string> = {
-  running: "●",    // filled = active
-  ready: "○",      // empty = ready to start
-  pending: "○",    // empty = waiting
+  running: "●",    // filled green = active
+  ready: "◎",      // target = ready to dispatch
+  pending: "○",    // empty = not started
   stopped: "■",    // square = stopped by user
-  waiting: "◐",    // half = paused/waiting
-  blocked: "◐",    // half = needs attention
-  completed: "✓",  // check = done
-  failed: "✕",     // x = error
+  waiting: "◑",    // half = paused/waiting for input
+  blocked: "◐",    // half = needs gate approval
+  completed: "✔",  // heavy check = done successfully
+  failed: "✖",     // heavy x = error
 };
 
 export const COLOR: Record<string, string> = {
