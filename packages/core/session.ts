@@ -624,6 +624,34 @@ async function setupWorktree(repoPath: string, sessionId: string, branch?: strin
   return null;
 }
 
+// ── Wait ────────────────────────────────────────────────────────────────
+
+/** Wait for a session to reach a terminal state. Returns the final session. */
+export async function waitForCompletion(
+  sessionId: string,
+  opts?: { timeoutMs?: number; pollMs?: number; onStatus?: (status: string) => void },
+): Promise<{ session: store.Session; timedOut: boolean }> {
+  const timeout = opts?.timeoutMs ?? 0; // 0 = no timeout
+  const pollMs = opts?.pollMs ?? 3000;
+  const start = Date.now();
+
+  while (true) {
+    const session = store.getSession(sessionId);
+    if (!session) return { session: null as any, timedOut: false };
+
+    const terminal = ["completed", "failed", "stopped"].includes(session.status);
+    if (terminal) return { session, timedOut: false };
+
+    opts?.onStatus?.(session.status);
+
+    if (timeout > 0 && Date.now() - start > timeout) {
+      return { session, timedOut: true };
+    }
+
+    await new Promise(r => setTimeout(r, pollMs));
+  }
+}
+
 // ── Output ──────────────────────────────────────────────────────────────────
 
 export async function getOutput(sessionId: string, opts?: { lines?: number; ansi?: boolean }): Promise<string> {

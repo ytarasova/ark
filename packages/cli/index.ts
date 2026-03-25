@@ -845,6 +845,45 @@ schedule.command("disable")
     console.log(chalk.yellow(`Disabled ${id}`));
   });
 
+// ── Exec (headless CI mode) ─────────────────────────────────────────────────
+
+import { execSession } from "./exec.js";
+
+program.command("exec")
+  .description("Run a session non-interactively (for CI/CD)")
+  .option("-r, --repo <path>", "Repository path", ".")
+  .option("-s, --summary <text>", "Task summary")
+  .option("-t, --ticket <key>", "Ticket reference")
+  .option("-f, --flow <name>", "Flow name", "bare")
+  .option("-c, --compute <name>", "Compute target")
+  .option("-g, --group <name>", "Group name")
+  .option("-a, --autonomy <level>", "Autonomy: full/execute/edit/read-only")
+  .option("-o, --output <format>", "Output: text/json", "text")
+  .option("--timeout <seconds>", "Timeout in seconds (0=unlimited)", "0")
+  .action(async (opts) => {
+    // ark exec needs the conductor running (for hooks)
+    const { AppContext, setApp } = await import("../core/app.js");
+    const { loadConfig } = await import("../core/config.js");
+    const execApp = new AppContext(loadConfig());
+    await execApp.boot();
+    setApp(execApp);
+
+    const code = await execSession({
+      repo: opts.repo,
+      summary: opts.summary,
+      ticket: opts.ticket,
+      flow: opts.flow,
+      compute: opts.compute,
+      group: opts.group,
+      autonomy: opts.autonomy,
+      output: opts.output,
+      timeout: parseInt(opts.timeout),
+    });
+
+    await execApp.shutdown();
+    process.exit(code);
+  });
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 
 await program.parseAsync(process.argv);
