@@ -391,10 +391,6 @@ async function launchAgentTmux(
   claude.trustWorktree(workdir, effectiveWorkdir);
 
   // Determine conductor URL based on compute type
-  // For devcontainer (local or remote): channel runs inside Docker, needs host.docker.internal
-  // For EC2 bare metal: SSH reverse tunnel maps localhost:19100 back to user's machine
-  // For local bare metal: localhost:19100 works directly
-  const compute = session.compute_name ? getCompute(session.compute_name) : null;
   const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
   const usesDevcontainer = arcJson?.devcontainer ?? false;
   const conductorUrl = usesDevcontainer
