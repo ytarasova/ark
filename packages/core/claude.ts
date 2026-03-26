@@ -317,8 +317,9 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
     .join("\n");
   const envBlock = envExports ? envExports + "\n" : "";
 
-  // Source .bashrc/.profile for PATH (claude, bun, nvm live in ~/.local/bin etc)
-  const pathSetup = `[[ -f ~/.bashrc ]] && source ~/.bashrc\n`;
+  // Ensure tools are in PATH (claude, bun, nvm live in ~/.local/bin etc)
+  // Can't source .bashrc — it exits early for non-interactive shells
+  const pathSetup = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.nvm/versions/node/*/bin:$PATH"\n`;
 
   let content: string;
   if (opts.prevClaudeSessionId) {
