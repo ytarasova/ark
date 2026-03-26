@@ -101,21 +101,8 @@ export function shellQuoteArgs(claudeArgs: string[]): string {
 
 export function channelMcpConfig(
   sessionId: string, stage: string, channelPort: number,
-  opts?: { conductorUrl?: string; remote?: boolean },
+  opts?: { conductorUrl?: string },
 ): Record<string, unknown> {
-  if (opts?.remote) {
-    // Remote: use ark binary (installed via cloud-init)
-    return {
-      command: "/home/ubuntu/.ark/bin/ark",
-      args: ["channel"],
-      env: {
-        ARK_SESSION_ID: sessionId,
-        ARK_STAGE: stage,
-        ARK_CHANNEL_PORT: String(channelPort),
-        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
-      },
-    };
-  }
   const bunPath = join(homedir(), ".bun", "bin", "bun");
   return {
     command: bunPath,
@@ -138,9 +125,9 @@ export function channelMcpConfig(
 export function writeChannelConfig(
   sessionId: string, stage: string, channelPort: number,
   workdir: string,
-  opts?: { conductorUrl?: string; remote?: boolean },
+  opts?: { conductorUrl?: string; channelConfig?: Record<string, unknown> },
 ): string {
-  const channelOpts = { conductorUrl: opts?.conductorUrl, remote: opts?.remote };
+  const config = opts?.channelConfig ?? channelMcpConfig(sessionId, stage, channelPort, { conductorUrl: opts?.conductorUrl });
 
   // Write to worktree .mcp.json so Claude finds it
   const mcpConfigPath = join(workdir, ".mcp.json");
@@ -150,13 +137,13 @@ export function writeChannelConfig(
     catch { /* corrupted .mcp.json — start fresh */ }
   }
   if (!existing.mcpServers) existing.mcpServers = {};
-  existing.mcpServers["ark-channel"] = channelMcpConfig(sessionId, stage, channelPort, channelOpts);
+  existing.mcpServers["ark-channel"] = config;
   writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));
 
   // Also write a copy to tracks dir for reference
   const sessionDir = join(TRACKS_DIR(), sessionId);
   mkdirSync(sessionDir, { recursive: true });
-  writeFileSync(join(sessionDir, "mcp.json"), JSON.stringify({ mcpServers: { "ark-channel": channelMcpConfig(sessionId, stage, channelPort, channelOpts) } }, null, 2));
+  writeFileSync(join(sessionDir, "mcp.json"), JSON.stringify({ mcpServers: { "ark-channel": config } }, null, 2));
 
   return mcpConfigPath;
 }

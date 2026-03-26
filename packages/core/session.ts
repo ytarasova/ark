@@ -428,11 +428,11 @@ async function launchAgentTmux(
   const tmuxName = `ark-${session.id}`;
   const workdir = session.workdir ?? ".";
 
-  // Setup worktree — only for local compute with git repos
+  // Setup worktree — only for providers that support it (local) with git repos
   let effectiveWorkdir = workdir;
   const compute = session.compute_name ? store.getCompute(session.compute_name) : null;
-  const isLocal = !compute || compute.provider === "local";
-  const wantWorktree = isLocal && session.config?.worktree !== false;
+  const provider = getProvider(compute?.provider ?? "local");
+  const wantWorktree = provider?.supportsWorktree && session.config?.worktree !== false;
   if (wantWorktree && workdir !== "." && existsSync(join(workdir, ".git"))) {
     log("Setting up git worktree...");
     const wt = await setupWorktree(workdir, session.id, session.branch ?? undefined);
@@ -452,33 +452,14 @@ async function launchAgentTmux(
 
   // Channel config + launcher
   const channelPort = store.sessionChannelPort(session.id);
-  const isRemote = compute && compute.provider !== "local";
-  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, remote: !!isRemote });
+  const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
+  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig });
 
   // Status hooks — write .claude/settings.local.json for agent status detection
   claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts?.autonomy });
 
-  // For remote compute, pass auth token so Claude is logged in
-  const launchEnv = { ...(agent.env ?? {}) };
-  if (isRemote) {
-    // Try to get a session token from the current Claude process
-    const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
-    if (token) {
-      launchEnv.CLAUDE_CODE_SESSION_ACCESS_TOKEN = token;
-    }
-    // Long-lived OAuth token from 'claude setup-token' / 'ark auth'
-    let oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
-    if (!oauthToken) {
-      // Read from saved file
-      const tokenPath = join(store.ARK_DIR(), "claude-oauth-token");
-      if (existsSync(tokenPath)) {
-        oauthToken = readFileSync(tokenPath, "utf-8").trim();
-      }
-    }
-    if (oauthToken) {
-      launchEnv.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
-    }
-  }
+  // Build launch env from agent config + provider-specific env (e.g. auth tokens for remote)
+  const launchEnv = { ...(agent.env ?? {}), ...(provider?.buildLaunchEnv(session as any) ?? {}) };
 
   const { content: launchContent, claudeSessionId } = claude.buildLauncher({
     workdir: effectiveWorkdir,
@@ -497,12 +478,8 @@ async function launchAgentTmux(
   mkdirSync(sessionDir, { recursive: true });
   writeFileSync(join(sessionDir, "task.txt"), task);
 
-  // Check for remote compute
-  if (compute && compute.provider !== "local") {
-    const provider = getProvider(compute.provider);
-    if (!provider) {
-      return tmuxName; // fallback to local if provider not found
-    }
+  // Check for remote compute (providers that don't support local worktrees)
+  if (compute && provider && !provider.supportsWorktree) {
 
     // Auto-start stopped computes
     if (compute.status === "stopped") {
