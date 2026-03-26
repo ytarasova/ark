@@ -84,7 +84,7 @@ apt-get update
 apt-get install -y gh
 
 # ── Claude Code (native installer - run as ubuntu, not root) ─────────────────
-su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
+su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash'
 echo 'export PATH="\\$HOME/.local/bin:\\$PATH"' >> /home/ubuntu/.bashrc
 echo 'export COLORTERM=truecolor' >> /home/ubuntu/.bashrc
 echo 'export PATH="\\$HOME/.local/bin:\\$PATH"' >> /home/ubuntu/.profile
@@ -94,7 +94,7 @@ echo 'export COLORTERM=truecolor' >> /home/ubuntu/.profile
 apt-get install -y tmux
 
 # ── bun (install as ubuntu) ──────────────────────────────────────────────────
-su - ubuntu -c 'curl -fsSL https://bun.sh/install | bash' || true
+su - ubuntu -c 'curl -fsSL https://bun.sh/install | bash'
 echo 'export BUN_INSTALL="\\$HOME/.bun"' >> /home/ubuntu/.bashrc
 echo 'export PATH="\\$BUN_INSTALL/bin:\\$PATH"' >> /home/ubuntu/.bashrc
 
@@ -113,7 +113,7 @@ apt-get install -y kubectl
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 # ── Ark binary (for MCP channel on remote sessions) ──────────────────────────
-su - ubuntu -c 'curl -fsSL https://ytarasova.github.io/ark/install.sh | bash -s -- --latest' || true
+su - ubuntu -c 'curl -fsSL https://ytarasova.github.io/ark/install.sh | bash -s -- --latest'
 
 # ── Workspace ────────────────────────────────────────────────────────────────
 mkdir -p /home/ubuntu/Projects

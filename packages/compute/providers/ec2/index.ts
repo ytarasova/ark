@@ -162,7 +162,7 @@ export class EC2Provider implements ComputeProvider {
           async () => {
             const { stdout } = await sshExecAsync(key, result.ip!, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 15_000 });
             if (stdout.trim().includes("provisioning complete")) {
-              log("Cloud-init complete - all packages installed");
+              log("Cloud-init complete");
               mergeComputeConfig(compute.name, { cloud_init_done: true });
               return true;
             }
@@ -174,6 +174,31 @@ export class EC2Provider implements ComputeProvider {
           },
           { maxAttempts: 60, delayMs: 10_000 },
         );
+
+        // Verify + remediate required tools
+        log("Verifying tools...");
+        const checks = [
+          { name: "claude", test: "test -f ~/.local/bin/claude", fix: "curl -fsSL https://claude.ai/install.sh | bash" },
+          { name: "ark", test: "test -f ~/.ark/bin/ark", fix: "curl -fsSL https://ytarasova.github.io/ark/install.sh | bash -s -- --latest" },
+          { name: "bun", test: "test -f ~/.bun/bin/bun", fix: "curl -fsSL https://bun.sh/install | bash" },
+          { name: "tmux", test: "which tmux", fix: "sudo apt-get install -y tmux" },
+          { name: "git", test: "which git", fix: "sudo apt-get install -y git" },
+        ];
+        for (const { name, test, fix } of checks) {
+          const { exitCode } = await sshExecAsync(key, result.ip!, test, { timeout: 10_000 });
+          if (exitCode !== 0) {
+            log(`${name} missing — installing...`);
+            await sshExecAsync(key, result.ip!, fix, { timeout: 120_000 });
+            const { exitCode: verify } = await sshExecAsync(key, result.ip!, test, { timeout: 10_000 });
+            if (verify !== 0) {
+              log(`WARNING: ${name} installation failed`);
+            } else {
+              log(`${name} installed`);
+            }
+          } else {
+            log(`${name} ✓`);
+          }
+        }
       }
     }
   }
