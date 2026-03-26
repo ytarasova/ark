@@ -109,7 +109,7 @@ export function App() {
             <NewSessionForm
               store={store}
               async={sessionsAsync}
-              onDone={() => { setShowForm(null); setSessionPrefill(undefined); }}
+              onDone={() => { setShowForm(null); setSessionPrefill(undefined); store.refresh(); }}
               prefill={sessionPrefill}
             />
           ) : undefined}
@@ -142,7 +142,7 @@ export function App() {
           async={computeAsync}
           onShowForm={() => setShowForm("compute")}
           formOverlay={showForm === "compute" ? (
-            <NewComputeForm async={computeAsync} onDone={() => setShowForm(null)} />
+            <NewComputeForm async={computeAsync} onDone={() => { setShowForm(null); store.refresh(); }} />
           ) : undefined}
         />
       ) : null}

@@ -11,8 +11,10 @@ export function submitForm(opts: {
   onDone: () => void;
   asyncFollowUp?: { label: string; action: (updateLabel: (msg: string) => void) => Promise<void> };
   asyncState: AsyncState;
+  /** Message to show briefly after sync create (no asyncFollowUp). */
+  confirmLabel?: string;
 }): void {
-  const { create, onDone, asyncFollowUp, asyncState } = opts;
+  const { create, onDone, asyncFollowUp, asyncState, confirmLabel } = opts;
 
   try {
     create();
@@ -24,9 +26,11 @@ export function submitForm(opts: {
   // Close form BEFORE async work so React unmount doesn't cancel it
   onDone();
 
-  // Async follow-up via standard runner
-  // useAsync.run() now sets loading/label immediately for instant feedback
   if (asyncFollowUp) {
+    // Async follow-up — spinner persists until action completes
     asyncState.run(asyncFollowUp.label, (updateLabel) => asyncFollowUp.action(updateLabel));
+  } else if (confirmLabel) {
+    // Brief confirmation flash for sync-only creates
+    asyncState.run(confirmLabel, async () => {});
   }
 }
