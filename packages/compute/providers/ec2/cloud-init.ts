@@ -76,27 +76,29 @@ unzip /tmp/awscliv2.zip -d /tmp
 /tmp/aws/install
 
 # ── GitHub CLI ───────────────────────────────────────────────────────────────
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \\
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=\\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \\
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
   | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
 apt-get update
 apt-get install -y gh
 
 # ── Claude Code (native installer - run as ubuntu, not root) ─────────────────
 su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash'
-echo 'export PATH="\\$HOME/.local/bin:\\$PATH"' >> /home/ubuntu/.bashrc
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/ubuntu/.bashrc
 echo 'export COLORTERM=truecolor' >> /home/ubuntu/.bashrc
-echo 'export PATH="\\$HOME/.local/bin:\\$PATH"' >> /home/ubuntu/.profile
+
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/ubuntu/.profile
 echo 'export COLORTERM=truecolor' >> /home/ubuntu/.profile
+
 
 # ── tmux ─────────────────────────────────────────────────────────────────────
 apt-get install -y tmux
 
 # ── bun (install as ubuntu) ──────────────────────────────────────────────────
 su - ubuntu -c 'curl -fsSL https://bun.sh/install | bash'
-echo 'export BUN_INSTALL="\\$HOME/.bun"' >> /home/ubuntu/.bashrc
-echo 'export PATH="\\$BUN_INSTALL/bin:\\$PATH"' >> /home/ubuntu/.bashrc
+echo 'export BUN_INSTALL="$HOME/.bun"' >> /home/ubuntu/.bashrc
+echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> /home/ubuntu/.bashrc
 
 # ── nvm (install as ubuntu) ──────────────────────────────────────────────────
 su - ubuntu -c 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash' || true

@@ -153,12 +153,19 @@ async function syncClaudePush(key: string, ip: string): Promise<void> {
       remote.autoUpdates = false;
 
       if (remote.oauthAccount) {
-        const encoded = Buffer.from(JSON.stringify(remote, null, 2)).toString("base64");
-        // Use sshExec to write directly — rsync --update may skip if remote file is newer
-        await sshExec(key, ip,
-          `echo ${encoded} | base64 -d > /home/ubuntu/.claude.json`,
-          { timeout: 15_000 },
-        );
+        const tmp = mkdtempSync(join(tmpdir(), "ark-claudejson-"));
+        try {
+          writeFileSync(join(tmp, ".claude.json"), JSON.stringify(remote, null, 2));
+          // Use rsync WITHOUT --update to always overwrite (Claude install creates this file)
+          const [bin, ...rest] = [
+            "rsync", "-avz", "--timeout=15",
+            "-e", `ssh -i ${key} -o StrictHostKeyChecking=no -o ConnectTimeout=10`,
+            join(tmp, ".claude.json"), `ubuntu@${ip}:~/`,
+          ];
+          await execFileAsync(bin, rest, { encoding: "utf-8", timeout: 30_000 });
+        } finally {
+          await execFileAsync("rm", ["-rf", tmp]);
+        }
       }
     } catch { /* auth sync is best-effort */ }
   }
