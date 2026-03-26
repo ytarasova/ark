@@ -55,7 +55,7 @@ export function buildUserData(opts?: { idleMinutes?: number }): string {
 
 # ── Base packages ────────────────────────────────────────────────────────────
 apt-get update
-apt-get install -y git curl unzip build-essential jq rsync gnupg2
+apt-get install -y git curl unzip build-essential jq rsync gnupg2 sysstat
 
 # ── Node.js 22 ───────────────────────────────────────────────────────────────
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -

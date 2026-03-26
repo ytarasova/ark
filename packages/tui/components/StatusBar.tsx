@@ -129,7 +129,7 @@ function getComputeHints(): React.ReactNode[] {
     ...NAV_HINTS,
     <KeyHint key="enter" k="Enter" label="provision" />,
     <KeyHint key="s" k="s" label="start/stop" />,
-    <KeyHint key="r" k="r" label="reboot" />,
+    <KeyHint key="R" k="R" label="reboot" />,
     <KeyHint key="t" k="t" label="test" />,
     <KeyHint key="x" k="x" label="delete" />,
     <KeyHint key="c" k="c" label="clean" />,

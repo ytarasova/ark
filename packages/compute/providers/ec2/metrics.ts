@@ -57,7 +57,7 @@ const DOCKER_PS_CMD =
 
 /** Single SSH command that outputs section-delimited fast metrics. */
 export const SSH_FAST_CMD: string = [
-  "echo \"=== CPU ===\" && mpstat 1 1 | tail -1 | awk '{printf \"%.1f\\n\", 100 - $NF}'",
+  "echo \"=== CPU ===\" && (mpstat 1 1 2>/dev/null | tail -1 | awk '{printf \"%.1f\\n\", 100 - $NF}' || top -bn1 | awk '/^%?Cpu/{printf \"%.1f\\n\", 100 - $8}')",
   "echo \"=== MEMORY ===\" && free | awk '/Mem:/{printf \"%.1f %.1f\\n\", $3/1024, $2/1024}'",
   "echo \"=== DISK ===\" && df / | tail -1 | awk '{print $5}' | tr -d '%'",
   "echo \"=== UPTIME ===\" && uptime -p",

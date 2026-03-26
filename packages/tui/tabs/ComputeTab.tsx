@@ -80,7 +80,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
           });
         });
       }
-    } else if (input === "r") {
+    } else if (input === "R") {
       if (selected && selected.provider !== "local") {
         actions.reboot(selected);
       }
