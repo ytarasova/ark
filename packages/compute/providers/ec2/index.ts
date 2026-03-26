@@ -208,6 +208,32 @@ export class EC2Provider implements ComputeProvider {
         } catch (e: any) {
           log(`Credential sync failed: ${e?.message ?? e}`);
         }
+
+        // Check if Claude is authenticated on the remote
+        const { exitCode: authCheck } = await sshExecAsync(key, result.ip!,
+          "~/.local/bin/claude auth status 2>&1 | grep -q loggedIn",
+          { timeout: 15_000 });
+        if (authCheck !== 0) {
+          log("Claude not authenticated — launching setup...");
+          // Open interactive tmux window for user to complete claude auth
+          try {
+            const sshCmd = `ssh -i ${key} -o StrictHostKeyChecking=no -t ubuntu@${result.ip} "~/.local/bin/claude setup-token"`;
+            const { execFileSync } = await import("child_process");
+            if (process.env.TMUX) {
+              execFileSync("tmux", [
+                "new-window", "-n", `auth-${compute.name}`,
+                "bash", "-c", `${sshCmd}; echo 'Press Enter to close'; read`,
+              ], { stdio: "pipe" });
+              log("Auth window opened — complete Claude login in the new tmux tab");
+            } else {
+              log(`Run manually: ${sshCmd}`);
+            }
+          } catch {
+            log("Could not open auth window — run 'claude setup-token' on the remote host");
+          }
+        } else {
+          log("Claude authenticated ✓");
+        }
       }
     }
   }
