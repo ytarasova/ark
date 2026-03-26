@@ -108,9 +108,18 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         // Check if remote compute has Claude auth available
         const compute = selected.compute_name ? core.getCompute(selected.compute_name) : null;
         if (compute && compute.provider !== "local") {
-          const hasCredFile = existsSync(join(process.env.HOME!, ".claude", ".credentials.json"));
-          const hasSessionToken = !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
-          if (!hasCredFile && !hasSessionToken) {
+          let hasAuth = !!process.env.CLAUDE_CODE_OAUTH_TOKEN
+            || !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN
+            || !!process.env.ANTHROPIC_API_KEY;
+          // Also check saved token from 'ark auth'
+          if (!hasAuth) {
+            const tokenFile = join(process.env.HOME!, ".ark", "claude-oauth-token");
+            if (existsSync(tokenFile)) {
+              const token = require("fs").readFileSync(tokenFile, "utf-8").trim();
+              if (token) { process.env.CLAUDE_CODE_OAUTH_TOKEN = token; hasAuth = true; }
+            }
+          }
+          if (!hasAuth) {
             status.show("Run 'ark auth' in another terminal first");
             return;
           }

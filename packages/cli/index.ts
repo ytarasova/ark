@@ -780,15 +780,29 @@ program.command("auth")
         `ubuntu@${cfg.ip}`, "~/.local/bin/claude setup-token",
       ], { stdio: "inherit" });
     } else {
-      console.log("Setting up Claude authentication...");
-      console.log("Complete the browser auth to create a persistent token.");
-      console.log("This token will be synced to remote hosts on next provision/dispatch.\n");
-      execFileSync("claude", ["setup-token"], { stdio: "inherit" });
-      const { existsSync } = await import("fs");
+      const { writeFileSync, mkdirSync, existsSync } = await import("fs");
       const { join } = await import("path");
-      const credFile = join(process.env.HOME!, ".claude", ".credentials.json");
-      if (existsSync(credFile)) {
-        console.log("\n✓ Credentials saved. They will sync to remote hosts automatically.");
+
+      console.log("Setting up Claude authentication...\n");
+      // Capture setup-token output to extract the token
+      const output = execFileSync("claude", ["setup-token"], {
+        stdio: ["inherit", "pipe", "inherit"],
+        encoding: "utf-8",
+      });
+      process.stdout.write(output);
+
+      // Extract the OAuth token from the output
+      const tokenMatch = output.match(/sk-ant-oat\S+/);
+      if (tokenMatch) {
+        const token = tokenMatch[0];
+        // Save to ~/.ark/ so TUI + dispatch can read it without env var
+        const arkDir = join(process.env.HOME!, ".ark");
+        mkdirSync(arkDir, { recursive: true });
+        writeFileSync(join(arkDir, "claude-oauth-token"), token, { mode: 0o600 });
+        console.log(`\n✓ Token saved to ~/.ark/claude-oauth-token`);
+        console.log(`  TUI and dispatch will pick it up automatically.`);
+      } else if (existsSync(join(process.env.HOME!, ".claude", ".credentials.json"))) {
+        console.log("\n✓ Credentials saved.");
       }
     }
   });

@@ -214,10 +214,11 @@ export class EC2Provider implements ComputeProvider {
         }
 
         // Set up Claude auth on remote
-        const credFile = join(homedir(), ".claude", ".credentials.json");
-        const hasSessionToken = !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
-        if (!existsSync(credFile) && !hasSessionToken) {
-          log("⚠ No Claude auth — run 'ark auth' to set up credentials");
+        const hasAuth = !!process.env.CLAUDE_CODE_OAUTH_TOKEN
+          || !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN
+          || !!process.env.ANTHROPIC_API_KEY;
+        if (!hasAuth) {
+          log("⚠ No Claude auth — run 'ark auth', set CLAUDE_CODE_OAUTH_TOKEN, then restart");
         } else {
           // Credentials exist locally — verify they synced to remote
           const { exitCode: authCheck } = await sshExecAsync(key, result.ip!,

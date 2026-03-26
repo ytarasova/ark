@@ -457,6 +457,18 @@ async function launchAgentTmux(
     if (token) {
       launchEnv.CLAUDE_CODE_SESSION_ACCESS_TOKEN = token;
     }
+    // Long-lived OAuth token from 'claude setup-token' / 'ark auth'
+    let oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    if (!oauthToken) {
+      // Read from saved file
+      const tokenPath = join(store.ARK_DIR, "claude-oauth-token");
+      if (existsSync(tokenPath)) {
+        oauthToken = readFileSync(tokenPath, "utf-8").trim();
+      }
+    }
+    if (oauthToken) {
+      launchEnv.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
+    }
   }
 
   const { content: launchContent, claudeSessionId } = claude.buildLauncher({
