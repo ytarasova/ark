@@ -113,7 +113,7 @@ apt-get install -y kubectl
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 # ── Ark binary (for MCP channel on remote sessions) ──────────────────────────
-su - ubuntu -c 'curl -fsSL https://ytarasova.github.io/ark/install.sh | bash' || true
+su - ubuntu -c 'curl -fsSL https://ytarasova.github.io/ark/install.sh | bash -s -- --latest' || true
 
 # ── Workspace ────────────────────────────────────────────────────────────────
 mkdir -p /home/ubuntu/Projects
