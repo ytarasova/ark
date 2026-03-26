@@ -820,7 +820,7 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
       <Text> </Text>
 
       {/* Message history */}
-      <Box flexDirection="column" flexGrow={1}>
+      <Box flexDirection="column" flexGrow={1} overflow="hidden">
         {messages.length === 0 && (
           <Text dimColor>{"  No messages yet. Type below to send."}</Text>
         )}
@@ -840,6 +840,7 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
       </Box>
 
       {/* Input */}
+      <Text> </Text>
       <Box>
         <Text color="cyan">{"> "}</Text>
         <TextInputEnhanced
