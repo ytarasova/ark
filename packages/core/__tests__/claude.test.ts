@@ -391,14 +391,17 @@ describe("buildLauncher", () => {
     expect(content).toContain("export MY_VAR='hello world'");
   });
 
-  it("does not include env block when env is empty", () => {
+  it("does not include custom env when env is empty", () => {
     const { content } = buildLauncher({ ...baseOpts, env: {} });
-    expect(content).not.toContain("export ");
+    // PATH export is always present; custom env vars should not be
+    const lines = content.split("\n").filter(l => l.startsWith("export ") && !l.includes("PATH="));
+    expect(lines.length).toBe(0);
   });
 
-  it("does not include env block when env is undefined", () => {
+  it("does not include custom env when env is undefined", () => {
     const { content } = buildLauncher(baseOpts);
-    expect(content).not.toContain("export ");
+    const lines = content.split("\n").filter(l => l.startsWith("export ") && !l.includes("PATH="));
+    expect(lines.length).toBe(0);
   });
 
   it("env vars appear after cd and before claude command", () => {

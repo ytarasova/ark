@@ -169,14 +169,15 @@ describe("session resume", () => {
     expect(result.message).toContain("not found");
   });
 
-  it("resume returns ok: false for completed session", async () => {
+  it("resume allows completed sessions to restart", async () => {
     const { resume } = await import("../session.js");
     const session = createSession({ summary: "completed-test" });
     updateSession(session.id, { status: "completed", stage: "work" });
 
     const result = await resume(session.id);
-    expect(result.ok).toBe(false);
-    expect(result.message).toContain("completed");
+    // Completed sessions can now be resumed (dispatches again)
+    // It may fail for other reasons (no flow stage) but not because of "completed" status
+    expect(result.message).not.toContain("completed");
   });
 
   it("stopped session can transition to ready via updateSession", async () => {

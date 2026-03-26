@@ -57,17 +57,16 @@ describe("Conductor /hooks/status endpoint", () => {
     expect(updated?.status).toBe("running");
   });
 
-  it("Stop maps to status ready", async () => {
+  it("Stop does not change status (agent idle between turns)", async () => {
     const session = createSession({ summary: "hook test" });
     updateSession(session.id, { status: "running" });
 
     const resp = await postHook(session.id, { hook_event_name: "Stop" });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
-    expect(body.mapped).toBe("ready");
 
+    // Stop no longer maps to a status change — session stays running
     const updated = getSession(session.id);
-    expect(updated?.status).toBe("ready");
+    expect(updated?.status).toBe("running");
   });
 
   it("StopFailure maps to status failed with error field", async () => {

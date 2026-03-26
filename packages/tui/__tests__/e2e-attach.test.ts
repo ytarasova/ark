@@ -158,7 +158,7 @@ describe("e2e attach flow", () => {
     expect(events.length).toBeGreaterThanOrEqual(1);
   }, 30_000);
 
-  it("resume rejects already-completed sessions", async () => {
+  it("resume allows completed sessions to restart", async () => {
     const s = core.startSession({
       summary: "resume-completed-test",
       repo: env.workdir,
@@ -172,7 +172,8 @@ describe("e2e attach flow", () => {
     expect(core.getSession(s.id)!.status).toBe("completed");
 
     const result = await core.resume(s.id);
-    expect(result.ok).toBe(false);
+    // Completed sessions can now be resumed
+    expect(result.message).not.toContain("completed");
   }, 30_000);
 
   it("getOutput returns empty string for undispatched session", async () => {
