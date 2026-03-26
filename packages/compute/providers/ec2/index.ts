@@ -28,7 +28,7 @@ import { updateCompute, mergeComputeConfig } from "../../../core/store.js";
 import { sshKeyPath, sshExec, sshExecAsync, waitForSsh, waitForSshAsync, generateSshKey } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
-import { syncToHost, syncProjectFiles } from "./sync.js";
+import { syncToHost, syncProjectFiles, refreshRemoteToken } from "./sync.js";
 import { fetchMetrics, fetchMetricsAsync } from "./metrics.js";
 import { SSH_FAST_CMD, parseSnapshot } from "./metrics.js";
 import { setupTunnels, setupReverseTunnel, probeRemotePorts } from "./ports.js";
@@ -451,6 +451,18 @@ export class EC2Provider implements ComputeProvider {
     const cfg = compute.config as EC2HostConfig;
     if (!cfg.ip) throw new Error(`Compute '${compute.name}' has no IP`);
     const { queue } = this.getQueue(compute);
+
+    // Periodically refresh auth token on remote (piggyback on metrics cycle)
+    if (process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN) {
+      queue.command(async (p) => {
+        const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN!;
+        await p.exec(
+          `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN '${token}' 2>/dev/null; done`,
+          { timeout: 10_000 },
+        );
+      }).catch(() => {}); // fire-and-forget
+    }
+
     const result = await queue.metrics(async (p) => {
       const { stdout } = await p.exec(SSH_FAST_CMD, { timeout: 15_000 });
       return parseSnapshot(stdout);

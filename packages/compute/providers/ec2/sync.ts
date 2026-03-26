@@ -211,6 +211,21 @@ function rewriteJsonFiles(dir: string, direction: "push" | "pull"): void {
   }
 }
 
+/**
+ * Refresh the Claude session access token on a remote host.
+ * Called periodically to keep the remote agent authenticated.
+ */
+export async function refreshRemoteToken(key: string, ip: string): Promise<void> {
+  const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
+  if (!token) return;
+  // Write token to the remote's environment for running tmux sessions
+  // The token is picked up by Claude when it refreshes its auth
+  await sshExec(key, ip,
+    `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN '${token}' 2>/dev/null; done`,
+    { timeout: 10_000 },
+  );
+}
+
 export const SYNC_STEPS: SyncStep[] = [
   { name: "ssh",    push: syncSshPush,    pull: syncSshPull },
   { name: "aws",    push: syncAwsPush,    pull: syncAwsPull },

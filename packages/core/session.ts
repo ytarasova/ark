@@ -450,13 +450,23 @@ async function launchAgentTmux(
   // Status hooks — write .claude/settings.local.json for agent status detection
   claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts?.autonomy });
 
+  // For remote compute, pass auth token so Claude is logged in
+  const launchEnv = { ...(agent.env ?? {}) };
+  if (isRemote) {
+    // Try to get a session token from the current Claude process
+    const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
+    if (token) {
+      launchEnv.CLAUDE_CODE_SESSION_ACCESS_TOKEN = token;
+    }
+  }
+
   const { content: launchContent, claudeSessionId } = claude.buildLauncher({
     workdir: effectiveWorkdir,
     claudeArgs,
     mcpConfigPath,
     prevClaudeSessionId: session.claude_session_id,
     sessionName: session.summary ?? session.id,
-    env: agent.env,
+    env: launchEnv,
   });
 
   let finalLaunchContent = launchContent;
