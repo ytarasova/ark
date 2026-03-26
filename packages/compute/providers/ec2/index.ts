@@ -170,7 +170,10 @@ export class EC2Provider implements ComputeProvider {
             }
             const { stdout: progress } = await sshExecAsync(key, result.ip!,
               "tail -1 /var/log/cloud-init-output.log 2>/dev/null || echo 'waiting...'", { timeout: 15_000 });
-            const line = progress.trim().slice(0, 100);
+            const line = progress.trim()
+              .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")  // strip ANSI
+              .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")  // strip control chars
+              .slice(0, 100);
             if (line && line !== "waiting...") log(`cloud-init: ${line}`);
             return false;
           },

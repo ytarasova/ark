@@ -33,9 +33,10 @@ const PROCESSES_CMD = [
   "for pid in $(ps aux --sort=-%cpu",
   "| grep -vE 'sshd|grep|awk|ps aux|mpstat'",
   "| awk 'NR>1 && $3>0.1{print $2}' | head -8); do",
+  "  cmd=$(ps -p $pid -o comm= 2>/dev/null);",
+  "  [ -z \"$cmd\" ] && continue;",
   "  cpu=$(ps -p $pid -o %cpu= 2>/dev/null | tr -d ' ');",
   "  mem=$(ps -p $pid -o %mem= 2>/dev/null | tr -d ' ');",
-  "  cmd=$(ps -p $pid -o comm= 2>/dev/null);",
   "  cwd=$(readlink /proc/$pid/cwd 2>/dev/null | sed 's|/home/ubuntu/Projects/||');",
   '  printf "%s\\t%s%%\\t%s%%\\t%s\\t%s\\n" "$pid" "$cpu" "$mem" "$cmd" "$cwd";',
   "done",
@@ -191,19 +192,26 @@ function parseProcesses(s: Record<string, string[]>): ComputeProcess[] {
   const out: ComputeProcess[] = [];
   for (const ln of s["PROCESSES"] ?? []) {
     const p = ln.split("\t");
-    if (p.length >= 4) {
+    // Require all 4 fields with a non-empty command name
+    if (p.length >= 4 && p[3].trim()) {
       out.push({
-        pid: p[0],
-        cpu: p[1],
-        mem: p[2],
-        command: p[3].trim(),
-        workingDir: p.length >= 5 ? p[4].replace(PROJECT_PREFIX, "") : "",
+        pid: sanitize(p[0]),
+        cpu: sanitize(p[1]),
+        mem: sanitize(p[2]),
+        command: sanitize(p[3]),
+        workingDir: p.length >= 5 ? sanitize(p[4]).replace(PROJECT_PREFIX, "") : "",
       });
-    } else if (ln.trim()) {
-      out.push({ pid: "", cpu: "", mem: "", command: ln.trim(), workingDir: "" });
     }
   }
   return out;
+}
+
+/** Strip ANSI escape codes and control characters from metrics output. */
+function sanitize(s: string): string {
+  return s
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")  // ANSI escape sequences
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")  // control chars (keep \n \r \t)
+    .trim();
 }
 
 function parseDocker(s: Record<string, string[]>): DockerContainer[] {
