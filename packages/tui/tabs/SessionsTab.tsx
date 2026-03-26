@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
+import { existsSync } from "fs";
+import { join } from "path";
+import { execFile } from "child_process";
 import * as core from "../../core/index.js";
 import { ICON, COLOR } from "../constants.js";
 import { ago, hms } from "../helpers.js";
@@ -102,6 +105,23 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
     if (key.return) {
       if (selected.status === "ready" || selected.status === "blocked") {
+        // Check if remote compute needs Claude auth setup
+        const compute = selected.compute_name ? core.getCompute(selected.compute_name) : null;
+        if (compute && compute.provider !== "local") {
+          const credFile = join(process.env.HOME!, ".claude", ".credentials.json");
+          if (!existsSync(credFile)) {
+            if (process.env.TMUX) {
+              execFile("tmux", [
+                "new-window", "-n", "claude-auth",
+                "bash", "-c", "claude setup-token; echo; echo 'Done. Press Enter to close.'; read",
+              ], { stdio: "pipe" }, () => {});
+              status.show("Complete auth in 'claude-auth' tab, then dispatch again");
+            } else {
+              status.show("Run 'ark auth' first to set up Claude credentials");
+            }
+            return;
+          }
+        }
         actions.dispatch(selected.id);
       } else if (["failed", "stopped", "completed"].includes(selected.status)) {
         actions.restart(selected.id);
