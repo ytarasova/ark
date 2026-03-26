@@ -538,9 +538,16 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
         <>
           <Text> </Text>
           <SectionHeader title="Live Output" />
-          {agentOutput.split("\n").slice(-12).map((line, i) => (
-            <Text key={i} wrap="truncate">{`  ${line}`}</Text>
-          ))}
+          {agentOutput.split("\n")
+            .map(line => line
+              .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")  // strip ANSI
+              .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")  // strip control chars
+            )
+            .filter(line => line.trim())
+            .slice(-12)
+            .map((line, i) => (
+              <Text key={i} wrap="truncate">{`  ${line}`}</Text>
+            ))}
         </>
       ) : null}
 
