@@ -30,10 +30,13 @@ import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
 import { syncToHost, syncProjectFiles } from "./sync.js";
 import { fetchMetrics, fetchMetricsAsync } from "./metrics.js";
+import { SSH_FAST_CMD, parseSnapshot } from "./metrics.js";
 import { setupTunnels, setupReverseTunnel, probeRemotePorts } from "./ports.js";
 import { hourlyRate } from "./cost.js";
 import { sleep, poll } from "../../util.js";
 import { resolveRepoUrl, getRepoName, cloneRepoOnRemote, trustRemoteDirectory, autoAcceptChannelPrompt } from "./remote-setup.js";
+import { getOrCreatePool, destroyPool, destroyAllPools, type SSHPool } from "./pool.js";
+import { SSHQueue } from "./queue.js";
 
 interface EC2HostConfig {
   size?: string;
@@ -66,6 +69,20 @@ export class EC2Provider implements ComputeProvider {
   readonly isolationModes = [
     { value: "inplace", label: "Remote checkout (in-place)" },
   ];
+
+  private queues = new Map<string, SSHQueue>();
+
+  /** Get or create the pool + queue for a compute host. */
+  private getQueue(compute: Compute): { pool: SSHPool; queue: SSHQueue } {
+    const cfg = compute.config as EC2HostConfig;
+    if (!cfg.ip) throw new Error(`Compute '${compute.name}' has no IP`);
+    const key = sshKeyPath(compute.name);
+    const pool = getOrCreatePool(compute.name, key, cfg.ip);
+    if (!this.queues.has(compute.name)) {
+      this.queues.set(compute.name, new SSHQueue(pool));
+    }
+    return { pool, queue: this.queues.get(compute.name)! };
+  }
 
   async provision(compute: Compute, opts?: ProvisionOpts): Promise<void> {
     const log = opts?.onLog ?? (() => {});
@@ -162,6 +179,8 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async destroy(compute: Compute): Promise<void> {
+    await destroyPool(compute.name);
+    this.queues.delete(compute.name);
     const cfg = compute.config as EC2HostConfig;
     await destroyStack(compute.name, {
       region: cfg.region ?? "us-east-1",
@@ -205,6 +224,10 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async stop(compute: Compute): Promise<void> {
+    // Destroy pool before stopping — master socket won't survive
+    await destroyPool(compute.name);
+    this.queues.delete(compute.name);
+
     const cfg = compute.config as EC2HostConfig;
     const instanceId = cfg.instance_id;
     if (!instanceId) throw new Error(`Compute '${compute.name}' has no instance_id`);
@@ -313,42 +336,38 @@ export class EC2Provider implements ComputeProvider {
   // ── Session lifecycle ─────────────────────────────────────────────────
 
   async killAgent(compute: Compute, session: Session): Promise<void> {
-    // EC2: kill the remote tmux session via ssh
     if (!session.session_id) return;
-    const cfg = compute.config as EC2HostConfig;
-    const ip = cfg.ip;
-    if (!ip) return;
-    const key = sshKeyPath(compute.name);
     try {
-      await sshExecAsync(key, ip, `tmux kill-session -t '${session.session_id}'`, { timeout: 10_000 });
-    } catch { /* session may already be dead */ }
+      const { queue } = this.getQueue(compute);
+      await queue.command(async (p) => {
+        await p.exec(`tmux kill-session -t '${session.session_id}'`, { timeout: 10_000 });
+      });
+    } catch { /* session may already be dead or host unreachable */ }
   }
 
   async captureOutput(compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
-    // EC2: capture remote tmux pane via ssh
     if (!session.session_id) return "";
-    const cfg = compute.config as EC2HostConfig;
-    const ip = cfg.ip;
-    if (!ip) return "";
-    const key = sshKeyPath(compute.name);
-    const lines = opts?.lines ?? 50;
     try {
-      return await sshExecAsync(key, ip,
-        `tmux capture-pane -t '${session.session_id}' -p -S -${lines}`,
-        { timeout: 10_000 });
+      const { queue } = this.getQueue(compute);
+      const lines = opts?.lines ?? 50;
+      return await queue.command(async (p) => {
+        const { stdout } = await p.exec(
+          `tmux capture-pane -t '${session.session_id}' -p -S -${lines}`,
+          { timeout: 10_000 },
+        );
+        return stdout;
+      });
     } catch { return ""; }
   }
 
   async cleanupSession(compute: Compute, session: Session): Promise<void> {
-    // EC2: remove remote checkout only — don't touch the instance
     const remoteWorkdir = (session.config as any)?.remoteWorkdir;
     if (!remoteWorkdir) return;
-    const cfg = compute.config as EC2HostConfig;
-    const ip = cfg.ip;
-    if (!ip) return;
-    const key = sshKeyPath(compute.name);
     try {
-      await sshExecAsync(key, ip, `rm -rf '${remoteWorkdir}'`, { timeout: 15_000 });
+      const { queue } = this.getQueue(compute);
+      await queue.command(async (p) => {
+        await p.exec(`rm -rf '${remoteWorkdir}'`, { timeout: 15_000 });
+      });
     } catch { /* best effort */ }
   }
 
@@ -395,38 +414,45 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async getMetrics(compute: Compute): Promise<ComputeSnapshot> {
-    const cfg = compute.config as EC2HostConfig;
-    const ip = cfg.ip;
-    if (!ip) throw new Error(`Compute '${compute.name}' has no IP`);
-    return fetchMetricsAsync(sshKeyPath(compute.name), ip);
+    const { queue } = this.getQueue(compute);
+    const result = await queue.metrics(async (p) => {
+      const { stdout } = await p.exec(SSH_FAST_CMD, { timeout: 15_000 });
+      return parseSnapshot(stdout);
+    });
+    if (!result) throw new Error("Metrics poll skipped (previous still in flight)");
+    return result;
   }
 
   async probePorts(compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
-    const cfg = compute.config as EC2HostConfig;
-    const ip = cfg.ip;
-    if (!ip) return ports.map((p) => ({ ...p, listening: false }));
-    return await probeRemotePorts(sshKeyPath(compute.name), ip, ports);
+    const { queue } = this.getQueue(compute);
+    return queue.command(async (p) => {
+      const { stdout } = await p.exec("ss -tln", { timeout: 15_000 });
+      if (!stdout) return ports.map(pd => ({ ...pd, listening: false }));
+      return ports.map(pd => ({
+        ...pd,
+        listening: stdout.includes(`:${pd.port} `),
+      }));
+    });
   }
 
   async syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void> {
-    const cfg = compute.config as EC2HostConfig;
-    const ip = cfg.ip;
-    if (!ip) throw new Error(`Compute '${compute.name}' has no IP`);
-    const key = sshKeyPath(compute.name);
+    const { queue } = this.getQueue(compute);
+    await queue.sync(async () => {
+      const cfg = compute.config as EC2HostConfig;
+      const key = sshKeyPath(compute.name);
+      await syncToHost(key, cfg.ip!, {
+        direction: opts.direction,
+        categories: opts.categories,
+      });
 
-    await syncToHost(key, ip, {
-      direction: opts.direction,
-      categories: opts.categories,
+      if (opts.projectFiles?.length && opts.projectDir) {
+        await syncProjectFiles(
+          key,
+          cfg.ip!,
+          opts.projectFiles,
+          opts.projectDir,
+          `/home/ubuntu/Projects/${opts.projectDir.split("/").pop()}`,
+        );
+      }
     });
-
-    if (opts.projectFiles?.length && opts.projectDir) {
-      await syncProjectFiles(
-        key,
-        ip,
-        opts.projectFiles,
-        opts.projectDir,
-        `/home/ubuntu/Projects/${opts.projectDir.split("/").pop()}`,
-      );
-    }
   }
-}

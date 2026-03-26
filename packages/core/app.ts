@@ -261,7 +261,13 @@ export class AppContext {
     // 1. Remove signal handlers
     this._removeSignalHandlers();
 
-    // 2. Stop metrics poller
+    // 2. Close SSH connection pools
+    try {
+      const { destroyAllPools } = await import("../compute/providers/ec2/pool.js");
+      await destroyAllPools();
+    } catch { /* ec2 module may not be loaded */ }
+
+    // 3. Stop metrics poller
     if (this.metricsPoller) {
       this.metricsPoller.stop();
       this.metricsPoller = null;
