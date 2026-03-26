@@ -101,7 +101,12 @@ async function syncGhPush(key: string, ip: string): Promise<void> {
     });
     const token = stdout.trim();
     if (token) {
-      await sshExec(key, ip, `echo '${token}' | gh auth login --with-token 2>/dev/null`);
+      // Write token to temp file, pipe it — avoids quoting issues with echo
+      const encoded = Buffer.from(token).toString("base64");
+      await sshExec(key, ip,
+        `echo ${encoded} | base64 -d | gh auth login --with-token 2>/dev/null`,
+        { timeout: 15_000 },
+      );
     }
   } catch {
     // gh CLI not installed or not authenticated - skip
@@ -148,11 +153,15 @@ async function syncClaudePush(key: string, ip: string): Promise<void> {
       remote.autoUpdates = false;
 
       if (remote.oauthAccount) {
-        const encoded = Buffer.from(JSON.stringify(remote)).toString("base64");
-        await sshExec(key, ip,
-          `echo '${encoded}' | base64 -d > /tmp/ark-claude-auth.json && python3 -c "import json; e=json.load(open('/home/ubuntu/.claude.json')) if __import__('os').path.exists('/home/ubuntu/.claude.json') else {}; e.update(json.load(open('/tmp/ark-claude-auth.json'))); json.dump(e, open('/home/ubuntu/.claude.json','w'), indent=2); print('ok')"`,
-          { timeout: 15_000 },
-        );
+        // Write to temp file locally, rsync to remote
+        const tmp = mkdtempSync(join(tmpdir(), "ark-claudejson-"));
+        try {
+          const content = rewritePaths(JSON.stringify(remote, null, 2), "push");
+          writeFileSync(join(tmp, ".claude.json"), content);
+          await rsyncPush(key, ip, join(tmp, ".claude.json"), "~/");
+        } finally {
+          await execFileAsync("rm", ["-rf", tmp]);
+        }
       }
     } catch { /* auth sync is best-effort */ }
   }
