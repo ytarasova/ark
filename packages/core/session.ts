@@ -404,8 +404,17 @@ import type { ComputeProvider } from "../compute/types.js";
 
 /** Resolve the compute provider for a session via AppContext. */
 function resolveProvider(session: store.Session): { provider: ComputeProvider | null; compute: store.Compute | null } {
-  const { getApp } = require("./app.js");
-  return getApp().resolveProvider(session);
+  try {
+    const { getApp } = require("./app.js");
+    return getApp().resolveProvider(session);
+  } catch {
+    // AppContext not booted — resolve manually
+    const computeName = session.compute_name ?? "local";
+    const compute = store.getCompute(computeName);
+    if (!compute) return { provider: null, compute: null };
+    const { getProvider } = require("../compute/index.js");
+    return { provider: getProvider(compute.provider) ?? null, compute };
+  }
 }
 
 // ── Internal ────────────────────────────────────────────────────────────────
@@ -720,26 +729,11 @@ export async function getOutput(sessionId: string, opts?: { lines?: number; ansi
   const session = store.getSession(sessionId);
   if (!session?.session_id) return "";
 
-  // For remote compute, ONLY use provider's captureOutput — never fall back to local tmux
-  if (session.compute_name) {
-    const compute = store.getCompute(session.compute_name);
-    if (compute && compute.provider !== "local") {
-      try {
-        const { provider } = resolveProvider(session);
-        if (provider) {
-          return await provider.captureOutput(compute, session, opts);
-        }
-      } catch {}
-      return ""; // don't fall through to local tmux
-    }
-  }
-
   const { provider, compute } = resolveProvider(session);
   if (provider && compute) {
     return provider.captureOutput(compute, session, opts);
   }
-  // Local: direct tmux capture
-  return tmux.capturePaneAsync(session.session_id, opts);
+  return "";
 }
 
 export async function send(sessionId: string, message: string): Promise<{ ok: boolean; message: string }> {
