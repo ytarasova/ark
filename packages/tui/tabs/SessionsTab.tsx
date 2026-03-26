@@ -105,11 +105,12 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
     if (key.return) {
       if (selected.status === "ready" || selected.status === "blocked") {
-        // Check if remote compute needs Claude auth setup
+        // Check if remote compute has some form of Claude auth available
         const compute = selected.compute_name ? core.getCompute(selected.compute_name) : null;
         if (compute && compute.provider !== "local") {
-          const credFile = join(process.env.HOME!, ".claude", ".credentials.json");
-          if (!existsSync(credFile)) {
+          const hasCredFile = existsSync(join(process.env.HOME!, ".claude", ".credentials.json"));
+          const hasSessionToken = !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
+          if (!hasCredFile && !hasSessionToken) {
             if (process.env.TMUX) {
               execFile("tmux", [
                 "new-window", "-n", "claude-auth",

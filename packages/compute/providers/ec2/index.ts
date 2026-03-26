@@ -214,11 +214,10 @@ export class EC2Provider implements ComputeProvider {
         }
 
         // Set up Claude auth on remote
-        // Check if local setup-token credentials exist (needed for remote auth)
         const credFile = join(homedir(), ".claude", ".credentials.json");
-        if (!existsSync(credFile)) {
-          log("Claude setup-token not configured locally");
-          log("Opening 'claude setup-token' — complete the browser auth...");
+        const hasSessionToken = !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
+        if (!existsSync(credFile) && !hasSessionToken) {
+          log("No Claude auth available — opening setup-token...");
           try {
             const { execFileSync } = await import("child_process");
             if (process.env.TMUX) {
@@ -226,7 +225,7 @@ export class EC2Provider implements ComputeProvider {
                 "new-window", "-n", "claude-auth",
                 "bash", "-c", "claude setup-token; echo; echo 'Done. Press Enter to close.'; read",
               ], { stdio: "pipe" });
-              log("Complete auth in the 'claude-auth' tmux tab, then credentials will sync automatically");
+              log("Complete auth in the 'claude-auth' tmux tab");
             } else {
               log("Run: claude setup-token");
             }
