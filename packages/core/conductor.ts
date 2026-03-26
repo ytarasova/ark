@@ -114,7 +114,8 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
           const statusMap: Record<string, string> = {
             SessionStart: "running",
             UserPromptSubmit: "running",
-            Stop: "ready",
+            // Stop = Claude finished a turn (idle between turns) — keep running
+            // The tmux session is still alive; "ready" would wrongly indicate it needs dispatch
             StopFailure: "failed",
             SessionEnd: "completed",
           };
