@@ -121,14 +121,13 @@ su - ubuntu -c 'curl -fsSL https://ytarasova.github.io/ark/install.sh | bash -s 
 mkdir -p /home/ubuntu/Projects
 chown -R ubuntu:ubuntu /home/ubuntu/Projects
 
-# ── Tmux config: mouse scroll, history 50k, allow-passthrough, Ctrl+Q detach ─
+# ── Tmux config: mouse scroll, history 50k ────────────────────────────────────
 cat > /home/ubuntu/.tmux.conf <<'TMUX'
 set -g mouse on
 set -g history-limit 50000
 set -ga update-environment "TERM TERM_PROGRAM COLORTERM"
-bind-key -n C-q detach-client
 set -g status-left ""
-set -g status-right " C-q detach | #{session_name} "
+set -g status-right " Ctrl+B d detach | #{session_name} "
 set -g status-style "bg=colour235,fg=colour248"
 set -g status-right-style "bg=colour235,fg=colour214"
 TMUX
