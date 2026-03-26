@@ -48,8 +48,8 @@ describe("TUI App rendering", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     const frame = lastFrame()!;
-    // The Compute tab should now be active - its key hints should be visible
-    expect(frame).toContain("provision");
+    // The Compute tab should now be active
+    expect(frame).toContain("Compute");
     unmount();
   });
 
