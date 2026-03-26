@@ -120,7 +120,6 @@ chown -R ubuntu:ubuntu /home/ubuntu/Projects
 cat > /home/ubuntu/.tmux.conf <<'TMUX'
 set -g mouse on
 set -g history-limit 50000
-set -g allow-passthrough on
 set -ga update-environment "TERM TERM_PROGRAM COLORTERM"
 bind-key -n C-q detach-client
 set -g status-left ""
@@ -128,6 +127,10 @@ set -g status-right " C-q detach | #{session_name} "
 set -g status-style "bg=colour235,fg=colour248"
 set -g status-right-style "bg=colour235,fg=colour214"
 TMUX
+# allow-passthrough requires tmux 3.3+
+if tmux -V | awk '{if ($2+0 >= 3.3) exit 0; else exit 1}'; then
+  echo 'set -g allow-passthrough on' >> /home/ubuntu/.tmux.conf
+fi
 chown ubuntu:ubuntu /home/ubuntu/.tmux.conf
 
 # ── Idle shutdown script (${idleMinutes}m with no active sessions) ───────────
