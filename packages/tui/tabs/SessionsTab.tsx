@@ -105,21 +105,35 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
     if (key.return) {
       if (selected.status === "ready" || selected.status === "blocked") {
-        // Check if remote compute has some form of Claude auth available
+        // Check if remote compute has Claude auth available
         const compute = selected.compute_name ? core.getCompute(selected.compute_name) : null;
         if (compute && compute.provider !== "local") {
           const hasCredFile = existsSync(join(process.env.HOME!, ".claude", ".credentials.json"));
           const hasSessionToken = !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
           if (!hasCredFile && !hasSessionToken) {
-            if (process.env.TMUX) {
-              execFile("tmux", [
-                "new-window", "-n", "claude-auth",
-                "bash", "-c", "claude setup-token; echo; echo 'Done. Press Enter to close.'; read",
-              ], { stdio: "pipe" }, () => {});
-              status.show("Complete auth in 'claude-auth' tab, then dispatch again");
-            } else {
-              status.show("Run 'ark auth' first to set up Claude credentials");
-            }
+            // No file-based auth — run setup-token inline (it needs a TTY)
+            status.show("Setting up Claude auth — complete in the new window...");
+            const origWrite = process.stdout.write.bind(process.stdout);
+            const origErrWrite = process.stderr.write.bind(process.stderr);
+            process.stdout.write = (() => true) as any;
+            process.stderr.write = (() => true) as any;
+            setTimeout(() => {
+              process.stdout.write = origWrite;
+              process.stderr.write = origErrWrite;
+              try { process.stdin.setRawMode(false); } catch {}
+              process.stdout.write("\x1b[?1049l\x1b[?25h");
+              const result = Bun.spawnSync(["claude", "setup-token"], {
+                stdin: "inherit", stdout: "inherit", stderr: "inherit",
+              });
+              try { process.stdin.setRawMode(true); } catch {}
+              process.stdout.write("\x1b[?25l\x1b[2J\x1b[H");
+              if (existsSync(join(process.env.HOME!, ".claude", ".credentials.json"))) {
+                status.show("Auth configured — dispatching...");
+                actions.dispatch(selected!.id);
+              } else {
+                status.show("Auth setup incomplete — try again");
+              }
+            }, 100);
             return;
           }
         }
