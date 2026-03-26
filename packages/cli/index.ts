@@ -760,6 +760,39 @@ program.command("channel")
     await import("../core/channel.js");
   });
 
+// ── Auth ────────────────────────────────────────────────────────────────────
+
+program.command("auth")
+  .description("Set up Claude authentication (local + sync to remote hosts)")
+  .option("--host <name>", "Run setup-token on a specific remote host instead")
+  .action(async (opts) => {
+    const { execFileSync } = await import("child_process");
+    if (opts.host) {
+      const core = await import("../core/index.js");
+      const compute = core.getCompute(opts.host);
+      if (!compute) { console.error(`Compute '${opts.host}' not found`); process.exit(1); }
+      const cfg = compute.config as any;
+      if (!cfg.ip) { console.error(`No IP for '${opts.host}'`); process.exit(1); }
+      const key = `${process.env.HOME}/.ssh/ark-${compute.name}`;
+      console.log(`Running setup-token on ${compute.name} (${cfg.ip})...`);
+      execFileSync("ssh", [
+        "-i", key, "-o", "StrictHostKeyChecking=no", "-t",
+        `ubuntu@${cfg.ip}`, "~/.local/bin/claude setup-token",
+      ], { stdio: "inherit" });
+    } else {
+      console.log("Setting up Claude authentication...");
+      console.log("Complete the browser auth to create a persistent token.");
+      console.log("This token will be synced to remote hosts on next provision/dispatch.\n");
+      execFileSync("claude", ["setup-token"], { stdio: "inherit" });
+      const { existsSync } = await import("fs");
+      const { join } = await import("path");
+      const credFile = join(process.env.HOME!, ".claude", ".credentials.json");
+      if (existsSync(credFile)) {
+        console.log("\n✓ Credentials saved. They will sync to remote hosts automatically.");
+      }
+    }
+  });
+
 // ── Search ──────────────────────────────────────────────────────────────────
 
 program.command("search")

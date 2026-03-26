@@ -7,6 +7,8 @@
 
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+import { homedir } from "os";
+import { promisify } from "util";
 import {
   EC2Client,
   StartInstancesCommand,
@@ -209,30 +211,47 @@ export class EC2Provider implements ComputeProvider {
           log(`Credential sync failed: ${e?.message ?? e}`);
         }
 
-        // Check if Claude is authenticated on the remote
-        const { exitCode: authCheck } = await sshExecAsync(key, result.ip!,
-          "~/.local/bin/claude auth status 2>&1 | grep -q loggedIn",
-          { timeout: 15_000 });
-        if (authCheck !== 0) {
-          log("Claude not authenticated — launching setup...");
-          // Open interactive tmux window for user to complete claude auth
+        // Set up Claude auth on remote
+        // Check if local setup-token credentials exist (needed for remote auth)
+        const credFile = join(homedir(), ".claude", ".credentials.json");
+        if (!existsSync(credFile)) {
+          log("Claude setup-token not configured locally");
+          log("Opening 'claude setup-token' — complete the browser auth...");
           try {
-            const sshCmd = `ssh -i ${key} -o StrictHostKeyChecking=no -t ubuntu@${result.ip} "~/.local/bin/claude setup-token"`;
             const { execFileSync } = await import("child_process");
             if (process.env.TMUX) {
               execFileSync("tmux", [
-                "new-window", "-n", `auth-${compute.name}`,
-                "bash", "-c", `${sshCmd}; echo 'Press Enter to close'; read`,
+                "new-window", "-n", "claude-auth",
+                "bash", "-c", "claude setup-token; echo; echo 'Done. Press Enter to close.'; read",
               ], { stdio: "pipe" });
-              log("Auth window opened — complete Claude login in the new tmux tab");
+              log("Complete auth in the 'claude-auth' tmux tab, then credentials will sync automatically");
             } else {
-              log(`Run manually: ${sshCmd}`);
+              log("Run: claude setup-token");
             }
           } catch {
-            log("Could not open auth window — run 'claude setup-token' on the remote host");
+            log("Run 'claude setup-token' locally to enable remote agent auth");
           }
         } else {
-          log("Claude authenticated ✓");
+          // Credentials exist locally — verify they synced to remote
+          const { exitCode: authCheck } = await sshExecAsync(key, result.ip!,
+            "test -f ~/.claude/.credentials.json",
+            { timeout: 10_000 });
+          if (authCheck === 0) {
+            log("Claude credentials synced ✓");
+          } else {
+            // Re-sync just the credentials file
+            log("Re-syncing Claude credentials...");
+            try {
+              const { execFileAsync: efa } = await import("child_process").then(m => ({ execFileAsync: promisify(m.execFile) }));
+              await efa("scp", [
+                "-i", key, "-o", "StrictHostKeyChecking=no",
+                credFile, `ubuntu@${result.ip}:/home/ubuntu/.claude/.credentials.json`,
+              ], { timeout: 15_000 });
+              log("Claude credentials synced ✓");
+            } catch {
+              log("Failed to sync credentials — run 'ark auth --host " + compute.name + "'");
+            }
+          }
         }
       }
     }
