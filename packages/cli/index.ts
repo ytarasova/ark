@@ -780,29 +780,32 @@ program.command("auth")
         `ubuntu@${cfg.ip}`, "~/.local/bin/claude setup-token",
       ], { stdio: "inherit" });
     } else {
-      const { writeFileSync, mkdirSync, existsSync } = await import("fs");
+      const { writeFileSync, mkdirSync, readFileSync } = await import("fs");
       const { join } = await import("path");
 
       console.log("Setting up Claude authentication...\n");
-      // Capture setup-token output to extract the token
-      const output = execFileSync("claude", ["setup-token"], {
-        stdio: ["inherit", "pipe", "inherit"],
-        encoding: "utf-8",
-      });
-      process.stdout.write(output);
+      // Run setup-token with full TTY — clean output, no gibberish
+      execFileSync("claude", ["setup-token"], { stdio: "inherit" });
 
-      // Extract the OAuth token from the output
-      const tokenMatch = output.match(/sk-ant-oat\S+/);
-      if (tokenMatch) {
-        const token = tokenMatch[0];
-        // Save to ~/.ark/ so TUI + dispatch can read it without env var
+      // After completion, read the token back from setup-token's output
+      // setup-token doesn't save to a file — it just prints the token
+      // So we run it again in quiet mode to extract, or ask user
+      // Actually, let's just prompt the user to paste it:
+      console.log("\nPaste the OAuth token shown above (sk-ant-oat01-...):");
+      const readline = await import("readline");
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      const token = await new Promise<string>((resolve) => {
+        rl.question("> ", (answer) => { rl.close(); resolve(answer.trim()); });
+      });
+
+      if (token.startsWith("sk-ant-oat")) {
         const arkDir = join(process.env.HOME!, ".ark");
         mkdirSync(arkDir, { recursive: true });
         writeFileSync(join(arkDir, "claude-oauth-token"), token, { mode: 0o600 });
         console.log(`\n✓ Token saved to ~/.ark/claude-oauth-token`);
         console.log(`  TUI and dispatch will pick it up automatically.`);
-      } else if (existsSync(join(process.env.HOME!, ".claude", ".credentials.json"))) {
-        console.log("\n✓ Credentials saved.");
+      } else if (token) {
+        console.log("\nToken doesn't look right (should start with sk-ant-oat). Try again.");
       }
     }
   });
