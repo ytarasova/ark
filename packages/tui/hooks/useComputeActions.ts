@@ -77,7 +77,7 @@ export function useComputeActions(
     delete: (name: string) => {
       run(`Deleting ${name}`, async () => {
         const compute = core.getCompute(name);
-        if (compute && compute.provider !== "local") {
+        if (compute) {
           const provider = getProvider(compute.provider);
           if (provider) {
             try { await provider.stop(compute); } catch { /* already gone */ }
@@ -88,7 +88,8 @@ export function useComputeActions(
     },
 
     reboot: (compute: core.Compute) => {
-      if (compute.provider === "local") return;
+      const provider = getProvider(compute.provider);
+      if (!provider?.canReboot) return;
       const cfg = compute.config as any;
       if (!cfg?.instance_id) return;
       addLog(compute.name, "Rebooting...");
@@ -139,8 +140,8 @@ export function useComputeActions(
     },
 
     ping: (compute: core.Compute) => {
-      if (compute.provider === "local") {
-        addLog(compute.name, "Local compute — always reachable");
+      if (!getProvider(compute.provider)?.canReboot) {
+        addLog(compute.name, "Local — always available");
         return;
       }
       const cfg = compute.config as any;

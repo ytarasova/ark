@@ -59,8 +59,8 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
       }
     } else if (input === "x") {
       if (!selected) return;
-      if (selected.name === "local") {
-        status.show("Cannot delete local compute");
+      if (!getProvider(selected.provider)?.canDelete) {
+        status.show("Cannot delete this compute");
         return;
       }
       setConfirmDelete(true);
@@ -81,7 +81,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
         });
       }
     } else if (input === "R") {
-      if (selected && selected.provider !== "local") {
+      if (selected && getProvider(selected.provider)?.canReboot) {
         actions.reboot(selected);
       }
     } else if (input === "t") {

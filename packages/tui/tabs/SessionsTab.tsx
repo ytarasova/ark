@@ -3,7 +3,6 @@ import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import { existsSync } from "fs";
 import { join } from "path";
-import { execFile } from "child_process";
 import * as core from "../../core/index.js";
 import { ICON, COLOR } from "../constants.js";
 import { ago, hms } from "../helpers.js";
@@ -107,7 +106,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       if (selected.status === "ready" || selected.status === "blocked") {
         // Check if remote compute has Claude auth available
         const compute = selected.compute_name ? core.getCompute(selected.compute_name) : null;
-        if (compute && compute.provider !== "local") {
+        const { getProvider } = require("../../compute/index.js");
+        const provider = compute ? getProvider(compute.provider) : null;
+        if (provider?.needsAuth) {
           let hasAuth = !!process.env.CLAUDE_CODE_OAUTH_TOKEN
             || !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN
             || !!process.env.ANTHROPIC_API_KEY;
@@ -145,33 +146,20 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         const sid = selected.session_id;
         const selectedId = selected.id;
         asyncState.run("Attaching...", async () => {
-          // Determine if this is a remote session
           const compute = selected?.compute_name ? core.getCompute(selected.compute_name) : null;
-          const isRemote = compute && compute.provider !== "local";
-          let attachCmd: string[];
+          const attachCompute = compute ?? core.getCompute("local")!;
+          const { getProvider } = await import("../../compute/index.js");
+          const provider = getProvider(attachCompute.provider);
+          if (!provider) { status.show("Provider not found"); return; }
 
-          if (isRemote) {
-            const ip = (compute.config as any)?.ip;
-            if (!ip) { status.show("No IP for remote compute"); return; }
-            const keyPath = `${process.env.HOME}/.ssh/ark-${compute.name}`;
-            // Quick connectivity check before trying to attach
-            const { sshExecAsync } = await import("../../core/tmux.js").then(() => import("../../compute/providers/ec2/ssh.js"));
-            const { exitCode } = await sshExecAsync(keyPath, ip, "tmux has-session -t " + sid, { timeout: 10_000 });
-            if (exitCode !== 0) {
-              status.show(`Cannot reach ${compute.name} or session not found`);
-              return;
-            }
-            attachCmd = ["ssh", "-i", keyPath, "-o", "StrictHostKeyChecking=no",
-              "-o", "ConnectTimeout=10", "-t",
-              `ubuntu@${ip}`, `tmux attach -t ${sid}`];
-          } else {
-            const exists = await core.sessionExistsAsync(sid);
-            if (!exists) {
-              status.show(`No active tmux session for ${selectedId}. Try re-dispatching.`);
-              return;
-            }
-            attachCmd = ["tmux", "attach", "-t", sid];
+          const exists = await provider.checkSession(attachCompute, sid);
+          if (!exists) {
+            status.show(`Session not found on ${attachCompute.name}`);
+            return;
           }
+
+          const attachCmd = provider.getAttachCommand(attachCompute, selected!);
+          if (attachCmd.length === 0) { status.show("Cannot attach to this session"); return; }
 
           // Attach: mute Ink, reset terminal for tmux, spawn+wait, restore Ink
           const origWrite = process.stdout.write.bind(process.stdout);

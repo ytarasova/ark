@@ -18,7 +18,7 @@ import type { AsyncState } from "../hooks/useAsync.js";
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function mockAsyncState() {
-  const state: AsyncState & { ran: { label: string; fn: Function }[] } = {
+  const state: AsyncState & { ran: { label: string; fn: Function }[]; flush: () => Promise<void> } = {
     loading: false,
     label: null,
     error: null,
@@ -28,6 +28,11 @@ function mockAsyncState() {
       try { fn(); } catch {} // Execute sync side-effects for testing
     },
     clearError() {},
+    async flush() {
+      for (const { fn } of state.ran) {
+        try { await fn(); } catch {}
+      }
+    },
   };
   return state;
 }
@@ -87,17 +92,20 @@ describe("useComputeActions", () => {
     expect(typeof actions.clean).toBe("function");
   });
 
-  it("delete removes compute from store", () => {
+  it("delete removes compute from store", async () => {
     const compute = createCompute({ name: "del-target", provider: "local" });
     expect(getCompute("del-target")).not.toBeNull();
 
-    const async = mockAsyncState();
-    const actions = useComputeActions(async, () => {});
+    const asyncMock = mockAsyncState();
+    const actions = useComputeActions(asyncMock, () => {});
     actions.delete("del-target");
 
+    // Delete action is async (awaits provider.stop), so flush pending work
+    await asyncMock.flush();
+
     expect(getCompute("del-target")).toBeNull();
-    expect(async.ran.length).toBe(1);
-    expect(async.ran[0].label).toBe("Deleting del-target");
+    expect(asyncMock.ran.length).toBe(1);
+    expect(asyncMock.ran[0].label).toBe("Deleting del-target");
   });
 
   it("provision calls run with correct label", () => {
