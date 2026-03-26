@@ -72,6 +72,12 @@ export class EC2Provider implements ComputeProvider {
     { value: "inplace", label: "Remote checkout (in-place)" },
   ];
 
+  readonly canReboot = true;
+  readonly canDelete = true;
+  readonly supportsWorktree = false;
+  readonly initialStatus = "stopped";
+  readonly needsAuth = true;
+
   private queues = new Map<string, SSHQueue>();
 
   /** Get or create the pool + queue for a compute host. */
@@ -539,5 +545,57 @@ export class EC2Provider implements ComputeProvider {
         );
       }
     });
+  }
+
+  async checkSession(compute: Compute, tmuxSessionId: string): Promise<boolean> {
+    try {
+      const { queue } = this.getQueue(compute);
+      return await queue.command(async (p) => {
+        const { exitCode } = await p.exec(
+          `tmux has-session -t '${tmuxSessionId}'`, { timeout: 10_000 });
+        return exitCode === 0;
+      });
+    } catch { return false; }
+  }
+
+  getAttachCommand(compute: Compute, session: Session): string[] {
+    const cfg = compute.config as any;
+    if (!cfg?.ip || !session.session_id) return [];
+    return [
+      "ssh", "-i", sshKeyPath(compute.name),
+      "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10", "-t",
+      `ubuntu@${cfg.ip}`, `tmux attach -t ${session.session_id}`,
+    ];
+  }
+
+  buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
+    return {
+      command: "/home/ubuntu/.ark/bin/ark",
+      args: ["channel"],
+      env: {
+        ARK_SESSION_ID: sessionId,
+        ARK_STAGE: stage,
+        ARK_CHANNEL_PORT: String(channelPort),
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+      },
+    };
+  }
+
+  buildLaunchEnv(_session: Session): Record<string, string> {
+    const env: Record<string, string> = {};
+    const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
+    if (token) env.CLAUDE_CODE_SESSION_ACCESS_TOKEN = token;
+    let oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    if (!oauthToken) {
+      try {
+        const { existsSync: ex, readFileSync: rf } = require("fs");
+        const { join: j } = require("path");
+        const { ARK_DIR } = require("../../../core/store.js");
+        const p = j(ARK_DIR(), "claude-oauth-token");
+        if (ex(p)) oauthToken = rf(p, "utf-8").trim();
+      } catch {}
+    }
+    if (oauthToken) env.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
+    return env;
   }
 }
