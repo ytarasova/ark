@@ -780,21 +780,31 @@ program.command("auth")
         `ubuntu@${cfg.ip}`, "~/.local/bin/claude setup-token",
       ], { stdio: "inherit" });
     } else {
-      const { writeFileSync, mkdirSync, readFileSync } = await import("fs");
+      const { writeFileSync, mkdirSync } = await import("fs");
       const { join } = await import("path");
+      const { spawn } = await import("child_process");
 
       console.log("Setting up Claude authentication...\n");
-      // Run setup-token with full TTY — clean output, no gibberish
-      execFileSync("claude", ["setup-token"], { stdio: "inherit" });
 
-      // After completion, read the token back from setup-token's output
-      // setup-token doesn't save to a file — it just prints the token
-      // So we run it again in quiet mode to extract, or ask user
-      // Actually, let's just prompt the user to paste it:
+      // Spawn setup-token as a child process that forwards signals
+      const exitCode = await new Promise<number>((resolve) => {
+        const child = spawn("claude", ["setup-token"], {
+          stdio: "inherit",
+        });
+        // Forward Ctrl+C to the child
+        process.on("SIGINT", () => child.kill("SIGINT"));
+        child.on("close", (code) => resolve(code ?? 1));
+      });
+
+      if (exitCode !== 0) {
+        process.exit(exitCode);
+      }
+
       console.log("\nPaste the OAuth token shown above (sk-ant-oat01-...):");
       const readline = await import("readline");
       const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
       const token = await new Promise<string>((resolve) => {
+        rl.on("close", () => resolve(""));
         rl.question("> ", (answer) => { rl.close(); resolve(answer.trim()); });
       });
 
