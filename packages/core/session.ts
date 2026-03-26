@@ -461,7 +461,7 @@ async function launchAgentTmux(
     let oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
     if (!oauthToken) {
       // Read from saved file
-      const tokenPath = join(store.ARK_DIR, "claude-oauth-token");
+      const tokenPath = join(store.ARK_DIR(), "claude-oauth-token");
       if (existsSync(tokenPath)) {
         oauthToken = readFileSync(tokenPath, "utf-8").trim();
       }
