@@ -317,10 +317,13 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
     .join("\n");
   const envBlock = envExports ? envExports + "\n" : "";
 
+  // Source .bashrc/.profile for PATH (claude, bun, nvm live in ~/.local/bin etc)
+  const pathSetup = `[[ -f ~/.bashrc ]] && source ~/.bashrc\n`;
+
   let content: string;
   if (opts.prevClaudeSessionId) {
     content = `#!/bin/bash
-cd ${shellQuote(opts.workdir)}
+${pathSetup}cd ${shellQuote(opts.workdir)}
 ${envBlock}${claudeCmd} --resume ${shellQuote(opts.prevClaudeSessionId)} \\
   ${extraFlags} || \\
 ${claudeCmd} --session-id ${shellQuote(claudeSessionId)} \\
@@ -329,7 +332,7 @@ exec bash
 `;
   } else {
     content = `#!/bin/bash
-cd ${shellQuote(opts.workdir)}
+${pathSetup}cd ${shellQuote(opts.workdir)}
 ${envBlock}${claudeCmd} --session-id ${shellQuote(claudeSessionId)} \\
   ${extraFlags}
 exec bash

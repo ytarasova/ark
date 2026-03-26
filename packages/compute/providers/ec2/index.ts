@@ -414,6 +414,8 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async getMetrics(compute: Compute): Promise<ComputeSnapshot> {
+    const cfg = compute.config as EC2HostConfig;
+    if (!cfg.ip) throw new Error(`Compute '${compute.name}' has no IP`);
     const { queue } = this.getQueue(compute);
     const result = await queue.metrics(async (p) => {
       const { stdout } = await p.exec(SSH_FAST_CMD, { timeout: 15_000 });
@@ -424,6 +426,8 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async probePorts(compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
+    const cfg = compute.config as EC2HostConfig;
+    if (!cfg.ip) return ports.map(pd => ({ ...pd, listening: false }));
     const { queue } = this.getQueue(compute);
     return queue.command(async (p) => {
       const { stdout } = await p.exec("ss -tln", { timeout: 15_000 });
@@ -456,3 +460,4 @@ export class EC2Provider implements ComputeProvider {
       }
     });
   }
+}
