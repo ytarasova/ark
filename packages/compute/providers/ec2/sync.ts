@@ -135,6 +135,43 @@ async function syncClaudePush(key: string, ip: string): Promise<void> {
   } finally {
     await execFileAsync("rm", ["-rf", tmp]);
   }
+
+  // Sync auth + onboarding from ~/.claude.json so Claude skips first-run setup
+  const claudeJsonPath = join(homedir(), ".claude.json");
+  if (existsSync(claudeJsonPath)) {
+    try {
+      const local = JSON.parse(readFileSync(claudeJsonPath, "utf-8"));
+      // Only sync auth-essential fields, not the entire config
+      const remote: Record<string, unknown> = {};
+      if (local.oauthAccount) remote.oauthAccount = local.oauthAccount;
+      if (local.hasCompletedOnboarding) remote.hasCompletedOnboarding = true;
+      remote.numStartups = 1;
+      remote.autoUpdates = false;
+
+      if (remote.oauthAccount) {
+        const tmp2 = mkdtempSync(join(tmpdir(), "ark-claudejson-push-"));
+        try {
+          // Read existing remote config (if any) and merge
+          const encoded = Buffer.from(JSON.stringify(remote, null, 2)).toString("base64");
+          await sshExec(key, ip,
+            `python3 -c "
+import json, os, base64
+new = json.loads(base64.b64decode('${encoded}'))
+path = os.path.expanduser('~/.claude.json')
+try:
+    existing = json.load(open(path))
+except: existing = {}
+existing.update(new)
+json.dump(existing, open(path, 'w'), indent=2)
+print('ok')
+"`,
+          );
+        } finally {
+          await execFileAsync("rm", ["-rf", tmp2]);
+        }
+      }
+    } catch { /* auth sync is best-effort */ }
+  }
 }
 
 async function syncClaudePull(key: string, ip: string): Promise<void> {
