@@ -26,7 +26,7 @@ import type {
   PortStatus,
 } from "../../types.js";
 import type { Compute, Session } from "../../../core/store.js";
-import { updateCompute, mergeComputeConfig } from "../../../core/store.js";
+import { updateCompute, mergeComputeConfig, sessionChannelPort } from "../../../core/store.js";
 import { sshKeyPath, sshExec, sshExecAsync, waitForSsh, waitForSshAsync, generateSshKey } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
@@ -397,10 +397,10 @@ export class EC2Provider implements ComputeProvider {
     // 9. Auto-accept channel prompt
     await autoAcceptChannelPrompt(key, ip, opts.tmuxName);
 
-    // 10. Setup port tunnels (local forward for app ports)
-    if (opts.ports.length > 0) {
-      setupTunnels(key, ip, opts.ports);
-    }
+    // 10. Setup port tunnels (local forward for app ports + channel port)
+    const channelPort = sessionChannelPort(session.id);
+    const channelPortDecl: PortDecl = { port: channelPort, name: "channel", source: "ark" };
+    setupTunnels(key, ip, [...opts.ports, channelPortDecl]);
 
     // 11. Reverse tunnel: let remote channel reach local conductor
     setupReverseTunnel(key, ip, 19100);
@@ -458,11 +458,11 @@ export class EC2Provider implements ComputeProvider {
     if (!ip) return;
     const key = sshKeyPath(compute.name);
 
-    // Re-establish tunnels from session's port list
+    // Re-establish tunnels from session's port list + channel port
     const ports: PortDecl[] = (session.config as any)?.ports ?? [];
-    if (ports.length > 0) {
-      setupTunnels(key, ip, ports);
-    }
+    const channelPort = sessionChannelPort(session.id);
+    const channelPortDecl: PortDecl = { port: channelPort, name: "channel", source: "ark" };
+    setupTunnels(key, ip, [...ports, channelPortDecl]);
 
     // Re-establish reverse tunnel for conductor
     setupReverseTunnel(key, ip, 19100);

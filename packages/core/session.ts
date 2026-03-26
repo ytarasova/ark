@@ -196,7 +196,6 @@ export async function resume(sessionId: string): Promise<{ ok: boolean; message:
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status === "running" && session.session_id) return { ok: false, message: "Already running" };
-  if (session.status === "completed") return { ok: false, message: "Session already completed — clone it instead" };
 
   if (session.session_id) await tmux.killSessionAsync(session.session_id);
 

@@ -82,6 +82,8 @@ export async function createSessionAsync(name: string, command: string, opts?: {
     "-y", String(opts?.height ?? 50),
     "bash", "-c", command,
   ]);
+  // Bind Ctrl+Q to detach (consistent with remote EC2 hosts)
+  await execFileAsync("tmux", ["bind-key", "-n", "C-q", "detach-client"]);
 }
 
 /** Create a tmux session with a shell, then send a command via send-keys (async) */
@@ -95,6 +97,8 @@ export async function createSessionWithSendKeysAsync(name: string, command: stri
     "-x", String(opts?.width ?? 220),
     "-y", String(opts?.height ?? 50),
   ]);
+  // Bind Ctrl+Q to detach (consistent with remote EC2 hosts)
+  await execFileAsync("tmux", ["bind-key", "-n", "C-q", "detach-client"]);
   await execFileAsync("tmux", ["send-keys", "-t", name, command, "Enter"]);
 }
 
