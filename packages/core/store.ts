@@ -441,7 +441,12 @@ export function createCompute(opts: {
   const ts = now();
 
   const provider = opts.provider ?? "local";
-  const status = provider === "local" ? "running" : "stopped";
+  let providerInstance: any = null;
+  try {
+    const { getProvider } = require("../compute/index.js");
+    providerInstance = getProvider(opts.provider ?? "local");
+  } catch {}
+  const status = providerInstance?.initialStatus ?? (provider === "local" ? "running" : "stopped");
 
   db.prepare(`
     INSERT INTO compute (name, provider, status, config, created_at, updated_at)
