@@ -163,14 +163,18 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
             }
             attachCmd = ["ssh", "-i", keyPath, "-o", "StrictHostKeyChecking=no",
               "-o", "ConnectTimeout=10", "-t",
-              `ubuntu@${ip}`, `tmux attach -t ${sid}`];
+              `ubuntu@${ip}`, `stty -ixon 2>/dev/null; tmux attach -t ${sid}`];
           } else {
             const exists = await core.sessionExistsAsync(sid);
             if (!exists) {
               status.show(`No active tmux session for ${selectedId}. Try re-dispatching.`);
               return;
             }
-            attachCmd = ["tmux", "attach", "-t", sid];
+            // Ensure Ctrl+Q detach binding + disable flow control (Ctrl+Q/S)
+            try {
+              Bun.spawnSync(["tmux", "bind-key", "-n", "C-q", "detach-client"]);
+            } catch {}
+            attachCmd = ["bash", "-c", "stty -ixon 2>/dev/null; tmux attach -t " + sid];
           }
 
           // Attach: mute Ink, reset terminal for tmux, spawn+wait, restore Ink

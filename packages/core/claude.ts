@@ -332,7 +332,7 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
 
   // Ensure tools are in PATH (claude, bun, nvm live in ~/.local/bin etc)
   // Can't source .bashrc — it exits early for non-interactive shells
-  const pathSetup = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.nvm/versions/node/*/bin:$PATH"\n`;
+  const pathSetup = `stty -ixon 2>/dev/null\nexport PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.nvm/versions/node/*/bin:$PATH"\n`;
 
   let content: string;
   if (opts.prevClaudeSessionId) {
