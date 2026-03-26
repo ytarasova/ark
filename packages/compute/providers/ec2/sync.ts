@@ -244,8 +244,9 @@ export const SYNC_STEPS: SyncStep[] = [
 export async function syncToHost(
   key: string,
   ip: string,
-  opts: { direction: "push" | "pull"; categories?: string[] },
+  opts: { direction: "push" | "pull"; categories?: string[]; onLog?: (msg: string) => void },
 ): Promise<{ synced: string[]; failed: string[] }> {
+  const log = opts.onLog ?? (() => {});
   const synced: string[] = [];
   const failed: string[] = [];
 
@@ -253,7 +254,10 @@ export async function syncToHost(
     ? SYNC_STEPS.filter((s) => opts.categories!.includes(s.name))
     : SYNC_STEPS;
 
-  for (const step of steps) {
+  const total = steps.length;
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    log(`Syncing ${step.name} (${i + 1}/${total})...`);
     try {
       if (opts.direction === "push") {
         await step.push(key, ip);
@@ -261,8 +265,10 @@ export async function syncToHost(
         await step.pull(key, ip);
       }
       synced.push(step.name);
+      log(`${step.name} ✓ (${i + 1}/${total})`);
     } catch {
       failed.push(step.name);
+      log(`${step.name} failed (${i + 1}/${total})`);
     }
   }
 

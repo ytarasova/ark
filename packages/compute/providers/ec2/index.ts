@@ -208,8 +208,7 @@ export class EC2Provider implements ComputeProvider {
         // Sync credentials (SSH keys, AWS, git, gh, claude auth)
         log("Syncing credentials...");
         try {
-          await syncToHost(key, result.ip!, { direction: "push" });
-          log("Credentials synced");
+          await syncToHost(key, result.ip!, { direction: "push", onLog: log });
         } catch (e: any) {
           log(`Credential sync failed: ${e?.message ?? e}`);
         }
@@ -541,6 +540,7 @@ export class EC2Provider implements ComputeProvider {
       await syncToHost(key, cfg.ip!, {
         direction: opts.direction,
         categories: opts.categories,
+        onLog: opts.onLog,
       });
 
       if (opts.projectFiles?.length && opts.projectDir) {

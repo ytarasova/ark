@@ -512,15 +512,15 @@ async function launchAgentTmux(
     }
 
     // Sync environment to compute
-    log("Syncing credentials to remote...");
+    log("Syncing credentials...");
     try {
       const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
       await provider.syncEnvironment(compute, {
         direction: "push",
         projectFiles: arcJson?.sync,
         projectDir: effectiveWorkdir,
+        onLog: log,
       });
-      log("Credentials synced");
     } catch { log("Credential sync failed (continuing)"); }
 
     // Docker Compose - only when explicitly enabled in arc.json { "compose": true }

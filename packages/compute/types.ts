@@ -28,6 +28,7 @@ export interface SyncOpts {
   categories?: string[];
   projectFiles?: string[];
   projectDir?: string;
+  onLog?: (msg: string) => void;
 }
 
 export interface IsolationMode {
