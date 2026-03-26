@@ -122,6 +122,15 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
 
           let newStatus = statusMap[event];
 
+          // Don't override completed/failed status — late hooks (background task
+          // notifications) can fire UserPromptSubmit after session is done
+          if (newStatus && s.status === "completed" && newStatus !== "completed") {
+            newStatus = undefined as any;
+          }
+          if (newStatus && s.status === "failed" && newStatus === "running") {
+            newStatus = undefined as any;
+          }
+
           if (event === "Notification") {
             const matcher = String(payload.matcher ?? "");
             if (matcher.includes("permission_prompt") || matcher.includes("idle_prompt")) {
