@@ -147,15 +147,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest \
+          # Create release if it doesn't exist, then upload assets (clobber old ones)
+          gh release view latest >/dev/null 2>&1 || \
+            gh release create latest \
+              --title "Latest (rolling)" \
+              --prerelease \
+              --target "$COMMIT_SHA" \
+              --notes "Rolling release from main."
+          # Update release notes and upload new assets
+          gh release edit latest \
             --title "Latest (rolling)" \
+            --prerelease \
             --notes "Rolling release from main. Updated on every push.
 
           Install: \`curl -fsSL https://ytarasova.github.io/ark/install.sh | bash\`
 
-          Commit: ${{ github.sha }}" \
-            --prerelease \
-            --target ${{ github.sha }} \
-            dist/ark-*
+          Commit: $COMMIT_SHA"
+          gh release upload latest dist/ark-* --clobber

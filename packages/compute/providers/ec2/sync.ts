@@ -144,30 +144,27 @@ async function syncClaudePush(key: string, ip: string): Promise<void> {
   // Sync auth + onboarding from ~/.claude.json so Claude skips first-run setup
   const claudeJsonPath = join(homedir(), ".claude.json");
   if (existsSync(claudeJsonPath)) {
-    try {
-      const local = JSON.parse(readFileSync(claudeJsonPath, "utf-8"));
-      const remote: Record<string, unknown> = {};
-      if (local.oauthAccount) remote.oauthAccount = local.oauthAccount;
-      if (local.hasCompletedOnboarding) remote.hasCompletedOnboarding = true;
-      remote.numStartups = 1;
-      remote.autoUpdates = false;
-
-      if (remote.oauthAccount) {
-        const tmp = mkdtempSync(join(tmpdir(), "ark-claudejson-"));
-        try {
-          writeFileSync(join(tmp, ".claude.json"), JSON.stringify(remote, null, 2));
-          // Use rsync WITHOUT --update to always overwrite (Claude install creates this file)
-          const [bin, ...rest] = [
-            "rsync", "-avz", "--timeout=15",
-            "-e", `ssh -i ${key} -o StrictHostKeyChecking=no -o ConnectTimeout=10`,
-            join(tmp, ".claude.json"), `ubuntu@${ip}:~/`,
-          ];
-          await execFileAsync(bin, rest, { encoding: "utf-8", timeout: 30_000 });
-        } finally {
-          await execFileAsync("rm", ["-rf", tmp]);
-        }
+    const local = JSON.parse(readFileSync(claudeJsonPath, "utf-8"));
+    if (local.oauthAccount) {
+      const remote: Record<string, unknown> = {
+        oauthAccount: local.oauthAccount,
+        hasCompletedOnboarding: true,
+        numStartups: 1,
+        autoUpdates: false,
+      };
+      const tmp = mkdtempSync(join(tmpdir(), "ark-claudejson-"));
+      try {
+        const tmpFile = join(tmp, ".claude.json");
+        writeFileSync(tmpFile, JSON.stringify(remote, null, 2));
+        // scp directly — rsync has edge cases with dotfiles and --update
+        await execFileAsync("scp", [
+          "-i", key, "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
+          tmpFile, `ubuntu@${ip}:/home/ubuntu/.claude.json`,
+        ], { encoding: "utf-8", timeout: 30_000 });
+      } finally {
+        await execFileAsync("rm", ["-rf", tmp]);
       }
-    } catch { /* auth sync is best-effort */ }
+    }
   }
 }
 
