@@ -217,21 +217,7 @@ export class EC2Provider implements ComputeProvider {
         const credFile = join(homedir(), ".claude", ".credentials.json");
         const hasSessionToken = !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
         if (!existsSync(credFile) && !hasSessionToken) {
-          log("No Claude auth available — opening setup-token...");
-          try {
-            const { execFileSync } = await import("child_process");
-            if (process.env.TMUX) {
-              execFileSync("tmux", [
-                "new-window", "-n", "claude-auth",
-                "bash", "-c", "claude setup-token; echo; echo 'Done. Press Enter to close.'; read",
-              ], { stdio: "pipe" });
-              log("Complete auth in the 'claude-auth' tmux tab");
-            } else {
-              log("Run: claude setup-token");
-            }
-          } catch {
-            log("Run 'claude setup-token' locally to enable remote agent auth");
-          }
+          log("⚠ No Claude auth — run 'ark auth' to set up credentials");
         } else {
           // Credentials exist locally — verify they synced to remote
           const { exitCode: authCheck } = await sshExecAsync(key, result.ip!,
