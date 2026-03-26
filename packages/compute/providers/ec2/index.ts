@@ -199,6 +199,15 @@ export class EC2Provider implements ComputeProvider {
             log(`${name} ✓`);
           }
         }
+
+        // Sync credentials (SSH keys, AWS, git, gh, claude auth)
+        log("Syncing credentials...");
+        try {
+          await syncToHost(key, result.ip!, { direction: "push" });
+          log("Credentials synced");
+        } catch (e: any) {
+          log(`Credential sync failed: ${e?.message ?? e}`);
+        }
       }
     }
   }
