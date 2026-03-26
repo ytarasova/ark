@@ -17,6 +17,8 @@ export interface StoreData {
   /** Add a log entry for a compute. */
   addComputeLog: (name: string, message: string) => void;
   refreshing: boolean;
+  /** True until the first data fetch completes. */
+  initialLoading: boolean;
   /** Force an immediate refresh (call after mutations like delete/stop). */
   refresh: () => void;
 }
@@ -112,6 +114,7 @@ function fingerprint(data: Payload): string {
  */
 export function useStore(refreshMs = 3000): StoreData {
   const [ver, setVer] = useState(0);
+  const [initialLoading, setInitialLoading] = useState(true);
   const emptyPayload: Payload = {
     sessions: [], computes: [], agents: [], flows: [],
     unreadCounts: new Map(), snapshots: new Map(), computeLogs: new Map(),
@@ -135,6 +138,7 @@ export function useStore(refreshMs = 3000): StoreData {
         dataRef.current = data;
         setVer(v => v + 1);
       }
+      setInitialLoading(false);
     } catch {}
     running.current = false;
   }, []);
@@ -180,5 +184,5 @@ export function useStore(refreshMs = 3000): StoreData {
     setVer(v => v + 1);
   }, []);
 
-  return { ...dataRef.current, refreshing: false, refresh, addComputeLog };
+  return { ...dataRef.current, refreshing: false, initialLoading, refresh, addComputeLog };
 }
