@@ -720,11 +720,25 @@ export async function getOutput(sessionId: string, opts?: { lines?: number; ansi
   const session = store.getSession(sessionId);
   if (!session?.session_id) return "";
 
+  // For remote compute, ONLY use provider's captureOutput — never fall back to local tmux
+  if (session.compute_name) {
+    const compute = store.getCompute(session.compute_name);
+    if (compute && compute.provider !== "local") {
+      try {
+        const { provider } = resolveProvider(session);
+        if (provider) {
+          return await provider.captureOutput(compute, session, opts);
+        }
+      } catch {}
+      return ""; // don't fall through to local tmux
+    }
+  }
+
   const { provider, compute } = resolveProvider(session);
   if (provider && compute) {
     return provider.captureOutput(compute, session, opts);
   }
-  // Fallback: direct tmux capture (async)
+  // Local: direct tmux capture
   return tmux.capturePaneAsync(session.session_id, opts);
 }
 
