@@ -69,6 +69,19 @@ export interface ComputeProvider {
   checkStatus?(compute: Compute): Promise<string | null>;
 
   syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void>;
+
+  // ── Capability flags ────────────────────────────────────────────────────
+  readonly canReboot: boolean;
+  readonly canDelete: boolean;
+  readonly supportsWorktree: boolean;
+  readonly initialStatus: string;
+  readonly needsAuth: boolean;
+
+  // ── Session lifecycle (extended) ──────────────────────────────────────
+  checkSession(compute: Compute, tmuxSessionId: string): Promise<boolean>;
+  getAttachCommand(compute: Compute, session: Session): string[];
+  buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown>;
+  buildLaunchEnv(session: Session): Record<string, string>;
 }
 
 // ── Metrics types ───────────────────────────────────────────────────────────
