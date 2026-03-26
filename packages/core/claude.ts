@@ -101,8 +101,21 @@ export function shellQuoteArgs(claudeArgs: string[]): string {
 
 export function channelMcpConfig(
   sessionId: string, stage: string, channelPort: number,
-  opts?: { conductorUrl?: string },
+  opts?: { conductorUrl?: string; remote?: boolean },
 ): Record<string, unknown> {
+  if (opts?.remote) {
+    // Remote: use ark binary (installed via cloud-init)
+    return {
+      command: "/home/ubuntu/.ark/bin/ark",
+      args: ["channel"],
+      env: {
+        ARK_SESSION_ID: sessionId,
+        ARK_STAGE: stage,
+        ARK_CHANNEL_PORT: String(channelPort),
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+      },
+    };
+  }
   const bunPath = join(homedir(), ".bun", "bin", "bun");
   return {
     command: bunPath,
@@ -125,9 +138,9 @@ export function channelMcpConfig(
 export function writeChannelConfig(
   sessionId: string, stage: string, channelPort: number,
   workdir: string,
-  opts?: { conductorUrl?: string },
+  opts?: { conductorUrl?: string; remote?: boolean },
 ): string {
-  const channelOpts = opts?.conductorUrl ? { conductorUrl: opts.conductorUrl } : undefined;
+  const channelOpts = { conductorUrl: opts?.conductorUrl, remote: opts?.remote };
 
   // Write to worktree .mcp.json so Claude finds it
   const mcpConfigPath = join(workdir, ".mcp.json");

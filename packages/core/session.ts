@@ -444,7 +444,8 @@ async function launchAgentTmux(
 
   // Channel config + launcher
   const channelPort = store.sessionChannelPort(session.id);
-  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl });
+  const isRemote = compute && compute.provider !== "local";
+  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, remote: !!isRemote });
 
   // Status hooks — write .claude/settings.local.json for agent status detection
   claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts?.autonomy });

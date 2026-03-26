@@ -752,6 +752,14 @@ program.command("conductor")
     setInterval(() => {}, 60_000);
   });
 
+// ── Channel (MCP stdio server for remote compute) ──────────────────────────
+
+program.command("channel")
+  .description("Run the MCP channel server (used by remote agents)")
+  .action(async () => {
+    await import("../core/channel.js");
+  });
+
 // ── Search ──────────────────────────────────────────────────────────────────
 
 program.command("search")
