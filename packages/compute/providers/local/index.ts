@@ -11,9 +11,8 @@ import { join } from "path";
 const execFileAsync = promisify(execFile);
 import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
-  ComputeSnapshot, PortDecl, PortStatus,
+  ComputeSnapshot, PortDecl, PortStatus, Compute, Session,
 } from "../../types.js";
-import type { Compute, Session } from "../../../core/store.js";
 import { WORKTREES_DIR } from "../../../core/store.js";
 import * as tmux from "../../../core/tmux.js";
 import { collectLocalMetrics } from "./metrics.js";
@@ -25,6 +24,11 @@ export class LocalProvider implements ComputeProvider {
     { value: "worktree", label: "Git worktree (isolated)" },
     { value: "inplace", label: "In-place (direct)" },
   ];
+  readonly canReboot = false;
+  readonly canDelete = false;
+  readonly supportsWorktree = true;
+  readonly initialStatus = "running";
+  readonly needsAuth = false;
 
   async provision(_compute: Compute, _opts?: ProvisionOpts): Promise<void> {
     // No-op: your machine is already provisioned
@@ -99,5 +103,32 @@ export class LocalProvider implements ComputeProvider {
 
   async syncEnvironment(_compute: Compute, _opts: SyncOpts): Promise<void> {
     // No-op: local machine shares the filesystem
+  }
+
+  async checkSession(_compute: Compute, tmuxSessionId: string): Promise<boolean> {
+    return tmux.sessionExistsAsync(tmuxSessionId);
+  }
+
+  getAttachCommand(_compute: Compute, session: Session): string[] {
+    if (!session.session_id) return [];
+    return ["tmux", "attach", "-t", session.session_id];
+  }
+
+  buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
+    const { homedir } = require("os");
+    return {
+      command: join(homedir(), ".bun", "bin", "bun"),
+      args: [join(__dirname, "../../../core/channel.ts")],
+      env: {
+        ARK_SESSION_ID: sessionId,
+        ARK_STAGE: stage,
+        ARK_CHANNEL_PORT: String(channelPort),
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+      },
+    };
+  }
+
+  buildLaunchEnv(_session: Session): Record<string, string> {
+    return {};
   }
 }
