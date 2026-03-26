@@ -37,9 +37,29 @@
     }
 
     .container {
-      max-width: 720px;
+      max-width: 1100px;
       margin: 0 auto;
-      padding: 6rem 2rem 4rem;
+      padding: 3rem 2rem 4rem;
+    }
+
+    /* Top nav */
+    .top-nav {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .top-nav a {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .top-nav a:hover {
+      color: #38bdf8;
     }
 
     /* Header */
@@ -264,6 +284,15 @@
 </head>
 <body>
   <div class="container">
+    <nav class="top-nav">
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="tui.html">TUI Guide</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute</a>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+    </nav>
     <div class="logo">ark</div>
     <p class="tagline">
       <strong>Autonomous agent ecosystem.</strong><br>

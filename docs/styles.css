@@ -74,7 +74,7 @@ body::before {
 }
 
 .sidebar a:hover { color: #c9d1d9; background: rgba(56,189,248,0.08); }
-.sidebar-logo:hover { -webkit-text-fill-color: transparent; background: linear-gradient(135deg, #38bdf8, #818cf8, #a78bfa); -webkit-background-clip: text; background-clip: text; }
+.sidebar-logo:hover { opacity: 0.8; }
 .sidebar a.active { color: #38bdf8; background: rgba(56,189,248,0.1); font-weight: 500; }
 
 .sidebar .section-title {
@@ -170,10 +170,8 @@ pre .copy-btn {
   cursor: pointer;
   font-family: 'Inter', -apple-system, sans-serif;
   transition: all 0.15s;
-  opacity: 0;
 }
 
-pre:hover .copy-btn { opacity: 1; }
 pre .copy-btn:hover { background: #334155; color: #e2e8f0; }
 
 pre code {
