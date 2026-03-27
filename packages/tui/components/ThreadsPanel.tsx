@@ -12,20 +12,11 @@ import { Box, Text, useInput } from "ink";
 import * as core from "../../core/index.js";
 import { TextInputEnhanced } from "./TextInputEnhanced.js";
 import { ScrollBox } from "./ScrollBox.js";
+import { useMessages } from "../hooks/useMessages.js";
 
 interface ThreadsPanelProps {
   sessions: core.Session[];
   onDone: () => void;
-}
-
-interface ThreadMessage {
-  id: number;
-  sessionName: string;
-  sessionId: string;
-  role: string;
-  content: string;
-  type: string;
-  time: string;
 }
 
 /** Extract the @mention being typed (if any) from text that starts with @ */
@@ -52,8 +43,13 @@ export function filterSessionCompletions(
 
 export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
   const [msg, setMsg] = useState("");
-  const [allMessages, setAllMessages] = useState<ThreadMessage[]>([]);
   const [completionIndex, setCompletionIndex] = useState(0);
+
+  const { messages: allMessages, send: sendMessage } = useMessages({
+    sessions,
+    pollMs: 2000,
+    limit: 30,
+  });
 
   // Build a name→id lookup
   const sessionMap = useMemo(() => {
@@ -79,39 +75,6 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
   useEffect(() => {
     setCompletionIndex(0);
   }, [completions.length, mentionPrefix]);
-
-  // Load all messages across all sessions
-  useEffect(() => {
-    const load = () => {
-      const all: ThreadMessage[] = [];
-      for (const s of sessions) {
-        const msgs = core.getMessages(s.id, { limit: 10 });
-        const name = s.summary ?? s.id;
-        for (const m of msgs) {
-          all.push({
-            id: m.id,
-            sessionName: name,
-            sessionId: s.id,
-            role: m.role,
-            content: m.content,
-            type: m.type,
-            time: m.created_at.slice(11, 16),
-          });
-        }
-      }
-      // Sort by ID (chronological across all sessions)
-      all.sort((a, b) => a.id - b.id);
-      setAllMessages(all);
-
-      // Mark all as read
-      for (const s of sessions) {
-        core.markMessagesRead(s.id);
-      }
-    };
-    load();
-    const t = setInterval(load, 2000);
-    return () => clearInterval(t);
-  }, [sessions]);
 
   const [scrollMode, setScrollMode] = useState(false);
   const inputFocused = !scrollMode;
@@ -139,7 +102,7 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
     setCompletionIndex(i => (i >= completions.length - 1 ? 0 : i + 1));
   }, [showCompletions, completions.length]);
 
-  const send = async () => {
+  const send = () => {
     const text = msg.trim();
     if (!text) return;
 
@@ -168,38 +131,9 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
       }
     }
 
-    // Store, show immediately, then deliver
-    core.addMessage({ session_id: targetId, role: "user", content });
+    sendMessage(targetId, content);
     setMsg("");
-    // Reload messages immediately so the sent message appears
-    const all: typeof allMessages = [];
-    for (const s of sessions) {
-      const msgs = core.getMessages(s.id, { limit: 30 });
-      const name = s.summary ?? s.id.slice(0, 8);
-      for (const m of msgs) all.push({ ...m, sessionId: s.id, sessionName: name, time: m.created_at.slice(11, 16) });
-    }
-    all.sort((a, b) => a.id - b.id);
-    setAllMessages(all);
-
-    const channelPort = core.sessionChannelPort(targetId);
-    try {
-      await fetch(`http://localhost:${channelPort}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "steer",
-          sessionId: targetId,
-          message: content,
-          from: "user",
-        }),
-      });
-    } catch {
-      core.addMessage({ session_id: targetId, role: "system", content: "Failed to deliver", type: "error" });
-    }
   };
-
-  // Display
-  const visible = allMessages.slice(-30);
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -207,21 +141,21 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
       <Text> </Text>
 
       {/* Message stream — j/k/g/G scroll when focused, auto-follow when input focused */}
-      {visible.length === 0 ? (
+      {allMessages.length === 0 ? (
         <Box flexGrow={1}><Text dimColor>{"  No messages yet. Agents will post here."}</Text></Box>
       ) : (
         <ScrollBox
           active={scrollMode}
-          followIndex={inputFocused ? visible.length - 1 : undefined}
+          followIndex={inputFocused ? allMessages.length - 1 : undefined}
           reserveRows={12}
         >
-          {visible.map((m) => {
+          {allMessages.map((m) => {
             const isUser = m.role === "user";
             const isSystem = m.role === "system";
             const roleColor = isUser ? "cyan" : isSystem ? "gray" : "green";
             const sender = isUser ? "you" : m.sessionName;
             const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
-            const prefix = isUser && m.sessionId ? ` \u2192${(sessions.find(s => s.id === m.sessionId)?.summary ?? m.sessionId).slice(0, 15)}` : "";
+            const prefix = isUser && m.session_id ? ` \u2192${(sessions.find(s => s.id === m.session_id)?.summary ?? m.session_id).slice(0, 15)}` : "";
             return (
               <Text key={m.id} wrap="wrap">
                 <Text dimColor>{`${m.time} `}</Text>
