@@ -550,6 +550,7 @@ async function launchAgentTmux(
       ports,
     });
 
+    store.updateSession(session.id, { claude_session_id: claudeSessionId });
     return result;
   }
 

@@ -172,9 +172,15 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
               }
             } catch { /* transcript parsing failure shouldn't block status update */ }
 
-              // Index transcript for FTS5 search
+              // Index transcript for FTS5 search — only if the transcript belongs to THIS session's agent
+              // (avoid indexing the orchestrator's transcript under the agent's session ID)
               try {
-                indexSession(transcriptPath, sessionId);
+                const hookClaudeSession = payload.session_id as string | undefined;
+                const arkSession = store.getSession(sessionId);
+                if (hookClaudeSession && arkSession?.claude_session_id &&
+                    transcriptPath.includes(hookClaudeSession)) {
+                  indexSession(transcriptPath, sessionId);
+                }
               } catch { /* indexing failure shouldn't block status update */ }
           }
 
