@@ -297,4 +297,89 @@ describe("TextInputEnhanced", () => {
       unmount();
     });
   });
+
+  describe("multi-line paste", () => {
+    it("preserves newlines in pasted text value", async () => {
+      let captured = "";
+      const { stdin, unmount } = render(
+        <TestInput onValue={(v) => { captured = v; }} />
+      );
+      stdin.write("line1\nline2\nline3");
+      await delay();
+      expect(captured).toContain("\n");
+      expect(captured.split("\n").length).toBe(3);
+      unmount();
+    });
+
+    it("collapses display when paste exceeds MAX_DISPLAY_LINES", async () => {
+      const multiLine = "first line\nsecond\nthird\nfourth\nfifth";
+      const { lastFrame, unmount } = render(
+        <TextInputEnhanced value={multiLine} onChange={() => {}} focus={true} />
+      );
+      const frame = stripAnsi(lastFrame()!);
+      // Should show first line and a line count indicator
+      expect(frame).toContain("first line");
+      expect(frame).toContain("[+4 lines]");
+      // Should NOT show all lines
+      expect(frame).not.toContain("fifth");
+      unmount();
+    });
+
+    it("renders normally when lines are within MAX_DISPLAY_LINES", () => {
+      const fewLines = "line1\nline2\nline3";
+      const { lastFrame, unmount } = render(
+        <TextInputEnhanced value={fewLines} onChange={() => {}} focus={true} />
+      );
+      const frame = stripAnsi(lastFrame()!);
+      expect(frame).toContain("line1");
+      expect(frame).toContain("line3");
+      expect(frame).not.toContain("[+");
+      unmount();
+    });
+
+    it("truncates long first line in collapsed view", () => {
+      const longFirst = "a".repeat(80) + "\nsecond\nthird\nfourth\nfifth";
+      const { lastFrame, unmount } = render(
+        <TextInputEnhanced value={longFirst} onChange={() => {}} focus={true} />
+      );
+      const frame = stripAnsi(lastFrame()!);
+      expect(frame).toContain("...");
+      expect(frame).toContain("[+4 lines]");
+      unmount();
+    });
+
+    it("submits full multi-line value on Enter", async () => {
+      let submitted = "";
+      const multiLine = "line1\nline2\nline3\nline4\nline5";
+      function SubmitTest() {
+        const [value, setValue] = useState(multiLine);
+        return (
+          <TextInputEnhanced
+            value={value}
+            onChange={setValue}
+            onSubmit={(v) => { submitted = v; }}
+            focus={true}
+          />
+        );
+      }
+      const { stdin, unmount } = render(<SubmitTest />);
+      stdin.write("\r"); // Enter
+      await delay();
+      expect(submitted).toBe(multiLine);
+      expect(submitted.split("\n").length).toBe(5);
+      unmount();
+    });
+
+    it("strips carriage returns from pasted Windows-style text", async () => {
+      let captured = "";
+      const { stdin, unmount } = render(
+        <TestInput onValue={(v) => { captured = v; }} />
+      );
+      stdin.write("line1\r\nline2\r\nline3");
+      await delay();
+      expect(captured).not.toContain("\r");
+      expect(captured.split("\n").length).toBe(3);
+      unmount();
+    });
+  });
 });
