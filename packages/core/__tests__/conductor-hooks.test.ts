@@ -386,6 +386,17 @@ describe("Conductor /hooks/status endpoint", () => {
     expect(updated?.status).toBe("completed");
   });
 
+  it("UserPromptSubmit clears breakpoint_reason when resuming from waiting", async () => {
+    const session = createSession({ summary: "breakpoint clear test" });
+    updateSession(session.id, { status: "waiting", breakpoint_reason: "Need a PAT token" });
+
+    await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
+
+    const updated = getSession(session.id);
+    expect(updated?.status).toBe("running");
+    expect(updated?.breakpoint_reason).toBeNull();
+  });
+
   it("returns 400 for missing session param", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status`, {
       method: "POST",

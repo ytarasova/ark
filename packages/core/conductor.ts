@@ -163,6 +163,10 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
             if (newStatus === "failed") {
               updates.error = String(payload.error ?? payload.error_details ?? "unknown error");
             }
+            // Clear stale breakpoint when resuming from waiting
+            if (newStatus === "running" && s.status === "waiting") {
+              updates.breakpoint_reason = null;
+            }
             store.updateSession(sessionId, updates);
 
             eventBus.emit("hook_status", sessionId, {
@@ -352,7 +356,7 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
       // without this reset the session stays "waiting" permanently.
       const current = store.getSession(sessionId);
       if (current && current.status === "waiting") {
-        store.updateSession(sessionId, { status: "running" });
+        store.updateSession(sessionId, { status: "running", breakpoint_reason: null });
       }
       break;
     }
