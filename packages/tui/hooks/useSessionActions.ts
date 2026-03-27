@@ -13,7 +13,12 @@ export function useSessionActions(asyncState: AsyncState) {
   return {
     dispatch: (id: string) => {
       run(`Dispatching ${id}`, (updateLabel) =>
-        core.dispatch(id, { onLog: (msg) => updateLabel(msg) }),
+        core.dispatch(id, {
+          onLog: (msg) => {
+            updateLabel(msg);
+            core.logEvent(id, "dispatch_progress", { actor: "system", data: { message: msg } });
+          },
+        }),
       );
     },
 

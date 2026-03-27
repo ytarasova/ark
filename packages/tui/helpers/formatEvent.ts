@@ -28,6 +28,8 @@ export function formatEvent(type: string, data?: Record<string, unknown>): strin
       return "All forked sessions joined";
     case "session_handoff":
       return `Handed off to ${data?.to_agent ?? "?"}`;
+    case "dispatch_progress":
+      return String(data?.message ?? "Provisioning...");
     default:
       // Humanize unknown types: stage_started -> Stage started
       return type.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
