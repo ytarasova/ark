@@ -187,11 +187,10 @@ describe("Conductor E2E — report pipeline", () => {
     expect(msgs2[0].content).toBe("For session 2");
   });
 
-  it("progress report resets waiting status to running", async () => {
+  it("progress report resets waiting status to running and clears breakpoint", async () => {
     const session = createSession({ summary: "waiting → running" });
-    // Simulate: dispatch sets running, then Notification hook sets waiting
-    // (e.g. channel trust dialog triggers permission_prompt hook)
-    updateSession(session.id, { status: "waiting" });
+    // Simulate: question report set waiting + breakpoint_reason
+    updateSession(session.id, { status: "waiting", breakpoint_reason: "Should I proceed?" });
 
     await postReport(session.id, {
       type: "progress", sessionId: session.id, stage: "work",
@@ -200,6 +199,7 @@ describe("Conductor E2E — report pipeline", () => {
 
     const updated = getSession(session.id);
     expect(updated?.status).toBe("running");
+    expect(updated?.breakpoint_reason).toBeNull();
 
     // Message should still be stored
     const msgs = getMessages(session.id);

@@ -466,8 +466,8 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
       {s.status === "failed" && !s.error && (
         <Text color="red">{`  ✕ Session failed`}</Text>
       )}
-      {s.breakpoint_reason && (
-        <KeyValue label=""><Text color="yellow" bold>{`⏸ ${s.breakpoint_reason}`}</Text></KeyValue>
+      {s.status === "waiting" && s.breakpoint_reason && (
+        <Text color="yellow" bold wrap="wrap">{`  ⏸ ${s.breakpoint_reason}`}</Text>
       )}
       <KeyValue label="Compute">{s.compute_name || "local"}</KeyValue>
       {s.repo && <KeyValue label="Repo">{s.repo}</KeyValue>}
