@@ -168,9 +168,18 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
       }
     }
 
-    // Store and send
+    // Store, show immediately, then deliver
     core.addMessage({ session_id: targetId, role: "user", content });
     setMsg("");
+    // Reload messages immediately so the sent message appears
+    const all: typeof allMessages = [];
+    for (const s of sessions) {
+      const msgs = core.getMessages(s.id, { limit: 30 });
+      const name = s.summary ?? s.id.slice(0, 8);
+      for (const m of msgs) all.push({ ...m, sessionId: s.id, sessionName: name, time: m.created_at.slice(11, 16) });
+    }
+    all.sort((a, b) => a.id - b.id);
+    setAllMessages(all);
 
     const channelPort = core.sessionChannelPort(targetId);
     try {

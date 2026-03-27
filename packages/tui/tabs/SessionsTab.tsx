@@ -100,7 +100,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
     // Global keys — work regardless of selection
     if (input === "n") { onShowForm(); return; }
-    if (input === "i") { setInboxMode(true); return; }
+    if (input === "T") { setInboxMode(true); return; }
     if (input === "o") { setGroupMode("menu"); return; }
 
     // Cancel pending confirm on any non-d key
@@ -797,10 +797,11 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
     if (!msg.trim()) return;
     const text = msg.trim();
     setMsg("");
-    asyncState.run("Sending message...", async () => {
-      // Store outbound message
-      core.addMessage({ session_id: session.id, role: "user", content: text });
-      setMessages(core.getMessages(session.id, { limit: 20 }));
+    // Store and show immediately
+    core.addMessage({ session_id: session.id, role: "user", content: text });
+    setMessages(core.getMessages(session.id, { limit: 20 }));
+    // Deliver in background
+    asyncState.run("Sending...", async () => {
       try {
         await fetch(`http://localhost:${channelPort}`, {
           method: "POST",
