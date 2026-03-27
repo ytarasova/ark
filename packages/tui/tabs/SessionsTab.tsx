@@ -20,6 +20,7 @@ import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useSessionActions } from "../hooks/useSessionActions.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
+import { useMessages } from "../hooks/useMessages.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
@@ -766,23 +767,13 @@ interface TalkToSessionProps {
 
 function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
   const [msg, setMsg] = useState("");
-  const [messages, setMessages] = useState<core.Message[]>([]);
   const [scrollMode, setScrollMode] = useState(false);
 
-
-  // Load messages and mark as read
-  useEffect(() => {
-    if (!session) return;
-    const load = () => {
-      setMessages(core.getMessages(session.id, { limit: 20 }));
-    };
-    load();
-    core.markMessagesRead(session.id);
-    const t = setInterval(load, 2000);
-    return () => clearInterval(t);
-  }, [session?.id]);
-
-  const channelPort = useMemo(() => session ? core.sessionChannelPort(session.id) : 0, [session?.id]);
+  const { messages, send: sendMessage } = useMessages({
+    sessionId: session?.id,
+    pollMs: 2000,
+    limit: 20,
+  });
 
   useInput((input, key) => {
     if (key.escape) onDone();
@@ -795,29 +786,8 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
 
   const send = () => {
     if (!msg.trim()) return;
-    const text = msg.trim();
+    sendMessage(session.id, msg.trim());
     setMsg("");
-    // Store and show immediately
-    core.addMessage({ session_id: session.id, role: "user", content: text });
-    setMessages(core.getMessages(session.id, { limit: 20 }));
-    // Deliver in background
-    asyncState.run("Sending...", async () => {
-      try {
-        await fetch(`http://localhost:${channelPort}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "steer",
-            sessionId: session.id,
-            message: text,
-            from: "user",
-          }),
-        });
-      } catch {
-        core.addMessage({ session_id: session.id, role: "system", content: `Failed to deliver (port ${channelPort})`, type: "error" });
-        setMessages(core.getMessages(session.id, { limit: 20 }));
-      }
-    });
   };
 
   // Tab toggles focus: messages (scroll with j/k) vs input (type)
@@ -829,12 +799,11 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
   });
 
   const messageElements = messages.map((m) => {
-    const ts = m.created_at.slice(11, 16);
     const roleColor = m.role === "user" ? "cyan" : m.role === "agent" ? "green" : "gray";
     const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
     return (
       <Text key={m.id} wrap="wrap">
-        <Text dimColor>{`  ${ts} `}</Text>
+        <Text dimColor>{`  ${m.time} `}</Text>
         <Text color={roleColor as any} bold>{m.role === "user" ? "you" : (session?.agent || "agent")}</Text>
         {typeTag && <Text dimColor>{typeTag}</Text>}
         <Text>{` ${m.content}`}</Text>
