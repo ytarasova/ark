@@ -285,9 +285,10 @@ describe("Conductor /hooks/status endpoint", () => {
     expect(updated?.error).toBe("agent crashed");
   });
 
-  it("SessionEnd can still set completed on running session", async () => {
-    const session = createSession({ summary: "hook test" });
-    updateSession(session.id, { status: "running" });
+  it("SessionEnd can still set completed on auto-gate session", async () => {
+    // Use default flow with implement stage (gate: auto)
+    const session = createSession({ summary: "hook test", pipeline: "default" });
+    updateSession(session.id, { status: "running", stage: "implement" });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
@@ -326,6 +327,63 @@ describe("Conductor /hooks/status endpoint", () => {
       count = row?.c ?? 0;
     } catch { /* FTS5 table may not exist */ }
     expect(count).toBe(0);
+  });
+
+  // ── Manual gate (bare flow) tests ──────────────────────────────────────
+
+  it("StopFailure keeps manual-gate session running", async () => {
+    const session = createSession({ summary: "bare test" });
+    updateSession(session.id, { flow: "bare" });
+    updateSession(session.id, { status: "running", stage: "work" });
+
+    const resp = await postHook(session.id, {
+      hook_event_name: "StopFailure",
+      error: "authentication_failed",
+    });
+    expect(resp.status).toBe(200);
+
+    const updated = getSession(session.id);
+    expect(updated?.status).toBe("running");
+
+    // Error should be logged as agent_error event
+    const events = getEvents(session.id, { type: "agent_error" });
+    expect(events.length).toBeGreaterThanOrEqual(1);
+    expect(events[0].data?.error).toContain("authentication_failed");
+  });
+
+  it("SessionEnd keeps manual-gate session running", async () => {
+    const session = createSession({ summary: "bare test" });
+    updateSession(session.id, { flow: "bare" });
+    updateSession(session.id, { status: "running", stage: "work" });
+
+    const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
+    expect(resp.status).toBe(200);
+
+    const updated = getSession(session.id);
+    expect(updated?.status).toBe("running");
+  });
+
+  it("StopFailure still fails auto-gate sessions", async () => {
+    const session = createSession({ summary: "auto test", pipeline: "default" });
+    updateSession(session.id, { status: "running", stage: "implement" });
+
+    await postHook(session.id, {
+      hook_event_name: "StopFailure",
+      error: "some error",
+    });
+
+    const updated = getSession(session.id);
+    expect(updated?.status).toBe("failed");
+  });
+
+  it("SessionEnd still completes auto-gate sessions", async () => {
+    const session = createSession({ summary: "auto test", pipeline: "default" });
+    updateSession(session.id, { status: "running", stage: "implement" });
+
+    await postHook(session.id, { hook_event_name: "SessionEnd" });
+
+    const updated = getSession(session.id);
+    expect(updated?.status).toBe("completed");
   });
 
   it("returns 400 for missing session param", async () => {
