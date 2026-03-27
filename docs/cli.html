@@ -172,7 +172,7 @@
       <pre><code><span class="prompt">$</span> ark session send s-1a2b "Focus on the login flow only"</code></pre>
 
       <h3>ark session clone &lt;id&gt;</h3>
-      <p>Clone a session, resuming the existing Claude Code conversation in a new session.</p>
+      <p>Clone a session, creating a new session that resumes the original Claude Code conversation via <code>--resume</code>. The cloned session inherits the repo, flow, and compute of the original. Use <code>--task</code> to give the clone new instructions.</p>
       <pre><code><span class="prompt">$</span> ark session clone s-1a2b
 <span class="prompt">$</span> ark session clone s-1a2b --task "Now add tests" --dispatch</code></pre>
 
@@ -420,6 +420,30 @@
       <p>Enable or disable a schedule without deleting it.</p>
       <pre><code><span class="prompt">$</span> ark schedule enable sch-1a2b
 <span class="prompt">$</span> ark schedule disable sch-1a2b</code></pre>
+
+      <!-- ── ark auth ─────────────────────────────────────────────────────── -->
+      <h2>ark auth</h2>
+      <p>Set up Claude authentication for remote compute. Runs <code>claude setup-token</code> to create a persistent OAuth token, then saves it to <code>~/.ark/claude-oauth-token</code>. The TUI and dispatch read this token automatically &mdash; no environment variables needed.</p>
+      <pre><code><span class="prompt">$</span> ark auth
+<span class="prompt">$</span> ark auth --host my-ec2</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--host &lt;name&gt;</code></td><td>Run <code>setup-token</code> on a specific remote compute host instead of locally</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout info">
+        <strong>Note:</strong> Run <code>ark auth</code> once before dispatching sessions to EC2 compute. The token persists across reboots and is synced to remote hosts during provisioning.
+      </div>
+
+      <!-- ── ark channel ───────────────────────────────────────────────────── -->
+      <h2>ark channel</h2>
+      <p>Run the MCP channel server. This is an internal command used by remote agents to communicate with the conductor via stdio. It is normally launched automatically by the remote launcher &mdash; you do not need to run it manually.</p>
+      <pre><code><span class="prompt">$</span> ark channel</code></pre>
 
       <!-- ── ark claude ───────────────────────────────────────────────────── -->
       <h2>ark claude</h2>
