@@ -20,9 +20,12 @@ const CLAUDE_CMD = [
   "for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null); do",
   "  pid=$(tmux list-panes -t \"$sess\" -F '#{pane_pid}' 2>/dev/null | head -1);",
   "  cwd=$(tmux display-message -t \"$sess\" -p '#{pane_current_path}' 2>/dev/null);",
-  "  cpu=$(ps -p $pid -o %cpu= 2>/dev/null | tr -d ' ');",
-  "  mem=$(ps -p $pid -o %mem= 2>/dev/null | tr -d ' ');",
-  "  cmd=$(ps -p $pid -o args= 2>/dev/null);",
+  // Find the actual claude process among descendants of the pane shell
+  "  cpid=$(pgrep -a -P $pid 2>/dev/null | grep -m1 claude | awk '{print $1}');",
+  "  [ -z \"$cpid\" ] && cpid=$pid;",
+  "  cpu=$(ps -p $cpid -o %cpu= 2>/dev/null | tr -d ' ');",
+  "  mem=$(ps -p $cpid -o %mem= 2>/dev/null | tr -d ' ');",
+  "  cmd=$(ps -p $cpid -o args= 2>/dev/null);",
   '  mode="interactive";',
   "  echo \"$cmd\" | grep -q 'dangerously' && mode=\"agentic\";",
   '  printf "%s\\t%s%%\\t%s%%\\t%s\\t%s\\n" "$sess" "$cpu" "$mem" "$cwd" "$mode";',
@@ -57,7 +60,7 @@ const DOCKER_PS_CMD =
 
 /** Single SSH command that outputs section-delimited fast metrics. */
 export const SSH_FAST_CMD: string = [
-  "echo \"=== CPU ===\" && (mpstat 1 1 2>/dev/null | tail -1 | awk '{printf \"%.1f\\n\", 100 - $NF}' || top -bn1 | awk '/^%?Cpu/{printf \"%.1f\\n\", 100 - $8}')",
+  "echo \"=== CPU ===\" && { cpu=$(mpstat 1 1 2>/dev/null | tail -1 | awk 'NF>0{printf \"%.1f\", 100 - $NF}'); [ -n \"$cpu\" ] && echo \"$cpu\" || top -bn1 | awk '/^%?Cpu/{printf \"%.1f\\n\", 100 - $8}'; }",
   "echo \"=== MEMORY ===\" && free | awk '/Mem:/{printf \"%.1f %.1f\\n\", $3/1024, $2/1024}'",
   "echo \"=== DISK ===\" && df / | tail -1 | awk '{print $5}' | tr -d '%'",
   "echo \"=== UPTIME ===\" && uptime -p",
