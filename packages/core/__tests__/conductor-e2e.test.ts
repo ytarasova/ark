@@ -239,6 +239,19 @@ describe("Conductor E2E — report pipeline", () => {
     expect(getSession(s3.id)?.status).toBe("completed");
   });
 
+  it("progress report without message defaults to 'working'", async () => {
+    const session = createSession({ summary: "no message" });
+
+    await postReport(session.id, {
+      type: "progress", sessionId: session.id, stage: "work",
+      filesChanged: [],
+    });
+
+    const msgs = getMessages(session.id);
+    expect(msgs.length).toBe(1);
+    expect(msgs[0].content).toBe("working");
+  });
+
   it("health endpoint returns ok", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/health`);
     const body = await resp.json();

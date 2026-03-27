@@ -278,7 +278,7 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
   const content = report.type === "completed" ? (report as any).summary
     : report.type === "question" ? (report as any).question
     : report.type === "error" ? (report as any).error
-    : (report as any).message ?? JSON.stringify(report);
+    : (report as any).message || "working";
   store.addMessage({
     session_id: sessionId,
     role: "agent",
