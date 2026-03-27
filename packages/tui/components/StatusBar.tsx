@@ -113,7 +113,8 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
         hints.push(<KeyHint key="s" k="s" label="stop" />);
         break;
     }
-    hints.push(<KeyHint key="c" k="c" label="clone" />);
+    hints.push(<KeyHint key="c" k="c" label="fork" />);
+    hints.push(<KeyHint key="C" k="C" label="clone" />);
     hints.push(<KeyHint key="m" k="m" label="move" />);
   }
 

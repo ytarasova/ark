@@ -38,6 +38,15 @@ export function useSessionActions(asyncState: AsyncState) {
       run(`Deleting ${id}`, () => core.deleteSessionAsync(id));
     },
 
+    fork: (sourceId: string, groupName?: string | null) => {
+      run(`Forking session`, async (updateLabel) => {
+        const { ok, forkId } = core.forkSession(sourceId);
+        if (!ok) return;
+        if (groupName) core.updateSession(forkId, { group_name: groupName });
+        await core.dispatch(forkId, { onLog: (msg) => updateLabel(msg) });
+      });
+    },
+
     clone: (sourceId: string, name: string, groupName?: string | null) => {
       run(`Cloning → ${name}`, async (updateLabel) => {
         const { ok, cloneId } = core.cloneSession(sourceId, name);

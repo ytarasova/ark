@@ -25,7 +25,7 @@ export { loadConfig, type ArkConfig } from "./config.js";
 // Session lifecycle (the main API)
 export {
   startSession, dispatch, advance, stop, resume, complete, pause,
-  cloneSession, handoff, fork, joinFork, getOutput, send,
+  forkSession, cloneSession, handoff, fork, joinFork, getOutput, send,
   deleteSessionAsync, waitForCompletion, approveReviewGate,
 } from "./session.js";
 

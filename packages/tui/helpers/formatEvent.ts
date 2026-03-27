@@ -22,6 +22,8 @@ export function formatEvent(type: string, data?: Record<string, unknown>): strin
       return `Session retried (was ${data?.from_status ?? "failed"})`;
     case "session_completed":
       return "Session completed successfully";
+    case "session_forked":
+      return `Session forked from ${data?.forked_from ?? "?"}`;
     case "session_cloned":
       return `Session cloned from ${data?.cloned_from ?? "?"}`;
     case "session_paused":

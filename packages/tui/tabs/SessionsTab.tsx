@@ -149,6 +149,12 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         actions.restart(selected.id);
       }
     } else if (input === "c") {
+      // Fork: shallow copy (same config, fresh session)
+      if (selected) {
+        actions.fork(selected.id, selected.group_name);
+      }
+    } else if (input === "C") {
+      // Clone: deep copy with resume (opens name prompt)
       if (selected) setCloneMode(true);
     } else if (input === "x") {
       actions.delete(selected.id);

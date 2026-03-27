@@ -254,13 +254,47 @@ export function approveReviewGate(sessionId: string): { ok: boolean; message: st
 
 // ── Clone & Handoff ─────────────────────────────────────────────────────────
 
-export function cloneSession(sessionId: string, newTask?: string): { ok: boolean; cloneId: string } {
+/**
+ * Fork: shallow copy - same compute, repo, flow, group. Fresh session, no resume.
+ */
+export function forkSession(sessionId: string, newName?: string): { ok: boolean; forkId: string } {
+  const original = store.getSession(sessionId);
+  if (!original) return { ok: false, forkId: `Session ${sessionId} not found` };
+
+  const fork = store.createSession({
+    ticket: original.ticket || undefined,
+    summary: newName ?? original.summary ?? sessionId,
+    repo: original.repo || undefined,
+    flow: original.flow,
+    compute_name: original.compute_name || undefined,
+    workdir: original.workdir || undefined,
+  });
+
+  store.updateSession(fork.id, {
+    stage: original.stage,
+    status: "ready",
+    group_name: original.group_name,
+  });
+
+  store.logEvent(fork.id, "session_forked", {
+    stage: original.stage, actor: "user",
+    data: { forked_from: sessionId },
+  });
+
+  return { ok: true, forkId: fork.id };
+}
+
+/**
+ * Clone: deep copy - same as fork PLUS claude_session_id for --resume.
+ * The new session will resume the same Claude conversation.
+ */
+export function cloneSession(sessionId: string, newName?: string): { ok: boolean; cloneId: string } {
   const original = store.getSession(sessionId);
   if (!original) return { ok: false, cloneId: `Session ${sessionId} not found` };
 
   const clone = store.createSession({
     ticket: original.ticket || undefined,
-    summary: newTask ?? `Clone of ${original.summary ?? sessionId}`,
+    summary: newName ?? original.summary ?? sessionId,
     repo: original.repo || undefined,
     flow: original.flow,
     compute_name: original.compute_name || undefined,
@@ -270,6 +304,7 @@ export function cloneSession(sessionId: string, newTask?: string): { ok: boolean
   store.updateSession(clone.id, {
     stage: original.stage,
     status: "ready",
+    group_name: original.group_name,
     claude_session_id: original.claude_session_id, // --resume handoff
   });
 
