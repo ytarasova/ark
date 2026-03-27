@@ -72,8 +72,32 @@ ark compute provision my-docker</code></pre>
         <li>Agent launches in a tmux session inside the container</li>
       </ol>
 
+      <h2>Provider Capabilities</h2>
+      <p>Each provider declares its own capabilities, which determine what operations are available:</p>
+      <table>
+        <thead>
+          <tr><th>Capability</th><th>Local</th><th>EC2</th><th>Docker</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Always running</td><td>Yes</td><td>No (needs provisioning)</td><td>No (needs provisioning)</td></tr>
+          <tr><td><code>supportsWorktree</code></td><td>Yes (git worktree per session)</td><td>No (remote clone)</td><td>No</td></tr>
+          <tr><td><code>canReboot</code></td><td>No</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td><code>canDelete</code></td><td>No</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td>Test support</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+
       <h2>EC2 Provider</h2>
       <p>Run agents on AWS EC2 instances. Good for heavy workloads or when you need isolation from your dev machine.</p>
+
+      <h3>Authentication Setup</h3>
+      <p>Before your first remote dispatch, set up credentials:</p>
+      <ol>
+        <li>Run <code>ark auth</code> to configure Claude credentials for remote agents</li>
+        <li>Configure AWS credentials via <code>~/.aws/credentials</code> or pass <code>--profile</code> when creating the compute</li>
+        <li>SSH keys are auto-generated per compute at <code>~/.ssh/ark-&lt;name&gt;</code> -- no manual key management needed</li>
+      </ol>
+      <p>On provision and dispatch, ark automatically syncs all required credentials to the EC2 instance: SSH keys, AWS credentials, git config, <code>gh</code> auth tokens, and Claude API keys.</p>
 
       <h3>Setup</h3>
       <pre><code>ark compute create dev-box --provider ec2 --size m --arch x64 --region us-east-1
@@ -112,6 +136,18 @@ ark compute provision dev-box</code></pre>
         <li><code>--idle-minutes</code>: auto-shutdown after idle</li>
       </ul>
 
+      <h3>Post-Provision Verification</h3>
+      <p>After cloud-init completes, ark automatically verifies that all required tools are installed on the instance: <code>claude</code>, <code>ark</code>, <code>bun</code>, <code>tmux</code>, and <code>git</code>. If any tool is missing, ark attempts auto-remediation to install it. Credentials are synced as part of this process.</p>
+
+      <h3>SSH Connection Pool</h3>
+      <p>EC2 operations use SSH ControlMaster multiplexing to avoid opening a new TCP connection for every command. Requests are managed through per-type queues:</p>
+      <ul>
+        <li><strong>Metrics</strong>: drops stale requests (only the latest poll matters)</li>
+        <li><strong>Commands</strong>: FIFO queue</li>
+        <li><strong>Sync</strong>: FIFO queue</li>
+      </ul>
+      <p>This prevents overwhelming the remote <code>sshd</code> with concurrent connections.</p>
+
       <h3>Operations</h3>
       <pre><code>ark compute start dev-box     # start a stopped instance
 ark compute stop dev-box      # stop (preserves data)
@@ -134,7 +170,15 @@ ark compute metrics dev-box   # show CPU, memory, disk, network</code></pre>
       <p>When creating a session, specify the compute target:</p>
       <pre><code>ark session start --repo . --summary "Deploy" --compute dev-box</code></pre>
       <p>Or select it in the TUI's New Session form.</p>
-      <p>The agent will be launched on the remote compute. Attach via <kbd>a</kbd> in the TUI to get a remote tmux session.</p>
+      <p>The agent will be launched on the remote compute. Attach via <kbd>a</kbd> in the TUI to get a remote tmux session. Press <kbd>Ctrl+B</kbd> <kbd>d</kbd> to detach from the tmux session without interrupting the agent.</p>
+
+      <h2>Devcontainer and Compose</h2>
+      <p>Devcontainer and Docker Compose support require explicit opt-in via <code>arc.json</code> in your project root:</p>
+      <pre><code>{
+  "devcontainer": true,   // use repo's devcontainer.json
+  "compose": true          // use repo's docker-compose.yml
+}</code></pre>
+      <p><code>arc.json</code> supports JSONC (comments are allowed in <code>devcontainer.json</code> as well). These options are not enabled by default to avoid unexpected container builds.</p>
 
       <div class="doc-footer">
         <a href="configuration.html">&larr; Configuration</a>
