@@ -236,7 +236,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
-              const marker = topLevel.indexOf(s) === sel ? ">" : " ";
+              const marker = topLevel.findIndex(t => t.id === s.id) === sel ? ">" : " ";
               const unread = unreadCounts.get(s.id) ?? 0;
               const badge = unread > 0 ? ` (${unread})` : "";
               return ` ${marker} ${icon} ${summary} ${stage} ${age}${badge}`;
