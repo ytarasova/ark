@@ -384,12 +384,15 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
     }
   }, [s?.id, s?.status]);
 
-  // Load conversation history from FTS5
+  // Load conversation history from Claude transcript (local sessions only)
+  // Remote sessions don't have local transcripts — their conversation is in channel messages
   useEffect(() => {
     if (!s) { setConversation([]); return; }
-    const convId = s.claude_session_id || s.id;
+    // Only load FTS5 conversation for sessions with a local claude_session_id
+    // Remote sessions would match wrong transcripts (e.g. our own session mentioning the ID)
+    if (!s.claude_session_id) { setConversation([]); return; }
     try {
-      setConversation(core.getSessionConversation(convId, { limit: 100 }));
+      setConversation(core.getSessionConversation(s.claude_session_id, { limit: 100 }));
     } catch {
       setConversation([]);
     }
