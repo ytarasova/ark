@@ -551,6 +551,11 @@ async function launchAgentTmux(
     });
 
     store.updateSession(session.id, { claude_session_id: claudeSessionId });
+
+    // Deliver task via channel (tunnels are now up, channel port is accessible locally)
+    log("Delivering task...");
+    claude.deliverTask(session.id, channelPort, task, stage);
+
     return result;
   }
 
