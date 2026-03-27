@@ -55,6 +55,7 @@
           <tr><td><kbd>e</kbd></td><td>Toggle event log</td></tr>
           <tr><td><kbd>q</kbd></td><td>Quit</td></tr>
           <tr><td><kbd>p</kbd></td><td>Screenshot / copy</td></tr>
+          <tr><td><kbd>Ctrl+B</kbd> <kbd>d</kbd></td><td>Detach from tmux session (local and remote)</td></tr>
         </tbody>
       </table>
 
@@ -83,14 +84,15 @@
         </thead>
         <tbody>
           <tr><td><kbd>n</kbd></td><td>New session</td><td>Any</td></tr>
-          <tr><td><kbd>i</kbd></td><td>Threads / inbox</td><td>Any</td></tr>
+          <tr><td><kbd>T</kbd></td><td>Threads (multi-session chat view)</td><td>Any</td></tr>
           <tr><td><kbd>o</kbd></td><td>Groups</td><td>Any</td></tr>
-          <tr><td><kbd>c</kbd></td><td>Clone session</td><td>Any</td></tr>
+          <tr><td><kbd>c</kbd></td><td>Fork session (shallow copy, same config, fresh start)</td><td>Any</td></tr>
+          <tr><td><kbd>C</kbd></td><td>Clone session (deep copy with conversation resume)</td><td>Any</td></tr>
           <tr><td><kbd>m</kbd></td><td>Move to group</td><td>Any</td></tr>
           <tr><td><kbd>x</kbd></td><td>Delete session</td><td>Any</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Dispatch session</td><td>Ready / Blocked</td></tr>
           <tr><td><kbd>a</kbd></td><td>Attach to tmux</td><td>Running</td></tr>
-          <tr><td><kbd>t</kbd></td><td>Talk / send message</td><td>Running</td></tr>
+          <tr><td><kbd>t</kbd></td><td>Talk (1:1 chat with selected session)</td><td>Running</td></tr>
           <tr><td><kbd>s</kbd></td><td>Stop session</td><td>Running</td></tr>
           <tr><td><kbd>d</kbd></td><td>Mark done (press twice)</td><td>Running</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Restart session</td><td>Stopped / Failed / Completed</td></tr>
@@ -132,7 +134,7 @@
       </table>
 
       <h2>Status Bar</h2>
-      <p>The status bar at the bottom is the single source of truth for available actions. It shows context-sensitive shortcuts that update based on the active tab, pane, and overlay state. When a form or overlay is open, the status bar switches to show form controls (<kbd>Enter</kbd> confirm, <kbd>Esc</kbd> cancel) instead of tab shortcuts.</p>
+      <p>The status bar at the bottom is the single source of truth for available actions. It shows context-sensitive shortcuts that update based on the active tab, pane, and overlay state. Shortcuts are organized with <code>|</code> separators: navigation | session actions | quit. When a form or overlay is open, the status bar switches to show form controls (<kbd>Enter</kbd> confirm, <kbd>Esc</kbd> cancel) instead of tab shortcuts.</p>
 
       <h2>Tips</h2>
       <div class="callout tip">
@@ -142,7 +144,13 @@
         <p>Sessions display live tmux output in the detail pane. Press <kbd>a</kbd> to attach directly to the tmux session for full terminal access.</p>
       </div>
       <div class="callout tip">
-        <p>Unread message counts appear as badges next to session names in the list pane. Press <kbd>i</kbd> to open the inbox and reply.</p>
+        <p>Unread message counts appear as badges next to session names in the list pane. Press <kbd>T</kbd> to open threads and reply.</p>
+      </div>
+      <div class="callout tip">
+        <p>In chat (<kbd>t</kbd>) or threads (<kbd>T</kbd>), press <kbd>Tab</kbd> to switch focus between the message scroll area (<kbd>j</kbd>/<kbd>k</kbd> to navigate) and the text input.</p>
+      </div>
+      <div class="callout tip">
+        <p>Bare flow sessions use a manual gate &mdash; the agent can complete tasks but the session stays running until you press <kbd>d</kbd> (done) twice to mark it complete.</p>
       </div>
       <div class="callout tip">
         <p>The detail pane uses a scroll box for long content. Switch focus with <kbd>Tab</kbd>, then use <kbd>j</kbd>/<kbd>k</kbd> to scroll.</p>
