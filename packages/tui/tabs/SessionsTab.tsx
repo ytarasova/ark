@@ -223,7 +223,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     <Box flexDirection="column" flexGrow={1}>
       {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
-        focus={pane}
+        focus={talkMode || inboxMode ? "right" : pane}
         leftTitle="Sessions"
         rightTitle="Details"
         left={
