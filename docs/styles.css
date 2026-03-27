@@ -45,10 +45,7 @@ body::before {
   font-family: 'JetBrains Mono', monospace;
   font-size: 1.5rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #38bdf8, #818cf8, #a78bfa);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #38bdf8;
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -74,7 +71,7 @@ body::before {
 }
 
 .sidebar a:hover { color: #c9d1d9; background: rgba(56,189,248,0.08); }
-.sidebar-logo:hover { opacity: 0.8; }
+.sidebar-logo:hover { color: #818cf8; }
 .sidebar a.active { color: #38bdf8; background: rgba(56,189,248,0.1); font-weight: 500; }
 
 .sidebar .section-title {

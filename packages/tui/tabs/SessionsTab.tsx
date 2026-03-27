@@ -11,6 +11,7 @@ import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
+import { ScrollBox } from "../components/ScrollBox.js";
 import { KeyValue } from "../components/KeyValue.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
@@ -812,30 +813,34 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
     });
   };
 
+  // Build message elements for ScrollBox
+  const messageElements = messages.map((m) => {
+    const ts = m.created_at.slice(11, 16);
+    const roleColor = m.role === "user" ? "cyan" : m.role === "agent" ? "green" : "gray";
+    const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
+    return (
+      <Text key={m.id} wrap="wrap">
+        <Text dimColor>{`  ${ts} `}</Text>
+        <Text color={roleColor as any} bold>{m.role === "user" ? "you" : (session?.agent || "agent")}</Text>
+        {typeTag && <Text dimColor>{typeTag}</Text>}
+        <Text>{` ${m.content}`}</Text>
+      </Text>
+    );
+  });
+
   return (
     <Box flexDirection="column" flexGrow={1}>
       <Text bold color="cyan">{` Chat: ${session.summary ?? session.id} `}</Text>
       <Text> </Text>
 
-      {/* Message history */}
-      <Box flexDirection="column" flexGrow={1} overflow="hidden">
-        {messages.length === 0 && (
-          <Text dimColor>{"  No messages yet. Type below to send."}</Text>
-        )}
-        {messages.map((m) => {
-          const ts = m.created_at.slice(11, 16);
-          const roleColor = m.role === "user" ? "cyan" : m.role === "agent" ? "green" : "gray";
-          const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
-          return (
-            <Text key={m.id} wrap="wrap">
-              <Text dimColor>{`  ${ts} `}</Text>
-              <Text color={roleColor as any} bold>{m.role === "user" ? "you" : (session?.agent || "agent")}</Text>
-              {typeTag && <Text dimColor>{typeTag}</Text>}
-              <Text>{` ${m.content}`}</Text>
-            </Text>
-          );
-        })}
-      </Box>
+      {/* Message history — scrollable, follows latest */}
+      {messages.length === 0 ? (
+        <Box flexGrow={1}><Text dimColor>{"  No messages yet. Type below to send."}</Text></Box>
+      ) : (
+        <ScrollBox followIndex={messageElements.length - 1} reserveRows={12}>
+          {messageElements}
+        </ScrollBox>
+      )}
 
       {/* Input */}
       <Text> </Text>
