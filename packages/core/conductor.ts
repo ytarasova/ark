@@ -279,10 +279,16 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
   });
 
   // Store as message for the TUI chat view
-  // Use || (not ??) so empty strings also trigger the fallback chain
-  const content = (report as any).summary || (report as any).message
-    || (report as any).question || (report as any).error
-    || JSON.stringify(report);
+  // Each type checks its canonical field first, then "message" (the channel
+  // tool's universal input param), so field lookup is deterministic per type.
+  const r = report as Record<string, unknown>;
+  const contentByType: Record<string, string | undefined> = {
+    completed: (r.summary || r.message) as string | undefined,
+    question:  (r.question || r.message) as string | undefined,
+    error:     (r.error || r.message) as string | undefined,
+    progress:  (r.message || r.summary) as string | undefined,
+  };
+  const content = contentByType[report.type] || JSON.stringify(report);
   store.addMessage({
     session_id: sessionId,
     role: "agent",
