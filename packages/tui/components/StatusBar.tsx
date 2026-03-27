@@ -128,7 +128,7 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
     hints.push(<KeyHint key="m" k="m" label="move" />);
   }
 
-  hints.push(SEP);
+  hints.push(sep());
 
   // Global
   hints.push(<KeyHint key="o" k="o" label="groups" />);
