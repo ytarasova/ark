@@ -192,8 +192,8 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
       <Text bold color="cyan">{" Threads "}</Text>
       <Text> </Text>
 
-      {/* Message stream */}
-      <Box flexDirection="column" flexGrow={1}>
+      {/* Message stream — scrollable */}
+      <Box flexDirection="column" flexGrow={1} overflow="hidden">
         {visible.length === 0 && (
           <Text dimColor>{"  No messages yet. Agents will post here."}</Text>
         )}
@@ -203,7 +203,7 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
           const roleColor = isUser ? "cyan" : isSystem ? "gray" : "green";
           const sender = isUser ? "you" : m.sessionName;
           const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
-          const prefix = isUser && m.sessionId ? `→${(sessions.find(s => s.id === m.sessionId)?.summary ?? m.sessionId).slice(0, 12)}` : "";
+          const prefix = isUser && m.sessionId ? ` →${(sessions.find(s => s.id === m.sessionId)?.summary ?? m.sessionId).slice(0, 15)}` : "";
           return (
             <Text key={m.id} wrap="wrap">
               <Text dimColor>{`${m.time} `}</Text>
@@ -233,7 +233,8 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
         </Box>
       )}
 
-      {/* Input */}
+      {/* Input separator */}
+      <Text dimColor>{"  " + "─".repeat(40)}</Text>
       <Box>
         <Text color="cyan">{"> "}</Text>
         <TextInputEnhanced
