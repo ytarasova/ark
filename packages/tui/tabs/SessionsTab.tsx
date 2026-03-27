@@ -764,11 +764,6 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
   const [msg, setMsg] = useState("");
   const [messages, setMessages] = useState<core.Message[]>([]);
 
-  // Show cursor while chat is active
-  useEffect(() => {
-    process.stdout.write("\x1b[?25h"); // show cursor
-    return () => { process.stdout.write("\x1b[?25l"); }; // hide on unmount
-  }, []);
 
   // Load messages and mark as read
   useEffect(() => {

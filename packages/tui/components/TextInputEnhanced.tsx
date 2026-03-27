@@ -173,7 +173,7 @@ export function TextInputEnhanced({
   const after = value.slice(cursor + 1);
 
   if (showPlaceholder) {
-    return <Text dimColor>{placeholder}</Text>;
+    return <Text><Text inverse>{" "}</Text><Text dimColor>{placeholder}</Text></Text>;
   }
 
   return (
