@@ -47,8 +47,17 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const [searchResults, setSearchResults] = useState<core.SearchResult[] | null>(null);
   const status = useStatusMessage();
 
-  // Top-level sessions only (exclude fork children from list)
-  const topLevel = useMemo(() => sessions.filter((s) => !s.parent_id), [sessions]);
+  // Top-level sessions, sorted by group name to match visual TreeList order
+  const topLevel = useMemo(() => {
+    const filtered = sessions.filter((s) => !s.parent_id);
+    return filtered.sort((a, b) => {
+      const ga = a.group_name ?? "";
+      const gb = b.group_name ?? "";
+      if (ga === "" && gb !== "") return -1;
+      if (ga !== "" && gb === "") return 1;
+      return ga.localeCompare(gb);
+    });
+  }, [sessions]);
 
   const hasOverlay = formOverlay || moveMode || groupMode || talkMode || inboxMode || cloneMode || searchMode;
   const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !hasOverlay });
@@ -236,7 +245,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
-              const marker = topLevel.findIndex(t => t.id === s.id) === sel ? ">" : " ";
+              const marker = topLevel.indexOf(s) === sel ? ">" : " ";
               const unread = unreadCounts.get(s.id) ?? 0;
               const badge = unread > 0 ? ` (${unread})` : "";
               return ` ${marker} ${icon} ${summary} ${stage} ${age}${badge}`;

@@ -62,6 +62,8 @@ export function TreeList<T>({
   // Track which row index corresponds to the selected item
   const rows: React.ReactNode[] = [];
   let selRow = 0;
+  // Rebuild a visual-order flat index so sel matches top-to-bottom visual order
+  let visualIdx = 0;
 
   for (const groupName of sortedKeys) {
     const entries = groups.get(groupName)!;
@@ -74,7 +76,8 @@ export function TreeList<T>({
       rows.push(<Text key={`empty-${groupName}`} dimColor>{"    (empty)"}</Text>);
     }
     for (const { item, flatIndex } of entries) {
-      const isSel = flatIndex === sel;
+      const isSel = visualIdx === sel;
+      visualIdx++;
       if (isSel) selRow = rows.length;
       rows.push(
         <Box key={`item-${flatIndex}`} flexDirection="column">
