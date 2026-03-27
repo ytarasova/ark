@@ -234,7 +234,7 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
       )}
 
       {/* Input separator */}
-      <Text dimColor>{"  " + "─".repeat(40)}</Text>
+      <Text dimColor>{"  " + "-".repeat(40)}</Text>
       <Box>
         <Text color="cyan">{"> "}</Text>
         <TextInputEnhanced
