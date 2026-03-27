@@ -1,12 +1,19 @@
 /**
- * Enhanced text input with readline-style shortcuts:
- * - Ctrl+A: beginning of line
- * - Ctrl+E: end of line
- * - Ctrl+W: delete word backward
- * - Ctrl+U: delete to beginning
- * - Ctrl+K: delete to end
- * - Option+Left/Right (or Ctrl+Left/Right): word hop
+ * Enhanced text input with readline-style shortcuts + Mac defaults:
+ *
+ * Navigation:
+ * - Left/Right: move one character
+ * - Option+Left/Right: word hop backward/forward
+ * - Ctrl+A / Home: beginning of line
+ * - Ctrl+E / End: end of line
  * - Ctrl+B/F: char left/right (standard readline)
+ *
+ * Deletion:
+ * - Backspace: delete character backward
+ * - Option+Backspace: delete word backward
+ * - Ctrl+W: delete word backward (readline)
+ * - Ctrl+U: delete to beginning of line
+ * - Ctrl+K: delete to end of line
  */
 
 import React, { useState, useEffect, useRef } from "react";
@@ -120,8 +127,8 @@ export function TextInputEnhanced({
 
     // Left arrow
     if (key.leftArrow) {
-      if (key.meta) {
-        // Option+Left: word hop backward
+      if (key.meta || key.ctrl) {
+        // Option+Left / Ctrl+Left: word hop backward
         const before = value.slice(0, cursor);
         const wordStart = before.replace(/\S+\s*$/, "").length;
         setCursor(wordStart);
@@ -133,13 +140,26 @@ export function TextInputEnhanced({
 
     // Right arrow
     if (key.rightArrow) {
-      if (key.meta) {
-        // Option+Right: word hop forward
+      if (key.meta || key.ctrl) {
+        // Option+Right / Ctrl+Right: word hop forward
         const after = value.slice(cursor);
         const match = after.match(/^\s*\S+/);
         setCursor(c => c + (match ? match[0].length : after.length));
       } else {
         setCursor(c => Math.min(value.length, c + 1));
+      }
+      return;
+    }
+
+    // Option+Backspace: delete word backward (Mac default)
+    if ((key.backspace || key.delete) && key.meta) {
+      if (cursor > 0) {
+        const before = value.slice(0, cursor);
+        const after = value.slice(cursor);
+        const wordStart = before.replace(/\S+\s*$/, "").length;
+        internalEdit.current = true;
+        onChange(before.slice(0, wordStart) + after);
+        setCursor(wordStart);
       }
       return;
     }
