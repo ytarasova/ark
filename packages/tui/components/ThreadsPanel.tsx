@@ -243,9 +243,8 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
         </Box>
       )}
 
-      {/* Input separator */}
-      <Text dimColor>{"  " + "-".repeat(40)}</Text>
-      <Box>
+      {/* Input panel */}
+      <Box borderStyle="single" borderColor={inputFocused ? "cyan" : "gray"} paddingX={1}>
         <Text color={inputFocused ? "cyan" : "gray"}>{"> "}</Text>
         <TextInputEnhanced
           value={msg}
