@@ -385,14 +385,25 @@ const CHANNEL_PROMPT_MARKERS = [
   "I am using this for local",
   "local channel development",
 ];
+/** Indicators that Claude is past all prompts and actively working. */
+const CLAUDE_WORKING_MARKERS = [
+  "ctrl+o to expand",
+  "esc to interrupt",
+];
+
 /**
  * Poll tmux pane for the channel development prompt and auto-accept it.
  *
- * Three outcomes per poll:
- * 1. Prompt found → send "1" + Enter, done
- * 2. No prompt but Claude is working (tool use visible) → stop, prompt was
- *    already accepted or skipped. Don't send rogue keystrokes.
- * 3. Neither → keep polling (Claude still starting up)
+ * The launcher may use `--resume <id> || --session-id <id>`, which causes
+ * TWO Claude startups (and two channel prompts) when resume fails.
+ * To handle this, we keep polling after acceptance until Claude is actually
+ * working — we don't return after the first accept.
+ *
+ * Four outcomes per poll:
+ * 1. Prompt found → send "1" + Enter, keep polling for a second prompt
+ * 2. No prompt and Claude is working (tool use visible) → done
+ * 3. No prompt but previously accepted one → keep polling briefly
+ * 4. Neither → keep polling (Claude still starting up)
  */
 export async function autoAcceptChannelPrompt(
   tmuxName: string,
@@ -400,23 +411,25 @@ export async function autoAcceptChannelPrompt(
 ): Promise<void> {
   const max = opts?.maxAttempts ?? 45;
   const delay = opts?.delayMs ?? 1000;
+  let accepted = 0;
 
   for (let i = 0; i < max; i++) {
     await Bun.sleep(delay);
     try {
       const output = await tmux.capturePaneAsync(tmuxName, { lines: 30 });
 
-      // Found the prompt — accept it
+      // Found the prompt — accept it and keep polling
       if (CHANNEL_PROMPT_MARKERS.some(m => output.includes(m))) {
         await tmux.sendKeysAsync(tmuxName, "1");
         await Bun.sleep(300);
         await tmux.sendKeysAsync(tmuxName, "Enter");
-        return;
+        accepted++;
+        continue;
       }
 
-      // Claude is already working — safe to stop polling.
+      // Claude is actively working — safe to stop polling.
       // These only appear after Claude has fully started and is past any prompts.
-      if (output.includes("ctrl+o to expand") || output.includes("esc to interrupt")) {
+      if (CLAUDE_WORKING_MARKERS.some(m => output.includes(m))) {
         return;
       }
     } catch {}

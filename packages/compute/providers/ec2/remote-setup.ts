@@ -93,24 +93,54 @@ json.dump(j, open(f, 'w'), indent=2)
   await sshExecAsync(key, ip, script, { timeout: 10_000 });
 }
 
+/** Markers that indicate the channel development prompt is visible. */
+const CHANNEL_PROMPT_MARKERS = [
+  "I am using this for local",
+  "local channel development",
+];
+
+/** Markers that indicate Claude is past all prompts and actively working. */
+const CLAUDE_WORKING_MARKERS = [
+  "ctrl+o to expand",
+  "esc to interrupt",
+];
+
 /**
  * Auto-accept the development channels prompt on remote tmux.
+ *
+ * The launcher may use `--resume <id> || --session-id <id>`, which causes
+ * TWO Claude startups (and two channel prompts) when resume fails.
+ * We keep polling after acceptance until Claude is actually working.
  */
 export async function autoAcceptChannelPrompt(
   key: string, ip: string, tmuxName: string,
+  opts?: { maxAttempts?: number; delayMs?: number },
 ): Promise<void> {
-  const { poll } = await import("../../util.js");
-  await poll(
-    async () => {
+  const max = opts?.maxAttempts ?? 60;
+  const delay = opts?.delayMs ?? 2000;
+  const { sleep } = await import("../../util.js");
+
+  for (let i = 0; i < max; i++) {
+    await sleep(delay);
+    try {
       const { stdout } = await sshExecAsync(key, ip,
-        `tmux capture-pane -t ${tmuxName} -p 2>/dev/null | tail -20`,
+        `tmux capture-pane -t ${tmuxName} -p 2>/dev/null | tail -30`,
         { timeout: 10_000 });
-      if (stdout.includes("I am using this for local")) {
-        await sshExecAsync(key, ip, `tmux send-keys -t ${tmuxName} Enter`);
-        return true;
+
+      // Found the prompt — send "1" + Enter to accept, keep polling
+      if (CHANNEL_PROMPT_MARKERS.some(m => stdout.includes(m))) {
+        await sshExecAsync(key, ip,
+          `tmux send-keys -t ${tmuxName} 1`, { timeout: 5_000 });
+        await sleep(300);
+        await sshExecAsync(key, ip,
+          `tmux send-keys -t ${tmuxName} Enter`, { timeout: 5_000 });
+        continue;
       }
-      return stdout.includes("Welcome") || stdout.includes("Claude Code v");
-    },
-    { maxAttempts: 60, delayMs: 2000 },
-  );
+
+      // Claude is actively working — done
+      if (CLAUDE_WORKING_MARKERS.some(m => stdout.includes(m))) {
+        return;
+      }
+    } catch {}
+  }
 }
