@@ -829,7 +829,7 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
           return (
             <Text key={m.id} wrap="wrap">
               <Text dimColor>{`  ${ts} `}</Text>
-              <Text color={roleColor as any} bold>{m.role === "user" ? "you" : (selected?.agent || "agent")}</Text>
+              <Text color={roleColor as any} bold>{m.role === "user" ? "you" : (session?.agent || "agent")}</Text>
               {typeTag && <Text dimColor>{typeTag}</Text>}
               <Text>{` ${m.content}`}</Text>
             </Text>
