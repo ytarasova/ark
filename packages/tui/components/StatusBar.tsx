@@ -89,11 +89,10 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
 
   // Navigation
   hints.push(...NAV_HINTS);
+  hints.push(sep());
 
+  // Sessions
   if (s) {
-    hints.push(sep());
-
-    // Lifecycle
     switch (s.status) {
       case "ready":
       case "blocked":
@@ -114,26 +113,16 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
         hints.push(<KeyHint key="s" k="s" label="stop" />);
         break;
     }
-
-    hints.push(sep());
-
-    // Communication
     hints.push(<KeyHint key="tT" k="t/T" label="chat/threads" />);
-
-    hints.push(sep());
-
-    // Session management
     hints.push(<KeyHint key="cC" k="c/C" label="fork/clone" />);
     hints.push(<KeyHint key="x" k="x" label="delete" />);
     hints.push(<KeyHint key="m" k="m" label="move" />);
   }
-
-  hints.push(sep());
-
-  // Global
   hints.push(<KeyHint key="o" k="o" label="groups" />);
   hints.push(<KeyHint key="n" k="n" label="new" />);
   hints.push(sep());
+
+  // App
   hints.push(<KeyHint key="q" k="q" label="quit" />);
   return hints;
 }
