@@ -111,6 +111,6 @@ export async function autoAcceptChannelPrompt(
       }
       return stdout.includes("Welcome") || stdout.includes("Claude Code v");
     },
-    { maxAttempts: 15, delayMs: 1000 },
+    { maxAttempts: 60, delayMs: 2000 },
   );
 }
