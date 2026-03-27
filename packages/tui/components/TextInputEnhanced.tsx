@@ -14,10 +14,18 @@
  * - Ctrl+W: delete word backward (readline)
  * - Ctrl+U: delete to beginning of line
  * - Ctrl+K: delete to end of line
+ *
+ * Multi-line paste:
+ * - Pasted text with newlines is preserved in the value
+ * - Display is collapsed to MAX_DISPLAY_LINES; excess shown as "[+N lines]"
+ * - Full text is submitted via onSubmit
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { Text, useInput } from "ink";
+import { Box, Text, useInput } from "ink";
+
+/** Max lines to render in the input box before collapsing. */
+const MAX_DISPLAY_LINES = 3;
 
 interface TextInputEnhancedProps {
   value: string;
@@ -176,8 +184,8 @@ export function TextInputEnhanced({
 
     // Regular character input — supports single chars and pasted text (multi-char)
     if (input && !key.ctrl && !key.meta) {
-      // Strip control characters (keep printable chars, including unicode)
-      const clean = input.replace(/[\x00-\x1f]/g, "");
+      // Strip control characters but preserve newlines (\n=0x0a, \r=0x0d)
+      const clean = input.replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, "").replace(/\r\n?/g, "\n");
       if (clean.length > 0) {
         internalEdit.current = true;
         onChange(value.slice(0, cursor) + clean + value.slice(cursor));
@@ -188,13 +196,29 @@ export function TextInputEnhanced({
 
   // Render with cursor
   const showPlaceholder = value.length === 0 && placeholder;
-  const before = value.slice(0, cursor);
-  const cursorChar = value[cursor] ?? " ";
-  const after = value.slice(cursor + 1);
 
   if (showPlaceholder) {
     return <Text><Text inverse>{" "}</Text><Text dimColor>{placeholder}</Text></Text>;
   }
+
+  // Multi-line collapse: if value has more lines than MAX_DISPLAY_LINES,
+  // show a compact summary instead of the full text
+  const lines = value.split("\n");
+  if (lines.length > MAX_DISPLAY_LINES) {
+    const firstLine = lines[0].length > 60 ? lines[0].slice(0, 57) + "..." : lines[0];
+    const extra = lines.length - 1;
+    return (
+      <Box>
+        <Text>{firstLine} </Text>
+        <Text dimColor color="cyan">{`[+${extra} lines]`}</Text>
+        <Text inverse>{" "}</Text>
+      </Box>
+    );
+  }
+
+  const before = value.slice(0, cursor);
+  const cursorChar = value[cursor] ?? " ";
+  const after = value.slice(cursor + 1);
 
   return (
     <Text>
