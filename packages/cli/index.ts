@@ -800,12 +800,22 @@ program.command("auth")
         process.exit(exitCode);
       }
 
-      console.log("\nPaste the OAuth token shown above (sk-ant-oat01-...):");
+      console.log("\nPaste the full OAuth token (sk-ant-oat01-...) and press Enter:");
       const readline = await import("readline");
       const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      // Read lines until we get a complete token (handles terminal line wrapping)
+      let tokenBuf = "";
       const token = await new Promise<string>((resolve) => {
-        rl.on("close", () => resolve(""));
-        rl.question("> ", (answer) => { rl.close(); resolve(answer.trim()); });
+        rl.on("close", () => resolve(tokenBuf.trim()));
+        rl.on("line", (line) => {
+          tokenBuf += line.trim();
+          // Token format: sk-ant-oat01-...-..AA (ends with == or AA or similar)
+          if (tokenBuf.startsWith("sk-ant-oat") && tokenBuf.length > 100) {
+            rl.close();
+            resolve(tokenBuf.trim());
+          }
+        });
+        rl.question("> ", () => {});
       });
 
       if (token.startsWith("sk-ant-oat")) {
