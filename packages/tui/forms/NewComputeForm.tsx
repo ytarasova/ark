@@ -92,7 +92,7 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
       create: () => core.createCompute({ name: name.trim(), provider: "docker", config: { image: img } }),
       onDone,
       asyncState,
-      confirmLabel: `Created '${name.trim()}' — press Enter to provision`,
+      confirmLabel: `Created '${name.trim()}'  - press Enter to provision`,
     });
   };
 
@@ -128,7 +128,7 @@ export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProp
       },
       onDone,
       asyncState,
-      confirmLabel: `Created '${trimmedName}' — press Enter to provision`,
+      confirmLabel: `Created '${trimmedName}'  - press Enter to provision`,
     });
   };
 

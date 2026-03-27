@@ -287,17 +287,31 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
         const cfg = { ...(existing.config as any), completion_summary: (report as any).summary };
         store.updateSession(sessionId, { config: cfg });
       }
-      store.updateSession(sessionId, { status: "ready", session_id: null });
-      const advResult = session.advance(sessionId);
-      if (advResult.ok) {
-        const updated = store.getSession(sessionId);
-        if (updated && updated.status === "ready" && updated.stage) {
-          const nextAction = flow.getStageAction(
-            updated.flow,
-            updated.stage
-          );
-          if (nextAction.type === "agent" || nextAction.type === "fork") {
-            session.dispatch(sessionId);
+
+      // Check gate type — manual gates keep session running (user decides when done)
+      const stageDef = existing ? flow.getStage(existing.flow, existing.stage ?? "") : null;
+      const isManualGate = stageDef?.gate === "manual";
+
+      if (isManualGate) {
+        // Manual gate: agent completed its task but session stays running
+        // User can send more work or press 'd' to finish
+        store.logEvent(sessionId, "agent_completed", {
+          stage: existing?.stage ?? undefined,
+          actor: "agent",
+          data: { summary: (report as any).summary },
+        });
+        // Don't change status — session stays running, agent stays alive
+      } else {
+        // Auto gate: advance to next stage or complete the session
+        store.updateSession(sessionId, { status: "ready", session_id: null });
+        const advResult = session.advance(sessionId);
+        if (advResult.ok) {
+          const updated = store.getSession(sessionId);
+          if (updated && updated.status === "ready" && updated.stage) {
+            const nextAction = flow.getStageAction(updated.flow, updated.stage);
+            if (nextAction.type === "agent" || nextAction.type === "fork") {
+              session.dispatch(sessionId);
+            }
           }
         }
       }

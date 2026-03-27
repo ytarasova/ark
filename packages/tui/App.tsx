@@ -118,7 +118,7 @@ export function App() {
         <AgentsTab {...store} pane={pane} />
       ) : tab === "tools" ? (
         <Box flexGrow={1} justifyContent="center" alignItems="center">
-          <Text dimColor>{"Tools — coming soon (recipes, skills, prompt templates)"}</Text>
+          <Text dimColor>{"Tools - coming soon (recipes, skills, prompt templates)"}</Text>
         </Box>
       ) : tab === "flows" ? (
         <FlowsTab {...store} pane={pane} />

@@ -588,7 +588,7 @@ function MoveToGroup({ session, onDone }: MoveToGroupProps) {
 
   const choices = [
     ...existing.map(g => ({ label: g, value: g })),
-    { label: "(none) — remove from group", value: "__none__" },
+    { label: "(none) - remove from group", value: "__none__" },
     { label: "+ New group...", value: "__new__" },
   ];
 

@@ -215,7 +215,7 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
 
       {repoPath && !isGitRepo && (
         <Box marginTop={1}>
-          <Text color="red">{" ⚠ Not a git repository — select a folder with .git"}</Text>
+          <Text color="red">{" Not a git repository - select a folder with .git"}</Text>
         </Box>
       )}
       <Box flexGrow={1} />
