@@ -192,7 +192,7 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
   return { ok: true, message: "Session stopped" };
 }
 
-export async function resume(sessionId: string): Promise<{ ok: boolean; message: string }> {
+export async function resume(sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status === "running" && session.session_id) return { ok: false, message: "Already running" };
@@ -209,7 +209,7 @@ export async function resume(sessionId: string): Promise<{ ok: boolean; message:
   });
 
   // Auto re-dispatch
-  return await dispatch(sessionId);
+  return await dispatch(sessionId, opts);
 }
 
 export function complete(sessionId: string): { ok: boolean; message: string } {

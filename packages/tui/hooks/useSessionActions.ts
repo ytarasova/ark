@@ -23,7 +23,11 @@ export function useSessionActions(asyncState: AsyncState) {
     },
 
     restart: (id: string) => {
-      run(`Restarting ${id}`, () => core.resume(id));
+      run(`Restarting ${id}`, async (updateLabel) => {
+        // resume sets status to ready, then dispatches
+        // Pass onLog so progress shows in the spinner
+        await core.resume(id, { onLog: (msg) => updateLabel(msg) });
+      });
     },
 
     stop: (id: string) => {
