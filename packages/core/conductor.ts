@@ -111,13 +111,16 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
           const payload = await req.json() as Record<string, unknown>;
           const event = String(payload.hook_event_name ?? "");
 
+          // Check if this session uses manual gate (interactive - user controls lifecycle)
+          const stageDef = s.stage ? flow.getStage(s.flow, s.stage) : null;
+          const isManualGate = stageDef?.gate === "manual";
+
           const statusMap: Record<string, string> = {
             SessionStart: "running",
             UserPromptSubmit: "running",
-            // Stop = Claude finished a turn (idle between turns) — keep running
-            // The tmux session is still alive; "ready" would wrongly indicate it needs dispatch
-            StopFailure: "failed",
-            SessionEnd: "completed",
+            // Stop = Claude finished a turn (idle between turns) - keep running
+            StopFailure: isManualGate ? "running" : "failed",
+            SessionEnd: isManualGate ? "running" : "completed",
           };
 
           let newStatus = statusMap[event];
@@ -143,6 +146,17 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
             actor: "hook",
             data: { event, ...payload } as Record<string, unknown>,
           });
+
+          // For manual gate: log errors/completions as events but don't change status
+          if (isManualGate && (event === "StopFailure" || event === "SessionEnd")) {
+            const errorMsg = payload.error ?? payload.error_details;
+            if (errorMsg) {
+              store.logEvent(sessionId, "agent_error", {
+                actor: "agent",
+                data: { error: String(errorMsg), event },
+              });
+            }
+          }
 
           if (newStatus) {
             const updates: Partial<store.Session> = { status: newStatus as any };

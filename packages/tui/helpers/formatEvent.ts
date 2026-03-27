@@ -10,6 +10,8 @@ export function formatEvent(type: string, data?: Record<string, unknown>): strin
       return `Stage completed: ${data?.stage ?? ""}`;
     case "agent_completed":
       return `Agent completed: ${data?.summary ? String(data.summary).slice(0, 80) : "task done"}`;
+    case "agent_error":
+      return `Agent error: ${data?.error ? String(data.error).slice(0, 80) : "unknown"}`;
     case "agent_exited": {
       const output = data?.last_output ? String(data.last_output).slice(0, 60) : "no output";
       return `Agent crashed: ${output}`;
