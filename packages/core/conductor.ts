@@ -279,10 +279,10 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
   });
 
   // Store as message for the TUI chat view
-  const content = report.type === "completed" ? (report as any).summary
-    : report.type === "question" ? (report as any).question
-    : report.type === "error" ? (report as any).error
-    : (report as any).message || "working";
+  // Use || (not ??) so empty strings also trigger the fallback chain
+  const content = (report as any).summary || (report as any).message
+    || (report as any).question || (report as any).error
+    || JSON.stringify(report);
   store.addMessage({
     session_id: sessionId,
     role: "agent",

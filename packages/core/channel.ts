@@ -106,7 +106,8 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 
   if (req.params.name === "report") {
     const reportType = args.type as string;
-    const message = args.message as string;
+    // Agents sometimes pass "summary" instead of "message" — accept both
+    const message = (args.message ?? args.summary ?? args.question ?? args.error ?? "") as string;
 
     const report: OutboundMessage = (() => {
       const base = { sessionId: SESSION_ID, stage: process.env.ARK_STAGE ?? "" };
