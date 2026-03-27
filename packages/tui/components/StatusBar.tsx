@@ -81,44 +81,37 @@ const NAV_HINTS = [
 ];
 
 function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
-  const hints: React.ReactNode[] = [
-    ...NAV_HINTS,
-    <KeyHint key="tab" k="Tab" label="detail" />,
-  ];
+  const hints: React.ReactNode[] = [...NAV_HINTS];
 
   if (s) {
     switch (s.status) {
       case "ready":
       case "blocked":
         hints.push(<KeyHint key="enter" k="Enter" label="dispatch" />);
-        hints.push(<KeyHint key="x" k="x" label="delete" />);
         break;
       case "running":
         hints.push(<KeyHint key="a" k="a" label="attach" />);
-        hints.push(<KeyHint key="t" k="t" label="talk" />);
         hints.push(<KeyHint key="s" k="s" label="stop" />);
         hints.push(<KeyHint key="d" k="d" label="done" />);
         break;
       case "stopped":
       case "failed":
-        hints.push(<KeyHint key="enter" k="Enter" label="restart" />);
-        hints.push(<KeyHint key="x" k="x" label="delete" />);
-        break;
       case "completed":
         hints.push(<KeyHint key="enter" k="Enter" label="restart" />);
-        hints.push(<KeyHint key="x" k="x" label="delete" />);
         break;
       case "waiting":
         hints.push(<KeyHint key="a" k="a" label="attach" />);
         hints.push(<KeyHint key="s" k="s" label="stop" />);
         break;
     }
-    hints.push(<KeyHint key="c" k="c" label="fork" />);
-    hints.push(<KeyHint key="C" k="C" label="clone" />);
+    // Chat
+    hints.push(<KeyHint key="tT" k="t/T" label="chat/threads" />);
+    // Session ops
+    hints.push(<KeyHint key="cC" k="c/C" label="fork/clone" />);
+    hints.push(<KeyHint key="x" k="x" label="delete" />);
     hints.push(<KeyHint key="m" k="m" label="move" />);
   }
 
-  hints.push(<KeyHint key="T" k="T" label="threads" />);
   hints.push(<KeyHint key="o" k="o" label="groups" />);
   hints.push(<KeyHint key="n" k="n" label="new" />);
   hints.push(<KeyHint key="q" k="q" label="quit" />);
