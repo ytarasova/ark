@@ -767,6 +767,7 @@ interface TalkToSessionProps {
 function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
   const [msg, setMsg] = useState("");
   const [messages, setMessages] = useState<core.Message[]>([]);
+  const [scrollMode, setScrollMode] = useState(false);
 
 
   // Load messages and mark as read
@@ -818,7 +819,14 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
     });
   };
 
-  // Build message elements for ScrollBox
+  // Tab toggles focus: messages (scroll with j/k) vs input (type)
+  const inputFocused = !scrollMode;
+
+  useInput((input, key) => {
+    if (key.tab) { setScrollMode(s => !s); return; }
+    if (key.escape) { onDone(null); }
+  });
+
   const messageElements = messages.map((m) => {
     const ts = m.created_at.slice(11, 16);
     const roleColor = m.role === "user" ? "cyan" : m.role === "agent" ? "green" : "gray";
@@ -838,24 +846,28 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
       <Text bold color="cyan">{` Chat: ${session.summary ?? session.id} `}</Text>
       <Text> </Text>
 
-      {/* Message history — scrollable, follows latest */}
+      {/* Messages — j/k/g/G scroll when focused, auto-follow when input focused */}
       {messages.length === 0 ? (
         <Box flexGrow={1}><Text dimColor>{"  No messages yet. Type below to send."}</Text></Box>
       ) : (
-        <ScrollBox followIndex={messageElements.length - 1} reserveRows={12}>
+        <ScrollBox
+          active={scrollMode}
+          followIndex={inputFocused ? messageElements.length - 1 : undefined}
+          reserveRows={12}
+        >
           {messageElements}
         </ScrollBox>
       )}
 
-      {/* Input */}
-      <Text> </Text>
+      {/* Separator + input */}
+      <Text dimColor>{"  " + "-".repeat(40)}</Text>
       <Box>
-        <Text color="cyan">{"> "}</Text>
+        <Text color={inputFocused ? "cyan" : "gray"}>{"> "}</Text>
         <TextInputEnhanced
           value={msg}
           onChange={setMsg}
           onSubmit={send}
-          focus={true}
+          focus={inputFocused}
           placeholder="Type a message..."
         />
       </Box>

@@ -11,6 +11,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import * as core from "../../core/index.js";
 import { TextInputEnhanced } from "./TextInputEnhanced.js";
+import { ScrollBox } from "./ScrollBox.js";
 
 interface ThreadsPanelProps {
   sessions: core.Session[];
@@ -112,8 +113,12 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
     return () => clearInterval(t);
   }, [sessions]);
 
+  const [scrollMode, setScrollMode] = useState(false);
+  const inputFocused = !scrollMode;
+
   useInput((input, key) => {
-    if (key.escape) onDone();
+    if (key.tab && !showCompletions) { setScrollMode(s => !s); return; }
+    if (key.escape) { onDone(); }
   });
 
   const handleTab = useCallback(() => {
@@ -192,29 +197,34 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
       <Text bold color="cyan">{" Threads "}</Text>
       <Text> </Text>
 
-      {/* Message stream — scrollable */}
-      <Box flexDirection="column" flexGrow={1} overflow="hidden">
-        {visible.length === 0 && (
-          <Text dimColor>{"  No messages yet. Agents will post here."}</Text>
-        )}
-        {visible.map((m) => {
-          const isUser = m.role === "user";
-          const isSystem = m.role === "system";
-          const roleColor = isUser ? "cyan" : isSystem ? "gray" : "green";
-          const sender = isUser ? "you" : m.sessionName;
-          const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
-          const prefix = isUser && m.sessionId ? ` →${(sessions.find(s => s.id === m.sessionId)?.summary ?? m.sessionId).slice(0, 15)}` : "";
-          return (
-            <Text key={m.id} wrap="wrap">
-              <Text dimColor>{`${m.time} `}</Text>
-              <Text color={roleColor as any} bold>{sender}</Text>
-              {prefix && <Text dimColor>{` ${prefix}`}</Text>}
-              {typeTag && <Text dimColor>{typeTag}</Text>}
-              <Text>{` ${m.content}`}</Text>
-            </Text>
-          );
-        })}
-      </Box>
+      {/* Message stream — j/k/g/G scroll when focused, auto-follow when input focused */}
+      {visible.length === 0 ? (
+        <Box flexGrow={1}><Text dimColor>{"  No messages yet. Agents will post here."}</Text></Box>
+      ) : (
+        <ScrollBox
+          active={scrollMode}
+          followIndex={inputFocused ? visible.length - 1 : undefined}
+          reserveRows={12}
+        >
+          {visible.map((m) => {
+            const isUser = m.role === "user";
+            const isSystem = m.role === "system";
+            const roleColor = isUser ? "cyan" : isSystem ? "gray" : "green";
+            const sender = isUser ? "you" : m.sessionName;
+            const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
+            const prefix = isUser && m.sessionId ? ` \u2192${(sessions.find(s => s.id === m.sessionId)?.summary ?? m.sessionId).slice(0, 15)}` : "";
+            return (
+              <Text key={m.id} wrap="wrap">
+                <Text dimColor>{`${m.time} `}</Text>
+                <Text color={roleColor as any} bold>{sender}</Text>
+                {prefix && <Text dimColor>{` ${prefix}`}</Text>}
+                {typeTag && <Text dimColor>{typeTag}</Text>}
+                <Text>{` ${m.content}`}</Text>
+              </Text>
+            );
+          })}
+        </ScrollBox>
+      )}
 
       {/* Autocomplete dropdown */}
       {showCompletions && (
@@ -236,7 +246,7 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
       {/* Input separator */}
       <Text dimColor>{"  " + "-".repeat(40)}</Text>
       <Box>
-        <Text color="cyan">{"> "}</Text>
+        <Text color={inputFocused ? "cyan" : "gray"}>{"> "}</Text>
         <TextInputEnhanced
           value={msg}
           onChange={setMsg}
@@ -244,7 +254,7 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
           onTab={showCompletions ? handleTab : undefined}
           onUpArrow={showCompletions ? handleUpArrow : undefined}
           onDownArrow={showCompletions ? handleDownArrow : undefined}
-          focus={true}
+          focus={inputFocused}
           placeholder="@session-name message..."
         />
       </Box>
