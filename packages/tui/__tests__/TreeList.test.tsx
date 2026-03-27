@@ -64,4 +64,69 @@ describe("TreeList", () => {
     expect(lastFrame()!).toContain("Gamma");
     unmount();
   });
+
+  it("sel follows visual group order, not original array order", () => {
+    // Items in reverse group order (z before a)
+    const unsorted = [
+      { id: "z", name: "Zulu", group: "z-group" },
+      { id: "a", name: "Alpha", group: "a-group" },
+    ];
+    // sel=0 should select the first VISUAL item (a-group → Alpha)
+    const { lastFrame, unmount } = render(
+      <TreeList
+        items={unsorted}
+        groupBy={(i) => i.group}
+        renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
+        sel={0}
+      />
+    );
+    const frame = lastFrame()!;
+    // Alpha (a-group) should be selected, not Zulu (z-group)
+    expect(frame).toContain("> Alpha");
+    expect(frame).not.toContain("> Zulu");
+    unmount();
+  });
+
+  it("sel=1 selects second visual item across groups", () => {
+    const unsorted = [
+      { id: "z", name: "Zulu", group: "z-group" },
+      { id: "a", name: "Alpha", group: "a-group" },
+    ];
+    // sel=1 should select Zulu (second in visual order)
+    const { lastFrame, unmount } = render(
+      <TreeList
+        items={unsorted}
+        groupBy={(i) => i.group}
+        renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
+        sel={1}
+      />
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("> Zulu");
+    expect(frame).not.toContain("> Alpha");
+    unmount();
+  });
+
+  it("empty groups between items don't break selection", () => {
+    const items = [
+      { id: "c", name: "Charlie", group: "c-group" },
+      { id: "a", name: "Alpha", group: "a-group" },
+    ];
+    // b-group is empty but present
+    const { lastFrame, unmount } = render(
+      <TreeList
+        items={items}
+        groupBy={(i) => i.group}
+        emptyGroups={["b-group"]}
+        renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
+        sel={0}
+      />
+    );
+    const frame = lastFrame()!;
+    // sel=0 should be Alpha (a-group, first alphabetically)
+    expect(frame).toContain("> Alpha");
+    expect(frame).toContain("(empty)"); // b-group shows as empty
+    expect(frame).not.toContain("> Charlie");
+    unmount();
+  });
 });
