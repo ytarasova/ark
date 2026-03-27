@@ -112,6 +112,62 @@ describe("EC2 metrics", () => {
   });
 
   // -----------------------------------------------------------------------
+  // parseSnapshot - ANSI sanitization
+  // -----------------------------------------------------------------------
+  describe("ANSI sanitization", () => {
+    it("parseSnapshot strips ANSI from process command names", () => {
+      const input = `=== CPU ===
+10.0
+=== MEMORY ===
+4096.0 16384.0
+=== DISK ===
+20
+=== UPTIME ===
+up 1 hour
+=== IDLE ===
+0
+=== TMUX ===
+(none)
+=== CLAUDE ===
+=== PROCESSES ===
+9999\t30.0%\t5.0%\t\x1b[32mclaude\x1b[0m\tmyapp
+=== NETWORK ===
+0.0 0.0`;
+
+      const snap = parseSnapshot(input);
+      expect(snap.processes).toHaveLength(1);
+      expect(snap.processes[0].command).toBe("claude");
+      expect(snap.processes[0].command).not.toContain("\x1b");
+    });
+
+    it("parseSnapshot skips processes with empty command", () => {
+      const input = `=== CPU ===
+10.0
+=== MEMORY ===
+4096.0 16384.0
+=== DISK ===
+20
+=== UPTIME ===
+up 1 hour
+=== IDLE ===
+0
+=== TMUX ===
+(none)
+=== CLAUDE ===
+=== PROCESSES ===
+1111\t10.0%\t2.0%\t\t
+2222\t20.0%\t3.0%\tnode\tserver
+=== NETWORK ===
+0.0 0.0`;
+
+      const snap = parseSnapshot(input);
+      expect(snap.processes).toHaveLength(1);
+      expect(snap.processes[0].pid).toBe("2222");
+      expect(snap.processes[0].command).toBe("node");
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // SSH command strings
   // -----------------------------------------------------------------------
   describe("SSH commands", () => {
@@ -123,6 +179,11 @@ describe("EC2 metrics", () => {
     it("SSH_DOCKER_CMD is a non-empty string", () => {
       expect(typeof SSH_DOCKER_CMD).toBe("string");
       expect(SSH_DOCKER_CMD.length).toBeGreaterThan(0);
+    });
+
+    it("SSH_FAST_CMD includes top fallback for CPU", () => {
+      expect(SSH_FAST_CMD).toContain("mpstat");
+      expect(SSH_FAST_CMD).toContain("top");
     });
   });
 

@@ -258,6 +258,76 @@ describe("Conductor /hooks/status endpoint", () => {
     expect(config.usage).toBeUndefined();
   });
 
+  it("UserPromptSubmit does not override completed status", async () => {
+    const session = createSession({ summary: "hook test" });
+    updateSession(session.id, { status: "completed" });
+
+    const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
+    expect(resp.status).toBe(200);
+    const body = await resp.json();
+    expect(body.mapped).toBe("no-op");
+
+    const updated = getSession(session.id);
+    expect(updated?.status).toBe("completed");
+  });
+
+  it("UserPromptSubmit does not override failed status back to running", async () => {
+    const session = createSession({ summary: "hook test" });
+    updateSession(session.id, { status: "failed", error: "agent crashed" });
+
+    const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
+    expect(resp.status).toBe(200);
+    const body = await resp.json();
+    expect(body.mapped).toBe("no-op");
+
+    const updated = getSession(session.id);
+    expect(updated?.status).toBe("failed");
+    expect(updated?.error).toBe("agent crashed");
+  });
+
+  it("SessionEnd can still set completed on running session", async () => {
+    const session = createSession({ summary: "hook test" });
+    updateSession(session.id, { status: "running" });
+
+    const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
+    expect(resp.status).toBe(200);
+    const body = await resp.json();
+    expect(body.mapped).toBe("completed");
+
+    const updated = getSession(session.id);
+    expect(updated?.status).toBe("completed");
+  });
+
+  it("Stop hook does not index transcript when claude session ID does not match", async () => {
+    const session = createSession({ summary: "hook test" });
+    updateSession(session.id, { status: "running", claude_session_id: "real-claude-session-abc" });
+
+    // Write a fake transcript file named after a DIFFERENT claude session
+    const { writeFileSync: wf } = await import("fs");
+    const { join: j } = await import("path");
+    const transcriptPath = j(ctx.arkDir, "different-claude-session-xyz.jsonl");
+    wf(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "hello" }] } }));
+
+    const resp = await postHook(session.id, {
+      hook_event_name: "Stop",
+      transcript_path: transcriptPath,
+      session_id: "different-claude-session-xyz",
+    });
+    expect(resp.status).toBe(200);
+
+    // The transcript should NOT have been indexed because the hook's session_id
+    // ("different-claude-session-xyz") does not match the ark session's claude_session_id
+    // ("real-claude-session-abc"). We verify by checking the FTS5 index table directly.
+    const { getDb } = await import("../store.js");
+    const db = getDb();
+    let count = 0;
+    try {
+      const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index WHERE session_id = ?").get(session.id) as any;
+      count = row?.c ?? 0;
+    } catch { /* FTS5 table may not exist */ }
+    expect(count).toBe(0);
+  });
+
   it("returns 400 for missing session param", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status`, {
       method: "POST",
