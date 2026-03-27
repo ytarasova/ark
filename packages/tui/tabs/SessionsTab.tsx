@@ -271,12 +271,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
           />
         }
         right={
-          asyncState.loading && asyncState.label ? (
-            <Box flexDirection="column" flexGrow={1} justifyContent="center" alignItems="center">
-              <Text color="yellow"><Spinner type="dots" />{` ${asyncState.label}`}</Text>
-            </Box>
-          )
-          : formOverlay ? formOverlay
+          formOverlay ? formOverlay
           : cloneMode ? (
             <CloneSession
               session={selected}
