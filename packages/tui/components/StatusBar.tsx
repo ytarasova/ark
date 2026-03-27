@@ -93,6 +93,7 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
 
   // Sessions
   if (s) {
+    // Interact with current session
     switch (s.status) {
       case "ready":
       case "blocked":
@@ -100,6 +101,7 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
         break;
       case "running":
         hints.push(<KeyHint key="a" k="a" label="attach" />);
+        hints.push(<KeyHint key="tT" k="t/T" label="chat/threads" />);
         hints.push(<KeyHint key="s" k="s" label="stop" />);
         hints.push(<KeyHint key="d" k="d" label="done" />);
         break;
@@ -110,16 +112,18 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
         break;
       case "waiting":
         hints.push(<KeyHint key="a" k="a" label="attach" />);
+        hints.push(<KeyHint key="tT2" k="t/T" label="chat/threads" />);
         hints.push(<KeyHint key="s" k="s" label="stop" />);
         break;
     }
-    hints.push(<KeyHint key="tT" k="t/T" label="chat/threads" />);
+    // Create / duplicate
     hints.push(<KeyHint key="cC" k="c/C" label="fork/clone" />);
-    hints.push(<KeyHint key="x" k="x" label="delete" />);
+    // Organize
     hints.push(<KeyHint key="m" k="m" label="move" />);
+    hints.push(<KeyHint key="x" k="x" label="delete" />);
   }
-  hints.push(<KeyHint key="o" k="o" label="groups" />);
   hints.push(<KeyHint key="n" k="n" label="new" />);
+  hints.push(<KeyHint key="o" k="o" label="groups" />);
   hints.push(sep());
 
   // App
@@ -128,39 +132,41 @@ function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
 }
 
 function getComputeHints(): React.ReactNode[] {
+  sepId = 0;
   return [
-    ...NAV_HINTS,
+    ...NAV_HINTS, sep(),
     <KeyHint key="enter" k="Enter" label="provision" />,
     <KeyHint key="s" k="s" label="start/stop" />,
     <KeyHint key="R" k="R" label="reboot" />,
     <KeyHint key="t" k="t" label="test" />,
     <KeyHint key="x" k="x" label="delete" />,
     <KeyHint key="c" k="c" label="clean" />,
-    <KeyHint key="n" k="n" label="new" />,
+    <KeyHint key="n" k="n" label="new" />, sep(),
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
 
 function getHistoryHints(): React.ReactNode[] {
+  sepId = 0;
   return [
-    ...NAV_HINTS,
+    ...NAV_HINTS, sep(),
     <KeyHint key="enter" k="Enter" label="import" />,
-    <KeyHint key="r" k="r" label="refresh" />,
-    <KeyHint key="R" k="R" label="rebuild" />,
-    <KeyHint key="s" k="s" label="search" />,
+    <KeyHint key="r" k="r/R" label="refresh/rebuild" />,
+    <KeyHint key="s" k="s" label="search" />, sep(),
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
 
 function getAgentsHints(): React.ReactNode[] {
+  sepId = 0;
   return [
-    ...NAV_HINTS,
-    <KeyHint key="tab" k="Tab" label="detail" />,
+    ...NAV_HINTS, sep(),
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
 
 function getToolsHints(): React.ReactNode[] {
+  sepId = 0;
   return [
     <KeyHint key="q" k="q" label="quit" />,
   ];
