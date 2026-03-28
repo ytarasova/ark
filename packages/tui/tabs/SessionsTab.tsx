@@ -488,6 +488,7 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
       {s.stage && <KeyValue label="Stage">{s.stage}</KeyValue>}
       {s.agent && <KeyValue label="Agent">{s.agent}</KeyValue>}
       {s.group_name && <KeyValue label="Group">{s.group_name}</KeyValue>}
+      {s.pr_url && <KeyValue label="PR">{s.pr_url}</KeyValue>}
 
       {/* Token usage from hooks */}
       {(s.config as any)?.usage && (

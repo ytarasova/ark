@@ -40,6 +40,8 @@ export interface ProgressReport {
   message: string;
   toolCalls?: number;
   filesChanged?: string[];
+  /** GitHub PR URL - set when agent creates a PR */
+  pr_url?: string;
 }
 
 /** Agent → Conductor: stage completed */
@@ -52,6 +54,8 @@ export interface CompletionReport {
   commits: string[];
   cost?: number;
   turns?: number;
+  /** GitHub PR URL - set when agent creates a PR */
+  pr_url?: string;
 }
 
 /** Agent → Conductor: question for human */

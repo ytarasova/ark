@@ -75,6 +75,10 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
             items: { type: "string" },
             description: "Commit hashes (for completed reports)",
           },
+          pr_url: {
+            type: "string",
+            description: "GitHub PR URL - include when you create a pull request",
+          },
         },
         required: ["type", "message"],
       },
@@ -111,17 +115,20 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     const report: OutboundMessage = (() => {
       const base = { sessionId: SESSION_ID, stage: process.env.ARK_STAGE ?? "" };
+      const prUrl = args.pr_url as string | undefined;
       switch (reportType) {
         case "completed":
           return { ...base, type: "completed" as const, summary: message,
-            filesChanged: (args.filesChanged as string[]) ?? [], commits: (args.commits as string[]) ?? [] };
+            filesChanged: (args.filesChanged as string[]) ?? [], commits: (args.commits as string[]) ?? [],
+            ...(prUrl ? { pr_url: prUrl } : {}) };
         case "question":
           return { ...base, type: "question" as const, question: message };
         case "error":
           return { ...base, type: "error" as const, error: message };
         default:
           return { ...base, type: "progress" as const, message,
-            filesChanged: (args.filesChanged as string[]) ?? [] };
+            filesChanged: (args.filesChanged as string[]) ?? [],
+            ...(prUrl ? { pr_url: prUrl } : {}) };
       }
     })();
 

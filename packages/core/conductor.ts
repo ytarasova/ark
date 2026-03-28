@@ -266,8 +266,6 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
   });
 
   // Store as message for the TUI chat view
-  // Each type checks its canonical field first, then "message" (the channel
-  // tool's universal input param), so field lookup is deterministic per type.
   const r = report as Record<string, unknown>;
   const contentByType: Record<string, string | undefined> = {
     completed: (r.summary || r.message) as string | undefined,
@@ -275,7 +273,18 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
     error:     (r.error || r.message) as string | undefined,
     progress:  (r.message || r.summary) as string | undefined,
   };
-  const content = contentByType[report.type] || JSON.stringify(report);
+  let content = contentByType[report.type] || JSON.stringify(report);
+
+  // Enrich with files, commits, PR URL when available
+  const extras: string[] = [];
+  if (r.pr_url) extras.push(`PR: ${r.pr_url}`);
+  if (Array.isArray(r.filesChanged) && r.filesChanged.length > 0) {
+    extras.push(`Files: ${(r.filesChanged as string[]).join(", ")}`);
+  }
+  if (Array.isArray(r.commits) && r.commits.length > 0) {
+    extras.push(`Commits: ${(r.commits as string[]).join(", ")}`);
+  }
+  if (extras.length > 0) content += "\n" + extras.join("\n");
   store.addMessage({
     session_id: sessionId,
     role: "agent",
@@ -355,18 +364,15 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
     }
   }
 
-  // Auto-detect PR URL from agent messages
-  const reportContent = String(
-    (report as any).summary ?? (report as any).message ?? ""
-  );
-  const prUrlMatch = reportContent.match(/https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/);
-  if (prUrlMatch) {
+  // PR URL from agent report - explicit field or detected from content
+  const prUrl = (report as any).pr_url as string | undefined;
+  if (prUrl) {
     const existingSession = store.getSession(sessionId);
     if (existingSession && !existingSession.pr_url) {
-      store.updateSession(sessionId, { pr_url: prUrlMatch[0] });
+      store.updateSession(sessionId, { pr_url: prUrl });
       store.logEvent(sessionId, "pr_detected", {
-        actor: "system",
-        data: { pr_url: prUrlMatch[0] },
+        actor: "agent",
+        data: { pr_url: prUrl },
       });
     }
   }

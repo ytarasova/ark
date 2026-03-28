@@ -7,25 +7,24 @@ let ctx: TestContext;
 beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
 afterEach(() => { ctx.cleanup(); });
 
-describe("PR auto-detection", () => {
-  it("extracts PR URL from agent report content", () => {
-    // This tests the regex pattern
-    const content = "Created PR: https://github.com/owner/repo/pull/42 for the changes.";
-    const match = content.match(/https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/);
-    expect(match).not.toBeNull();
-    expect(match![0]).toBe("https://github.com/owner/repo/pull/42");
-  });
-
-  it("does not match non-PR GitHub URLs", () => {
-    const content = "See https://github.com/owner/repo/issues/10 for details.";
-    const match = content.match(/https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/);
-    expect(match).toBeNull();
-  });
-
-  it("pr_url can be stored on session", () => {
+describe("PR URL on sessions", () => {
+  it("pr_url can be stored and retrieved", () => {
     const session = createSession({ summary: "pr-test" });
     updateSession(session.id, { pr_url: "https://github.com/owner/repo/pull/1" });
     const updated = getSession(session.id);
     expect(updated?.pr_url).toBe("https://github.com/owner/repo/pull/1");
+  });
+
+  it("pr_url is null by default", () => {
+    const session = createSession({ summary: "no-pr" });
+    expect(getSession(session.id)?.pr_url).toBeFalsy();
+  });
+
+  it("pr_url persists across reads", () => {
+    const session = createSession({ summary: "persist" });
+    updateSession(session.id, { pr_url: "https://github.com/a/b/pull/99" });
+    // Read twice
+    expect(getSession(session.id)?.pr_url).toBe("https://github.com/a/b/pull/99");
+    expect(getSession(session.id)?.pr_url).toBe("https://github.com/a/b/pull/99");
   });
 });
