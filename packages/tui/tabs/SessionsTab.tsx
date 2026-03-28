@@ -884,7 +884,7 @@ function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
       )}
 
       {/* Input panel */}
-      <Box borderStyle="single" borderColor={inputFocused ? "cyan" : "gray"} paddingX={1}>
+      <Box borderStyle="single" borderColor={inputFocused ? "cyan" : "gray"} paddingX={1} width="100%">
         <Text color={inputFocused ? "cyan" : "gray"}>{"> "}</Text>
         <TextInputEnhanced
           value={msg}

@@ -198,7 +198,7 @@ export function TextInputEnhanced({
   const showPlaceholder = value.length === 0 && placeholder;
 
   if (showPlaceholder) {
-    return <Text><Text inverse>{" "}</Text><Text dimColor>{placeholder}</Text></Text>;
+    return <Text wrap="wrap"><Text inverse>{" "}</Text><Text dimColor>{placeholder}</Text></Text>;
   }
 
   // Multi-line collapse: if value has more lines than MAX_DISPLAY_LINES,
@@ -221,7 +221,7 @@ export function TextInputEnhanced({
   const after = value.slice(cursor + 1);
 
   return (
-    <Text>
+    <Text wrap="wrap">
       {before}
       <Text inverse>{cursorChar}</Text>
       {after}

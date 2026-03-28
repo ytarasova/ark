@@ -12,9 +12,29 @@ import { execFile, execFileSync, spawn } from "child_process";
 import { promisify } from "util";
 import { existsSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
-import { TRACKS_DIR } from "./store.js";
+import { TRACKS_DIR, ARK_DIR } from "./store.js";
 
 const execFileAsync = promisify(execFile);
+
+/** Ark tmux config: Ctrl+Q to detach, mouse, big history */
+const ARK_TMUX_CONF = `
+set -g mouse on
+set -g history-limit 50000
+set -ga update-environment "TERM TERM_PROGRAM COLORTERM"
+set -g status-left ""
+set -g status-right " Ctrl+Q detach | #{session_name} "
+set -g status-style "bg=colour235,fg=colour248"
+set -g status-right-style "bg=colour235,fg=colour214"
+# Ctrl+Q to detach (no prefix needed)
+bind -n C-q detach-client
+`.trim();
+
+/** Ensure ~/.ark/tmux.conf exists, return its path */
+function ensureTmuxConf(): string {
+  const confPath = join(ARK_DIR(), "tmux.conf");
+  writeFileSync(confPath, ARK_TMUX_CONF + "\n");
+  return confPath;
+}
 
 export interface TmuxSession {
   name: string;
@@ -76,7 +96,9 @@ export async function createSessionAsync(name: string, command: string, opts?: {
   height?: number;
 }): Promise<void> {
   await killSessionAsync(name);
+  const conf = ensureTmuxConf();
   await execFileAsync("tmux", [
+    "-f", conf,
     "new-session", "-d", "-s", name,
     "-x", String(opts?.width ?? 220),
     "-y", String(opts?.height ?? 50),
@@ -90,7 +112,9 @@ export async function createSessionWithSendKeysAsync(name: string, command: stri
   height?: number;
 }): Promise<void> {
   await killSessionAsync(name);
+  const conf = ensureTmuxConf();
   await execFileAsync("tmux", [
+    "-f", conf,
     "new-session", "-d", "-s", name,
     "-x", String(opts?.width ?? 220),
     "-y", String(opts?.height ?? 50),

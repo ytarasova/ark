@@ -127,9 +127,11 @@ set -g mouse on
 set -g history-limit 50000
 set -ga update-environment "TERM TERM_PROGRAM COLORTERM"
 set -g status-left ""
-set -g status-right " Ctrl+B d detach | #{session_name} "
+set -g status-right " Ctrl+Q detach | #{session_name} "
 set -g status-style "bg=colour235,fg=colour248"
 set -g status-right-style "bg=colour235,fg=colour214"
+# Ctrl+Q to detach (no prefix needed)
+bind -n C-q detach-client
 TMUX
 # allow-passthrough requires tmux 3.3+
 if tmux -V | awk '{if ($2+0 >= 3.3) exit 0; else exit 1}'; then
