@@ -5,7 +5,7 @@ import { existsSync } from "fs";
 import { join } from "path";
 import * as core from "../../core/index.js";
 import { ICON, COLOR } from "../constants.js";
-import { ago, hms, humanTokens, extractGitHubBase } from "../helpers.js";
+import { ago, hms, humanTokens } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
@@ -508,7 +508,7 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
       {/* Files changed - as a collapsible list */}
       {(s.config as any)?.filesChanged?.length > 0 && (() => {
         const files: string[] = (s.config as any).filesChanged;
-        const ghBase = extractGitHubBase(s.pr_url ?? s.repo ?? "");
+        const ghBase = (s.config as any)?.github_url as string | null;
         return (
           <>
             <Text> </Text>
@@ -528,7 +528,7 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
       {/* Commits - with GitHub links */}
       {(s.config as any)?.commits?.length > 0 && (() => {
         const commits: string[] = (s.config as any).commits;
-        const ghBase = extractGitHubBase(s.pr_url ?? s.repo ?? "");
+        const ghBase = (s.config as any)?.github_url as string | null;
         return (
           <>
             <Text> </Text>

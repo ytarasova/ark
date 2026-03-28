@@ -124,9 +124,9 @@ describe("ICON and COLOR alignment", () => {
   });
 });
 
-// ── humanTokens and extractGitHubBase ──────────────────────────────────────
+// ── humanTokens ──────────────────────────────────────────────────────────────
 
-import { humanTokens, extractGitHubBase } from "../helpers.js";
+import { humanTokens } from "../helpers.js";
 
 describe("humanTokens", () => {
   it("formats thousands", () => { expect(humanTokens(1500)).toBe("1.5K"); });
@@ -134,19 +134,4 @@ describe("humanTokens", () => {
   it("formats billions", () => { expect(humanTokens(1200000000)).toBe("1.2B"); });
   it("formats small numbers as-is", () => { expect(humanTokens(500)).toBe("500"); });
   it("formats zero", () => { expect(humanTokens(0)).toBe("0"); });
-});
-
-describe("extractGitHubBase", () => {
-  it("extracts from PR URL", () => {
-    expect(extractGitHubBase("https://github.com/owner/repo/pull/42")).toBe("https://github.com/owner/repo");
-  });
-  it("extracts from org/repo format", () => {
-    expect(extractGitHubBase("owner/repo")).toBe("https://github.com/owner/repo");
-  });
-  it("returns null for local path", () => {
-    expect(extractGitHubBase("/Users/yana/Projects/ark")).toBeNull();
-  });
-  it("returns null for empty string", () => {
-    expect(extractGitHubBase("")).toBeNull();
-  });
 });

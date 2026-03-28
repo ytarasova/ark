@@ -27,6 +27,24 @@ import { loadRepoConfig } from "./repo-config.js";
 
 // ── Session lifecycle ───────────────────────────────────────────────────────
 
+/** Resolve GitHub repo URL from a local git directory. Returns null if not a GitHub repo. */
+function resolveGitHubUrl(dir?: string | null): string | null {
+  if (!dir) return null;
+  try {
+    const { execFileSync } = require("child_process");
+    const remote = execFileSync("git", ["-C", dir, "remote", "get-url", "origin"], {
+      encoding: "utf-8", timeout: 5_000,
+    }).trim();
+    // git@github.com:owner/repo.git -> https://github.com/owner/repo
+    const sshMatch = remote.match(/git@github\.com:([^/]+\/[^.]+)/);
+    if (sshMatch) return `https://github.com/${sshMatch[1]}`;
+    // https://github.com/owner/repo.git -> https://github.com/owner/repo
+    const httpsMatch = remote.match(/(https:\/\/github\.com\/[^/]+\/[^/.]+)/);
+    if (httpsMatch) return httpsMatch[1];
+    return null;
+  } catch { return null; }
+}
+
 export function startSession(opts: {
   ticket?: string;
   summary?: string;
@@ -46,6 +64,12 @@ export function startSession(opts: {
     compute_name: opts.compute_name ?? repoConfig.compute,
     group_name: opts.group_name ?? repoConfig.group,
   };
+
+  // Resolve GitHub repo URL from git remote
+  const repoUrl = resolveGitHubUrl(opts.workdir ?? opts.repo);
+  if (repoUrl) {
+    mergedOpts.config = { ...(mergedOpts.config ?? {}), github_url: repoUrl };
+  }
 
   const session = store.createSession(mergedOpts);
 
