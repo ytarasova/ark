@@ -169,18 +169,17 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
     // Steer via channel if session is running
     if (session.status === "running") {
       const channelPort = store.sessionChannelPort(session.id);
-      const payload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
-      try {
-        const { deliverToChannel } = await import("./conductor.js");
-        deliverToChannel(session, channelPort, payload).catch(() => {});
-      } catch {
+      const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
+      import("./conductor.js").then(({ deliverToChannel }) => {
+        deliverToChannel(session, channelPort, steerPayload).catch(() => {});
+      }).catch(() => {
         // Fallback: direct HTTP
         fetch(`http://localhost:${channelPort}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(steerPayload),
         }).catch(() => {});
-      }
+      });
     }
 
     return { action: "steer", sessionId: session.id, message: prompt };
