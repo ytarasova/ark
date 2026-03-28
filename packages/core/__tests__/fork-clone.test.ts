@@ -41,10 +41,10 @@ describe("forkSession (shallow)", () => {
     expect(forked!.claude_session_id).toBeFalsy();
   });
 
-  it("uses original name when no new name given", () => {
+  it("auto-generates unique name when no new name given", () => {
     const original = createSession({ summary: "my-task" });
     const { forkId } = forkSession(original.id);
-    expect(getSession(forkId)!.summary).toBe("my-task");
+    expect(getSession(forkId)!.summary).toBe("my-task (fork)");
   });
 
   it("uses provided name", () => {
