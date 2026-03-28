@@ -48,10 +48,18 @@ export function TextInputEnhanced({
   placeholder,
   focus = true,
 }: TextInputEnhancedProps) {
-  const [cursor, setCursor] = useState(value.length);
+  const [cursor, _setCursor] = useState(value.length);
+  const valueRef = useRef(value);
+  const cursorRef = useRef(cursor);
   const internalEdit = useRef(false);
 
-  // Move cursor to end when value changes externally (e.g. Tab completion)
+  // Update both state and ref atomically so rapid keystrokes read fresh values
+  const setCursor = (c: number) => { cursorRef.current = c; _setCursor(c); };
+
+  // Keep value ref in sync (parent controls value via props)
+  valueRef.current = value;
+
+  // Move cursor to end when value changes externally (e.g. Tab completion, submit clear)
   useEffect(() => {
     if (internalEdit.current) {
       internalEdit.current = false;
@@ -62,6 +70,10 @@ export function TextInputEnhanced({
 
   useInput((input, key) => {
     if (!focus) return;
+
+    // Read from refs to avoid stale closures during fast typing
+    const val = valueRef.current;
+    const cur = cursorRef.current;
 
     if (key.tab && onTab) {
       onTab();
@@ -79,7 +91,7 @@ export function TextInputEnhanced({
     }
 
     if (key.return) {
-      onSubmit?.(value);
+      onSubmit?.(val);
       return;
     }
 
@@ -91,45 +103,81 @@ export function TextInputEnhanced({
 
     // Ctrl+E: end of line
     if (input === "e" && key.ctrl) {
-      setCursor(value.length);
+      setCursor(val.length);
       return;
     }
 
     // Ctrl+B: char left
     if (input === "b" && key.ctrl) {
-      setCursor(c => Math.max(0, c - 1));
+      setCursor(Math.max(0, cur - 1));
       return;
     }
 
     // Ctrl+F: char right
     if (input === "f" && key.ctrl) {
-      setCursor(c => Math.min(value.length, c + 1));
+      setCursor(Math.min(val.length, cur + 1));
+      return;
+    }
+
+    // Meta+B / Option+Left: word hop backward
+    if (input === "b" && key.meta) {
+      const before = val.slice(0, cur);
+      const wordStart = before.replace(/\S+\s*$/, "").length;
+      setCursor(wordStart);
+      return;
+    }
+
+    // Meta+F / Option+Right: word hop forward
+    if (input === "f" && key.meta) {
+      const after = val.slice(cur);
+      const match = after.match(/^\s*\S+/);
+      setCursor(cur + (match ? match[0].length : after.length));
+      return;
+    }
+
+    // Meta+D: delete word forward
+    if (input === "d" && key.meta) {
+      const after = val.slice(cur);
+      const match = after.match(/^\s*\S+/);
+      const wordEnd = cur + (match ? match[0].length : after.length);
+      internalEdit.current = true;
+      const next = val.slice(0, cur) + val.slice(wordEnd);
+      onChange(next);
+      valueRef.current = next;
       return;
     }
 
     // Ctrl+W: delete word backward
     if (input === "w" && key.ctrl) {
-      const before = value.slice(0, cursor);
-      const after = value.slice(cursor);
+      const before = val.slice(0, cur);
+      const after = val.slice(cur);
       const wordStart = before.replace(/\S+\s*$/, "").length;
       internalEdit.current = true;
-      onChange(before.slice(0, wordStart) + after);
+      const next = before.slice(0, wordStart) + after;
+      onChange(next);
+      valueRef.current = next;
       setCursor(wordStart);
+      cursorRef.current = wordStart;
       return;
     }
 
     // Ctrl+U: delete to beginning
     if (input === "u" && key.ctrl) {
       internalEdit.current = true;
-      onChange(value.slice(cursor));
+      const next = val.slice(cur);
+      onChange(next);
+      valueRef.current = next;
       setCursor(0);
+      cursorRef.current = 0;
       return;
     }
 
     // Ctrl+K: delete to end
     if (input === "k" && key.ctrl) {
       internalEdit.current = true;
-      onChange(value.slice(0, cursor));
+      const next = val.slice(0, cur);
+      onChange(next);
+      valueRef.current = next;
       return;
     }
 
@@ -137,11 +185,11 @@ export function TextInputEnhanced({
     if (key.leftArrow) {
       if (key.meta || key.ctrl) {
         // Option+Left / Ctrl+Left: word hop backward
-        const before = value.slice(0, cursor);
+        const before = val.slice(0, cur);
         const wordStart = before.replace(/\S+\s*$/, "").length;
         setCursor(wordStart);
       } else {
-        setCursor(c => Math.max(0, c - 1));
+        setCursor(Math.max(0, cur - 1));
       }
       return;
     }
@@ -150,34 +198,40 @@ export function TextInputEnhanced({
     if (key.rightArrow) {
       if (key.meta || key.ctrl) {
         // Option+Right / Ctrl+Right: word hop forward
-        const after = value.slice(cursor);
+        const after = val.slice(cur);
         const match = after.match(/^\s*\S+/);
-        setCursor(c => c + (match ? match[0].length : after.length));
+        setCursor(cur + (match ? match[0].length : after.length));
       } else {
-        setCursor(c => Math.min(value.length, c + 1));
+        setCursor(Math.min(val.length, cur + 1));
       }
       return;
     }
 
     // Option+Backspace: delete word backward (Mac default)
     if ((key.backspace || key.delete) && key.meta) {
-      if (cursor > 0) {
-        const before = value.slice(0, cursor);
-        const after = value.slice(cursor);
+      if (cur > 0) {
+        const before = val.slice(0, cur);
+        const after = val.slice(cur);
         const wordStart = before.replace(/\S+\s*$/, "").length;
         internalEdit.current = true;
-        onChange(before.slice(0, wordStart) + after);
+        const next = before.slice(0, wordStart) + after;
+        onChange(next);
+        valueRef.current = next;
         setCursor(wordStart);
+        cursorRef.current = wordStart;
       }
       return;
     }
 
     // Backspace
     if (key.backspace || key.delete) {
-      if (cursor > 0) {
+      if (cur > 0) {
         internalEdit.current = true;
-        onChange(value.slice(0, cursor - 1) + value.slice(cursor));
-        setCursor(c => c - 1);
+        const next = val.slice(0, cur - 1) + val.slice(cur);
+        onChange(next);
+        valueRef.current = next;
+        setCursor(cur - 1);
+        cursorRef.current = cur - 1;
       }
       return;
     }
@@ -188,8 +242,12 @@ export function TextInputEnhanced({
       const clean = input.replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, "").replace(/\r\n?/g, "\n");
       if (clean.length > 0) {
         internalEdit.current = true;
-        onChange(value.slice(0, cursor) + clean + value.slice(cursor));
-        setCursor(c => c + clean.length);
+        const next = val.slice(0, cur) + clean + val.slice(cur);
+        onChange(next);
+        valueRef.current = next;
+        const newCur = cur + clean.length;
+        setCursor(newCur);
+        cursorRef.current = newCur;
       }
     }
   });
