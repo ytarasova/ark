@@ -182,6 +182,15 @@ describe("client system", () => {
     expect(typeof m.diskPct).toBe("number");
   });
 
+  it("snapshot returns full system state", async () => {
+    const snap = await client.snapshot();
+    expect(typeof snap.metrics.cpu).toBe("number");
+    expect(snap.metrics.memTotalGb).toBeGreaterThan(0);
+    expect(Array.isArray(snap.sessions)).toBe(true);
+    expect(Array.isArray(snap.processes)).toBe(true);
+    expect(Array.isArray(snap.docker)).toBe(true);
+  });
+
   it("probePorts detects server port", async () => {
     const res = await client.probePorts([TEST_PORT, 19999]);
     const arkd = res.results.find(r => r.port === TEST_PORT);

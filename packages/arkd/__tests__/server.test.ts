@@ -329,6 +329,51 @@ describe("GET /metrics", () => {
   });
 });
 
+// ── Snapshot ────────────────────────────────────────────────────────────────
+
+describe("GET /snapshot", () => {
+  it("returns full system snapshot with all sections", async () => {
+    const { status, data } = await get<any>("/snapshot");
+    expect(status).toBe(200);
+
+    // Metrics section
+    expect(typeof data.metrics.cpu).toBe("number");
+    expect(typeof data.metrics.memUsedGb).toBe("number");
+    expect(typeof data.metrics.memTotalGb).toBe("number");
+    expect(data.metrics.memTotalGb).toBeGreaterThan(0);
+    expect(typeof data.metrics.memPct).toBe("number");
+    expect(typeof data.metrics.diskPct).toBe("number");
+    expect(typeof data.metrics.uptime).toBe("string");
+    expect(typeof data.metrics.netRxMb).toBe("number");
+    expect(typeof data.metrics.netTxMb).toBe("number");
+    expect(typeof data.metrics.idleTicks).toBe("number");
+
+    // Sessions, processes, docker are arrays (may be empty in test env)
+    expect(Array.isArray(data.sessions)).toBe(true);
+    expect(Array.isArray(data.processes)).toBe(true);
+    expect(Array.isArray(data.docker)).toBe(true);
+  });
+
+  it("snapshot sessions include running tmux sessions", async () => {
+    const name = `arkd-snap-test-${Date.now()}`;
+    await post("/agent/launch", {
+      sessionName: name,
+      script: "#!/bin/bash\nsleep 60",
+      workdir: tempDir,
+    });
+    await new Promise(r => setTimeout(r, 500));
+
+    try {
+      const { data } = await get<any>("/snapshot");
+      const found = data.sessions.find((s: any) => s.name === name);
+      expect(found).toBeTruthy();
+      expect(found.status).toBe("detached");
+    } finally {
+      await post("/agent/kill", { sessionName: name });
+    }
+  });
+});
+
 // ── Port probing ────────────────────────────────────────────────────────────
 
 describe("POST /ports/probe", () => {
