@@ -42,6 +42,8 @@ export function formatEvent(type: string, data?: Record<string, unknown>): strin
       return `PR review feedback (${data?.state ?? "comment"})`;
     case "pr_status":
       return `PR ${data?.state?.toLowerCase() ?? "updated"}`;
+    case "pr_detected":
+      return `PR detected: ${data?.pr_url ?? ""}`;
     default:
       // Humanize unknown types: stage_started -> Stage started
       return type.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());

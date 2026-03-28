@@ -1,0 +1,28 @@
+name: pr-review
+description: "Plan, implement, create PR, wait for review approval, then merge"
+stages:
+  - name: plan
+    agent: planner
+    gate: manual
+    artifacts:
+      - PLAN.md
+
+  - name: implement
+    agent: implementer
+    gate: auto
+
+  - name: review
+    agent: worker
+    gate: review
+    task: |
+      Create a pull request for the changes made in the implement stage.
+      Push the branch and open a PR on GitHub. Then wait for review feedback.
+      Address any review comments by pushing fixes to the branch.
+      The session will advance automatically when the PR is approved.
+
+  - name: merge
+    agent: worker
+    gate: auto
+    task: |
+      The PR has been approved. Merge it into the main branch.
+      Verify the build passes after merge.

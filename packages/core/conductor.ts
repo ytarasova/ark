@@ -354,4 +354,20 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
       break;
     }
   }
+
+  // Auto-detect PR URL from agent messages
+  const reportContent = String(
+    (report as any).summary ?? (report as any).message ?? ""
+  );
+  const prUrlMatch = reportContent.match(/https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/);
+  if (prUrlMatch) {
+    const existingSession = store.getSession(sessionId);
+    if (existingSession && !existingSession.pr_url) {
+      store.updateSession(sessionId, { pr_url: prUrlMatch[0] });
+      store.logEvent(sessionId, "pr_detected", {
+        actor: "system",
+        data: { pr_url: prUrlMatch[0] },
+      });
+    }
+  }
 }
