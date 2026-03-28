@@ -41,17 +41,24 @@ afterAll(() => {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Claude session ID used in hook payloads — must appear in the transcript path
+ *  to pass the conductor's "belongs to this session" guard. */
+const CLAUDE_SESSION_ID = "test-claude-session";
+
 async function postHookStatus(sessionId: string, payload: Record<string, unknown>): Promise<Response> {
   return fetch(`http://localhost:${TEST_PORT}/hooks/status?session=${sessionId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ session_id: CLAUDE_SESSION_ID, ...payload }),
   });
 }
 
 function writeTranscript(dir: string, filename: string, lines: object[]): string {
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, filename);
+  // Include CLAUDE_SESSION_ID in the path so the conductor's guard
+  // (transcriptPath.includes(hookClaudeSession)) passes
+  const subdir = join(dir, CLAUDE_SESSION_ID);
+  mkdirSync(subdir, { recursive: true });
+  const path = join(subdir, filename);
   writeFileSync(path, lines.map(l => JSON.stringify(l)).join("\n"));
   return path;
 }
@@ -93,7 +100,7 @@ function toolResultTurn(ts: string) {
 describe("E2E: Hook -> Index -> Query flow", () => {
   it("Stop hook with transcript_path indexes and getSessionConversation returns turns", async () => {
     const session = createSession({ summary: "e2e-conv-basic" });
-    updateSession(session.id, { status: "running" });
+    updateSession(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
     const transcriptPath = writeTranscript(ctx.arkDir, "conv-basic.jsonl", [
       userTurn("fix the auth bug in the login module", "2026-01-01T00:01:00Z"),
@@ -122,7 +129,7 @@ describe("E2E: Hook -> Index -> Query flow", () => {
 describe("E2E: Incremental indexing", () => {
   it("second Stop hook adds new messages without duplicates", async () => {
     const session = createSession({ summary: "e2e-incremental" });
-    updateSession(session.id, { status: "running" });
+    updateSession(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
     const transcriptPath = writeTranscript(ctx.arkDir, "conv-incr.jsonl", [
       userTurn("implement the caching layer for redis", "2026-01-01T00:01:00Z"),
@@ -145,7 +152,7 @@ describe("E2E: Incremental indexing", () => {
     ]);
 
     // Simulate going back to running then stopping again
-    updateSession(session.id, { status: "running" });
+    updateSession(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     await postHookStatus(session.id, {
       hook_event_name: "Stop",
       transcript_path: transcriptPath,
@@ -163,7 +170,7 @@ describe("E2E: Per-session search", () => {
   it("searchSessionConversation is scoped to one session", async () => {
     // Session A — talks about authentication
     const sessionA = createSession({ summary: "e2e-search-A" });
-    updateSession(sessionA.id, { status: "running" });
+    updateSession(sessionA.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathA = writeTranscript(ctx.arkDir, "conv-a.jsonl", [
       userTurn("fix the authentication middleware vulnerability", "2026-01-01T00:01:00Z"),
       assistantTurn("I have patched the authentication middleware to prevent bypass", "2026-01-01T00:02:00Z"),
@@ -172,7 +179,7 @@ describe("E2E: Per-session search", () => {
 
     // Session B — talks about database
     const sessionB = createSession({ summary: "e2e-search-B" });
-    updateSession(sessionB.id, { status: "running" });
+    updateSession(sessionB.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathB = writeTranscript(ctx.arkDir, "conv-b.jsonl", [
       userTurn("optimize the database connection pooling", "2026-01-01T00:01:00Z"),
       assistantTurn("I have optimized the database connection pool settings", "2026-01-01T00:02:00Z"),
@@ -203,7 +210,7 @@ describe("E2E: Cross-session search", () => {
   it("searchTranscripts finds matches across both sessions via FTS5", async () => {
     // Session C — mentions "deployment pipeline"
     const sessionC = createSession({ summary: "e2e-cross-C" });
-    updateSession(sessionC.id, { status: "running" });
+    updateSession(sessionC.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathC = writeTranscript(ctx.arkDir, "conv-c.jsonl", [
       assistantTurn("I have configured the deployment pipeline for staging", "2026-01-01T00:01:00Z"),
     ]);
@@ -211,7 +218,7 @@ describe("E2E: Cross-session search", () => {
 
     // Session D — also mentions "deployment"
     const sessionD = createSession({ summary: "e2e-cross-D" });
-    updateSession(sessionD.id, { status: "running" });
+    updateSession(sessionD.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathD = writeTranscript(ctx.arkDir, "conv-d.jsonl", [
       assistantTurn("Fixed the deployment rollback mechanism for production", "2026-01-01T00:01:00Z"),
     ]);
@@ -234,7 +241,7 @@ describe("E2E: Cross-session search", () => {
 describe("E2E: Token usage stored on hook", () => {
   it("Stop hook with transcript_path stores aggregated token usage", async () => {
     const session = createSession({ summary: "e2e-usage" });
-    updateSession(session.id, { status: "running" });
+    updateSession(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
     const transcriptPath = writeTranscript(ctx.arkDir, "conv-usage.jsonl", [
       userTurn("analyze the performance bottleneck in the query", "2026-01-01T00:01:00Z"),
@@ -270,7 +277,7 @@ describe("E2E: Token usage stored on hook", () => {
 describe("E2E: Noise filtering", () => {
   it("tool_use and tool_result entries are not in getSessionConversation", async () => {
     const session = createSession({ summary: "e2e-noise" });
-    updateSession(session.id, { status: "running" });
+    updateSession(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
     const transcriptPath = writeTranscript(ctx.arkDir, "conv-noise.jsonl", [
       userTurn("please read the config file and explain it", "2026-01-01T00:01:00Z"),

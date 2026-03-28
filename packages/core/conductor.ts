@@ -205,7 +205,6 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
           return Response.json({ status: "ok", mapped: newStatus ?? "no-op" });
         }
 
-        // GitHub webhook for PR review events
         return new Response("Not found", { status: 404 });
       } catch (e) {
         return Response.json({ error: String(e) }, { status: 500 });
@@ -216,7 +215,7 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
   if (!opts?.quiet) console.log(`Ark conductor listening on localhost:${port}`);
 
   // Schedule poller — check every 60 seconds
-  setInterval(async () => {
+  const scheduleTimer = setInterval(async () => {
     try {
       const schedules = listSchedules().filter(s => s.enabled);
       const now = new Date();
@@ -250,11 +249,17 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
   }, 60_000);
 
   // PR review poller - check every 60 seconds
-  setInterval(async () => {
+  const prTimer = setInterval(async () => {
     try { await pollPRReviews(); } catch {}
   }, 60_000);
 
-  return server;
+  return {
+    stop() {
+      clearInterval(scheduleTimer);
+      clearInterval(prTimer);
+      server.stop();
+    },
+  };
 }
 
 function handleReport(sessionId: string, report: OutboundMessage): void {
