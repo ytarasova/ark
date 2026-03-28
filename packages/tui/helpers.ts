@@ -48,3 +48,22 @@ export function getAwsProfiles(): string[] {
     return profiles;
   } catch { return ["default"]; }
 }
+
+/** Format token count as human-readable (1.2K, 3.5M, etc.) */
+export function humanTokens(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+/** Extract GitHub repo base URL from a PR URL or repo path. */
+export function extractGitHubBase(urlOrPath: string): string | null {
+  // From PR URL: https://github.com/owner/repo/pull/42 -> https://github.com/owner/repo
+  const prMatch = urlOrPath.match(/^(https:\/\/github\.com\/[^/]+\/[^/]+)/);
+  if (prMatch) return prMatch[1];
+  // From org/repo format
+  const orgRepo = urlOrPath.match(/^([a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+)$/);
+  if (orgRepo) return `https://github.com/${orgRepo[1]}`;
+  return null;
+}

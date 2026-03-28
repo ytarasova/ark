@@ -5,13 +5,14 @@ import { existsSync } from "fs";
 import { join } from "path";
 import * as core from "../../core/index.js";
 import { ICON, COLOR } from "../constants.js";
-import { ago, hms } from "../helpers.js";
+import { ago, hms, humanTokens, extractGitHubBase } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { ScrollBox } from "../components/ScrollBox.js";
+import { Link } from "../components/Link.js";
 import { KeyValue } from "../components/KeyValue.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
@@ -488,20 +489,60 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
       {s.stage && <KeyValue label="Stage">{s.stage}</KeyValue>}
       {s.agent && <KeyValue label="Agent">{s.agent}</KeyValue>}
       {s.group_name && <KeyValue label="Group">{s.group_name}</KeyValue>}
-      {s.pr_url && <KeyValue label="PR">{s.pr_url}</KeyValue>}
-      {(s.config as any)?.filesChanged?.length > 0 && (
-        <KeyValue label="Files">{(s.config as any).filesChanged.join(", ")}</KeyValue>
-      )}
-      {(s.config as any)?.commits?.length > 0 && (
-        <KeyValue label="Commits">{(s.config as any).commits.map((c: string) => c.slice(0, 7)).join(", ")}</KeyValue>
-      )}
-
-      {/* Token usage from hooks */}
-      {(s.config as any)?.usage && (
-        <KeyValue label="Tokens">
-          {`${((s.config as any).usage.total_tokens / 1000).toFixed(1)}K (in:${((s.config as any).usage.input_tokens / 1000).toFixed(1)}K out:${((s.config as any).usage.output_tokens / 1000).toFixed(1)}K cache:${((s.config as any).usage.cache_read_input_tokens / 1000).toFixed(1)}K)`}
+      {s.pr_url && (
+        <KeyValue label="PR">
+          <Link url={s.pr_url} color="cyan">{s.pr_url.replace("https://github.com/", "")}</Link>
         </KeyValue>
       )}
+
+      {/* Token usage */}
+      {(s.config as any)?.usage && (() => {
+        const u = (s.config as any).usage;
+        return (
+          <KeyValue label="Tokens">
+            {`${humanTokens(u.total_tokens)} (in:${humanTokens(u.input_tokens)} out:${humanTokens(u.output_tokens)} cache:${humanTokens(u.cache_read_input_tokens ?? 0)})`}
+          </KeyValue>
+        );
+      })()}
+
+      {/* Files changed - as a collapsible list */}
+      {(s.config as any)?.filesChanged?.length > 0 && (() => {
+        const files: string[] = (s.config as any).filesChanged;
+        const ghBase = extractGitHubBase(s.pr_url ?? s.repo ?? "");
+        return (
+          <>
+            <Text> </Text>
+            <Text bold dimColor>{`  Files changed (${files.length})`}</Text>
+            {files.slice(0, 15).map((f, i) => (
+              <Text key={i} dimColor>
+                {ghBase
+                  ? `    \x1b]8;;${ghBase}/blob/main/${f}\x07${f}\x1b]8;;\x07`
+                  : `    ${f}`}
+              </Text>
+            ))}
+            {files.length > 15 && <Text dimColor>{`    ... and ${files.length - 15} more`}</Text>}
+          </>
+        );
+      })()}
+
+      {/* Commits - with GitHub links */}
+      {(s.config as any)?.commits?.length > 0 && (() => {
+        const commits: string[] = (s.config as any).commits;
+        const ghBase = extractGitHubBase(s.pr_url ?? s.repo ?? "");
+        return (
+          <>
+            <Text> </Text>
+            <Text bold dimColor>{`  Commits (${commits.length})`}</Text>
+            {commits.slice(0, 10).map((c, i) => (
+              <Text key={i} dimColor>
+                {ghBase
+                  ? `    \x1b]8;;${ghBase}/commit/${c}\x07${c.slice(0, 7)}\x1b]8;;\x07`
+                  : `    ${c.slice(0, 7)}`}
+              </Text>
+            ))}
+          </>
+        );
+      })()}
 
       {/* Channel status */}
       {s.session_id && (s.status === "running" || s.status === "waiting") && (
