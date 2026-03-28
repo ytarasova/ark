@@ -285,9 +285,10 @@ export function forkSession(sessionId: string, newName?: string): { ok: boolean;
   const original = store.getSession(sessionId);
   if (!original) return { ok: false, forkId: `Session ${sessionId} not found` };
 
+  const baseName = original.summary || sessionId;
   const fork = store.createSession({
     ticket: original.ticket || undefined,
-    summary: newName ?? original.summary ?? sessionId,
+    summary: newName ?? `${baseName} (fork)`,
     repo: original.repo || undefined,
     flow: original.flow,
     compute_name: original.compute_name || undefined,
@@ -316,9 +317,10 @@ export function cloneSession(sessionId: string, newName?: string): { ok: boolean
   const original = store.getSession(sessionId);
   if (!original) return { ok: false, cloneId: `Session ${sessionId} not found` };
 
+  const baseName = original.summary || sessionId;
   const clone = store.createSession({
     ticket: original.ticket || undefined,
-    summary: newName ?? original.summary ?? sessionId,
+    summary: newName ?? `${baseName} (clone)`,
     repo: original.repo || undefined,
     flow: original.flow,
     compute_name: original.compute_name || undefined,
