@@ -1,5 +1,5 @@
 /**
- * ArkdClient integration tests — exercises client methods against a live arkd server.
+ * ArkdClient integration tests - exercises client methods against a live arkd server.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";

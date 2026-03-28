@@ -1,5 +1,5 @@
 /**
- * Tests for ArkdBackedProvider — verifies the base class correctly
+ * Tests for ArkdBackedProvider - verifies the base class correctly
  * delegates operations to an arkd instance.
  */
 
@@ -17,7 +17,7 @@ const TEST_PORT = 19360;
 let server: { stop(): void };
 let tempDir: string;
 
-// Concrete test subclass — implements the abstract methods minimally
+// Concrete test subclass - implements the abstract methods minimally
 class TestArkdProvider extends ArkdBackedProvider {
   readonly name = "test-arkd";
   readonly isolationModes: IsolationMode[] = [];

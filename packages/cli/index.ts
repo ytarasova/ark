@@ -757,9 +757,11 @@ program.command("conductor")
 program.command("arkd")
   .description("Start the arkd agent daemon")
   .option("-p, --port <port>", "Port", "19300")
+  .option("--conductor-url <url>", "Conductor URL for channel relay")
   .action(async (opts) => {
     const { startArkd } = await import("../arkd/index.js");
-    startArkd(parseInt(opts.port));
+    const conductorUrl = opts.conductorUrl || process.env.ARK_CONDUCTOR_URL || "http://localhost:19100";
+    startArkd(parseInt(opts.port), { conductorUrl });
     // Keep alive
     setInterval(() => {}, 60_000);
   });

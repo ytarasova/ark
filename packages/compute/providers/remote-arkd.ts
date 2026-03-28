@@ -1,9 +1,9 @@
 /**
- * Remote compute providers — all 4 isolation modes running on EC2.
+ * Remote compute providers - all 4 isolation modes running on EC2.
  *
  * Each extends ArkdBackedProvider and talks to arkd on the remote instance.
  * EC2 provisioning, SSH setup, and cloud-init are shared via RemoteArkdBase.
- * After provisioning, all operations go through ArkdClient — no more SSH pool/queue.
+ * After provisioning, all operations go through ArkdClient - no more SSH pool/queue.
  *
  * Isolation is encoded in how the launcher script is structured + what
  * extra setup is done during provision (docker install, firecracker, etc.).
@@ -81,9 +81,11 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       const { privateKeyPath } = await generateSshKey(compute.name);
 
       log("Building cloud-init script with arkd...");
+      const conductorUrl = process.env.ARK_CONDUCTOR_URL ?? `http://localhost:${process.env.ARK_CONDUCTOR_PORT ?? "19100"}`;
       const userData = buildUserDataWithArkd({
         idleMinutes: cfg.idle_minutes ?? 60,
         isolation: this.isolationType,
+        conductorUrl,
       });
 
       log("Creating Pulumi stack...");
@@ -184,7 +186,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
   async start(compute: Compute): Promise<void> {
     const cfg = compute.config as RemoteConfig;
-    if (!cfg.instance_id) throw new Error("No instance_id — cannot start");
+    if (!cfg.instance_id) throw new Error("No instance_id - cannot start");
 
     const { EC2Client, StartInstancesCommand, DescribeInstancesCommand } = await import("@aws-sdk/client-ec2");
     const { fromIni } = await import("@aws-sdk/credential-providers");
@@ -216,7 +218,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
   async stop(compute: Compute): Promise<void> {
     const cfg = compute.config as RemoteConfig;
-    if (!cfg.instance_id) throw new Error("No instance_id — cannot stop");
+    if (!cfg.instance_id) throw new Error("No instance_id - cannot stop");
 
     const { EC2Client, StopInstancesCommand } = await import("@aws-sdk/client-ec2");
     const { fromIni } = await import("@aws-sdk/credential-providers");
@@ -267,6 +269,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
         ARK_STAGE: stage,
         ARK_CHANNEL_PORT: String(channelPort),
         ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+        ARK_ARKD_URL: `http://localhost:${ARKD_REMOTE_PORT}`,
       },
     };
   }
@@ -490,21 +493,23 @@ export class RemoteFirecrackerProvider extends RemoteArkdBase {
 
 // ── Cloud-init with arkd ────────────────────────────────────────────────────
 
-function buildUserDataWithArkd(opts: { idleMinutes?: number; isolation?: string }): string {
+function buildUserDataWithArkd(opts: { idleMinutes?: number; isolation?: string; conductorUrl?: string }): string {
   const { buildUserData } = require("./ec2/cloud-init.js");
   let base = buildUserData(opts) as string;
+
+  const conductorFlag = opts.conductorUrl ? ` --conductor-url ${opts.conductorUrl}` : "";
 
   // Insert arkd startup before the ready marker
   const arkdSetup = `
 # ── ArkD daemon (universal agent API) ──────────────────────────────────────
-cat > /etc/systemd/system/arkd.service <<'UNIT'
+cat > /etc/systemd/system/arkd.service <<UNIT
 [Unit]
 Description=ArkD Agent Daemon
 After=network.target
 
 [Service]
 User=ubuntu
-ExecStart=/home/ubuntu/.bun/bin/bun /home/ubuntu/.ark/bin/ark arkd --port ${ARKD_REMOTE_PORT}
+ExecStart=/home/ubuntu/.bun/bin/bun /home/ubuntu/.ark/bin/ark arkd --port ${ARKD_REMOTE_PORT}${conductorFlag}
 Restart=always
 RestartSec=5
 Environment=HOME=/home/ubuntu

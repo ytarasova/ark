@@ -1,5 +1,5 @@
 /**
- * Local compute providers — all 4 isolation modes running on localhost.
+ * Local compute providers - all 4 isolation modes running on localhost.
  *
  * Each extends ArkdBackedProvider and talks to arkd on localhost:19300.
  * Isolation is handled by how the launcher script is structured:
@@ -50,6 +50,7 @@ abstract class LocalArkdBase extends ArkdBackedProvider {
         ARK_STAGE: stage,
         ARK_CHANNEL_PORT: String(channelPort),
         ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+        ARK_ARKD_URL: ARKD_URL,
       },
     };
   }
@@ -251,7 +252,7 @@ export class LocalDevcontainerProvider extends LocalArkdBase {
   }
 
   async destroy(compute: Compute): Promise<void> {
-    // devcontainer doesn't have a clean "destroy" — stop is enough
+    // devcontainer doesn't have a clean "destroy" - stop is enough
     const { updateCompute } = await import("../../core/store.js");
     updateCompute(compute.name, { status: "destroyed" });
   }
@@ -384,7 +385,7 @@ export class LocalFirecrackerProvider extends LocalArkdBase {
   }
 
   async start(compute: Compute): Promise<void> {
-    // Firecracker VMs can't be paused/resumed — need full re-provision
+    // Firecracker VMs can't be paused/resumed - need full re-provision
     await this.provision(compute);
   }
 

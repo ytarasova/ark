@@ -1,5 +1,5 @@
 /**
- * ArkD server tests — exercises every endpoint against a live server.
+ * ArkD server tests - exercises every endpoint against a live server.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
@@ -308,7 +308,7 @@ describe("Agent lifecycle (tmux)", () => {
   it("capture from nonexistent session returns empty or error gracefully", async () => {
     const { status } = await post<any>("/agent/capture", { sessionName: "arkd-no-such-capture" });
     // Should return 200 with empty output (tmux capture-pane on missing session returns empty)
-    // or 500 if tmux errors — either is acceptable as long as server doesn't crash
+    // or 500 if tmux errors - either is acceptable as long as server doesn't crash
     expect(status === 200 || status === 500).toBe(true);
   });
 });
@@ -466,7 +466,7 @@ describe("Server lifecycle", () => {
       await fetch(`http://localhost:${ephemeralPort}/health`);
       expect(true).toBe(false); // should not reach
     } catch {
-      // Expected — connection refused
+      // Expected - connection refused
     }
   });
 });

@@ -1,5 +1,5 @@
 /**
- * ArkdBackedProvider — abstract base class for providers that delegate
+ * ArkdBackedProvider - abstract base class for providers that delegate
  * operations to an arkd daemon running on the compute target.
  *
  * Implements: killAgent, captureOutput, checkSession, getMetrics, probePorts, launch

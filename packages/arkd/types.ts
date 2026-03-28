@@ -1,5 +1,5 @@
 /**
- * ArkD — typed request/response contracts for the agent daemon HTTP API.
+ * ArkD - typed request/response contracts for the agent daemon HTTP API.
  *
  * Every compute target (local, Docker, EC2, Firecracker) runs an arkd
  * instance. Providers talk to it via ArkdClient instead of SSH/exec/tmux.
@@ -124,6 +124,36 @@ export interface SnapshotRes {
   processes: SnapshotProcess[];
   docker: SnapshotContainer[];
 }
+
+// ── Channel relay (arkd as conductor transport) ────────────────────────────
+
+/** Agent report forwarded through arkd to conductor */
+export interface ChannelReportReq {
+  sessionId: string;
+  report: Record<string, unknown>;
+}
+export interface ChannelReportRes { ok: true; forwarded: boolean }
+
+/** Agent-to-agent relay forwarded through arkd to conductor */
+export interface ChannelRelayReq {
+  from: string;
+  target: string;
+  message: string;
+}
+export interface ChannelRelayRes { ok: true; forwarded: boolean }
+
+/** Conductor → agent delivery: arkd delivers to local channel port */
+export interface ChannelDeliverReq {
+  channelPort: number;
+  payload: Record<string, unknown>;
+}
+export interface ChannelDeliverRes { ok: true; delivered: boolean }
+
+/** Runtime config update */
+export interface ConfigReq {
+  conductorUrl?: string;
+}
+export interface ConfigRes { ok: true; conductorUrl: string | null }
 
 // ── Error envelope ──────────────────────────────────────────────────────────
 

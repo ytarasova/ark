@@ -1,8 +1,8 @@
-# ArkD — Universal Agent Daemon
+# ArkD - Universal Agent Daemon
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a universal HTTP daemon (arkd) that runs on every compute target — localhost, Docker, EC2, future Firecracker — providing a typed JSON-over-HTTP API for file ops, process execution, agent lifecycle, metrics, and port probing.
+**Goal:** Build a universal HTTP daemon (arkd) that runs on every compute target - localhost, Docker, EC2, future Firecracker - providing a typed JSON-over-HTTP API for file ops, process execution, agent lifecycle, metrics, and port probing.
 
 **Architecture:** Bun.serve() HTTP server with typed request/response contracts. Each compute provider gets an `arkdUrl` field and delegates operations through `ArkdClient`. Phase 1 builds the daemon + client + tests; Phase 2 refactors providers to use it.
 
@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Shared types — `packages/arkd/types.ts`
+### Task 1: Shared types - `packages/arkd/types.ts`
 
 **Files:**
 - Create: `packages/arkd/types.ts`
@@ -31,7 +31,7 @@
 
 ```typescript
 /**
- * ArkD — typed request/response contracts for the agent daemon HTTP API.
+ * ArkD - typed request/response contracts for the agent daemon HTTP API.
  *
  * Every compute target (local, Docker, EC2, Firecracker) runs an arkd
  * instance. Providers talk to it via ArkdClient instead of SSH/exec/tmux.
@@ -128,7 +128,7 @@ git commit -m "feat(arkd): add typed request/response contracts"
 
 ---
 
-### Task 2: Server — `packages/arkd/server.ts`
+### Task 2: Server - `packages/arkd/server.ts`
 
 **Files:**
 - Create: `packages/arkd/server.ts`
@@ -168,7 +168,7 @@ git commit -m "feat(arkd): HTTP server with all route handlers"
 
 ---
 
-### Task 3: Server tests — `packages/arkd/__tests__/server.test.ts`
+### Task 3: Server tests - `packages/arkd/__tests__/server.test.ts`
 
 **Files:**
 - Create: `packages/arkd/__tests__/server.test.ts`
@@ -205,7 +205,7 @@ git commit -m "test(arkd): comprehensive server endpoint tests"
 
 ---
 
-### Task 4: Client — `packages/arkd/client.ts`
+### Task 4: Client - `packages/arkd/client.ts`
 
 **Files:**
 - Create: `packages/arkd/client.ts`
@@ -256,7 +256,7 @@ git commit -m "feat(arkd): ArkdClient typed HTTP wrapper"
 
 ---
 
-### Task 5: Client tests — `packages/arkd/__tests__/client.test.ts`
+### Task 5: Client tests - `packages/arkd/__tests__/client.test.ts`
 
 **Files:**
 - Create: `packages/arkd/__tests__/client.test.ts`
@@ -290,11 +290,11 @@ git commit -m "test(arkd): client integration tests against live server"
 
 ---
 
-### Task 6: Index + CLI entry point — `packages/arkd/index.ts`
+### Task 6: Index + CLI entry point - `packages/arkd/index.ts`
 
 **Files:**
 - Create: `packages/arkd/index.ts`
-- Modify: `packages/cli/index.ts` — add `ark arkd` subcommand
+- Modify: `packages/cli/index.ts` - add `ark arkd` subcommand
 
 - [ ] **Step 1: Create index.ts re-exports**
 

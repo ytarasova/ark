@@ -167,17 +167,19 @@ export async function checkSessionPR(session: store.Session): Promise<void> {
   // Steer via channel if running
   if (session.status === "running") {
     const channelPort = store.sessionChannelPort(session.id);
+    const payload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
     try {
-      await fetch(`http://localhost:${channelPort}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "steer",
-          sessionId: session.id,
-          message: prompt,
-          from: "github-review",
-        }),
-      });
-    } catch {}
+      const { deliverToChannel } = await import("./conductor.js");
+      await deliverToChannel(session, channelPort, payload);
+    } catch {
+      // Fallback: direct HTTP
+      try {
+        await fetch(`http://localhost:${channelPort}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } catch {}
+    }
   }
 }
