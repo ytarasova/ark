@@ -752,6 +752,18 @@ program.command("conductor")
     setInterval(() => {}, 60_000);
   });
 
+// ── ArkD (universal agent daemon) ────────────────────────────────────────────
+
+program.command("arkd")
+  .description("Start the arkd agent daemon")
+  .option("-p, --port <port>", "Port", "19300")
+  .action(async (opts) => {
+    const { startArkd } = await import("../arkd/index.js");
+    startArkd(parseInt(opts.port));
+    // Keep alive
+    setInterval(() => {}, 60_000);
+  });
+
 // ── Channel (MCP stdio server for remote compute) ──────────────────────────
 
 program.command("channel")
