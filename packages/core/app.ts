@@ -216,9 +216,17 @@ export class AppContext {
     // 4. Register compute providers
     try {
       const compute = await import("../compute/index.js");
+      // Legacy providers (backward compat — same names: "local", "ec2", "docker")
       this.registerProvider(new compute.LocalProvider());
       this.registerProvider(new compute.EC2Provider());
       this.registerProvider(new compute.DockerProvider());
+
+      // ArkD-backed providers (new: "devcontainer", "firecracker", "ec2-docker", etc.)
+      this.registerProvider(new compute.LocalDevcontainerProvider());
+      this.registerProvider(new compute.LocalFirecrackerProvider());
+      this.registerProvider(new compute.RemoteDockerProvider());
+      this.registerProvider(new compute.RemoteDevcontainerProvider());
+      this.registerProvider(new compute.RemoteFirecrackerProvider());
     } catch {
       // compute module may not be available in minimal builds
     }

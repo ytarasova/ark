@@ -1,0 +1,421 @@
+/**
+ * Local compute providers — all 4 isolation modes running on localhost.
+ *
+ * Each extends ArkdBackedProvider and talks to arkd on localhost:19300.
+ * Isolation is handled by how the launcher script is structured:
+ *   - worktree: direct execution
+ *   - docker: docker exec wrapper
+ *   - devcontainer: devcontainer exec wrapper
+ *   - firecracker: SSH into microVM wrapper
+ */
+
+import { existsSync, rmSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
+import { ArkdBackedProvider } from "./arkd-backed.js";
+import type {
+  Compute, Session, ProvisionOpts, SyncOpts, IsolationMode,
+} from "../types.js";
+
+const ARKD_PORT = 19300;
+const ARKD_URL = `http://localhost:${ARKD_PORT}`;
+
+// ── Shared local base ───────────────────────────────────────────────────────
+
+abstract class LocalArkdBase extends ArkdBackedProvider {
+  readonly canReboot = false;
+  readonly needsAuth = false;
+
+  getArkdUrl(_compute: Compute): string { return ARKD_URL; }
+
+  async attach(_compute: Compute, _session: Session): Promise<void> {
+    // Local: tmux attach handled by CLI layer, no tunnels
+  }
+
+  async syncEnvironment(_compute: Compute, _opts: SyncOpts): Promise<void> {
+    // Local: shared filesystem, no sync needed
+  }
+
+  getAttachCommand(_compute: Compute, session: Session): string[] {
+    if (!session.session_id) return [];
+    return ["tmux", "attach", "-t", session.session_id];
+  }
+
+  buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
+    return {
+      command: join(homedir(), ".bun", "bin", "bun"),
+      args: [join(__dirname, "../../core/channel.ts")],
+      env: {
+        ARK_SESSION_ID: sessionId,
+        ARK_STAGE: stage,
+        ARK_CHANNEL_PORT: String(channelPort),
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+      },
+    };
+  }
+
+  buildLaunchEnv(_session: Session): Record<string, string> {
+    return {};
+  }
+}
+
+// ── Local Worktree Provider ─────────────────────────────────────────────────
+
+export class LocalWorktreeProvider extends LocalArkdBase {
+  readonly name = "local";
+  readonly isolationModes: IsolationMode[] = [
+    { value: "worktree", label: "Git worktree (isolated)" },
+    { value: "inplace", label: "In-place (direct)" },
+  ];
+  readonly canDelete = false;
+  readonly supportsWorktree = true;
+  readonly initialStatus = "running";
+
+  async provision(_compute: Compute, _opts?: ProvisionOpts): Promise<void> {
+    // Local machine is always provisioned
+  }
+
+  async destroy(_compute: Compute): Promise<void> {
+    throw new Error("Cannot destroy the local compute");
+  }
+
+  async start(_compute: Compute): Promise<void> {
+    // Always running
+  }
+
+  async stop(_compute: Compute): Promise<void> {
+    throw new Error("Cannot stop the local compute");
+  }
+
+  async cleanupSession(_compute: Compute, session: Session): Promise<void> {
+    const { WORKTREES_DIR } = await import("../../core/store.js");
+    const wtPath = join(WORKTREES_DIR(), session.id);
+    if (!existsSync(wtPath)) return;
+
+    const repo = session.workdir ?? session.repo;
+    if (repo) {
+      const { spawn } = await import("child_process");
+      const ok = await new Promise<boolean>((resolve) => {
+        const cp = spawn("git", ["-C", repo!, "worktree", "remove", "--force", wtPath], { stdio: "pipe" });
+        cp.on("close", (code: number | null) => resolve(code === 0));
+        cp.on("error", () => resolve(false));
+      });
+      if (!ok) {
+        try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
+      }
+    } else {
+      try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
+    }
+  }
+}
+
+// ── Local Docker Provider ───────────────────────────────────────────────────
+
+export class LocalDockerProvider extends LocalArkdBase {
+  readonly name = "docker";
+  readonly isolationModes: IsolationMode[] = [
+    { value: "container", label: "Docker container (isolated)" },
+  ];
+  readonly canDelete = true;
+  readonly supportsWorktree = false;
+  readonly initialStatus = "stopped";
+
+  private containerName(compute: Compute): string {
+    return `ark-${compute.name}`;
+  }
+
+  async provision(compute: Compute, _opts?: ProvisionOpts): Promise<void> {
+    const { execFile } = await import("child_process");
+    const { promisify } = await import("util");
+    const execFileAsync = promisify(execFile);
+
+    const cfg = compute.config as Record<string, unknown>;
+    const name = this.containerName(compute);
+    const image = (cfg.image as string) || "ubuntu:22.04";
+    const extraVolumes = (cfg.volumes as string[]) ?? [];
+
+    const { updateCompute, mergeComputeConfig } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "provisioning" });
+
+    try {
+      await execFileAsync("docker", ["pull", image], { timeout: 300_000 });
+
+      const home = homedir();
+      const createArgs = [
+        "create", "--name", name, "-it",
+        "-v", `${join(home, ".ssh")}:/root/.ssh:ro`,
+        "-v", `${join(home, ".claude")}:/root/.claude:ro`,
+      ];
+      if (existsSync(join(home, ".aws"))) {
+        createArgs.push("-v", `${join(home, ".aws")}:/root/.aws:ro`);
+      }
+      for (const vol of extraVolumes) createArgs.push("-v", vol);
+      createArgs.push(image, "bash");
+
+      await execFileAsync("docker", createArgs, { timeout: 30_000 });
+      await execFileAsync("docker", ["start", name], { timeout: 15_000 });
+
+      mergeComputeConfig(compute.name, { image, container_name: name });
+      updateCompute(compute.name, { status: "running" });
+    } catch (err) {
+      const { mergeComputeConfig: mc, updateCompute: uc } = await import("../../core/store.js");
+      mc(compute.name, { last_error: err instanceof Error ? err.message : String(err) });
+      uc(compute.name, { status: "stopped" });
+      throw err;
+    }
+  }
+
+  async destroy(compute: Compute): Promise<void> {
+    const { execFile } = await import("child_process");
+    const { promisify } = await import("util");
+    const execFileAsync = promisify(execFile);
+    const name = this.containerName(compute);
+    try { await execFileAsync("docker", ["rm", "-f", name], { timeout: 15_000 }); } catch {}
+    const { updateCompute } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "destroyed" });
+  }
+
+  async start(compute: Compute): Promise<void> {
+    const { execFile } = await import("child_process");
+    const { promisify } = await import("util");
+    const execFileAsync = promisify(execFile);
+    const name = this.containerName(compute);
+    await execFileAsync("docker", ["start", name], { timeout: 15_000 });
+    const { updateCompute } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "running" });
+  }
+
+  async stop(compute: Compute): Promise<void> {
+    const { execFile } = await import("child_process");
+    const { promisify } = await import("util");
+    const execFileAsync = promisify(execFile);
+    const name = this.containerName(compute);
+    try { await execFileAsync("docker", ["stop", name], { timeout: 15_000 }); } catch {}
+    const { updateCompute } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "stopped" });
+  }
+
+  async cleanupSession(compute: Compute, _session: Session): Promise<void> {
+    const { execFile } = await import("child_process");
+    const { promisify } = await import("util");
+    const execFileAsync = promisify(execFile);
+    const name = this.containerName(compute);
+    try { await execFileAsync("docker", ["stop", name], { timeout: 15_000 }); } catch {}
+  }
+
+  async launch(compute: Compute, _session: Session, opts: any): Promise<string> {
+    const client = this.getClient(compute);
+    const container = this.containerName(compute);
+
+    // Write launcher to host, copy into container, exec inside
+    const scriptPath = `/tmp/arkd-launcher-${opts.tmuxName}.sh`;
+    await client.writeFile({ path: scriptPath, content: opts.launcherContent, mode: 0o755 });
+    await client.run({ command: "docker", args: ["cp", scriptPath, `${container}:${scriptPath}`] });
+    await client.launchAgent({
+      sessionName: opts.tmuxName,
+      script: `#!/bin/bash\ndocker exec -i ${container} bash ${scriptPath}`,
+      workdir: opts.workdir,
+    });
+    return opts.tmuxName;
+  }
+}
+
+// ── Local Devcontainer Provider ─────────────────────────────────────────────
+
+export class LocalDevcontainerProvider extends LocalArkdBase {
+  readonly name = "devcontainer";
+  readonly isolationModes: IsolationMode[] = [
+    { value: "devcontainer", label: "Devcontainer (project-defined)" },
+  ];
+  readonly canDelete = true;
+  readonly supportsWorktree = false;
+  readonly initialStatus = "stopped";
+
+  async provision(compute: Compute, _opts?: ProvisionOpts): Promise<void> {
+    const cfg = compute.config as Record<string, unknown>;
+    const workdir = (cfg.workdir as string) || process.cwd();
+
+    const { detectDevcontainer, buildDevcontainer } = await import("./docker/devcontainer.js");
+    if (!detectDevcontainer(workdir)) {
+      throw new Error(`No devcontainer.json found in ${workdir}`);
+    }
+
+    const { updateCompute, mergeComputeConfig } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "provisioning" });
+
+    const result = await buildDevcontainer(workdir);
+    if (!result.ok) throw new Error(`devcontainer up failed: ${result.error}`);
+
+    mergeComputeConfig(compute.name, { devcontainer: true, workdir });
+    updateCompute(compute.name, { status: "running" });
+  }
+
+  async destroy(compute: Compute): Promise<void> {
+    // devcontainer doesn't have a clean "destroy" — stop is enough
+    const { updateCompute } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "destroyed" });
+  }
+
+  async start(compute: Compute): Promise<void> {
+    const cfg = compute.config as Record<string, unknown>;
+    const workdir = (cfg.workdir as string) || process.cwd();
+    const { buildDevcontainer } = await import("./docker/devcontainer.js");
+    await buildDevcontainer(workdir);
+    const { updateCompute } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "running" });
+  }
+
+  async stop(compute: Compute): Promise<void> {
+    const { updateCompute } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "stopped" });
+  }
+
+  async cleanupSession(_compute: Compute, _session: Session): Promise<void> {
+    // Devcontainer stays running; session cleanup is a noop
+  }
+
+  async launch(compute: Compute, _session: Session, opts: any): Promise<string> {
+    const client = this.getClient(compute);
+    const cfg = compute.config as Record<string, unknown>;
+    const workdir = (cfg.workdir as string) || opts.workdir;
+
+    const scriptPath = `/tmp/arkd-launcher-${opts.tmuxName}.sh`;
+    await client.writeFile({ path: scriptPath, content: opts.launcherContent, mode: 0o755 });
+    await client.launchAgent({
+      sessionName: opts.tmuxName,
+      script: `#!/bin/bash\ndevcontainer exec --workspace-folder '${workdir}' -- bash ${scriptPath}`,
+      workdir: opts.workdir,
+    });
+    return opts.tmuxName;
+  }
+}
+
+// ── Local Firecracker Provider ──────────────────────────────────────────────
+
+export class LocalFirecrackerProvider extends LocalArkdBase {
+  readonly name = "firecracker";
+  readonly isolationModes: IsolationMode[] = [
+    { value: "microvm", label: "Firecracker microVM (hardware isolation)" },
+  ];
+  readonly canDelete = true;
+  readonly supportsWorktree = false;
+  readonly initialStatus = "stopped";
+
+  async provision(compute: Compute, _opts?: ProvisionOpts): Promise<void> {
+    const { platform } = await import("os");
+    if (platform() !== "linux") {
+      throw new Error("Firecracker requires Linux with /dev/kvm. Use ec2-firecracker for remote.");
+    }
+    if (!existsSync("/dev/kvm")) {
+      throw new Error("Firecracker requires /dev/kvm (KVM support). Enable nested virtualization or use a bare-metal host.");
+    }
+
+    const cfg = compute.config as Record<string, unknown>;
+    const { updateCompute, mergeComputeConfig } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "provisioning" });
+
+    // Firecracker provisioning:
+    // 1. Download kernel + rootfs if not present
+    // 2. Create VM config
+    // 3. Start firecracker process
+    const vmId = `ark-fc-${compute.name}`;
+    const kernelPath = (cfg.kernel as string) || "/opt/firecracker/vmlinux";
+    const rootfsPath = (cfg.rootfs as string) || "/opt/firecracker/rootfs.ext4";
+
+    if (!existsSync(kernelPath)) {
+      throw new Error(`Firecracker kernel not found at ${kernelPath}. Download from https://github.com/firecracker-microvm/firecracker/releases`);
+    }
+    if (!existsSync(rootfsPath)) {
+      throw new Error(`Firecracker rootfs not found at ${rootfsPath}. Build one with bun + tmux installed.`);
+    }
+
+    const client = this.getClient(compute);
+    const socketPath = `/tmp/firecracker-${vmId}.sock`;
+
+    // Start firecracker process
+    await client.run({
+      command: "firecracker",
+      args: ["--api-sock", socketPath],
+      timeout: 10_000,
+    });
+
+    // Configure VM via API
+    const vmConfig = JSON.stringify({
+      boot_source: { kernel_image_path: kernelPath, boot_args: "console=ttyS0 reboot=k panic=1 pci=off" },
+      drives: [{ drive_id: "rootfs", path_on_host: rootfsPath, is_root_device: true, is_read_only: false }],
+      machine_config: { vcpu_count: (cfg.vcpus as number) || 2, mem_size_mib: (cfg.memMib as number) || 512 },
+    });
+
+    await client.run({
+      command: "curl",
+      args: ["--unix-socket", socketPath, "-X", "PUT", "http://localhost/machine-config",
+             "-H", "Content-Type: application/json", "-d", vmConfig],
+    });
+
+    // Start the VM
+    await client.run({
+      command: "curl",
+      args: ["--unix-socket", socketPath, "-X", "PUT", "http://localhost/actions",
+             "-H", "Content-Type: application/json", "-d", '{"action_type":"InstanceStart"}'],
+    });
+
+    mergeComputeConfig(compute.name, {
+      vm_id: vmId,
+      socket_path: socketPath,
+      kernel: kernelPath,
+      rootfs: rootfsPath,
+    });
+    updateCompute(compute.name, { status: "running" });
+  }
+
+  async destroy(compute: Compute): Promise<void> {
+    const cfg = compute.config as Record<string, unknown>;
+    const socketPath = cfg.socket_path as string;
+    if (socketPath) {
+      const client = this.getClient(compute);
+      await client.run({
+        command: "curl",
+        args: ["--unix-socket", socketPath, "-X", "PUT", "http://localhost/actions",
+               "-H", "Content-Type: application/json", "-d", '{"action_type":"SendCtrlAltDel"}'],
+      });
+    }
+    const { updateCompute } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "destroyed" });
+  }
+
+  async start(compute: Compute): Promise<void> {
+    // Firecracker VMs can't be paused/resumed — need full re-provision
+    await this.provision(compute);
+  }
+
+  async stop(compute: Compute): Promise<void> {
+    await this.destroy(compute);
+    const { updateCompute } = await import("../../core/store.js");
+    updateCompute(compute.name, { status: "stopped" });
+  }
+
+  async cleanupSession(_compute: Compute, _session: Session): Promise<void> {
+    // VM stays running; session cleanup is a noop
+  }
+
+  async launch(compute: Compute, _session: Session, opts: any): Promise<string> {
+    const client = this.getClient(compute);
+    const cfg = compute.config as Record<string, unknown>;
+    const vmSshPort = (cfg.ssh_port as number) || 2222;
+
+    const scriptPath = `/tmp/arkd-launcher-${opts.tmuxName}.sh`;
+    await client.writeFile({ path: scriptPath, content: opts.launcherContent, mode: 0o755 });
+
+    // Copy script into VM via SSH, then exec
+    await client.launchAgent({
+      sessionName: opts.tmuxName,
+      script: [
+        "#!/bin/bash",
+        `scp -o StrictHostKeyChecking=no -P ${vmSshPort} ${scriptPath} root@localhost:${scriptPath}`,
+        `ssh -o StrictHostKeyChecking=no -p ${vmSshPort} root@localhost bash ${scriptPath}`,
+      ].join("\n"),
+      workdir: opts.workdir,
+    });
+    return opts.tmuxName;
+  }
+}
