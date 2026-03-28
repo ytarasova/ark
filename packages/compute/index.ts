@@ -43,7 +43,7 @@ export function clearProviders(): void {
   // noop — AppContext owns the registry
 }
 
-// Provider classes (exported for AppContext to instantiate during boot)
+// Legacy provider classes (kept for backward compatibility during migration)
 import { LocalProvider } from "./providers/local/index.js";
 export { LocalProvider };
 
@@ -52,6 +52,23 @@ export { EC2Provider };
 
 import { DockerProvider } from "./providers/docker/index.js";
 export { DockerProvider };
+
+// ArkD-backed providers (new universal architecture)
+import {
+  LocalWorktreeProvider,
+  LocalDockerProvider,
+  LocalDevcontainerProvider,
+  LocalFirecrackerProvider,
+} from "./providers/local-arkd.js";
+export { LocalWorktreeProvider, LocalDockerProvider, LocalDevcontainerProvider, LocalFirecrackerProvider };
+
+import {
+  RemoteWorktreeProvider,
+  RemoteDockerProvider,
+  RemoteDevcontainerProvider,
+  RemoteFirecrackerProvider,
+} from "./providers/remote-arkd.js";
+export { RemoteWorktreeProvider, RemoteDockerProvider, RemoteDevcontainerProvider, RemoteFirecrackerProvider };
 
 // arc.json
 export { parseArcJson, resolvePortDecls, hasDevcontainer, hasComposeFile } from "./arc-json.js";

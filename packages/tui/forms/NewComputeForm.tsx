@@ -43,9 +43,14 @@ const REGION_OPTIONS = [
 ];
 
 const PROVIDER_OPTIONS = [
-  { label: "ec2", value: "ec2" },
-  { label: "local", value: "local" },
+  { label: "local (worktree)", value: "local" },
   { label: "docker", value: "docker" },
+  { label: "devcontainer", value: "devcontainer" },
+  { label: "firecracker", value: "firecracker" },
+  { label: "ec2 (remote)", value: "ec2" },
+  { label: "ec2-docker", value: "ec2-docker" },
+  { label: "ec2-devcontainer", value: "ec2-devcontainer" },
+  { label: "ec2-firecracker", value: "ec2-firecracker" },
 ];
 
 export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProps) {
