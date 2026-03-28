@@ -53,6 +53,9 @@ export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getI
 // GitHub PR utilities (lookup, formatting)
 export { findSessionByPR, formatReviewPrompt, extractComments } from "./github-pr.js";
 
+// PR polling
+export { pollPRReviews } from "./pr-poller.js";
+
 // Conductor
 export { startConductor } from "./conductor.js";
 

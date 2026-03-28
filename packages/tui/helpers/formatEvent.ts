@@ -36,6 +36,12 @@ export function formatEvent(type: string, data?: Record<string, unknown>): strin
       return `Handed off to ${data?.to_agent ?? "?"}`;
     case "dispatch_progress":
       return String(data?.message ?? "Provisioning...");
+    case "pr_approved":
+      return `PR approved by ${(data?.reviewers as string[])?.join(", ") ?? "reviewer"}`;
+    case "pr_review_feedback":
+      return `PR review feedback (${data?.state ?? "comment"})`;
+    case "pr_status":
+      return `PR ${data?.state?.toLowerCase() ?? "updated"}`;
     default:
       // Humanize unknown types: stage_started -> Stage started
       return type.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());

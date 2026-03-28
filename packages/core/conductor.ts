@@ -28,6 +28,7 @@ import { getProvider } from "../compute/index.js";
 import { parseTranscriptUsage } from "./claude.js";
 import { indexSession } from "./search.js";
 import { listSchedules, cronMatches, updateScheduleLastRun } from "./schedule.js";
+import { pollPRReviews } from "./pr-poller.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -246,6 +247,11 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
         } catch { /* dispatch failure shouldn't crash the poller */ }
       }
     } catch { /* ignore polling errors */ }
+  }, 60_000);
+
+  // PR review poller - check every 60 seconds
+  setInterval(async () => {
+    try { await pollPRReviews(); } catch {}
   }, 60_000);
 
   return server;
