@@ -29,6 +29,7 @@ import { parseTranscriptUsage } from "./claude.js";
 import { indexSession } from "./search.js";
 import { listSchedules, cronMatches, updateScheduleLastRun } from "./schedule.js";
 import { pollPRReviews } from "./pr-poller.js";
+import { ArkdClient } from "../arkd/client.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -59,20 +60,8 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
           const targetSession = store.getSession(target);
           if (targetSession) {
             const channelPort = store.sessionChannelPort(target);
-            try {
-              await fetch(`http://localhost:${channelPort}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  type: "steer",
-                  message,
-                  from,
-                  sessionId: target,
-                }),
-              });
-            } catch {
-              /* target channel not reachable */
-            }
+            const payload = { type: "steer", message, from, sessionId: target };
+            await deliverToChannel(targetSession, channelPort, payload);
           }
           return Response.json({ status: "relayed" });
         }
@@ -260,6 +249,40 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
       server.stop();
     },
   };
+}
+
+/**
+ * Deliver a message to a session's channel, using arkd if available.
+ * Falls back to direct HTTP to the channel port for local sessions.
+ */
+export async function deliverToChannel(
+  targetSession: store.Session,
+  channelPort: number,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  // Try arkd delivery first (works for both local and remote)
+  const computeName = targetSession.compute_name || "local";
+  const compute = store.getCompute(computeName);
+  if (compute) {
+    const provider = getProvider(compute.provider);
+    if (provider && typeof (provider as any).getArkdUrl === "function") {
+      try {
+        const arkdUrl = (provider as any).getArkdUrl(compute);
+        const client = new ArkdClient(arkdUrl);
+        const result = await client.channelDeliver({ channelPort, payload });
+        if (result.delivered) return;
+      } catch { /* arkd not available — fall through */ }
+    }
+  }
+
+  // Fallback: direct HTTP to channel port (local only)
+  try {
+    await fetch(`http://localhost:${channelPort}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch { /* channel not reachable */ }
 }
 
 function handleReport(sessionId: string, report: OutboundMessage): void {

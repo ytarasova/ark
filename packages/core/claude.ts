@@ -441,20 +441,32 @@ export async function autoAcceptChannelPrompt(
 const deliveryInFlight = new Map<string, boolean>();
 
 /**
- * Deliver a task to a Claude session via channel HTTP POST.
- * Waits for the channel server to become ready, then posts the task.
+ * Deliver a task to a Claude session via channel.
+ * Tries arkd delivery first, then falls back to direct HTTP with retry.
  */
 export async function deliverTask(
   sessionId: string, channelPort: number,
   task: string, stage: string,
+  opts?: { arkdUrl?: string },
 ): Promise<void> {
   if (deliveryInFlight.get(sessionId)) return;
   deliveryInFlight.set(sessionId, true);
 
-  const url = `http://localhost:${channelPort}`;
   const payload = { type: "task", task, sessionId, stage };
 
   try {
+    // Try arkd delivery first
+    if (opts?.arkdUrl) {
+      try {
+        const { ArkdClient } = await import("../arkd/client.js");
+        const client = new ArkdClient(opts.arkdUrl);
+        const result = await client.channelDeliver({ channelPort, payload });
+        if (result.delivered) return;
+      } catch { /* arkd not available — fall through to direct */ }
+    }
+
+    // Fallback: direct HTTP to channel port with retry
+    const url = `http://localhost:${channelPort}`;
     for (let i = 0; i < 60; i++) {
       try {
         const resp = await fetch(url);

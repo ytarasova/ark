@@ -21,6 +21,8 @@ import {
 import type { OutboundMessage } from "./channel-types.js";
 
 const SESSION_ID = process.env.ARK_SESSION_ID ?? "unknown";
+const ARKD_URL = process.env.ARK_ARKD_URL ?? `http://localhost:${process.env.ARK_ARKD_PORT ?? "19300"}`;
+// Fallback: if no arkd available, try conductor directly
 const CONDUCTOR_URL = process.env.ARK_CONDUCTOR_URL ?? `http://localhost:${process.env.ARK_CONDUCTOR_PORT ?? "19100"}`;
 const HTTP_PORT = parseInt(process.env.ARK_CHANNEL_PORT ?? "0");
 
@@ -132,29 +134,49 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       }
     })();
 
+    // Report through arkd (preferred) with conductor fallback
     try {
-      await fetch(`${CONDUCTOR_URL}/api/channel/${SESSION_ID}`, {
+      await fetch(`${ARKD_URL}/channel/${SESSION_ID}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(report),
       });
-    } catch {}
+    } catch {
+      // Fallback: direct to conductor if arkd not available
+      try {
+        await fetch(`${CONDUCTOR_URL}/api/channel/${SESSION_ID}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(report),
+        });
+      } catch {}
+    }
 
     return { content: [{ type: "text", text: `Reported: ${reportType}` }] };
   }
 
   if (req.params.name === "send_to_agent") {
+    const relayPayload = {
+      from: SESSION_ID,
+      target: args.target_session as string,
+      message: args.message as string,
+    };
+    // Relay through arkd (preferred) with conductor fallback
     try {
-      await fetch(`${CONDUCTOR_URL}/api/relay`, {
+      await fetch(`${ARKD_URL}/channel/relay`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: SESSION_ID,
-          target: args.target_session as string,
-          message: args.message as string,
-        }),
+        body: JSON.stringify(relayPayload),
       });
-    } catch {}
+    } catch {
+      try {
+        await fetch(`${CONDUCTOR_URL}/api/relay`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(relayPayload),
+        });
+      } catch {}
+    }
     return { content: [{ type: "text", text: `Sent to ${args.target_session}` }] };
   }
 

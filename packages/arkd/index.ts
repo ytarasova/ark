@@ -1,5 +1,5 @@
 /**
- * ArkD — universal agent daemon.
+ * ArkD - universal agent daemon.
  *
  * Re-exports server, client, and types for use by compute providers.
  */

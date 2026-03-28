@@ -1,5 +1,5 @@
 /**
- * ArkdClient — typed HTTP wrapper for talking to an arkd instance.
+ * ArkdClient - typed HTTP wrapper for talking to an arkd instance.
  *
  * Providers use this instead of SSH / direct tmux to interact with compute targets.
  */
@@ -19,6 +19,10 @@ import type {
   ProbePortsRes,
   HealthRes,
   SnapshotRes,
+  ChannelReportRes,
+  ChannelRelayReq, ChannelRelayRes,
+  ChannelDeliverReq, ChannelDeliverRes,
+  ConfigRes,
   ArkdError,
 } from "./types.js";
 
@@ -92,6 +96,28 @@ export class ArkdClient {
 
   async probePorts(ports: number[]): Promise<ProbePortsRes> {
     return this.post("/ports/probe", { ports });
+  }
+
+  // ── Channel relay ────────────────────────────────────────────────────────
+
+  async channelReport(sessionId: string, report: Record<string, unknown>): Promise<ChannelReportRes> {
+    return this.post(`/channel/${sessionId}`, report);
+  }
+
+  async channelRelay(req: ChannelRelayReq): Promise<ChannelRelayRes> {
+    return this.post("/channel/relay", req);
+  }
+
+  async channelDeliver(req: ChannelDeliverReq): Promise<ChannelDeliverRes> {
+    return this.post("/channel/deliver", req);
+  }
+
+  async setConfig(config: { conductorUrl?: string }): Promise<ConfigRes> {
+    return this.post("/config", config);
+  }
+
+  async getConfig(): Promise<ConfigRes> {
+    return this.get("/config");
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────

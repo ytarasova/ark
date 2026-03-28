@@ -1,5 +1,5 @@
 /**
- * ArkD HTTP server — runs on every compute target.
+ * ArkD HTTP server - runs on every compute target.
  *
  * Provides file ops, process execution, agent lifecycle (tmux),
  * system metrics, and port probing over a typed JSON-over-HTTP API.
@@ -48,12 +48,24 @@ import type {
   ProbePortsReq, ProbePortsRes,
   HealthRes,
   SnapshotRes, SnapshotMetrics, SnapshotSession, SnapshotProcess, SnapshotContainer,
+  ChannelReportReq, ChannelReportRes,
+  ChannelRelayReq, ChannelRelayRes,
+  ChannelDeliverReq, ChannelDeliverRes,
+  ConfigReq, ConfigRes,
 } from "./types.js";
 
 const VERSION = "0.1.0";
 const DEFAULT_PORT = 19300;
 
-export function startArkd(port = DEFAULT_PORT, opts?: { quiet?: boolean }): { stop(): void } {
+export interface ArkdOpts {
+  quiet?: boolean;
+  conductorUrl?: string;
+}
+
+export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void; setConductorUrl(url: string): void } {
+  // Mutable runtime config
+  let conductorUrl: string | null = opts?.conductorUrl ?? null;
+
   const server = Bun.serve({
     port,
     hostname: "127.0.0.1",
@@ -175,6 +187,38 @@ export function startArkd(port = DEFAULT_PORT, opts?: { quiet?: boolean }): { st
           return json(result);
         }
 
+        // ── Channel: report (agent → conductor via arkd) ─────────────
+        if (req.method === "POST" && path.startsWith("/channel/") && !path.endsWith("/relay") && !path.endsWith("/deliver")) {
+          const sessionId = path.split("/")[2]!;
+          const report = await req.json() as Record<string, unknown>;
+          const result = await channelReport(sessionId, report, conductorUrl);
+          return json(result);
+        }
+
+        // ── Channel: relay (agent → agent via conductor) ─────────────
+        if (req.method === "POST" && path === "/channel/relay") {
+          const body = await req.json() as ChannelRelayReq;
+          const result = await channelRelay(body, conductorUrl);
+          return json(result);
+        }
+
+        // ── Channel: deliver (conductor → agent on this compute) ─────
+        if (req.method === "POST" && path === "/channel/deliver") {
+          const body = await req.json() as ChannelDeliverReq;
+          const result = await channelDeliver(body);
+          return json(result);
+        }
+
+        // ── Config: runtime config update ────────────────────────────
+        if (req.method === "POST" && path === "/config") {
+          const body = await req.json() as ConfigReq;
+          if (body.conductorUrl !== undefined) conductorUrl = body.conductorUrl || null;
+          return json<ConfigRes>({ ok: true, conductorUrl });
+        }
+        if (req.method === "GET" && path === "/config") {
+          return json<ConfigRes>({ ok: true, conductorUrl });
+        }
+
         return new Response("Not found", { status: 404 });
       } catch (e: any) {
         if (e instanceof SyntaxError) {
@@ -189,6 +233,7 @@ export function startArkd(port = DEFAULT_PORT, opts?: { quiet?: boolean }): { st
 
   return {
     stop() { server.stop(); },
+    setConductorUrl(url: string) { conductorUrl = url; },
   };
 }
 
@@ -613,4 +658,54 @@ async function probePorts(req: ProbePortsReq): Promise<ProbePortsRes> {
     })
   );
   return { results };
+}
+
+// ── Channel relay (arkd as conductor transport) ─────────────────────────────
+
+async function channelReport(
+  sessionId: string,
+  report: Record<string, unknown>,
+  conductorUrl: string | null,
+): Promise<ChannelReportRes> {
+  if (!conductorUrl) return { ok: true, forwarded: false };
+  try {
+    await fetch(`${conductorUrl}/api/channel/${sessionId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(report),
+    });
+    return { ok: true, forwarded: true };
+  } catch {
+    return { ok: true, forwarded: false };
+  }
+}
+
+async function channelRelay(
+  req: ChannelRelayReq,
+  conductorUrl: string | null,
+): Promise<ChannelRelayRes> {
+  if (!conductorUrl) return { ok: true, forwarded: false };
+  try {
+    await fetch(`${conductorUrl}/api/relay`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    return { ok: true, forwarded: true };
+  } catch {
+    return { ok: true, forwarded: false };
+  }
+}
+
+async function channelDeliver(req: ChannelDeliverReq): Promise<ChannelDeliverRes> {
+  try {
+    const resp = await fetch(`http://localhost:${req.channelPort}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.payload),
+    });
+    return { ok: true, delivered: resp.ok };
+  } catch {
+    return { ok: true, delivered: false };
+  }
 }
