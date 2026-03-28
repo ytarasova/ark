@@ -1,9 +1,7 @@
 /**
- * GitHub webhook handler — HMAC validation, comment extraction, session binding.
+ * GitHub PR utilities - session lookup, review comment extraction, prompt formatting.
  *
- * Handles `pull_request_review` and `pull_request_review_comment` events.
- * Validates webhook signatures, extracts review comments, and either
- * approves review gates or steers active agents with feedback.
+ * Used by pull-based PR monitoring to detect review feedback and steer agents.
  */
 
 import { createHmac } from "crypto";

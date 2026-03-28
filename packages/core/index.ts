@@ -50,8 +50,8 @@ export * from "./hooks.js";
 // Search
 export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, type SearchResult, type SearchOpts } from "./search.js";
 
-// GitHub PR utilities (lookup, formatting — webhook endpoint removed)
-export { findSessionByPR, formatReviewPrompt, extractComments } from "./github-webhook.js";
+// GitHub PR utilities (lookup, formatting)
+export { findSessionByPR, formatReviewPrompt, extractComments } from "./github-pr.js";
 
 // Conductor
 export { startConductor } from "./conductor.js";

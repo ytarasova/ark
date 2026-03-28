@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "ark-channel": {
+      "command": "/home/ubuntu/.ark/bin/ark",
+      "args": [
+        "channel"
+      ],
+      "env": {
+        "ARK_SESSION_ID": "s-a9b0f2",
+        "ARK_STAGE": "work",
+        "ARK_CHANNEL_PORT": "20082",
+        "ARK_CONDUCTOR_URL": "http://localhost:19100"
+      }
+    }
+  }
+}

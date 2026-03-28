@@ -17,7 +17,7 @@ import {
   formatReviewPrompt,
   findSessionByPR,
   handleGitHubWebhook,
-} from "../github-webhook.js";
+} from "../github-pr.js";
 
 let ctx: TestContext;
 

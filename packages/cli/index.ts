@@ -334,7 +334,7 @@ pr.command("status")
   .description("Show session bound to a PR URL")
   .argument("<pr-url>", "GitHub PR URL")
   .action((prUrl) => {
-    const { findSessionByPR } = require("../core/github-webhook.js");
+    const { findSessionByPR } = require("../core/github-pr.js");
     const session = findSessionByPR(prUrl);
     if (!session) {
       console.log(chalk.yellow(`No session for ${prUrl}`));
