@@ -79,6 +79,52 @@ export interface HealthRes {
   platform: string;
 }
 
+// ── System snapshot (full metrics + sessions + processes + docker) ───────────
+
+export interface SnapshotMetrics {
+  cpu: number;
+  memUsedGb: number;
+  memTotalGb: number;
+  memPct: number;
+  diskPct: number;
+  netRxMb: number;
+  netTxMb: number;
+  uptime: string;
+  idleTicks: number;
+}
+
+export interface SnapshotSession {
+  name: string;
+  status: string;
+  mode: string;
+  projectPath: string;
+  cpu: number;
+  mem: number;
+}
+
+export interface SnapshotProcess {
+  pid: string;
+  cpu: string;
+  mem: string;
+  command: string;
+  workingDir: string;
+}
+
+export interface SnapshotContainer {
+  name: string;
+  cpu: string;
+  memory: string;
+  image: string;
+  project: string;
+}
+
+export interface SnapshotRes {
+  metrics: SnapshotMetrics;
+  sessions: SnapshotSession[];
+  processes: SnapshotProcess[];
+  docker: SnapshotContainer[];
+}
+
 // ── Error envelope ──────────────────────────────────────────────────────────
 
 export interface ArkdError {

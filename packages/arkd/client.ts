@@ -18,6 +18,7 @@ import type {
   MetricsRes,
   ProbePortsRes,
   HealthRes,
+  SnapshotRes,
   ArkdError,
 } from "./types.js";
 
@@ -83,6 +84,10 @@ export class ArkdClient {
 
   async metrics(): Promise<MetricsRes> {
     return this.get("/metrics");
+  }
+
+  async snapshot(): Promise<SnapshotRes> {
+    return this.get("/snapshot");
   }
 
   async probePorts(ports: number[]): Promise<ProbePortsRes> {
