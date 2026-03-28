@@ -301,10 +301,15 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
   // Handle by type
   switch (report.type) {
     case "completed": {
-      // Save completion summary to session config for display in detail pane
+      // Save completion data to session config for display in detail pane
       const existing = store.getSession(sessionId);
       if (existing) {
-        const cfg = { ...(existing.config as any), completion_summary: (report as any).summary };
+        const cfg = {
+          ...(existing.config as any),
+          completion_summary: (report as any).summary,
+          filesChanged: (report as any).filesChanged,
+          commits: (report as any).commits,
+        };
         store.updateSession(sessionId, { config: cfg });
       }
 

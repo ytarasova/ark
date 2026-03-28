@@ -489,6 +489,12 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
       {s.agent && <KeyValue label="Agent">{s.agent}</KeyValue>}
       {s.group_name && <KeyValue label="Group">{s.group_name}</KeyValue>}
       {s.pr_url && <KeyValue label="PR">{s.pr_url}</KeyValue>}
+      {(s.config as any)?.filesChanged?.length > 0 && (
+        <KeyValue label="Files">{(s.config as any).filesChanged.join(", ")}</KeyValue>
+      )}
+      {(s.config as any)?.commits?.length > 0 && (
+        <KeyValue label="Commits">{(s.config as any).commits.map((c: string) => c.slice(0, 7)).join(", ")}</KeyValue>
+      )}
 
       {/* Token usage from hooks */}
       {(s.config as any)?.usage && (
