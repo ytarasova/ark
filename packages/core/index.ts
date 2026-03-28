@@ -50,6 +50,9 @@ export * from "./hooks.js";
 // Search
 export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, type SearchResult, type SearchOpts } from "./search.js";
 
+// GitHub PR utilities (lookup, formatting — webhook endpoint removed)
+export { findSessionByPR, formatReviewPrompt, extractComments } from "./github-webhook.js";
+
 // Conductor
 export { startConductor } from "./conductor.js";
 
@@ -61,6 +64,3 @@ export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
 
 // Schedules
 export { createSchedule, listSchedules, getSchedule, deleteSchedule, enableSchedule, updateScheduleLastRun, cronMatches, type Schedule } from "./schedule.js";
-
-// GitHub webhook
-export { validateSignature, handleGitHubWebhook, findSessionByPR, formatReviewPrompt, extractComments } from "./github-webhook.js";
