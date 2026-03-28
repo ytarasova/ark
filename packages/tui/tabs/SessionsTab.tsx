@@ -606,8 +606,6 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
       {events.length > 0 && (
         <>
           <Text> </Text>
-          <Text dimColor>{"  " + "-".repeat(50)}</Text>
-          <Text> </Text>
           <SectionHeader title="Events" />
           {events.slice(-10).map((ev, i) => {
             const ts = hms(ev.created_at).slice(0, 5); // HH:MM
