@@ -661,3 +661,52 @@ describe("buildClaudeArgs", () => {
     expect(args).not.toContain("-p");
   });
 });
+
+// ── Integration: full agent lifecycle ───────────────────────────────────────
+
+describe("full agent lifecycle", () => {
+  it("create → list → load → delete round-trip for project scope", () => {
+    const root = projectDir();
+    const agent = { name: "lifecycle-test", description: "Integration test agent", model: "haiku" } as AgentDefinition;
+    saveAgent(agent, "project", root);
+
+    const agents = listAgents(root);
+    const found = agents.find(a => a.name === "lifecycle-test");
+    expect(found).not.toBeNull();
+    expect(found!._source).toBe("project");
+
+    const loaded = loadAgent("lifecycle-test", root);
+    expect(loaded!.model).toBe("haiku");
+
+    deleteAgent("lifecycle-test", "project", root);
+    expect(loadAgent("lifecycle-test", root)).toBeNull();
+  });
+
+  it("project agent shadows global agent with same name", () => {
+    const root = projectDir();
+
+    saveAgent({ name: "shadow-test", model: "sonnet" } as AgentDefinition, "global");
+    saveAgent({ name: "shadow-test", model: "opus" } as AgentDefinition, "project", root);
+
+    const loaded = loadAgent("shadow-test", root);
+    expect(loaded!.model).toBe("opus");
+    expect(loaded!._source).toBe("project");
+
+    deleteAgent("shadow-test", "project", root);
+    const fallback = loadAgent("shadow-test", root);
+    expect(fallback!.model).toBe("sonnet");
+    expect(fallback!._source).toBe("global");
+  });
+
+  it("global agent shadows builtin with same name", () => {
+    writeAgentYaml("worker", { name: "worker", model: "haiku", description: "custom worker" });
+
+    const loaded = loadAgent("worker");
+    expect(loaded!.model).toBe("haiku");
+    expect(loaded!._source).toBe("global");
+
+    deleteAgent("worker", "global");
+    const fallback = loadAgent("worker");
+    expect(fallback!._source).toBe("builtin");
+  });
+});
