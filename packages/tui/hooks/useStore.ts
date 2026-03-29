@@ -87,7 +87,7 @@ async function fetchAll(prev: Payload, metricsThisCycle: boolean): Promise<Paylo
   return {
     sessions,
     computes,
-    agents: core.listAgents(),
+    agents: core.listAgents(core.findProjectRoot(process.cwd()) ?? undefined),
     flows: core.listFlows(),
     unreadCounts,
     snapshots,
@@ -102,7 +102,8 @@ function fingerprint(data: Payload): string {
   const u = [...data.unreadCounts.entries()].map(([k, v]) => `${k}=${v}`).join(",");
   // Include a simple metrics hash (cpu values change → fingerprint changes)
   const m = [...data.snapshots.entries()].map(([k, v]) => `${k}:${v.metrics.cpu.toFixed(0)}`).join(",");
-  return `${s};${h};${u};${m}`;
+  const a = data.agents.map(a => `${a.name}:${a._source}`).join("|");
+  return `${s};${h};${u};${m};${a}`;
 }
 
 /**
@@ -158,7 +159,7 @@ export function useStore(refreshMs = 3000): StoreData {
     }
     const data: Payload = {
       sessions, computes,
-      agents: core.listAgents(),
+      agents: core.listAgents(core.findProjectRoot(process.cwd()) ?? undefined),
       flows: core.listFlows(),
       unreadCounts,
       snapshots: dataRef.current.snapshots, // keep existing metrics

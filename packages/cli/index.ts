@@ -11,9 +11,10 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
-import { resolve, basename } from "path";
-import { existsSync } from "fs";
-import { execSync } from "child_process";
+import { resolve, basename, join } from "path";
+import { existsSync, writeFileSync, mkdirSync } from "fs";
+import { execSync, execFileSync } from "child_process";
+import YAML from "yaml";
 import * as core from "../core/index.js";
 import { getProvider } from "../compute/index.js";
 import { AppContext, setApp } from "../core/app.js";
@@ -351,14 +352,17 @@ pr.command("status")
 
 const agent = program.command("agent").description("Manage agent definitions");
 
-agent.command("list").description("List agents").action(() => {
-  for (const a of core.listAgents()) {
-    console.log(`  ${a.name.padEnd(16)} ${a.model.padEnd(8)} T:${a.tools.length} M:${a.mcp_servers.length} S:${a.skills.length} R:${a.memories.length}  ${a.description.slice(0, 40)}`);
+agent.command("list").description("List agents").option("--project <dir>", "Project root").action((opts) => {
+  const projectRoot = opts.project ?? core.findProjectRoot(process.cwd()) ?? undefined;
+  for (const a of core.listAgents(projectRoot)) {
+    const src = (a._source === "project" ? "P" : a._source === "global" ? "G" : "B").padEnd(2);
+    console.log(`  ${src} ${a.name.padEnd(16)} ${a.model.padEnd(8)} T:${a.tools.length} M:${a.mcp_servers.length} S:${a.skills.length} R:${a.memories.length}  ${a.description.slice(0, 40)}`);
   }
 });
 
 agent.command("show").description("Show agent details").argument("<name>").action((name) => {
-  const a = core.loadAgent(name);
+  const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
+  const a = core.loadAgent(name, projectRoot);
   if (!a) { console.log(chalk.red("Not found")); return; }
   console.log(chalk.bold(`\n${a.name}`) + chalk.dim(` (${a._source})`));
   console.log(`  Model:      ${a.model}`);
@@ -368,6 +372,113 @@ agent.command("show").description("Show agent details").argument("<name>").actio
   console.log(`  Skills:     ${a.skills.length ? a.skills.join(", ") : "-"}`);
   console.log(`  Memories:   ${a.memories.length ? a.memories.join(", ") : "-"}`);
 });
+
+agent.command("create").description("Create a new agent").argument("<name>")
+  .option("--global", "Save to ~/.ark/agents/ instead of project")
+  .action(async (name, opts) => {
+    const projectRoot = core.findProjectRoot(process.cwd());
+    const scope: "project" | "global" = opts.global || !projectRoot ? "global" : "project";
+    const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(core.ARK_DIR(), "agents");
+    const filePath = join(dir, `${name}.yaml`);
+
+    if (existsSync(filePath)) {
+      console.log(chalk.red(`Agent '${name}' already exists at ${filePath}`));
+      return;
+    }
+
+    mkdirSync(dir, { recursive: true });
+    const scaffold = YAML.stringify({
+      name,
+      description: "",
+      model: "sonnet",
+      max_turns: 200,
+      system_prompt: "",
+      tools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep"],
+      mcp_servers: [],
+      skills: [],
+      memories: [],
+      context: [],
+      permission_mode: "bypassPermissions",
+      env: {},
+    });
+    writeFileSync(filePath, scaffold);
+    console.log(chalk.green(`Created ${scope} agent: ${filePath}`));
+
+    const editor = process.env.EDITOR || "vi";
+    execFileSync(editor, [filePath], { stdio: "inherit" });
+  });
+
+agent.command("edit").description("Edit an agent definition").argument("<name>").action(async (name) => {
+  const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
+  const a = core.loadAgent(name, projectRoot);
+  if (!a) { console.log(chalk.red(`Agent '${name}' not found`)); return; }
+
+  if (a._source === "builtin") {
+    const readline = await import("readline");
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise<string>(resolve => rl.question(
+      `'${name}' is a builtin agent. Copy to [p]roject/[g]lobal first? [p/g/N] `, resolve,
+    ));
+    rl.close();
+    const choice = answer.trim().toLowerCase();
+    if (choice === "p" && projectRoot) {
+      core.saveAgent(a, "project", projectRoot);
+      const path = join(projectRoot, ".ark", "agents", `${name}.yaml`);
+      execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
+    } else if (choice === "g") {
+      core.saveAgent(a, "global");
+      const path = join(core.ARK_DIR(), "agents", `${name}.yaml`);
+      execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
+    } else {
+      console.log("Cancelled.");
+    }
+    return;
+  }
+
+  execFileSync(process.env.EDITOR || "vi", [a._path!], { stdio: "inherit" });
+});
+
+agent.command("delete").description("Delete a custom agent").argument("<name>").action(async (name) => {
+  const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
+  const a = core.loadAgent(name, projectRoot);
+  if (!a) { console.log(chalk.red(`Agent '${name}' not found`)); return; }
+
+  if (a._source === "builtin") {
+    console.log(chalk.red("Cannot delete builtin agents."));
+    return;
+  }
+
+  const readline = await import("readline");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise<string>(resolve => rl.question(
+    `Delete ${a._source} agent '${name}' at ${a._path}? [y/N] `, resolve,
+  ));
+  rl.close();
+
+  if (answer.trim().toLowerCase() === "y") {
+    const scope = a._source as "project" | "global";
+    core.deleteAgent(name, scope, scope === "project" ? projectRoot : undefined);
+    console.log(chalk.green(`Deleted '${name}'.`));
+  } else {
+    console.log("Cancelled.");
+  }
+});
+
+agent.command("copy").description("Copy an agent for customization").argument("<name>").argument("[new-name]")
+  .option("--global", "Save to ~/.ark/agents/ instead of project")
+  .action((name, newName, opts) => {
+    const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
+    const a = core.loadAgent(name, projectRoot);
+    if (!a) { console.log(chalk.red(`Agent '${name}' not found`)); return; }
+
+    const targetName = newName || name;
+    const scope: "project" | "global" = opts.global || !projectRoot ? "global" : "project";
+    const copy = { ...a, name: targetName };
+    core.saveAgent(copy, scope, scope === "project" ? projectRoot : undefined);
+
+    const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(core.ARK_DIR(), "agents");
+    console.log(chalk.green(`Copied '${name}' → ${scope} '${targetName}' at ${join(dir, `${targetName}.yaml`)}`));
+  });
 
 // ── Flow commands ───────────────────────────────────────────────────────────
 

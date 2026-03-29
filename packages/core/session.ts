@@ -122,7 +122,8 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
 
   const agentName = action.agent!;
   log(`Resolving agent: ${agentName}`);
-  const agent = agentRegistry.resolveAgent(agentName, session as unknown as Record<string, unknown>);
+  const projectRoot = agentRegistry.findProjectRoot(session.workdir || session.repo) ?? undefined;
+  const agent = agentRegistry.resolveAgent(agentName, session as unknown as Record<string, unknown>, projectRoot);
   if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
 
   // Resolve autonomy level from flow stage definition

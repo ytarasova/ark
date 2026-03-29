@@ -12,7 +12,7 @@ import {
 } from "../context.js";
 import {
   loadAgent, listAgents, saveAgent, deleteAgent,
-  resolveAgent, buildClaudeArgs,
+  resolveAgent, buildClaudeArgs, findProjectRoot,
   type AgentDefinition,
 } from "../agent.js";
 import { ARK_DIR } from "../store.js";
@@ -23,6 +23,14 @@ const agentDir = () => join(ARK_DIR(), "agents");
 function writeAgentYaml(name: string, data: Record<string, unknown>) {
   mkdirSync(agentDir(), { recursive: true });
   writeFileSync(join(agentDir(), `${name}.yaml`), YAML.stringify(data));
+}
+
+const projectDir = () => ctx.arkDir;
+
+function writeProjectAgentYaml(name: string, data: Record<string, unknown>) {
+  const dir = join(projectDir(), ".ark", "agents");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(data));
 }
 
 beforeEach(() => {
@@ -79,11 +87,11 @@ describe("loadAgent", () => {
     expect(agent!.system_prompt).toBe("");
   });
 
-  it("marks user agents with _source 'user'", () => {
+  it("marks global agents with _source 'global'", () => {
     writeAgentYaml("tagged", { name: "tagged" });
 
     const agent = loadAgent("tagged");
-    expect(agent!._source).toBe("user");
+    expect(agent!._source).toBe("global");
   });
 
   it("sets _path to the YAML file path", () => {
@@ -101,7 +109,7 @@ describe("loadAgent", () => {
     expect(agent!._source).toBe("builtin");
   });
 
-  it("user agent overrides builtin with same name", () => {
+  it("global agent overrides builtin with same name", () => {
     writeAgentYaml("worker", {
       name: "worker",
       description: "My custom worker",
@@ -110,7 +118,7 @@ describe("loadAgent", () => {
 
     const agent = loadAgent("worker");
     expect(agent).not.toBeNull();
-    expect(agent!._source).toBe("user");
+    expect(agent!._source).toBe("global");
     expect(agent!.description).toBe("My custom worker");
     expect(agent!.model).toBe("haiku");
   });
@@ -138,7 +146,7 @@ describe("listAgents", () => {
     expect(names).toContain("custom-two");
   });
 
-  it("user agent overrides builtin with same name in listing", () => {
+  it("global agent overrides builtin with same name in listing", () => {
     writeAgentYaml("worker", {
       name: "worker",
       description: "Override",
@@ -147,7 +155,7 @@ describe("listAgents", () => {
     const agents = listAgents();
     const worker = agents.find(a => a.name === "worker");
     expect(worker).toBeDefined();
-    expect(worker!._source).toBe("user");
+    expect(worker!._source).toBe("global");
     expect(worker!.description).toBe("Override");
   });
 
@@ -232,7 +240,7 @@ describe("saveAgent", () => {
       context: [],
       permission_mode: "bypassPermissions",
       env: {},
-      _source: "user",
+      _source: "global",
       _path: "/some/path",
     };
 
@@ -370,6 +378,206 @@ describe("resolveAgent", () => {
   });
 });
 
+// ── findProjectRoot ─────────────────────────────────────────────────────────
+
+describe("findProjectRoot", () => {
+  it("finds .git walking up from subdirectory", () => {
+    // The test is running inside a git repo, so findProjectRoot from cwd should find it
+    const root = findProjectRoot(process.cwd());
+    expect(root).not.toBeNull();
+    expect(existsSync(join(root!, ".git"))).toBe(true);
+  });
+
+  it("returns null when no .git exists", () => {
+    // /tmp is unlikely to be inside a git repo
+    const root = findProjectRoot("/tmp");
+    expect(root).toBeNull();
+  });
+
+  it("finds .git in exact directory", () => {
+    const tmpDir = join(ctx.arkDir, "fake-project");
+    mkdirSync(join(tmpDir, ".git"), { recursive: true });
+    expect(findProjectRoot(tmpDir)).toBe(tmpDir);
+  });
+
+  it("finds .git from nested subdirectory", () => {
+    const tmpDir = join(ctx.arkDir, "fake-project2");
+    mkdirSync(join(tmpDir, ".git"), { recursive: true });
+    const nested = join(tmpDir, "src", "deep");
+    mkdirSync(nested, { recursive: true });
+    expect(findProjectRoot(nested)).toBe(tmpDir);
+  });
+});
+
+// ── Three-tier resolution ───────────────────────────────────────────────────
+
+describe("three-tier resolution", () => {
+  it("project agent overrides global agent", () => {
+    writeAgentYaml("my-agent", { name: "my-agent", description: "global" });
+    writeProjectAgentYaml("my-agent", { name: "my-agent", description: "project" });
+
+    const agent = loadAgent("my-agent", projectDir());
+    expect(agent).not.toBeNull();
+    expect(agent!._source).toBe("project");
+    expect(agent!.description).toBe("project");
+  });
+
+  it("project agent overrides builtin agent", () => {
+    writeProjectAgentYaml("worker", { name: "worker", description: "project worker" });
+
+    const agent = loadAgent("worker", projectDir());
+    expect(agent).not.toBeNull();
+    expect(agent!._source).toBe("project");
+    expect(agent!.description).toBe("project worker");
+  });
+
+  it("global agent overrides builtin when no project agent", () => {
+    writeAgentYaml("worker", { name: "worker", description: "global worker" });
+
+    const agent = loadAgent("worker", projectDir());
+    expect(agent).not.toBeNull();
+    expect(agent!._source).toBe("global");
+    expect(agent!.description).toBe("global worker");
+  });
+
+  it("falls back to builtin when no project or global agent", () => {
+    const agent = loadAgent("worker", projectDir());
+    expect(agent).not.toBeNull();
+    expect(agent!._source).toBe("builtin");
+  });
+
+  it("without projectRoot, skips project tier", () => {
+    writeProjectAgentYaml("only-project", { name: "only-project", description: "project only" });
+
+    // Without projectRoot, should not find project-only agent
+    const agent = loadAgent("only-project");
+    expect(agent).toBeNull();
+  });
+});
+
+// ── listAgents with projectRoot ─────────────────────────────────────────────
+
+describe("listAgents with projectRoot", () => {
+  it("merges all three tiers", () => {
+    writeAgentYaml("global-only", { name: "global-only", description: "global" });
+    writeProjectAgentYaml("project-only", { name: "project-only", description: "project" });
+
+    const agents = listAgents(projectDir());
+    const names = agents.map(a => a.name);
+    expect(names).toContain("worker"); // builtin
+    expect(names).toContain("global-only"); // global
+    expect(names).toContain("project-only"); // project
+  });
+
+  it("project agent wins over global and builtin", () => {
+    writeAgentYaml("worker", { name: "worker", description: "global worker" });
+    writeProjectAgentYaml("worker", { name: "worker", description: "project worker" });
+
+    const agents = listAgents(projectDir());
+    const worker = agents.find(a => a.name === "worker");
+    expect(worker).toBeDefined();
+    expect(worker!._source).toBe("project");
+    expect(worker!.description).toBe("project worker");
+  });
+
+  it("without projectRoot, does not include project agents", () => {
+    writeProjectAgentYaml("project-only", { name: "project-only" });
+
+    const agents = listAgents();
+    const names = agents.map(a => a.name);
+    expect(names).not.toContain("project-only");
+  });
+});
+
+// ── saveAgent with scope ────────────────────────────────────────────────────
+
+describe("saveAgent with scope", () => {
+  const minAgent: AgentDefinition = {
+    name: "scoped-agent",
+    description: "test",
+    model: "sonnet",
+    max_turns: 200,
+    system_prompt: "",
+    tools: [],
+    mcp_servers: [],
+    skills: [],
+    memories: [],
+    context: [],
+    permission_mode: "bypassPermissions",
+    env: {},
+  };
+
+  it("saves to global by default", () => {
+    saveAgent(minAgent);
+    expect(existsSync(join(agentDir(), "scoped-agent.yaml"))).toBe(true);
+  });
+
+  it("saves to project when scope is 'project'", () => {
+    saveAgent(minAgent, "project", projectDir());
+    const projectAgentPath = join(projectDir(), ".ark", "agents", "scoped-agent.yaml");
+    expect(existsSync(projectAgentPath)).toBe(true);
+    // Should NOT exist in global
+    expect(existsSync(join(agentDir(), "scoped-agent.yaml"))).toBe(false);
+  });
+
+  it("falls back to global when scope is 'project' but no projectRoot", () => {
+    saveAgent(minAgent, "project");
+    expect(existsSync(join(agentDir(), "scoped-agent.yaml"))).toBe(true);
+  });
+
+  it("project-saved agent is loadable with projectRoot", () => {
+    saveAgent(minAgent, "project", projectDir());
+    const loaded = loadAgent("scoped-agent", projectDir());
+    expect(loaded).not.toBeNull();
+    expect(loaded!._source).toBe("project");
+  });
+});
+
+// ── deleteAgent with scope ──────────────────────────────────────────────────
+
+describe("deleteAgent with scope", () => {
+
+  it("deletes from global by default", () => {
+    writeAgentYaml("to-delete", { name: "to-delete" });
+    expect(deleteAgent("to-delete")).toBe(true);
+    expect(existsSync(join(agentDir(), "to-delete.yaml"))).toBe(false);
+  });
+
+  it("deletes from project when scope is 'project'", () => {
+    writeProjectAgentYaml("proj-del", { name: "proj-del" });
+    const projectPath = join(projectDir(), ".ark", "agents", "proj-del.yaml");
+    expect(existsSync(projectPath)).toBe(true);
+
+    expect(deleteAgent("proj-del", "project", projectDir())).toBe(true);
+    expect(existsSync(projectPath)).toBe(false);
+  });
+
+  it("returns false when agent does not exist in specified scope", () => {
+    writeAgentYaml("global-only", { name: "global-only" });
+    // Try deleting from project scope — should not find it
+    expect(deleteAgent("global-only", "project", projectDir())).toBe(false);
+    // Global copy should still exist
+    expect(existsSync(join(agentDir(), "global-only.yaml"))).toBe(true);
+  });
+});
+
+// ── resolveAgent with projectRoot ───────────────────────────────────────────
+
+describe("resolveAgent with projectRoot", () => {
+
+  it("resolves project agent with template substitution", () => {
+    writeProjectAgentYaml("proj-tmpl", {
+      name: "proj-tmpl",
+      system_prompt: "Working on {ticket} in {repo}",
+    });
+
+    const agent = resolveAgent("proj-tmpl", { ticket: "T-1", repo: "/code" }, projectDir());
+    expect(agent).not.toBeNull();
+    expect(agent!._source).toBe("project");
+    expect(agent!.system_prompt).toBe("Working on T-1 in /code");
+  });
+});
+
 // ── buildClaudeArgs ──────────────────────────────────────────────────────────
 
 describe("buildClaudeArgs", () => {
@@ -451,5 +659,54 @@ describe("buildClaudeArgs", () => {
   it("does not include -p without headless mode", () => {
     const args = buildClaudeArgs(baseAgent, { task: "ignored" });
     expect(args).not.toContain("-p");
+  });
+});
+
+// ── Integration: full agent lifecycle ───────────────────────────────────────
+
+describe("full agent lifecycle", () => {
+  it("create → list → load → delete round-trip for project scope", () => {
+    const root = projectDir();
+    const agent = { name: "lifecycle-test", description: "Integration test agent", model: "haiku" } as AgentDefinition;
+    saveAgent(agent, "project", root);
+
+    const agents = listAgents(root);
+    const found = agents.find(a => a.name === "lifecycle-test");
+    expect(found).not.toBeNull();
+    expect(found!._source).toBe("project");
+
+    const loaded = loadAgent("lifecycle-test", root);
+    expect(loaded!.model).toBe("haiku");
+
+    deleteAgent("lifecycle-test", "project", root);
+    expect(loadAgent("lifecycle-test", root)).toBeNull();
+  });
+
+  it("project agent shadows global agent with same name", () => {
+    const root = projectDir();
+
+    saveAgent({ name: "shadow-test", model: "sonnet" } as AgentDefinition, "global");
+    saveAgent({ name: "shadow-test", model: "opus" } as AgentDefinition, "project", root);
+
+    const loaded = loadAgent("shadow-test", root);
+    expect(loaded!.model).toBe("opus");
+    expect(loaded!._source).toBe("project");
+
+    deleteAgent("shadow-test", "project", root);
+    const fallback = loadAgent("shadow-test", root);
+    expect(fallback!.model).toBe("sonnet");
+    expect(fallback!._source).toBe("global");
+  });
+
+  it("global agent shadows builtin with same name", () => {
+    writeAgentYaml("worker", { name: "worker", model: "haiku", description: "custom worker" });
+
+    const loaded = loadAgent("worker");
+    expect(loaded!.model).toBe("haiku");
+    expect(loaded!._source).toBe("global");
+
+    deleteAgent("worker", "global");
+    const fallback = loadAgent("worker");
+    expect(fallback!._source).toBe("builtin");
   });
 });
