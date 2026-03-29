@@ -25,6 +25,14 @@ function writeAgentYaml(name: string, data: Record<string, unknown>) {
   writeFileSync(join(agentDir(), `${name}.yaml`), YAML.stringify(data));
 }
 
+const projectDir = () => ctx.arkDir;
+
+function writeProjectAgentYaml(name: string, data: Record<string, unknown>) {
+  const dir = join(projectDir(), ".ark", "agents");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(data));
+}
+
 beforeEach(() => {
   if (ctx) ctx.cleanup();
   ctx = createTestContext();
@@ -404,14 +412,6 @@ describe("findProjectRoot", () => {
 // ── Three-tier resolution ───────────────────────────────────────────────────
 
 describe("three-tier resolution", () => {
-  const projectDir = () => ctx.arkDir; // use ctx.dir as a fake project root
-
-  function writeProjectAgentYaml(name: string, data: Record<string, unknown>) {
-    const dir = join(projectDir(), ".ark", "agents");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(data));
-  }
-
   it("project agent overrides global agent", () => {
     writeAgentYaml("my-agent", { name: "my-agent", description: "global" });
     writeProjectAgentYaml("my-agent", { name: "my-agent", description: "project" });
@@ -458,14 +458,6 @@ describe("three-tier resolution", () => {
 // ── listAgents with projectRoot ─────────────────────────────────────────────
 
 describe("listAgents with projectRoot", () => {
-  const projectDir = () => ctx.arkDir;
-
-  function writeProjectAgentYaml(name: string, data: Record<string, unknown>) {
-    const dir = join(projectDir(), ".ark", "agents");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(data));
-  }
-
   it("merges all three tiers", () => {
     writeAgentYaml("global-only", { name: "global-only", description: "global" });
     writeProjectAgentYaml("project-only", { name: "project-only", description: "project" });
@@ -500,8 +492,6 @@ describe("listAgents with projectRoot", () => {
 // ── saveAgent with scope ────────────────────────────────────────────────────
 
 describe("saveAgent with scope", () => {
-  const projectDir = () => ctx.arkDir;
-
   const minAgent: AgentDefinition = {
     name: "scoped-agent",
     description: "test",
@@ -546,13 +536,6 @@ describe("saveAgent with scope", () => {
 // ── deleteAgent with scope ──────────────────────────────────────────────────
 
 describe("deleteAgent with scope", () => {
-  const projectDir = () => ctx.arkDir;
-
-  function writeProjectAgentYaml(name: string, data: Record<string, unknown>) {
-    const dir = join(projectDir(), ".ark", "agents");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(data));
-  }
 
   it("deletes from global by default", () => {
     writeAgentYaml("to-delete", { name: "to-delete" });
@@ -581,13 +564,6 @@ describe("deleteAgent with scope", () => {
 // ── resolveAgent with projectRoot ───────────────────────────────────────────
 
 describe("resolveAgent with projectRoot", () => {
-  const projectDir = () => ctx.arkDir;
-
-  function writeProjectAgentYaml(name: string, data: Record<string, unknown>) {
-    const dir = join(projectDir(), ".ark", "agents");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(data));
-  }
 
   it("resolves project agent with template substitution", () => {
     writeProjectAgentYaml("proj-tmpl", {
