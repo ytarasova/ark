@@ -28,7 +28,7 @@ export interface AgentDefinition {
   context: string[];
   permission_mode: string;
   env: Record<string, string>;
-  _source?: "builtin" | "user";
+  _source?: "builtin" | "global" | "project";
   _path?: string;
 }
 
@@ -52,12 +52,29 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILTIN_DIR = join(__dirname, "..", "..", "agents");
-function USER_DIR() { return join(ARK_DIR(), "agents"); }
+function GLOBAL_DIR() { return join(ARK_DIR(), "agents"); }
+
+/** Walk up from cwd looking for .git/ to find project root. */
+export function findProjectRoot(cwd?: string): string | null {
+  let dir = cwd ?? process.cwd();
+  while (true) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+function PROJECT_DIR(root: string) { return join(root, ".ark", "agents"); }
 
 // ── Loading ─────────────────────────────────────────────────────────────────
 
-export function loadAgent(name: string): AgentDefinition | null {
-  for (const [dir, source] of [[USER_DIR(), "user"], [BUILTIN_DIR, "builtin"]] as const) {
+export function loadAgent(name: string, projectRoot?: string): AgentDefinition | null {
+  const dirs: [string, AgentDefinition["_source"]][] = [];
+  if (projectRoot) dirs.push([PROJECT_DIR(projectRoot), "project"]);
+  dirs.push([GLOBAL_DIR(), "global"], [BUILTIN_DIR, "builtin"]);
+
+  for (const [dir, source] of dirs) {
     const path = join(dir, `${name}.yaml`);
     if (existsSync(path)) {
       const raw = YAML.parse(readFileSync(path, "utf-8")) ?? {};
@@ -67,10 +84,15 @@ export function loadAgent(name: string): AgentDefinition | null {
   return null;
 }
 
-export function listAgents(): AgentDefinition[] {
+export function listAgents(projectRoot?: string): AgentDefinition[] {
   const agents = new Map<string, AgentDefinition>();
+  const dirs: [string, AgentDefinition["_source"]][] = [
+    [BUILTIN_DIR, "builtin"],
+    [GLOBAL_DIR(), "global"],
+  ];
+  if (projectRoot) dirs.push([PROJECT_DIR(projectRoot), "project"]);
 
-  for (const [dir, source] of [[BUILTIN_DIR, "builtin"], [USER_DIR(), "user"]] as const) {
+  for (const [dir, source] of dirs) {
     if (!existsSync(dir)) continue;
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml"))) {
       const raw = YAML.parse(readFileSync(join(dir, file), "utf-8")) ?? {};
@@ -81,22 +103,24 @@ export function listAgents(): AgentDefinition[] {
   return [...agents.values()];
 }
 
-export function saveAgent(agent: AgentDefinition): void {
-  mkdirSync(USER_DIR(), { recursive: true });
+export function saveAgent(agent: AgentDefinition, scope: "project" | "global" = "global", projectRoot?: string): void {
+  const dir = scope === "project" && projectRoot ? PROJECT_DIR(projectRoot) : GLOBAL_DIR();
+  mkdirSync(dir, { recursive: true });
   const { _source, _path, ...data } = agent;
-  writeFileSync(join(USER_DIR(), `${agent.name}.yaml`), YAML.stringify(data));
+  writeFileSync(join(dir, `${agent.name}.yaml`), YAML.stringify(data));
 }
 
-export function deleteAgent(name: string): boolean {
-  const path = join(USER_DIR(), `${name}.yaml`);
+export function deleteAgent(name: string, scope: "project" | "global" = "global", projectRoot?: string): boolean {
+  const dir = scope === "project" && projectRoot ? PROJECT_DIR(projectRoot) : GLOBAL_DIR();
+  const path = join(dir, `${name}.yaml`);
   if (existsSync(path)) { unlinkSync(path); return true; }
   return false;
 }
 
 // ── Template substitution ───────────────────────────────────────────────────
 
-export function resolveAgent(name: string, session: Record<string, unknown>): AgentDefinition | null {
-  const agent = loadAgent(name);
+export function resolveAgent(name: string, session: Record<string, unknown>, projectRoot?: string): AgentDefinition | null {
+  const agent = loadAgent(name, projectRoot);
   if (!agent) return null;
 
   const vars = buildSessionVars(session);
