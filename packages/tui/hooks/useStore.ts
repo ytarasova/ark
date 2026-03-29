@@ -102,7 +102,8 @@ function fingerprint(data: Payload): string {
   const u = [...data.unreadCounts.entries()].map(([k, v]) => `${k}=${v}`).join(",");
   // Include a simple metrics hash (cpu values change → fingerprint changes)
   const m = [...data.snapshots.entries()].map(([k, v]) => `${k}:${v.metrics.cpu.toFixed(0)}`).join(",");
-  return `${s};${h};${u};${m}`;
+  const a = data.agents.map(a => `${a.name}:${a._source}`).join("|");
+  return `${s};${h};${u};${m};${a}`;
 }
 
 /**

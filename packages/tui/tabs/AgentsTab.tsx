@@ -104,7 +104,7 @@ export function AgentsTab({ agents, pane, asyncState, onOverlayChange, refresh }
             projectRoot={projectRoot}
           />
         ) : (
-          <AgentDetail agent={selected} pane={pane} statusMessage={status.message} />
+          <AgentDetail agent={selected} pane={pane} statusMessage={status.message} projectRoot={projectRoot} />
         )
       }
     />
@@ -113,18 +113,19 @@ export function AgentsTab({ agents, pane, asyncState, onOverlayChange, refresh }
 
 // ── Detail ──────────────────────────────────────────────────────────────────
 
-function AgentDetail({ agent, pane, statusMessage }: {
+function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
   agent: core.AgentDefinition | null;
   pane: "left" | "right";
   statusMessage: string | null;
+  projectRoot?: string;
 }) {
   if (!agent) {
     return <Box flexGrow={1}><Text dimColor>{"  No agent selected"}</Text></Box>;
   }
 
   const a = useMemo(() => {
-    try { return core.loadAgent(agent.name); } catch { return null; }
-  }, [agent.name]);
+    try { return core.loadAgent(agent.name, projectRoot); } catch { return null; }
+  }, [agent.name, projectRoot]);
   if (!a) return <Text dimColor>{"  Failed to load agent"}</Text>;
 
   const sections: [string, string[]][] = [

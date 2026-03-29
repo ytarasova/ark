@@ -20,6 +20,7 @@ export function App() {
   const { exit } = useApp();
   const store = useStore();
   const sessionsAsync = useAsync(store.refresh);
+  const agentsAsync = useAsync(store.refresh);
   const historyAsync = useAsync(store.refresh);
   const computeAsync = useAsync(store.refresh);
   const [tab, setTab] = useState<Tab>("sessions");
@@ -36,7 +37,7 @@ export function App() {
   const switchTab = (t: Tab) => { setTab(t); setPane("left"); };
 
   // Active tab's async state — used for TabBar/StatusBar indicators
-  const asyncState = tab === "history" ? historyAsync : tab === "compute" ? computeAsync : sessionsAsync;
+  const asyncState = tab === "agents" ? agentsAsync : tab === "history" ? historyAsync : tab === "compute" ? computeAsync : sessionsAsync;
 
   const takeSnapshot = useCallback(() => {
     if (!process.env.TMUX) return;
@@ -118,7 +119,7 @@ export function App() {
         <AgentsTab
           {...store}
           pane={pane}
-          asyncState={sessionsAsync}
+          asyncState={agentsAsync}
           onOverlayChange={setActiveOverlay}
           refresh={store.refresh}
         />
