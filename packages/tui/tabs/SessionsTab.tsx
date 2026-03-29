@@ -44,6 +44,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const [inboxMode, setInboxMode] = useState(false);
   const [cloneMode, setCloneMode] = useState(false);
   const [confirmComplete, setConfirmComplete] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<core.SearchResult[] | null>(null);
@@ -105,9 +106,13 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     if (input === "T") { setInboxMode(true); return; }
     if (input === "o") { setGroupMode("menu"); return; }
 
-    // Cancel pending confirm on any non-d key
+    // Cancel pending confirms on unrelated keys
     if (confirmComplete && input !== "d") {
       setConfirmComplete(false);
+      status.clear();
+    }
+    if (confirmDelete && input !== "x") {
+      setConfirmDelete(false);
       status.clear();
     }
 
@@ -158,7 +163,13 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       // Clone: deep copy with resume (opens name prompt)
       if (selected) setCloneMode(true);
     } else if (input === "x") {
-      actions.delete(selected.id);
+      if (confirmDelete) {
+        actions.delete(selected.id);
+        setConfirmDelete(false);
+      } else {
+        setConfirmDelete(true);
+        status.show(`Delete '${selected.summary ?? selected.id}'? Press x again to confirm`);
+      }
     } else if (input === "a") {
       if (selected?.session_id) {
         const sid = selected.session_id;
