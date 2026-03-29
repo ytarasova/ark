@@ -87,7 +87,7 @@ async function fetchAll(prev: Payload, metricsThisCycle: boolean): Promise<Paylo
   return {
     sessions,
     computes,
-    agents: core.listAgents(),
+    agents: core.listAgents(core.findProjectRoot(process.cwd()) ?? undefined),
     flows: core.listFlows(),
     unreadCounts,
     snapshots,
@@ -158,7 +158,7 @@ export function useStore(refreshMs = 3000): StoreData {
     }
     const data: Payload = {
       sessions, computes,
-      agents: core.listAgents(),
+      agents: core.listAgents(core.findProjectRoot(process.cwd()) ?? undefined),
       flows: core.listFlows(),
       unreadCounts,
       snapshots: dataRef.current.snapshots, // keep existing metrics

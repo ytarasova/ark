@@ -1,63 +1,131 @@
-import React, { useMemo } from "react";
-import { Box, Text } from "ink";
+import React, { useMemo, useState, useCallback } from "react";
+import { Box, Text, useInput } from "ink";
 import * as core from "../../core/index.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
+import { useStatusMessage } from "../hooks/useStatusMessage.js";
+import { AgentForm } from "../forms/AgentForm.js";
 import type { StoreData } from "../hooks/useStore.js";
+import type { AsyncState } from "../hooks/useAsync.js";
 
 interface AgentsTabProps extends StoreData {
   pane: "left" | "right";
+  asyncState: AsyncState;
+  onOverlayChange?: (overlay: string | null) => void;
+  refresh: () => void;
 }
 
-export function AgentsTab({ agents, pane }: AgentsTabProps) {
-  const { sel } = useListNavigation(agents.length, { active: pane === "left" });
+export function AgentsTab({ agents, pane, asyncState, onOverlayChange, refresh }: AgentsTabProps) {
+  const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
+  const hasOverlay = formMode !== null;
+  const { sel } = useListNavigation(agents.length, { active: pane === "left" && !hasOverlay });
+  const status = useStatusMessage();
+  const projectRoot = useMemo(() => core.findProjectRoot(process.cwd()) ?? undefined, []);
 
   const selected = agents[sel] ?? null;
+
+  React.useEffect(() => {
+    onOverlayChange?.(formMode ? "form" : null);
+  }, [formMode]);
+
+  const closeForm = useCallback(() => {
+    setFormMode(null);
+    refresh();
+  }, [refresh]);
+
+  useInput((input, _key) => {
+    if (hasOverlay || pane !== "left") return;
+
+    if (input === "n") { setFormMode("create"); return; }
+
+    if (!selected) return;
+
+    if (input === "e") {
+      if (selected._source === "builtin") {
+        status.show("Cannot edit builtin -- press 'c' to copy first");
+        return;
+      }
+      setFormMode("edit");
+      return;
+    }
+
+    if (input === "c") {
+      const copyName = `${selected.name}-copy`;
+      const scope = projectRoot ? "project" : "global";
+      asyncState.run("Copying agent...", async () => {
+        core.saveAgent({ ...selected, name: copyName } as core.AgentDefinition, scope, scope === "project" ? projectRoot : undefined);
+        status.show(`Copied -> '${copyName}' (${scope})`);
+        refresh();
+      });
+      return;
+    }
+
+    if (input === "x") {
+      if (selected._source === "builtin") {
+        status.show("Cannot delete builtin agents");
+        return;
+      }
+      const scope = selected._source as "project" | "global";
+      asyncState.run("Deleting agent...", async () => {
+        core.deleteAgent(selected.name, scope, scope === "project" ? projectRoot : undefined);
+        status.show(`Deleted '${selected.name}'`);
+        refresh();
+      });
+      return;
+    }
+  });
 
   return (
     <SplitPane
       focus={pane}
       leftTitle="Agents"
-      rightTitle="Details"
+      rightTitle={formMode ? (formMode === "create" ? "New Agent" : "Edit Agent") : "Details"}
       left={
         <TreeList
           items={agents}
           renderRow={(a) => {
             const marker = agents.indexOf(a) === sel ? ">" : " ";
-            const source = a._source === "user" ? "*" : " ";
-            return `${marker} ${source} ${a.name.padEnd(16)} ${a.model}`;
+            const src = a._source === "project" ? "P" : a._source === "global" ? "G" : "B";
+            return `${marker} ${src} ${a.name.padEnd(16)} ${a.model.padEnd(8)} ${a.description.slice(0, 30)}`;
           }}
           sel={sel}
           emptyMessage="No agents found."
         />
       }
-      right={<AgentDetail agent={selected} pane={pane} />}
+      right={
+        formMode ? (
+          <AgentForm
+            agent={formMode === "edit" ? selected : null}
+            onDone={closeForm}
+            asyncState={asyncState}
+            projectRoot={projectRoot}
+          />
+        ) : (
+          <AgentDetail agent={selected} pane={pane} statusMessage={status.message} />
+        )
+      }
     />
   );
 }
 
 // ── Detail ──────────────────────────────────────────────────────────────────
 
-interface AgentDetailProps {
-  agent: ReturnType<typeof core.listAgents>[number] | null;
+function AgentDetail({ agent, pane, statusMessage }: {
+  agent: core.AgentDefinition | null;
   pane: "left" | "right";
-}
-
-function AgentDetail({ agent, pane }: AgentDetailProps) {
+  statusMessage: string | null;
+}) {
   if (!agent) {
     return <Box flexGrow={1}><Text dimColor>{"  No agent selected"}</Text></Box>;
   }
 
-  // Load full agent definition for detail view
   const a = useMemo(() => {
     try { return core.loadAgent(agent.name); } catch { return null; }
   }, [agent.name]);
-  if (!a) {
-    return <Text dimColor>{"  Failed to load agent"}</Text>;
-  }
+  if (!a) return <Text dimColor>{"  Failed to load agent"}</Text>;
 
   const sections: [string, string[]][] = [
     ["Tools", a.tools],
@@ -71,6 +139,7 @@ function AgentDetail({ agent, pane }: AgentDetailProps) {
     <DetailPanel active={pane === "right"}>
       <Text bold>{` ${a.name}`}<Text dimColor>{` (${a._source})`}</Text></Text>
       {a.description && <Text dimColor>{` ${a.description}`}</Text>}
+      {statusMessage && <Text color="yellow">{` ${statusMessage}`}</Text>}
 
       <Text> </Text>
       <SectionHeader title="Config" />

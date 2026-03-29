@@ -161,6 +161,10 @@ function getAgentsHints(): React.ReactNode[] {
   sepId = 0;
   return [
     ...NAV_HINTS, sep(),
+    <KeyHint key="n" k="n" label="new" />,
+    <KeyHint key="e" k="e" label="edit" />,
+    <KeyHint key="c" k="c" label="copy" />,
+    <KeyHint key="x" k="x" label="delete" />, sep(),
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }

@@ -115,7 +115,13 @@ export function App() {
           ) : undefined}
         />
       ) : tab === "agents" ? (
-        <AgentsTab {...store} pane={pane} />
+        <AgentsTab
+          {...store}
+          pane={pane}
+          asyncState={sessionsAsync}
+          onOverlayChange={setActiveOverlay}
+          refresh={store.refresh}
+        />
       ) : tab === "tools" ? (
         <Box flexGrow={1} justifyContent="center" alignItems="center">
           <Text dimColor>{"Tools - coming soon (recipes, skills, prompt templates)"}</Text>
