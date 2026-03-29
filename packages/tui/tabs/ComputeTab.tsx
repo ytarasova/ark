@@ -30,6 +30,8 @@ interface ComputeTabProps extends StoreData {
 
 export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snapshots, computeLogs, addComputeLog, async: asyncState, onShowForm, formOverlay }: ComputeTabProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmStop, setConfirmStop] = useState(false);
+  const [confirmReboot, setConfirmReboot] = useState(false);
   const { sel } = useListNavigation(computes.length, { active: pane === "left" && !formOverlay && !confirmDelete });
   const status = useStatusMessage();
   const actions = useComputeActions(asyncState, addComputeLog);
@@ -43,6 +45,19 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
     if (confirmDelete) {
       if (input === "x" && selected) actions.delete(selected.name);
       setConfirmDelete(false);
+      status.clear();
+      return;
+    }
+    if (confirmStop) {
+      if (input === "s" && selected) actions.stop(selected);
+      setConfirmStop(false);
+      status.clear();
+      return;
+    }
+    if (confirmReboot) {
+      if (input === "R" && selected) actions.reboot(selected);
+      setConfirmReboot(false);
+      status.clear();
       return;
     }
 
@@ -53,7 +68,8 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
     } else if (input === "s") {
       if (!selected) return;
       if (selected.status === "running") {
-        actions.stop(selected);
+        setConfirmStop(true);
+        status.show(`Stop '${selected.name}'? Press s again to confirm`);
       } else if (selected.status === "stopped") {
         actions.start(selected);
       }
@@ -82,7 +98,8 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
       }
     } else if (input === "R") {
       if (selected && getProvider(selected.provider)?.canReboot) {
-        actions.reboot(selected);
+        setConfirmReboot(true);
+        status.show(`Reboot '${selected.name}'? Press R again to confirm`);
       }
     } else if (input === "t") {
       if (selected) {
