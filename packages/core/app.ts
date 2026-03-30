@@ -227,8 +227,8 @@ export class AppContext {
       this.registerProvider(new compute.RemoteDockerProvider());
       this.registerProvider(new compute.RemoteDevcontainerProvider());
       this.registerProvider(new compute.RemoteFirecrackerProvider());
-    } catch {
-      // compute module may not be available in minimal builds
+    } catch (e: any) {
+      console.error("boot: failed to load compute providers:", e?.message ?? e);
     }
 
     // 5. Set up event bus
@@ -240,8 +240,8 @@ export class AppContext {
       try {
         const { startConductor } = await import("./conductor.js");
         this.conductor = startConductor(this.config.conductorPort, { quiet: true });
-      } catch {
-        // conductor module may not exist yet — that's fine
+      } catch (e: any) {
+        console.error("boot: failed to start conductor:", e?.message ?? e);
       }
     }
 
@@ -273,7 +273,9 @@ export class AppContext {
     try {
       const { destroyAllPools } = await import("../compute/providers/ec2/pool.js");
       await destroyAllPools();
-    } catch { /* ec2 module may not be loaded */ }
+    } catch (e: any) {
+      console.error("shutdown: failed to destroy SSH pools:", e?.message ?? e);
+    }
 
     // 3. Stop metrics poller
     if (this.metricsPoller) {
@@ -295,7 +297,10 @@ export class AppContext {
 
     // 5. Close database
     if (this._db) {
-      try { this._db.close(); } catch { /* already closed */ }
+      try { this._db.close(); } catch (e: any) {
+        // DB may already be closed — log but don't fail shutdown
+        console.error("shutdown: failed to close database:", e?.message ?? e);
+      }
       this._db = null;
     }
 
@@ -321,12 +326,12 @@ export class AppContext {
             if (typeof compute.pollMetrics === "function") {
               await compute.pollMetrics(c.name);
             }
-          } catch {
-            // compute module may not have pollMetrics — skip
+          } catch (e: any) {
+            console.error(`metrics: failed to poll compute "${c.name}":`, e?.message ?? e);
           }
         }
-      } catch {
-        // store not available yet — skip this tick
+      } catch (e: any) {
+        console.error("metrics: failed to list running computes:", e?.message ?? e);
       }
     }, 30_000);
 
