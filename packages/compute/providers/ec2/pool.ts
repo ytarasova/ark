@@ -63,7 +63,10 @@ export class SSHPool {
         "-O", "check", `ubuntu@${this.ip}`,
       ], { timeout: 5_000 });
       return true;
-    } catch { return false; }
+    } catch {
+      // Expected when master socket doesn't exist yet
+      return false;
+    }
   }
 
   /** Ensure the ControlMaster socket is established. */
@@ -78,7 +81,9 @@ export class SSHPool {
     this.masterStarting = true;
     try {
       if (existsSync(this.socketPath)) {
-        try { rmSync(this.socketPath); } catch {}
+        try { rmSync(this.socketPath); } catch {
+          // Stale socket file may already be gone — safe to ignore
+        }
       }
 
       await execFileAsync("ssh", [
@@ -136,7 +141,9 @@ export class SSHPool {
         "-e", this.rsyncSshOpt(),
         local, `ubuntu@${this.ip}:${remote}`,
       ], { encoding: "utf-8", timeout: opts?.timeout ?? 300_000 });
-    } catch {} finally {
+    } catch (e: any) {
+      console.error(`SSHPool.rsyncPush failed (${local} -> ${this.ip}:${remote}):`, e?.message ?? e);
+    } finally {
       this.release();
     }
   }
@@ -150,7 +157,9 @@ export class SSHPool {
         "-e", this.rsyncSshOpt(),
         `ubuntu@${this.ip}:${remote}`, local,
       ], { encoding: "utf-8", timeout: opts?.timeout ?? 300_000 });
-    } catch {} finally {
+    } catch (e: any) {
+      console.error(`SSHPool.rsyncPull failed (${this.ip}:${remote} -> ${local}):`, e?.message ?? e);
+    } finally {
       this.release();
     }
   }
@@ -193,10 +202,14 @@ export class SSHPool {
         "-o", `ControlPath=${this.socketPath}`,
         "-O", "exit", `ubuntu@${this.ip}`,
       ], { timeout: 5_000 });
-    } catch {}
+    } catch {
+      // Master may already be dead — expected during cleanup
+    }
     try {
       if (existsSync(this.socketPath)) rmSync(this.socketPath);
-    } catch {}
+    } catch {
+      // Socket file may already be removed — safe to ignore
+    }
   }
 
   private async acquire(): Promise<void> {

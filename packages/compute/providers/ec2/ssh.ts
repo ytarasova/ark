@@ -98,8 +98,8 @@ export async function rsyncPush(key: string, ip: string, local: string, remote: 
   const [bin, ...rest] = rsyncPushArgs(key, ip, local, remote);
   try {
     await execFileAsync(bin, rest, { encoding: "utf-8", timeout: 300_000 });
-  } catch {
-    // best-effort - caller may retry
+  } catch (e: any) {
+    console.error(`rsyncPush failed (${local} -> ${ip}:${remote}):`, e?.message ?? e);
   }
 }
 
@@ -108,8 +108,8 @@ export async function rsyncPull(key: string, ip: string, remote: string, local: 
   const [bin, ...rest] = rsyncPullArgs(key, ip, remote, local);
   try {
     await execFileAsync(bin, rest, { encoding: "utf-8", timeout: 300_000 });
-  } catch {
-    // best-effort - caller may retry
+  } catch (e: any) {
+    console.error(`rsyncPull failed (${ip}:${remote} -> ${local}):`, e?.message ?? e);
   }
 }
 

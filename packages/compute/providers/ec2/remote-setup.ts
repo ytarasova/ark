@@ -20,7 +20,10 @@ export async function getGitRemoteUrl(localPath: string): Promise<string | null>
       encoding: "utf-8",
     });
     return stdout.trim() || null;
-  } catch { return null; }
+  } catch (e: any) {
+    console.error(`getGitRemoteUrl: failed for ${localPath}:`, e?.message ?? e);
+    return null;
+  }
 }
 
 /**
@@ -141,6 +144,8 @@ export async function autoAcceptChannelPrompt(
       if (CLAUDE_WORKING_MARKERS.some(m => stdout.includes(m))) {
         return;
       }
-    } catch {}
+    } catch (e: any) {
+      console.error(`autoAcceptChannelPrompt: ssh to ${tmuxName} failed (attempt ${i + 1}/${max}):`, e?.message ?? e);
+    }
   }
 }

@@ -108,8 +108,9 @@ async function syncGhPush(key: string, ip: string): Promise<void> {
         { timeout: 15_000 },
       );
     }
-  } catch {
+  } catch (e: any) {
     // gh CLI not installed or not authenticated - skip
+    console.error('syncGhPush: gh auth token failed (gh CLI missing or not authenticated):', e?.message ?? e);
   }
 }
 
@@ -204,8 +205,8 @@ function rewriteJsonFiles(dir: string, direction: "push" | "pull"): void {
         if (rewritten !== content) {
           writeFileSync(full, rewritten);
         }
-      } catch {
-        // Skip files that can't be read/written
+      } catch (e: any) {
+        console.error(`rewriteJsonFiles: failed to process ${full}:`, e?.message ?? e);
       }
     }
   }
@@ -266,8 +267,9 @@ export async function syncToHost(
       }
       synced.push(step.name);
       log(`${step.name} ✓ (${i + 1}/${total})`);
-    } catch {
+    } catch (e: any) {
       failed.push(step.name);
+      console.error(`syncToHost: step '${step.name}' ${opts.direction} failed:`, e?.message ?? e);
       log(`${step.name} failed (${i + 1}/${total})`);
     }
   }

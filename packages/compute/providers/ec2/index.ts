@@ -242,7 +242,8 @@ export class EC2Provider implements ComputeProvider {
                 credFile, `ubuntu@${result.ip}:/home/ubuntu/.claude/.credentials.json`,
               ], { timeout: 15_000 });
               log("Claude credentials synced ✓");
-            } catch {
+            } catch (e: any) {
+              console.error(`provision: scp credentials to ${compute.name} failed:`, e?.message ?? e);
               log("Failed to sync credentials — run 'ark auth --host " + compute.name + "'");
             }
           }
@@ -415,7 +416,10 @@ export class EC2Provider implements ComputeProvider {
       await queue.command(async (p) => {
         await p.exec(`tmux kill-session -t '${session.session_id}'`, { timeout: 10_000 });
       });
-    } catch { /* session may already be dead or host unreachable */ }
+    } catch (e: any) {
+      // Session may already be dead or host unreachable
+      console.error(`killAgent: tmux kill-session '${session.session_id}' on ${compute.name} failed:`, e?.message ?? e);
+    }
   }
 
   async captureOutput(compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
@@ -430,7 +434,10 @@ export class EC2Provider implements ComputeProvider {
         );
         return stdout;
       });
-    } catch { return ""; }
+    } catch (e: any) {
+      console.error(`captureOutput: tmux capture-pane '${session.session_id}' on ${compute.name} failed:`, e?.message ?? e);
+      return "";
+    }
   }
 
   async cleanupSession(compute: Compute, session: Session): Promise<void> {
@@ -441,7 +448,10 @@ export class EC2Provider implements ComputeProvider {
       await queue.command(async (p) => {
         await p.exec(`rm -rf '${remoteWorkdir}'`, { timeout: 15_000 });
       });
-    } catch { /* best effort */ }
+    } catch (e: any) {
+      // Best effort cleanup — remote may be unreachable
+      console.error(`cleanupSession: rm remote workdir for ${session.id} on ${compute.name} failed:`, e?.message ?? e);
+    }
   }
 
   async attach(compute: Compute, session: Session): Promise<void> {
@@ -499,7 +509,9 @@ export class EC2Provider implements ComputeProvider {
           `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN '${token}' 2>/dev/null; done`,
           { timeout: 10_000 },
         );
-      }).catch(() => {}); // fire-and-forget
+      }).catch((e: any) => {
+      console.error(`getMetrics: token refresh on ${compute.name} failed:`, e?.message ?? e);
+    }); // fire-and-forget
     }
 
     const result = await queue.metrics(async (p) => {
@@ -555,7 +567,10 @@ export class EC2Provider implements ComputeProvider {
           `tmux has-session -t '${tmuxSessionId}'`, { timeout: 10_000 });
         return exitCode === 0;
       });
-    } catch { return false; }
+    } catch (e: any) {
+      console.error(`checkSession: tmux has-session '${tmuxSessionId}' on ${compute.name} failed:`, e?.message ?? e);
+      return false;
+    }
   }
 
   getAttachCommand(compute: Compute, session: Session): string[] {
@@ -593,7 +608,9 @@ export class EC2Provider implements ComputeProvider {
         const { ARK_DIR } = require("../../../core/store.js");
         const p = j(ARK_DIR(), "claude-oauth-token");
         if (ex(p)) oauthToken = rf(p, "utf-8").trim();
-      } catch {}
+      } catch (e: any) {
+        console.error('buildLaunchEnv: failed to read claude-oauth-token:', e?.message ?? e);
+      }
     }
     if (oauthToken) env.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
     return env;
