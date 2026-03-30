@@ -138,14 +138,9 @@ describe("LocalProvider", () => {
         ports: [],
       });
       expect(returnedName).toBe(tmuxName);
-      // Verify the tmux session actually exists
       execFileSync("tmux", ["has-session", "-t", tmuxName]);
     } finally {
-      try {
-        execFileSync("tmux", ["kill-session", "-t", tmuxName]);
-      } catch {
-        // session may already be gone
-      }
+      try { execFileSync("tmux", ["kill-session", "-t", tmuxName]); } catch {}
     }
   }, 10_000);
 
