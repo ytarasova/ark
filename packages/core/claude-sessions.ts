@@ -115,7 +115,9 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
             }
           }
         }
-      } catch {}
+      } catch {
+          // Truncated or malformed JSON lines are expected in partial transcript reads
+        }
     }
 
     // Parse tail lines for lastActivity
@@ -124,7 +126,9 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
       try {
         const entry = JSON.parse(tailLines[i]);
         if (entry.timestamp) { lastActivity = entry.timestamp; break; }
-      } catch {}
+      } catch {
+          // Truncated JSON in tail buffer is expected — last line is often incomplete
+        }
     }
 
     // Fast message count via grep -c (counts lines matching "user" or "assistant")
@@ -137,7 +141,8 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
       // grep returns exit 1 if no matches — that's 0 messages
       messageCount = 0;
     }
-  } catch {
+  } catch (e: any) {
+    console.error(`parseTranscriptMeta(${filePath}):`, e?.message ?? e);
     return null;
   }
 
@@ -177,8 +182,12 @@ export function listClaudeSessions(opts?: ListOpts): ClaudeSession[] {
       timestamp: r.timestamp,
       lastActivity: r.last_activity,
     }));
-  } catch {
-    return []; // table may not exist yet
+  } catch (e: any) {
+    // Table may not exist yet on first run — SQLITE_ERROR is expected
+    if (!String(e?.message).includes("no such table")) {
+      console.error("listClaudeSessions:", e?.message ?? e);
+    }
+    return [];
   }
 }
 
@@ -197,7 +206,10 @@ export function getClaudeSession(sessionId: string, opts?: ListOpts): ClaudeSess
       transcriptPath: row.transcript_path, summary: row.summary,
       messageCount: row.message_count, timestamp: row.timestamp, lastActivity: row.last_activity,
     };
-  } catch {
+  } catch (e: any) {
+    if (!String(e?.message).includes("no such table")) {
+      console.error("getClaudeSession:", e?.message ?? e);
+    }
     return null;
   }
 }
@@ -223,7 +235,12 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
   try {
     const row = db.prepare("SELECT MAX(cached_at) as max_ts FROM claude_sessions_cache").get() as any;
     lastCachedAt = row?.max_ts ?? "";
-  } catch {}
+  } catch (e: any) {
+    // Table may not exist yet on first refresh — that's fine, we'll do a full scan
+    if (!String(e?.message).includes("no such table")) {
+      console.error("refreshClaudeSessionsCache (read max cached_at):", e?.message ?? e);
+    }
+  }
   const lastCachedTime = lastCachedAt ? new Date(lastCachedAt).getTime() : 0;
 
   let count = 0;
@@ -235,15 +252,15 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
   let totalFiles = 0;
   for (const pd of readdirSync(baseDir)) {
     const pp = join(baseDir, pd);
-    try { if (!statSync(pp).isDirectory()) continue; } catch { continue; }
+    try { if (!statSync(pp).isDirectory()) continue; } catch (e: any) { if (e?.code !== 'ENOENT') console.error('refreshClaudeSessionsCache (stat project dir):', e?.message ?? e); continue; }
     const decoded = decodeProjectDir(pd);
     if (decoded.includes("/var/folders/") || decoded.includes("/tmp/") || decoded.includes("/worktrees/") || decoded.includes("/subagents/")) continue;
-    try { totalFiles += readdirSync(pp).filter(f => f.endsWith(".jsonl")).length; } catch {}
+    try { totalFiles += readdirSync(pp).filter(f => f.endsWith(".jsonl")).length; } catch (e: any) { if (e?.code !== 'ENOENT') console.error('refreshClaudeSessionsCache (readdir for count):', e?.message ?? e); }
   }
 
   for (const projectDir of readdirSync(baseDir)) {
     const projectPath = join(baseDir, projectDir);
-    try { if (!statSync(projectPath).isDirectory()) continue; } catch { continue; }
+    try { if (!statSync(projectPath).isDirectory()) continue; } catch (e: any) { if (e?.code !== 'ENOENT') console.error('refreshClaudeSessionsCache (stat project):', e?.message ?? e); continue; }
 
     const decodedProject = decodeProjectDir(projectDir);
 
@@ -254,12 +271,12 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
         decodedProject.includes("/subagents/")) continue;
 
     let files: string[];
-    try { files = readdirSync(projectPath).filter(f => f.endsWith(".jsonl")); } catch { continue; }
+    try { files = readdirSync(projectPath).filter(f => f.endsWith(".jsonl")); } catch (e: any) { if (e?.code !== 'ENOENT') console.error('refreshClaudeSessionsCache (readdir):', e?.message ?? e); continue; }
 
     for (const file of files) {
       const filePath = join(projectPath, file);
       let fileStat;
-      try { fileStat = statSync(filePath); if (!fileStat.isFile()) continue; } catch { continue; }
+      try { fileStat = statSync(filePath); if (!fileStat.isFile()) continue; } catch (e: any) { if (e?.code !== 'ENOENT') console.error('refreshClaudeSessionsCache (stat file):', e?.message ?? e); continue; }
 
       fileCount++;
 
