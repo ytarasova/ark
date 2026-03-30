@@ -140,13 +140,15 @@ describe("LocalProvider", () => {
       const returnedName = await provider.launch(fakeCompute, fakeSession, {
         tmuxName,
         workdir: "/tmp",
-        launcherContent: "echo hello && sleep 1",
+        launcherContent: "#!/bin/bash\necho hello && sleep 10",
         ports: [],
       });
       expect(returnedName).toBe(tmuxName);
-      execFileSync("tmux", ["has-session", "-t", tmuxName]);
+      // Wait for tmux session to be registered
+      await new Promise(r => setTimeout(r, 500));
+      execFileSync("tmux", ["has-session", "-t", tmuxName], { stdio: "pipe" });
     } finally {
-      try { execFileSync("tmux", ["kill-session", "-t", tmuxName]); } catch {}
+      try { execFileSync("tmux", ["kill-session", "-t", tmuxName], { stdio: "pipe" }); } catch {}
     }
   }, 10_000);
 
