@@ -1,7 +1,13 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { execFileSync } from "child_process";
 import { LocalProvider } from "../providers/local/index.js";
+import { createTestContext, setContext } from "../../core/context.js";
 import type { Compute, Session } from "../../core/store.js";
+import type { TestContext } from "../../core/context.js";
+
+let ctx: TestContext;
+beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
+afterEach(() => { ctx.cleanup(); });
 
 const provider = new LocalProvider();
 
