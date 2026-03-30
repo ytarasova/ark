@@ -1,5 +1,11 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { createTestContext, setContext } from "../context.js";
+import type { TestContext } from "../context.js";
 import { dispatch } from "../session.js";
+
+let ctx: TestContext;
+beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
+afterEach(() => { ctx.cleanup(); });
 
 describe("session compute dispatch", () => {
   it("dispatch is an async function that returns a Promise", () => {

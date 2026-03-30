@@ -3,23 +3,29 @@
  * Verifies that stop() sets correct status/fields and resume() re-dispatches.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { createTestContext, setContext } from "../context.js";
+import type { TestContext } from "../context.js";
 import { getSession, updateSession } from "../index.js";
 import { createSession } from "../store.js";
 import { stop } from "../session.js";
 import { AppContext, setApp, clearApp } from "../app.js";
 
+let ctx: TestContext;
 let app: AppContext;
 
 beforeEach(async () => {
+  ctx = createTestContext();
+  setContext(ctx);
   app = AppContext.forTest();
   await app.boot();
   setApp(app);
 });
 
-afterAll(async () => {
+afterEach(async () => {
   await app?.shutdown();
   clearApp();
+  ctx.cleanup();
 });
 
 describe("session stop", () => {

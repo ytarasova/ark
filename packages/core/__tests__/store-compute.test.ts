@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { createTestContext, setContext } from "../context.js";
+import type { TestContext } from "../context.js";
 import {
-  getDb,
   createCompute,
   getCompute,
   listCompute,
@@ -8,10 +9,11 @@ import {
   deleteCompute,
 } from "../store.js";
 
+let ctx: TestContext;
+beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
+afterEach(() => { ctx.cleanup(); });
+
 describe("compute CRUD", () => {
-  beforeEach(() => {
-    getDb().run("DELETE FROM compute");
-  });
 
   it("creates a local compute as running by default", () => {
     const compute = createCompute({ name: "my-laptop" });

@@ -5,9 +5,11 @@
  * Skips functions that create/kill real tmux sessions (covered by E2E tests).
  */
 
-import { describe, it, expect, afterAll } from "bun:test";
-import { existsSync, readFileSync, statSync, rmSync } from "fs";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { existsSync, readFileSync, statSync } from "fs";
 import { join } from "path";
+import { createTestContext, setContext } from "../context.js";
+import type { TestContext } from "../context.js";
 import {
   hasTmux,
   attachCommand,
@@ -17,14 +19,9 @@ import {
 } from "../tmux.js";
 import { TRACKS_DIR } from "../store.js";
 
-// Track directories created by writeLauncher for cleanup
-const createdDirs: string[] = [];
-
-afterAll(() => {
-  for (const dir of createdDirs) {
-    try { rmSync(dir, { recursive: true, force: true }); } catch {}
-  }
-});
+let ctx: TestContext;
+beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
+afterEach(() => { ctx.cleanup(); });
 
 // ── hasTmux ──────────────────────────────────────────────────────────────────
 
@@ -91,16 +88,11 @@ describe("attachCommand", () => {
 // ── writeLauncher ────────────────────────────────────────────────────────────
 
 describe("writeLauncher", () => {
-  const testSessionId = `test-launcher-${Date.now()}`;
   const testContent = "#!/bin/bash\necho hello\n";
 
-  afterAll(() => {
-    // Cleanup handled by top-level afterAll via createdDirs
-  });
-
   it("creates launch.sh and returns its path", () => {
+    const testSessionId = `test-launcher-${Date.now()}`;
     const path = writeLauncher(testSessionId, testContent);
-    createdDirs.push(join(TRACKS_DIR(), testSessionId));
 
     expect(path).toBe(join(TRACKS_DIR(), testSessionId, "launch.sh"));
     expect(existsSync(path)).toBe(true);
@@ -110,7 +102,6 @@ describe("writeLauncher", () => {
     const sessionId = `test-content-${Date.now()}`;
     const content = "#!/bin/bash\nset -e\ncd /app && npm start\n";
     const path = writeLauncher(sessionId, content);
-    createdDirs.push(join(TRACKS_DIR(), sessionId));
 
     const written = readFileSync(path, "utf-8");
     expect(written).toBe(content);
@@ -122,7 +113,6 @@ describe("writeLauncher", () => {
     expect(existsSync(dir)).toBe(false);
 
     writeLauncher(sessionId, "#!/bin/bash\n");
-    createdDirs.push(dir);
 
     expect(existsSync(dir)).toBe(true);
   });
@@ -130,7 +120,6 @@ describe("writeLauncher", () => {
   it("sets executable permissions (755)", () => {
     const sessionId = `test-perms-${Date.now()}`;
     const path = writeLauncher(sessionId, "#!/bin/bash\n");
-    createdDirs.push(join(TRACKS_DIR(), sessionId));
 
     const mode = statSync(path).mode & 0o777;
     expect(mode).toBe(0o755);
