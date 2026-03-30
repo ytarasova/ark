@@ -134,7 +134,7 @@ export function writeChannelConfig(
   let existing: Record<string, any> = {};
   if (existsSync(mcpConfigPath)) {
     try { existing = JSON.parse(readFileSync(mcpConfigPath, "utf-8")); }
-    catch { /* corrupted .mcp.json — start fresh */ }
+    catch (e: any) { console.error(`writeChannelConfig: failed to parse ${mcpConfigPath}:`, e?.message ?? e); }
   }
   if (!existing.mcpServers) existing.mcpServers = {};
   existing.mcpServers["ark-channel"] = config;
@@ -182,7 +182,8 @@ export function writeHooksConfig(
 
   let existing: Record<string, unknown> = {};
   if (existsSync(settingsPath)) {
-    try { existing = JSON.parse(readFileSync(settingsPath, "utf-8")); } catch {}
+    try { existing = JSON.parse(readFileSync(settingsPath, "utf-8")); }
+    catch (e: any) { console.error(`writeHooksConfig: failed to parse ${settingsPath}:`, e?.message ?? e); }
   }
 
   // Remove previous ark hooks (idempotent)
@@ -227,7 +228,8 @@ export function removeHooksConfig(workdir: string): void {
   if (!existsSync(settingsPath)) return;
 
   let settings: Record<string, unknown>;
-  try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")); } catch { return; }
+  try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")); }
+  catch (e: any) { console.error(`removeHooksConfig: failed to parse ${settingsPath}:`, e?.message ?? e); return; }
 
   if (!settings.hooks || typeof settings.hooks !== "object") return;
 
@@ -265,7 +267,8 @@ export function parseTranscriptUsage(transcriptPath: string): TranscriptUsage {
   if (!existsSync(transcriptPath)) return usage;
 
   let content: string;
-  try { content = readFileSync(transcriptPath, "utf-8"); } catch { return usage; }
+  try { content = readFileSync(transcriptPath, "utf-8"); }
+  catch (e: any) { console.error(`parseTranscriptUsage: failed to read ${transcriptPath}:`, e?.message ?? e); return usage; }
 
   for (const line of content.split("\n")) {
     if (!line.trim()) continue;
@@ -278,7 +281,7 @@ export function parseTranscriptUsage(transcriptPath: string): TranscriptUsage {
       usage.output_tokens += u.output_tokens ?? 0;
       usage.cache_read_input_tokens += u.cache_read_input_tokens ?? 0;
       usage.cache_creation_input_tokens += u.cache_creation_input_tokens ?? 0;
-    } catch {}
+    } catch { /* individual JSONL line may be malformed — skip to avoid log spam */ }
   }
 
   usage.total_tokens = usage.input_tokens + usage.output_tokens
@@ -354,7 +357,8 @@ export function trustWorktree(originalRepo: string, worktreeDir: string): void {
   const wtProject = join(projectsDir, encode(worktreeDir));
 
   if (existsSync(origProject) && !existsSync(wtProject)) {
-    try { symlinkSync(origProject, wtProject); } catch {}
+    try { symlinkSync(origProject, wtProject); }
+    catch (e: any) { console.error(`trustWorktree: failed to symlink ${origProject} -> ${wtProject}:`, e?.message ?? e); }
   }
 
   trustDirectory(worktreeDir);
@@ -376,7 +380,7 @@ export function trustDirectory(dir: string): void {
       };
       writeFileSync(claudeJsonPath, JSON.stringify(claudeJson, null, 2));
     }
-  } catch {}
+  } catch (e: any) { console.error(`trustDirectory: failed to update ${claudeJsonPath}:`, e?.message ?? e); }
 }
 
 // ── Channel prompt auto-accept ───────────────────────────────────────────────
@@ -432,7 +436,7 @@ export async function autoAcceptChannelPrompt(
       if (CLAUDE_WORKING_MARKERS.some(m => output.includes(m))) {
         return;
       }
-    } catch {}
+    } catch { /* tmux pane may not exist yet during startup — retry on next iteration */ }
   }
 }
 
@@ -462,7 +466,7 @@ export async function deliverTask(
         const client = new ArkdClient(opts.arkdUrl);
         const result = await client.channelDeliver({ channelPort, payload });
         if (result.delivered) return;
-      } catch { /* arkd not available — fall through to direct */ }
+      } catch (e: any) { console.error(`deliverTask: arkd delivery failed for session ${sessionId}, falling back to direct:`, e?.message ?? e); }
     }
 
     // Fallback: direct HTTP to channel port with retry
@@ -478,7 +482,7 @@ export async function deliverTask(
           });
           return;
         }
-      } catch {}
+      } catch { /* channel port not ready yet — retry */ }
       await Bun.sleep(1000);
     }
   } finally {
