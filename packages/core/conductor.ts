@@ -177,7 +177,7 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
                   store.updateSession(sessionId, { config });
                 }
               }
-            } catch { /* transcript parsing failure shouldn't block status update */ }
+            } catch (e: any) { console.error("transcript parsing failed:", e?.message ?? e); }
 
               // Index transcript for FTS5 search — only if the transcript belongs to THIS session's agent
               // (avoid indexing the orchestrator's transcript under the agent's session ID)
@@ -188,7 +188,7 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
                     transcriptPath.includes(hookClaudeSession)) {
                   indexSession(transcriptPath, sessionId);
                 }
-              } catch { /* indexing failure shouldn't block status update */ }
+              } catch (e: any) { console.error("transcript indexing failed:", e?.message ?? e); }
           }
 
           return Response.json({ status: "ok", mapped: newStatus ?? "no-op" });
@@ -232,14 +232,14 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
             actor: "scheduler",
             data: { schedule_id: sched.id, cron: sched.cron },
           });
-        } catch { /* dispatch failure shouldn't crash the poller */ }
+        } catch (e: any) { console.error(`scheduled dispatch failed for ${sched.id}:`, e?.message ?? e); }
       }
-    } catch { /* ignore polling errors */ }
+    } catch (e: any) { console.error("schedule polling error:", e?.message ?? e); }
   }, 60_000);
 
   // PR review poller - check every 60 seconds
   const prTimer = setInterval(async () => {
-    try { await pollPRReviews(); } catch {}
+    try { await pollPRReviews(); } catch (e: any) { console.error("PR review polling error:", e?.message ?? e); }
   }, 60_000);
 
   return {
@@ -271,7 +271,7 @@ export async function deliverToChannel(
         const client = new ArkdClient(arkdUrl);
         const result = await client.channelDeliver({ channelPort, payload });
         if (result.delivered) return;
-      } catch { /* arkd not available — fall through */ }
+      } catch (e: any) { /* arkd not available — fall through to direct HTTP */ }
     }
   }
 
@@ -282,7 +282,7 @@ export async function deliverToChannel(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-  } catch { /* channel not reachable */ }
+  } catch (e: any) { /* channel not reachable — expected when agent hasn't started channel yet */ }
 }
 
 function handleReport(sessionId: string, report: OutboundMessage): void {
