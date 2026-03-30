@@ -42,7 +42,14 @@ function resolveGitHubUrl(dir?: string | null): string | null {
     const httpsMatch = remote.match(/(https:\/\/github\.com\/[^/]+\/[^/.]+)/);
     if (httpsMatch) return httpsMatch[1];
     return null;
-  } catch { return null; }
+  } catch (e: any) {
+    // Expected: "not a git repo" or no remote configured. Unexpected errors should be visible.
+    const msg = String(e?.message ?? e);
+    if (!msg.includes("not a git repository") && !msg.includes("No such remote")) {
+      console.error("resolveGitHubUrl:", msg);
+    }
+    return null;
+  }
 }
 
 export function startSession(opts: {
@@ -205,7 +212,9 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
 
   // Clean up hook config from working directory
   if (session.workdir) {
-    try { claude.removeHooksConfig(session.workdir); } catch {}
+    try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
+      console.error(`stop: removeHooksConfig failed for ${sessionId}:`, e?.message ?? e);
+    }
   }
 
   // Preserve claude_session_id so restart can --resume the conversation
@@ -439,19 +448,26 @@ export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boole
 
   // 1. Kill agent process via provider
   if (provider && compute) {
-    try { await provider.killAgent(compute, session); } catch {}
+    try { await provider.killAgent(compute, session); } catch (e: any) {
+      console.error(`deleteSession: killAgent failed for ${sessionId}:`, e?.message ?? e);
+    }
   } else if (session.session_id) {
     await tmux.killSessionAsync(session.session_id);
   }
 
   // 2. Clean up hook config
   if (session.workdir) {
-    try { claude.removeHooksConfig(session.workdir); } catch {}
+    try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
+      // Cleanup best-effort: workdir may already be deleted
+      console.error(`deleteSession: removeHooksConfig failed for ${sessionId}:`, e?.message ?? e);
+    }
   }
 
   // 3. Provider-specific session cleanup (worktree, remote checkout, container stop)
   if (provider && compute) {
-    try { await provider.cleanupSession(compute, session); } catch {}
+    try { await provider.cleanupSession(compute, session); } catch (e: any) {
+      console.error(`deleteSession: cleanupSession failed for ${sessionId}:`, e?.message ?? e);
+    }
   }
 
   // 4. Delete DB rows (instant)
@@ -470,7 +486,7 @@ function resolveProvider(session: store.Session): { provider: ComputeProvider | 
     const { getApp } = require("./app.js");
     return getApp().resolveProvider(session);
   } catch {
-    // AppContext not booted — resolve manually
+    // Expected: AppContext not booted (e.g. CLI mode) — resolve manually
     const computeName = session.compute_name ?? "local";
     const compute = store.getCompute(computeName);
     if (!compute) return { provider: null, compute: null };
@@ -580,7 +596,7 @@ async function launchAgentTmux(
         projectDir: effectiveWorkdir,
         onLog: log,
       });
-    } catch { log("Credential sync failed (continuing)"); }
+    } catch (e: any) { log(`Credential sync failed (continuing): ${e?.message ?? e}`); }
 
     // Docker Compose - only when explicitly enabled in arc.json { "compose": true }
     if (effectiveWorkdir) {
@@ -686,7 +702,9 @@ async function buildTaskWithHandoff(session: store.Session, stage: string, agent
         encoding: "utf-8",
       });
       if (log.trim()) parts.push(`\n## Recent commits:\n${log.trim()}`);
-    } catch { /* ignore */ }
+    } catch {
+      // Expected: worktree dir may not be a git repo yet
+    }
   }
 
   return parts.join("\n");
@@ -725,18 +743,30 @@ async function setupWorktree(repoPath: string, sessionId: string, branch?: strin
     try {
       await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], { stdio: "pipe" });
       return wtPath;
-    } catch { /* branch exists */ }
+    } catch (e: any) {
+      if (!String(e).includes("already exists")) {
+        console.error(`setupWorktree: new branch '${branchName}' failed:`, e?.message ?? e);
+      }
+    }
     // Try existing branch
     try {
       await execFileAsync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], { stdio: "pipe" });
       return wtPath;
-    } catch { /* checked out elsewhere */ }
+    } catch (e: any) {
+      if (!String(e).includes("already checked out") && !String(e).includes("already exists")) {
+        console.error(`setupWorktree: existing branch '${branchName}' failed:`, e?.message ?? e);
+      }
+    }
     // Unique branch
     try {
       await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], { stdio: "pipe" });
       return wtPath;
-    } catch { /* give up */ }
-  } catch { /* ignore */ }
+    } catch (e: any) {
+      console.error(`setupWorktree: all worktree strategies failed for ${sessionId}:`, e?.message ?? e);
+    }
+  } catch (e: any) {
+    console.error(`setupWorktree: worktree prune failed:`, e?.message ?? e);
+  }
   return null;
 }
 
