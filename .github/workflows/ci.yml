@@ -30,7 +30,7 @@ jobs:
       - name: Unit tests (excludes E2E and integration)
         run: |
           bun test --timeout 30000 \
-            $(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | grep -v local-arkd | sort)
+            $(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | grep -v local-arkd | grep -v local-provider | sort)
 
   # Build binaries for all 4 platforms
   build:
