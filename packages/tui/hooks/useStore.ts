@@ -79,7 +79,7 @@ async function fetchAll(prev: Payload, metricsThisCycle: boolean): Promise<Paylo
       try {
         const snap = await provider.getMetrics(c);
         if (snap) next.set(c.name, snap);
-      } catch {}
+      } catch (e: any) { console.error(`metrics fetch failed for ${c.name}:`, e?.message ?? e); }
     }
     snapshots = next;
   }
@@ -138,7 +138,7 @@ export function useStore(refreshMs = 3000): StoreData {
         setVer(v => v + 1);
       }
       setInitialLoading(false);
-    } catch {}
+    } catch (e: any) { console.error("store refresh failed:", e?.message ?? e); }
     running.current = false;
   }, []);
 

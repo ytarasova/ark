@@ -80,7 +80,7 @@ export function useComputeActions(
         if (compute) {
           const provider = getProvider(compute.provider);
           if (provider) {
-            try { await provider.stop(compute); } catch { /* already gone */ }
+            try { await provider.stop(compute); } catch (e: any) { console.error(`compute delete: stop failed (may already be gone):`, e?.message ?? e); }
           }
         }
         core.deleteCompute(name);
