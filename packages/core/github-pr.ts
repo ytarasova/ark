@@ -171,14 +171,19 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
       const channelPort = store.sessionChannelPort(session.id);
       const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
       import("./conductor.js").then(({ deliverToChannel }) => {
-        deliverToChannel(session, channelPort, steerPayload).catch(() => {});
-      }).catch(() => {
+        deliverToChannel(session, channelPort, steerPayload).catch((err) => {
+          console.error(`[github-pr] deliverToChannel failed for ${session.id}:`, err);
+        });
+      }).catch((err) => {
         // Fallback: direct HTTP
+        console.error(`[github-pr] conductor import failed, falling back to direct HTTP:`, err);
         fetch(`http://localhost:${channelPort}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(steerPayload),
-        }).catch(() => {});
+        }).catch((err) => {
+          console.error(`[github-pr] direct HTTP fallback failed for ${session.id}:`, err);
+        });
       });
     }
 
