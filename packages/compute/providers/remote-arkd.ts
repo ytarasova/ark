@@ -13,10 +13,12 @@ import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 import { ArkdBackedProvider } from "./arkd-backed.js";
 import type {
-  Compute, Session, ProvisionOpts, SyncOpts, IsolationMode,
+  Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
 } from "../types.js";
 
 const ARKD_REMOTE_PORT = 19300;
+const REMOTE_USER = "ubuntu";
+const REMOTE_HOME = `/home/${REMOTE_USER}`;
 
 interface RemoteConfig {
   size?: string;
@@ -136,7 +138,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
         log("Waiting for cloud-init to finish...");
         await poll(
           async () => {
-            const res = await sshExecAsync(privateKeyPath, result.ip!, "test -f /home/ubuntu/.ark-ready && echo ready", { timeout: 10_000 });
+            const res = await sshExecAsync(privateKeyPath, result.ip!, `test -f ${REMOTE_HOME}/.ark-ready && echo ready`, { timeout: 10_000 });
             return res.stdout.includes("ready");
           },
           { maxAttempts: 60, delayMs: 10_000 },
@@ -255,14 +257,14 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     return [
       "ssh", "-i", sshKeyPath(compute.name),
       "-o", "StrictHostKeyChecking=no",
-      `ubuntu@${cfg.ip}`,
+      `${REMOTE_USER}@${cfg.ip}`,
       `tmux attach -t ${session.session_id}`,
     ];
   }
 
   buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
     return {
-      command: "/home/ubuntu/.ark/bin/ark",
+      command: `${REMOTE_HOME}/.ark/bin/ark`,
       args: ["channel"],
       env: {
         ARK_SESSION_ID: sessionId,
@@ -302,13 +304,13 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
     { value: "inplace", label: "Remote checkout (in-place)" },
   ];
 
-  async launch(compute: Compute, session: Session, opts: any): Promise<string> {
+  async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
 
     // Clone repo on remote if needed
     if (session.repo) {
       const repoName = session.repo.split("/").pop()?.replace(".git", "") ?? "project";
-      const remoteWorkdir = `/home/ubuntu/Projects/${repoName}`;
+      const remoteWorkdir = `${REMOTE_HOME}/Projects/${repoName}`;
       await client.run({ command: "git", args: ["clone", session.repo, remoteWorkdir], timeout: 120_000 });
     }
 
@@ -349,8 +351,8 @@ export class RemoteDockerProvider extends RemoteArkdBase {
       command: "docker",
       args: [
         "create", "--name", container, "-it",
-        "-v", "/home/ubuntu/.ssh:/root/.ssh:ro",
-        "-v", "/home/ubuntu/.claude:/root/.claude:ro",
+        "-v", `${REMOTE_HOME}/.ssh:/root/.ssh:ro`,
+        "-v", `${REMOTE_HOME}/.claude:/root/.claude:ro`,
         image, "bash",
       ],
     });
@@ -361,7 +363,7 @@ export class RemoteDockerProvider extends RemoteArkdBase {
     log("Remote Docker container ready.");
   }
 
-  async launch(compute: Compute, _session: Session, opts: any): Promise<string> {
+  async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
     const container = this.containerName(compute);
 
@@ -389,7 +391,7 @@ export class RemoteDevcontainerProvider extends RemoteArkdBase {
   async postProvision(compute: Compute, log: (msg: string) => void): Promise<void> {
     const client = this.getClient(compute);
     const cfg = compute.config as RemoteConfig;
-    const workdir = cfg.devcontainer_workdir || "/home/ubuntu/Projects/workspace";
+    const workdir = cfg.devcontainer_workdir || `${REMOTE_HOME}/Projects/workspace`;
 
     // Clone repo if configured
     if (cfg.devcontainer_workdir) {
@@ -406,7 +408,7 @@ export class RemoteDevcontainerProvider extends RemoteArkdBase {
     log("Remote devcontainer ready.");
   }
 
-  async launch(compute: Compute, _session: Session, opts: any): Promise<string> {
+  async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
     const cfg = compute.config as RemoteConfig;
     const workdir = (cfg.devcontainer_workdir as string) || opts.workdir;
@@ -470,7 +472,7 @@ export class RemoteFirecrackerProvider extends RemoteArkdBase {
     log("Firecracker ready on remote.");
   }
 
-  async launch(compute: Compute, _session: Session, opts: any): Promise<string> {
+  async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
     const cfg = compute.config as RemoteConfig;
     const vmSshPort = 2222; // Default firecracker VM SSH port
@@ -509,10 +511,10 @@ After=network.target
 
 [Service]
 User=ubuntu
-ExecStart=/home/ubuntu/.bun/bin/bun /home/ubuntu/.ark/bin/ark arkd --port ${ARKD_REMOTE_PORT}${conductorFlag}
+ExecStart=${REMOTE_HOME}/.bun/bin/bun ${REMOTE_HOME}/.ark/bin/ark arkd --port ${ARKD_REMOTE_PORT}${conductorFlag}
 Restart=always
 RestartSec=5
-Environment=HOME=/home/ubuntu
+Environment=HOME=${REMOTE_HOME}
 
 [Install]
 WantedBy=multi-user.target

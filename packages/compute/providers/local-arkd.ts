@@ -14,7 +14,7 @@ import { join } from "path";
 import { homedir } from "os";
 import { ArkdBackedProvider } from "./arkd-backed.js";
 import type {
-  Compute, Session, ProvisionOpts, SyncOpts, IsolationMode,
+  Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
 } from "../types.js";
 
 const ARKD_PORT = 19300;
@@ -204,7 +204,7 @@ export class LocalDockerProvider extends LocalArkdBase {
     try { await execFileAsync("docker", ["stop", name], { timeout: 15_000 }); } catch {}
   }
 
-  async launch(compute: Compute, _session: Session, opts: any): Promise<string> {
+  async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
     const container = this.containerName(compute);
 
@@ -275,7 +275,7 @@ export class LocalDevcontainerProvider extends LocalArkdBase {
     // Devcontainer stays running; session cleanup is a noop
   }
 
-  async launch(compute: Compute, _session: Session, opts: any): Promise<string> {
+  async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
     const cfg = compute.config as Record<string, unknown>;
     const workdir = (cfg.workdir as string) || opts.workdir;
@@ -399,7 +399,7 @@ export class LocalFirecrackerProvider extends LocalArkdBase {
     // VM stays running; session cleanup is a noop
   }
 
-  async launch(compute: Compute, _session: Session, opts: any): Promise<string> {
+  async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
     const cfg = compute.config as Record<string, unknown>;
     const vmSshPort = (cfg.ssh_port as number) || 2222;
