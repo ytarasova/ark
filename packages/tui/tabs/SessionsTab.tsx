@@ -1,12 +1,11 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
-import { existsSync } from "fs";
-import { join } from "path";
 import * as core from "../../core/index.js";
 import { ICON, COLOR } from "../constants.js";
-import { ago, hms, humanTokens } from "../helpers.js";
+import { ago, hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
+import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter } from "../helpers/sessionFormatting.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { TreeList } from "../components/TreeList.js";
@@ -22,6 +21,8 @@ import { useSessionActions } from "../hooks/useSessionActions.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
 import { useMessages } from "../hooks/useMessages.js";
+import { useAuthStatus } from "../hooks/useAuthStatus.js";
+import { useGroupActions } from "../hooks/useGroupActions.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
@@ -97,6 +98,14 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const groups = useMemo(() => core.getGroups(), [sessions]);
 
   const actions = useSessionActions(asyncState);
+  const groupActions = useGroupActions(asyncState);
+
+  // Auth status for selected session's compute target
+  const selectedCompute = useMemo(
+    () => selected?.compute_name ? core.getCompute(selected.compute_name) : null,
+    [selected?.compute_name],
+  );
+  const authStatus = useAuthStatus(selectedCompute);
 
   useInput((input, key) => {
     if (formOverlay || hasOverlay) return;
@@ -121,26 +130,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
     if (key.return) {
       if (selected.status === "ready" || selected.status === "blocked") {
-        // Check if remote compute has Claude auth available
-        const compute = selected.compute_name ? core.getCompute(selected.compute_name) : null;
-        const { getProvider } = require("../../compute/index.js");
-        const provider = compute ? getProvider(compute.provider) : null;
-        if (provider?.needsAuth) {
-          let hasAuth = !!process.env.CLAUDE_CODE_OAUTH_TOKEN
-            || !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN
-            || !!process.env.ANTHROPIC_API_KEY;
-          // Also check saved token from 'ark auth'
-          if (!hasAuth) {
-            const tokenFile = join(process.env.HOME!, ".ark", "claude-oauth-token");
-            if (existsSync(tokenFile)) {
-              const token = require("fs").readFileSync(tokenFile, "utf-8").trim();
-              if (token) { process.env.CLAUDE_CODE_OAUTH_TOKEN = token; hasAuth = true; }
-            }
-          }
-          if (!hasAuth) {
-            status.show("Run 'ark auth' in another terminal first");
-            return;
-          }
+        if (!authStatus.hasAuth) {
+          status.show("Run 'ark auth' in another terminal first");
+          return;
         }
         actions.dispatch(selected.id);
       } else if (["failed", "stopped", "completed"].includes(selected.status)) {
@@ -507,48 +499,41 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
       )}
 
       {/* Token usage */}
-      {(s.config as any)?.usage && (() => {
-        const u = (s.config as any).usage;
-        return (
-          <KeyValue label="Tokens">
-            {`${humanTokens(u.total_tokens)} (in:${humanTokens(u.input_tokens)} out:${humanTokens(u.output_tokens)} cache:${humanTokens(u.cache_read_input_tokens ?? 0)})`}
-          </KeyValue>
-        );
-      })()}
+      {formatTokenDisplay(s) && (
+        <KeyValue label="Tokens">{formatTokenDisplay(s)}</KeyValue>
+      )}
 
       {/* Files changed - as a collapsible list */}
-      {(s.config as any)?.filesChanged?.length > 0 && (() => {
-        const files: string[] = (s.config as any).filesChanged;
-        const ghBase = (s.config as any)?.github_url as string | null;
+      {buildFileLinks(s) && (() => {
+        const fileLinks = buildFileLinks(s)!;
         return (
           <>
             <Text> </Text>
-            <Text bold dimColor>{`  Files changed (${files.length})`}</Text>
-            {files.slice(0, 15).map((f, i) => (
+            <Text bold dimColor>{`  Files changed (${fileLinks.length})`}</Text>
+            {fileLinks.slice(0, 15).map((f, i) => (
               <Text key={i} dimColor>
-                {ghBase
-                  ? `    \x1b]8;;${ghBase}/blob/main/${f}\x07${f}\x1b]8;;\x07`
-                  : `    ${f}`}
+                {f.url
+                  ? `    \x1b]8;;${f.url}\x07${f.path}\x1b]8;;\x07`
+                  : `    ${f.path}`}
               </Text>
             ))}
-            {files.length > 15 && <Text dimColor>{`    ... and ${files.length - 15} more`}</Text>}
+            {fileLinks.length > 15 && <Text dimColor>{`    ... and ${fileLinks.length - 15} more`}</Text>}
           </>
         );
       })()}
 
       {/* Commits - with GitHub links */}
-      {(s.config as any)?.commits?.length > 0 && (() => {
-        const commits: string[] = (s.config as any).commits;
-        const ghBase = (s.config as any)?.github_url as string | null;
+      {buildCommitLinks(s) && (() => {
+        const commitLinks = buildCommitLinks(s)!;
         return (
           <>
             <Text> </Text>
-            <Text bold dimColor>{`  Commits (${commits.length})`}</Text>
-            {commits.slice(0, 10).map((c, i) => (
+            <Text bold dimColor>{`  Commits (${commitLinks.length})`}</Text>
+            {commitLinks.slice(0, 10).map((c, i) => (
               <Text key={i} dimColor>
-                {ghBase
-                  ? `    \x1b]8;;${ghBase}/commit/${c}\x07${c.slice(0, 7)}\x1b]8;;\x07`
-                  : `    ${c.slice(0, 7)}`}
+                {c.url
+                  ? `    \x1b]8;;${c.url}\x07${c.shortSha}\x1b]8;;\x07`
+                  : `    ${c.shortSha}`}
               </Text>
             ))}
           </>
@@ -600,16 +585,9 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
         <>
           <Text> </Text>
           <SectionHeader title="Live Output" />
-          {agentOutput.split("\n")
-            .map(line => line
-              .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")  // strip ANSI
-              .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")  // strip control chars
-            )
-            .filter(line => line.trim())
-            .slice(-12)
-            .map((line, i) => (
-              <Text key={i} wrap="truncate">{`  ${line}`}</Text>
-            ))}
+          {stripAnsiAndFilter(agentOutput).map((line, i) => (
+            <Text key={i} wrap="truncate">{`  ${line}`}</Text>
+          ))}
         </>
       ) : null}
 
@@ -713,6 +691,7 @@ function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps) {
   const [action, setAction] = useState<"menu" | "create" | "delete">("menu");
   const [newName, setNewName] = useState("");
   const existing = useMemo(() => core.getGroups(), []);
+  const groupActs = useGroupActions(asyncState);
 
   useInput((input, key) => {
     if (key.escape) {
@@ -734,8 +713,7 @@ function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps) {
             onChange={setNewName}
             onSubmit={() => {
               if (!newName.trim()) return;
-              asyncState.run("Creating group...", () => {
-                core.createGroup(newName.trim());
+              groupActs.createGroup(newName.trim(), () => {
                 onDone(`Group '${newName.trim()}' created`);
               });
             }}
@@ -772,18 +750,8 @@ function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps) {
         <SelectMenu
           items={deleteChoices}
           onSelect={(item) => {
-            asyncState.run("Deleting group...", async () => {
-              // Kill and delete all sessions in the group
-              const groupSessions = sessions.filter(s => s.group_name === item.value);
-              for (const s of groupSessions) {
-                if (s.session_id) {
-                  try { await core.killSessionAsync(s.session_id); } catch {}
-                }
-                core.deleteSession(s.id);
-              }
-              // Delete the group itself
-              core.deleteGroup(item.value);
-              onDone(`Deleted group '${item.value}' (${groupSessions.length} sessions removed)`);
+            groupActs.deleteGroup(item.value, sessions, (count) => {
+              onDone(`Deleted group '${item.value}' (${count} sessions removed)`);
             });
           }}
         />
