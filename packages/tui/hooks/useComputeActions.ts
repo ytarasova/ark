@@ -89,53 +89,15 @@ export function useComputeActions(
 
     reboot: (compute: core.Compute) => {
       const provider = getProvider(compute.provider);
-      if (!provider?.canReboot) return;
+      if (!provider?.canReboot || !provider.reboot) return;
       const cfg = compute.config as any;
       if (!cfg?.instance_id) return;
       addLog(compute.name, "Rebooting...");
       run(`Rebooting ${compute.name}`, async (updateLabel) => {
-        const { EC2Client, RebootInstancesCommand, DescribeInstancesCommand } = await import("@aws-sdk/client-ec2");
-        const { fromIni } = await import("@aws-sdk/credential-providers");
-        const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
-
-        const ec2 = new EC2Client({
-          region: cfg.region ?? "us-east-1",
-          ...(cfg.aws_profile ? { credentials: fromIni({ profile: cfg.aws_profile }) } : {}),
+        await provider.reboot!(compute, {
+          onLog: (msg: string) => addLog(compute.name, msg),
+          onProgress: (msg: string) => updateLabel(msg),
         });
-        await ec2.send(new RebootInstancesCommand({ InstanceIds: [cfg.instance_id] }));
-        addLog(compute.name, "Reboot initiated — waiting for host...");
-
-        // Wait up to 3 minutes for SSH to come back
-        const deadline = Date.now() + 180_000;
-        let attempt = 0;
-        while (Date.now() < deadline) {
-          attempt++;
-          updateLabel(`Rebooting ${compute.name} (${attempt}...)`);
-          await new Promise(r => setTimeout(r, 10_000));
-
-          // Check if IP changed (stop/start assigns new IP)
-          const desc = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [cfg.instance_id] }));
-          const inst = desc.Reservations?.[0]?.Instances?.[0];
-          const newIp = inst?.PublicIpAddress;
-          if (newIp && newIp !== cfg.ip) {
-            core.mergeComputeConfig(compute.name, { ip: newIp });
-            addLog(compute.name, `IP changed: ${cfg.ip} → ${newIp}`);
-            cfg.ip = newIp;
-          }
-
-          if (!cfg.ip) continue;
-          const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), cfg.ip, "echo ok", { timeout: 10_000 });
-          if (exitCode === 0) {
-            addLog(compute.name, "Host is back online");
-            core.updateCompute(compute.name, { status: "running" });
-            return;
-          }
-        }
-
-        // Timed out
-        addLog(compute.name, "Host did not come back after 3 minutes");
-        core.updateCompute(compute.name, { status: "stopped" });
-        core.mergeComputeConfig(compute.name, { last_error: "Reboot timeout — host unreachable" });
       });
     },
 

@@ -68,6 +68,9 @@ export interface ComputeProvider {
   /** Check the actual provider status and reconcile with DB. Returns null if not applicable. */
   checkStatus?(compute: Compute): Promise<string | null>;
 
+  /** Reboot the compute instance and wait for it to come back. */
+  reboot?(compute: Compute, opts?: { onLog?: (msg: string) => void; onProgress?: (msg: string) => void }): Promise<void>;
+
   syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void>;
 
   // ── Capability flags ────────────────────────────────────────────────────

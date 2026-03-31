@@ -13,6 +13,7 @@ import {
   EC2Client,
   StartInstancesCommand,
   StopInstancesCommand,
+  RebootInstancesCommand,
   DescribeInstancesCommand,
 } from "@aws-sdk/client-ec2";
 import { fromIni } from "@aws-sdk/credential-providers";
@@ -319,6 +320,51 @@ export class EC2Provider implements ComputeProvider {
 
     updateCompute(compute.name, { status: "stopped" });
     mergeComputeConfig(compute.name, { ip: null });
+  }
+
+  async reboot(compute: Compute, opts?: { onLog?: (msg: string) => void; onProgress?: (msg: string) => void }): Promise<void> {
+    const log = opts?.onLog ?? (() => {});
+    const progress = opts?.onProgress ?? (() => {});
+    const cfg = compute.config as EC2HostConfig;
+    const instanceId = cfg.instance_id;
+    if (!instanceId) throw new Error(`Compute '${compute.name}' has no instance_id`);
+
+    const ec2 = createEc2Client(cfg);
+    await ec2.send(new RebootInstancesCommand({ InstanceIds: [instanceId] }));
+    log("Reboot initiated — waiting for host...");
+
+    // Wait up to 3 minutes for SSH to come back
+    const deadline = Date.now() + 180_000;
+    let attempt = 0;
+    let currentIp = cfg.ip;
+    while (Date.now() < deadline) {
+      attempt++;
+      progress(`Rebooting ${compute.name} (${attempt}...)`);
+      await sleep(10_000);
+
+      // Check if IP changed (stop/start assigns new IP)
+      const desc = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
+      const inst = desc.Reservations?.[0]?.Instances?.[0];
+      const newIp = inst?.PublicIpAddress;
+      if (newIp && newIp !== currentIp) {
+        mergeComputeConfig(compute.name, { ip: newIp });
+        log(`IP changed: ${currentIp} → ${newIp}`);
+        currentIp = newIp;
+      }
+
+      if (!currentIp) continue;
+      const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), currentIp, "echo ok", { timeout: 10_000 });
+      if (exitCode === 0) {
+        log("Host is back online");
+        updateCompute(compute.name, { status: "running" });
+        return;
+      }
+    }
+
+    // Timed out
+    log("Host did not come back after 3 minutes");
+    updateCompute(compute.name, { status: "stopped" });
+    mergeComputeConfig(compute.name, { last_error: "Reboot timeout — host unreachable" });
   }
 
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
