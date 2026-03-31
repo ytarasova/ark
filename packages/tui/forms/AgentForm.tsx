@@ -1,10 +1,12 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import * as core from "../../core/index.js";
 import { useFormNavigation } from "../components/form/useFormNavigation.js";
 import { FormTextField } from "../components/form/FormTextField.js";
 import { FormSelectField } from "../components/form/FormSelectField.js";
 import { submitForm } from "./submitForm.js";
+import { useToolSelection } from "../hooks/useToolSelection.js";
+import { openExternalEditor } from "../helpers/openExternalEditor.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 interface AgentFormProps {
@@ -39,14 +41,38 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
   const [description, setDescription] = useState(agent?.description ?? "");
   const [model, setModel] = useState(agent?.model ?? "sonnet");
   const [maxTurns, setMaxTurns] = useState(String(agent?.max_turns ?? 200));
-  const [tools, setTools] = useState<string[]>(agent?.tools ?? ["Bash", "Read", "Write", "Edit", "Glob", "Grep"]);
   const [permissionMode, setPermissionMode] = useState(agent?.permission_mode ?? "bypassPermissions");
   const [scope, setScope] = useState<"project" | "global">(
     agent?._source === "global" ? "global" : projectRoot ? "project" : "global",
   );
   const [systemPrompt, setSystemPrompt] = useState(agent?.system_prompt ?? "");
 
-  const submit = useCallback(() => {
+  // submit is defined as a ref-stable callback below, after useFormNavigation
+  // We use a ref pattern to avoid circular dependency between submit and useFormNavigation
+  const submitRef = React.useRef<() => void>(() => {});
+
+  const { active, advance, setEditing } = useFormNavigation({
+    fields: [
+      { name: "name", type: "text", visible: !isEdit },
+      { name: "description", type: "text" },
+      { name: "model", type: "select" },
+      { name: "max_turns", type: "text" },
+      { name: "tools", type: "text" },
+      { name: "permission", type: "select" },
+      { name: "scope", type: "select", visible: !isEdit },
+      { name: "prompt", type: "text" },
+    ],
+    onCancel: onDone,
+    onSubmit: () => submitRef.current(),
+  });
+
+  const { tools, setTools, toolCursor } = useToolSelection(
+    TOOL_OPTIONS,
+    agent?.tools ?? ["Bash", "Read", "Write", "Edit", "Glob", "Grep"],
+    active === "tools",
+  );
+
+  submitRef.current = () => {
     if (!isEdit && !name.trim()) return;
 
     const agentDef: Omit<core.AgentDefinition, "_source" | "_path"> = {
@@ -74,34 +100,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
       asyncState,
       confirmLabel: isEdit ? "Agent saved" : "Agent created",
     });
-  }, [name, description, model, maxTurns, tools, permissionMode, scope, systemPrompt, isEdit, agent, projectRoot, onDone, asyncState]);
-
-  const { active, advance, setEditing } = useFormNavigation({
-    fields: [
-      { name: "name", type: "text", visible: !isEdit },
-      { name: "description", type: "text" },
-      { name: "model", type: "select" },
-      { name: "max_turns", type: "text" },
-      { name: "tools", type: "text" },
-      { name: "permission", type: "select" },
-      { name: "scope", type: "select", visible: !isEdit },
-      { name: "prompt", type: "text" },
-    ],
-    onCancel: onDone,
-    onSubmit: submit,
-  });
-
-  // Tools field: j/k navigate, space toggles
-  const [toolCursor, setToolCursor] = useState(0);
-  useInput((input, key) => {
-    if (active !== "tools") return;
-    if (input === "j" || key.downArrow) setToolCursor(c => Math.min(c + 1, TOOL_OPTIONS.length - 1));
-    if (input === "k" || key.upArrow) setToolCursor(c => Math.max(c - 1, 0));
-    if (input === " " || key.return) {
-      const tool = TOOL_OPTIONS[toolCursor];
-      setTools(prev => prev.includes(tool) ? prev.filter(t => t !== tool) : [...prev, tool]);
-    }
-  });
+  };
 
   // System prompt field: Enter opens $EDITOR
   useInput((_input, key) => {
@@ -109,16 +108,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
     if (key.return) {
       setEditing(true);
       try {
-        const os = require("os");
-        const fs = require("fs");
-        const path = require("path");
-        const cp = require("child_process");
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ark-agent-"));
-        const tmpFile = path.join(tmpDir, "system-prompt.md");
-        fs.writeFileSync(tmpFile, systemPrompt);
-        const editor = process.env.EDITOR || "vi";
-        cp.execFileSync(editor, [tmpFile], { stdio: "inherit" });
-        setSystemPrompt(fs.readFileSync(tmpFile, "utf-8"));
+        setSystemPrompt(openExternalEditor(systemPrompt));
       } catch {}
       setEditing(false);
     }

@@ -41,6 +41,38 @@ export function filterSessionCompletions(
   return results;
 }
 
+/**
+ * Parse @mention from message text and resolve target session.
+ * Returns { targetId, content } where targetId is null if no target found.
+ */
+export function parseMentions(
+  text: string,
+  sessionMap: Map<string, string>,
+  sessions: core.Session[],
+): { targetId: string | null; content: string } {
+  const atMatch = text.match(/^@(\S+)\s+([\s\S]+)$/);
+  let targetId: string | null = null;
+  let content = text;
+
+  if (atMatch) {
+    const tag = atMatch[1].toLowerCase();
+    targetId = sessionMap.get(tag) ?? null;
+    if (targetId) {
+      content = atMatch[2];
+    }
+  }
+
+  if (!targetId) {
+    // No valid @tag -- try to find a single running/waiting session
+    const active = sessions.filter(s => s.status === "running" || s.status === "waiting");
+    if (active.length === 1) {
+      targetId = active[0].id;
+    }
+  }
+
+  return { targetId, content };
+}
+
 export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
   const [msg, setMsg] = useState("");
   const [completionIndex, setCompletionIndex] = useState(0);
@@ -106,29 +138,11 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
     const text = msg.trim();
     if (!text) return;
 
-    // Parse @session-name prefix
-    const atMatch = text.match(/^@(\S+)\s+([\s\S]+)$/);
-    let targetId: string | null = null;
-    let content = text;
-
-    if (atMatch) {
-      const tag = atMatch[1].toLowerCase();
-      targetId = sessionMap.get(tag) ?? null;
-      if (targetId) {
-        content = atMatch[2];
-      }
-    }
-
+    const { targetId, content } = parseMentions(text, sessionMap, sessions);
     if (!targetId) {
-      // No valid @tag — try to find a single running/waiting session
-      const active = sessions.filter(s => s.status === "running" || s.status === "waiting");
-      if (active.length === 1) {
-        targetId = active[0].id;
-      } else {
-        // Can't determine target
-        setMsg("");
-        return;
-      }
+      // Can't determine target
+      setMsg("");
+      return;
     }
 
     sendMessage(targetId, content);

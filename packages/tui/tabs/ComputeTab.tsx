@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import { execFile } from "child_process";
@@ -156,6 +156,25 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
   );
 }
 
+// -- Helpers -----------------------------------------------------------------
+
+interface ComputePort {
+  port: number;
+  name?: string;
+  listening: boolean;
+  source: string;
+}
+
+function getComputePorts(sessions: core.Session[], computeName: string): ComputePort[] {
+  const ports: ComputePort[] = [];
+  for (const s of sessions) {
+    if (s.compute_name !== computeName || s.status !== "running") continue;
+    const sessionPorts = (s.config as any)?.ports ?? [];
+    ports.push(...sessionPorts);
+  }
+  return ports;
+}
+
 // -- Detail ------------------------------------------------------------------
 
 interface ComputeDetailProps {
@@ -308,33 +327,30 @@ function ComputeDetail({ compute: h, snapshot, computeLogs, sessions, pane }: Co
       )}
 
       {/* Ports */}
-      {(() => {
-        const computeSessions = sessions.filter(
-          (s) => s.compute_name === h.name && s.status === "running"
-        );
-        const allPorts: any[] = [];
-        for (const s of computeSessions) {
-          const ports = (s.config as any)?.ports ?? [];
-          allPorts.push(...ports);
-        }
-        if (allPorts.length === 0) return null;
-        return (
-          <>
-            <Text> </Text>
-            <SectionHeader title="Ports" />
-            {allPorts.map((p: any, i: number) => {
-              const name = p.name ? ` (${p.name})` : "";
-              return (
-                <Text key={i}>
-                  {"  "}<Text color={p.listening ? "green" : "red"}>{p.listening ? "\u25CF" : "\u25CB"}</Text>
-                  {` :${p.port}${name}  ${p.source}  ${p.listening ? "listening" : "closed"}`}
-                </Text>
-              );
-            })}
-          </>
-        );
-      })()}
+      <ComputePortList sessions={sessions} computeName={h.name} />
 
     </DetailPanel>
+  );
+}
+
+// -- Port list (memoized) ----------------------------------------------------
+
+function ComputePortList({ sessions, computeName }: { sessions: core.Session[]; computeName: string }) {
+  const ports = useMemo(() => getComputePorts(sessions, computeName), [sessions, computeName]);
+  if (ports.length === 0) return null;
+  return (
+    <>
+      <Text> </Text>
+      <SectionHeader title="Ports" />
+      {ports.map((p, i) => {
+        const name = p.name ? ` (${p.name})` : "";
+        return (
+          <Text key={i}>
+            {"  "}<Text color={p.listening ? "green" : "red"}>{p.listening ? "\u25CF" : "\u25CB"}</Text>
+            {` :${p.port}${name}  ${p.source}  ${p.listening ? "listening" : "closed"}`}
+          </Text>
+        );
+      })}
+    </>
   );
 }
