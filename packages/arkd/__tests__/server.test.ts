@@ -38,6 +38,21 @@ async function get<T>(path: string): Promise<{ status: number; data: T }> {
   return { status: resp.status, data: await resp.json() as T };
 }
 
+/** Poll a condition until true or timeout. Replaces arbitrary setTimeout waits. */
+async function pollUntil(
+  condition: () => boolean | Promise<boolean>,
+  opts?: { timeout?: number; interval?: number; message?: string }
+): Promise<void> {
+  const timeout = opts?.timeout ?? 5000;
+  const interval = opts?.interval ?? 100;
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (await condition()) return;
+    await new Promise(r => setTimeout(r, interval));
+  }
+  throw new Error(opts?.message ?? `pollUntil timed out after ${timeout}ms`);
+}
+
 // ── Health ──────────────────────────────────────────────────────────────────
 
 describe("GET /health", () => {
@@ -272,16 +287,22 @@ describe("Agent lifecycle (tmux)", () => {
     expect(launch.status).toBe(200);
     expect(launch.data.ok).toBe(true);
 
-    // Wait for tmux to start
-    await new Promise(r => setTimeout(r, 500));
+    // Poll until tmux reports the session as running
+    await pollUntil(async () => {
+      const s = await post<any>("/agent/status", { sessionName: SESSION_NAME });
+      return s.data.running === true;
+    }, { timeout: 5000, message: "tmux session never started" });
 
     // Status: should be running
     const status = await post<any>("/agent/status", { sessionName: SESSION_NAME });
     expect(status.data.running).toBe(true);
 
-    // Capture output
-    await new Promise(r => setTimeout(r, 1000));
-    const capture = await post<any>("/agent/capture", { sessionName: SESSION_NAME });
+    // Poll until capture output contains expected text
+    let capture: { status: number; data: any } = { status: 0, data: {} };
+    await pollUntil(async () => {
+      capture = await post<any>("/agent/capture", { sessionName: SESSION_NAME });
+      return capture.data.output?.includes("arkd agent running") ?? false;
+    }, { timeout: 5000, message: "capture never contained expected output" });
     expect(capture.data.output).toContain("arkd agent running");
 
     // Kill
@@ -361,7 +382,11 @@ describe("GET /snapshot", () => {
       script: "#!/bin/bash\nsleep 60",
       workdir: tempDir,
     });
-    await new Promise(r => setTimeout(r, 500));
+    // Poll until tmux session is visible
+    await pollUntil(async () => {
+      const s = await post<any>("/agent/status", { sessionName: name });
+      return s.data.running === true;
+    }, { timeout: 5000, message: "snapshot tmux session never started" });
 
     try {
       const { data } = await get<any>("/snapshot");

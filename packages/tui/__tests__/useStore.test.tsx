@@ -15,6 +15,7 @@ import { createSession } from "../../core/store.js";
 import type { TestContext } from "../../core/store.js";
 import { useStore } from "../hooks/useStore.js";
 import type { StoreData } from "../hooks/useStore.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 let ctx: TestContext;
 
@@ -46,7 +47,7 @@ describe("useStore", () => {
   it("provides all required StoreData fields", async () => {
     captured = null;
     const { unmount } = render(<StoreCapture />);
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => captured !== null);
 
     expect(captured).not.toBeNull();
     expect(captured!.sessions).toBeInstanceOf(Array);
@@ -66,7 +67,7 @@ describe("useStore", () => {
     createSession({ summary: "test-session" });
     captured = null;
     const { unmount } = render(<StoreCapture />);
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => captured !== null && captured.sessions.length === 1);
 
     expect(captured!.sessions.length).toBe(1);
     expect(captured!.sessions[0].summary).toBe("test-session");
@@ -76,7 +77,7 @@ describe("useStore", () => {
   it("includes local compute by default", async () => {
     captured = null;
     const { unmount } = render(<StoreCapture />);
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => captured !== null && captured.computes.length >= 1);
 
     expect(captured!.computes.length).toBeGreaterThanOrEqual(1);
     expect(captured!.computes.some(c => c.name === "local")).toBe(true);
@@ -90,7 +91,7 @@ describe("useStore", () => {
 
     captured = null;
     const { unmount } = render(<StoreCapture />);
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => captured !== null && captured.unreadCounts.get(session.id) === 2);
 
     expect(captured!.unreadCounts.get(session.id)).toBe(2);
     unmount();
@@ -102,7 +103,7 @@ describe("useStore", () => {
 
     captured = null;
     const { unmount } = render(<StoreCapture />);
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => captured !== null);
 
     expect(captured!.unreadCounts.has(session.id)).toBe(false);
     unmount();
@@ -111,12 +112,12 @@ describe("useStore", () => {
   it("refresh() picks up new data immediately", async () => {
     captured = null;
     const { unmount } = render(<StoreCapture />);
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => captured !== null);
     expect(captured!.sessions.length).toBe(0);
 
     createSession({ summary: "after-refresh" });
     captured!.refresh();
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => captured !== null && captured.sessions.length === 1);
 
     expect(captured!.sessions.length).toBe(1);
     unmount();
@@ -125,10 +126,10 @@ describe("useStore", () => {
   it("addComputeLog appends to computeLogs", async () => {
     captured = null;
     const { unmount } = render(<StoreCapture />);
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => captured !== null);
 
     captured!.addComputeLog("local", "test log entry");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => (captured!.computeLogs.get("local")?.length ?? 0) >= 1);
 
     const logs = captured!.computeLogs.get("local");
     expect(logs).toBeDefined();
@@ -140,7 +141,7 @@ describe("useStore", () => {
   it("snapshots map is a Map", async () => {
     captured = null;
     const { unmount } = render(<StoreCapture />);
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => captured !== null);
 
     expect(captured!.snapshots).toBeInstanceOf(Map);
     unmount();

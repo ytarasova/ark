@@ -2,19 +2,16 @@
  * Tests for Claude Code session discovery — listClaudeSessions, getClaudeSession.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
-import { mkdirSync, writeFileSync } from "fs";
+import { describe, it, expect } from "bun:test";
+import { mkdirSync, writeFileSync, utimesSync } from "fs";
 import { join } from "path";
-import {
-  createTestContext, setContext, resetContext,
-  type TestContext,
-} from "../index.js";
 import { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache } from "../claude-sessions.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
+const { getCtx } = withTestContext();
 
 function baseDir() {
-  return join(ctx.arkDir, "claude-projects");
+  return join(getCtx().arkDir, "claude-projects");
 }
 
 /** Padding messages to pass the >=10 message + 10KB size filter */
@@ -41,16 +38,6 @@ async function writeAndRefresh(projectDirName: string, filename: string, lines: 
   await refreshClaudeSessionsCache({ baseDir: baseDir() });
 }
 
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
-});
-
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
-});
 
 // ── listClaudeSessions ──────────────────────────────────────────────────────
 
@@ -258,13 +245,14 @@ describe("incremental refresh", () => {
     const before = listClaudeSessions();
     const countBefore = before.length;
 
-    // Small delay so mtime is different
-    await new Promise(r => setTimeout(r, 50));
-
+    // Set explicit future mtime to guarantee incremental refresh detects the new file
+    // (avoids flaky 50ms sleep that fails on filesystems with 1s mtime granularity)
     writeTranscript("-incr2-proj", "brand-new.jsonl", [
       { type: "system", sessionId: "brand-new", timestamp: "2026-03-24T11:00:00Z" },
       { type: "user", message: { role: "user", content: "new session" }, timestamp: "2026-03-24T11:01:00Z" },
     ]);
+    const futureTime = new Date(Date.now() + 2000);
+    utimesSync(join(baseDir(), "-incr2-proj", "brand-new.jsonl"), futureTime, futureTime);
 
     const added = await refreshClaudeSessionsCache({ baseDir: baseDir() });
     expect(added).toBeGreaterThanOrEqual(1);
@@ -410,14 +398,16 @@ describe("claude sessions filtering", () => {
     const secondCount = await refreshClaudeSessionsCache({ baseDir: baseDir() });
     expect(secondCount).toBe(0);
 
-    // Small delay so mtime differs
-    await new Promise(r => setTimeout(r, 50));
+    // Set explicit future mtime to guarantee incremental refresh detects the new file
+    // (avoids flaky 50ms sleep that fails on filesystems with 1s mtime granularity)
 
     // Write a second file and refresh incrementally
     writeTranscript("-refresh-flow", "second.jsonl", [
       { type: "system", sessionId: "second-session", timestamp: "2026-03-24T11:00:00Z" },
       { type: "user", message: { role: "user", content: "second task" }, timestamp: "2026-03-24T11:01:00Z" },
     ]);
+    const futureTime2 = new Date(Date.now() + 2000);
+    utimesSync(join(baseDir(), "-refresh-flow", "second.jsonl"), futureTime2, futureTime2);
 
     const thirdCount = await refreshClaudeSessionsCache({ baseDir: baseDir() });
     expect(thirdCount).toBeGreaterThanOrEqual(1);

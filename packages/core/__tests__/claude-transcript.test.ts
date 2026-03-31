@@ -1,30 +1,16 @@
 /**
  * Tests for claude.ts transcript parsing — token usage extraction.
  */
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { writeFileSync } from "fs";
 import { join } from "path";
-import {
-  createTestContext, setContext, resetContext,
-  type TestContext,
-} from "../context.js";
 import { parseTranscriptUsage } from "../claude.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
-
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
-});
-
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
-});
+const { getCtx } = withTestContext();
 
 function writeTranscript(name: string, lines: Record<string, unknown>[]): string {
-  const path = join(ctx.arkDir, `${name}.jsonl`);
+  const path = join(getCtx().arkDir, `${name}.jsonl`);
   writeFileSync(path, lines.map(l => JSON.stringify(l)).join("\n") + "\n");
   return path;
 }

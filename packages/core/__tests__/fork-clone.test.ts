@@ -2,15 +2,12 @@
  * Tests for forkSession (shallow) and cloneSession (deep).
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext } from "../context.js";
+import { describe, it, expect } from "bun:test";
 import { createSession, getSession, updateSession } from "../store.js";
 import { forkSession, cloneSession } from "../session.js";
-import type { TestContext } from "../context.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+withTestContext();
 
 describe("forkSession (shallow)", () => {
   it("creates a new session with same config", () => {
