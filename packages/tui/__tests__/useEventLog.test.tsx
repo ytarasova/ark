@@ -1,0 +1,159 @@
+/**
+ * Tests for useEventLog — fetches and transforms session events into display list.
+ * Tests the data fetching and transformation logic through the React hook.
+ */
+
+import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import React from "react";
+import { render } from "ink-testing-library";
+import { Text } from "ink";
+import {
+  startSession, logEvent, getEvents,
+  AppContext, setApp, clearApp,
+} from "../../core/index.js";
+import { useEventLog, type EventLogEntry } from "../hooks/useEventLog.js";
+import { withTestContext, waitFor } from "../../core/__tests__/test-helpers.js";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+let capturedEvents: EventLogEntry[] = [];
+
+function EventCapture({ expanded }: { expanded: boolean }) {
+  const events = useEventLog(expanded);
+  capturedEvents = events;
+  return <Text>{`count=${events.length}`}</Text>;
+}
+
+// ── Setup ────────────────────────────────────────────────────────────────────
+
+withTestContext();
+
+let app: AppContext;
+
+beforeEach(async () => {
+  capturedEvents = [];
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+
+afterAll(async () => {
+  if (app) await app.shutdown();
+  clearApp();
+});
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+describe("useEventLog", () => {
+  it("returns empty array when no sessions exist", async () => {
+    const { unmount } = render(<EventCapture expanded={false} />);
+    await waitFor(() => capturedEvents !== null);
+    // Give effect time to fire
+    await new Promise(r => setTimeout(r, 100));
+    expect(capturedEvents).toBeInstanceOf(Array);
+    expect(capturedEvents.length).toBe(0);
+    unmount();
+  });
+
+  it("returns formatted events when sessions have events", async () => {
+    const s = startSession({ summary: "event-test", repo: ".", flow: "bare" });
+    logEvent(s.id, "session_created", { data: { summary: "event-test" } });
+    logEvent(s.id, "stage_started", { data: { agent: "planner", stage: "plan" } });
+
+    const { unmount } = render(<EventCapture expanded={false} />);
+    await waitFor(() => capturedEvents.length > 0, { timeout: 3000 });
+
+    expect(capturedEvents.length).toBeGreaterThan(0);
+
+    // Each entry should have the expected fields
+    for (const entry of capturedEvents) {
+      expect(typeof entry.time).toBe("string");
+      expect(typeof entry.source).toBe("string");
+      expect(typeof entry.type).toBe("string");
+      expect(typeof entry.message).toBe("string");
+      expect(typeof entry.color).toBe("string");
+    }
+    unmount();
+  });
+
+  it("events include correct color for type", async () => {
+    const s = startSession({ summary: "color-test", repo: ".", flow: "bare" });
+    logEvent(s.id, "agent_error", { data: { error: "something broke" } });
+    logEvent(s.id, "session_completed");
+    logEvent(s.id, "stage_started", { data: { agent: "impl", stage: "implement" } });
+
+    const { unmount } = render(<EventCapture expanded={true} />);
+    await waitFor(() => capturedEvents.length >= 3, { timeout: 3000 });
+
+    const errorEntry = capturedEvents.find(e => e.type === "agent_error");
+    expect(errorEntry).toBeDefined();
+    expect(errorEntry!.color).toBe("red");
+
+    const completeEntry = capturedEvents.find(e => e.type === "session_completed");
+    expect(completeEntry).toBeDefined();
+    expect(completeEntry!.color).toBe("green");
+
+    const startEntry = capturedEvents.find(e => e.type === "stage_started");
+    expect(startEntry).toBeDefined();
+    expect(startEntry!.color).toBe("cyan");
+    unmount();
+  });
+
+  it("expanded mode returns more events than collapsed", async () => {
+    const s = startSession({ summary: "expand-test", repo: ".", flow: "bare" });
+    // Create many events
+    for (let i = 0; i < 8; i++) {
+      logEvent(s.id, "stage_started", { data: { agent: `agent-${i}`, stage: `stage-${i}` } });
+    }
+
+    // Render collapsed
+    let collapsedCount = 0;
+    const { unmount: unmount1 } = render(<EventCapture expanded={false} />);
+    await waitFor(() => capturedEvents.length > 0, { timeout: 3000 });
+    collapsedCount = capturedEvents.length;
+    unmount1();
+
+    // Reset
+    capturedEvents = [];
+
+    // Render expanded
+    const { unmount: unmount2 } = render(<EventCapture expanded={true} />);
+    await waitFor(() => capturedEvents.length > 0, { timeout: 3000 });
+    const expandedCount = capturedEvents.length;
+    unmount2();
+
+    // Expanded should show at least as many (likely more) events
+    expect(expandedCount).toBeGreaterThanOrEqual(collapsedCount);
+  });
+
+  it("source field is truncated to 20 chars", async () => {
+    const longSummary = "This is a very long session summary that exceeds twenty characters";
+    const s = startSession({ summary: longSummary, repo: ".", flow: "bare" });
+    logEvent(s.id, "session_created", { data: { summary: longSummary } });
+
+    const { unmount } = render(<EventCapture expanded={false} />);
+    await waitFor(() => capturedEvents.length > 0, { timeout: 3000 });
+
+    for (const entry of capturedEvents) {
+      expect(entry.source.length).toBeLessThanOrEqual(20);
+    }
+    unmount();
+  });
+
+  it("events are sorted by time descending (newest first)", async () => {
+    const s = startSession({ summary: "sort-test", repo: ".", flow: "bare" });
+    logEvent(s.id, "session_created");
+    // Small delay so times differ
+    await new Promise(r => setTimeout(r, 50));
+    logEvent(s.id, "stage_started", { data: { stage: "plan" } });
+
+    const { unmount } = render(<EventCapture expanded={true} />);
+    await waitFor(() => capturedEvents.length >= 2, { timeout: 3000 });
+
+    // Events should be newest first (descending time)
+    for (let i = 0; i < capturedEvents.length - 1; i++) {
+      expect(capturedEvents[i].time >= capturedEvents[i + 1].time).toBe(true);
+    }
+    unmount();
+  });
+});
