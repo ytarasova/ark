@@ -12,6 +12,7 @@ export {
   addMessage, getMessages, getUnreadCount, markMessagesRead,
   type Message,
   createTestContext, setContext, resetContext, closeDb,
+  rowToSession, type SessionRow,
   type Session, type Event, type Compute, type TestContext,
 } from "./store.js";
 
@@ -28,7 +29,7 @@ export {
   forkSession, cloneSession, handoff, fork, joinFork, getOutput, send,
   deleteSessionAsync, waitForCompletion, approveReviewGate,
   applyHookStatus, applyReport,
-  type HookStatusResult, type ReportResult,
+  type HookStatusResult, type ReportResult, type SessionOpResult,
 } from "./session.js";
 
 // Flow

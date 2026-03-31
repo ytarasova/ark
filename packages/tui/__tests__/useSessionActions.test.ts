@@ -53,10 +53,11 @@ describe("Session action patterns", () => {
     const { cloneSession, updateSession } = require("../../core/index.js");
     updateSession(s.id, { group_name: "mygroup" });
 
-    const { ok, cloneId } = cloneSession(s.id, "my-clone");
-    expect(ok).toBe(true);
+    const result = cloneSession(s.id, "my-clone");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
 
-    const clone = getSession(cloneId);
+    const clone = getSession(result.sessionId);
     expect(clone).not.toBeNull();
     expect(clone!.summary).toBe("my-clone");
     expect(clone!.repo).toBe("/tmp/test");

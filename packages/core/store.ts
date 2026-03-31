@@ -101,6 +101,86 @@ export interface Compute {
   updated_at: string;
 }
 
+// ── DB Row Types ────────────────────────────────────────────────────────────
+
+export interface SessionRow {
+  id: string;
+  jira_key: string | null;
+  jira_summary: string | null;
+  repo: string | null;
+  branch: string | null;
+  compute_name: string | null;
+  session_id: string | null;
+  claude_session_id: string | null;
+  stage: string | null;
+  status: string;
+  pipeline: string;
+  agent: string | null;
+  workdir: string | null;
+  pr_url: string | null;
+  pr_id: string | null;
+  error: string | null;
+  parent_id: string | null;
+  fork_group: string | null;
+  group_name: string | null;
+  breakpoint_reason: string | null;
+  attached_by: string | null;
+  config: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ComputeRow {
+  name: string;
+  provider: string;
+  status: string;
+  config: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface EventRow {
+  id: number;
+  track_id: string;
+  type: string;
+  stage: string | null;
+  actor: string | null;
+  data: string | null;
+  created_at: string;
+}
+
+interface MessageRow {
+  id: number;
+  session_id: string;
+  role: string;
+  content: string;
+  type: string;
+  read: number;
+  created_at: string;
+}
+
+export function rowToSession(row: SessionRow): Session {
+  return {
+    ...row,
+    ticket: row.jira_key,
+    summary: row.jira_summary,
+    flow: row.pipeline,
+    config: JSON.parse(row.config ?? "{}"),
+  };
+}
+
+function rowToCompute(row: ComputeRow): Compute {
+  return { ...row, config: JSON.parse(row.config ?? "{}") };
+}
+
+function rowToEvent(row: EventRow): Event {
+  return { ...row, data: row.data ? JSON.parse(row.data) : null };
+}
+
+function rowToMessage(row: MessageRow): Message {
+  return { ...row, read: !!row.read };
+}
+
 // ── Database ────────────────────────────────────────────────────────────────
 
 function now(): string {
@@ -131,7 +211,7 @@ export function getDb(): Database {
   return db;
 }
 
-function initSchema(db: Database): void {
+export function initSchema(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
@@ -298,9 +378,9 @@ export function createSession(opts: {
 
 export function getSession(id: string): Session | null {
   const db = getDb();
-  const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as any;
+  const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as SessionRow | undefined;
   if (!row) return null;
-  return { ...row, ticket: row.jira_key, summary: row.jira_summary, flow: row.pipeline, config: JSON.parse(row.config ?? "{}") };
+  return rowToSession(row);
 }
 
 export function listSessions(opts?: {
@@ -322,9 +402,7 @@ export function listSessions(opts?: {
   sql += ` ORDER BY created_at DESC LIMIT ?`;
   params.push(opts?.limit ?? 100);
 
-  return (db.prepare(sql).all(...params) as any[]).map((r) => ({
-    ...r, ticket: r.jira_key, summary: r.jira_summary, flow: r.pipeline, config: JSON.parse(r.config ?? "{}"),
-  }));
+  return (db.prepare(sql).all(...params) as SessionRow[]).map(rowToSession);
 }
 
 export function updateSession(id: string, fields: Partial<Session>): Session | null {
@@ -410,9 +488,7 @@ export function getEvents(
   sql += " ORDER BY id ASC LIMIT ?";
   params.push(opts?.limit ?? 200);
 
-  return (db.prepare(sql).all(...params) as any[]).map((r) => ({
-    ...r, data: r.data ? JSON.parse(r.data) : null,
-  }));
+  return (db.prepare(sql).all(...params) as EventRow[]).map(rowToEvent);
 }
 
 // ── Compute CRUD ────────────────────────────────────────────────────────────
@@ -464,9 +540,9 @@ export function createCompute(opts: {
 
 export function getCompute(name: string): Compute | null {
   const db = getDb();
-  const row = db.prepare("SELECT * FROM compute WHERE name = ?").get(name) as any;
+  const row = db.prepare("SELECT * FROM compute WHERE name = ?").get(name) as ComputeRow | undefined;
   if (!row) return null;
-  return { ...row, config: JSON.parse(row.config ?? "{}") };
+  return rowToCompute(row);
 }
 
 export function listCompute(opts?: {
@@ -485,9 +561,7 @@ export function listCompute(opts?: {
   sql += " ORDER BY created_at DESC LIMIT ?";
   params.push(opts?.limit ?? 100);
 
-  return (db.prepare(sql).all(...params) as any[]).map((r) => ({
-    ...r, config: JSON.parse(r.config ?? "{}"),
-  }));
+  return (db.prepare(sql).all(...params) as ComputeRow[]).map(rowToCompute);
 }
 
 export function updateCompute(name: string, fields: Partial<Compute>): Compute | null {
@@ -543,8 +617,8 @@ export function getGroups(): string[] {
     UNION
     SELECT DISTINCT group_name FROM sessions WHERE group_name IS NOT NULL
     ORDER BY 1
-  `).all() as any[];
-  return rows.map((r) => r.name ?? r.group_name);
+  `).all() as { name: string }[];
+  return rows.map((r) => r.name);
 }
 
 export function createGroup(name: string): void {
@@ -586,23 +660,23 @@ export function addMessage(opts: {
   db.prepare(
     "INSERT INTO messages (session_id, role, content, type, read, created_at) VALUES (?, ?, ?, ?, 0, ?)"
   ).run(opts.session_id, opts.role, opts.content, opts.type ?? "text", ts);
-  const row = db.prepare("SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT 1").get(opts.session_id) as any;
-  return { ...row, read: !!row.read };
+  const row = db.prepare("SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT 1").get(opts.session_id) as MessageRow;
+  return rowToMessage(row);
 }
 
 export function getMessages(sessionId: string, opts?: { limit?: number }): Message[] {
   const db = getDb();
   const rows = db.prepare(
     "SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT ?"
-  ).all(sessionId, opts?.limit ?? 50) as any[];
-  return rows.reverse().map(r => ({ ...r, read: !!r.read }));
+  ).all(sessionId, opts?.limit ?? 50) as MessageRow[];
+  return rows.reverse().map(rowToMessage);
 }
 
 export function getUnreadCount(sessionId: string): number {
   const db = getDb();
   const row = db.prepare(
     "SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND role = 'agent' AND read = 0"
-  ).get(sessionId) as any;
+  ).get(sessionId) as { count: number } | undefined;
   return row?.count ?? 0;
 }
 

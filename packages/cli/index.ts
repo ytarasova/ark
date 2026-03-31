@@ -243,10 +243,10 @@ session.command("clone")
   .action(async (id, opts) => {
     const r = core.cloneSession(id, opts.task);
     if (r.ok) {
-      console.log(chalk.green(`Cloned → ${r.cloneId}`));
-      if (opts.dispatch) await core.dispatch(r.cloneId);
+      console.log(chalk.green(`Cloned → ${r.sessionId}`));
+      if (opts.dispatch) await core.dispatch(r.sessionId);
     } else {
-      console.log(chalk.red(r.cloneId));
+      console.log(chalk.red(r.message));
     }
   });
 
@@ -266,7 +266,7 @@ session.command("fork")
   .argument("<task>")
   .action((parentId, task) => {
     const r = core.fork(parentId, task);
-    console.log(r.ok ? chalk.green(`Forked → ${r.childId}`) : chalk.red(r.childId));
+    console.log(r.ok ? chalk.green(`Forked → ${r.sessionId}`) : chalk.red(r.message));
   });
 
 session.command("join")

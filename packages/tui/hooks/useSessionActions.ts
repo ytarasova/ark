@@ -44,19 +44,19 @@ export function useSessionActions(asyncState: AsyncState) {
 
     fork: (sourceId: string, groupName?: string | null) => {
       run(`Forking session`, async (updateLabel) => {
-        const { ok, forkId } = core.forkSession(sourceId);
-        if (!ok) return;
-        if (groupName) core.updateSession(forkId, { group_name: groupName });
-        await core.dispatch(forkId, { onLog: (msg) => updateLabel(msg) });
+        const result = core.forkSession(sourceId);
+        if (!result.ok) return;
+        if (groupName) core.updateSession(result.sessionId, { group_name: groupName });
+        await core.dispatch(result.sessionId, { onLog: (msg) => updateLabel(msg) });
       });
     },
 
     clone: (sourceId: string, name: string, groupName?: string | null) => {
       run(`Cloning → ${name}`, async (updateLabel) => {
-        const { ok, cloneId } = core.cloneSession(sourceId, name);
-        if (!ok) return;
-        if (groupName) core.updateSession(cloneId, { group_name: groupName });
-        await core.dispatch(cloneId, { onLog: (msg) => updateLabel(msg) });
+        const result = core.cloneSession(sourceId, name);
+        if (!result.ok) return;
+        if (groupName) core.updateSession(result.sessionId, { group_name: groupName });
+        await core.dispatch(result.sessionId, { onLog: (msg) => updateLabel(msg) });
       });
     },
 

@@ -22,6 +22,8 @@ import * as agentRegistry from "./agent.js";
 import * as claude from "./claude.js";
 import { parseTranscriptUsage } from "./claude.js";
 import { getProvider } from "../compute/index.js";
+
+export type SessionOpResult = { ok: true; sessionId: string } | { ok: false; message: string };
 import { resolvePortDecls, parseArcJson } from "../compute/arc-json.js";
 import { buildSessionVars } from "./template.js";
 import { resolveFlow } from "./flow.js";
@@ -296,9 +298,9 @@ export function approveReviewGate(sessionId: string): { ok: boolean; message: st
 /**
  * Fork: shallow copy - same compute, repo, flow, group. Fresh session, no resume.
  */
-export function forkSession(sessionId: string, newName?: string): { ok: boolean; forkId: string } {
+export function forkSession(sessionId: string, newName?: string): SessionOpResult {
   const original = store.getSession(sessionId);
-  if (!original) return { ok: false, forkId: `Session ${sessionId} not found` };
+  if (!original) return { ok: false, message: `Session ${sessionId} not found` };
 
   const baseName = original.summary || sessionId;
   const fork = store.createSession({
@@ -321,16 +323,16 @@ export function forkSession(sessionId: string, newName?: string): { ok: boolean;
     data: { forked_from: sessionId },
   });
 
-  return { ok: true, forkId: fork.id };
+  return { ok: true, sessionId: fork.id };
 }
 
 /**
  * Clone: deep copy - same as fork PLUS claude_session_id for --resume.
  * The new session will resume the same Claude conversation.
  */
-export function cloneSession(sessionId: string, newName?: string): { ok: boolean; cloneId: string } {
+export function cloneSession(sessionId: string, newName?: string): SessionOpResult {
   const original = store.getSession(sessionId);
-  if (!original) return { ok: false, cloneId: `Session ${sessionId} not found` };
+  if (!original) return { ok: false, message: `Session ${sessionId} not found` };
 
   const baseName = original.summary || sessionId;
   const clone = store.createSession({
@@ -354,19 +356,19 @@ export function cloneSession(sessionId: string, newName?: string): { ok: boolean
     data: { cloned_from: sessionId, claude_session_id: original.claude_session_id },
   });
 
-  return { ok: true, cloneId: clone.id };
+  return { ok: true, sessionId: clone.id };
 }
 
 export async function handoff(sessionId: string, toAgent: string, instructions?: string): Promise<{ ok: boolean; message: string }> {
-  const { ok, cloneId } = cloneSession(sessionId, instructions);
-  if (!ok) return { ok: false, message: cloneId };
+  const result = cloneSession(sessionId, instructions);
+  if (!result.ok) return { ok: false, message: result.message };
 
-  store.logEvent(cloneId, "session_handoff", {
+  store.logEvent(result.sessionId, "session_handoff", {
     actor: "user",
     data: { from_session: sessionId, to_agent: toAgent, instructions },
   });
 
-  return await dispatch(cloneId);
+  return await dispatch(result.sessionId);
 }
 
 // ── Fork/Join ───────────────────────────────────────────────────────────────
@@ -374,9 +376,9 @@ export async function handoff(sessionId: string, toAgent: string, instructions?:
 export function fork(parentId: string, task: string, opts?: {
   agent?: string;
   dispatch?: boolean;
-}): { ok: boolean; childId: string } {
+}): SessionOpResult {
   const parent = store.getSession(parentId);
-  if (!parent) return { ok: false, childId: "Parent not found" };
+  if (!parent) return { ok: false, message: "Parent not found" };
 
   const forkGroup = parent.fork_group ?? randomUUID().slice(0, 8);
   if (!parent.fork_group) store.updateSession(parentId, { fork_group: forkGroup });
@@ -402,7 +404,7 @@ export function fork(parentId: string, task: string, opts?: {
   if (opts?.dispatch !== false) {
     void dispatch(child.id);
   }
-  return { ok: true, childId: child.id };
+  return { ok: true, sessionId: child.id };
 }
 
 function dispatchFork(sessionId: string, stageDef: flow.StageDefinition): { ok: boolean; message: string } {
@@ -412,8 +414,8 @@ function dispatchFork(sessionId: string, stageDef: flow.StageDefinition): { ok: 
 
   const children: string[] = [];
   for (const sub of subtasks.slice(0, stageDef.max_parallel ?? 4)) {
-    const { ok, childId } = fork(sessionId, sub.task, { dispatch: true });
-    if (ok) children.push(childId);
+    const result = fork(sessionId, sub.task, { dispatch: true });
+    if (result.ok) children.push(result.sessionId);
   }
 
   store.updateSession(sessionId, { status: "running" });
