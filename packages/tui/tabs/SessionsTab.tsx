@@ -26,27 +26,23 @@ import { useGroupActions } from "../hooks/useGroupActions.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
+type Overlay = "move" | "group" | "talk" | "inbox" | "clone" | "search" | null;
+
 interface SessionsTabProps extends StoreData {
   async: AsyncState;
   pane: "left" | "right";
   onShowForm: () => void;
-  onSelectionChange?: (session: any) => void;
+  onSelectionChange?: (session: core.Session | null) => void;
   onInputActive?: (active: boolean) => void;
   onOverlayChange?: (overlay: string | null) => void;
-  onListLength?: (length: number) => void;
   formOverlay?: React.ReactNode;
   refresh: () => void;
 }
 
-export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, onInputActive, onOverlayChange, onListLength, formOverlay }: SessionsTabProps) {
-  const [moveMode, setMoveMode] = useState(false);
-  const [groupMode, setGroupMode] = useState<false | "menu">(false);
-  const [talkMode, setTalkMode] = useState(false);
-  const [inboxMode, setInboxMode] = useState(false);
-  const [cloneMode, setCloneMode] = useState(false);
+export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, onInputActive, onOverlayChange, formOverlay }: SessionsTabProps) {
+  const [overlay, setOverlay] = useState<Overlay>(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<core.SearchResult[] | null>(null);
   const status = useStatusMessage();
@@ -63,7 +59,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     });
   }, [sessions]);
 
-  const hasOverlay = formOverlay || moveMode || groupMode || talkMode || inboxMode || cloneMode || searchMode;
+  const hasOverlay = formOverlay || overlay;
   const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !hasOverlay });
 
   // Signal parent when an overlay with text input is active
@@ -73,14 +69,10 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
   // Signal parent which overlay is active (for status bar hints)
   useEffect(() => {
-    const ov = moveMode ? "move" : talkMode ? "talk" : groupMode ? "group" : inboxMode ? "inbox" : cloneMode ? "clone" : searchMode ? "search" : null;
-    onOverlayChange?.(ov);
-  }, [moveMode, talkMode, groupMode, inboxMode, cloneMode, searchMode]);
+    onOverlayChange?.(overlay);
+  }, [overlay]);
 
   const selected = topLevel[sel] ?? null;
-
-  // Report list length for conditional scroll hints
-  useEffect(() => { onListLength?.(topLevel.length); }, [topLevel.length]);
 
   // Notify parent of selection/pane changes for status bar
   useEffect(() => {
@@ -112,8 +104,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
     // Global keys — work regardless of selection
     if (input === "n") { onShowForm(); return; }
-    if (input === "T") { setInboxMode(true); return; }
-    if (input === "o") { setGroupMode("menu"); return; }
+    if (input === "T") { setOverlay("inbox"); return; }
+    if (input === "o") { setOverlay("group"); return; }
 
     // Cancel pending confirms on unrelated keys
     if (confirmComplete && input !== "d") {
@@ -153,7 +145,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       }
     } else if (input === "C") {
       // Clone: deep copy with resume (opens name prompt)
-      if (selected) setCloneMode(true);
+      if (selected) setOverlay("clone");
     } else if (input === "x") {
       if (confirmDelete) {
         actions.delete(selected.id);
@@ -210,7 +202,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         });
       }
     } else if (input === "m") {
-      if (selected) setMoveMode(true);
+      if (selected) setOverlay("move");
     } else if (input === "d") {
       if (selected && selected.status === "running") {
         if (confirmComplete) {
@@ -222,7 +214,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         }
       }
     } else if (input === "t") {
-      if (selected?.status === "running" || selected?.status === "waiting") setTalkMode(true);
+      if (selected?.status === "running" || selected?.status === "waiting") setOverlay("talk");
     } else if (input === "S") {
       if (selectedGroup && groupSessions.length > 0) {
         actions.stopGroup(groupSessions);
@@ -243,7 +235,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     <Box flexDirection="column" flexGrow={1}>
       {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
-        focus={talkMode || inboxMode ? "right" : pane}
+        focus={overlay === "talk" || overlay === "inbox" ? "right" : pane}
         leftTitle="Sessions"
         rightTitle="Details"
         left={
@@ -292,43 +284,43 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         }
         right={
           formOverlay ? formOverlay
-          : cloneMode ? (
+          : overlay === "clone" ? (
             <CloneSession
               session={selected}
               onDone={(name) => {
-                setCloneMode(false);
+                setOverlay(null);
                 if (!selected || !name) return;
                 actions.clone(selected.id, name, selected.group_name);
               }}
             />
           )
-          : inboxMode ? (
+          : overlay === "inbox" ? (
             <ThreadsPanel
               sessions={topLevel}
-              onDone={() => { setInboxMode(false); refresh(); }}
+              onDone={() => { setOverlay(null); refresh(); }}
             />
           )
-          : talkMode ? (
+          : overlay === "talk" ? (
             <TalkToSession
               session={selected}
               asyncState={asyncState}
               onDone={(msg) => {
                 if (msg) status.show(msg);
-                setTalkMode(false);
+                setOverlay(null);
               }}
             />
           )
-          : groupMode ? (
+          : overlay === "group" ? (
             <GroupManager
               sessions={topLevel}
               asyncState={asyncState}
               onDone={(msg) => {
                 if (msg) { status.show(msg); refresh(); }
-                setGroupMode(false);
+                setOverlay(null);
               }}
             />
           )
-          : moveMode ? (
+          : overlay === "move" ? (
             <MoveToGroup
               session={selected}
               onDone={(group) => {
@@ -339,7 +331,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
                     refresh();
                   });
                 }
-                setMoveMode(false);
+                setOverlay(null);
               }}
             />
           )
@@ -347,11 +339,11 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               session={selected}
               sessions={sessions}
               pane={pane}
-              searchMode={searchMode}
+              searchMode={overlay === "search"}
               searchQuery={searchQuery}
               searchResults={searchResults}
               onSearchToggle={(on) => {
-                setSearchMode(on);
+                setOverlay(on ? "search" : null);
                 if (!on) { setSearchQuery(""); setSearchResults(null); }
               }}
               onSearchQueryChange={setSearchQuery}
@@ -465,8 +457,8 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
       {s.status === "completed" && (
         <>
           <Text color="green" bold>{`  ✓ Agent completed successfully`}</Text>
-          {(s.config as any)?.completion_summary && (
-            <Text color="green" wrap="wrap">{`  ${(s.config as any).completion_summary}`}</Text>
+          {s.config?.completion_summary && (
+            <Text color="green" wrap="wrap">{`  ${s.config.completion_summary}`}</Text>
           )}
         </>
       )}
@@ -485,8 +477,8 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
       {s.workdir && s.workdir !== s.repo && (
         <KeyValue label="Workdir">{s.workdir}</KeyValue>
       )}
-      {(s.config as any)?.remoteWorkdir && (
-        <KeyValue label="Remote">{(s.config as any).remoteWorkdir}</KeyValue>
+      {s.config?.remoteWorkdir && (
+        <KeyValue label="Remote">{String(s.config.remoteWorkdir)}</KeyValue>
       )}
       <KeyValue label="Flow">{s.flow}</KeyValue>
       {s.stage && <KeyValue label="Stage">{s.stage}</KeyValue>}
@@ -510,8 +502,8 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
           <>
             <Text> </Text>
             <Text bold dimColor>{`  Files changed (${fileLinks.length})`}</Text>
-            {fileLinks.slice(0, 15).map((f, i) => (
-              <Text key={i} dimColor>
+            {fileLinks.slice(0, 15).map((f) => (
+              <Text key={f.path} dimColor>
                 {f.url
                   ? `    \x1b]8;;${f.url}\x07${f.path}\x1b]8;;\x07`
                   : `    ${f.path}`}
@@ -529,8 +521,8 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
           <>
             <Text> </Text>
             <Text bold dimColor>{`  Commits (${commitLinks.length})`}</Text>
-            {commitLinks.slice(0, 10).map((c, i) => (
-              <Text key={i} dimColor>
+            {commitLinks.slice(0, 10).map((c) => (
+              <Text key={c.shortSha} dimColor>
                 {c.url
                   ? `    \x1b]8;;${c.url}\x07${c.shortSha}\x1b]8;;\x07`
                   : `    ${c.shortSha}`}
@@ -555,8 +547,8 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
           {searchResults.length === 0 && (
             <Text dimColor>{"  No matches found."}</Text>
           )}
-          {searchResults.map((r, i) => (
-            <Text key={i} wrap="wrap">
+          {searchResults.map((r, idx) => (
+            <Text key={`${r.source}-${r.timestamp ?? idx}`} wrap="wrap">
               {"  "}<Text dimColor>{r.timestamp?.slice(0, 16) ?? ""}</Text>
               <Text>{` ${r.match}`}</Text>
             </Text>
@@ -566,12 +558,12 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
         <>
           <Text> </Text>
           <SectionHeader title="Conversation" />
-          {conversation.map((turn, i) => {
+          {conversation.map((turn, idx) => {
             const label = turn.role === "user" ? "You" : turn.role === "assistant" ? "Claude" : turn.role;
             const color = turn.role === "user" ? "cyan" : undefined;
             const dim = turn.role !== "user";
             return (
-              <Text key={i} wrap="wrap">
+              <Text key={`${turn.role}-${turn.timestamp}-${idx}`} wrap="wrap">
                 {"  "}<Text color={color as any} dimColor={dim} bold>{label}:</Text>
                 <Text color={color as any} dimColor={dim}>{` ${turn.content}`}</Text>
               </Text>
@@ -585,8 +577,8 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
         <>
           <Text> </Text>
           <SectionHeader title="Live Output" />
-          {stripAnsiAndFilter(agentOutput).map((line, i) => (
-            <Text key={i} wrap="truncate">{`  ${line}`}</Text>
+          {stripAnsiAndFilter(agentOutput).map((line, idx) => (
+            <Text key={`out-${idx}`} wrap="truncate">{`  ${line}`}</Text>
           ))}
         </>
       ) : null}
@@ -596,11 +588,11 @@ function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResult
         <>
           <Text> </Text>
           <SectionHeader title="Events" />
-          {events.slice(-10).map((ev, i) => {
+          {events.slice(-10).map((ev) => {
             const ts = hms(ev.created_at).slice(0, 5); // HH:MM
             const msg = formatEvent(ev.type, ev.data ?? undefined);
             return (
-              <Text key={i}>
+              <Text key={ev.id}>
                 {"  "}<Text dimColor>{ts}</Text>{"  "}
                 {msg}
               </Text>

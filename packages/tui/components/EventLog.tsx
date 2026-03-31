@@ -4,7 +4,6 @@ import { useEventLog } from "../hooks/useEventLog.js";
 
 interface EventLogProps {
   expanded: boolean;
-  onToggle: () => void;
 }
 
 export function EventLog({ expanded }: EventLogProps) {
@@ -32,8 +31,8 @@ export function EventLog({ expanded }: EventLogProps) {
   return (
     <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} height={Math.min(events.length + 2, 10)}>
       <Text bold>{"Events"}<Text dimColor>{" (e:collapse)"}</Text></Text>
-      {events.map((ev, i) => (
-        <Text key={i}>
+      {events.map((ev, idx) => (
+        <Text key={`${ev.time}-${ev.source}-${idx}`}>
           <Text dimColor>{`  ${ev.time.slice(0, 5)}  `}</Text>
           <Text color={ev.color as any}>{ev.message}</Text>
           <Text dimColor>{`  ${ev.source}`}</Text>

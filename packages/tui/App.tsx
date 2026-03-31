@@ -27,7 +27,7 @@ export function App() {
   const [showForm, setShowForm] = useState<string | null>(null);
   const [sessionPrefill, setSessionPrefill] = useState<SessionPrefill | undefined>();
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [selectedSession, setSelectedSession] = useState<import("../core/store.js").Session | null>(null);
   const [pane, setPane] = useState<Pane>("left");
   const [childInputActive, setChildInputActive] = useState(false);
   const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
@@ -156,7 +156,6 @@ export function App() {
 
       <EventLog
         expanded={eventLogExpanded}
-        onToggle={() => setEventLogExpanded((v) => !v)}
       />
 
       <StatusBar
