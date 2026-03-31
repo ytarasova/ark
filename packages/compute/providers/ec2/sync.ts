@@ -10,6 +10,7 @@ import { homedir, tmpdir, userInfo } from "os";
 import { join } from "path";
 
 import { rsyncPush, rsyncPull, sshExec } from "./ssh.js";
+import { REMOTE_USER, REMOTE_HOME } from "./constants.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -26,7 +27,7 @@ const execFileAsync = promisify(execFile);
  */
 export function rewritePaths(content: string, direction: "push" | "pull"): string {
   const localHome = `/Users/${userInfo().username}`;
-  const remoteHome = "/home/ubuntu";
+  const remoteHome = REMOTE_HOME;
 
   if (direction === "push") {
     return content.replaceAll(localHome, remoteHome);
@@ -160,7 +161,7 @@ async function syncClaudePush(key: string, ip: string): Promise<void> {
         // scp directly — rsync has edge cases with dotfiles and --update
         await execFileAsync("scp", [
           "-i", key, "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
-          tmpFile, `ubuntu@${ip}:/home/ubuntu/.claude.json`,
+          tmpFile, `${REMOTE_USER}@${ip}:${REMOTE_HOME}/.claude.json`,
         ], { encoding: "utf-8", timeout: 30_000 });
       } finally {
         await execFileAsync("rm", ["-rf", tmp]);

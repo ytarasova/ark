@@ -16,6 +16,18 @@ const execFileAsync = promisify(execFile);
 
 const CONTROL_DIR = join(homedir(), ".ark", "ssh-control");
 
+/** Timeout for SSH control socket health checks */
+const SSH_CHECK_TIMEOUT_MS = 5_000;
+
+/** Timeout for establishing the ControlMaster connection */
+const SSH_MASTER_CONNECT_TIMEOUT_MS = 20_000;
+
+/** Default timeout for SSH command execution */
+const SSH_EXEC_TIMEOUT_MS = 30_000;
+
+/** Default timeout for rsync file transfer operations */
+const RSYNC_TIMEOUT_MS = 300_000;
+
 export interface SSHPoolOpts {
   computeName: string;
   key: string;
@@ -61,7 +73,7 @@ export class SSHPool {
       await execFileAsync("ssh", [
         "-i", this.key, "-o", `ControlPath=${this.socketPath}`,
         "-O", "check", `ubuntu@${this.ip}`,
-      ], { timeout: 5_000 });
+      ], { timeout: SSH_CHECK_TIMEOUT_MS });
       return true;
     } catch {
       // Expected when master socket doesn't exist yet
@@ -94,7 +106,7 @@ export class SSHPool {
         "-o", `ControlPersist=${this.controlPersist}`,
         "-N", "-f",
         `ubuntu@${this.ip}`,
-      ], { timeout: 20_000 });
+      ], { timeout: SSH_MASTER_CONNECT_TIMEOUT_MS });
     } finally {
       this.masterStarting = false;
       const q = this.waitQueue.splice(0);
@@ -115,7 +127,7 @@ export class SSHPool {
         "-o", "LogLevel=ERROR",
         `ubuntu@${this.ip}`,
         cmd,
-      ], { encoding: "utf-8", timeout: opts?.timeout ?? 30_000 });
+      ], { encoding: "utf-8", timeout: opts?.timeout ?? SSH_EXEC_TIMEOUT_MS });
       return { stdout, stderr: "", exitCode: 0 };
     } catch (err: any) {
       return {
@@ -140,7 +152,7 @@ export class SSHPool {
         "-avz", "--update", "--timeout=30",
         "-e", this.rsyncSshOpt(),
         local, `ubuntu@${this.ip}:${remote}`,
-      ], { encoding: "utf-8", timeout: opts?.timeout ?? 300_000 });
+      ], { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS });
     } catch (e: any) {
       console.error(`SSHPool.rsyncPush failed (${local} -> ${this.ip}:${remote}):`, e?.message ?? e);
     } finally {
@@ -156,7 +168,7 @@ export class SSHPool {
         "-avz", "--update", "--timeout=30",
         "-e", this.rsyncSshOpt(),
         `ubuntu@${this.ip}:${remote}`, local,
-      ], { encoding: "utf-8", timeout: opts?.timeout ?? 300_000 });
+      ], { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS });
     } catch (e: any) {
       console.error(`SSHPool.rsyncPull failed (${this.ip}:${remote} -> ${local}):`, e?.message ?? e);
     } finally {
@@ -201,7 +213,7 @@ export class SSHPool {
       await execFileAsync("ssh", [
         "-o", `ControlPath=${this.socketPath}`,
         "-O", "exit", `ubuntu@${this.ip}`,
-      ], { timeout: 5_000 });
+      ], { timeout: SSH_CHECK_TIMEOUT_MS });
     } catch {
       // Master may already be dead — expected during cleanup
     }

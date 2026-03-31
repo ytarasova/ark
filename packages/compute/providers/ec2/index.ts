@@ -32,7 +32,6 @@ import { sshKeyPath, sshExec, sshExecAsync, waitForSsh, waitForSshAsync, generat
 import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
 import { syncToHost, syncProjectFiles, refreshRemoteToken } from "./sync.js";
-import { fetchMetrics, fetchMetricsAsync } from "./metrics.js";
 import { SSH_FAST_CMD, parseSnapshot } from "./metrics.js";
 import { setupTunnels, setupReverseTunnel, probeRemotePorts } from "./ports.js";
 import { hourlyRate } from "./cost.js";
@@ -40,6 +39,18 @@ import { sleep, poll } from "../../util.js";
 import { resolveRepoUrl, getRepoName, cloneRepoOnRemote, trustRemoteDirectory, autoAcceptChannelPrompt } from "./remote-setup.js";
 import { getOrCreatePool, destroyPool, destroyAllPools, type SSHPool } from "./pool.js";
 import { SSHQueue } from "./queue.js";
+import { REMOTE_USER, REMOTE_HOME } from "./constants.js";
+
+/** Max time to wait for SSH to come back after a reboot */
+const REBOOT_TIMEOUT_MS = 180_000;
+
+interface SessionConfig {
+  remoteWorkdir?: string;
+  ports?: Array<{ port: number; source: string }>;
+  worktree?: boolean;
+  github_url?: string;
+  [key: string]: unknown;
+}
 
 interface EC2HostConfig {
   size?: string;
@@ -169,7 +180,7 @@ export class EC2Provider implements ComputeProvider {
         const key = sshKeyPath(compute.name);
         await poll(
           async () => {
-            const { stdout } = await sshExecAsync(key, result.ip!, "cat /home/ubuntu/.ark-ready 2>/dev/null || echo 'not ready'", { timeout: 15_000 });
+            const { stdout } = await sshExecAsync(key, result.ip!, `cat ${REMOTE_HOME}/.ark-ready 2>/dev/null || echo 'not ready'`, { timeout: 15_000 });
             if (stdout.trim().includes("provisioning complete")) {
               log("Cloud-init complete");
               mergeComputeConfig(compute.name, { cloud_init_done: true });
@@ -238,9 +249,10 @@ export class EC2Provider implements ComputeProvider {
             log("Re-syncing Claude credentials...");
             try {
               const { execFileAsync: efa } = await import("child_process").then(m => ({ execFileAsync: promisify(m.execFile) }));
+              const localCredFile = join(homedir(), ".claude", ".credentials.json");
               await efa("scp", [
                 "-i", key, "-o", "StrictHostKeyChecking=no",
-                credFile, `ubuntu@${result.ip}:/home/ubuntu/.claude/.credentials.json`,
+                localCredFile, `${REMOTE_USER}@${result.ip}:${REMOTE_HOME}/.claude/.credentials.json`,
               ], { timeout: 15_000 });
               log("Claude credentials synced ✓");
             } catch (e: any) {
@@ -334,7 +346,7 @@ export class EC2Provider implements ComputeProvider {
     log("Reboot initiated — waiting for host...");
 
     // Wait up to 3 minutes for SSH to come back
-    const deadline = Date.now() + 180_000;
+    const deadline = Date.now() + REBOOT_TIMEOUT_MS;
     let attempt = 0;
     let currentIp = cfg.ip;
     while (Date.now() < deadline) {
@@ -487,7 +499,7 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async cleanupSession(compute: Compute, session: Session): Promise<void> {
-    const remoteWorkdir = (session.config as any)?.remoteWorkdir;
+    const remoteWorkdir = (session.config as SessionConfig)?.remoteWorkdir;
     if (!remoteWorkdir) return;
     try {
       const { queue } = this.getQueue(compute);
@@ -507,7 +519,7 @@ export class EC2Provider implements ComputeProvider {
     const key = sshKeyPath(compute.name);
 
     // Re-establish tunnels from session's port list + channel port
-    const ports: PortDecl[] = (session.config as any)?.ports ?? [];
+    const ports: PortDecl[] = (session.config as SessionConfig)?.ports ?? [];
     const channelPort = sessionChannelPort(session.id);
     const channelPortDecl: PortDecl = { port: channelPort, name: "channel", source: "ark" };
     setupTunnels(key, ip, [...ports, channelPortDecl]);
@@ -599,7 +611,7 @@ export class EC2Provider implements ComputeProvider {
           cfg.ip!,
           opts.projectFiles,
           opts.projectDir,
-          `/home/ubuntu/Projects/${opts.projectDir.split("/").pop()}`,
+          `${REMOTE_HOME}/Projects/${opts.projectDir.split("/").pop()}`,
         );
       }
     });
@@ -620,18 +632,18 @@ export class EC2Provider implements ComputeProvider {
   }
 
   getAttachCommand(compute: Compute, session: Session): string[] {
-    const cfg = compute.config as any;
+    const cfg = compute.config as EC2HostConfig;
     if (!cfg?.ip || !session.session_id) return [];
     return [
       "ssh", "-i", sshKeyPath(compute.name),
       "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10", "-t",
-      `ubuntu@${cfg.ip}`, `tmux attach -t ${session.session_id}`,
+      `${REMOTE_USER}@${cfg.ip}`, `tmux attach -t ${session.session_id}`,
     ];
   }
 
   buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
     return {
-      command: "/home/ubuntu/.ark/bin/ark",
+      command: `${REMOTE_HOME}/.ark/bin/ark`,
       args: ["channel"],
       env: {
         ARK_SESSION_ID: sessionId,

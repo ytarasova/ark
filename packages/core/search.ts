@@ -8,6 +8,12 @@ import { join } from "path";
 import { homedir } from "os";
 import { getDb } from "./store.js";
 
+/** Max bytes to read from the tail of large transcript files for indexing */
+const MAX_TRANSCRIPT_TAIL_BYTES = 65536;
+
+/** Number of context words for FTS5 snippet() results */
+const FTS_SNIPPET_WORDS = 30;
+
 export interface SearchResult {
   sessionId: string;
   source: "metadata" | "event" | "message" | "transcript";
@@ -91,12 +97,11 @@ export function searchTranscripts(query: string, opts?: SearchOpts): SearchResul
 
 function searchTranscriptsFTS(query: string, limit: number): SearchResult[] {
   const db = getDb();
-  // FTS5 match query — escape special chars, use quoted terms
-  const ftsQuery = query.replace(/['"*()]/g, "").split(/\s+/).map(w => `"${w}"`).join(" ");
+  const ftsQuery = escapeFtsQuery(query);
 
   const rows = db.prepare(
     `SELECT session_id, role, content, timestamp,
-            snippet(transcript_index, 3, '>>>','<<<', '...', 30) as snippet
+            snippet(transcript_index, 3, '>>>','<<<', '...', ${FTS_SNIPPET_WORDS}) as snippet
      FROM transcript_index
      WHERE transcript_index MATCH ?
      ORDER BY rank
@@ -171,11 +176,11 @@ export function getSessionConversation(sessionId: string, opts?: { limit?: numbe
 export function searchSessionConversation(sessionId: string, query: string, opts?: { limit?: number }): SearchResult[] {
   const db = getDb();
   const limit = opts?.limit ?? 20;
-  const ftsQuery = query.replace(/['"*()]/g, "").split(/\s+/).map(w => `"${w}"`).join(" ");
+  const ftsQuery = escapeFtsQuery(query);
   try {
     const rows = db.prepare(
       `SELECT role, content, timestamp,
-              snippet(transcript_index, 3, '>>>','<<<', '...', 30) as snippet
+              snippet(transcript_index, 3, '>>>','<<<', '...', ${FTS_SNIPPET_WORDS}) as snippet
        FROM transcript_index
        WHERE session_id = ? AND transcript_index MATCH ?
        ORDER BY rank LIMIT ?`
@@ -222,11 +227,11 @@ export async function indexTranscripts(opts?: { transcriptsDir?: string; onProgr
       let content: string;
       try {
         const fstat = statSync(filePath);
-        if (fstat.size > 65536) {
+        if (fstat.size > MAX_TRANSCRIPT_TAIL_BYTES) {
           // Large file — read tail only (recent conversation)
           const fd = openSync(filePath, "r");
-          const buf = Buffer.alloc(65536);
-          readSync(fd, buf, 0, 65536, fstat.size - 65536);
+          const buf = Buffer.alloc(MAX_TRANSCRIPT_TAIL_BYTES);
+          readSync(fd, buf, 0, MAX_TRANSCRIPT_TAIL_BYTES, fstat.size - MAX_TRANSCRIPT_TAIL_BYTES);
           closeSync(fd);
           content = buf.toString("utf-8");
         } else {
@@ -287,10 +292,10 @@ export function indexSession(transcriptPath: string, sessionId: string, project?
   let content: string;
   try {
     const fstat = statSync(transcriptPath);
-    if (fstat.size > 65536) {
+    if (fstat.size > MAX_TRANSCRIPT_TAIL_BYTES) {
       const fd = openSync(transcriptPath, "r");
-      const buf = Buffer.alloc(65536);
-      readSync(fd, buf, 0, 65536, fstat.size - 65536);
+      const buf = Buffer.alloc(MAX_TRANSCRIPT_TAIL_BYTES);
+      readSync(fd, buf, 0, MAX_TRANSCRIPT_TAIL_BYTES, fstat.size - MAX_TRANSCRIPT_TAIL_BYTES);
       closeSync(fd);
       content = buf.toString("utf-8");
     } else {
@@ -338,6 +343,11 @@ export function getIndexStats(): { entries: number; sessions: number } {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Escape and quote terms for FTS5 MATCH queries. */
+function escapeFtsQuery(query: string): string {
+  return query.replace(/['"*()]/g, "").split(/\s+/).map(w => `"${w}"`).join(" ");
+}
 
 function extractText(entry: any): string {
   const msg = entry.message;

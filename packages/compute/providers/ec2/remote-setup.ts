@@ -8,6 +8,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { sshExecAsync } from "./ssh.js";
+import { REMOTE_HOME } from "./constants.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -58,7 +59,7 @@ export async function cloneRepoOnRemote(
   const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(4, 12); // MMDD-HHMM (e.g. 03221430)
   const branchSuffix = opts?.branch ? `-${opts.branch.split("/").pop()}` : "";
   const dirName = `${repoName}${branchSuffix}-${ts}`;
-  const remotePath = `/home/ubuntu/Projects/${dirName}`;
+  const remotePath = `${REMOTE_HOME}/Projects/${dirName}`;
 
   // Ensure Projects directory exists
   await sshExecAsync(key, ip, "mkdir -p ~/Projects", { timeout: 5000 });

@@ -32,6 +32,9 @@ import { ArkdClient } from "../arkd/client.js";
 
 const DEFAULT_PORT = 19100;
 
+/** Interval between schedule and PR review poll ticks */
+const POLL_INTERVAL_MS = 60_000;
+
 export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }): { stop(): void } {
   const server = Bun.serve({
     port,
@@ -181,12 +184,12 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
         } catch (e: any) { console.error(`scheduled dispatch failed for ${sched.id}:`, e?.message ?? e); }
       }
     } catch (e: any) { console.error("schedule polling error:", e?.message ?? e); }
-  }, 60_000);
+  }, POLL_INTERVAL_MS);
 
   // PR review poller - check every 60 seconds
   const prTimer = setInterval(async () => {
     try { await pollPRReviews(); } catch (e: any) { console.error("PR review polling error:", e?.message ?? e); }
-  }, 60_000);
+  }, POLL_INTERVAL_MS);
 
   return {
     stop() {

@@ -13,6 +13,9 @@ import { formatReviewPrompt, type ReviewComment } from "./github-pr.js";
 
 const execFileAsync = promisify(execFile);
 
+/** Cooldown between PR checks per session — slightly under the 60s poll interval to account for jitter */
+const POLL_COOLDOWN_MS = 55_000;
+
 /** Replaceable exec function for testing. */
 export let ghExec: (args: string[]) => Promise<{ stdout: string }> = async (args) => {
   return execFileAsync("gh", args, { encoding: "utf-8", timeout: 15_000 });
@@ -56,7 +59,7 @@ export async function pollPRReviews(): Promise<void> {
     // Cooldown: skip if checked within last 60 seconds
     const config = (session.config ?? {}) as Record<string, any>;
     const lastCheck = config.last_review_check ? new Date(config.last_review_check).getTime() : 0;
-    if (now - lastCheck < 55_000) continue;
+    if (now - lastCheck < POLL_COOLDOWN_MS) continue;
 
     try {
       await checkSessionPR(session);

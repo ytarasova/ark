@@ -11,6 +11,7 @@ import type {
   ComputeSnapshot,
 } from "../../types.js";
 import { sshExec, sshExecAsync } from "./ssh.js";
+import { REMOTE_PROJECTS_DIR } from "./constants.js";
 
 // ---------------------------------------------------------------------------
 // Internal sub-commands
@@ -81,7 +82,7 @@ export const SSH_DOCKER_CMD: string = [
 // Parsing helpers
 // ---------------------------------------------------------------------------
 
-const PROJECT_PREFIX = "/home/ubuntu/Projects/";
+const PROJECT_PREFIX = `${REMOTE_PROJECTS_DIR}/`;
 
 function emptyMetrics(): ComputeMetrics {
   return {

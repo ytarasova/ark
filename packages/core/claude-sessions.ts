@@ -14,6 +14,15 @@ import { getDb } from "./store.js";
 
 const execFileAsync = promisify(execFile);
 
+/** Bytes to read from the start of a transcript for header + summary extraction */
+const TRANSCRIPT_HEAD_BYTES = 16384;
+
+/** Bytes to read from the end of a transcript for lastActivity timestamp */
+const TRANSCRIPT_TAIL_BYTES = 2048;
+
+/** Minimum message count to include a session in the cache */
+const MIN_MESSAGE_COUNT = 10;
+
 export interface ClaudeSession {
   sessionId: string;
   project: string;
@@ -78,11 +87,11 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
 
     // Read first 16KB for header + summary (8KB may miss real messages in tool-heavy sessions)
     const fd = openSync(filePath, "r");
-    const headBuf = Buffer.alloc(Math.min(16384, stat.size));
+    const headBuf = Buffer.alloc(Math.min(TRANSCRIPT_HEAD_BYTES, stat.size));
     readSync(fd, headBuf, 0, headBuf.length, 0);
 
     // Read last 2KB for lastActivity timestamp
-    const tailSize = Math.min(2048, stat.size);
+    const tailSize = Math.min(TRANSCRIPT_TAIL_BYTES, stat.size);
     const tailBuf = Buffer.alloc(tailSize);
     readSync(fd, tailBuf, 0, tailSize, Math.max(0, stat.size - tailSize));
     closeSync(fd);
@@ -289,7 +298,7 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
 
       const meta = await parseTranscriptMeta(filePath);
       if (!meta) continue;
-      if (meta.messageCount < 10) continue;
+      if (meta.messageCount < MIN_MESSAGE_COUNT) continue;
 
       insert.run(
         meta.sessionId, decodedProject, projectDir, filePath,
