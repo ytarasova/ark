@@ -27,6 +27,8 @@ export {
   startSession, dispatch, advance, stop, resume, complete, pause,
   forkSession, cloneSession, handoff, fork, joinFork, getOutput, send,
   deleteSessionAsync, waitForCompletion, approveReviewGate,
+  applyHookStatus, applyReport,
+  type HookStatusResult, type ReportResult,
 } from "./session.js";
 
 // Flow

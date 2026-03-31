@@ -25,7 +25,6 @@ import * as flow from "./flow.js";
 import { eventBus } from "./hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../compute/index.js";
-import { parseTranscriptUsage } from "./claude.js";
 import { indexSession } from "./search.js";
 import { listSchedules, cronMatches, updateScheduleLastRun } from "./schedule.js";
 import { pollPRReviews } from "./pr-poller.js";
@@ -100,98 +99,45 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
           const payload = await req.json() as Record<string, unknown>;
           const event = String(payload.hook_event_name ?? "");
 
-          // Check if this session uses manual gate (interactive - user controls lifecycle)
-          const stageDef = s.stage ? flow.getStage(s.flow, s.stage) : null;
-          const isManualGate = stageDef?.gate === "manual";
+          // Delegate business logic to session.ts
+          const result = session.applyHookStatus(s, event, payload);
 
-          const statusMap: Record<string, string> = {
-            SessionStart: "running",
-            UserPromptSubmit: "running",
-            // Stop = Claude finished a turn (idle between turns) - keep running
-            StopFailure: isManualGate ? "running" : "failed",
-            SessionEnd: isManualGate ? "running" : "completed",
-          };
-
-          let newStatus = statusMap[event];
-
-          // Don't override completed/failed status — late hooks (background task
-          // notifications) can fire UserPromptSubmit after session is done
-          if (newStatus && s.status === "completed" && newStatus !== "completed") {
-            newStatus = undefined as any;
-          }
-          if (newStatus && s.status === "failed" && newStatus === "running") {
-            newStatus = undefined as any;
+          // Apply events
+          for (const evt of result.events ?? []) {
+            store.logEvent(sessionId, evt.type, evt.opts);
           }
 
-          if (event === "Notification") {
-            const matcher = String(payload.matcher ?? "");
-            if (matcher.includes("permission_prompt") || matcher.includes("idle_prompt")) {
-              newStatus = "waiting";
-            }
+          // Apply store updates
+          if (result.updates) {
+            store.updateSession(sessionId, result.updates);
           }
 
-          // Log the hook event
-          store.logEvent(sessionId, "hook_status", {
-            actor: "hook",
-            data: { event, ...payload } as Record<string, unknown>,
-          });
-
-          // For manual gate: log errors/completions as events but don't change status
-          if (isManualGate && (event === "StopFailure" || event === "SessionEnd")) {
-            const errorMsg = payload.error ?? payload.error_details;
-            if (errorMsg) {
-              store.logEvent(sessionId, "agent_error", {
-                actor: "agent",
-                data: { error: String(errorMsg), event },
-              });
-            }
-          }
-
-          if (newStatus) {
-            const updates: Partial<store.Session> = { status: newStatus as any };
-            if (newStatus === "failed") {
-              updates.error = String(payload.error ?? payload.error_details ?? "unknown error");
-            }
-            // Clear stale breakpoint when resuming from waiting
-            if (newStatus === "running" && s.status === "waiting") {
-              updates.breakpoint_reason = null;
-            }
-            store.updateSession(sessionId, updates);
-
+          // Emit to event bus
+          if (result.newStatus) {
             eventBus.emit("hook_status", sessionId, {
-              data: { event, status: newStatus, ...payload } as Record<string, unknown>,
+              data: { event, status: result.newStatus, ...payload } as Record<string, unknown>,
             });
           }
 
-          // Track token usage from transcript on Stop and SessionEnd
-          const transcriptPath = payload.transcript_path as string | undefined;
-          if (transcriptPath && (event === "Stop" || event === "SessionEnd")) {
-            try {
-              const usage = parseTranscriptUsage(transcriptPath);
-              if (usage.total_tokens > 0) {
-                const currentSession = store.getSession(sessionId);
-                if (currentSession) {
-                  const config = typeof currentSession.config === "string"
-                    ? JSON.parse(currentSession.config) : (currentSession.config ?? {});
-                  config.usage = usage;
-                  store.updateSession(sessionId, { config });
-                }
-              }
-            } catch (e: any) { console.error("transcript parsing failed:", e?.message ?? e); }
-
-              // Index transcript for FTS5 search — only if the transcript belongs to THIS session's agent
-              // (avoid indexing the orchestrator's transcript under the agent's session ID)
-              try {
-                const hookClaudeSession = payload.session_id as string | undefined;
-                const arkSession = store.getSession(sessionId);
-                if (hookClaudeSession && arkSession?.claude_session_id &&
-                    transcriptPath.includes(hookClaudeSession)) {
-                  indexSession(transcriptPath, sessionId);
-                }
-              } catch (e: any) { console.error("transcript indexing failed:", e?.message ?? e); }
+          // Apply usage data
+          if (result.usage) {
+            const currentSession = store.getSession(sessionId);
+            if (currentSession) {
+              const config = typeof currentSession.config === "string"
+                ? JSON.parse(currentSession.config) : (currentSession.config ?? {});
+              config.usage = result.usage;
+              store.updateSession(sessionId, { config });
+            }
           }
 
-          return Response.json({ status: "ok", mapped: newStatus ?? "no-op" });
+          // Index transcript
+          if (result.shouldIndex && result.indexTranscript) {
+            try {
+              indexSession(result.indexTranscript.transcriptPath, result.indexTranscript.sessionId);
+            } catch (e: any) { console.error("transcript indexing failed:", e?.message ?? e); }
+          }
+
+          return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
         }
 
         return new Response("Not found", { status: 404 });
@@ -286,127 +232,54 @@ export async function deliverToChannel(
 }
 
 function handleReport(sessionId: string, report: OutboundMessage): void {
-  // Log event
-  store.logEvent(sessionId, `agent_${report.type}`, {
-    stage: report.stage,
-    actor: "agent",
-    data: report as unknown as Record<string, unknown>,
-  });
+  // Delegate business logic to session.ts
+  const result = session.applyReport(sessionId, report);
 
-  // Store as message for the TUI chat view
-  const r = report as Record<string, unknown>;
-  const contentByType: Record<string, string | undefined> = {
-    completed: (r.summary || r.message) as string | undefined,
-    question:  (r.question || r.message) as string | undefined,
-    error:     (r.error || r.message) as string | undefined,
-    progress:  (r.message || r.summary) as string | undefined,
-  };
-  let content = contentByType[report.type] || JSON.stringify(report);
-
-  // Enrich with files, commits, PR URL when available
-  const extras: string[] = [];
-  if (r.pr_url) extras.push(`PR: ${r.pr_url}`);
-  if (Array.isArray(r.filesChanged) && r.filesChanged.length > 0) {
-    extras.push(`Files: ${(r.filesChanged as string[]).join(", ")}`);
+  // Log events
+  for (const evt of result.logEvents ?? []) {
+    store.logEvent(sessionId, evt.type, evt.opts);
   }
-  if (Array.isArray(r.commits) && r.commits.length > 0) {
-    extras.push(`Commits: ${(r.commits as string[]).join(", ")}`);
+
+  // Store message for TUI chat view
+  if (result.message) {
+    store.addMessage({
+      session_id: sessionId,
+      role: result.message.role,
+      content: result.message.content,
+      type: result.message.type,
+    });
   }
-  if (extras.length > 0) content += "\n" + extras.join("\n");
-  store.addMessage({
-    session_id: sessionId,
-    role: "agent",
-    content,
-    type: report.type,
-  });
 
-  // Emit to event bus
-  eventBus.emit(`agent_${report.type}`, sessionId, {
-    stage: report.stage,
-    data: report as unknown as Record<string, unknown>,
-  });
+  // Emit bus events
+  for (const evt of result.busEvents ?? []) {
+    eventBus.emit(evt.type, evt.sessionId, evt.data);
+  }
 
-  // Handle by type
-  switch (report.type) {
-    case "completed": {
-      // Save completion data to session config for display in detail pane
-      const existing = store.getSession(sessionId);
-      if (existing) {
-        const cfg = {
-          ...(existing.config as any),
-          completion_summary: (report as any).summary,
-          filesChanged: (report as any).filesChanged,
-          commits: (report as any).commits,
-        };
-        store.updateSession(sessionId, { config: cfg });
-      }
+  // Apply store updates
+  if (Object.keys(result.updates).length > 0) {
+    store.updateSession(sessionId, result.updates);
+  }
 
-      // Check gate type — manual gates keep session running (user decides when done)
-      const stageDef = existing ? flow.getStage(existing.flow, existing.stage ?? "") : null;
-      const isManualGate = stageDef?.gate === "manual";
-
-      if (isManualGate) {
-        // Manual gate: agent completed its task but session stays running
-        // User can send more work or press 'd' to finish
-        store.logEvent(sessionId, "agent_completed", {
-          stage: existing?.stage ?? undefined,
-          actor: "agent",
-          data: { summary: (report as any).summary },
-        });
-        // Don't change status — session stays running, agent stays alive
-      } else {
-        // Auto gate: advance to next stage or complete the session
-        store.updateSession(sessionId, { status: "ready", session_id: null });
-        const advResult = session.advance(sessionId);
-        if (advResult.ok) {
-          const updated = store.getSession(sessionId);
-          if (updated && updated.status === "ready" && updated.stage) {
-            const nextAction = flow.getStageAction(updated.flow, updated.stage);
-            if (nextAction.type === "agent" || nextAction.type === "fork") {
-              session.dispatch(sessionId);
-            }
-          }
+  // Handle advance + auto-dispatch for completed reports
+  if (result.shouldAdvance) {
+    const advResult = session.advance(sessionId);
+    if (result.shouldAutoDispatch && advResult.ok) {
+      const updated = store.getSession(sessionId);
+      if (updated && updated.status === "ready" && updated.stage) {
+        const nextAction = flow.getStageAction(updated.flow, updated.stage);
+        if (nextAction.type === "agent" || nextAction.type === "fork") {
+          session.dispatch(sessionId);
         }
       }
-      break;
-    }
-    case "question":
-      store.updateSession(sessionId, {
-        status: "waiting",
-        breakpoint_reason:
-          (report as any).question ?? (report as any).message,
-      });
-      break;
-    case "error":
-      store.updateSession(sessionId, {
-        status: "failed",
-        error: (report as any).error ?? (report as any).message,
-      });
-      break;
-    case "progress": {
-      // Agent is actively reporting — ensure status reflects that.
-      // The Notification hook can set status to "waiting" (e.g. for the
-      // channel trust dialog) before the agent's first progress report.
-      // In channel-driven sessions UserPromptSubmit never fires, so
-      // without this reset the session stays "waiting" permanently.
-      const current = store.getSession(sessionId);
-      if (current && current.status === "waiting") {
-        store.updateSession(sessionId, { status: "running", breakpoint_reason: null });
-      }
-      break;
     }
   }
 
-  // PR URL from agent report - explicit field or detected from content
-  const prUrl = (report as any).pr_url as string | undefined;
-  if (prUrl) {
-    const existingSession = store.getSession(sessionId);
-    if (existingSession && !existingSession.pr_url) {
-      store.updateSession(sessionId, { pr_url: prUrl });
-      store.logEvent(sessionId, "pr_detected", {
-        actor: "agent",
-        data: { pr_url: prUrl },
-      });
-    }
+  // PR URL detection
+  if (result.prUrl) {
+    store.updateSession(sessionId, { pr_url: result.prUrl });
+    store.logEvent(sessionId, "pr_detected", {
+      actor: "agent",
+      data: { pr_url: result.prUrl },
+    });
   }
 }
