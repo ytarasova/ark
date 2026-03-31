@@ -78,16 +78,20 @@ export class LocalProvider implements ComputeProvider {
       });
       if (!ok) {
         try { rmSync(wtPath, { recursive: true, force: true }); } catch (e: any) {
-          console.error('local cleanupSession: rmSync worktree fallback:', e?.message ?? e);
+          console.error(`[local] cleanupSession: rmSync worktree fallback for ${session.id}:`, e?.message ?? e);
         }
       }
     } else {
       try { rmSync(wtPath, { recursive: true, force: true }); } catch (e: any) {
-        console.error('local cleanupSession: rmSync worktree:', e?.message ?? e);
+        console.error(`[local] cleanupSession: rmSync worktree for ${session.id}:`, e?.message ?? e);
       }
     }
   }
 
+  /**
+   * Populates all ComputeSnapshot fields: metrics, sessions, processes, docker.
+   * netRxMb/netTxMb and idleTicks are always 0 (macOS doesn't expose /proc/net/dev).
+   */
   async getMetrics(_compute: Compute): Promise<ComputeSnapshot> {
     return collectLocalMetrics();
   }
@@ -102,7 +106,7 @@ export class LocalProvider implements ComputeProvider {
         listening = stdout.trim().length > 0;
       } catch (e: any) {
         // Port not listening
-        console.error('local probePorts:', e?.message ?? e);
+        console.error(`[local] probePorts: port ${decl.port} check failed:`, e?.message ?? e);
       }
       return { ...decl, listening };
     }));

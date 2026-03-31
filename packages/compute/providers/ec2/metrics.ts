@@ -17,6 +17,10 @@ import { REMOTE_PROJECTS_DIR } from "./constants.js";
 // Internal sub-commands
 // ---------------------------------------------------------------------------
 
+/**
+ * Iterates tmux sessions, finds the claude process in each pane, and outputs
+ * tab-delimited lines: session_name, cpu%, mem%, cwd, mode (interactive|agentic).
+ */
 const CLAUDE_CMD = [
   "for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null); do",
   "  pid=$(tmux list-panes -t \"$sess\" -F '#{pane_pid}' 2>/dev/null | head -1);",
@@ -33,6 +37,10 @@ const CLAUDE_CMD = [
   "done",
 ].join(" ");
 
+/**
+ * Lists top 8 processes by CPU usage (>0.1%), outputting tab-delimited lines:
+ * pid, cpu%, mem%, command, working_dir (relative to ~/Projects/).
+ */
 const PROCESSES_CMD = [
   "for pid in $(ps aux --sort=-%cpu",
   "| grep -vE 'sshd|grep|awk|ps aux|mpstat'",
@@ -46,12 +54,15 @@ const PROCESSES_CMD = [
   "done",
 ].join(" ");
 
+/** Reads /proc/net/dev for eth0/ens interfaces, outputs "rx_mb tx_mb" in MiB. */
 const NETWORK_CMD =
   "cat /proc/net/dev | awk '/eth0|ens/{printf \"%.1f %.1f\\n\", $2/1048576, $10/1048576}'";
 
+/** Docker stats for all containers: tab-delimited name, cpu%, mem_usage. Falls back to "(none)". */
 const DOCKER_CMD =
   "docker stats --no-stream --format '{{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}' 2>/dev/null || echo \"(none)\"";
 
+/** Lists running containers: tab-delimited name, image. Used to build image lookup for docker stats. */
 const DOCKER_PS_CMD =
   "docker ps --format '{{.Names}}\\t{{.Image}}' 2>/dev/null";
 

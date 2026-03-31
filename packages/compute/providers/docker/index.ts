@@ -40,7 +40,7 @@ async function run(cmd: string, args: string[]): Promise<string> {
     });
     return stdout.trim();
   } catch (e: any) {
-    console.error('docker run helper:', e?.message ?? e);
+    console.error('[docker] run: command failed:', e?.message ?? e);
     return "";
   }
 }
@@ -179,7 +179,7 @@ export class DockerProvider implements ComputeProvider {
       });
     } catch (e: any) {
       // Container may already be stopped
-      console.error('docker stop:', e?.message ?? e);
+      console.error(`[docker] stop: container ${name} failed:`, e?.message ?? e);
     }
     updateCompute(compute.name, { status: "stopped" });
   }
@@ -194,7 +194,7 @@ export class DockerProvider implements ComputeProvider {
       });
     } catch (e: any) {
       // Container may not exist
-      console.error('docker rm:', e?.message ?? e);
+      console.error(`[docker] destroy: rm container ${name} failed:`, e?.message ?? e);
     }
     updateCompute(compute.name, { status: "destroyed" });
   }
@@ -256,12 +256,17 @@ export class DockerProvider implements ComputeProvider {
       });
     } catch (e: any) {
       // Container may already be stopped
-      console.error('docker stop (cleanup):', e?.message ?? e);
+      console.error(`[docker] cleanupSession: stop container ${name} failed:`, e?.message ?? e);
     }
   }
 
   // ── Metrics ──────────────────────────────────────────────────────────────
 
+  /**
+   * Populates metrics (cpu, mem, disk, uptime), processes, and docker fields.
+   * sessions is always empty (Docker containers don't have tmux sessions inside).
+   * netRxMb/netTxMb and idleTicks are always 0.
+   */
   async getMetrics(compute: Compute): Promise<ComputeSnapshot> {
     const name = containerName(compute.name);
 
@@ -397,7 +402,7 @@ export class DockerProvider implements ComputeProvider {
         if (out) listening = true;
       } catch (e: any) {
         // Port not listening inside container
-        console.error('docker probePorts (container):', e?.message ?? e);
+        console.error(`[docker] probePorts: container ${name} port ${decl.port} check failed:`, e?.message ?? e);
       }
 
       if (!listening) {
@@ -409,7 +414,7 @@ export class DockerProvider implements ComputeProvider {
           listening = stdout.trim().length > 0;
         } catch (e: any) {
           // Port not listening on host
-          console.error('docker probePorts (host):', e?.message ?? e);
+          console.error(`[docker] probePorts: host port ${decl.port} check failed:`, e?.message ?? e);
         }
       }
 

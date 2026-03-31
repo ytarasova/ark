@@ -178,7 +178,7 @@ async function syncRemoteCredentials(
         ], { timeout: 15_000 });
         onLog("Claude credentials synced ✓");
       } catch (e: any) {
-        console.error(`provision: scp credentials to ${computeName} failed:`, e?.message ?? e);
+        console.error(`[ec2] syncRemoteCredentials: scp credentials to ${computeName} failed:`, e?.message ?? e);
         onLog("Failed to sync credentials — run 'ark auth --host " + computeName + "'");
       }
     }
@@ -516,7 +516,7 @@ export class EC2Provider implements ComputeProvider {
       });
     } catch (e: any) {
       // Session may already be dead or host unreachable
-      console.error(`killAgent: tmux kill-session '${session.session_id}' on ${compute.name} failed:`, e?.message ?? e);
+      console.error(`[ec2] killAgent: tmux kill-session '${session.session_id}' on ${compute.name} failed:`, e?.message ?? e);
     }
   }
 
@@ -533,7 +533,7 @@ export class EC2Provider implements ComputeProvider {
         return stdout;
       });
     } catch (e: any) {
-      console.error(`captureOutput: tmux capture-pane '${session.session_id}' on ${compute.name} failed:`, e?.message ?? e);
+      console.error(`[ec2] captureOutput: tmux capture-pane '${session.session_id}' on ${compute.name} failed:`, e?.message ?? e);
       return "";
     }
   }
@@ -548,7 +548,7 @@ export class EC2Provider implements ComputeProvider {
       });
     } catch (e: any) {
       // Best effort cleanup — remote may be unreachable
-      console.error(`cleanupSession: rm remote workdir for ${session.id} on ${compute.name} failed:`, e?.message ?? e);
+      console.error(`[ec2] cleanupSession: rm remote workdir for ${session.id} on ${compute.name} failed:`, e?.message ?? e);
     }
   }
 
@@ -594,6 +594,7 @@ export class EC2Provider implements ComputeProvider {
     }
   }
 
+  /** Populates all ComputeSnapshot fields: metrics, sessions, processes, docker (via SSH_FAST_CMD). */
   async getMetrics(compute: Compute): Promise<ComputeSnapshot> {
     const cfg = compute.config as EC2HostConfig;
     if (!cfg.ip) throw new Error(`Compute '${compute.name}' has no IP`);
@@ -608,7 +609,7 @@ export class EC2Provider implements ComputeProvider {
           { timeout: 10_000 },
         );
       }).catch((e: any) => {
-      console.error(`getMetrics: token refresh on ${compute.name} failed:`, e?.message ?? e);
+      console.error(`[ec2] getMetrics: token refresh on ${compute.name} failed:`, e?.message ?? e);
     }); // fire-and-forget
     }
 
@@ -666,7 +667,7 @@ export class EC2Provider implements ComputeProvider {
         return exitCode === 0;
       });
     } catch (e: any) {
-      console.error(`checkSession: tmux has-session '${tmuxSessionId}' on ${compute.name} failed:`, e?.message ?? e);
+      console.error(`[ec2] checkSession: tmux has-session '${tmuxSessionId}' on ${compute.name} failed:`, e?.message ?? e);
       return false;
     }
   }
@@ -707,7 +708,7 @@ export class EC2Provider implements ComputeProvider {
         const p = j(ARK_DIR(), "claude-oauth-token");
         if (ex(p)) oauthToken = rf(p, "utf-8").trim();
       } catch (e: any) {
-        console.error('buildLaunchEnv: failed to read claude-oauth-token:', e?.message ?? e);
+        console.error('[ec2] buildLaunchEnv: failed to read claude-oauth-token:', e?.message ?? e);
       }
     }
     if (oauthToken) env.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;

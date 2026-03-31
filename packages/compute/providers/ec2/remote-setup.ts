@@ -22,7 +22,7 @@ export async function getGitRemoteUrl(localPath: string): Promise<string | null>
     });
     return stdout.trim() || null;
   } catch (e: any) {
-    console.error(`getGitRemoteUrl: failed for ${localPath}:`, e?.message ?? e);
+    console.error(`[ec2] getGitRemoteUrl: failed for ${localPath}:`, e?.message ?? e);
     return null;
   }
 }
@@ -72,7 +72,7 @@ export async function cloneRepoOnRemote(
     { timeout: 120_000 });
 
   if (exitCode !== 0) {
-    throw new Error(`Git clone failed: ${stderr.slice(0, 200)}`);
+    throw new Error(`Git clone failed: ${stderr.slice(0, 200)}${stderr.length > 200 ? '...' : ''}`);
   }
 
   log(`Cloned to ${remotePath}`);
@@ -146,7 +146,7 @@ export async function autoAcceptChannelPrompt(
         return;
       }
     } catch (e: any) {
-      console.error(`autoAcceptChannelPrompt: ssh to ${tmuxName} failed (attempt ${i + 1}/${max}):`, e?.message ?? e);
+      console.error(`[ec2] autoAcceptChannelPrompt: ssh to ${tmuxName} failed (attempt ${i + 1}/${max}):`, e?.message ?? e);
     }
   }
 }

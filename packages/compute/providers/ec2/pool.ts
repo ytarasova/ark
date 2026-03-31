@@ -154,7 +154,7 @@ export class SSHPool {
         local, `ubuntu@${this.ip}:${remote}`,
       ], { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS });
     } catch (e: any) {
-      console.error(`SSHPool.rsyncPush failed (${local} -> ${this.ip}:${remote}):`, e?.message ?? e);
+      console.error(`[ec2] SSHPool.rsyncPush: failed (${local} -> ${this.ip}:${remote}):`, e?.message ?? e);
     } finally {
       this.release();
     }
@@ -170,7 +170,7 @@ export class SSHPool {
         `ubuntu@${this.ip}:${remote}`, local,
       ], { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS });
     } catch (e: any) {
-      console.error(`SSHPool.rsyncPull failed (${this.ip}:${remote} -> ${local}):`, e?.message ?? e);
+      console.error(`[ec2] SSHPool.rsyncPull: failed (${this.ip}:${remote} -> ${local}):`, e?.message ?? e);
     } finally {
       this.release();
     }
@@ -218,9 +218,10 @@ export class SSHPool {
       // Master may already be dead — expected during cleanup
     }
     try {
+      // Clean up control socket file at this.socketPath
       if (existsSync(this.socketPath)) rmSync(this.socketPath);
     } catch {
-      // Socket file may already be removed — safe to ignore
+      // Socket file at this.socketPath may already be removed — safe to ignore
     }
   }
 

@@ -78,7 +78,7 @@ function rsyncSshOpt(key: string): string {
 /** Build rsync arguments for pushing local -> remote. */
 export function rsyncPushArgs(key: string, ip: string, local: string, remote: string): string[] {
   return [
-    "rsync", "-avz", "--update", "--timeout=15",
+    "rsync", "-avz", "--update", "--timeout=30",
     "-e", rsyncSshOpt(key),
     local, `ubuntu@${ip}:${remote}`,
   ];
@@ -87,7 +87,7 @@ export function rsyncPushArgs(key: string, ip: string, local: string, remote: st
 /** Build rsync arguments for pulling remote -> local. */
 export function rsyncPullArgs(key: string, ip: string, remote: string, local: string): string[] {
   return [
-    "rsync", "-avz", "--update", "--timeout=15",
+    "rsync", "-avz", "--update", "--timeout=30",
     "-e", rsyncSshOpt(key),
     `ubuntu@${ip}:${remote}`, local,
   ];
@@ -99,7 +99,7 @@ export async function rsyncPush(key: string, ip: string, local: string, remote: 
   try {
     await execFileAsync(bin, rest, { encoding: "utf-8", timeout: 300_000 });
   } catch (e: any) {
-    console.error(`rsyncPush failed (${local} -> ${ip}:${remote}):`, e?.message ?? e);
+    console.error(`[ec2] rsyncPush: failed (${local} -> ${ip}:${remote}):`, e?.message ?? e);
   }
 }
 
@@ -109,7 +109,7 @@ export async function rsyncPull(key: string, ip: string, remote: string, local: 
   try {
     await execFileAsync(bin, rest, { encoding: "utf-8", timeout: 300_000 });
   } catch (e: any) {
-    console.error(`rsyncPull failed (${ip}:${remote} -> ${local}):`, e?.message ?? e);
+    console.error(`[ec2] rsyncPull: failed (${ip}:${remote} -> ${local}):`, e?.message ?? e);
   }
 }
 
