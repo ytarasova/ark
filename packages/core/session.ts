@@ -5,6 +5,7 @@
  * Direct interaction with the store is for reads only - writes go through these functions.
  */
 
+import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { execFile } from "child_process";
@@ -19,11 +20,15 @@ import * as tmux from "./tmux.js";
 import * as flow from "./flow.js";
 import * as agentRegistry from "./agent.js";
 import * as claude from "./claude.js";
+import { parseTranscriptUsage } from "./claude.js";
 import { getProvider } from "../compute/index.js";
 import { resolvePortDecls, parseArcJson } from "../compute/arc-json.js";
 import { buildSessionVars } from "./template.js";
 import { resolveFlow } from "./flow.js";
 import { loadRepoConfig } from "./repo-config.js";
+import { eventBus } from "./hooks.js";
+import { indexSession } from "./search.js";
+import type { OutboundMessage } from "./channel-types.js";
 
 // ── Session lifecycle ───────────────────────────────────────────────────────
 
@@ -497,19 +502,17 @@ function resolveProvider(session: store.Session): { provider: ComputeProvider | 
 
 // ── Internal ────────────────────────────────────────────────────────────────
 
-async function launchAgentTmux(
-  session: store.Session, stage: string,
-  claudeArgs: string[], task: string, agent: agentRegistry.AgentDefinition,
-  opts?: { autonomy?: string; onLog?: (msg: string) => void },
+/** Setup git worktree + Claude trust for the session working directory. */
+async function setupSessionWorktree(
+  session: store.Session,
+  compute: store.Compute | null,
+  provider: ComputeProvider | undefined,
+  onLog?: (msg: string) => void,
 ): Promise<string> {
-  const log = opts?.onLog ?? (() => {});
-  const tmuxName = `ark-${session.id}`;
+  const log = onLog ?? (() => {});
   const workdir = session.workdir ?? ".";
-
-  // Setup worktree — only for providers that support it (local) with git repos
   let effectiveWorkdir = workdir;
-  const compute = session.compute_name ? store.getCompute(session.compute_name) : null;
-  const provider = getProvider(compute?.provider ?? "local");
+
   const wantWorktree = provider?.supportsWorktree && session.config?.worktree !== false;
   if (wantWorktree && workdir !== "." && existsSync(join(workdir, ".git"))) {
     log("Setting up git worktree...");
@@ -520,6 +523,98 @@ async function launchAgentTmux(
   // Trust worktree for Claude
   log("Configuring Claude trust + channel...");
   claude.trustWorktree(workdir, effectiveWorkdir);
+
+  return effectiveWorkdir;
+}
+
+/** Prepare remote compute: connectivity check, env sync, docker/devcontainer setup. */
+async function prepareRemoteEnvironment(
+  session: store.Session,
+  compute: store.Compute,
+  provider: ComputeProvider,
+  effectiveWorkdir: string,
+  opts?: { launchContent?: string; onLog?: (msg: string) => void },
+): Promise<{ finalLaunchContent: string; ports: any[] }> {
+  const log = opts?.onLog ?? (() => {});
+  let finalLaunchContent = opts?.launchContent ?? "";
+
+  // Auto-start stopped computes
+  if (compute.status === "stopped") {
+    log(`Starting compute '${compute.name}'...`);
+    await provider.start(compute);
+  }
+
+  // Verify host is reachable before starting expensive sync/clone chain
+  const ip = (compute.config as any)?.ip;
+  if (ip) {
+    log("Checking host connectivity...");
+    const { sshExecAsync, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
+    const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), ip, "echo ok", { timeout: 15_000 });
+    if (exitCode !== 0) {
+      throw new Error(`Cannot reach compute '${compute.name}' at ${ip}`);
+    }
+  }
+
+  // Resolve ports from arc.json / devcontainer / compose
+  const ports = effectiveWorkdir ? resolvePortDecls(effectiveWorkdir) : [];
+
+  // Store ports on session config
+  if (ports.length > 0) {
+    store.updateSession(session.id, {
+      config: { ...session.config, ports },
+    });
+  }
+
+  // Sync environment to compute
+  log("Syncing credentials...");
+  try {
+    const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
+    await provider.syncEnvironment(compute, {
+      direction: "push",
+      projectFiles: arcJson?.sync,
+      projectDir: effectiveWorkdir,
+      onLog: log,
+    });
+  } catch (e: any) { log(`Credential sync failed (continuing): ${e?.message ?? e}`); }
+
+  // Docker Compose - only when explicitly enabled in arc.json { "compose": true }
+  if (effectiveWorkdir) {
+    const arcJson = parseArcJson(effectiveWorkdir);
+    if (arcJson?.compose === true && compute.config?.ip) {
+      log("Starting Docker Compose services...");
+      const { sshExec, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
+      sshExec(sshKeyPath(compute.name), compute.config.ip as string,
+        `cd ${effectiveWorkdir} && docker compose up -d`);
+    }
+  }
+
+  // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }
+  if (effectiveWorkdir) {
+    const arcJson = parseArcJson(effectiveWorkdir);
+    if (arcJson?.devcontainer === true) {
+      log("Building devcontainer...");
+      const { buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
+      finalLaunchContent = buildLaunchCommand(effectiveWorkdir, finalLaunchContent);
+    }
+  }
+
+  return { finalLaunchContent, ports };
+}
+
+async function launchAgentTmux(
+  session: store.Session, stage: string,
+  claudeArgs: string[], task: string, agent: agentRegistry.AgentDefinition,
+  opts?: { autonomy?: string; onLog?: (msg: string) => void },
+): Promise<string> {
+  const log = opts?.onLog ?? (() => {});
+  const tmuxName = `ark-${session.id}`;
+
+  // Resolve compute + provider
+  const compute = session.compute_name ? store.getCompute(session.compute_name) : null;
+  const provider = getProvider(compute?.provider ?? "local");
+
+  // Setup worktree + trust
+  const effectiveWorkdir = await setupSessionWorktree(session, compute, provider, log);
 
   // Determine conductor URL based on compute type
   const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
@@ -548,7 +643,6 @@ async function launchAgentTmux(
     env: launchEnv,
   });
 
-  let finalLaunchContent = launchContent;
   const launcher = tmux.writeLauncher(session.id, launchContent);
 
   // Save task for reference
@@ -556,68 +650,12 @@ async function launchAgentTmux(
   mkdirSync(sessionDir, { recursive: true });
   writeFileSync(join(sessionDir, "task.txt"), task);
 
-  // Check for remote compute (providers that don't support local worktrees)
+  // Remote compute (providers that don't support local worktrees)
   if (compute && provider && !provider.supportsWorktree) {
-
-    // Auto-start stopped computes
-    if (compute.status === "stopped") {
-      log(`Starting compute '${compute.name}'...`);
-      await provider.start(compute);
-    }
-
-    // Verify host is reachable before starting expensive sync/clone chain
-    const ip = (compute.config as any)?.ip;
-    if (ip) {
-      log("Checking host connectivity...");
-      const { sshExecAsync, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
-      const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), ip, "echo ok", { timeout: 15_000 });
-      if (exitCode !== 0) {
-        throw new Error(`Cannot reach compute '${compute.name}' at ${ip}`);
-      }
-    }
-
-    // Resolve ports from arc.json / devcontainer / compose
-    const ports = effectiveWorkdir ? resolvePortDecls(effectiveWorkdir) : [];
-
-    // Store ports on session config
-    if (ports.length > 0) {
-      store.updateSession(session.id, {
-        config: { ...session.config, ports },
-      });
-    }
-
-    // Sync environment to compute
-    log("Syncing credentials...");
-    try {
-      const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
-      await provider.syncEnvironment(compute, {
-        direction: "push",
-        projectFiles: arcJson?.sync,
-        projectDir: effectiveWorkdir,
-        onLog: log,
-      });
-    } catch (e: any) { log(`Credential sync failed (continuing): ${e?.message ?? e}`); }
-
-    // Docker Compose - only when explicitly enabled in arc.json { "compose": true }
-    if (effectiveWorkdir) {
-      const arcJson = parseArcJson(effectiveWorkdir);
-      if (arcJson?.compose === true && compute.config?.ip) {
-        log("Starting Docker Compose services...");
-        const { sshExec, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
-        sshExec(sshKeyPath(compute.name), compute.config.ip as string,
-          `cd ${effectiveWorkdir} && docker compose up -d`);
-      }
-    }
-
-    // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }
-    if (effectiveWorkdir) {
-      const arcJson = parseArcJson(effectiveWorkdir);
-      if (arcJson?.devcontainer === true) {
-        log("Building devcontainer...");
-        const { buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
-        finalLaunchContent = buildLaunchCommand(effectiveWorkdir, finalLaunchContent);
-      }
-    }
+    const { finalLaunchContent, ports } = await prepareRemoteEnvironment(
+      session, compute, provider, effectiveWorkdir,
+      { launchContent, onLog: log },
+    );
 
     // Launch via provider
     log("Launching on remote...");
@@ -816,4 +854,245 @@ export async function send(sessionId: string, message: string): Promise<{ ok: bo
   if (!session?.session_id) return { ok: false, message: "No active session" };
   await tmux.sendTextAsync(session.session_id, message);
   return { ok: true, message: "Sent" };
+}
+
+// ── Hook status logic (extracted from conductor) ─────────────────────────────
+
+export interface HookStatusResult {
+  newStatus?: string;
+  shouldIndex?: boolean;
+  claudeSessionId?: string;
+  /** Store updates to apply */
+  updates?: Partial<store.Session>;
+  /** Events to log */
+  events?: Array<{ type: string; opts: { actor?: string; stage?: string; data?: Record<string, unknown> } }>;
+  /** Usage data parsed from transcript */
+  usage?: { total_tokens: number; [key: string]: unknown };
+  /** Transcript indexing info */
+  indexTranscript?: { transcriptPath: string; sessionId: string };
+}
+
+/**
+ * Pure business logic for processing a hook status event.
+ * Determines status transitions, events to log, and side effects
+ * without touching the store or event bus directly.
+ */
+export function applyHookStatus(
+  session: store.Session,
+  hookEvent: string,
+  payload: Record<string, unknown>,
+): HookStatusResult {
+  const result: HookStatusResult = { events: [] };
+
+  // Check if this session uses manual gate (interactive - user controls lifecycle)
+  const stageDef = session.stage ? flow.getStage(session.flow, session.stage) : null;
+  const isManualGate = stageDef?.gate === "manual";
+
+  const statusMap: Record<string, string> = {
+    SessionStart: "running",
+    UserPromptSubmit: "running",
+    StopFailure: isManualGate ? "running" : "failed",
+    SessionEnd: isManualGate ? "running" : "completed",
+  };
+
+  let newStatus = statusMap[hookEvent];
+
+  // Don't override completed/failed status — late hooks can fire after session is done
+  if (newStatus && session.status === "completed" && newStatus !== "completed") {
+    newStatus = undefined;
+  }
+  if (newStatus && session.status === "failed" && newStatus === "running") {
+    newStatus = undefined;
+  }
+
+  if (hookEvent === "Notification") {
+    const matcher = String(payload.matcher ?? "");
+    if (matcher.includes("permission_prompt") || matcher.includes("idle_prompt")) {
+      newStatus = "waiting";
+    }
+  }
+
+  // Always log the hook event
+  result.events!.push({
+    type: "hook_status",
+    opts: { actor: "hook", data: { event: hookEvent, ...payload } as Record<string, unknown> },
+  });
+
+  // For manual gate: log errors/completions as events but don't change status
+  if (isManualGate && (hookEvent === "StopFailure" || hookEvent === "SessionEnd")) {
+    const errorMsg = payload.error ?? payload.error_details;
+    if (errorMsg) {
+      result.events!.push({
+        type: "agent_error",
+        opts: { actor: "agent", data: { error: String(errorMsg), event: hookEvent } },
+      });
+    }
+  }
+
+  if (newStatus) {
+    const updates: Partial<store.Session> = { status: newStatus as any };
+    if (newStatus === "failed") {
+      updates.error = String(payload.error ?? payload.error_details ?? "unknown error");
+    }
+    // Clear stale breakpoint when resuming from waiting
+    if (newStatus === "running" && session.status === "waiting") {
+      updates.breakpoint_reason = null;
+    }
+    result.updates = updates;
+    result.newStatus = newStatus;
+  }
+
+  // Track token usage from transcript on Stop and SessionEnd
+  const transcriptPath = payload.transcript_path as string | undefined;
+  if (transcriptPath && (hookEvent === "Stop" || hookEvent === "SessionEnd")) {
+    try {
+      const usage = parseTranscriptUsage(transcriptPath);
+      if (usage.total_tokens > 0) {
+        result.usage = usage;
+      }
+    } catch (e: any) { console.error("transcript parsing failed:", e?.message ?? e); }
+
+    // Index transcript for FTS5 search — only if the transcript belongs to THIS session's agent
+    const hookClaudeSession = payload.session_id as string | undefined;
+    if (hookClaudeSession && session.claude_session_id &&
+        transcriptPath.includes(hookClaudeSession)) {
+      result.shouldIndex = true;
+      result.indexTranscript = { transcriptPath, sessionId: session.id };
+    }
+  }
+
+  return result;
+}
+
+// ── Report handling logic (extracted from conductor) ─────────────────────────
+
+export interface ReportResult {
+  /** Store updates to apply to the session */
+  updates: Partial<store.Session>;
+  /** Whether to call session.advance() after applying updates */
+  shouldAdvance?: boolean;
+  /** Whether to auto-dispatch next stage after advance */
+  shouldAutoDispatch?: boolean;
+  /** Events to emit on the event bus */
+  busEvents?: Array<{ type: string; sessionId: string; data: Record<string, unknown> }>;
+  /** Events to log to the store */
+  logEvents?: Array<{ type: string; opts: { stage?: string; actor?: string; data?: Record<string, unknown> } }>;
+  /** Message to store for TUI chat view */
+  message?: { role: string; content: string; type: string };
+  /** PR URL detected from report */
+  prUrl?: string;
+}
+
+/**
+ * Pure business logic for processing an agent channel report.
+ * Determines state transitions, messages, and events without
+ * touching the store, event bus, or session lifecycle directly.
+ */
+export function applyReport(sessionId: string, report: OutboundMessage): ReportResult {
+  const session = store.getSession(sessionId);
+  const result: ReportResult = { updates: {}, logEvents: [], busEvents: [] };
+
+  // Log event
+  result.logEvents!.push({
+    type: `agent_${report.type}`,
+    opts: {
+      stage: report.stage,
+      actor: "agent",
+      data: report as unknown as Record<string, unknown>,
+    },
+  });
+
+  // Build message content for TUI chat view
+  const r = report as Record<string, unknown>;
+  const contentByType: Record<string, string | undefined> = {
+    completed: (r.summary || r.message) as string | undefined,
+    question:  (r.question || r.message) as string | undefined,
+    error:     (r.error || r.message) as string | undefined,
+    progress:  (r.message || r.summary) as string | undefined,
+  };
+  let content = contentByType[report.type] || JSON.stringify(report);
+
+  // Enrich with files, commits, PR URL when available
+  const extras: string[] = [];
+  if (r.pr_url) extras.push(`PR: ${r.pr_url}`);
+  if (Array.isArray(r.filesChanged) && r.filesChanged.length > 0) {
+    extras.push(`Files: ${(r.filesChanged as string[]).join(", ")}`);
+  }
+  if (Array.isArray(r.commits) && r.commits.length > 0) {
+    extras.push(`Commits: ${(r.commits as string[]).join(", ")}`);
+  }
+  if (extras.length > 0) content += "\n" + extras.join("\n");
+  result.message = { role: "agent", content, type: report.type };
+
+  // Emit to event bus
+  result.busEvents!.push({
+    type: `agent_${report.type}`,
+    sessionId,
+    data: { stage: report.stage, data: report as unknown as Record<string, unknown> },
+  });
+
+  // Handle by type
+  switch (report.type) {
+    case "completed": {
+      // Save completion data to session config for display in detail pane
+      if (session) {
+        const cfg = {
+          ...(session.config as any),
+          completion_summary: (report as any).summary,
+          filesChanged: (report as any).filesChanged,
+          commits: (report as any).commits,
+        };
+        result.updates.config = cfg;
+      }
+
+      // Check gate type — manual gates keep session running (user decides when done)
+      const stageDef = session ? flow.getStage(session.flow, session.stage ?? "") : null;
+      const isManualGate = stageDef?.gate === "manual";
+
+      if (isManualGate) {
+        // Manual gate: agent completed its task but session stays running
+        result.logEvents!.push({
+          type: "agent_completed",
+          opts: {
+            stage: session?.stage ?? undefined,
+            actor: "agent",
+            data: { summary: (report as any).summary },
+          },
+        });
+        // Don't change status — session stays running, agent stays alive
+      } else {
+        // Auto gate: advance to next stage or complete the session
+        result.updates.status = "ready";
+        result.updates.session_id = null;
+        result.shouldAdvance = true;
+        result.shouldAutoDispatch = true;
+      }
+      break;
+    }
+    case "question":
+      result.updates.status = "waiting";
+      result.updates.breakpoint_reason =
+        (report as any).question ?? (report as any).message;
+      break;
+    case "error":
+      result.updates.status = "failed";
+      result.updates.error = (report as any).error ?? (report as any).message;
+      break;
+    case "progress": {
+      // Agent is actively reporting — ensure status reflects that.
+      if (session && session.status === "waiting") {
+        result.updates.status = "running";
+        result.updates.breakpoint_reason = null;
+      }
+      break;
+    }
+  }
+
+  // PR URL from agent report
+  const prUrl = (report as any).pr_url as string | undefined;
+  if (prUrl && session && !session.pr_url) {
+    result.prUrl = prUrl;
+  }
+
+  return result;
 }
