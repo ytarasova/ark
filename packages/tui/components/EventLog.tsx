@@ -1,61 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Box, Text } from "ink";
-import * as core from "../../core/index.js";
-import { formatEvent } from "../helpers/formatEvent.js";
+import { useEventLog } from "../hooks/useEventLog.js";
 
 interface EventLogProps {
   expanded: boolean;
   onToggle: () => void;
 }
 
-interface DisplayEvent {
-  time: string;
-  source: string;  // session ID or compute name
-  type: string;
-  message: string; // human-readable via formatEvent
-  color: string;
-}
-
 export function EventLog({ expanded }: EventLogProps) {
-  const [events, setEvents] = useState<DisplayEvent[]>([]);
-
-  useEffect(() => {
-    const refresh = () => {
-      try {
-        const allEvents: DisplayEvent[] = [];
-
-        // Session events
-        const sessions = core.listSessions({ limit: 15 });
-        for (const s of sessions) {
-          try {
-            const evts = core.getEvents(s.id, { limit: expanded ? 10 : 3 });
-            for (const ev of evts) {
-              const source = (s.summary ?? s.id).slice(0, 20);
-              const color = ev.type.includes("error") || ev.type.includes("exit") || ev.type.includes("fail") ? "red"
-                : ev.type.includes("complete") ? "green"
-                : ev.type.includes("start") ? "cyan"
-                : "gray";
-              allEvents.push({
-                time: hms(ev.created_at),
-                source,
-                type: ev.type,
-                message: formatEvent(ev.type, ev.data ?? undefined),
-                color,
-              });
-            }
-          } catch {}
-        }
-
-        // Sort newest first
-        allEvents.sort((a, b) => b.time.localeCompare(a.time));
-        setEvents(allEvents.slice(0, expanded ? 30 : 5));
-      } catch {}
-    };
-    refresh();
-    const t = setInterval(refresh, 5000);
-    return () => clearInterval(t);
-  }, [expanded]);
-
+  const events = useEventLog(expanded);
   const latest = events[0];
 
   if (!expanded) {
@@ -88,8 +41,4 @@ export function EventLog({ expanded }: EventLogProps) {
       ))}
     </Box>
   );
-}
-
-function hms(iso: string): string {
-  try { return new Date(iso).toISOString().slice(11, 19); } catch { return ""; }
 }
