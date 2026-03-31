@@ -22,7 +22,7 @@ const defaultGhExec: GhExecFn = async (args) => {
   return execFileAsync("gh", args, { encoding: "utf-8", timeout: 15_000 });
 };
 
-/** Global ghExec — used when no override is provided via options. */
+// Replaceable via setGhExec() for testing; allows mocking gh CLI calls without subprocess
 let _ghExec: GhExecFn = defaultGhExec;
 
 /** Replace the gh exec function (for testing). */

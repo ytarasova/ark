@@ -89,7 +89,7 @@ export function searchTranscripts(query: string, opts?: SearchOpts): SearchResul
     if (count > 0) {
       return searchTranscriptsFTS(query, limit);
     }
-  } catch { /* FTS5 table may not exist yet */ }
+  } catch (e: any) { console.error('FTS search failed, falling back to file scan:', e?.message ?? e); }
 
   // Fallback to file scanning
   return searchTranscriptsFiles(query, opts);
@@ -361,12 +361,12 @@ function extractText(entry: any): string {
 }
 
 function truncateAround(text: string, query: string, maxLen: number): string {
-  const idx = text.toLowerCase().indexOf(query.toLowerCase());
-  if (idx === -1) return text.slice(0, maxLen);
-  const start = Math.max(0, idx - 40);
-  const end = Math.min(text.length, idx + query.length + 80);
-  let result = text.slice(start, end);
-  if (start > 0) result = "..." + result;
-  if (end < text.length) result = result + "...";
+  const matchIndex = text.toLowerCase().indexOf(query.toLowerCase());
+  if (matchIndex === -1) return text.slice(0, maxLen);
+  const contextStart = Math.max(0, matchIndex - 40);
+  const contextEnd = Math.min(text.length, matchIndex + query.length + 80);
+  let result = text.slice(contextStart, contextEnd);
+  if (contextStart > 0) result = "..." + result;
+  if (contextEnd < text.length) result = result + "...";
   return result;
 }

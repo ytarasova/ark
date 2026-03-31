@@ -172,6 +172,16 @@ function buildHooksConfig(sessionId: string, conductorUrl: string): Record<strin
   };
 }
 
+/** Remove all ark-managed hook entries from a hooks object, mutating it in place. */
+function filterOutArkHooks(hooks: Record<string, unknown[]>): void {
+  for (const [event, matchers] of Object.entries(hooks)) {
+    hooks[event] = (matchers as any[]).filter(
+      (m: any) => !m.hooks?.some((h: any) => h.command?.includes(ARK_HOOK_MARKER))
+    );
+    if (hooks[event].length === 0) delete hooks[event];
+  }
+}
+
 export function writeHooksConfig(
   sessionId: string, conductorUrl: string, workdir: string,
   opts?: { autonomy?: string },
@@ -188,14 +198,8 @@ export function writeHooksConfig(
 
   // Remove previous ark hooks (idempotent)
   if (existing.hooks && typeof existing.hooks === "object") {
-    const hooks = existing.hooks as Record<string, unknown[]>;
-    for (const [event, matchers] of Object.entries(hooks)) {
-      hooks[event] = (matchers as any[]).filter(
-        (m: any) => !m.hooks?.some((h: any) => h.command?.includes(ARK_HOOK_MARKER))
-      );
-      if (hooks[event].length === 0) delete hooks[event];
-    }
-    if (Object.keys(hooks).length === 0) delete existing.hooks;
+    filterOutArkHooks(existing.hooks as Record<string, unknown[]>);
+    if (Object.keys(existing.hooks as object).length === 0) delete existing.hooks;
   }
 
   // Merge new hooks
@@ -233,14 +237,8 @@ export function removeHooksConfig(workdir: string): void {
 
   if (!settings.hooks || typeof settings.hooks !== "object") return;
 
-  const hooks = settings.hooks as Record<string, unknown[]>;
-  for (const [event, matchers] of Object.entries(hooks)) {
-    hooks[event] = (matchers as any[]).filter(
-      (m: any) => !m.hooks?.some((h: any) => h.command?.includes(ARK_HOOK_MARKER))
-    );
-    if (hooks[event].length === 0) delete hooks[event];
-  }
-  if (Object.keys(hooks).length === 0) delete settings.hooks;
+  filterOutArkHooks(settings.hooks as Record<string, unknown[]>);
+  if (Object.keys(settings.hooks as object).length === 0) delete settings.hooks;
 
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 }

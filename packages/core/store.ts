@@ -190,6 +190,7 @@ function now(): string {
   return new Date().toISOString();
 }
 
+// Tracks databases that have had schema initialized, preventing re-initialization
 const _initialized = new WeakSet<Database>();
 
 export function getDb(): Database {
@@ -412,7 +413,7 @@ export function updateSession(id: string, fields: Partial<Session>): Session | n
   const updates: string[] = ["updated_at = ?"];
   const values: any[] = [now()];
 
-  // Map TS field names to DB column names
+  // Maps TypeScript field names to legacy SQLite column names (from original Jira integration)
   const fieldMap: Record<string, string> = { ticket: "jira_key", summary: "jira_summary", flow: "pipeline" };
 
   for (const [key, value] of Object.entries(fields)) {

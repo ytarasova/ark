@@ -530,9 +530,11 @@ async function setupSessionWorktree(
   onLog?: (msg: string) => void,
 ): Promise<string> {
   const log = onLog ?? (() => {});
+  // Fallback to CWD when no explicit workdir set (e.g. local sessions)
   const workdir = session.workdir ?? ".";
   let effectiveWorkdir = workdir;
 
+  // Create git worktree unless provider doesn't support it or session config explicitly disables it
   const wantWorktree = provider?.supportsWorktree && session.config?.worktree !== false;
   if (wantWorktree && workdir !== "." && existsSync(join(workdir, ".git"))) {
     log("Setting up git worktree...");
@@ -552,14 +554,14 @@ async function applyContainerSetup(
   compute: store.Compute,
   effectiveWorkdir: string,
   launchContent: string,
-  log: (msg: string) => void,
+  onLog: (msg: string) => void,
 ): Promise<string> {
   if (!effectiveWorkdir) return launchContent;
 
   // Docker Compose - only when explicitly enabled in arc.json { "compose": true }
   const arcJson = parseArcJson(effectiveWorkdir);
   if (arcJson?.compose === true && compute.config?.ip) {
-    log("Starting Docker Compose services...");
+    onLog("Starting Docker Compose services...");
     const { sshExec, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
     sshExec(sshKeyPath(compute.name), compute.config.ip as string,
       `cd ${effectiveWorkdir} && docker compose up -d`);
@@ -567,7 +569,7 @@ async function applyContainerSetup(
 
   // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }
   if (arcJson?.devcontainer === true) {
-    log("Building devcontainer...");
+    onLog("Building devcontainer...");
     const { buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
     return buildLaunchCommand(effectiveWorkdir, launchContent);
   }
