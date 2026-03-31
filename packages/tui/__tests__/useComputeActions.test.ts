@@ -5,15 +5,14 @@
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import {
-  createTestContext, setContext, resetContext,
   createCompute, getCompute, deleteCompute,
   AppContext, setApp, clearApp,
 } from "../../core/index.js";
-import type { TestContext } from "../../core/store.js";
 import type { Compute } from "../../core/store.js";
 import { registerProvider, clearProviders } from "../../compute/index.js";
 import { useComputeActions } from "../hooks/useComputeActions.js";
 import type { AsyncState } from "../hooks/useAsync.js";
+import { withTestContext } from "../../core/__tests__/test-helpers.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -57,13 +56,11 @@ function mockProvider(name = "mock") {
 
 // ── Setup ────────────────────────────────────────────────────────────────────
 
-let ctx: TestContext;
+withTestContext();
+
 let app: AppContext;
 
 beforeEach(async () => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
   app = AppContext.forTest();
   await app.boot();
   setApp(app);
@@ -73,8 +70,6 @@ beforeEach(async () => {
 afterAll(async () => {
   if (app) await app.shutdown();
   clearApp();
-  if (ctx) ctx.cleanup();
-  resetContext();
   clearProviders();
 });
 

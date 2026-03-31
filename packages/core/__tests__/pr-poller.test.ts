@@ -5,7 +5,7 @@
  * Uses real store with test isolation for session/event verification.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
@@ -15,18 +15,15 @@ import YAML from "yaml";
 let execFileResult: { stdout: string; stderr: string } = { stdout: "{}", stderr: "" };
 let execFileShouldThrow = false;
 
-import {
-  createTestContext, setContext, resetContext,
-  type TestContext,
-} from "../context.js";
 import { ARK_DIR } from "../store.js";
 import * as store from "../store.js";
 import { createSession } from "../store.js";
 import { pollPRReviews, checkSessionPR, setGhExec } from "../pr-poller.js";
+import { withTestContext } from "./test-helpers.js";
 
 // ── Test setup ───────────────────────────────────────────────────────────────
 
-let ctx: TestContext;
+withTestContext();
 
 const flowDir = () => join(ARK_DIR(), "flows");
 
@@ -61,9 +58,6 @@ function createReviewSession(opts: { pr_url?: string; status?: string; flow?: st
 }
 
 beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
   rmSync(flowDir(), { recursive: true, force: true });
 
   // Write a flow with a review-gated stage
@@ -87,11 +81,6 @@ beforeEach(() => {
   });
 });
 
-afterAll(() => {
-  rmSync(flowDir(), { recursive: true, force: true });
-  if (ctx) ctx.cleanup();
-  resetContext();
-});
 
 // ── pollPRReviews ────────────────────────────────────────────────────────────
 

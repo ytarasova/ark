@@ -24,9 +24,9 @@ describe("groups table", () => {
     createGroup("beta");
     createGroup("beta");
     const groups = getGroups();
-    // Should appear only once
-    const count = groups.filter((g) => g === "beta").length;
-    expect(count).toBe(1);
+    // Should appear only once — indexOf === lastIndexOf proves no duplicates
+    expect(groups).toContain("beta");
+    expect(groups.indexOf("beta")).toBe(groups.lastIndexOf("beta"));
   });
 
   it("getGroups returns groups from the groups table", () => {
@@ -57,8 +57,8 @@ describe("groups table", () => {
     createSession({ summary: "s1", group_name: "shared-name" });
 
     const groups = getGroups();
-    const count = groups.filter((g) => g === "shared-name").length;
-    expect(count).toBe(1);
+    expect(groups).toContain("shared-name");
+    expect(groups.indexOf("shared-name")).toBe(groups.lastIndexOf("shared-name"));
   });
 
   it("getGroups returns sorted results", () => {
@@ -126,8 +126,8 @@ describe("groups table", () => {
     createSession({ summary: "s2", group_name: "shared" });
 
     const groups = getGroups();
-    const count = groups.filter((g) => g === "shared").length;
-    expect(count).toBe(1); // appears once despite two sessions
+    expect(groups).toContain("shared");
+    expect(groups.indexOf("shared")).toBe(groups.lastIndexOf("shared")); // appears once despite two sessions
   });
 
   it("deleteGroup unassigns all sessions in the group", () => {

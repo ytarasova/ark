@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Box, Text } from "ink";
 import type { Tab } from "./TabBar.js";
 import type { Session } from "../../core/index.js";
@@ -29,7 +29,8 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
   const nRun = sessions.filter((s) => s.status === "running").length;
   const nErr = sessions.filter((s) => s.status === "failed").length;
 
-  const hints = overlay ? getOverlayHints(overlay)
+  const hints = useMemo(() =>
+    overlay ? getOverlayHints(overlay)
     : pane === "right" ? getRightPaneHints(tab)
     : tab === "sessions" ? getSessionHints(selectedSession)
     : tab === "agents" ? getAgentsHints()
@@ -37,7 +38,8 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
     : tab === "flows" ? getFlowsHints()
     : tab === "compute" ? getComputeHints()
     : tab === "history" ? getHistoryHints()
-    : getGenericHints();
+    : getGenericHints(),
+  [tab, pane, overlay, selectedSession]);
 
   return (
     <Box flexDirection="column">

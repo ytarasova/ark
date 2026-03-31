@@ -1,11 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext } from "../../../core/context.js";
+import { describe, it, expect } from "bun:test";
 import * as core from "../../../core/index.js";
-import type { TestContext } from "../../../core/context.js";
+import { withTestContext } from "../../../core/__tests__/test-helpers.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+withTestContext();
 
 describe("useMessages internals", () => {
   it("getMessages returns stored messages", () => {

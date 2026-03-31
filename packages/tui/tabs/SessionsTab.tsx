@@ -266,10 +266,10 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               const children = sessions.filter(c => c.parent_id === s.id);
               if (children.length === 0) return null;
               return children.map(child => {
-                const ci = ICON[child.status] ?? "?";
-                const cc = (COLOR[child.status] ?? "white") as any;
-                const cs = (child.summary ?? "---").slice(0, 20);
-                return <Text key={child.id} dimColor>{"   | "}<Text color={cc}>{ci}</Text>{` ${cs}`}</Text>;
+                const childIcon = ICON[child.status] ?? "?";
+                const childColor = (COLOR[child.status] ?? "white") as any;
+                const childSummary = (child.summary ?? "---").slice(0, 20);
+                return <Text key={child.id} dimColor>{"   | "}<Text color={childColor}>{childIcon}</Text>{` ${childSummary}`}</Text>;
               });
             }}
             sel={sel}

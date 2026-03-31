@@ -6,6 +6,7 @@ interface UseListNavigationOpts {
   active?: boolean;
 }
 
+// Number of items to jump per page-up/page-down keypress
 const PAGE_SIZE = 20;
 
 /**

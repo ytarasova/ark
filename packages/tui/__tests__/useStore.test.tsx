@@ -3,32 +3,19 @@
  * Uses refresh() (sync path) instead of waiting for async poll cycle.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import React, { useEffect } from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import {
-  createTestContext, setContext, resetContext,
   addMessage,
 } from "../../core/index.js";
 import { createSession } from "../../core/store.js";
-import type { TestContext } from "../../core/store.js";
 import { useStore } from "../hooks/useStore.js";
 import type { StoreData } from "../hooks/useStore.js";
-import { waitFor } from "../../core/__tests__/test-helpers.js";
+import { withTestContext, waitFor } from "../../core/__tests__/test-helpers.js";
 
-let ctx: TestContext;
-
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
-});
-
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
-});
+withTestContext();
 
 // Captures store data and immediately triggers a sync refresh
 let captured: StoreData | null = null;

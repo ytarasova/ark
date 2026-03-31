@@ -7,7 +7,7 @@
 
 export function buildUserData(opts?: { idleMinutes?: number }): string {
   const idleMinutes = opts?.idleMinutes ?? 60;
-  const tickMinutes = 10;
+  const tickMinutes = 10; // Check interval for idle shutdown timer (minutes)
   const ticks = Math.ceil(idleMinutes / tickMinutes);
 
   // Build idle-shutdown script content separately so we can inject ticks/minutes

@@ -22,9 +22,14 @@ interface TreeListProps<T> {
 }
 
 /**
- * Grouped or flat list for left panels. Items are grouped by a key,
- * each group gets a header. Flat lists = single unnamed group.
- * Uses ScrollBox with followIndex for automatic scrolling.
+ * Grouped or flat list for left panels.
+ *
+ * Items are grouped by a key, each group gets a header.
+ * Flat lists = single unnamed group. Uses ScrollBox with
+ * followIndex for automatic scrolling.
+ *
+ * @param groupBy - Categorize items into named groups; return value becomes the group header.
+ * @param renderChildren - Render extra nodes beneath an item (e.g. fork children in sessions).
  */
 export function TreeList<T>({
   items,

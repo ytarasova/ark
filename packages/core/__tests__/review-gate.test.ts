@@ -3,21 +3,18 @@
  * then approveReviewGate() force-advances past the gate.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 
-import {
-  createTestContext, setContext, resetContext,
-  type TestContext,
-} from "../context.js";
 import { ARK_DIR } from "../store.js";
 import * as store from "../store.js";
 import { startSession, advance, approveReviewGate } from "../session.js";
 import { loadFlow, evaluateGate } from "../flow.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
+withTestContext();
 
 const flowDir = () => join(ARK_DIR(), "flows");
 
@@ -28,16 +25,7 @@ function writeUserFlow(name: string, def: Record<string, unknown>): void {
 }
 
 beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
   rmSync(flowDir(), { recursive: true, force: true });
-});
-
-afterAll(() => {
-  rmSync(flowDir(), { recursive: true, force: true });
-  if (ctx) ctx.cleanup();
-  resetContext();
 });
 
 // ── approveReviewGate ─────────────────────────────────────────────────────

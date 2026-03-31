@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import { existsSync } from "fs";
 import { resolve as resolvePath, basename } from "path";
@@ -54,13 +54,13 @@ export function NewSessionForm({ store, async: asyncState, onDone, prefill }: Ne
   }, [repoPath]);
 
   // Apply repo config defaults once per repoPath change (don't override user edits)
-  const [repoConfigApplied, setRepoConfigApplied] = useState("");
+  const repoConfigApplied = useRef("");
   useEffect(() => {
-    if (repoPath === repoConfigApplied) return;
+    if (repoPath === repoConfigApplied.current) return;
     if (repoConfig.flow) setFlowName(repoConfig.flow);
     if (repoConfig.compute) setComputeName(repoConfig.compute);
     if (repoConfig.group) setGroupName(repoConfig.group);
-    setRepoConfigApplied(repoPath);
+    repoConfigApplied.current = repoPath;
   }, [repoPath, repoConfig]);
 
   // Provider-driven isolation modes

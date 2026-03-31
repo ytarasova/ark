@@ -7,10 +7,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext } from "../context.js";
-import type { TestContext } from "../context.js";
 import { AppContext, setApp, clearApp } from "../app.js";
 import { startSession, getSession } from "../index.js";
+import { withTestContext } from "./test-helpers.js";
 
 /** Same sanitization regex as in NewSessionForm.tsx submit */
 const sanitize = (name: string) =>
@@ -20,12 +19,11 @@ const sanitize = (name: string) =>
     .replace(/^-|-$/g, "")
     .slice(0, 60);
 
-let ctx: TestContext;
+withTestContext();
+
 let app: AppContext;
 
 beforeEach(async () => {
-  ctx = createTestContext();
-  setContext(ctx);
   app = AppContext.forTest();
   await app.boot();
   setApp(app);
@@ -34,7 +32,6 @@ beforeEach(async () => {
 afterEach(async () => {
   await app?.shutdown();
   clearApp();
-  ctx.cleanup();
 });
 
 describe("session name sanitization", () => {

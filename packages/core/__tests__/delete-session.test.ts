@@ -9,20 +9,18 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
-import { createTestContext, setContext } from "../context.js";
-import type { TestContext } from "../context.js";
 import * as core from "../index.js";
 import * as store from "../store.js";
 import { deleteSessionAsync } from "../session.js";
 import { writeHooksConfig } from "../claude.js";
 import { AppContext, setApp, clearApp } from "../app.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
+const { getCtx } = withTestContext();
+
 let app: AppContext;
 
 beforeEach(async () => {
-  ctx = createTestContext();
-  setContext(ctx);
   app = AppContext.forTest();
   await app.boot();
   setApp(app);
@@ -31,7 +29,6 @@ beforeEach(async () => {
 afterEach(async () => {
   await app?.shutdown();
   clearApp();
-  ctx.cleanup();
 });
 
 // ── Unit tests ──────────────────────────────────────────────────────────────

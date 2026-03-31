@@ -4,19 +4,16 @@
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import {
-  createTestContext, setContext, resetContext,
   getSession, listSessions, startSession, stop,
   AppContext, setApp, clearApp,
 } from "../../core/index.js";
-import type { TestContext } from "../../core/store.js";
+import { withTestContext } from "../../core/__tests__/test-helpers.js";
 
-let ctx: TestContext;
+withTestContext();
+
 let app: AppContext;
 
 beforeEach(async () => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
   app = AppContext.forTest();
   await app.boot();
   setApp(app);
@@ -25,8 +22,6 @@ beforeEach(async () => {
 afterAll(async () => {
   if (app) await app.shutdown();
   clearApp();
-  if (ctx) ctx.cleanup();
-  resetContext();
 });
 
 // Test the action logic directly (not the hook, which needs React)

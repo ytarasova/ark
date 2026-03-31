@@ -113,13 +113,13 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
             items={computes}
             groupBy={h => h.provider}
             renderRow={(h) => {
-              const icon = h.status === "destroyed" ? "\u2715" : h.status === "running" ? "\u25CF" : "\u25CB";
+              const icon = h.status === "destroyed" ? "\u2715" /* ✕ cross */ : h.status === "running" ? "\u25CF" /* ● circle */ : "\u25CB";
               const marker = computes.indexOf(h) === sel ? ">" : " ";
               return ` ${marker} ${icon} ${h.name.padEnd(16)} ${h.provider}`;
             }}
             renderColoredRow={(h) => {
               const iconColor = (h.status === "running" ? "green" : h.status === "provisioning" ? "yellow" : h.status === "destroyed" ? "red" : "gray") as any;
-              const icon = h.status === "destroyed" ? "\u2715" : h.status === "running" ? "\u25CF" : "\u25CB";
+              const icon = h.status === "destroyed" ? "\u2715" /* ✕ cross */ : h.status === "running" ? "\u25CF" /* ● circle */ : "\u25CB";
               return <Text>{" "} <Text color={iconColor}>{icon}</Text>{` ${h.name.padEnd(16)} ${h.provider}`}</Text>;
             }}
             sel={sel}
@@ -335,7 +335,7 @@ function ComputePortList({ sessions, computeName }: { sessions: core.Session[]; 
         const name = p.name ? ` (${p.name})` : "";
         return (
           <Text key={i}>
-            {"  "}<Text color={p.listening ? "green" : "red"}>{p.listening ? "\u25CF" : "\u25CB"}</Text>
+            {"  "}<Text color={p.listening ? "green" : "red"}>{p.listening ? "\u25CF" /* ● circle */ : "\u25CB"}</Text>
             {` :${p.port}${name}  ${p.source}  ${p.listening ? "listening" : "closed"}`}
           </Text>
         );

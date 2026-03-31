@@ -5,34 +5,26 @@
  * session statuses in the store, without triggering pipeline advancement.
  */
 
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import {
-  createTestContext, setContext, resetContext,
   getEvents, listSessions,
 } from "../index.js";
 import { createSession, updateSession, getSession } from "../store.js";
 import { startConductor } from "../conductor.js";
-import type { TestContext } from "../context.js";
+import { withTestContext } from "./test-helpers.js";
 
 const TEST_PORT = 19198;
 
-let ctx: TestContext;
+const { getCtx } = withTestContext();
+
 let server: { stop(): void };
 
 beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
   server = startConductor(TEST_PORT, { quiet: true });
 });
 
 afterEach(() => {
   try { server.stop(); } catch {}
-});
-
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
 });
 
 async function postHook(sessionId: string, payload: Record<string, unknown>): Promise<Response> {
@@ -207,7 +199,7 @@ describe("Conductor /hooks/status endpoint", () => {
     // Write a fake transcript
     const { writeFileSync: wf } = await import("fs");
     const { join: j } = await import("path");
-    const transcriptPath = j(ctx.arkDir, "transcript-stop.jsonl");
+    const transcriptPath = j(getCtx().arkDir, "transcript-stop.jsonl");
     wf(transcriptPath, [
       JSON.stringify({ type: "assistant", message: { role: "assistant", usage: { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 5000, cache_creation_input_tokens: 100 } } }),
       JSON.stringify({ type: "assistant", message: { role: "assistant", usage: { input_tokens: 2000, output_tokens: 800, cache_read_input_tokens: 3000, cache_creation_input_tokens: 50 } } }),
@@ -232,7 +224,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const { writeFileSync: wf } = await import("fs");
     const { join: j } = await import("path");
-    const transcriptPath = j(ctx.arkDir, "transcript-end.jsonl");
+    const transcriptPath = j(getCtx().arkDir, "transcript-end.jsonl");
     wf(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", usage: { input_tokens: 500, output_tokens: 200 } } }));
 
     await postHook(session.id, {
@@ -306,7 +298,7 @@ describe("Conductor /hooks/status endpoint", () => {
     // Write a fake transcript file named after a DIFFERENT claude session
     const { writeFileSync: wf } = await import("fs");
     const { join: j } = await import("path");
-    const transcriptPath = j(ctx.arkDir, "different-claude-session-xyz.jsonl");
+    const transcriptPath = j(getCtx().arkDir, "different-claude-session-xyz.jsonl");
     wf(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "hello" }] } }));
 
     const resp = await postHook(session.id, {

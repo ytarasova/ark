@@ -2,26 +2,14 @@
  * Tests for schedules table — CRUD operations and cron matching.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import {
-  createTestContext, setContext, resetContext,
   createSchedule, listSchedules, getSchedule, deleteSchedule,
   enableSchedule, updateScheduleLastRun, cronMatches,
-  type TestContext,
 } from "../index.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
-
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
-});
-
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
-});
+withTestContext();
 
 describe("schedule CRUD", () => {
   it("createSchedule returns schedule with ID", () => {

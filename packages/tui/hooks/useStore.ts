@@ -98,12 +98,12 @@ async function fetchAll(prev: Payload, metricsThisCycle: boolean): Promise<Paylo
 /** Shallow fingerprint: only re-render when data actually changes. */
 function fingerprint(data: Payload): string {
   const s = data.sessions.map(s => `${s.id}:${s.status}:${s.session_id}:${s.error ?? ""}`).join("|");
-  const h = data.computes.map(h => `${h.name}:${h.status}`).join("|");
+  const compute = data.computes.map(compute => `${compute.name}:${compute.status}`).join("|");
   const u = [...data.unreadCounts.entries()].map(([k, v]) => `${k}=${v}`).join(",");
   // Include a simple metrics hash (cpu values change → fingerprint changes)
   const m = [...data.snapshots.entries()].map(([k, v]) => `${k}:${v.metrics.cpu.toFixed(0)}`).join(",");
   const a = data.agents.map(a => `${a.name}:${a._source}`).join("|");
-  return `${s};${h};${u};${m};${a}`;
+  return `${s};${compute};${u};${m};${a}`;
 }
 
 /**

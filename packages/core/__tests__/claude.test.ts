@@ -3,7 +3,7 @@
  * channel config writing, and launcher generation.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import {
@@ -18,24 +18,10 @@ import {
   type ClaudeArgsOpts,
   type LauncherOpts,
 } from "../claude.js";
-import {
-  createTestContext, setContext, resetContext,
-  type TestContext,
-} from "../context.js";
 import { TRACKS_DIR } from "../store.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
-
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
-});
-
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
-});
+const { getCtx } = withTestContext();
 
 // ── resolveModel ──────────────────────────────────────────────────────────────
 
@@ -201,7 +187,7 @@ describe("shellQuoteArgs", () => {
 
 describe("writeChannelConfig", () => {
   it("writes .mcp.json to the workdir", () => {
-    const workdir = ctx.arkDir; // use temp dir as workdir
+    const workdir = getCtx().arkDir; // use temp dir as workdir
     const result = writeChannelConfig("s-abc123", "work", 19300, workdir);
 
     expect(result).toBe(join(workdir, ".mcp.json"));
@@ -209,7 +195,7 @@ describe("writeChannelConfig", () => {
   });
 
   it("contains ark-channel key in mcpServers", () => {
-    const workdir = ctx.arkDir;
+    const workdir = getCtx().arkDir;
     writeChannelConfig("s-abc123", "work", 19300, workdir);
 
     const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
@@ -218,7 +204,7 @@ describe("writeChannelConfig", () => {
   });
 
   it("includes correct env vars in channel config", () => {
-    const workdir = ctx.arkDir;
+    const workdir = getCtx().arkDir;
     writeChannelConfig("s-abc123", "work", 19300, workdir);
 
     const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
@@ -229,7 +215,7 @@ describe("writeChannelConfig", () => {
   });
 
   it("includes ARK_CONDUCTOR_URL in channel config env", () => {
-    const workdir = ctx.arkDir;
+    const workdir = getCtx().arkDir;
     writeChannelConfig("s-abc123", "work", 19300, workdir);
 
     const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
@@ -250,7 +236,7 @@ describe("writeChannelConfig", () => {
   });
 
   it("preserves existing .mcp.json content", () => {
-    const workdir = ctx.arkDir;
+    const workdir = getCtx().arkDir;
     const { writeFileSync: wfs } = require("fs");
     wfs(join(workdir, ".mcp.json"), JSON.stringify({
       mcpServers: { "other-server": { command: "other" } },
@@ -264,7 +250,7 @@ describe("writeChannelConfig", () => {
   });
 
   it("also writes mcp.json to tracks dir", () => {
-    const workdir = ctx.arkDir;
+    const workdir = getCtx().arkDir;
     writeChannelConfig("s-abc123", "work", 19300, workdir);
 
     const tracksFile = join(TRACKS_DIR(), "s-abc123", "mcp.json");
@@ -274,7 +260,7 @@ describe("writeChannelConfig", () => {
   });
 
   it("uses bun path from home directory in command", () => {
-    const workdir = ctx.arkDir;
+    const workdir = getCtx().arkDir;
     writeChannelConfig("s-test", "deploy", 19400, workdir);
 
     const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));

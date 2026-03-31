@@ -2,22 +2,20 @@
  * Tests for agent.ts — CRUD, template resolution, CLI arg building.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import {
-  createTestContext, setContext, resetContext,
-  type TestContext,
-} from "../context.js";
 import {
   loadAgent, listAgents, saveAgent, deleteAgent,
   resolveAgent, buildClaudeArgs, findProjectRoot,
   type AgentDefinition,
 } from "../agent.js";
 import { ARK_DIR } from "../store.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
+const { getCtx } = withTestContext();
+
 const agentDir = () => join(ARK_DIR(), "agents");
 
 function writeAgentYaml(name: string, data: Record<string, unknown>) {
@@ -25,7 +23,7 @@ function writeAgentYaml(name: string, data: Record<string, unknown>) {
   writeFileSync(join(agentDir(), `${name}.yaml`), YAML.stringify(data));
 }
 
-const projectDir = () => ctx.arkDir;
+const projectDir = () => getCtx().arkDir;
 
 function writeProjectAgentYaml(name: string, data: Record<string, unknown>) {
   const dir = join(projectDir(), ".ark", "agents");
@@ -34,16 +32,8 @@ function writeProjectAgentYaml(name: string, data: Record<string, unknown>) {
 }
 
 beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
   // Clean user agent dir to prevent leaking between tests
   rmSync(agentDir(), { recursive: true, force: true });
-});
-
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
 });
 
 // ── loadAgent ────────────────────────────────────────────────────────────────
@@ -395,13 +385,13 @@ describe("findProjectRoot", () => {
   });
 
   it("finds .git in exact directory", () => {
-    const tmpDir = join(ctx.arkDir, "fake-project");
+    const tmpDir = join(getCtx().arkDir, "fake-project");
     mkdirSync(join(tmpDir, ".git"), { recursive: true });
     expect(findProjectRoot(tmpDir)).toBe(tmpDir);
   });
 
   it("finds .git from nested subdirectory", () => {
-    const tmpDir = join(ctx.arkDir, "fake-project2");
+    const tmpDir = join(getCtx().arkDir, "fake-project2");
     mkdirSync(join(tmpDir, ".git"), { recursive: true });
     const nested = join(tmpDir, "src", "deep");
     mkdirSync(nested, { recursive: true });

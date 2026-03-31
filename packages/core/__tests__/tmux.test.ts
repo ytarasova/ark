@@ -5,11 +5,9 @@
  * Skips functions that create/kill real tmux sessions (covered by E2E tests).
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, statSync } from "fs";
 import { join } from "path";
-import { createTestContext, setContext } from "../context.js";
-import type { TestContext } from "../context.js";
 import {
   hasTmux,
   attachCommand,
@@ -18,10 +16,9 @@ import {
   listArkSessionsAsync,
 } from "../tmux.js";
 import { TRACKS_DIR } from "../store.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+withTestContext();
 
 // ── hasTmux ──────────────────────────────────────────────────────────────────
 
