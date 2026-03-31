@@ -34,7 +34,7 @@ export function App() {
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;
 
-  const switchTab = (t: Tab) => { setTab(t); setPane("left"); };
+  const switchTab = useCallback((t: Tab) => { setTab(t); setPane("left"); }, []);
 
   // Active tab's async state — used for TabBar/StatusBar indicators
   const asyncState = tab === "agents" ? agentsAsync : tab === "history" ? historyAsync : tab === "compute" ? computeAsync : sessionsAsync;

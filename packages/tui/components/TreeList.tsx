@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Box, Text } from "ink";
 import { ListRow } from "./ListRow.js";
 import { ScrollBox } from "./ScrollBox.js";
@@ -36,23 +36,27 @@ export function TreeList<T>({
   sel,
   emptyMessage = "No items.",
 }: TreeListProps<T>) {
-  // Group items
-  const groups = new Map<string, { item: T; flatIndex: number }[]>();
-  items.forEach((item, i) => {
-    const key = groupBy ? groupBy(item) : "";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push({ item, flatIndex: i });
-  });
+  // Group items and sort keys (memoized to avoid rebuilding on every render)
+  const { sortedKeys, groupMap } = useMemo(() => {
+    const gm = new Map<string, { item: T; flatIndex: number }[]>();
+    items.forEach((item, i) => {
+      const key = groupBy ? groupBy(item) : "";
+      if (!gm.has(key)) gm.set(key, []);
+      gm.get(key)!.push({ item, flatIndex: i });
+    });
 
-  // Add empty groups that aren't already represented
-  for (const g of emptyGroups ?? []) {
-    if (!groups.has(g)) groups.set(g, []);
-  }
+    // Add empty groups that aren't already represented
+    for (const g of emptyGroups ?? []) {
+      if (!gm.has(g)) gm.set(g, []);
+    }
 
-  // Sort: unnamed group first, then alphabetical
-  const sortedKeys = [...groups.keys()].sort((a, b) =>
-    a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)
-  );
+    // Sort: unnamed group first, then alphabetical
+    const sk = [...gm.keys()].sort((a, b) =>
+      a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)
+    );
+
+    return { sortedKeys: sk, groupMap: gm };
+  }, [items, groupBy, emptyGroups]);
 
   if (items.length === 0 && sortedKeys.filter(k => k !== "").length === 0) {
     return <Text dimColor>{`  ${emptyMessage}`}</Text>;
@@ -66,7 +70,7 @@ export function TreeList<T>({
   let visualIdx = 0;
 
   for (const groupName of sortedKeys) {
-    const entries = groups.get(groupName)!;
+    const entries = groupMap.get(groupName)!;
     if (groupName) {
       rows.push(
         <Text key={`grp-${groupName}`} backgroundColor="gray" color="white">{` ${groupName} `}</Text>

@@ -40,27 +40,34 @@ export function useMessages(opts: UseMessagesOpts): UseMessagesResult {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Use refs for values that change frequently but shouldn't reset the poll interval
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+  const limitRef = useRef(limit);
+  limitRef.current = limit;
+
   const loadMessages = useCallback(() => {
+    const currentLimit = limitRef.current;
     if (sessionId) {
-      const msgs = core.getMessages(sessionId, { limit });
+      const msgs = core.getMessages(sessionId, { limit: currentLimit });
       setMessages(msgs.map(m => ({
         ...m,
         sessionName: "",
         time: m.created_at.slice(11, 16),
       })));
-    } else if (sessions?.length) {
+    } else if (sessionsRef.current?.length) {
       const all: ThreadMessage[] = [];
-      for (const s of sessions) {
-        const msgs = core.getMessages(s.id, { limit });
+      for (const s of sessionsRef.current) {
+        const msgs = core.getMessages(s.id, { limit: currentLimit });
         const name = s.summary ?? s.id.slice(0, 8);
         for (const m of msgs) {
           all.push({ ...m, sessionName: name, time: m.created_at.slice(11, 16) });
         }
       }
       all.sort((a, b) => a.id - b.id);
-      setMessages(all.slice(-limit));
+      setMessages(all.slice(-currentLimit));
     }
-  }, [sessionId, sessions, limit]);
+  }, [sessionId]);
 
   useEffect(() => {
     loadMessages();

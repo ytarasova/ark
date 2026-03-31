@@ -29,10 +29,9 @@ interface ComputeTabProps extends StoreData {
 }
 
 export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snapshots, computeLogs, addComputeLog, async: asyncState, onShowForm, formOverlay }: ComputeTabProps) {
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [confirmStop, setConfirmStop] = useState(false);
-  const [confirmReboot, setConfirmReboot] = useState(false);
-  const { sel } = useListNavigation(computes.length, { active: pane === "left" && !formOverlay && !confirmDelete });
+  type ConfirmAction = "delete" | "stop" | "reboot" | null;
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const { sel } = useListNavigation(computes.length, { active: pane === "left" && !formOverlay && !confirmAction });
   const status = useStatusMessage();
   const actions = useComputeActions(asyncState, addComputeLog);
 
@@ -42,21 +41,11 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
     if (formOverlay) return;
     if (pane === "right") return;
 
-    if (confirmDelete) {
-      if (input === "x" && selected) actions.delete(selected.name);
-      setConfirmDelete(false);
-      status.clear();
-      return;
-    }
-    if (confirmStop) {
-      if (input === "s" && selected) actions.stop(selected);
-      setConfirmStop(false);
-      status.clear();
-      return;
-    }
-    if (confirmReboot) {
-      if (input === "R" && selected) actions.reboot(selected);
-      setConfirmReboot(false);
+    if (confirmAction) {
+      if (confirmAction === "delete" && input === "x" && selected) actions.delete(selected.name);
+      if (confirmAction === "stop" && input === "s" && selected) actions.stop(selected);
+      if (confirmAction === "reboot" && input === "R" && selected) actions.reboot(selected);
+      setConfirmAction(null);
       status.clear();
       return;
     }
@@ -68,7 +57,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
     } else if (input === "s") {
       if (!selected) return;
       if (selected.status === "running") {
-        setConfirmStop(true);
+        setConfirmAction("stop");
         status.show(`Stop '${selected.name}'? Press s again to confirm`);
       } else if (selected.status === "stopped") {
         actions.start(selected);
@@ -79,7 +68,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
         status.show("Cannot delete this compute");
         return;
       }
-      setConfirmDelete(true);
+      setConfirmAction("delete");
       status.show(`Delete '${selected.name}'? Press x to confirm`);
     } else if (input === "a") {
       if (selected?.status === "running") {
@@ -98,7 +87,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
       }
     } else if (input === "R") {
       if (selected && getProvider(selected.provider)?.canReboot) {
-        setConfirmReboot(true);
+        setConfirmAction("reboot");
         status.show(`Reboot '${selected.name}'? Press R again to confirm`);
       }
     } else if (input === "t") {
@@ -149,7 +138,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
       />
       {status.message && (
         <Box>
-          <Text color={confirmDelete ? "red" : "cyan"}>{` ${status.message}`}</Text>
+          <Text color={confirmAction === "delete" ? "red" : "cyan"}>{` ${status.message}`}</Text>
         </Box>
       )}
     </Box>
