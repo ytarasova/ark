@@ -14,7 +14,9 @@ import { tmpdir } from "os";
 import { loadConfig, type ArkConfig } from "./config.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
+import { initSchema as initStoreSchema, setAppStore, clearAppStore } from "./store.js";
 import type { Compute, Session } from "./store.js";
+import { setProviderResolver, clearProviderResolver } from "./session.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,103 +31,6 @@ export interface AppOptions {
   skipSignals?: boolean;
   /** Remove arkDir on shutdown (used by forTest) */
   cleanupOnShutdown?: boolean;
-}
-
-// ── Schema ─────────────────────────────────────────────────────────────────
-
-function initSchema(db: Database): void {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      jira_key TEXT,
-      jira_summary TEXT,
-      repo TEXT,
-      branch TEXT,
-      compute_name TEXT,
-      session_id TEXT,
-      claude_session_id TEXT,
-      stage TEXT,
-      status TEXT NOT NULL DEFAULT 'pending',
-      pipeline TEXT NOT NULL DEFAULT 'default',
-      agent TEXT,
-      workdir TEXT,
-      pr_url TEXT,
-      pr_id TEXT,
-      error TEXT,
-      parent_id TEXT,
-      fork_group TEXT,
-      group_name TEXT,
-      breakpoint_reason TEXT,
-      attached_by TEXT,
-      config TEXT DEFAULT '{}',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      track_id TEXT NOT NULL,
-      type TEXT NOT NULL,
-      stage TEXT,
-      actor TEXT,
-      data TEXT,
-      created_at TEXT NOT NULL
-    )
-  `);
-
-  db.run("CREATE INDEX IF NOT EXISTS idx_events_track ON events(track_id)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_sessions_repo ON sessions(repo)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_id)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_name)");
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS compute (
-      name TEXT PRIMARY KEY,
-      provider TEXT NOT NULL DEFAULT 'local',
-      status TEXT NOT NULL DEFAULT 'stopped',
-      config TEXT DEFAULT '{}',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `);
-
-  db.run("CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider)");
-  db.run("CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status)");
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'text',
-      read INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
-    )
-  `);
-
-  db.run("CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)");
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS groups (
-      name TEXT PRIMARY KEY,
-      created_at TEXT NOT NULL
-    )
-  `);
-}
-
-function seedLocalCompute(db: Database): void {
-  const row = db.prepare("SELECT name FROM compute WHERE name = 'local'").get();
-  if (!row) {
-    const ts = new Date().toISOString();
-    db.prepare(
-      "INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at) VALUES ('local', 'local', 'running', '{}', ?, ?)"
-    ).run(ts, ts);
-  }
 }
 
 // ── AppContext ──────────────────────────────────────────────────────────────
@@ -179,9 +84,11 @@ export class AppContext {
   /** Resolve the compute provider for a session. Defaults to local. */
   resolveProvider(session: Session): { provider: ComputeProvider | null; compute: Compute | null } {
     const computeName = session.compute_name || "local";
-    const { getCompute } = require("./store.js");
-    const compute = getCompute(computeName);
-    if (!compute) return { provider: null, compute: null };
+    // Query compute directly via the app DB to avoid circular imports
+    const row = this._db?.prepare("SELECT * FROM compute WHERE name = ?").get(computeName) as
+      { name: string; provider: string; status: string; config: string; created_at: string; updated_at: string } | undefined;
+    if (!row) return { provider: null, compute: null };
+    const compute: Compute = { ...row, config: JSON.parse(row.config || "{}") };
     const provider = this.getProvider(compute.provider);
     return { provider: provider ?? null, compute };
   }
@@ -209,9 +116,17 @@ export class AppContext {
     this._db.run("PRAGMA journal_mode = WAL");
     this._db.run("PRAGMA busy_timeout = 5000");
 
-    // 3. Initialize schema + seed local compute
-    initSchema(this._db);
-    seedLocalCompute(this._db);
+    // 3. Initialize schema + wire store paths
+    initStoreSchema(this._db);
+    setAppStore(this._db, this.config);
+    // Seed directly on this._db since _app singleton isn't set yet during boot
+    const row = this._db.prepare("SELECT name FROM compute WHERE name = 'local'").get();
+    if (!row) {
+      const ts = new Date().toISOString();
+      this._db.prepare(
+        "INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at) VALUES ('local', 'local', 'running', '{}', ?, ?)"
+      ).run(ts, ts);
+    }
 
     // 4. Register compute providers
     try {
@@ -231,11 +146,14 @@ export class AppContext {
       console.error("boot: failed to load compute providers:", e?.message ?? e);
     }
 
-    // 5. Set up event bus
+    // 5. Wire provider resolver for session.ts
+    setProviderResolver((session) => this.resolveProvider(session));
+
+    // 6. Set up event bus
     this._eventBus = eventBus;
     this._eventBus.clear();
 
-    // 6. Optionally start conductor (dynamic import to avoid circular deps)
+    // 7. Optionally start conductor (dynamic import to avoid circular deps)
     if (!this.options.skipConductor) {
       try {
         const { startConductor } = await import("./conductor.js");
@@ -245,12 +163,12 @@ export class AppContext {
       }
     }
 
-    // 7. Optionally start metrics poller
+    // 8. Optionally start metrics poller
     if (!this.options.skipMetrics) {
       this.metricsPoller = this._startMetricsPoller();
     }
 
-    // 8. Register signal handlers
+    // 9. Register signal handlers
     if (!this.options.skipSignals) {
       this._registerSignalHandlers();
     }
@@ -295,7 +213,9 @@ export class AppContext {
       this._eventBus = null;
     }
 
-    // 5. Close database
+    // 5. Clear provider resolver + app store bindings + close database
+    clearProviderResolver();
+    clearAppStore();
     if (this._db) {
       try { this._db.close(); } catch (e: any) {
         // DB may already be closed — log but don't fail shutdown

@@ -23,31 +23,34 @@ import {
 // Functions (not constants) so they respect ARK_TEST_DIR and setContext()
 // at call time rather than freezing at import time.
 
-// Migration shims — delegate to AppContext if available, fall back to legacy context
-function appOrFallback(): { config: { arkDir: string; dbPath: string; tracksDir: string; worktreesDir: string } } | null {
-  try {
-    const { getApp } = require("./app.js") as typeof import("./app.js");
-    return getApp();
-  } catch {
-    return null;
-  }
+// App-level overrides — set by AppContext.boot(), cleared on shutdown.
+// Removes the need for a circular require("./app.js") at call time.
+let _appConfig: { arkDir: string; dbPath: string; tracksDir: string; worktreesDir: string } | null = null;
+let _appDb: Database | null = null;
+
+/** Called by AppContext.boot() to wire up the app-level DB and paths. */
+export function setAppStore(db: Database, config: typeof _appConfig): void {
+  _appDb = db;
+  _appConfig = config;
+}
+
+/** Called by AppContext.shutdown() to clear app-level overrides. */
+export function clearAppStore(): void {
+  _appDb = null;
+  _appConfig = null;
 }
 
 export function ARK_DIR(): string {
-  const app = appOrFallback();
-  return app ? app.config.arkDir : getContext().arkDir;
+  return _appConfig ? _appConfig.arkDir : getContext().arkDir;
 }
 export function DB_PATH(): string {
-  const app = appOrFallback();
-  return app ? app.config.dbPath : getContext().dbPath;
+  return _appConfig ? _appConfig.dbPath : getContext().dbPath;
 }
 export function TRACKS_DIR(): string {
-  const app = appOrFallback();
-  return app ? app.config.tracksDir : getContext().tracksDir;
+  return _appConfig ? _appConfig.tracksDir : getContext().tracksDir;
 }
 export function WORKTREES_DIR(): string {
-  const app = appOrFallback();
-  return app ? app.config.worktreesDir : getContext().worktreesDir;
+  return _appConfig ? _appConfig.worktreesDir : getContext().worktreesDir;
 }
 
 // Re-export context utilities for tests
@@ -190,11 +193,10 @@ function now(): string {
 const _initialized = new WeakSet<Database>();
 
 export function getDb(): Database {
-  // Use AppContext if available
-  const app = appOrFallback();
-  if (app && (app as any).db) return (app as any).db;
+  // Use app-level DB if set by AppContext.boot()
+  if (_appDb) return _appDb;
 
-  // Legacy path
+  // Legacy path (CLI without AppContext, or tests using context.ts)
   const db = getDbFromContext();
   if (!_initialized.has(db)) {
     _initialized.add(db); // mark BEFORE init to prevent recursion

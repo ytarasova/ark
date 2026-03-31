@@ -32,6 +32,13 @@ import { eventBus } from "./hooks.js";
 import { indexSession } from "./search.js";
 import type { OutboundMessage } from "./channel-types.js";
 
+/** Convert a typed Session to a plain Record for template variable resolution. */
+function sessionAsVars(session: store.Session): Record<string, unknown> {
+  const rec: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(session)) rec[k] = v;
+  return rec;
+}
+
 // ── Session lifecycle ───────────────────────────────────────────────────────
 
 /** Resolve GitHub repo URL from a local git directory. Returns null if not a GitHub repo. */
@@ -137,7 +144,7 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   const agentName = action.agent!;
   log(`Resolving agent: ${agentName}`);
   const projectRoot = agentRegistry.findProjectRoot(session.workdir || session.repo) ?? undefined;
-  const agent = agentRegistry.resolveAgent(agentName, session as unknown as Record<string, unknown>, projectRoot);
+  const agent = agentRegistry.resolveAgent(agentName, sessionAsVars(session), projectRoot);
   if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
 
   // Resolve autonomy level from flow stage definition
@@ -487,19 +494,30 @@ export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boole
 
 import type { ComputeProvider } from "../compute/types.js";
 
-/** Resolve the compute provider for a session via AppContext. */
+// App-level provider resolver — set by AppContext.boot() via setProviderResolver()
+type ProviderResolver = (session: store.Session) => { provider: ComputeProvider | null; compute: store.Compute | null };
+let _providerResolver: ProviderResolver | null = null;
+
+/** Called by AppContext to register the provider resolver. */
+export function setProviderResolver(resolver: ProviderResolver): void {
+  _providerResolver = resolver;
+}
+
+/** Called by AppContext shutdown to clear the resolver. */
+export function clearProviderResolver(): void {
+  _providerResolver = null;
+}
+
+/** Resolve the compute provider for a session. Uses AppContext resolver if set, otherwise falls back to direct lookup. */
 function resolveProvider(session: store.Session): { provider: ComputeProvider | null; compute: store.Compute | null } {
-  try {
-    const { getApp } = require("./app.js");
-    return getApp().resolveProvider(session);
-  } catch {
-    // Expected: AppContext not booted (e.g. CLI mode) — resolve manually
-    const computeName = session.compute_name ?? "local";
-    const compute = store.getCompute(computeName);
-    if (!compute) return { provider: null, compute: null };
-    const { getProvider } = require("../compute/index.js");
-    return { provider: getProvider(compute.provider) ?? null, compute };
+  if (_providerResolver) {
+    return _providerResolver(session);
   }
+  // Fallback: direct lookup (CLI mode without AppContext)
+  const computeName = session.compute_name ?? "local";
+  const compute = store.getCompute(computeName);
+  if (!compute) return { provider: null, compute: null };
+  return { provider: getProvider(compute.provider) ?? null, compute };
 }
 
 // ── Internal ────────────────────────────────────────────────────────────────
@@ -529,6 +547,34 @@ async function setupSessionWorktree(
   return effectiveWorkdir;
 }
 
+/** Apply arc.json container setup: Docker Compose and devcontainer. */
+async function applyContainerSetup(
+  compute: store.Compute,
+  effectiveWorkdir: string,
+  launchContent: string,
+  log: (msg: string) => void,
+): Promise<string> {
+  if (!effectiveWorkdir) return launchContent;
+
+  // Docker Compose - only when explicitly enabled in arc.json { "compose": true }
+  const arcJson = parseArcJson(effectiveWorkdir);
+  if (arcJson?.compose === true && compute.config?.ip) {
+    log("Starting Docker Compose services...");
+    const { sshExec, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
+    sshExec(sshKeyPath(compute.name), compute.config.ip as string,
+      `cd ${effectiveWorkdir} && docker compose up -d`);
+  }
+
+  // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }
+  if (arcJson?.devcontainer === true) {
+    log("Building devcontainer...");
+    const { buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
+    return buildLaunchCommand(effectiveWorkdir, launchContent);
+  }
+
+  return launchContent;
+}
+
 /** Prepare remote compute: connectivity check, env sync, docker/devcontainer setup. */
 async function prepareRemoteEnvironment(
   session: store.Session,
@@ -538,7 +584,6 @@ async function prepareRemoteEnvironment(
   opts?: { launchContent?: string; onLog?: (msg: string) => void },
 ): Promise<{ finalLaunchContent: string; ports: any[] }> {
   const log = opts?.onLog ?? (() => {});
-  let finalLaunchContent = opts?.launchContent ?? "";
 
   // Auto-start stopped computes
   if (compute.status === "stopped") {
@@ -579,26 +624,8 @@ async function prepareRemoteEnvironment(
     });
   } catch (e: any) { log(`Credential sync failed (continuing): ${e?.message ?? e}`); }
 
-  // Docker Compose - only when explicitly enabled in arc.json { "compose": true }
-  if (effectiveWorkdir) {
-    const arcJson = parseArcJson(effectiveWorkdir);
-    if (arcJson?.compose === true && compute.config?.ip) {
-      log("Starting Docker Compose services...");
-      const { sshExec, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
-      sshExec(sshKeyPath(compute.name), compute.config.ip as string,
-        `cd ${effectiveWorkdir} && docker compose up -d`);
-    }
-  }
-
-  // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }
-  if (effectiveWorkdir) {
-    const arcJson = parseArcJson(effectiveWorkdir);
-    if (arcJson?.devcontainer === true) {
-      log("Building devcontainer...");
-      const { buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
-      finalLaunchContent = buildLaunchCommand(effectiveWorkdir, finalLaunchContent);
-    }
-  }
+  // Apply container setup (Docker Compose + devcontainer)
+  const finalLaunchContent = await applyContainerSetup(compute, effectiveWorkdir, opts?.launchContent ?? "", log);
 
   return { finalLaunchContent, ports };
 }
@@ -688,12 +715,13 @@ async function launchAgentTmux(
   return tmuxName;
 }
 
-async function buildTaskWithHandoff(session: store.Session, stage: string, agentName: string): Promise<string> {
+/** Build the task header: agent role, stage description, and reporting instructions. */
+function formatTaskHeader(session: store.Session, stage: string, agentName: string): string[] {
   const parts: string[] = [];
   const isBare = session.flow === "bare";
 
   // Get resolved stage with substituted variables
-  const vars = buildSessionVars(session as unknown as Record<string, unknown>);
+  const vars = buildSessionVars(sessionAsVars(session));
   const resolved = resolveFlow(session.flow, vars);
   const stageDef = resolved?.stages.find(s => s.name === stage);
 
@@ -714,6 +742,13 @@ async function buildTaskWithHandoff(session: store.Session, stage: string, agent
   // Readiness + completion reporting
   parts.push(`\nWhen you start up, immediately call the \`report\` tool with type='progress' to announce you are online and ready for work.`);
   parts.push(`When you finish your work, call \`report\` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.`);
+
+  return parts;
+}
+
+/** Append previous stage context: completed stages, PLAN.md, and recent git log. */
+async function appendPreviousStageContext(session: store.Session): Promise<string[]> {
+  const parts: string[] = [];
 
   // Previous stage context
   const events = store.getEvents(session.id);
@@ -747,7 +782,13 @@ async function buildTaskWithHandoff(session: store.Session, stage: string, agent
     }
   }
 
-  return parts.join("\n");
+  return parts;
+}
+
+async function buildTaskWithHandoff(session: store.Session, stage: string, agentName: string): Promise<string> {
+  const header = formatTaskHeader(session, stage, agentName);
+  const context = await appendPreviousStageContext(session);
+  return [...header, ...context].join("\n");
 }
 
 function extractSubtasks(session: store.Session): { name: string; task: string }[] {
@@ -1000,7 +1041,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
     opts: {
       stage: report.stage,
       actor: "agent",
-      data: report as unknown as Record<string, unknown>,
+      data: report as Record<string, unknown>,
     },
   });
 
@@ -1030,7 +1071,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
   result.busEvents!.push({
     type: `agent_${report.type}`,
     sessionId,
-    data: { stage: report.stage, data: report as unknown as Record<string, unknown> },
+    data: { stage: report.stage, data: report as Record<string, unknown> },
   });
 
   // Handle by type
