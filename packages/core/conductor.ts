@@ -35,6 +35,112 @@ const DEFAULT_PORT = 19100;
 /** Interval between schedule and PR review poll ticks */
 const POLL_INTERVAL_MS = 60_000;
 
+/** Extract a path segment by index, returning null if missing. */
+function extractPathSegment(path: string, index: number): string | null {
+  return path.split("/")[index] ?? null;
+}
+
+// ── Route handlers ──────────────────────────────────────────────────────────
+
+async function handleChannelReport(req: Request, sessionId: string): Promise<Response> {
+  const report = (await req.json()) as OutboundMessage;
+  handleReport(sessionId, report);
+  return Response.json({ status: "ok" });
+}
+
+async function handleAgentRelay(req: Request): Promise<Response> {
+  const { from, target, message } = (await req.json()) as {
+    from: string;
+    target: string;
+    message: string;
+  };
+  const targetSession = store.getSession(target);
+  if (targetSession) {
+    const channelPort = store.sessionChannelPort(target);
+    const payload = { type: "steer", message, from, sessionId: target };
+    await deliverToChannel(targetSession, channelPort, payload);
+  }
+  return Response.json({ status: "relayed" });
+}
+
+async function handleHookStatus(req: Request, url: URL): Promise<Response> {
+  const sessionId = url.searchParams.get("session");
+  if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
+
+  const s = store.getSession(sessionId);
+  if (!s) return Response.json({ error: "session not found" }, { status: 404 });
+
+  const payload = await req.json() as Record<string, unknown>;
+  const event = String(payload.hook_event_name ?? "");
+
+  // Delegate business logic to session.ts
+  const result = session.applyHookStatus(s, event, payload);
+
+  // Apply events
+  for (const evt of result.events ?? []) {
+    store.logEvent(sessionId, evt.type, evt.opts);
+  }
+
+  // Apply store updates
+  if (result.updates) {
+    store.updateSession(sessionId, result.updates);
+  }
+
+  // Emit to event bus
+  if (result.newStatus) {
+    eventBus.emit("hook_status", sessionId, {
+      data: { event, status: result.newStatus, ...payload } as Record<string, unknown>,
+    });
+  }
+
+  // Apply usage data
+  if (result.usage) {
+    const currentSession = store.getSession(sessionId);
+    if (currentSession) {
+      const config = typeof currentSession.config === "string"
+        ? JSON.parse(currentSession.config) : (currentSession.config ?? {});
+      config.usage = result.usage;
+      store.updateSession(sessionId, { config });
+    }
+  }
+
+  // Index transcript
+  if (result.shouldIndex && result.indexTranscript) {
+    try {
+      indexSession(result.indexTranscript.transcriptPath, result.indexTranscript.sessionId);
+    } catch (e: any) { console.error("transcript indexing failed:", e?.message ?? e); }
+  }
+
+  return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
+}
+
+function handleRestApi(path: string): Response {
+  if (path === "/api/sessions")
+    return Response.json(store.listSessions());
+  if (path.startsWith("/api/sessions/")) {
+    const id = extractPathSegment(path, 3);
+    if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
+    const s = store.getSession(id);
+    return s
+      ? Response.json(s)
+      : Response.json({ error: "not found" }, { status: 404 });
+  }
+  if (path.startsWith("/api/events/")) {
+    const id = extractPathSegment(path, 3);
+    if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
+    return Response.json(store.getEvents(id));
+  }
+  if (path === "/health") {
+    return Response.json({
+      status: "ok",
+      sessions: store.listSessions().length,
+    });
+  }
+  return new Response("Not found", { status: 404 });
+}
+
+// ── Server ──────────────────────────────────────────────────────────────────
+
 export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }): { stop(): void } {
   const server = Bun.serve({
     port,
@@ -44,103 +150,22 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
       const path = url.pathname;
 
       try {
-        // Agent channel reports
         if (req.method === "POST" && path.startsWith("/api/channel/")) {
-          const sessionId = path.split("/")[3]!;
-          const report = (await req.json()) as OutboundMessage;
-          handleReport(sessionId, report);
-          return Response.json({ status: "ok" });
+          const sessionId = extractPathSegment(path, 3);
+          if (!sessionId) return Response.json({ error: "missing session id" }, { status: 400 });
+          return handleChannelReport(req, sessionId);
         }
 
-        // Agent-to-agent relay
         if (req.method === "POST" && path === "/api/relay") {
-          const { from, target, message } = (await req.json()) as {
-            from: string;
-            target: string;
-            message: string;
-          };
-          const targetSession = store.getSession(target);
-          if (targetSession) {
-            const channelPort = store.sessionChannelPort(target);
-            const payload = { type: "steer", message, from, sessionId: target };
-            await deliverToChannel(targetSession, channelPort, payload);
-          }
-          return Response.json({ status: "relayed" });
+          return handleAgentRelay(req);
         }
 
-        // REST API
-        if (req.method === "GET") {
-          if (path === "/api/sessions")
-            return Response.json(store.listSessions());
-          if (path.startsWith("/api/sessions/")) {
-            const id = path.split("/")[3]!;
-            const s = store.getSession(id);
-            return s
-              ? Response.json(s)
-              : Response.json({ error: "not found" }, { status: 404 });
-          }
-          if (path.startsWith("/api/events/")) {
-            const id = path.split("/")[3]!;
-            return Response.json(store.getEvents(id));
-          }
-          if (path === "/health") {
-            return Response.json({
-              status: "ok",
-              sessions: store.listSessions().length,
-            });
-          }
-        }
-
-        // Hook-based agent status (separate from channel protocol)
         if (req.method === "POST" && path === "/hooks/status") {
-          const sessionId = url.searchParams.get("session");
-          if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
+          return handleHookStatus(req, url);
+        }
 
-          const s = store.getSession(sessionId);
-          if (!s) return Response.json({ error: "session not found" }, { status: 404 });
-
-          const payload = await req.json() as Record<string, unknown>;
-          const event = String(payload.hook_event_name ?? "");
-
-          // Delegate business logic to session.ts
-          const result = session.applyHookStatus(s, event, payload);
-
-          // Apply events
-          for (const evt of result.events ?? []) {
-            store.logEvent(sessionId, evt.type, evt.opts);
-          }
-
-          // Apply store updates
-          if (result.updates) {
-            store.updateSession(sessionId, result.updates);
-          }
-
-          // Emit to event bus
-          if (result.newStatus) {
-            eventBus.emit("hook_status", sessionId, {
-              data: { event, status: result.newStatus, ...payload } as Record<string, unknown>,
-            });
-          }
-
-          // Apply usage data
-          if (result.usage) {
-            const currentSession = store.getSession(sessionId);
-            if (currentSession) {
-              const config = typeof currentSession.config === "string"
-                ? JSON.parse(currentSession.config) : (currentSession.config ?? {});
-              config.usage = result.usage;
-              store.updateSession(sessionId, { config });
-            }
-          }
-
-          // Index transcript
-          if (result.shouldIndex && result.indexTranscript) {
-            try {
-              indexSession(result.indexTranscript.transcriptPath, result.indexTranscript.sessionId);
-            } catch (e: any) { console.error("transcript indexing failed:", e?.message ?? e); }
-          }
-
-          return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
+        if (req.method === "GET") {
+          return handleRestApi(path);
         }
 
         return new Response("Not found", { status: 404 });

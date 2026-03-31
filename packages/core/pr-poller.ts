@@ -16,14 +16,22 @@ const execFileAsync = promisify(execFile);
 /** Cooldown between PR checks per session — slightly under the 60s poll interval to account for jitter */
 const POLL_COOLDOWN_MS = 55_000;
 
-/** Replaceable exec function for testing. */
-export let ghExec: (args: string[]) => Promise<{ stdout: string }> = async (args) => {
+type GhExecFn = (args: string[]) => Promise<{ stdout: string }>;
+
+const defaultGhExec: GhExecFn = async (args) => {
   return execFileAsync("gh", args, { encoding: "utf-8", timeout: 15_000 });
 };
 
+/** Global ghExec — used when no override is provided via options. */
+let _ghExec: GhExecFn = defaultGhExec;
+
 /** Replace the gh exec function (for testing). */
-export function setGhExec(fn: typeof ghExec): void {
-  ghExec = fn;
+export function setGhExec(fn: GhExecFn): void {
+  _ghExec = fn;
+}
+
+export interface PRPollerOptions {
+  ghExec?: GhExecFn;
 }
 
 interface GhReview {
@@ -41,68 +49,33 @@ interface GhPRData {
 }
 
 /**
- * Main poller tick. Called every 60s from the conductor.
- * Finds sessions with pr_url in review-gated stages and checks for new reviews.
+ * Fetch PR data (reviews, title, number, state) via gh CLI.
+ * Returns null if the CLI call fails.
  */
-export async function pollPRReviews(): Promise<void> {
-  const sessions = store.listSessions({ limit: 100 });
-  const now = Date.now();
-
-  for (const session of sessions) {
-    if (!session.pr_url) continue;
-    if (!["running", "waiting", "ready", "blocked"].includes(session.status)) continue;
-
-    // Only poll sessions in review-gated stages
-    const stageDef = session.stage ? flow.getStage(session.flow, session.stage) : null;
-    if (stageDef?.gate !== "review") continue;
-
-    // Cooldown: skip if checked within last 60 seconds
-    const config = (session.config ?? {}) as Record<string, any>;
-    const lastCheck = config.last_review_check ? new Date(config.last_review_check).getTime() : 0;
-    if (now - lastCheck < POLL_COOLDOWN_MS) continue;
-
-    try {
-      await checkSessionPR(session);
-    } catch {
-      // Don't let one session's failure block others
-    }
+export async function fetchPRReviews(
+  prUrl: string,
+  ghExec: GhExecFn = _ghExec,
+): Promise<GhPRData | null> {
+  try {
+    const { stdout } = await ghExec([
+      "pr", "view", prUrl,
+      "--json", "reviews,title,number,state",
+    ]);
+    return JSON.parse(stdout) as GhPRData;
+  } catch {
+    return null;
   }
 }
 
 /**
- * Check a single session's PR for new review activity.
+ * Process new review feedback for a session: detect approvals, request changes,
+ * store messages, log events, and steer running agents.
  */
-export async function checkSessionPR(session: store.Session): Promise<void> {
-  const config = (session.config ?? {}) as Record<string, any>;
-
-  // Query GitHub via gh CLI
-  let data: GhPRData;
-  try {
-    const { stdout } = await ghExec([
-      "pr", "view", session.pr_url!,
-      "--json", "reviews,title,number,state",
-    ]);
-    data = JSON.parse(stdout);
-  } catch (e: any) {
-    // gh CLI not available or PR not found - skip silently
-    return;
-  }
-
-  // Update check timestamp
-  store.updateSession(session.id, {
-    config: { ...config, last_review_check: new Date().toISOString(), pr_state: data.state },
-  });
-
-  // PR merged or closed - stop polling
-  if (data.state === "MERGED" || data.state === "CLOSED") {
-    store.logEvent(session.id, "pr_status", {
-      actor: "github",
-      data: { state: data.state, pr_url: session.pr_url },
-    });
-    return;
-  }
-
-  // Find new reviews since last check
+export async function processReviewFeedback(
+  session: store.Session,
+  data: GhPRData,
+  config: Record<string, any>,
+): Promise<void> {
   const previousCount = config.review_count ?? 0;
   const lastReviewTime = config.last_review_time ?? "";
   const reviews = data.reviews ?? [];
@@ -185,4 +158,60 @@ export async function checkSessionPR(session: store.Session): Promise<void> {
       } catch {}
     }
   }
+}
+
+/**
+ * Main poller tick. Called every 60s from the conductor.
+ * Finds sessions with pr_url in review-gated stages and checks for new reviews.
+ */
+export async function pollPRReviews(opts?: PRPollerOptions): Promise<void> {
+  const sessions = store.listSessions({ limit: 100 });
+  const now = Date.now();
+
+  for (const s of sessions) {
+    if (!s.pr_url) continue;
+    if (!["running", "waiting", "ready", "blocked"].includes(s.status)) continue;
+
+    // Only poll sessions in review-gated stages
+    const stageDef = s.stage ? flow.getStage(s.flow, s.stage) : null;
+    if (stageDef?.gate !== "review") continue;
+
+    // Cooldown: skip if checked within last 60 seconds
+    const config = (s.config ?? {}) as Record<string, any>;
+    const lastCheck = config.last_review_check ? new Date(config.last_review_check).getTime() : 0;
+    if (now - lastCheck < POLL_COOLDOWN_MS) continue;
+
+    try {
+      await checkSessionPR(s, opts);
+    } catch {
+      // Don't let one session's failure block others
+    }
+  }
+}
+
+/**
+ * Check a single session's PR for new review activity.
+ */
+export async function checkSessionPR(session: store.Session, opts?: PRPollerOptions): Promise<void> {
+  const config = (session.config ?? {}) as Record<string, any>;
+  const ghExec = opts?.ghExec ?? _ghExec;
+
+  const data = await fetchPRReviews(session.pr_url!, ghExec);
+  if (!data) return;
+
+  // Update check timestamp
+  store.updateSession(session.id, {
+    config: { ...config, last_review_check: new Date().toISOString(), pr_state: data.state },
+  });
+
+  // PR merged or closed - stop polling
+  if (data.state === "MERGED" || data.state === "CLOSED") {
+    store.logEvent(session.id, "pr_status", {
+      actor: "github",
+      data: { state: data.state, pr_url: session.pr_url },
+    });
+    return;
+  }
+
+  await processReviewFeedback(session, data, config);
 }
