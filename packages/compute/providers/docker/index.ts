@@ -39,7 +39,8 @@ async function run(cmd: string, args: string[]): Promise<string> {
       encoding: "utf-8",
     });
     return stdout.trim();
-  } catch {
+  } catch (e: any) {
+    console.error('docker run helper:', e?.message ?? e);
     return "";
   }
 }
@@ -55,8 +56,8 @@ async function assertDockerAvailable(): Promise<void> {
     await execFileAsync("docker", ["info"], {
       timeout: 10_000,
     });
-  } catch {
-    throw new Error("Docker is not available. Is the Docker daemon running?");
+  } catch (e: any) {
+    throw new Error(`Docker is not available. Is the Docker daemon running? (${e?.message ?? e})`);
   }
 }
 
@@ -176,7 +177,10 @@ export class DockerProvider implements ComputeProvider {
       await execFileAsync("docker", ["stop", name], {
         timeout: 15_000,
       });
-    } catch { /* container may already be stopped */ }
+    } catch (e: any) {
+      // Container may already be stopped
+      console.error('docker stop:', e?.message ?? e);
+    }
     updateCompute(compute.name, { status: "stopped" });
   }
 
@@ -188,7 +192,10 @@ export class DockerProvider implements ComputeProvider {
       await execFileAsync("docker", ["rm", "-f", name], {
         timeout: 15_000,
       });
-    } catch { /* container may not exist */ }
+    } catch (e: any) {
+      // Container may not exist
+      console.error('docker rm:', e?.message ?? e);
+    }
     updateCompute(compute.name, { status: "destroyed" });
   }
 
@@ -247,7 +254,10 @@ export class DockerProvider implements ComputeProvider {
       await execFileAsync("docker", ["stop", name], {
         timeout: 15_000,
       });
-    } catch { /* already stopped */ }
+    } catch (e: any) {
+      // Container may already be stopped
+      console.error('docker stop (cleanup):', e?.message ?? e);
+    }
   }
 
   // ── Metrics ──────────────────────────────────────────────────────────────
@@ -385,7 +395,10 @@ export class DockerProvider implements ComputeProvider {
           `cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk '{print $2}' | grep -i ':${decl.port.toString(16).padStart(4, "0").toUpperCase()}'`,
         ]);
         if (out) listening = true;
-      } catch { /* not listening */ }
+      } catch (e: any) {
+        // Port not listening inside container
+        console.error('docker probePorts (container):', e?.message ?? e);
+      }
 
       if (!listening) {
         // Fallback: check on the host side (port mapping)
@@ -394,7 +407,10 @@ export class DockerProvider implements ComputeProvider {
             encoding: "utf-8", timeout: 5000,
           });
           listening = stdout.trim().length > 0;
-        } catch { /* not listening */ }
+        } catch (e: any) {
+          // Port not listening on host
+          console.error('docker probePorts (host):', e?.message ?? e);
+        }
       }
 
       return { ...decl, listening };

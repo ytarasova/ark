@@ -78,6 +78,170 @@ function createEc2Client(cfg: EC2HostConfig): EC2Client {
   });
 }
 
+// ── Extracted helpers for provision() ─────────────────────────────────────────
+
+interface ToolCheck {
+  name: string;
+  test: string;
+  fix: string;
+}
+
+const REQUIRED_TOOLS: ToolCheck[] = [
+  { name: "claude", test: "test -f ~/.local/bin/claude", fix: "curl -fsSL https://claude.ai/install.sh | bash" },
+  { name: "ark", test: "test -f ~/.ark/bin/ark", fix: "curl -fsSL https://ytarasova.github.io/ark/install.sh | bash -s -- --latest" },
+  { name: "bun", test: "test -f ~/.bun/bin/bun", fix: "curl -fsSL https://bun.sh/install | bash" },
+  { name: "tmux", test: "which tmux", fix: "sudo apt-get install -y tmux" },
+  { name: "git", test: "which git", fix: "sudo apt-get install -y git" },
+];
+
+/** Poll cloud-init until .ark-ready sentinel appears. */
+async function waitForCloudInit(
+  key: string, ip: string, computeName: string, onLog: (msg: string) => void,
+): Promise<void> {
+  onLog("Waiting for cloud-init to complete...");
+  await poll(
+    async () => {
+      const { stdout } = await sshExecAsync(key, ip, `cat ${REMOTE_HOME}/.ark-ready 2>/dev/null || echo 'not ready'`, { timeout: 15_000 });
+      if (stdout.trim().includes("provisioning complete")) {
+        onLog("Cloud-init complete");
+        mergeComputeConfig(computeName, { cloud_init_done: true });
+        return true;
+      }
+      const { stdout: progress } = await sshExecAsync(key, ip,
+        "tail -1 /var/log/cloud-init-output.log 2>/dev/null || echo 'waiting...'", { timeout: 15_000 });
+      const line = progress.trim()
+        .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")  // strip ANSI
+        .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")  // strip control chars
+        .slice(0, 100);
+      if (line && line !== "waiting...") onLog(`cloud-init: ${line}`);
+      return false;
+    },
+    { maxAttempts: 60, delayMs: 10_000 },
+  );
+}
+
+/** Verify required tools are installed on remote, auto-install missing ones. */
+async function verifyRemoteTools(
+  key: string, ip: string, onLog: (msg: string) => void,
+): Promise<void> {
+  onLog("Verifying tools...");
+  for (const { name, test, fix } of REQUIRED_TOOLS) {
+    const { exitCode } = await sshExecAsync(key, ip, test, { timeout: 10_000 });
+    if (exitCode !== 0) {
+      onLog(`${name} missing — installing...`);
+      await sshExecAsync(key, ip, fix, { timeout: 120_000 });
+      const { exitCode: verify } = await sshExecAsync(key, ip, test, { timeout: 10_000 });
+      if (verify !== 0) {
+        onLog(`WARNING: ${name} installation failed`);
+      } else {
+        onLog(`${name} installed`);
+      }
+    } else {
+      onLog(`${name} ✓`);
+    }
+  }
+}
+
+/** Sync credentials and Claude auth to remote host. */
+async function syncRemoteCredentials(
+  key: string, ip: string, computeName: string, onLog: (msg: string) => void,
+): Promise<void> {
+  onLog("Syncing credentials...");
+  try {
+    await syncToHost(key, ip, { direction: "push", onLog });
+  } catch (e: any) {
+    onLog(`Credential sync failed: ${e?.message ?? e}`);
+  }
+
+  // Set up Claude auth on remote
+  const hasAuth = !!process.env.CLAUDE_CODE_OAUTH_TOKEN
+    || !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN
+    || !!process.env.ANTHROPIC_API_KEY;
+  if (!hasAuth) {
+    onLog("⚠ No Claude auth — run 'ark auth', set CLAUDE_CODE_OAUTH_TOKEN, then restart");
+  } else {
+    // Credentials exist locally — verify they synced to remote
+    const { exitCode: authCheck } = await sshExecAsync(key, ip,
+      "test -f ~/.claude/.credentials.json",
+      { timeout: 10_000 });
+    if (authCheck === 0) {
+      onLog("Claude credentials synced ✓");
+    } else {
+      // Re-sync just the credentials file
+      onLog("Re-syncing Claude credentials...");
+      try {
+        const { execFileAsync: efa } = await import("child_process").then(m => ({ execFileAsync: promisify(m.execFile) }));
+        const localCredFile = join(homedir(), ".claude", ".credentials.json");
+        await efa("scp", [
+          "-i", key, "-o", "StrictHostKeyChecking=no",
+          localCredFile, `${REMOTE_USER}@${ip}:${REMOTE_HOME}/.claude/.credentials.json`,
+        ], { timeout: 15_000 });
+        onLog("Claude credentials synced ✓");
+      } catch (e: any) {
+        console.error(`provision: scp credentials to ${computeName} failed:`, e?.message ?? e);
+        onLog("Failed to sync credentials — run 'ark auth --host " + computeName + "'");
+      }
+    }
+  }
+}
+
+// ── Extracted helpers for launch() ───────────────────────────────────────────
+
+/** Upload MCP config, hooks config, and sync project files to remote clone. */
+async function uploadSessionConfigs(
+  key: string, ip: string, remoteWorkdir: string, opts: LaunchOpts,
+): Promise<void> {
+  const localMcpJson = join(opts.workdir, ".mcp.json");
+  if (existsSync(localMcpJson)) {
+    const encoded = Buffer.from(readFileSync(localMcpJson, "utf-8")).toString("base64");
+    await sshExecAsync(key, ip,
+      `echo '${encoded}' | base64 -d > ${remoteWorkdir}/.mcp.json`,
+      { timeout: 15_000 });
+  }
+  const localHooksConfig = join(opts.workdir, ".claude", "settings.local.json");
+  if (existsSync(localHooksConfig)) {
+    const encoded = Buffer.from(readFileSync(localHooksConfig, "utf-8")).toString("base64");
+    await sshExecAsync(key, ip,
+      `mkdir -p ${remoteWorkdir}/.claude && echo '${encoded}' | base64 -d > ${remoteWorkdir}/.claude/settings.local.json`,
+      { timeout: 15_000 });
+  }
+
+  // Sync project files from arc.json
+  const { parseArcJson } = await import("../../arc-json.js");
+  const arcJson = opts.workdir ? parseArcJson(opts.workdir) : null;
+  if (arcJson?.sync?.length && opts.workdir) {
+    await syncProjectFiles(key, ip, arcJson.sync, opts.workdir, remoteWorkdir);
+  }
+}
+
+/** Rewrite launcher script for remote paths and upload it. */
+async function setupRemoteLauncher(
+  key: string, ip: string, session: Session, remoteWorkdir: string, opts: LaunchOpts,
+): Promise<void> {
+  let remoteLauncher = opts.launcherContent;
+  if (opts.workdir) {
+    const escaped = opts.workdir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    remoteLauncher = remoteLauncher.replace(new RegExp(escaped, 'g'), remoteWorkdir);
+  }
+  remoteLauncher = remoteLauncher.replace(/^cd .*$/m, `cd '${remoteWorkdir}'`);
+
+  const encoded = Buffer.from(remoteLauncher).toString("base64");
+  const remoteDir = `~/.ark/tracks/${session.id}`;
+  await sshExecAsync(key, ip,
+    `mkdir -p ${remoteDir} && echo '${encoded}' | base64 -d > ${remoteDir}/launch.sh && chmod +x ${remoteDir}/launch.sh`,
+    { timeout: 15_000 });
+}
+
+/** Set up channel forward tunnel and reverse tunnel to conductor. */
+async function setupSessionTunnels(
+  key: string, ip: string, session: Session, opts: LaunchOpts,
+): Promise<void> {
+  const channelPort = sessionChannelPort(session.id);
+  const channelPortDecl: PortDecl = { port: channelPort, name: "channel", source: "ark" };
+  setupTunnels(key, ip, [...opts.ports, channelPortDecl]);
+  setupReverseTunnel(key, ip, 19100);
+}
+
 export class EC2Provider implements ComputeProvider {
   readonly name = "ec2";
   readonly isolationModes = [
@@ -174,93 +338,12 @@ export class EC2Provider implements ComputeProvider {
       );
       log(sshOk ? "SSH ready" : "SSH failed after 30 attempts");
 
-      // Poll cloud-init status
+      // Poll cloud-init, verify tools, sync credentials
       if (sshOk) {
-        log("Waiting for cloud-init to complete...");
         const key = sshKeyPath(compute.name);
-        await poll(
-          async () => {
-            const { stdout } = await sshExecAsync(key, result.ip!, `cat ${REMOTE_HOME}/.ark-ready 2>/dev/null || echo 'not ready'`, { timeout: 15_000 });
-            if (stdout.trim().includes("provisioning complete")) {
-              log("Cloud-init complete");
-              mergeComputeConfig(compute.name, { cloud_init_done: true });
-              return true;
-            }
-            const { stdout: progress } = await sshExecAsync(key, result.ip!,
-              "tail -1 /var/log/cloud-init-output.log 2>/dev/null || echo 'waiting...'", { timeout: 15_000 });
-            const line = progress.trim()
-              .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")  // strip ANSI
-              .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")  // strip control chars
-              .slice(0, 100);
-            if (line && line !== "waiting...") log(`cloud-init: ${line}`);
-            return false;
-          },
-          { maxAttempts: 60, delayMs: 10_000 },
-        );
-
-        // Verify + remediate required tools
-        log("Verifying tools...");
-        const checks = [
-          { name: "claude", test: "test -f ~/.local/bin/claude", fix: "curl -fsSL https://claude.ai/install.sh | bash" },
-          { name: "ark", test: "test -f ~/.ark/bin/ark", fix: "curl -fsSL https://ytarasova.github.io/ark/install.sh | bash -s -- --latest" },
-          { name: "bun", test: "test -f ~/.bun/bin/bun", fix: "curl -fsSL https://bun.sh/install | bash" },
-          { name: "tmux", test: "which tmux", fix: "sudo apt-get install -y tmux" },
-          { name: "git", test: "which git", fix: "sudo apt-get install -y git" },
-        ];
-        for (const { name, test, fix } of checks) {
-          const { exitCode } = await sshExecAsync(key, result.ip!, test, { timeout: 10_000 });
-          if (exitCode !== 0) {
-            log(`${name} missing — installing...`);
-            await sshExecAsync(key, result.ip!, fix, { timeout: 120_000 });
-            const { exitCode: verify } = await sshExecAsync(key, result.ip!, test, { timeout: 10_000 });
-            if (verify !== 0) {
-              log(`WARNING: ${name} installation failed`);
-            } else {
-              log(`${name} installed`);
-            }
-          } else {
-            log(`${name} ✓`);
-          }
-        }
-
-        // Sync credentials (SSH keys, AWS, git, gh, claude auth)
-        log("Syncing credentials...");
-        try {
-          await syncToHost(key, result.ip!, { direction: "push", onLog: log });
-        } catch (e: any) {
-          log(`Credential sync failed: ${e?.message ?? e}`);
-        }
-
-        // Set up Claude auth on remote
-        const hasAuth = !!process.env.CLAUDE_CODE_OAUTH_TOKEN
-          || !!process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN
-          || !!process.env.ANTHROPIC_API_KEY;
-        if (!hasAuth) {
-          log("⚠ No Claude auth — run 'ark auth', set CLAUDE_CODE_OAUTH_TOKEN, then restart");
-        } else {
-          // Credentials exist locally — verify they synced to remote
-          const { exitCode: authCheck } = await sshExecAsync(key, result.ip!,
-            "test -f ~/.claude/.credentials.json",
-            { timeout: 10_000 });
-          if (authCheck === 0) {
-            log("Claude credentials synced ✓");
-          } else {
-            // Re-sync just the credentials file
-            log("Re-syncing Claude credentials...");
-            try {
-              const { execFileAsync: efa } = await import("child_process").then(m => ({ execFileAsync: promisify(m.execFile) }));
-              const localCredFile = join(homedir(), ".claude", ".credentials.json");
-              await efa("scp", [
-                "-i", key, "-o", "StrictHostKeyChecking=no",
-                localCredFile, `${REMOTE_USER}@${result.ip}:${REMOTE_HOME}/.claude/.credentials.json`,
-              ], { timeout: 15_000 });
-              log("Claude credentials synced ✓");
-            } catch (e: any) {
-              console.error(`provision: scp credentials to ${compute.name} failed:`, e?.message ?? e);
-              log("Failed to sync credentials — run 'ark auth --host " + compute.name + "'");
-            }
-          }
-        }
+        await waitForCloudInit(key, result.ip!, compute.name, log);
+        await verifyRemoteTools(key, result.ip!, log);
+        await syncRemoteCredentials(key, result.ip!, compute.name, log);
       }
     }
   }
@@ -385,78 +468,35 @@ export class EC2Provider implements ComputeProvider {
     if (!ip) throw new Error(`Compute '${compute.name}' has no IP`);
     const key = sshKeyPath(compute.name);
 
-    // 1. Resolve repo URL
+    // 1. Resolve repo URL + clone on remote
     const repoUrl = await resolveRepoUrl(session.repo ?? opts.workdir);
     if (!repoUrl) throw new Error("Cannot determine git repo URL. Provide org/repo or a git repo path.");
     const repoName = getRepoName(repoUrl);
-
-    // 2. Clone on remote
     const remoteWorkdir = await cloneRepoOnRemote(key, ip, repoUrl, repoName, {
       branch: session.branch ?? undefined,
       sessionId: session.id,
     });
 
-    // 3. Upload Claude configs (.mcp.json, .claude/settings.local.json) to remote clone
-    //    These are written locally during dispatch but needed on the remote for Claude to work.
-    const localMcpJson = join(opts.workdir, ".mcp.json");
-    if (existsSync(localMcpJson)) {
-      const encoded = Buffer.from(readFileSync(localMcpJson, "utf-8")).toString("base64");
-      await sshExecAsync(key, ip,
-        `echo '${encoded}' | base64 -d > ${remoteWorkdir}/.mcp.json`,
-        { timeout: 15_000 });
-    }
-    const localHooksConfig = join(opts.workdir, ".claude", "settings.local.json");
-    if (existsSync(localHooksConfig)) {
-      const encoded = Buffer.from(readFileSync(localHooksConfig, "utf-8")).toString("base64");
-      await sshExecAsync(key, ip,
-        `mkdir -p ${remoteWorkdir}/.claude && echo '${encoded}' | base64 -d > ${remoteWorkdir}/.claude/settings.local.json`,
-        { timeout: 15_000 });
-    }
+    // 2. Upload configs + project files
+    await uploadSessionConfigs(key, ip, remoteWorkdir, opts);
 
-    // 4. Sync project files from arc.json
-    const { parseArcJson } = await import("../../arc-json.js");
-    const arcJson = opts.workdir ? parseArcJson(opts.workdir) : null;
-    if (arcJson?.sync?.length && opts.workdir) {
-      await syncProjectFiles(key, ip, arcJson.sync, opts.workdir, remoteWorkdir);
-    }
-
-    // 5. Trust remote directory
+    // 3. Trust remote directory
     await trustRemoteDirectory(key, ip, remoteWorkdir);
 
-    // 6. Build launcher with REMOTE paths
-    let remoteLauncher = opts.launcherContent;
-    if (opts.workdir) {
-      // Replace all occurrences of the local workdir with the remote one
-      const escaped = opts.workdir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      remoteLauncher = remoteLauncher.replace(new RegExp(escaped, 'g'), remoteWorkdir);
-    }
-    // Also fix the cd command to use remote path
-    remoteLauncher = remoteLauncher.replace(/^cd .*$/m, `cd '${remoteWorkdir}'`);
-
-    // 7. Upload launcher
-    const encoded = Buffer.from(remoteLauncher).toString("base64");
+    // 4. Build + upload launcher, create tmux session
+    await setupRemoteLauncher(key, ip, session, remoteWorkdir, opts);
     const remoteDir = `~/.ark/tracks/${session.id}`;
-    await sshExecAsync(key, ip,
-      `mkdir -p ${remoteDir} && echo '${encoded}' | base64 -d > ${remoteDir}/launch.sh && chmod +x ${remoteDir}/launch.sh`,
-      { timeout: 15_000 });
-
-    // 8. Create remote tmux session
     await sshExecAsync(key, ip,
       `tmux new-session -d -s ${opts.tmuxName} -c ${remoteWorkdir} 'bash ${remoteDir}/launch.sh'`,
       { timeout: 15_000 });
 
-    // 9. Auto-accept channel prompt
+    // 5. Auto-accept channel prompt
     await autoAcceptChannelPrompt(key, ip, opts.tmuxName);
 
-    // 10. Setup port tunnels (local forward for app ports + channel port)
-    const channelPort = sessionChannelPort(session.id);
-    const channelPortDecl: PortDecl = { port: channelPort, name: "channel", source: "ark" };
-    setupTunnels(key, ip, [...opts.ports, channelPortDecl]);
+    // 6. Setup tunnels (forward + reverse)
+    await setupSessionTunnels(key, ip, session, opts);
 
-    // 11. Reverse tunnel: let remote channel reach local conductor
-    setupReverseTunnel(key, ip, 19100);
-
-    // 12. Store remote workdir in session config for display
+    // 7. Store remote workdir in session config for display
     const { updateSession } = await import("../../../core/store.js");
     updateSession(session.id, {
       config: { ...(session.config ?? {}), remoteWorkdir },

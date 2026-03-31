@@ -77,10 +77,14 @@ export class LocalProvider implements ComputeProvider {
         cp.on("error", () => resolve(false));
       });
       if (!ok) {
-        try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
+        try { rmSync(wtPath, { recursive: true, force: true }); } catch (e: any) {
+          console.error('local cleanupSession: rmSync worktree fallback:', e?.message ?? e);
+        }
       }
     } else {
-      try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
+      try { rmSync(wtPath, { recursive: true, force: true }); } catch (e: any) {
+        console.error('local cleanupSession: rmSync worktree:', e?.message ?? e);
+      }
     }
   }
 
@@ -96,7 +100,10 @@ export class LocalProvider implements ComputeProvider {
           encoding: "utf-8", timeout: 5000,
         });
         listening = stdout.trim().length > 0;
-      } catch { /* not listening */ }
+      } catch (e: any) {
+        // Port not listening
+        console.error('local probePorts:', e?.message ?? e);
+      }
       return { ...decl, listening };
     }));
   }
