@@ -35,4 +35,29 @@ describe("ComputeProvider interface", () => {
     expect(typeof ec2.buildChannelConfig).toBe("function");
     expect(typeof ec2.buildLaunchEnv).toBe("function");
   });
+
+  it("local.buildChannelConfig returns valid config shape", () => {
+    const config = local.buildChannelConfig("s-test", "plan", 19200);
+    expect(config).toHaveProperty("command");
+    expect(config).toHaveProperty("args");
+    expect(config).toHaveProperty("env");
+    expect(typeof config.command).toBe("string");
+  });
+
+  it("local.buildLaunchEnv returns an object", () => {
+    const env = local.buildLaunchEnv({} as any);
+    expect(typeof env).toBe("object");
+  });
+
+  it("local.getAttachCommand returns array for session with session_id", () => {
+    const cmd = local.getAttachCommand({} as any, { session_id: "ark-s-test" } as any);
+    expect(Array.isArray(cmd)).toBe(true);
+    expect(cmd.length).toBeGreaterThan(0);
+    expect(cmd).toContain("ark-s-test");
+  });
+
+  it("local.getAttachCommand returns empty array for session without session_id", () => {
+    const cmd = local.getAttachCommand({} as any, {} as any);
+    expect(cmd).toEqual([]);
+  });
 });

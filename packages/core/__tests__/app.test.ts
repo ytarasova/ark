@@ -78,7 +78,7 @@ describe("AppContext", () => {
   it("creates event bus on boot", async () => {
     app = AppContext.forTest();
     await app.boot();
-    expect(app.eventBus).toBeTruthy();
+    expect(app.eventBus).toBeDefined();
     expect(typeof app.eventBus.emit).toBe("function");
   });
 });

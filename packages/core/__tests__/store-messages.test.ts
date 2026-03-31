@@ -2,32 +2,20 @@
  * Tests for the messages table — addMessage, getMessages, unread counts.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import {
-  createTestContext, setContext, resetContext,
   getDb, addMessage, getMessages, getUnreadCount, markMessagesRead,
 } from "../index.js";
 import { createSession } from "../store.js";
-import type { TestContext } from "../store.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
-
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
-});
-
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
-});
+withTestContext();
 
 describe("Messages", () => {
   it("addMessage stores a message", () => {
     const session = createSession({ summary: "test" });
     const msg = addMessage({ session_id: session.id, role: "user", content: "hello" });
-    expect(msg.id).toBeTruthy();
+    expect(typeof msg.id).toBe("number");
     expect(msg.role).toBe("user");
     expect(msg.content).toBe("hello");
     expect(msg.type).toBe("text");

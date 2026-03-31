@@ -84,7 +84,7 @@ describe("File operations", () => {
     expect(data.exists).toBe(true);
     expect(data.type).toBe("file");
     expect(data.size).toBe(7);
-    expect(data.mtime).toBeTruthy();
+    expect(typeof data.mtime).toBe("string");
   });
 
   it("stat nonexistent file returns exists=false", async () => {
@@ -134,7 +134,7 @@ describe("File operations", () => {
   it("list nonexistent directory returns 500", async () => {
     const { status, data } = await post<any>("/file/list", { path: "/nonexistent/dir" });
     expect(status).toBe(500);
-    expect(data.error).toBeTruthy();
+    expect(typeof data.error).toBe("string");
   });
 
   it("stat on directory returns type=dir", async () => {
@@ -152,7 +152,7 @@ describe("File operations", () => {
       content: "should fail",
     });
     expect(status).toBe(500);
-    expect(data.error).toBeTruthy();
+    expect(typeof data.error).toBe("string");
   });
 
   it("write with custom mode sets permissions", async () => {
@@ -168,7 +168,7 @@ describe("File operations", () => {
     const { statSync } = require("fs");
     const s = statSync(filePath);
     // Check that owner-execute bit is set
-    expect(s.mode & 0o100).toBeTruthy();
+    expect(s.mode & 0o100).toBeGreaterThan(0);
   });
 
   it("handles unicode content correctly", async () => {
@@ -366,7 +366,7 @@ describe("GET /snapshot", () => {
     try {
       const { data } = await get<any>("/snapshot");
       const found = data.sessions.find((s: any) => s.name === name);
-      expect(found).toBeTruthy();
+      expect(found).toBeDefined();
       expect(found.status).toBe("detached");
     } finally {
       await post("/agent/kill", { sessionName: name });
@@ -454,19 +454,24 @@ describe("Server lifecycle", () => {
     const ephemeralPort = TEST_PORT + 50;
     const ephemeral = startArkd(ephemeralPort, { quiet: true });
 
-    // Verify it's alive
-    const resp = await fetch(`http://localhost:${ephemeralPort}/health`);
-    expect(resp.status).toBe(200);
-
-    // Stop it
-    ephemeral.stop();
-
-    // Verify it's dead
     try {
-      await fetch(`http://localhost:${ephemeralPort}/health`);
-      expect(true).toBe(false); // should not reach
-    } catch {
-      // Expected - connection refused
+      // Verify it's alive
+      const resp = await fetch(`http://localhost:${ephemeralPort}/health`);
+      expect(resp.status).toBe(200);
+
+      // Stop it
+      ephemeral.stop();
+
+      // Verify it's dead
+      try {
+        await fetch(`http://localhost:${ephemeralPort}/health`);
+        expect(true).toBe(false); // should not reach
+      } catch {
+        // Expected - connection refused
+      }
+    } finally {
+      // Ensure cleanup even if assertions fail
+      try { ephemeral.stop(); } catch {}
     }
   });
 });

@@ -3,28 +3,14 @@
  * searchTranscripts across Claude JSONL files.
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import {
-  createTestContext, setContext, resetContext,
-  type TestContext,
-} from "../index.js";
 import { createSession, logEvent, addMessage } from "../store.js";
 import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation } from "../search.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
-
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
-});
-
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
-});
+const { getCtx } = withTestContext();
 
 // ── searchSessions ──────────────────────────────────────────────────────────
 
@@ -42,7 +28,7 @@ describe("searchSessions", () => {
     const results = searchSessions("PROJ-1234");
     expect(results.length).toBeGreaterThanOrEqual(1);
     const meta = results.find(r => r.source === "metadata");
-    expect(meta).toBeTruthy();
+    expect(meta).toBeDefined();
   });
 
   it("finds session by repo", () => {
@@ -50,7 +36,7 @@ describe("searchSessions", () => {
     const results = searchSessions("widget-service");
     expect(results.length).toBeGreaterThanOrEqual(1);
     const meta = results.find(r => r.source === "metadata");
-    expect(meta).toBeTruthy();
+    expect(meta).toBeDefined();
   });
 
   it("finds matches in event data", () => {
@@ -58,7 +44,7 @@ describe("searchSessions", () => {
     logEvent(session.id, "deploy", { data: { message: "deployed to staging-east" } });
     const results = searchSessions("staging-east");
     const ev = results.find(r => r.source === "event");
-    expect(ev).toBeTruthy();
+    expect(ev).toBeDefined();
     expect(ev!.sessionId).toBe(session.id);
   });
 
@@ -67,7 +53,7 @@ describe("searchSessions", () => {
     addMessage({ session_id: session.id, role: "agent", content: "Refactored the payment module" });
     const results = searchSessions("payment module");
     const msg = results.find(r => r.source === "message");
-    expect(msg).toBeTruthy();
+    expect(msg).toBeDefined();
     expect(msg!.sessionId).toBe(session.id);
   });
 
@@ -107,7 +93,7 @@ describe("searchSessions", () => {
     const results = searchSessions("timestamped");
     expect(results.length).toBeGreaterThanOrEqual(1);
     for (const r of results) {
-      expect(r.timestamp).toBeTruthy();
+      expect(typeof r.timestamp).toBe("string");
     }
   });
 
@@ -129,7 +115,7 @@ describe("searchSessions", () => {
 describe("searchTranscripts", () => {
   it("finds match in JSONL transcript files", () => {
     // Set up a fake transcripts directory inside the test's arkDir
-    const transcriptsDir = join(ctx.arkDir, "transcripts");
+    const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "test-project");
     mkdirSync(projectDir, { recursive: true });
 
@@ -148,7 +134,7 @@ describe("searchTranscripts", () => {
   });
 
   it("handles array content in transcript entries", () => {
-    const transcriptsDir = join(ctx.arkDir, "transcripts");
+    const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "array-project");
     mkdirSync(projectDir, { recursive: true });
 
@@ -166,7 +152,7 @@ describe("searchTranscripts", () => {
   });
 
   it("returns empty when no transcripts match", () => {
-    const transcriptsDir = join(ctx.arkDir, "transcripts");
+    const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "empty-project");
     mkdirSync(projectDir, { recursive: true });
 
@@ -183,7 +169,7 @@ describe("searchTranscripts", () => {
   });
 
   it("limits transcript results", () => {
-    const transcriptsDir = join(ctx.arkDir, "transcripts");
+    const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "many-project");
     mkdirSync(projectDir, { recursive: true });
 
@@ -197,7 +183,7 @@ describe("searchTranscripts", () => {
   });
 
   it("is case insensitive", () => {
-    const transcriptsDir = join(ctx.arkDir, "transcripts");
+    const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "case-project");
     mkdirSync(projectDir, { recursive: true });
 
@@ -209,7 +195,7 @@ describe("searchTranscripts", () => {
   });
 
   it("returns one match per file", () => {
-    const transcriptsDir = join(ctx.arkDir, "transcripts");
+    const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "dedup-project");
     mkdirSync(projectDir, { recursive: true });
 
@@ -230,39 +216,39 @@ describe("searchTranscripts", () => {
 
 describe("indexTranscripts", () => {
   it("indexes JSONL files and returns count", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-test-project");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "sess-1.jsonl"), [
       JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: "fix the auth bug" }] } }),
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "I'll fix the authentication issue" }] } }),
     ].join("\n"));
 
-    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    const count = await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(2); // 1 user + 1 assistant message
   });
 
   it("FTS5 search returns matches after indexing", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-test-project");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "sess-fts.jsonl"), [
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "fixed the SQL injection vulnerability in the login handler" }] } }),
     ].join("\n"));
 
-    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     const results = searchTranscripts("SQL injection");
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].source).toBe("transcript");
   });
 
   it("is fast — sub-100ms for indexed search", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-test-project");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
     const lines = [];
     for (let i = 0; i < 100; i++) {
       lines.push(JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: `Working on task ${i}: implementing feature ${i % 10}` }] } }));
     }
     writeFileSync(join(projectDir, "sess-perf.jsonl"), lines.join("\n"));
-    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     const start = performance.now();
     searchTranscripts("implementing feature");
@@ -275,7 +261,7 @@ describe("indexTranscripts", () => {
 
 describe("indexTranscripts filtering", () => {
   it("does NOT index tool_result entries", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-filter-project");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-filter-project");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "sess-filter.jsonl"), [
       JSON.stringify({
@@ -284,12 +270,12 @@ describe("indexTranscripts filtering", () => {
       }),
     ].join("\n"));
 
-    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    const count = await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(0);
   });
 
   it("does NOT index tool_use-only entries", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-tooluse-project");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-tooluse-project");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "sess-tooluse.jsonl"), [
       JSON.stringify({
@@ -298,36 +284,36 @@ describe("indexTranscripts filtering", () => {
       }),
     ].join("\n"));
 
-    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    const count = await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(0);
   });
 
   it("does NOT index short messages under 10 chars", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-short-project");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-short-project");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "sess-short.jsonl"), [
       JSON.stringify({ type: "user", message: { role: "user", content: "ok" } }),
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: "done" } }),
     ].join("\n"));
 
-    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    const count = await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(0);
   });
 
   it("DOES index real user/assistant text", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-real-project");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-real-project");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "sess-real.jsonl"), [
       JSON.stringify({ type: "user", message: { role: "user", content: "Please refactor the authentication module" } }),
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will refactor the authentication module now" } }),
     ].join("\n"));
 
-    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    const count = await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(2);
   });
 
   it("indexes text blocks alongside tool_use blocks", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-mixed-project");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-mixed-project");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "sess-mixed.jsonl"), [
       JSON.stringify({
@@ -342,7 +328,7 @@ describe("indexTranscripts filtering", () => {
       }),
     ].join("\n"));
 
-    const count = await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    const count = await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(1); // text block present, so it's indexed
   });
 });
@@ -351,7 +337,7 @@ describe("indexTranscripts filtering", () => {
 
 describe("indexSession", () => {
   it("indexes a single transcript file", () => {
-    const transcriptPath = join(ctx.arkDir, "single.jsonl");
+    const transcriptPath = join(getCtx().arkDir, "single.jsonl");
     writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: "hello world" } }));
 
     const count = indexSession(transcriptPath, "s-single", "test-project");
@@ -359,7 +345,7 @@ describe("indexSession", () => {
   });
 
   it("incremental — does not duplicate on second call", () => {
-    const transcriptPath = join(ctx.arkDir, "replace.jsonl");
+    const transcriptPath = join(getCtx().arkDir, "replace.jsonl");
     writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: "first version here" }, timestamp: "2026-01-01T00:01:00Z" }));
     indexSession(transcriptPath, "s-replace");
 
@@ -378,7 +364,7 @@ describe("indexSession", () => {
 
 describe("getSessionConversation", () => {
   it("returns turns for a known session", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-conv-proj");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-conv-proj");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "conv-sess.jsonl"), [
       JSON.stringify({ type: "user", message: { role: "user", content: "hello there friend" }, timestamp: "2026-01-01T00:01:00Z" }),
@@ -386,7 +372,7 @@ describe("getSessionConversation", () => {
       JSON.stringify({ type: "user", message: { role: "user", content: "fix the auth bug please" }, timestamp: "2026-01-01T00:03:00Z" }),
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will fix the authentication issue now" }, timestamp: "2026-01-01T00:04:00Z" }),
     ].join("\n"));
-    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     const turns = getSessionConversation("conv-sess");
     expect(turns.length).toBe(4);
@@ -400,7 +386,7 @@ describe("getSessionConversation", () => {
   });
 
   it("respects limit", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-conv-proj2");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-conv-proj2");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "conv-sess2.jsonl"), [
       JSON.stringify({ type: "user", message: { role: "user", content: "hello there friend" }, timestamp: "2026-01-01T00:01:00Z" }),
@@ -408,7 +394,7 @@ describe("getSessionConversation", () => {
       JSON.stringify({ type: "user", message: { role: "user", content: "fix the auth bug please" }, timestamp: "2026-01-01T00:03:00Z" }),
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will fix the authentication issue now" }, timestamp: "2026-01-01T00:04:00Z" }),
     ].join("\n"));
-    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     const turns = getSessionConversation("conv-sess2", { limit: 2 });
     expect(turns.length).toBe(2);
@@ -419,13 +405,13 @@ describe("getSessionConversation", () => {
 
 describe("searchSessionConversation", () => {
   it("finds matches within a session", async () => {
-    const projectDir = join(ctx.arkDir, "claude-projects", "-search-conv-proj");
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-search-conv-proj");
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, "search-conv-sess.jsonl"), [
       JSON.stringify({ type: "user", message: { role: "user", content: "fix the auth bug please" }, timestamp: "2026-01-01T00:01:00Z" }),
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will fix the authentication issue now" }, timestamp: "2026-01-01T00:02:00Z" }),
     ].join("\n"));
-    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     const results = searchSessionConversation("search-conv-sess", "authentication");
     expect(results.length).toBeGreaterThan(0);
@@ -433,19 +419,19 @@ describe("searchSessionConversation", () => {
   });
 
   it("does NOT return results from other sessions", async () => {
-    const projectDir1 = join(ctx.arkDir, "claude-projects", "-iso-proj1");
+    const projectDir1 = join(getCtx().arkDir, "claude-projects", "-iso-proj1");
     mkdirSync(projectDir1, { recursive: true });
     writeFileSync(join(projectDir1, "iso-sess1.jsonl"), [
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: "authentication is handled here in the module" }, timestamp: "2026-01-01T00:01:00Z" }),
     ].join("\n"));
 
-    const projectDir2 = join(ctx.arkDir, "claude-projects", "-iso-proj2");
+    const projectDir2 = join(getCtx().arkDir, "claude-projects", "-iso-proj2");
     mkdirSync(projectDir2, { recursive: true });
     writeFileSync(join(projectDir2, "iso-sess2.jsonl"), [
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: "authentication is fixed in this version" }, timestamp: "2026-01-01T00:01:00Z" }),
     ].join("\n"));
 
-    await indexTranscripts({ transcriptsDir: join(ctx.arkDir, "claude-projects") });
+    await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     const results = searchSessionConversation("iso-sess1", "authentication");
     for (const r of results) {
@@ -462,7 +448,7 @@ describe("searchSessionConversation", () => {
 
 describe("indexSession improvements", () => {
   it("skips tool_result entries", () => {
-    const path = join(ctx.arkDir, "tool-test.jsonl");
+    const path = join(getCtx().arkDir, "tool-test.jsonl");
     writeFileSync(path, [
       JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "x", content: "big output here" }] }, timestamp: "2026-01-01T00:01:00Z" }),
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I see the output clearly now" }, timestamp: "2026-01-01T00:02:00Z" }),
@@ -472,7 +458,7 @@ describe("indexSession improvements", () => {
   });
 
   it("skips tool_use-only entries", () => {
-    const path = join(ctx.arkDir, "tooluse-test.jsonl");
+    const path = join(getCtx().arkDir, "tooluse-test.jsonl");
     writeFileSync(path, [
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "x", name: "Read", input: {} }] }, timestamp: "2026-01-01T00:01:00Z" }),
       JSON.stringify({ type: "user", message: { role: "user", content: "what did you find in there" }, timestamp: "2026-01-01T00:02:00Z" }),
@@ -482,7 +468,7 @@ describe("indexSession improvements", () => {
   });
 
   it("incremental — second call adds only new entries", () => {
-    const path = join(ctx.arkDir, "incr-test.jsonl");
+    const path = join(getCtx().arkDir, "incr-test.jsonl");
     writeFileSync(path, JSON.stringify({ type: "user", message: { role: "user", content: "first message here" }, timestamp: "2026-01-01T00:01:00Z" }));
     indexSession(path, "incr-test");
 

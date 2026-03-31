@@ -1,6 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext } from "../context.js";
-import type { TestContext } from "../context.js";
+import { describe, it, expect } from "bun:test";
 import {
   createCompute,
   getCompute,
@@ -8,10 +6,9 @@ import {
   updateCompute,
   deleteCompute,
 } from "../store.js";
+import { withTestContext } from "./test-helpers.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+withTestContext();
 
 describe("compute CRUD", () => {
 
@@ -21,8 +18,8 @@ describe("compute CRUD", () => {
     expect(compute.provider).toBe("local");
     expect(compute.status).toBe("running");
     expect(compute.config).toEqual({});
-    expect(compute.created_at).toBeTruthy();
-    expect(compute.updated_at).toBeTruthy();
+    expect(typeof compute.created_at).toBe("string");
+    expect(typeof compute.updated_at).toBe("string");
   });
 
   it("creates a non-local compute as stopped by default", () => {

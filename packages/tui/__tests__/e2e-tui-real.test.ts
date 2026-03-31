@@ -97,7 +97,9 @@ describe("e2e TUI (real tmux)", () => {
   }, 30_000);
 
   // Test 6: Quit with q key
-  // TODO: flaky — Ink exit() doesn't reliably kill the parent tmux session
+  // SKIP: Ink exit() doesn't reliably kill the parent tmux session.
+  // Re-enable when Ink provides a reliable process.exit hook or when we
+  // switch to a signal-based tmux session teardown.
   it.skip("quits with q key", async () => {
     const tui = new TuiDriver();
     try {
@@ -117,7 +119,9 @@ describe("e2e TUI (real tmux)", () => {
   }, 30_000);
 
   // Test 7: Create session via new form (n key)
-  // TODO: form overlay not rendering in tmux capture — needs investigation
+  // SKIP: Form overlay not rendering in tmux capture-pane output.
+  // Re-enable once Ink overlay rendering is verified in headless tmux
+  // (may need alternate-screen or larger capture window).
   it.skip("opens new session form with n key", async () => {
     const tui = new TuiDriver();
     try {
@@ -136,7 +140,9 @@ describe("e2e TUI (real tmux)", () => {
   }, 30_000);
 
   // Test 8: Delete session (x key)
-  // TODO: x key not triggering delete in tmux — may need focus/selection first
+  // SKIP: x key not triggering delete — likely because no session is focused
+  // in the list pane after start. Re-enable after adding explicit j/k
+  // navigation to select a session before pressing x.
   it.skip("deletes session with x key", async () => {
     const tui = new TuiDriver();
     try {
