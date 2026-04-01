@@ -28,6 +28,7 @@ import { getProvider } from "../compute/index.js";
 import { indexSession } from "./search.js";
 import { listSchedules, cronMatches, updateScheduleLastRun } from "./schedule.js";
 import { pollPRReviews } from "./pr-poller.js";
+import { pollIssues } from "./issue-poller.js";
 import { ArkdClient } from "../arkd/client.js";
 import { safeAsync } from "./safe.js";
 
@@ -141,7 +142,11 @@ function handleRestApi(path: string): Response {
 
 // ── Server ──────────────────────────────────────────────────────────────────
 
-export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }): { stop(): void } {
+export function startConductor(port = DEFAULT_PORT, opts?: {
+  quiet?: boolean;
+  issueLabel?: string;
+  issueAutoDispatch?: boolean;
+}): { stop(): void } {
   const server = Bun.serve({
     port,
     hostname: "127.0.0.1",
@@ -214,10 +219,22 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
     safeAsync("PR review polling", () => pollPRReviews()),
   POLL_INTERVAL_MS);
 
+  // Issue poller - only start if a label is configured
+  let issueTimer: ReturnType<typeof setInterval> | null = null;
+  if (opts?.issueLabel) {
+    const issueOpts = { label: opts.issueLabel, autoDispatch: opts.issueAutoDispatch };
+    // Run immediately on start
+    safeAsync("issue polling: initial", () => pollIssues(issueOpts));
+    issueTimer = setInterval(() =>
+      safeAsync("issue polling", () => pollIssues(issueOpts)),
+    POLL_INTERVAL_MS);
+  }
+
   return {
     stop() {
       clearInterval(scheduleTimer);
       clearInterval(prTimer);
+      if (issueTimer) clearInterval(issueTimer);
       server.stop();
     },
   };

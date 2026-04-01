@@ -32,6 +32,7 @@ import { eventBus } from "./hooks.js";
 import { indexSession } from "./search.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { safeAsync } from "./safe.js";
+import { saveCheckpoint } from "./checkpoint.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 function sessionAsVars(session: store.Session): Record<string, unknown> {
@@ -174,6 +175,9 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
     },
   });
 
+  // Checkpoint after successful dispatch
+  saveCheckpoint(sessionId);
+
   return { ok: true, message: tmuxName };
 }
 
@@ -188,6 +192,9 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
     const { canProceed, reason } = flow.evaluateGate(flowName, stage, session);
     if (!canProceed) return { ok: false, message: reason };
   }
+
+  // Checkpoint before advancing to next stage
+  saveCheckpoint(sessionId);
 
   const nextStage = flow.getNextStage(flowName, stage);
   if (!nextStage) {
@@ -213,12 +220,18 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
     },
   });
 
+  // Checkpoint after advancing to new stage
+  saveCheckpoint(sessionId);
+
   return { ok: true, message: `Advanced to ${nextStage}` };
 }
 
 export async function stop(sessionId: string): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
+
+  // Checkpoint before stopping (preserve state for potential recovery)
+  saveCheckpoint(sessionId);
 
   // Kill agent + clean up provider resources
   const stopped = await withProvider(session, `stop ${sessionId}`, async (p, c) => {

@@ -1,0 +1,158 @@
+/**
+ * GitHub Issues polling — auto-creates sessions from labeled issues.
+ *
+ * Polls `gh issue list` for issues with a specific label.
+ * For each new issue (not already linked to a session), creates a session
+ * and optionally auto-dispatches it.
+ */
+
+import { execFile } from "child_process";
+import { promisify } from "util";
+import * as store from "./store.js";
+import { safeAsync } from "./safe.js";
+
+const execFileAsync = promisify(execFile);
+
+type GhExecFn = (args: string[]) => Promise<{ stdout: string }>;
+
+const defaultGhExec: GhExecFn = async (args) => {
+  return execFileAsync("gh", args, { encoding: "utf-8", timeout: 15_000 });
+};
+
+// Replaceable via setGhExec() for testing
+let _ghExec: GhExecFn = defaultGhExec;
+
+/** Replace the gh exec function (for testing). */
+export function setGhExec(fn: GhExecFn): void {
+  _ghExec = fn;
+}
+
+export interface IssuePollerOptions {
+  /** Label to watch for (default: "ark") */
+  label?: string;
+  /** Poll interval in ms (default: 60000) */
+  intervalMs?: number;
+  /** Auto-dispatch created sessions */
+  autoDispatch?: boolean;
+  /** Override gh exec (for testing) */
+  ghExec?: GhExecFn;
+}
+
+export interface GhIssue {
+  number: number;
+  title: string;
+  body: string;
+  url: string;
+  labels: Array<{ name: string }>;
+}
+
+/**
+ * Fetch open issues with a specific label via gh CLI.
+ * Returns null if the CLI call fails.
+ */
+export async function fetchLabeledIssues(
+  label: string,
+  ghExec: GhExecFn = _ghExec,
+): Promise<GhIssue[] | null> {
+  try {
+    const { stdout } = await ghExec([
+      "issue", "list",
+      "--label", label,
+      "--state", "open",
+      "--json", "number,title,body,url,labels",
+    ]);
+    return JSON.parse(stdout) as GhIssue[];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a session already exists for a given issue ticket.
+ * Ticket format is "#<number>" (e.g. "#42").
+ */
+export function issueAlreadyTracked(ticket: string): boolean {
+  const sessions = store.listSessions({ limit: 500 });
+  return sessions.some(s => s.ticket === ticket);
+}
+
+/**
+ * Create a session from a GitHub issue.
+ * Returns the created session, or null if skipped (duplicate).
+ */
+export async function createSessionFromIssue(
+  issue: GhIssue,
+  opts?: { autoDispatch?: boolean },
+): Promise<store.Session | null> {
+  const ticket = `#${issue.number}`;
+
+  if (issueAlreadyTracked(ticket)) return null;
+
+  // Lazy import to avoid circular deps (same pattern as pr-poller.ts)
+  const { startSession, dispatch } = await import("./session.js");
+
+  const session = startSession({
+    ticket,
+    summary: issue.title,
+    config: {
+      issue_url: issue.url,
+      issue_body: issue.body,
+      issue_labels: issue.labels.map(l => l.name),
+    },
+  });
+
+  store.logEvent(session.id, "issue_imported", {
+    actor: "github",
+    data: {
+      issue_number: issue.number,
+      issue_url: issue.url,
+      title: issue.title,
+    },
+  });
+
+  if (opts?.autoDispatch) {
+    await safeAsync(`issue-poller: dispatch ${session.id}`, async () => {
+      await dispatch(session.id);
+    });
+  }
+
+  return session;
+}
+
+/**
+ * Main poller tick. Fetches labeled issues and creates sessions for new ones.
+ */
+export async function pollIssues(opts?: IssuePollerOptions): Promise<void> {
+  const label = opts?.label ?? "ark";
+  const ghExec = opts?.ghExec ?? _ghExec;
+
+  const issues = await fetchLabeledIssues(label, ghExec);
+  if (!issues) return;
+
+  for (const issue of issues) {
+    await safeAsync(`issue-poller: process issue #${issue.number}`, async () => {
+      await createSessionFromIssue(issue, { autoDispatch: opts?.autoDispatch });
+    });
+  }
+}
+
+/**
+ * Start a recurring issue poller. Returns a handle to stop it.
+ */
+export function startIssuePoller(opts?: IssuePollerOptions): { stop: () => void } {
+  const intervalMs = opts?.intervalMs ?? 60_000;
+
+  // Run immediately on start
+  safeAsync("issue-poller: initial poll", () => pollIssues(opts));
+
+  const timer = setInterval(
+    () => safeAsync("issue-poller: poll tick", () => pollIssues(opts)),
+    intervalMs,
+  );
+
+  return {
+    stop() {
+      clearInterval(timer);
+    },
+  };
+}

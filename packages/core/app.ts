@@ -50,6 +50,12 @@ export class AppContext {
 
   private _signalHandlers: { signal: string; handler: () => void }[] = [];
   private _forceExitCount = 0;
+  private _orphanedSessions: Session[] = [];
+
+  /** Sessions detected as orphaned during boot (running but tmux dead). */
+  get orphanedSessions(): Session[] {
+    return this._orphanedSessions;
+  }
 
   constructor(config: ArkConfig, options: AppOptions = {}) {
     this.config = config;
@@ -169,6 +175,18 @@ export class AppContext {
     if (!this.options.skipSignals) {
       this._registerSignalHandlers();
     }
+
+    // 10. Detect orphaned sessions (crashed while running)
+    await safeAsync("boot: detect orphaned sessions", async () => {
+      const { findOrphanedSessions } = await import("./checkpoint.js");
+      const orphaned = findOrphanedSessions();
+      if (orphaned.length > 0) {
+        this._orphanedSessions = orphaned;
+        for (const s of orphaned) {
+          console.warn(`[ark] Orphaned session detected: ${s.id} (status: ${s.status}, stage: ${s.stage})`);
+        }
+      }
+    });
 
     this.phase = "ready";
   }

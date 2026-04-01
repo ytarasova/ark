@@ -67,6 +67,9 @@ export { findSessionByPR, formatReviewPrompt, extractComments } from "./github-p
 // PR polling
 export { pollPRReviews } from "./pr-poller.js";
 
+// Issue polling
+export { pollIssues, startIssuePoller, fetchLabeledIssues, createSessionFromIssue, type IssuePollerOptions, type GhIssue } from "./issue-poller.js";
+
 // Conductor
 export { startConductor } from "./conductor.js";
 
@@ -88,8 +91,14 @@ export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review
 // Guardrails
 export { evaluateGuardrail, DEFAULT_RULES, type GuardrailRule } from "./guardrails.js";
 
+// Checkpoint and crash recovery
+export { saveCheckpoint, getCheckpoint, listCheckpoints, findOrphanedSessions, recoverSession, type Checkpoint } from "./checkpoint.js";
+
 // Safe async helper
 export { safeAsync } from "./safe.js";
 
 // Unified tool discovery
 export { discoverTools, removeMcpServer, removeCommand, getCommand, addMcpServer, addCommand, type ToolEntry } from "./tools.js";
+
+// Replay
+export { buildReplay, type ReplayStep } from "./replay.js";
