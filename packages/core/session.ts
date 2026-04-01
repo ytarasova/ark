@@ -1141,3 +1141,86 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
 
   return result;
 }
+
+// ── Fail-Loopback ──────────────────────────────────────────────────────────
+
+export function retryWithContext(
+  sessionId: string,
+  opts?: { maxRetries?: number }
+): { ok: boolean; message: string } {
+  const s = store.getSession(sessionId);
+  if (!s) return { ok: false, message: "Session not found" };
+  if (s.status !== "failed") return { ok: false, message: "Session is not in failed state" };
+
+  const maxRetries = opts?.maxRetries ?? 3;
+  const priorRetries = store.getEvents(sessionId).filter(e => e.type === "retry_with_context").length;
+  if (priorRetries >= maxRetries) {
+    return { ok: false, message: `Max retries (${maxRetries}) reached` };
+  }
+
+  // Log the retry event with error context
+  store.logEvent(sessionId, "retry_with_context", {
+    actor: "system",
+    data: {
+      attempt: priorRetries + 1,
+      error: s.error,
+      stage: s.stage,
+    },
+  });
+
+  // Reset to ready for re-dispatch
+  store.updateSession(sessionId, { status: "ready", error: null });
+
+  return { ok: true, message: `Retry ${priorRetries + 1}/${maxRetries} queued` };
+}
+
+// ── Sub-Agent Fan-Out ──────────────────────────────────────────────────────
+
+interface FanOutTask {
+  summary: string;
+  agent?: string;
+  flow?: string;
+}
+
+export function fanOut(
+  parentId: string,
+  opts: { tasks: FanOutTask[] }
+): { ok: boolean; childIds?: string[]; message?: string } {
+  const parent = store.getSession(parentId);
+  if (!parent) return { ok: false, message: "Parent session not found" };
+  if (opts.tasks.length === 0) return { ok: false, message: "No tasks provided" };
+
+  const forkGroup = randomUUID().slice(0, 8);
+  const childIds: string[] = [];
+
+  for (const task of opts.tasks) {
+    const child = store.createSession({
+      summary: task.summary,
+      repo: parent.repo || undefined,
+      flow: task.flow ?? "bare",
+      compute_name: parent.compute_name || undefined,
+      workdir: parent.workdir || undefined,
+      group_name: parent.group_name || undefined,
+    });
+    // Set first stage so child is dispatchable
+    const childFlow = task.flow ?? "bare";
+    const firstStage = flow.getFirstStage(childFlow);
+    store.updateSession(child.id, {
+      parent_id: parentId,
+      fork_group: forkGroup,
+      agent: task.agent ?? null,
+      stage: firstStage ?? null,
+      status: "ready",
+    });
+    childIds.push(child.id);
+  }
+
+  // Parent waits for children
+  store.updateSession(parentId, { status: "waiting", fork_group: forkGroup });
+  store.logEvent(parentId, "fan_out", {
+    actor: "system",
+    data: { childCount: childIds.length, forkGroup },
+  });
+
+  return { ok: true, childIds };
+}

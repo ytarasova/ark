@@ -29,6 +29,7 @@ export {
   forkSession, cloneSession, handoff, fork, joinFork, getOutput, send,
   deleteSessionAsync, waitForCompletion, approveReviewGate,
   applyHookStatus, applyReport,
+  retryWithContext, fanOut,
   type HookStatusResult, type ReportResult, type SessionOpResult,
 } from "./session.js";
 
@@ -76,3 +77,18 @@ export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
 
 // Schedules
 export { createSchedule, listSchedules, getSchedule, deleteSchedule, enableSchedule, updateScheduleLastRun, cronMatches, type Schedule } from "./schedule.js";
+
+// Skill extraction
+export { extractSkillCandidates, type SkillCandidate, type ConversationTurn } from "./skill-extractor.js";
+
+// Structured review output
+export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review.js";
+
+// Guardrails
+export { evaluateGuardrail, DEFAULT_RULES, type GuardrailRule } from "./guardrails.js";
+
+// Skills
+export { listSkills, loadSkill, saveSkill, deleteSkill, type SkillDefinition } from "./skill.js";
+
+// Recipes
+export { listRecipes, loadRecipe, instantiateRecipe, type RecipeDefinition, type RecipeVariable, type RecipeInstance } from "./recipe.js";
