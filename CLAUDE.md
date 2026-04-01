@@ -35,7 +35,7 @@ No workspaces config - packages are coordinated manually via relative imports.
 **Core modules** (in dependency order):
 `context.ts` → `store.ts` → `claude.ts` / `flow.ts` / `agent.ts` / `tmux.ts` / `exec.ts` → `session.ts` → `conductor.ts` → `search.ts` / `claude-sessions.ts` / `hooks.ts` / `app.ts` / `config.ts`
 
-**Key entry point:** `session.ts` - all session lifecycle (startSession, dispatch, advance, stop, resume, complete, fork). This is the main orchestration API. `index.ts` re-exports everything.
+**Key entry point:** `session.ts` - all session lifecycle (startSession, dispatch, advance, stop, resume, complete, fork) plus `applyHookStatus` and `applyReport` (moved from conductor.ts to keep mutation logic in one place). This is the main orchestration API. `index.ts` re-exports everything.
 
 ## Key Gotchas
 
@@ -96,6 +96,16 @@ afterEach(() => { ctx.cleanup(); });
 ```
 
 Forgetting `setContext()` pollutes global state. Forgetting `cleanup()` leaks temp dirs under `/tmp/ark-test-*`.
+
+**`withTestContext()` helper** - wraps test setup/teardown into a single call. Preferred over manual `beforeEach`/`afterEach` for new tests:
+```ts
+const ctx = withTestContext();  // handles createTestContext + setContext + cleanup
+```
+
+**`waitFor()` polling utility** - async helper that polls a condition until it returns true (or times out). Useful for testing async state transitions:
+```ts
+await waitFor(() => getSession(id).status === "running");
+```
 
 Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 
@@ -183,6 +193,14 @@ stages:
 
 **Overlay hints:** When a form/overlay is active, status bar shows form controls (`Enter:confirm Esc:cancel`) instead of tab hints. Overlay state flows up via `onOverlayChange` callbacks from tabs to App.tsx to StatusBar.
 
+**Focus system:** The TUI uses `useFocus` context (`packages/tui/hooks/useFocus.ts`) for keyboard input ownership. When a form/overlay opens, it pushes onto the focus stack and takes ownership of all input (including Tab). App-level shortcuts only fire when no child component owns focus.
+
+**SessionsTab sub-components:** SessionsTab was split into focused sub-components: `SessionDetail`, `MoveToGroup`, `GroupManager`, `TalkToSession`, `CloneSession`. Each manages its own overlay lifecycle and reports focus state upward.
+
+**Helper modules:**
+- `helpers/statusBarHints.tsx` - centralized status bar hint generation per tab/pane/overlay state
+- `helpers/sessionFormatting.ts` - shared session display formatting (status colors, labels, summaries)
+
 ## App Boot System
 
 `app.ts` provides `AppContext` - initializes conductor, metrics polling, and config. CLI creates it with `skipConductor: true` (only TUI runs the conductor). `config.ts` loads `~/.ark/config.yaml` for user preferences.
@@ -249,3 +267,4 @@ Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/h
 - **`claude-sessions.ts`** - Read-only discovery of Claude Code sessions from `~/.claude/projects/`. No writes.
 - **`hooks.ts`** - Internal event bus (pub/sub). NOT Claude Code hooks - those are in claude.ts.
 - **`app.ts`** - Boot/shutdown lifecycle. Owns conductor and metrics polling. CLI skips conductor; TUI runs it.
+- **`packages/tui/hooks/useFocus.ts`** - Focus stack context for TUI keyboard input ownership. Overlays push/pop focus to prevent key conflicts with app-level navigation.

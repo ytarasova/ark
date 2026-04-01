@@ -69,6 +69,7 @@
         <li><strong>permission_mode</strong>: bypassPermissions, default</li>
         <li><strong>max_turns</strong>: conversation turn limit</li>
       </ul>
+      <p>Agents are resolved with a 3-tier lookup: <strong>builtin</strong> (shipped with Ark), <strong>project</strong> (in your repo's <code>agents/</code> directory), and <strong>global</strong> (in <code>~/.ark/agents/</code>). Project agents override builtins of the same name, and global agents override both. You can create, edit, copy, and delete custom agents from the TUI Agents tab.</p>
       <p>Built-in agents: <code>planner</code>, <code>implementer</code>, <code>reviewer</code>, <code>documenter</code>, <code>worker</code>.</p>
 
       <h2>Autonomy Levels</h2>
@@ -106,6 +107,9 @@
         <li><strong>approved</strong>: the review gate opens and the flow advances</li>
       </ul>
       <p>Set up by pointing a GitHub webhook at your conductor's <code>/api/webhook/github</code> endpoint.</p>
+
+      <h2>Focus System</h2>
+      <p>The TUI uses a focus stack for keyboard input ownership. When a form or overlay opens, it pushes onto the focus stack and takes ownership of all keyboard input (including Tab). App-level shortcuts only fire when no child component owns focus. This prevents key conflicts between overlays and the main navigation.</p>
 
       <div class="doc-footer">
         <a href="quickstart.html">&larr; Quick Start</a>

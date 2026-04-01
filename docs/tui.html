@@ -34,7 +34,7 @@
       <p>The TUI has 6 tabs accessible via number keys <kbd>1</kbd>&ndash;<kbd>6</kbd>:</p>
       <ol>
         <li><strong>Sessions</strong> &mdash; manage agent sessions</li>
-        <li><strong>Agents</strong> &mdash; view agent definitions</li>
+        <li><strong>Agents</strong> &mdash; create, edit, copy, delete agent definitions</li>
         <li><strong>Tools</strong> &mdash; (coming soon)</li>
         <li><strong>Flows</strong> &mdash; view flow definitions</li>
         <li><strong>History</strong> &mdash; browse and import Claude Code sessions</li>
@@ -105,6 +105,20 @@
       <h3>Detail Pane</h3>
       <p>The detail pane shows session metadata, token usage, channel status, and a live view of agent output. Press <kbd>/</kbd> to search within the conversation history. Use the scroll box to navigate long content.</p>
 
+      <h2>Agents Tab (2)</h2>
+      <p>Manage agent definitions across all three tiers (builtin, project, global).</p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>n</kbd></td><td>New agent</td></tr>
+          <tr><td><kbd>e</kbd></td><td>Edit agent</td></tr>
+          <tr><td><kbd>c</kbd></td><td>Copy agent</td></tr>
+          <tr><td><kbd>x</kbd></td><td>Delete agent</td></tr>
+        </tbody>
+      </table>
+
       <h2>History Tab (5)</h2>
       <p>Shows both Ark sessions and native Claude Code sessions from <code>~/.claude/projects/</code>.</p>
       <table>
@@ -135,6 +149,9 @@
 
       <h2>Status Bar</h2>
       <p>The status bar at the bottom is the single source of truth for available actions. It shows context-sensitive shortcuts that update based on the active tab, pane, and overlay state. Shortcuts are organized with <code>|</code> separators: navigation | session actions | quit. When a form or overlay is open, the status bar switches to show form controls (<kbd>Enter</kbd> confirm, <kbd>Esc</kbd> cancel) instead of tab shortcuts.</p>
+
+      <h2>Focus</h2>
+      <p>When a form or overlay is open (new session, talk, move-to-group, etc.), it takes ownership of all keyboard input. App-level shortcuts like tab switching and navigation are blocked until the overlay is dismissed. The status bar updates to show only the controls relevant to the active overlay.</p>
 
       <h2>Tips</h2>
       <div class="callout tip">
