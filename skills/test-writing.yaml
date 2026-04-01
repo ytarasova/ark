@@ -1,0 +1,8 @@
+name: test-writing
+description: Writes comprehensive tests for existing code
+prompt: |
+  Analyze the specified code and write comprehensive tests.
+  Cover: happy path, edge cases, error conditions, boundary values.
+  Follow existing test patterns in the project.
+  Use the project's test framework and conventions.
+tags: [testing, quality]

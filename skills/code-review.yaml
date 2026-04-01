@@ -1,0 +1,7 @@
+name: code-review
+description: Reviews code changes for bugs, style, and best practices
+prompt: |
+  Review the code changes in the current branch (git diff main...HEAD).
+  Check for: bugs, security issues, performance problems, style violations.
+  Rate each issue P0-P3. Suggest specific fixes with code.
+tags: [review, quality]
