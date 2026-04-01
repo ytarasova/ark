@@ -2,7 +2,7 @@
  * EC2 compute provider - implements ComputeProvider for AWS EC2 instances.
  *
  * Ties together all EC2 modules: SSH, cloud-init, sync, metrics, ports.
- * Provision/destroy are stubbed until the Pulumi-based provision module lands.
+ * Provision/destroy via Pulumi with cloud-init. Full lifecycle: provision, start, stop, reboot, destroy.
  */
 
 import { existsSync, readFileSync } from "fs";
@@ -28,7 +28,7 @@ import type {
 } from "../../types.js";
 import type { Compute, Session } from "../../../core/store.js";
 import { updateCompute, mergeComputeConfig, sessionChannelPort } from "../../../core/store.js";
-import { sshKeyPath, sshExec, sshExecAsync, waitForSsh, waitForSshAsync, generateSshKey } from "./ssh.js";
+import { sshKeyPath, sshExec, sshExecAsync, waitForSsh, waitForSshAsync, generateSshKey, rsyncPush } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
 import { syncToHost, syncProjectFiles, refreshRemoteToken } from "./sync.js";
@@ -203,6 +203,29 @@ async function uploadSessionConfigs(
     const encoded = Buffer.from(readFileSync(localHooksConfig, "utf-8")).toString("base64");
     await sshExecAsync(key, ip,
       `mkdir -p ${remoteWorkdir}/.claude && echo '${encoded}' | base64 -d > ${remoteWorkdir}/.claude/settings.local.json`,
+      { timeout: 15_000 });
+  }
+
+  // Sync .claude/commands/ if it exists
+  const commandsDir = join(opts.workdir, ".claude", "commands");
+  if (existsSync(commandsDir)) {
+    await sshExecAsync(key, ip, `mkdir -p ${remoteWorkdir}/.claude/commands`, { timeout: 15_000 });
+    await rsyncPush(key, ip, commandsDir + "/", `${remoteWorkdir}/.claude/commands/`);
+  }
+
+  // Sync .claude/skills/ if it exists
+  const skillsDir = join(opts.workdir, ".claude", "skills");
+  if (existsSync(skillsDir)) {
+    await sshExecAsync(key, ip, `mkdir -p ${remoteWorkdir}/.claude/skills`, { timeout: 15_000 });
+    await rsyncPush(key, ip, skillsDir + "/", `${remoteWorkdir}/.claude/skills/`);
+  }
+
+  // Sync CLAUDE.md if it exists
+  const claudeMd = join(opts.workdir, "CLAUDE.md");
+  if (existsSync(claudeMd)) {
+    const encoded = Buffer.from(readFileSync(claudeMd, "utf-8")).toString("base64");
+    await sshExecAsync(key, ip,
+      `echo '${encoded}' | base64 -d > ${remoteWorkdir}/CLAUDE.md`,
       { timeout: 15_000 });
   }
 
