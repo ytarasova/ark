@@ -90,7 +90,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const authStatus = useAuthStatus(selectedCompute);
 
   useInput((input, key) => {
-    if (pane !== "left" || formOverlay || hasOverlay) return;
+    if (pane !== "left" || hasOverlay) return;
 
     // Global keys — work regardless of selection
     if (input === "n") { onShowForm(); return; }

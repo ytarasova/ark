@@ -117,14 +117,14 @@ function AppInner() {
         <SessionsTab
           {...store}
           pane={pane}
-          async={sessionsAsync}
+          asyncState={sessionsAsync}
           onShowForm={() => setShowForm("session")}
           onSelectionChange={setSelectedSession}
 
           formOverlay={showForm === "session" ? (
             <NewSessionForm
               store={store}
-              async={sessionsAsync}
+              asyncState={sessionsAsync}
               onDone={() => { setShowForm(null); setSessionPrefill(undefined); store.refresh(); }}
               prefill={sessionPrefill}
             />
@@ -145,7 +145,7 @@ function AppInner() {
         <HistoryTab
           {...store}
           pane={pane}
-          async={historyAsync}
+          asyncState={historyAsync}
 
           onImport={(prefill) => {
             setSessionPrefill(prefill);
@@ -157,10 +157,10 @@ function AppInner() {
         <ComputeTab
           {...store}
           pane={pane}
-          async={computeAsync}
+          asyncState={computeAsync}
           onShowForm={() => setShowForm("compute")}
           formOverlay={showForm === "compute" ? (
-            <NewComputeForm async={computeAsync} onDone={() => { setShowForm(null); store.refresh(); }} />
+            <NewComputeForm asyncState={computeAsync} onDone={() => { setShowForm(null); store.refresh(); }} />
           ) : undefined}
         />
       ) : null}

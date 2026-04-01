@@ -25,14 +25,14 @@ export interface SessionPrefill {
 
 interface NewSessionFormProps {
   store: StoreData;
-  async: AsyncState;
+  asyncState: AsyncState;
   onDone: () => void;
   prefill?: SessionPrefill;
 }
 
 // Isolation choices are provider-driven — see ComputeProvider.isolationModes
 
-export function NewSessionForm({ store, async: asyncState, onDone, prefill }: NewSessionFormProps) {
+export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessionFormProps) {
   const [name, setName] = useState(prefill?.name || generateName());
   const [repoPath, setRepoPath] = useState(prefill?.repo || process.cwd());
   const [isolation, setIsolation] = useState("worktree");

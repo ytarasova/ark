@@ -30,7 +30,7 @@ export function FlowsTab({ flows, pane }: FlowsTabProps) {
             return `${source} ${p.name.padEnd(16)} ${p.stages.length} stages`;
           }}
           sel={sel}
-          emptyMessage="No flows found."
+          emptyMessage="  No flows found."
         />
       }
       right={<FlowDetail flow={selected} pane={pane} />}
@@ -47,7 +47,7 @@ interface FlowDetailProps {
 
 function FlowDetail({ flow, pane }: FlowDetailProps) {
   if (!flow) {
-    return <Box flexGrow={1}><Text dimColor>{"  No flow selected"}</Text></Box>;
+    return <Box flexGrow={1}><Text dimColor>{"  No flow selected."}</Text></Box>;
   }
 
   const p = useMemo(() => {

@@ -11,6 +11,8 @@ import {
   getOverlayHints,
   getSessionHints,
   getComputeHints,
+  getToolsHints,
+  getFlowsHints,
 } from "../helpers/statusBarHints.js";
 import type { Session } from "../../core/index.js";
 
@@ -152,6 +154,25 @@ describe("getComputeHints", () => {
     expect(hasLabel(hints, "delete")).toBe(true);
     expect(hasLabel(hints, "clean")).toBe(true);
     expect(hasLabel(hints, "new")).toBe(true);
+    expect(hasLabel(hints, "quit")).toBe(true);
+  });
+});
+
+describe("getToolsHints", () => {
+  it("includes nav, delete, and quit hints", () => {
+    const hints = getToolsHints();
+    expect(hasKey(hints, "j/k")).toBe(true);
+    expect(hasLabel(hints, "delete")).toBe(true);
+    expect(hasLabel(hints, "quit")).toBe(true);
+  });
+});
+
+describe("getFlowsHints", () => {
+  it("includes nav, Tab detail, and quit hints", () => {
+    const hints = getFlowsHints();
+    expect(hasKey(hints, "j/k")).toBe(true);
+    expect(hasKey(hints, "Tab")).toBe(true);
+    expect(hasLabel(hints, "detail")).toBe(true);
     expect(hasLabel(hints, "quit")).toBe(true);
   });
 });

@@ -154,6 +154,8 @@ export function getAgentsHints(): React.ReactNode[] {
 
 export function getToolsHints(): React.ReactNode[] {
   return [
+    ...NAV_HINTS, sep(0),
+    <KeyHint key="x" k="x" label="delete" />, sep(1),
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
@@ -161,7 +163,7 @@ export function getToolsHints(): React.ReactNode[] {
 export function getFlowsHints(): React.ReactNode[] {
   return [
     ...NAV_HINTS,
-    <KeyHint key="tab" k="Tab" label="detail" />,
+    <KeyHint key="tab" k="Tab" label="detail" />, sep(0),
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }

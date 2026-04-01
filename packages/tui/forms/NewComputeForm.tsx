@@ -10,7 +10,7 @@ import type { AsyncState } from "../hooks/useAsync.js";
 type Step = "name" | "provider" | "image" | "size" | "arch" | "region" | "profile";
 
 interface NewComputeFormProps {
-  async: AsyncState;
+  asyncState: AsyncState;
   onDone: () => void;
 }
 
@@ -53,7 +53,7 @@ const PROVIDER_OPTIONS = [
   { label: "ec2-firecracker", value: "ec2-firecracker" },
 ];
 
-export function NewComputeForm({ async: asyncState, onDone }: NewComputeFormProps) {
+export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState(generateName());
   const [provider, setProvider] = useState("");

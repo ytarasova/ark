@@ -4,7 +4,7 @@ import Spinner from "ink-spinner";
 import * as core from "../../core/index.js";
 import { ago } from "../helpers.js";
 import { SplitPane } from "../components/SplitPane.js";
-import { ScrollBox } from "../components/ScrollBox.js";
+import { TreeList } from "../components/TreeList.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { KeyValue } from "../components/KeyValue.js";
@@ -17,7 +17,7 @@ import type { AsyncState } from "../hooks/useAsync.js";
 
 interface HistoryTabProps extends StoreData {
   pane: "left" | "right";
-  async: AsyncState;
+  asyncState: AsyncState;
   onImport?: (prefill: { name?: string; repo?: string; claudeSessionId?: string }) => void;
 }
 
@@ -66,7 +66,7 @@ function buildHistoryItems(arkSessions: any[], claudeSessions: core.ClaudeSessio
   return items;
 }
 
-export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, refresh, onImport }: HistoryTabProps) {
+export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, onImport }: HistoryTabProps) {
   const focus = useFocus();
   const [claudeSessions, setClaudeSessions] = useState<core.ClaudeSession[]>([]);
   const [searchResults, setSearchResults] = useState<core.SearchResult[]>([]);
@@ -207,38 +207,42 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
             {asyncState.loading && historyItems.length === 0 ? (
               <Text><Spinner type="dots" /> <Text dimColor>{asyncState.label || "loading..."}</Text></Text>
             ) : mode === "recent" ? (
-              historyItems.length === 0 ? (
-                <Text dimColor>{"No sessions found"}</Text>
-              ) : (
-                <ScrollBox followIndex={sel} active={false} reserveRows={9}>
-                  {historyItems.map((item, idx) => {
-                    const label = item.summary || (item.claudeSession?.project.split("/").pop() ?? item.id.slice(0, 8));
-                    const tag = item.type === "ark" ? " ARK " : "     ";
-                    return (
-                      <Text key={item.id} wrap="truncate">
-                        {idx === sel ? ">" : " "}
-                        <Text color={item.type === "ark" ? "green" : "dim"}>{item.date.slice(5)}</Text>
-                        <Text color={item.type === "ark" ? "green" : undefined} bold={item.type === "ark"}>{tag}</Text>
-                        {label}
-                      </Text>
-                    );
-                  })}
-                </ScrollBox>
-              )
-            ) : (
-              searchResults.length === 0 ? (
-                <Text dimColor>{"No results"}</Text>
-              ) : (
-                <ScrollBox followIndex={sel} active={false} reserveRows={9}>
-                  {searchResults.map((r, idx) => (
-                    <Text key={`${r.sessionId}-${idx}`} wrap="truncate">
-                      {idx === sel ? ">" : " "}
-                      <Text color={r.source === "transcript" ? "magenta" : "cyan"}>{r.source.slice(0, 4).padEnd(4)}</Text>
-                      {` ${r.match?.slice(0, 50) || ""}`}
+              <TreeList
+                items={historyItems}
+                renderRow={(item) => {
+                  const label = item.summary || (item.claudeSession?.project.split("/").pop() ?? item.id.slice(0, 8));
+                  const tag = item.type === "ark" ? " ARK " : "     ";
+                  return `${item.date.slice(5)}${tag}${label}`;
+                }}
+                renderColoredRow={(item) => {
+                  const label = item.summary || (item.claudeSession?.project.split("/").pop() ?? item.id.slice(0, 8));
+                  const tag = item.type === "ark" ? " ARK " : "     ";
+                  return (
+                    <Text wrap="truncate">
+                      {"  "}<Text color={item.type === "ark" ? "green" : "dim"}>{item.date.slice(5)}</Text>
+                      <Text color={item.type === "ark" ? "green" : undefined} bold={item.type === "ark"}>{tag}</Text>
+                      {label}
                     </Text>
-                  ))}
-                </ScrollBox>
-              )
+                  );
+                }}
+                sel={sel}
+                emptyMessage="  No sessions found."
+              />
+            ) : (
+              <TreeList
+                items={searchResults}
+                renderRow={(r) => {
+                  return `${r.source.slice(0, 4).padEnd(4)} ${r.match?.slice(0, 50) || ""}`;
+                }}
+                renderColoredRow={(r) => (
+                  <Text wrap="truncate">
+                    {"  "}<Text color={r.source === "transcript" ? "magenta" : "cyan"}>{r.source.slice(0, 4).padEnd(4)}</Text>
+                    {` ${r.match?.slice(0, 50) || ""}`}
+                  </Text>
+                )}
+                sel={sel}
+                emptyMessage="  No results found."
+              />
             )}
           </Box>
         }
@@ -253,7 +257,7 @@ export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, ref
 // -- Detail ------------------------------------------------------------------
 
 function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null; pane: string; conversation: string[] }) {
-  if (!item) return <Box flexGrow={1}><Text dimColor>{"Select a session"}</Text></Box>;
+  if (!item) return <Box flexGrow={1}><Text dimColor>{"  No session selected."}</Text></Box>;
 
   if (item.type === "ark") {
     const s = item.arkSession;

@@ -145,7 +145,7 @@ export function ToolsTab({ pane, asyncState, refresh }: ToolsTabProps) {
             return `${item.name.padEnd(20)} ${item.description}`;
           }}
           sel={sel}
-          emptyMessage="No tools found."
+          emptyMessage="  No tools found."
         />
       }
       right={
@@ -174,7 +174,7 @@ function ToolDetail({ item, pane, statusMessage }: {
   statusMessage: string | null;
 }) {
   if (!item) {
-    return <Box flexGrow={1}><Text dimColor>{"  No tool selected"}</Text></Box>;
+    return <Box flexGrow={1}><Text dimColor>{"  No tool selected."}</Text></Box>;
   }
 
   return (

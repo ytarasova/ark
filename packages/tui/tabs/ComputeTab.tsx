@@ -45,9 +45,10 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
 
   const selected = computes[sel] ?? null;
 
+  const hasOverlay = !!formOverlay;
+
   useInput((input, key) => {
-    if (formOverlay) return;
-    if (pane === "right") return;
+    if (pane !== "left" || hasOverlay) return;
 
     if (key.return) {
       if (selected && (selected.status === "stopped" || selected.status === "destroyed")) {

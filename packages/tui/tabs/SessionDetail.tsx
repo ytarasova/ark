@@ -73,7 +73,7 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
   );
 
   if (!s) {
-    return <Box flexGrow={1}><Text dimColor>{"  No session selected"}</Text></Box>;
+    return <Box flexGrow={1}><Text dimColor>{"  No session selected."}</Text></Box>;
   }
 
   return (

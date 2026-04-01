@@ -92,7 +92,7 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
             return `${a.name.padEnd(18)} ${a.model.padEnd(8)} ${a.description}`;
           }}
           sel={sel}
-          emptyMessage="No agents found."
+          emptyMessage="  No agents found."
         />
       }
       right={
@@ -120,7 +120,7 @@ function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
   projectRoot?: string;
 }) {
   if (!agent) {
-    return <Box flexGrow={1}><Text dimColor>{"  No agent selected"}</Text></Box>;
+    return <Box flexGrow={1}><Text dimColor>{"  No agent selected."}</Text></Box>;
   }
 
   const a = useMemo(() => {
