@@ -19,10 +19,11 @@ import { MoveToGroup } from "./MoveToGroup.js";
 import { GroupManager } from "./GroupManager.js";
 import { TalkToSession } from "./TalkToSession.js";
 import { CloneSession } from "./CloneSession.js";
+import { SessionReplay } from "./SessionReplay.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
-type Overlay = "move" | "group" | "talk" | "inbox" | "clone" | "search" | null;
+type Overlay = "move" | "group" | "talk" | "inbox" | "clone" | "search" | "replay" | null;
 
 interface SessionsTabProps extends StoreData {
   asyncState: AsyncState;
@@ -59,7 +60,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   // Push/pop focus when overlay opens/closes
   useEffect(() => {
     if (overlay) focus.push(overlay);
-    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("clone"), focus.pop("search");
+    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("clone"), focus.pop("search"), focus.pop("replay");
   }, [overlay]);
 
   const selected = topLevel[sel] ?? null;
@@ -121,7 +122,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         actions.stop(selected.id);
       }
     } else if (input === "r") {
-      if (["blocked", "failed", "stopped", "completed"].includes(selected.status)) {
+      if (["completed", "stopped", "failed"].includes(selected.status)) {
+        setOverlay("replay");
+      } else if (selected.status === "blocked") {
         actions.restart(selected.id);
       }
     } else if (input === "c") {
@@ -310,6 +313,12 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
                 }
                 setOverlay(null);
               }}
+            />
+          )
+          : overlay === "replay" && selected ? (
+            <SessionReplay
+              session={selected}
+              onClose={() => setOverlay(null)}
             />
           )
           : <SessionDetail

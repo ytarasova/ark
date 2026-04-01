@@ -50,6 +50,13 @@ export function getOverlayHints(overlay: string): React.ReactNode[] {
       return [
         <KeyHint key="esc" k="Esc" label="close" />,
       ];
+    case "replay":
+      return [
+        <KeyHint key="jk" k="j/k" label="step" />,
+        <KeyHint key="enter" k="Enter" label="expand" />,
+        <KeyHint key="/" k="/" label="search" />,
+        <KeyHint key="esc" k="Esc" label="close" />,
+      ];
     default:
       return [
         <KeyHint key="esc" k="Esc" label="cancel" />,
@@ -95,6 +102,7 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
       case "failed":
       case "completed":
         hints.push(<KeyHint key="enter" k="Enter" label="restart" />);
+        hints.push(<KeyHint key="r" k="r" label="replay" />);
         break;
       case "waiting":
         hints.push(<KeyHint key="a" k="a" label="attach" />);
