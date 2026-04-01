@@ -7,7 +7,22 @@ import { withTestContext } from "../../core/__tests__/test-helpers.js";
 describe("ToolsTab", () => {
   withTestContext();
 
-  it("renders skills and recipes sections", async () => {
+  it("renders all category groups", async () => {
+    const { ToolsTab } = await import("../tabs/ToolsTab.js");
+    const { lastFrame } = render(
+      <FocusProvider>
+        <ToolsTab pane="left" />
+      </FocusProvider>
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("MCP Servers");
+    expect(frame).toContain("Commands");
+    expect(frame).toContain("Skills");
+    expect(frame).toContain("Recipes");
+    expect(frame).toContain("Context");
+  });
+
+  it("renders Skills group (includes ark skills)", async () => {
     const { ToolsTab } = await import("../tabs/ToolsTab.js");
     const { lastFrame } = render(
       <FocusProvider>
@@ -18,7 +33,7 @@ describe("ToolsTab", () => {
     expect(frame).toContain("Skills");
   });
 
-  it("renders recipes group", async () => {
+  it("renders Recipes group", async () => {
     const { ToolsTab } = await import("../tabs/ToolsTab.js");
     const { lastFrame } = render(
       <FocusProvider>
@@ -37,7 +52,32 @@ describe("ToolsTab", () => {
       </FocusProvider>
     );
     const frame = lastFrame();
-    // Should show details pane (either "Details" title or tool info)
+    // Should show details pane title
     expect(frame).toBeDefined();
+    expect(frame).toContain("Details");
+  });
+
+  it("shows empty group placeholders for MCP Servers and Commands", async () => {
+    const { ToolsTab } = await import("../tabs/ToolsTab.js");
+    const { lastFrame } = render(
+      <FocusProvider>
+        <ToolsTab pane="left" />
+      </FocusProvider>
+    );
+    const frame = lastFrame();
+    // These groups should appear even when empty
+    expect(frame).toContain("MCP Servers");
+    expect(frame).toContain("Commands");
+  });
+
+  it("renders Tools as left panel title", async () => {
+    const { ToolsTab } = await import("../tabs/ToolsTab.js");
+    const { lastFrame } = render(
+      <FocusProvider>
+        <ToolsTab pane="left" />
+      </FocusProvider>
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("Tools");
   });
 });
