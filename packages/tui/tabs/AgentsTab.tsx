@@ -88,8 +88,8 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
       left={
         <TreeList
           items={agents}
-          renderRow={(a) => {
-            const marker = agents.indexOf(a) === sel ? ">" : " ";
+          renderRow={(a, isSelected) => {
+            const marker = isSelected ? ">" : " ";
             return `${marker} ${a.name.padEnd(18)} ${a.model.padEnd(8)} ${a.description}`;
           }}
           sel={sel}
