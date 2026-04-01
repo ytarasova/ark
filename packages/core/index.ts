@@ -86,3 +86,6 @@ export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review
 
 // Guardrails
 export { evaluateGuardrail, DEFAULT_RULES, type GuardrailRule } from "./guardrails.js";
+
+// Unified tool discovery
+export { discoverTools, removeMcpServer, removeCommand, getCommand, addMcpServer, addCommand, type ToolEntry } from "./tools.js";
