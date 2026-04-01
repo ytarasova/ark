@@ -287,8 +287,8 @@ export function parseSnapshot(stdout: string): ComputeSnapshot {
  * Fetch fast metrics from an EC2 host via SSH.
  * Runs SSH_FAST_CMD and parses the output into a ComputeSnapshot.
  */
-export function fetchMetrics(key: string, ip: string): ComputeSnapshot {
-  const { stdout } = sshExec(key, ip, SSH_FAST_CMD, { timeout: 15_000 });
+export async function fetchMetrics(key: string, ip: string): Promise<ComputeSnapshot> {
+  const { stdout } = await sshExec(key, ip, SSH_FAST_CMD, { timeout: 15_000 });
   return parseSnapshot(stdout);
 }
 
@@ -304,8 +304,8 @@ export async function fetchMetricsAsync(key: string, ip: string): Promise<Comput
  * Fetch docker metrics from an EC2 host via SSH.
  * Runs SSH_DOCKER_CMD and parses the output (only docker fields populated).
  */
-export function fetchDocker(key: string, ip: string): ComputeSnapshot {
-  const { stdout } = sshExec(key, ip, SSH_DOCKER_CMD, { timeout: 30_000 });
+export async function fetchDocker(key: string, ip: string): Promise<ComputeSnapshot> {
+  const { stdout } = await sshExec(key, ip, SSH_DOCKER_CMD, { timeout: 30_000 });
   return parseSnapshot(stdout);
 }
 

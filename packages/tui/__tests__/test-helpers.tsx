@@ -13,7 +13,7 @@ import type { Session, Compute } from "../../core/index.js";
 export function renderWithStore(
   ui: React.ReactElement,
   storeOverrides?: Partial<StoreData>,
-) {
+): ReturnType<typeof render> {
   const store = createMockStore(storeOverrides);
   return render(
     <StoreProvider store={store}>

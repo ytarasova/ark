@@ -15,7 +15,7 @@ export interface ThreadMessage {
   content: string;
   type: string;
   created_at: string;
-  read: number;
+  read: boolean;
   sessionName: string;
   time: string;
 }

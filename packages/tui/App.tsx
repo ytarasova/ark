@@ -63,15 +63,15 @@ function AppInner() {
     if (!process.env.TMUX) return;
     asyncState.run("Copying screen...", async () => {
       await new Promise<void>((resolve) => {
-        execFile("tmux", ["capture-pane", "-S", "-"], { stdio: "pipe" }, () => {
+        execFile("tmux", ["capture-pane", "-S", "-"], ((_err) => {
           execFile("tmux", ["save-buffer", "-"], { encoding: "utf-8" }, (err, content) => {
             if (!err && content) {
-              execFile("pbcopy", [], { stdio: ["pipe", "pipe", "pipe"] }, () => resolve()).stdin?.end(content);
+              execFile("pbcopy", [], ((() => resolve()) as any)).stdin?.end(content);
             } else {
               resolve();
             }
           });
-        });
+        }) as any);
       });
     });
   }, [asyncState]);

@@ -254,7 +254,7 @@ describe("Conductor E2E — report pipeline", () => {
 
   it("health endpoint returns ok", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/health`);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.status).toBe("ok");
   });
 });

@@ -10,6 +10,7 @@
  *   await waitFor(() => someCondition());
  */
 
+import { beforeEach, afterAll } from "bun:test";
 import { createTestContext, setContext, resetContext, type TestContext } from "../context.js";
 
 /**

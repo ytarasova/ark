@@ -22,9 +22,9 @@ function mockAsyncState() {
     label: null,
     error: null,
     ran: [],
-    run(label: string, fn: () => void | Promise<void>) {
+    run(label: string, fn: (updateLabel: (msg: string) => void) => void | Promise<void>) {
       state.ran.push({ label, fn });
-      try { fn(); } catch {} // Execute sync side-effects for testing
+      try { fn(() => {}); } catch {} // Execute sync side-effects for testing
     },
     clearError() {},
     async flush() {
@@ -39,18 +39,31 @@ function mockAsyncState() {
 function mockProvider(name = "mock") {
   return {
     name,
+    isolationModes: [],
+    canReboot: false,
+    canDelete: true,
+    supportsWorktree: false,
+    initialStatus: "running",
+    needsAuth: false,
     provision: async () => {},
     destroy: async () => {},
     start: async () => {},
     stop: async () => {},
     launch: async () => "",
     attach: async () => {},
+    killAgent: async () => {},
+    captureOutput: async () => "",
+    cleanupSession: async () => {},
     getMetrics: async () => ({
-      cpu: 0, memUsedGb: 0, memTotalGb: 0, memPct: 0,
-      diskPct: 0, netRxMb: 0, netTxMb: 0, uptime: "0s", idleTicks: 0,
+      metrics: { cpu: 0, memUsedGb: 0, memTotalGb: 0, memPct: 0, diskPct: 0, netRxMb: 0, netTxMb: 0, uptime: "0s", idleTicks: 0 },
+      sessions: [], processes: [], docker: [],
     }),
     probePorts: async () => [],
     syncEnvironment: async () => {},
+    checkSession: async () => false,
+    getAttachCommand: () => [],
+    buildChannelConfig: () => ({}),
+    buildLaunchEnv: () => ({}),
   };
 }
 

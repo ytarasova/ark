@@ -47,12 +47,14 @@ class TestArkdProvider extends ArkdBackedProvider {
 const provider = new TestArkdProvider();
 
 // Minimal Compute + Session objects for tests
-const compute: Compute = {
+const compute = {
   id: "test-compute",
   name: "test",
   provider: "test-arkd",
   status: "running",
   config: {},
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
 } as Compute;
 
 function makeSession(sessionId?: string): Session {

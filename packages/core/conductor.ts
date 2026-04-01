@@ -110,8 +110,9 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
   // Index transcript
   if (result.shouldIndex && result.indexTranscript) {
-    await safeAsync("transcript indexing", async () =>
-      indexSession(result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId));
+    await safeAsync("transcript indexing", async () => {
+      indexSession(result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId);
+    });
   }
 
   return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });

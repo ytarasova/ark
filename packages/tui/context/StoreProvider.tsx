@@ -46,6 +46,7 @@ export function createMockStore(overrides?: Partial<StoreData>): StoreData {
     computeLogs: new Map(),
     addComputeLog: () => {},
     refreshing: false,
+    initialLoading: false,
     refresh: () => {},
     ...overrides,
   };

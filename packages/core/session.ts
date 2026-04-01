@@ -367,7 +367,7 @@ export function cloneSession(sessionId: string, newName?: string): SessionOpResu
 
 export async function handoff(sessionId: string, toAgent: string, instructions?: string): Promise<{ ok: boolean; message: string }> {
   const result = cloneSession(sessionId, instructions);
-  if (!result.ok) return { ok: false, message: result.message };
+  if (!result.ok) return { ok: false, message: (result as { ok: false; message: string }).message };
 
   store.logEvent(result.sessionId, "session_handoff", {
     actor: "user",
@@ -833,10 +833,10 @@ async function setupWorktree(repoPath: string, sessionId: string, branch?: strin
 
   const branchName = branch ?? `ark-${sessionId}`;
   try {
-    await execFileAsync("git", ["-C", repoPath, "worktree", "prune"], { stdio: "pipe" });
+    await execFileAsync("git", ["-C", repoPath, "worktree", "prune"], { encoding: "utf-8" });
     // Try with new branch
     try {
-      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], { stdio: "pipe" });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], { encoding: "utf-8" });
       return wtPath;
     } catch (e: any) {
       if (!String(e).includes("already exists")) {
@@ -845,7 +845,7 @@ async function setupWorktree(repoPath: string, sessionId: string, branch?: strin
     }
     // Try existing branch
     try {
-      await execFileAsync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], { stdio: "pipe" });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], { encoding: "utf-8" });
       return wtPath;
     } catch (e: any) {
       if (!String(e).includes("already checked out") && !String(e).includes("already exists")) {
@@ -854,7 +854,7 @@ async function setupWorktree(repoPath: string, sessionId: string, branch?: strin
     }
     // Unique branch
     try {
-      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], { stdio: "pipe" });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], { encoding: "utf-8" });
       return wtPath;
     } catch (e: any) {
       console.error(`setupWorktree: all worktree strategies failed for ${sessionId}:`, e?.message ?? e);
@@ -924,7 +924,7 @@ export interface HookStatusResult {
   /** Events to log */
   events?: Array<{ type: string; opts: { actor?: string; stage?: string; data?: Record<string, unknown> } }>;
   /** Usage data parsed from transcript */
-  usage?: { total_tokens: number; [key: string]: unknown };
+  usage?: claude.TranscriptUsage;
   /** Transcript indexing info */
   indexTranscript?: { transcriptPath: string; sessionId: string };
 }
@@ -1055,12 +1055,12 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
     opts: {
       stage: report.stage,
       actor: "agent",
-      data: report as Record<string, unknown>,
+      data: report as unknown as Record<string, unknown>,
     },
   });
 
   // Build message content for TUI chat view
-  const r = report as Record<string, unknown>;
+  const r = report as unknown as Record<string, unknown>;
   const contentByType: Record<string, string | undefined> = {
     completed: (r.summary || r.message) as string | undefined,
     question:  (r.question || r.message) as string | undefined,
@@ -1085,7 +1085,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
   result.busEvents!.push({
     type: `agent_${report.type}`,
     sessionId,
-    data: { stage: report.stage, data: report as Record<string, unknown> },
+    data: { stage: report.stage, data: report as unknown as Record<string, unknown> },
   });
 
   // Handle by type

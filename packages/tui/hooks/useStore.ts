@@ -53,7 +53,7 @@ async function reconcileSessions(sessions: core.Session[]): Promise<void> {
   }
 }
 
-type Payload = Omit<StoreData, "refreshing" | "refresh" | "addComputeLog">;
+type Payload = Omit<StoreData, "refreshing" | "refresh" | "addComputeLog" | "initialLoading">;
 
 /** Fetch all store data in one shot. */
 async function fetchAll(prev: Payload, metricsThisCycle: boolean): Promise<Payload> {

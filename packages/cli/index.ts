@@ -162,8 +162,8 @@ session.command("dispatch")
 session.command("stop")
   .description("Stop a session")
   .argument("<id>")
-  .action((id) => {
-    const r = core.stop(id);
+  .action(async (id) => {
+    const r = await core.stop(id);
     console.log(r.ok ? chalk.yellow("Stopped") : chalk.red(r.message));
   });
 
@@ -246,7 +246,7 @@ session.command("clone")
       console.log(chalk.green(`Cloned → ${r.sessionId}`));
       if (opts.dispatch) await core.dispatch(r.sessionId);
     } else {
-      console.log(chalk.red(r.message));
+      console.log(chalk.red((r as { ok: false; message: string }).message));
     }
   });
 
@@ -266,7 +266,8 @@ session.command("fork")
   .argument("<task>")
   .action((parentId, task) => {
     const r = core.fork(parentId, task);
-    console.log(r.ok ? chalk.green(`Forked → ${r.sessionId}`) : chalk.red(r.message));
+    if (r.ok) console.log(chalk.green(`Forked → ${r.sessionId}`));
+    else console.log(chalk.red((r as { ok: false; message: string }).message));
   });
 
 session.command("join")

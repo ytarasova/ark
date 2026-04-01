@@ -12,14 +12,14 @@ export function useSessionActions(asyncState: AsyncState) {
 
   return {
     dispatch: (id: string) => {
-      run(`Dispatching ${id}`, (updateLabel) =>
-        core.dispatch(id, {
+      run(`Dispatching ${id}`, async (updateLabel) => {
+        await core.dispatch(id, {
           onLog: (msg) => {
             updateLabel(msg);
             core.logEvent(id, "dispatch_progress", { actor: "system", data: { message: msg } });
           },
-        }),
-      );
+        });
+      });
     },
 
     restart: (id: string) => {
@@ -31,7 +31,7 @@ export function useSessionActions(asyncState: AsyncState) {
     },
 
     stop: (id: string) => {
-      run(`Stopping ${id}`, () => core.stop(id));
+      run(`Stopping ${id}`, async () => { await core.stop(id); });
     },
 
     complete: (id: string) => {
@@ -39,7 +39,7 @@ export function useSessionActions(asyncState: AsyncState) {
     },
 
     delete: (id: string) => {
-      run(`Deleting ${id}`, () => core.deleteSessionAsync(id));
+      run(`Deleting ${id}`, async () => { await core.deleteSessionAsync(id); });
     },
 
     fork: (sourceId: string, groupName?: string | null) => {

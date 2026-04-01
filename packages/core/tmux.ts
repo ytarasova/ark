@@ -64,7 +64,7 @@ export function sessionExists(name: string): boolean {
 /** Check if a tmux session exists (async) */
 export async function sessionExistsAsync(name: string): Promise<boolean> {
   try {
-    await execFileAsync("tmux", ["has-session", "-t", name], { stdio: ["pipe", "pipe", "pipe"] });
+    await execFileAsync("tmux", ["has-session", "-t", name], { encoding: "utf-8" });
     return true;
   } catch {
     return false;

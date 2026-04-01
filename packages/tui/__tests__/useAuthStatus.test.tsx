@@ -39,6 +39,11 @@ function mockCompute(overrides?: Partial<Compute>): Compute {
 function mockRemoteProvider(name = "mock-remote") {
   return {
     name,
+    isolationModes: [],
+    canReboot: false,
+    canDelete: true,
+    supportsWorktree: false,
+    initialStatus: "running",
     needsAuth: true,
     provision: async () => {},
     destroy: async () => {},
@@ -46,12 +51,19 @@ function mockRemoteProvider(name = "mock-remote") {
     stop: async () => {},
     launch: async () => "",
     attach: async () => {},
+    killAgent: async () => {},
+    captureOutput: async () => "",
+    cleanupSession: async () => {},
     getMetrics: async () => ({
-      cpu: 0, memUsedGb: 0, memTotalGb: 0, memPct: 0,
-      diskPct: 0, netRxMb: 0, netTxMb: 0, uptime: "0s", idleTicks: 0,
+      metrics: { cpu: 0, memUsedGb: 0, memTotalGb: 0, memPct: 0, diskPct: 0, netRxMb: 0, netTxMb: 0, uptime: "0s", idleTicks: 0 },
+      sessions: [], processes: [], docker: [],
     }),
     probePorts: async () => [],
     syncEnvironment: async () => {},
+    checkSession: async () => false,
+    getAttachCommand: () => [],
+    buildChannelConfig: () => ({}),
+    buildLaunchEnv: () => ({}),
   };
 }
 

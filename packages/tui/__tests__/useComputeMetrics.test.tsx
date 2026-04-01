@@ -50,12 +50,21 @@ function makeCompute(overrides: Partial<Compute> & { name: string; provider: str
 function mockProvider(name = "mock") {
   return {
     name,
+    isolationModes: [],
+    canReboot: false,
+    canDelete: true,
+    supportsWorktree: false,
+    initialStatus: "running",
+    needsAuth: false,
     provision: async () => {},
     destroy: async () => {},
     start: async () => {},
     stop: async () => {},
     launch: async () => "",
     attach: async () => {},
+    killAgent: async () => {},
+    captureOutput: async () => "",
+    cleanupSession: async () => {},
     getMetrics: async () => ({
       metrics: {
         cpu: 42,
@@ -74,6 +83,10 @@ function mockProvider(name = "mock") {
     }),
     probePorts: async () => [],
     syncEnvironment: async () => {},
+    checkSession: async () => false,
+    getAttachCommand: () => [],
+    buildChannelConfig: () => ({}),
+    buildLaunchEnv: () => ({}),
   };
 }
 
@@ -152,9 +165,9 @@ describe("useComputeMetrics", () => {
     let fetchCount = 0;
     const provider = mockProvider("track");
     const origGetMetrics = provider.getMetrics;
-    provider.getMetrics = async (...args: any[]) => {
+    (provider as any).getMetrics = async (...args: any[]) => {
       fetchCount++;
-      return origGetMetrics(...args);
+      return (origGetMetrics as any)(...args);
     };
     registerProvider(provider as any);
 

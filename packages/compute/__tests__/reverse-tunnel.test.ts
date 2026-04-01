@@ -8,7 +8,7 @@ import { buildTunnelArgs } from "../providers/ec2/ports.js";
 describe("buildTunnelArgs", () => {
   it("builds correct -L forward tunnel args", () => {
     const args = buildTunnelArgs("/key", "1.2.3.4", [
-      { port: 3000, label: "web" },
+      { port: 3000, name: "web", source: "test" },
     ]);
     expect(args).toContain("-L");
     expect(args).toContain("3000:localhost:3000");
@@ -19,8 +19,8 @@ describe("buildTunnelArgs", () => {
 
   it("builds args for multiple ports", () => {
     const args = buildTunnelArgs("/key", "1.2.3.4", [
-      { port: 3000, label: "web" },
-      { port: 5432, label: "db" },
+      { port: 3000, name: "web", source: "test" },
+      { port: 5432, name: "db", source: "test" },
     ]);
     const lFlags = args.filter((a) => a === "-L");
     expect(lFlags.length).toBe(2);

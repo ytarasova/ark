@@ -78,10 +78,10 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
         const sshCmd = `ssh -i ${keyPath} -o StrictHostKeyChecking=no ubuntu@${ip}`;
         asyncState.run("Opening SSH...", async () => {
           await new Promise<void>((resolve, reject) => {
-            execFile("tmux", ["new-window", "-n", `ssh-${selected.name}`, "bash", "-c", sshCmd], { stdio: "pipe" }, (err) => {
+            execFile("tmux", ["new-window", "-n", `ssh-${selected.name}`, "bash", "-c", sshCmd], ((err) => {
               if (err) { status.show(`Run: ${sshCmd}`); reject(err); }
               else { status.show(`Opened SSH to ${selected.name}`); resolve(); }
-            });
+            }) as any);
           });
         });
       }

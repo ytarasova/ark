@@ -42,7 +42,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.mapped).toBe("running");
 
     const updated = getSession(session.id);
@@ -70,7 +70,7 @@ describe("Conductor /hooks/status endpoint", () => {
       error: "agent crashed",
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.mapped).toBe("failed");
 
     const updated = getSession(session.id);
@@ -84,7 +84,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.mapped).toBe("completed");
 
     const updated = getSession(session.id);
@@ -100,7 +100,7 @@ describe("Conductor /hooks/status endpoint", () => {
       matcher: "permission_prompt",
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.mapped).toBe("waiting");
 
     const updated = getSession(session.id);
@@ -112,7 +112,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SessionStart" });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.mapped).toBe("running");
 
     const updated = getSession(session.id);
@@ -122,7 +122,7 @@ describe("Conductor /hooks/status endpoint", () => {
   it("returns 404 for unknown session", async () => {
     const resp = await postHook("s-nonexistent", { hook_event_name: "Stop" });
     expect(resp.status).toBe(404);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.error).toBe("session not found");
   });
 
@@ -132,7 +132,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SomeUnknownEvent" });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.mapped).toBe("no-op");
 
     const updated = getSession(session.id);
@@ -256,7 +256,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.mapped).toBe("no-op");
 
     const updated = getSession(session.id);
@@ -269,7 +269,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.mapped).toBe("no-op");
 
     const updated = getSession(session.id);
@@ -279,12 +279,12 @@ describe("Conductor /hooks/status endpoint", () => {
 
   it("SessionEnd can still set completed on auto-gate session", async () => {
     // Use default flow with implement stage (gate: auto)
-    const session = createSession({ summary: "hook test", pipeline: "default" });
+    const session = createSession({ summary: "hook test", flow: "default" });
     updateSession(session.id, { status: "running", stage: "implement" });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.mapped).toBe("completed");
 
     const updated = getSession(session.id);
@@ -356,7 +356,7 @@ describe("Conductor /hooks/status endpoint", () => {
   });
 
   it("StopFailure still fails auto-gate sessions", async () => {
-    const session = createSession({ summary: "auto test", pipeline: "default" });
+    const session = createSession({ summary: "auto test", flow: "default" });
     updateSession(session.id, { status: "running", stage: "implement" });
 
     await postHook(session.id, {
@@ -369,7 +369,7 @@ describe("Conductor /hooks/status endpoint", () => {
   });
 
   it("SessionEnd still completes auto-gate sessions", async () => {
-    const session = createSession({ summary: "auto test", pipeline: "default" });
+    const session = createSession({ summary: "auto test", flow: "default" });
     updateSession(session.id, { status: "running", stage: "implement" });
 
     await postHook(session.id, { hook_event_name: "SessionEnd" });
@@ -396,7 +396,7 @@ describe("Conductor /hooks/status endpoint", () => {
       body: JSON.stringify({ hook_event_name: "Stop" }),
     });
     expect(resp.status).toBe(400);
-    const body = await resp.json();
+    const body = await resp.json() as any;
     expect(body.error).toBe("missing session param");
   });
 });

@@ -41,7 +41,7 @@ export function formatEvent(type: string, data?: Record<string, unknown>): strin
     case "pr_review_feedback":
       return `PR review feedback (${data?.state ?? "comment"})`;
     case "pr_status":
-      return `PR ${data?.state?.toLowerCase() ?? "updated"}`;
+      return `PR ${typeof data?.state === "string" ? data.state.toLowerCase() : "updated"}`;
     case "pr_detected":
       return `PR detected: ${data?.pr_url ?? ""}`;
     default:

@@ -30,12 +30,14 @@ let server: { stop(): void };
 let tempDir: string;
 let client: ArkdClient;
 
-const compute: Compute = {
+const compute = {
   id: "test-local",
   name: "test-local",
   provider: "local",
   status: "running",
   config: {},
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
 } as Compute;
 
 function makeSession(sessionId?: string): Session {

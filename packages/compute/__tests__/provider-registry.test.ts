@@ -17,6 +17,12 @@ afterAll(async () => {
 
 const fakeProvider: ComputeProvider = {
   name: "fake",
+  isolationModes: [],
+  canReboot: false,
+  canDelete: false,
+  supportsWorktree: false,
+  initialStatus: "running",
+  needsAuth: false,
   provision: async () => {},
   destroy: async () => {},
   start: async () => {},
@@ -32,6 +38,10 @@ const fakeProvider: ComputeProvider = {
   }),
   probePorts: async () => [],
   syncEnvironment: async () => {},
+  checkSession: async () => false,
+  getAttachCommand: () => [],
+  buildChannelConfig: () => ({}),
+  buildLaunchEnv: () => ({}),
 };
 
 describe("provider registry (via AppContext)", () => {

@@ -21,9 +21,9 @@ function mockAsyncState() {
     label: null,
     error: null,
     ran: [],
-    run(label: string, fn: () => void | Promise<void>) {
+    run(label: string, fn: (updateLabel: (msg: string) => void) => void | Promise<void>) {
       state.ran.push({ label, fn });
-      try { fn(); } catch {} // Execute sync side-effects for testing
+      try { fn(() => {}); } catch {} // Execute sync side-effects for testing
     },
     clearError() {},
     async flush() {

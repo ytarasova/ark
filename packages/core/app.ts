@@ -236,7 +236,7 @@ export class AppContext {
         const computes = store.listCompute({ status: "running" });
         for (const c of computes) {
           await safeAsync(`metrics: poll compute "${c.name}"`, async () => {
-            const compute = await import("./compute.js");
+            const compute = await import("../compute/index.js") as any;
             if (typeof compute.pollMetrics === "function") {
               await compute.pollMetrics(c.name);
             }
