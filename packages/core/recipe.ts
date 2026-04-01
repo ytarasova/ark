@@ -5,10 +5,11 @@
  * Three-tier resolution: builtin (recipes/), global (~/.ark/recipes/), project (.ark/recipes/).
  */
 
-import { readdirSync, readFileSync, existsSync } from "fs";
+import { readdirSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "fs";
 import { join, basename } from "path";
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { ARK_DIR } from "./store.js";
+import type { Session } from "./store.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -22,9 +23,11 @@ export interface RecipeVariable {
 export interface RecipeDefinition {
   name: string;
   description: string;
+  repo?: string;
   flow: string;
   agent?: string;
   compute?: string;
+  group?: string;
   variables: RecipeVariable[];
   defaults?: Record<string, string>;
   _source?: "builtin" | "project" | "global";
@@ -88,12 +91,50 @@ export function loadRecipe(name: string, projectRoot?: string): RecipeDefinition
 export function instantiateRecipe(recipe: RecipeDefinition, values: Record<string, string>): RecipeInstance {
   const merged = { ...recipe.defaults, ...values };
   return {
-    repo: merged.repo,
+    repo: recipe.repo ?? merged.repo,
     summary: merged.summary,
     ticket: merged.ticket,
     flow: recipe.flow,
     agent: recipe.agent,
     compute: recipe.compute ?? merged.compute,
-    group: merged.group,
+    group: recipe.group ?? merged.group,
+  };
+}
+
+export function saveRecipe(recipe: RecipeDefinition, scope: "project" | "global", projectRoot?: string): void {
+  const dir = scope === "project" && projectRoot
+    ? join(projectRoot, ".ark", "recipes")
+    : join(ARK_DIR(), "recipes");
+  mkdirSync(dir, { recursive: true });
+  const { _source, ...data } = recipe;
+  writeFileSync(join(dir, `${recipe.name}.yaml`), stringifyYaml(data));
+}
+
+export function deleteRecipe(name: string, scope: "project" | "global", projectRoot?: string): void {
+  const dir = scope === "project" && projectRoot
+    ? join(projectRoot, ".ark", "recipes")
+    : join(ARK_DIR(), "recipes");
+  for (const ext of [".yaml", ".yml"]) {
+    const path = join(dir, `${name}${ext}`);
+    if (existsSync(path)) { unlinkSync(path); return; }
+  }
+}
+
+/** Create a recipe from an existing session's config */
+export function sessionToRecipe(session: Session, name: string): RecipeDefinition {
+  return {
+    name,
+    description: session.summary ?? `Recipe from session ${session.id}`,
+    repo: session.repo ?? undefined,
+    flow: session.flow,
+    agent: session.agent ?? undefined,
+    compute: session.compute_name ?? undefined,
+    group: session.group_name ?? undefined,
+    variables: [
+      { name: "summary", description: "Task description", required: true },
+    ],
+    defaults: {
+      summary: session.summary ?? "",
+    },
   };
 }
