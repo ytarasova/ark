@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import { ListRow } from "./ListRow.js";
 import { ScrollBox } from "./ScrollBox.js";
@@ -15,8 +15,15 @@ interface TreeListProps<T> {
   renderColoredRow?: (item: T) => React.ReactNode;
   /** Children to render under an item (e.g. fork children in sessions). */
   renderChildren?: (item: T) => React.ReactNode;
-  /** Currently selected index (in the flat items array). */
+  /**
+   * Currently selected visual index (0 = first visible item).
+   * IMPORTANT: When using groupBy, items are sorted by group (unnamed first,
+   * then alphabetical). Callers must pre-sort their items array to match
+   * this order, or use onSelect to get the actual selected item.
+   */
   sel: number;
+  /** Called with the actual selected item when sel changes. Use this instead of items[sel] when groupBy is set. */
+  onSelect?: (item: T | null) => void;
   /** Message when list is empty and no groups exist. */
   emptyMessage?: string;
 }
@@ -39,6 +46,7 @@ export function TreeList<T>({
   renderColoredRow,
   renderChildren,
   sel,
+  onSelect,
   emptyMessage = "No items.",
 }: TreeListProps<T>) {
   // Group items and sort keys (memoized to avoid rebuilding on every render)
@@ -68,11 +76,10 @@ export function TreeList<T>({
   }
 
   // Build flat list of renderable rows for ScrollBox
-  // Track which row index corresponds to the selected item
   const rows: React.ReactNode[] = [];
   let selRow = 0;
-  // Rebuild a visual-order flat index so sel matches top-to-bottom visual order
   let visualIdx = 0;
+  let selectedItem: T | null = null;
 
   for (const groupName of sortedKeys) {
     const entries = groupMap.get(groupName)!;
@@ -87,7 +94,7 @@ export function TreeList<T>({
     for (const { item, flatIndex } of entries) {
       const isSel = visualIdx === sel;
       visualIdx++;
-      if (isSel) selRow = rows.length;
+      if (isSel) { selRow = rows.length; selectedItem = item; }
       rows.push(
         <Box key={`item-${flatIndex}`} flexDirection="column">
           {isSel ? (
@@ -102,6 +109,15 @@ export function TreeList<T>({
       );
     }
   }
+
+  // Notify caller of selected item (avoids index mismatch when groupBy reorders)
+  const prevSelRef = useRef<T | null>(null);
+  useEffect(() => {
+    if (onSelect && selectedItem !== prevSelRef.current) {
+      prevSelRef.current = selectedItem;
+      onSelect(selectedItem);
+    }
+  }, [sel, items]);
 
   return (
     <ScrollBox followIndex={selRow} active={false} reserveRows={9}>

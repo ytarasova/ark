@@ -33,7 +33,13 @@ interface ComputeTabProps extends StoreData {
 export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snapshots, computeLogs, addComputeLog, asyncState, onShowForm, formOverlay }: ComputeTabProps) {
   const confirmation = useConfirmation();
   const focus = useFocus();
-  const { sel } = useListNavigation(computes.length, { active: pane === "left" && !formOverlay && !confirmation.pending });
+
+  // Sort by provider to match TreeList's visual group order
+  const sorted = useMemo(() =>
+    [...computes].sort((a, b) => a.provider.localeCompare(b.provider)),
+  [computes]);
+
+  const { sel } = useListNavigation(sorted.length, { active: pane === "left" && !formOverlay && !confirmation.pending });
   const status = useStatusMessage();
   const actions = useComputeActions(asyncState, addComputeLog);
 
@@ -43,7 +49,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
     else focus.pop("confirm");
   }, [confirmation.pending]);
 
-  const selected = computes[sel] ?? null;
+  const selected = sorted[sel] ?? null;
 
   const hasOverlay = !!formOverlay;
 
@@ -113,7 +119,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
         rightTitle="Details"
         left={
           <TreeList
-            items={computes}
+            items={sorted}
             groupBy={h => h.provider}
             renderRow={(h) => {
               const icon = h.status === "destroyed" ? "\u2715" /* ✕ cross */ : h.status === "running" ? "\u25CF" /* ● circle */ : "\u25CB";
