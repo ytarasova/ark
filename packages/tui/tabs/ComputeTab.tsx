@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import { execFile } from "child_process";
@@ -16,39 +16,38 @@ import { KeyValue } from "../components/KeyValue.js";
 import { DataTable } from "../components/DataTable.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useComputeActions } from "../hooks/useComputeActions.js";
+import { useFocus } from "../hooks/useFocus.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
+import { useConfirmation } from "../hooks/useConfirmation.js";
 
 interface ComputeTabProps extends StoreData {
-  async: AsyncState;
+  asyncState: AsyncState;
   pane: "left" | "right";
   onShowForm: () => void;
   formOverlay?: React.ReactNode;
   refresh: () => void;
 }
 
-export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snapshots, computeLogs, addComputeLog, async: asyncState, onShowForm, formOverlay }: ComputeTabProps) {
-  type ConfirmAction = "delete" | "stop" | "reboot" | null;
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
-  const { sel } = useListNavigation(computes.length, { active: pane === "left" && !formOverlay && !confirmAction });
+export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snapshots, computeLogs, addComputeLog, asyncState, onShowForm, formOverlay }: ComputeTabProps) {
+  const confirmation = useConfirmation();
+  const focus = useFocus();
+  const { sel } = useListNavigation(computes.length, { active: pane === "left" && !formOverlay && !confirmation.pending });
   const status = useStatusMessage();
   const actions = useComputeActions(asyncState, addComputeLog);
+
+  // Push/pop focus when confirmation is pending
+  useEffect(() => {
+    if (confirmation.pending) focus.push("confirm");
+    else focus.pop("confirm");
+  }, [confirmation.pending]);
 
   const selected = computes[sel] ?? null;
 
   useInput((input, key) => {
     if (formOverlay) return;
     if (pane === "right") return;
-
-    if (confirmAction) {
-      if (confirmAction === "delete" && input === "x" && selected) actions.delete(selected.name);
-      if (confirmAction === "stop" && input === "s" && selected) actions.stop(selected);
-      if (confirmAction === "reboot" && input === "R" && selected) actions.reboot(selected);
-      setConfirmAction(null);
-      status.clear();
-      return;
-    }
 
     if (key.return) {
       if (selected && (selected.status === "stopped" || selected.status === "destroyed")) {
@@ -57,8 +56,9 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
     } else if (input === "s") {
       if (!selected) return;
       if (selected.status === "running") {
-        setConfirmAction("stop");
-        status.show(`Stop '${selected.name}'? Press s again to confirm`);
+        if (confirmation.confirm("stop", `Stop '${selected.name}'? Press s again to confirm`)) {
+          actions.stop(selected);
+        }
       } else if (selected.status === "stopped") {
         actions.start(selected);
       }
@@ -68,8 +68,9 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
         status.show("Cannot delete this compute");
         return;
       }
-      setConfirmAction("delete");
-      status.show(`Delete '${selected.name}'? Press x to confirm`);
+      if (confirmation.confirm("delete", `Delete '${selected.name}'? Press x again to confirm`)) {
+        actions.delete(selected.name);
+      }
     } else if (input === "a") {
       if (selected?.status === "running") {
         const ip = (selected.config as any)?.ip;
@@ -87,8 +88,9 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
       }
     } else if (input === "R") {
       if (selected && getProvider(selected.provider)?.canReboot) {
-        setConfirmAction("reboot");
-        status.show(`Reboot '${selected.name}'? Press R again to confirm`);
+        if (confirmation.confirm("reboot", `Reboot '${selected.name}'? Press R again to confirm`)) {
+          actions.reboot(selected);
+        }
       }
     } else if (input === "t") {
       if (selected) {
@@ -122,7 +124,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
               return <Text>{" "} <Text color={iconColor}>{icon}</Text>{` ${h.name.padEnd(16)} ${h.provider}`}</Text>;
             }}
             sel={sel}
-            emptyMessage="No compute configured."
+            emptyMessage="  No compute configured."
           />
         }
         right={formOverlay ??
@@ -137,7 +139,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
       />
       {status.message && (
         <Box>
-          <Text color={confirmAction === "delete" ? "red" : "cyan"}>{` ${status.message}`}</Text>
+          <Text color={confirmation.pending === "delete" ? "red" : "cyan"}>{` ${status.message}`}</Text>
         </Box>
       )}
     </Box>
@@ -175,7 +177,7 @@ interface ComputeDetailProps {
 
 function ComputeDetail({ compute: h, snapshot, computeLogs, sessions, pane }: ComputeDetailProps) {
   if (!h) {
-    return <Box flexGrow={1}><Text dimColor>{"  No compute selected"}</Text></Box>;
+    return <Box flexGrow={1}><Text dimColor>{"  No compute selected."}</Text></Box>;
   }
 
   const cfg = h.config as Record<string, unknown>;

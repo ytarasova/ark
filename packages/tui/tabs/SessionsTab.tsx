@@ -10,6 +10,7 @@ import { ThreadsPanel } from "../components/ThreadsPanel.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useSessionActions } from "../hooks/useSessionActions.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
+import { useConfirmation } from "../hooks/useConfirmation.js";
 import { useAuthStatus } from "../hooks/useAuthStatus.js";
 import { useGroupActions } from "../hooks/useGroupActions.js";
 import { useFocus } from "../hooks/useFocus.js";
@@ -24,7 +25,7 @@ import type { AsyncState } from "../hooks/useAsync.js";
 type Overlay = "move" | "group" | "talk" | "inbox" | "clone" | "search" | null;
 
 interface SessionsTabProps extends StoreData {
-  async: AsyncState;
+  asyncState: AsyncState;
   pane: "left" | "right";
   onShowForm: () => void;
   onSelectionChange?: (session: core.Session | null) => void;
@@ -32,11 +33,10 @@ interface SessionsTabProps extends StoreData {
   refresh: () => void;
 }
 
-export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
+export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
   const focus = useFocus();
   const [overlay, setOverlay] = useState<Overlay>(null);
-  const [confirmComplete, setConfirmComplete] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const confirmation = useConfirmation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<core.SearchResult[] | null>(null);
   const status = useStatusMessage();
@@ -90,7 +90,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const authStatus = useAuthStatus(selectedCompute);
 
   useInput((input, key) => {
-    if (formOverlay || hasOverlay) return;
+    if (pane !== "left" || formOverlay || hasOverlay) return;
 
     // Global keys — work regardless of selection
     if (input === "n") { onShowForm(); return; }
@@ -98,12 +98,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     if (input === "o") { setOverlay("group"); return; }
 
     // Cancel pending confirms on unrelated keys
-    if (confirmComplete && input !== "d") {
-      setConfirmComplete(false);
-      status.clear();
-    }
-    if (confirmDelete && input !== "x") {
-      setConfirmDelete(false);
+    if (confirmation.pending && input !== "d" && input !== "x") {
+      confirmation.cancel();
       status.clear();
     }
 
@@ -137,12 +133,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       // Clone: deep copy with resume (opens name prompt)
       if (selected) setOverlay("clone");
     } else if (input === "x") {
-      if (confirmDelete) {
+      if (confirmation.confirm("delete", `Delete '${selected.summary ?? selected.id}'? Press x again to confirm`)) {
         actions.delete(selected.id);
-        setConfirmDelete(false);
-      } else {
-        setConfirmDelete(true);
-        status.show(`Delete '${selected.summary ?? selected.id}'? Press x again to confirm`);
       }
     } else if (input === "a") {
       if (selected?.session_id) {
@@ -195,12 +187,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       if (selected) setOverlay("move");
     } else if (input === "d") {
       if (selected && selected.status === "running") {
-        if (confirmComplete) {
+        if (confirmation.confirm("complete", `Done with '${selected.summary ?? selected.id}'? Press d again to confirm`)) {
           actions.complete(selected.id);
-          setConfirmComplete(false);
-        } else {
-          setConfirmComplete(true);
-          status.show(`Done with '${selected.summary ?? selected.id}'? Press d again to confirm`);
         }
       }
     } else if (input === "t") {
