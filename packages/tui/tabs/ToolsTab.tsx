@@ -42,11 +42,12 @@ interface ToolsTabProps {
   pane: "left" | "right";
   asyncState?: AsyncState;
   refresh?: () => void;
+  onUseRecipe?: (instance: core.RecipeInstance) => void;
 }
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
-export function ToolsTab({ pane, asyncState, refresh }: ToolsTabProps) {
+export function ToolsTab({ pane, asyncState, refresh, onUseRecipe }: ToolsTabProps) {
   const focus = useFocus();
   const status = useStatusMessage();
   const [version, setVersion] = useState(0);
@@ -107,6 +108,21 @@ export function ToolsTab({ pane, asyncState, refresh }: ToolsTabProps) {
     if (hasOverlay) return;
 
     if (!selected) return;
+
+    // Use recipe
+    if (key.return && selected.kind === "ark-recipe") {
+      const recipe = core.loadRecipe(selected.name, projectRoot);
+      if (recipe) {
+        const missing = recipe.variables.filter(v => v.required && !v.default && !recipe.defaults?.[v.name] && !recipe.repo);
+        if (missing.length > 0) {
+          status.show(`Recipe needs: ${missing.map(v => v.name).join(", ")}`);
+          return;
+        }
+        const instance = core.instantiateRecipe(recipe, recipe.defaults ?? {});
+        onUseRecipe?.(instance);
+      }
+      return;
+    }
 
     // Delete
     if (input === "x") {

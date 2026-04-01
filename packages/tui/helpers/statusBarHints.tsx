@@ -155,6 +155,7 @@ export function getAgentsHints(): React.ReactNode[] {
 export function getToolsHints(): React.ReactNode[] {
   return [
     ...NAV_HINTS, sep(0),
+    <KeyHint key="enter" k="Enter" label="use" />,
     <KeyHint key="x" k="x" label="delete" />, sep(1),
     <KeyHint key="q" k="q" label="quit" />,
   ];

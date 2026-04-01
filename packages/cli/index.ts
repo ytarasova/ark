@@ -44,6 +44,7 @@ session.command("start")
   .option("-d, --dispatch", "Auto-dispatch the first stage agent")
   .option("-a, --attach", "Dispatch and attach to the session")
   .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
+  .option("--recipe <name>", "Create session from a recipe template")
   .action(async (ticket, opts) => {
     let workdir: string | undefined;
     let repo = opts.repo;
@@ -70,6 +71,25 @@ session.command("start")
       console.log(chalk.dim(`Importing Claude session ${cs.sessionId.slice(0, 8)} from ${cs.project}`));
     }
 
+    // Load recipe defaults if specified (CLI flags override recipe values)
+    let recipeAgent: string | undefined;
+    if (opts.recipe) {
+      const recipe = core.loadRecipe(opts.recipe, core.findProjectRoot(process.cwd()) ?? undefined);
+      if (!recipe) { console.error(chalk.red(`Recipe not found: ${opts.recipe}`)); process.exit(1); }
+      const instance = core.instantiateRecipe(recipe, {
+        ...(opts.summary ? { summary: opts.summary } : {}),
+        ...(opts.repo ? { repo: opts.repo } : {}),
+      });
+      if (!opts.summary && instance.summary) opts.summary = instance.summary;
+      if (!opts.summary) opts.summary = recipe.description;
+      if (!opts.flow || opts.flow === "default") opts.flow = instance.flow;
+      if (!opts.compute && instance.compute) opts.compute = instance.compute;
+      if (!opts.group && instance.group) opts.group = instance.group;
+      if (!repo && instance.repo) { repo = instance.repo; }
+      recipeAgent = instance.agent;
+      console.log(chalk.dim(`Using recipe '${recipe.name}' (${recipe._source})`));
+    }
+
     // Sanitize session name: alphanumeric, dash, underscore only
     const rawName = opts.summary ?? ticket ?? "";
     const summary = rawName.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || rawName;
@@ -77,6 +97,7 @@ session.command("start")
     const s = core.startSession({
       ticket, summary,
       repo, flow: opts.flow, compute_name: opts.compute,
+      agent: recipeAgent,
       workdir, group_name: opts.group,
     });
 
@@ -566,6 +587,38 @@ recipeCmd.command("show")
       console.log(chalk.bold(`\n  Variables:`));
       for (const v of recipe.variables) {
         console.log(`    ${v.name}${v.required ? " *" : ""}  ${v.description}${v.default ? ` (default: ${v.default})` : ""}`);
+      }
+    }
+  });
+
+recipeCmd.command("use")
+  .description("Create a session from a recipe")
+  .argument("<name>", "Recipe name")
+  .option("-s, --summary <text>", "Override task summary")
+  .option("-r, --repo <path>", "Override repository")
+  .option("-d, --dispatch", "Dispatch immediately")
+  .action(async (name: string, opts: { summary?: string; repo?: string; dispatch?: boolean }) => {
+    const recipe = core.loadRecipe(name, core.findProjectRoot(process.cwd()) ?? undefined);
+    if (!recipe) { console.error(chalk.red(`Recipe not found: ${name}`)); process.exit(1); }
+    const values: Record<string, string> = {};
+    if (opts.summary) values.summary = opts.summary;
+    if (opts.repo) values.repo = opts.repo;
+    const instance = core.instantiateRecipe(recipe, values);
+    const session = core.startSession({
+      summary: instance.summary ?? recipe.description,
+      repo: instance.repo,
+      flow: instance.flow,
+      agent: instance.agent,
+      compute_name: instance.compute,
+      group_name: instance.group,
+    });
+    console.log(`Session ${session.id} created from recipe '${name}'`);
+    if (opts.dispatch) {
+      const result = await core.dispatch(session.id);
+      if (result.ok) {
+        console.log(`Dispatched ${session.id}`);
+      } else {
+        console.error(chalk.red(`Dispatch failed: ${result.message}`));
       }
     }
   });

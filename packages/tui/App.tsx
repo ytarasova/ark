@@ -15,6 +15,7 @@ import { AgentsTab } from "./tabs/AgentsTab.js";
 import { FlowsTab } from "./tabs/FlowsTab.js";
 import { HistoryTab } from "./tabs/HistoryTab.js";
 import { ToolsTab } from "./tabs/ToolsTab.js";
+import * as core from "../core/index.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
 
@@ -138,7 +139,25 @@ function AppInner() {
           refresh={store.refresh}
         />
       ) : tab === "tools" ? (
-        <ToolsTab pane={pane} />
+        <ToolsTab
+          pane={pane}
+          asyncState={sessionsAsync}
+          refresh={store.refresh}
+          onUseRecipe={(instance) => {
+            sessionsAsync.run("Creating session...", async () => {
+              core.startSession({
+                summary: instance.summary,
+                repo: instance.repo,
+                flow: instance.flow,
+                agent: instance.agent,
+                compute_name: instance.compute,
+                group_name: instance.group,
+              });
+              store.refresh();
+              switchTab("sessions");
+            });
+          }}
+        />
       ) : tab === "flows" ? (
         <FlowsTab {...store} pane={pane} />
       ) : tab === "history" ? (
