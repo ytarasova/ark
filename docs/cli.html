@@ -82,6 +82,7 @@
           <tr><td><code>-g, --group</code></td><td>Group name</td></tr>
           <tr><td><code>-d, --dispatch</code></td><td>Dispatch immediately after creation</td></tr>
           <tr><td><code>-a, --attach</code></td><td>Attach to tmux after dispatch</td></tr>
+          <tr><td><code>--recipe</code></td><td>Use a recipe template (e.g. <code>quick-fix</code>)</td></tr>
           <tr><td><code>--claude-session</code></td><td>Import from an existing Claude Code session</td></tr>
         </tbody>
       </table>
@@ -305,6 +306,9 @@
       <h3>ark recipe show &lt;name&gt;</h3>
       <p>Show the full definition of a recipe including variables and defaults.</p>
       <pre><code><span class="prompt">$</span> ark recipe show quick-fix</code></pre>
+
+      <p>To use a recipe, pass <code>--recipe</code> to <code>ark session start</code>:</p>
+      <pre><code><span class="prompt">$</span> ark session start --recipe quick-fix --repo . --dispatch</code></pre>
 
       <div class="callout info">
         <strong>Built-in recipes:</strong> <code>quick-fix</code>, <code>feature-build</code>, <code>code-review</code>. You can also create a recipe from an existing session with <code>sessionToRecipe</code>.

@@ -12,6 +12,7 @@ make tui              # ark tui
 ./ark <command>       # run CLI directly via bun
 ark skill list        # list available skills
 ark recipe list       # list available recipes
+ark session start --recipe quick-fix --repo . --dispatch  # start session from recipe
 ark search <query>    # search sessions, events, messages (--transcripts for JSONL, --index to rebuild FTS5)
 ark index             # rebuild transcript FTS5 search index
 ark claude list       # list Claude Code sessions on disk (--project to filter)
@@ -176,7 +177,7 @@ Reusable prompt fragments for agents. Three-tier resolution (highest priority fi
 - **global**: `~/.ark/skills/<name>.md`
 - **builtin**: `skills/<name>.md` shipped with Ark
 
-Attach to agents via the `skills` field in agent YAML. CLI: `ark skill list`, `ark skill show <name>`.
+Attach to agents via the `skills` field in agent YAML. At dispatch, skill content is automatically injected into the agent's system prompt. CLI: `ark skill list`, `ark skill show <name>`.
 
 ## Recipes
 
@@ -211,7 +212,7 @@ At dispatch to remote compute, Ark syncs `.claude/commands/`, `.claude/skills/`,
 | `i` | Inbox/threads | `g` | Group manager |
 | `Tab` | Focus detail pane | `e` | Expand events |
 
-**Tools tab (3):** `Enter`:view `x`:delete (6 categories: MCP Servers, Commands, Claude Skills, Ark Skills, Recipes, Context)
+**Tools tab (3):** `Enter`:view/use `x`:delete (6 categories: MCP Servers, Commands, Claude Skills, Ark Skills, Recipes, Context)
 
 **History tab (5):** `Enter`:import `r`:refresh+reindex `s`:search
 

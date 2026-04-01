@@ -116,7 +116,7 @@
         <li><strong>global</strong>: <code>~/.ark/skills/</code></li>
         <li><strong>builtin</strong>: <code>skills/</code> shipped with Ark</li>
       </ul>
-      <p>Attach skills to agents via the <code>skills</code> field in agent YAML. Manage with <code>ark skill list</code> and <code>ark skill show</code>.</p>
+      <p>Attach skills to agents via the <code>skills</code> field in agent YAML. When a session is dispatched, Ark automatically injects the content of each listed skill into the agent's system prompt. Manage with <code>ark skill list</code> and <code>ark skill show</code>.</p>
 
       <h2>Recipes</h2>
       <p>Recipes are session templates with variables and a repo field. They let you quick-launch sessions from presets without manually filling in flow, agent, summary, and compute each time.</p>
