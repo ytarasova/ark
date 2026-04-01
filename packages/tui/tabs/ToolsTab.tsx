@@ -54,7 +54,14 @@ export function ToolsTab({ pane, asyncState, refresh, onUseRecipe }: ToolsTabPro
   const projectRoot = useMemo(() => core.findProjectRoot(process.cwd()) ?? undefined, []);
 
   const items = useMemo(() => {
-    return core.discoverTools(projectRoot);
+    const raw = core.discoverTools(projectRoot);
+    // Sort to match TreeList's visual group order (unnamed first, then alphabetical)
+    return raw.sort((a, b) => {
+      const ga = groupLabel(a);
+      const gb = groupLabel(b);
+      if (ga === gb) return a.name.localeCompare(b.name);
+      return ga.localeCompare(gb);
+    });
   }, [projectRoot, version]);
 
   const [confirmDelete, setConfirmDelete] = useState(false);
