@@ -10,6 +10,7 @@ import { promisify } from "util";
 import * as store from "./store.js";
 import * as flow from "./flow.js";
 import { formatReviewPrompt, type ReviewComment } from "./github-pr.js";
+import { safeAsync } from "./safe.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -141,23 +142,24 @@ export async function processReviewFeedback(
   });
 
   // Steer via channel if running
-  if (session.status === "running") {
-    const channelPort = store.sessionChannelPort(session.id);
-    const payload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
-    try {
-      const { deliverToChannel } = await import("./conductor.js");
-      await deliverToChannel(session, channelPort, payload);
-    } catch {
-      // Fallback: direct HTTP
-      try {
-        await fetch(`http://localhost:${channelPort}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      } catch {}
-    }
-  }
+  if (session.status !== "running") return;
+
+  const channelPort = store.sessionChannelPort(session.id);
+  const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
+  const delivered = await safeAsync(`pr-poller: deliverToChannel for ${session.id}`, async () => {
+    const { deliverToChannel } = await import("./conductor.js");
+    await deliverToChannel(session, channelPort, steerPayload);
+  });
+  if (delivered) return;
+
+  // Fallback: direct HTTP
+  await safeAsync(`pr-poller: direct HTTP fallback for ${session.id}`, async () => {
+    await fetch(`http://localhost:${channelPort}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(steerPayload),
+    });
+  });
 }
 
 /**

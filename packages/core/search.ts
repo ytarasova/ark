@@ -89,7 +89,7 @@ export function searchTranscripts(query: string, opts?: SearchOpts): SearchResul
     if (count > 0) {
       return searchTranscriptsFTS(query, limit);
     }
-  } catch (e: any) { console.error('FTS search failed, falling back to file scan:', e?.message ?? e); }
+  } catch { /* FTS table may not exist — fall back to file scan */ }
 
   // Fallback to file scanning
   return searchTranscriptsFiles(query, opts);

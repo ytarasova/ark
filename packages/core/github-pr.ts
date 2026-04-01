@@ -7,6 +7,7 @@
 import { createHmac } from "crypto";
 import { getDb } from "./store.js";
 import * as store from "./store.js";
+import { safeAsync } from "./safe.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -166,24 +167,23 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
       },
     });
 
-    // Steer via channel if session is running
+    // Steer via channel if session is running (fire-and-forget)
     if (session.status === "running") {
       const channelPort = store.sessionChannelPort(session.id);
       const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
-      import("./conductor.js").then(({ deliverToChannel }) => {
-        deliverToChannel(session, channelPort, steerPayload).catch((err) => {
-          console.error(`[github-pr] deliverToChannel failed for ${session.id}:`, err);
-        });
-      }).catch((err) => {
-        // Fallback: direct HTTP
-        console.error(`[github-pr] conductor import failed, falling back to direct HTTP:`, err);
-        fetch(`http://localhost:${channelPort}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(steerPayload),
-        }).catch((err) => {
-          console.error(`[github-pr] direct HTTP fallback failed for ${session.id}:`, err);
-        });
+      safeAsync(`[github-pr] deliverToChannel for ${session.id}`, async () => {
+        const { deliverToChannel } = await import("./conductor.js");
+        await deliverToChannel(session, channelPort, steerPayload);
+      }).then(delivered => {
+        if (!delivered) {
+          safeAsync(`[github-pr] direct HTTP fallback for ${session.id}`, async () => {
+            await fetch(`http://localhost:${channelPort}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(steerPayload),
+            });
+          });
+        }
       });
     }
 
