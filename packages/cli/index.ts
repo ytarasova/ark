@@ -502,6 +502,73 @@ pipe.command("show").description("Show flow").argument("<name>").action((name) =
   }
 });
 
+// ── Skill commands ──────────────────────────────────────────────────────────
+
+const skillCmd = program.command("skill").description("Manage skills");
+
+skillCmd.command("list")
+  .description("List available skills")
+  .action(() => {
+    const skills = core.listSkills(core.findProjectRoot(process.cwd()) ?? undefined);
+    if (!skills.length) {
+      console.log(chalk.dim("No skills found."));
+      return;
+    }
+    for (const s of skills) {
+      console.log(`  ${(s._source ?? "").padEnd(8)} ${s.name.padEnd(20)} ${s.description}`);
+    }
+  });
+
+skillCmd.command("show")
+  .description("Show skill details")
+  .argument("<name>", "Skill name")
+  .action((name: string) => {
+    const skill = core.loadSkill(name, core.findProjectRoot(process.cwd()) ?? undefined);
+    if (!skill) { console.log(chalk.red(`Skill not found: ${name}`)); return; }
+    console.log(chalk.bold(`\n${skill.name}`) + chalk.dim(` (${skill._source})`));
+    console.log(`  Description: ${skill.description}`);
+    if (skill.tags?.length) console.log(`  Tags:        ${skill.tags.join(", ")}`);
+    if (skill.prompt) {
+      console.log(`\n${chalk.bold("Prompt:")}`);
+      console.log(skill.prompt);
+    }
+  });
+
+// ── Recipe commands ─────────────────────────────────────────────────────────
+
+const recipeCmd = program.command("recipe").description("Manage recipes");
+
+recipeCmd.command("list")
+  .description("List available recipes")
+  .action(() => {
+    const recipes = core.listRecipes(core.findProjectRoot(process.cwd()) ?? undefined);
+    if (!recipes.length) {
+      console.log(chalk.dim("No recipes found."));
+      return;
+    }
+    for (const r of recipes) {
+      console.log(`  ${(r._source ?? "").padEnd(8)} ${r.name.padEnd(20)} ${r.description}`);
+    }
+  });
+
+recipeCmd.command("show")
+  .description("Show recipe details")
+  .argument("<name>", "Recipe name")
+  .action((name: string) => {
+    const recipe = core.loadRecipe(name, core.findProjectRoot(process.cwd()) ?? undefined);
+    if (!recipe) { console.log(chalk.red(`Recipe not found: ${name}`)); return; }
+    console.log(chalk.bold(`\n${recipe.name}`) + chalk.dim(` (${recipe._source})`));
+    console.log(`  Description: ${recipe.description}`);
+    console.log(`  Flow:        ${recipe.flow}`);
+    if (recipe.agent) console.log(`  Agent:       ${recipe.agent}`);
+    if (recipe.variables?.length) {
+      console.log(chalk.bold(`\n  Variables:`));
+      for (const v of recipe.variables) {
+        console.log(`    ${v.name}${v.required ? " *" : ""}  ${v.description}${v.default ? ` (default: ${v.default})` : ""}`);
+      }
+    }
+  });
+
 // ── Compute commands ────────────────────────────────────────────────────────
 
 const computeCmd = program.command("compute").description("Manage compute resources");
