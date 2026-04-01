@@ -28,7 +28,7 @@ export {
   startSession, dispatch, advance, stop, resume, complete, pause,
   forkSession, cloneSession, handoff, fork, joinFork, getOutput, send,
   deleteSessionAsync, waitForCompletion, approveReviewGate,
-  applyHookStatus, applyReport,
+  applyHookStatus, applyReport, cleanupOnTerminal,
   retryWithContext, fanOut,
   type HookStatusResult, type ReportResult, type SessionOpResult,
 } from "./session.js";
@@ -86,6 +86,9 @@ export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review
 
 // Guardrails
 export { evaluateGuardrail, DEFAULT_RULES, type GuardrailRule } from "./guardrails.js";
+
+// Safe async helper
+export { safeAsync } from "./safe.js";
 
 // Unified tool discovery
 export { discoverTools, removeMcpServer, removeCommand, getCommand, addMcpServer, addCommand, type ToolEntry } from "./tools.js";

@@ -31,6 +31,7 @@ import { loadRepoConfig } from "./repo-config.js";
 import { eventBus } from "./hooks.js";
 import { indexSession } from "./search.js";
 import type { OutboundMessage } from "./channel-types.js";
+import { safeAsync } from "./safe.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 function sessionAsVars(session: store.Session): Record<string, unknown> {
@@ -123,11 +124,8 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   if (!stage) return { ok: false, message: "No current stage" };
 
   // Validate compute exists if specified
-  if (session.compute_name) {
-    const compute = store.getCompute(session.compute_name);
-    if (!compute) {
-      return { ok: false, message: `Compute '${session.compute_name}' not found. Delete and recreate the session.` };
-    }
+  if (session.compute_name && !store.getCompute(session.compute_name)) {
+    return { ok: false, message: `Compute '${session.compute_name}' not found. Delete and recreate the session.` };
   }
 
   // Check if fork stage
@@ -215,20 +213,19 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  // Kill agent via provider
-  const { provider, compute } = resolveProvider(session);
-  if (provider && compute) {
-    await provider.killAgent(compute, session);
-  } else if (session.session_id) {
+  // Kill agent + clean up provider resources
+  const stopped = await withProvider(session, `stop ${sessionId}`, async (p, c) => {
+    await p.killAgent(c, session);
+    await p.cleanupSession(c, session);
+  });
+  if (!stopped && session.session_id) {
     // Fallback: direct tmux kill (no compute assigned)
     await tmux.killSessionAsync(session.session_id);
   }
 
   // Clean up hook config from working directory
   if (session.workdir) {
-    try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
-      console.error(`stop: removeHooksConfig failed for ${sessionId}:`, e?.message ?? e);
-    }
+    safeAsync(`stop ${sessionId}: removeHooksConfig`, () => Promise.resolve(claude.removeHooksConfig(session.workdir!)));
   }
 
   // Preserve claude_session_id so restart can --resume the conversation
@@ -458,33 +455,21 @@ export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boole
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  const { provider, compute } = resolveProvider(session);
-
-  // 1. Kill agent process via provider
-  if (provider && compute) {
-    try { await provider.killAgent(compute, session); } catch (e: any) {
-      console.error(`deleteSession: killAgent failed for ${sessionId}:`, e?.message ?? e);
-    }
-  } else if (session.session_id) {
+  // 1. Kill agent + clean up provider resources
+  const handled = await withProvider(session, `delete ${sessionId}`, async (p, c) => {
+    await p.killAgent(c, session);
+    await p.cleanupSession(c, session);
+  });
+  if (!handled && session.session_id) {
     await tmux.killSessionAsync(session.session_id);
   }
 
-  // 2. Clean up hook config
+  // 2. Clean up hook config (not provider-dependent)
   if (session.workdir) {
-    try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
-      // Cleanup best-effort: workdir may already be deleted
-      console.error(`deleteSession: removeHooksConfig failed for ${sessionId}:`, e?.message ?? e);
-    }
+    safeAsync(`delete ${sessionId}: removeHooksConfig`, () => Promise.resolve(claude.removeHooksConfig(session.workdir!)));
   }
 
-  // 3. Provider-specific session cleanup (worktree, remote checkout, container stop)
-  if (provider && compute) {
-    try { await provider.cleanupSession(compute, session); } catch (e: any) {
-      console.error(`deleteSession: cleanupSession failed for ${sessionId}:`, e?.message ?? e);
-    }
-  }
-
-  // 4. Delete DB rows (instant)
+  // 3. Delete DB rows (instant)
   store.deleteSession(sessionId);
 
   return { ok: true, message: "Session deleted" };
@@ -509,7 +494,7 @@ export function clearProviderResolver(): void {
 }
 
 /** Resolve the compute provider for a session. Uses AppContext resolver if set, otherwise falls back to direct lookup. */
-function resolveProvider(session: store.Session): { provider: ComputeProvider | null; compute: store.Compute | null } {
+export function resolveProvider(session: store.Session): { provider: ComputeProvider | null; compute: store.Compute | null } {
   if (_providerResolver) {
     return _providerResolver(session);
   }
@@ -517,7 +502,30 @@ function resolveProvider(session: store.Session): { provider: ComputeProvider | 
   const computeName = session.compute_name ?? "local";
   const compute = store.getCompute(computeName);
   if (!compute) return { provider: null, compute: null };
-  return { provider: getProvider(compute.provider) ?? null, compute };
+  try {
+    return { provider: getProvider(compute.provider) ?? null, compute };
+  } catch {
+    // AppContext not initialized (e.g. test environment)
+    return { provider: null, compute: null };
+  }
+}
+
+/** Safely run a provider method for a session. Resolves provider, handles null, logs errors. */
+async function withProvider(
+  session: store.Session,
+  label: string,
+  fn: (provider: ComputeProvider, compute: store.Compute) => Promise<void>,
+): Promise<boolean> {
+  const { provider, compute } = resolveProvider(session);
+  if (!provider || !compute) return false;
+  return safeAsync(label, () => fn(provider, compute));
+}
+
+/** Clean up provider resources when a session reaches a terminal state (completed/failed). */
+export async function cleanupOnTerminal(sessionId: string): Promise<void> {
+  const session = store.getSession(sessionId);
+  if (!session) return;
+  await withProvider(session, `cleanup ${sessionId}`, (p, c) => p.cleanupSession(c, session));
 }
 
 // ── Internal ────────────────────────────────────────────────────────────────

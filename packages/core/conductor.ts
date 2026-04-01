@@ -29,6 +29,7 @@ import { indexSession } from "./search.js";
 import { listSchedules, cronMatches, updateScheduleLastRun } from "./schedule.js";
 import { pollPRReviews } from "./pr-poller.js";
 import { ArkdClient } from "../arkd/client.js";
+import { safeAsync } from "./safe.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -91,24 +92,26 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
     eventBus.emit("hook_status", sessionId, {
       data: { event, status: result.newStatus, ...payload } as Record<string, unknown>,
     });
+
+    // Clean up provider resources on terminal states (stop container, remove worktree, etc.)
+    if (result.newStatus === "completed" || result.newStatus === "failed") {
+      session.cleanupOnTerminal(sessionId);
+    }
   }
 
   // Apply usage data
-  if (result.usage) {
-    const currentSession = store.getSession(sessionId);
-    if (currentSession) {
-      const config = typeof currentSession.config === "string"
-        ? JSON.parse(currentSession.config) : (currentSession.config ?? {});
-      config.usage = result.usage;
-      store.updateSession(sessionId, { config });
-    }
+  const usageSession = result.usage ? store.getSession(sessionId) : null;
+  if (result.usage && usageSession) {
+    const config = typeof usageSession.config === "string"
+      ? JSON.parse(usageSession.config) : (usageSession.config ?? {});
+    config.usage = result.usage;
+    store.updateSession(sessionId, { config });
   }
 
   // Index transcript
   if (result.shouldIndex && result.indexTranscript) {
-    try {
-      indexSession(result.indexTranscript.transcriptPath, result.indexTranscript.sessionId);
-    } catch (e: any) { console.error("transcript indexing failed:", e?.message ?? e); }
+    await safeAsync("transcript indexing", async () =>
+      indexSession(result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId));
   }
 
   return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
@@ -178,43 +181,41 @@ export function startConductor(port = DEFAULT_PORT, opts?: { quiet?: boolean }):
   if (!opts?.quiet) console.log(`Ark conductor listening on localhost:${port}`);
 
   // Schedule poller — check every 60 seconds
-  const scheduleTimer = setInterval(async () => {
-    try {
-      const schedules = listSchedules().filter(s => s.enabled);
-      const now = new Date();
-      for (const sched of schedules) {
-        if (!cronMatches(sched.cron, now)) continue;
-        // Skip if already ran this minute
-        if (sched.last_run) {
-          const lastRun = new Date(sched.last_run);
-          if (lastRun.getMinutes() === now.getMinutes() &&
-              lastRun.getHours() === now.getHours() &&
-              lastRun.getDate() === now.getDate()) continue;
-        }
-        try {
-          const s = session.startSession({
-            summary: sched.summary ?? `Scheduled: ${sched.id}`,
-            repo: sched.repo ?? undefined,
-            workdir: sched.workdir ?? undefined,
-            flow: sched.flow,
-            compute_name: sched.compute_name ?? undefined,
-            group_name: sched.group_name ?? undefined,
-          });
-          await session.dispatch(s.id);
-          updateScheduleLastRun(sched.id);
-          store.logEvent(s.id, "scheduled_dispatch", {
-            actor: "scheduler",
-            data: { schedule_id: sched.id, cron: sched.cron },
-          });
-        } catch (e: any) { console.error(`scheduled dispatch failed for ${sched.id}:`, e?.message ?? e); }
+  const scheduleTimer = setInterval(() => safeAsync("schedule polling", async () => {
+    const schedules = listSchedules().filter(s => s.enabled);
+    const now = new Date();
+    for (const sched of schedules) {
+      if (!cronMatches(sched.cron, now)) continue;
+      // Skip if already ran this minute
+      if (sched.last_run) {
+        const lastRun = new Date(sched.last_run);
+        if (lastRun.getMinutes() === now.getMinutes() &&
+            lastRun.getHours() === now.getHours() &&
+            lastRun.getDate() === now.getDate()) continue;
       }
-    } catch (e: any) { console.error("schedule polling error:", e?.message ?? e); }
-  }, POLL_INTERVAL_MS);
+      await safeAsync(`scheduled dispatch for ${sched.id}`, async () => {
+        const s = session.startSession({
+          summary: sched.summary ?? `Scheduled: ${sched.id}`,
+          repo: sched.repo ?? undefined,
+          workdir: sched.workdir ?? undefined,
+          flow: sched.flow,
+          compute_name: sched.compute_name ?? undefined,
+          group_name: sched.group_name ?? undefined,
+        });
+        await session.dispatch(s.id);
+        updateScheduleLastRun(sched.id);
+        store.logEvent(s.id, "scheduled_dispatch", {
+          actor: "scheduler",
+          data: { schedule_id: sched.id, cron: sched.cron },
+        });
+      });
+    }
+  }), POLL_INTERVAL_MS);
 
   // PR review poller - check every 60 seconds
-  const prTimer = setInterval(async () => {
-    try { await pollPRReviews(); } catch (e: any) { console.error("PR review polling error:", e?.message ?? e); }
-  }, POLL_INTERVAL_MS);
+  const prTimer = setInterval(() =>
+    safeAsync("PR review polling", () => pollPRReviews()),
+  POLL_INTERVAL_MS);
 
   return {
     stop() {
@@ -237,16 +238,14 @@ export async function deliverToChannel(
   // Try arkd delivery first (works for both local and remote)
   const computeName = targetSession.compute_name || "local";
   const compute = store.getCompute(computeName);
-  if (compute) {
-    const provider = getProvider(compute.provider);
-    if (provider && typeof (provider as any).getArkdUrl === "function") {
-      try {
-        const arkdUrl = (provider as any).getArkdUrl(compute);
-        const client = new ArkdClient(arkdUrl);
-        const result = await client.channelDeliver({ channelPort, payload });
-        if (result.delivered) return;
-      } catch (e: any) { /* arkd not available — fall through to direct HTTP */ }
-    }
+  const provider = compute ? getProvider(compute.provider) : null;
+  if (provider && typeof (provider as any).getArkdUrl === "function") {
+    try {
+      const arkdUrl = (provider as any).getArkdUrl(compute);
+      const client = new ArkdClient(arkdUrl);
+      const result = await client.channelDeliver({ channelPort, payload });
+      if (result.delivered) return;
+    } catch { /* arkd not available — fall through to direct HTTP */ }
   }
 
   // Fallback: direct HTTP to channel port (local only)
@@ -256,7 +255,7 @@ export async function deliverToChannel(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-  } catch (e: any) { /* channel not reachable — expected when agent hasn't started channel yet */ }
+  } catch { /* channel not reachable — expected when agent hasn't started channel yet */ }
 }
 
 function handleReport(sessionId: string, report: OutboundMessage): void {
@@ -291,13 +290,11 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
   // Handle advance + auto-dispatch for completed reports
   if (result.shouldAdvance) {
     const advResult = session.advance(sessionId);
-    if (result.shouldAutoDispatch && advResult.ok) {
-      const updated = store.getSession(sessionId);
-      if (updated && updated.status === "ready" && updated.stage) {
-        const nextAction = flow.getStageAction(updated.flow, updated.stage);
-        if (nextAction.type === "agent" || nextAction.type === "fork") {
-          session.dispatch(sessionId);
-        }
+    const updated = (result.shouldAutoDispatch && advResult.ok) ? store.getSession(sessionId) : null;
+    if (updated?.status === "ready" && updated.stage) {
+      const nextAction = flow.getStageAction(updated.flow, updated.stage);
+      if (nextAction.type === "agent" || nextAction.type === "fork") {
+        session.dispatch(sessionId);
       }
     }
   }

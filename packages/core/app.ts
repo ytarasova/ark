@@ -12,6 +12,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 import { loadConfig, type ArkConfig } from "./config.js";
+import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
 import { initSchema as initStoreSchema, setAppStore, clearAppStore } from "./store.js";
@@ -129,7 +130,7 @@ export class AppContext {
     }
 
     // 4. Register compute providers
-    try {
+    await safeAsync("boot: load compute providers", async () => {
       const compute = await import("../compute/index.js");
       // Legacy providers (backward compat — same names: "local", "ec2", "docker")
       this.registerProvider(new compute.LocalProvider());
@@ -142,9 +143,7 @@ export class AppContext {
       this.registerProvider(new compute.RemoteDockerProvider());
       this.registerProvider(new compute.RemoteDevcontainerProvider());
       this.registerProvider(new compute.RemoteFirecrackerProvider());
-    } catch (e: any) {
-      console.error("boot: failed to load compute providers:", e?.message ?? e);
-    }
+    });
 
     // 5. Wire provider resolver for session.ts
     setProviderResolver((session) => this.resolveProvider(session));
@@ -155,12 +154,10 @@ export class AppContext {
 
     // 7. Optionally start conductor (dynamic import to avoid circular deps)
     if (!this.options.skipConductor) {
-      try {
+      await safeAsync("boot: start conductor", async () => {
         const { startConductor } = await import("./conductor.js");
         this.conductor = startConductor(this.config.conductorPort, { quiet: true });
-      } catch (e: any) {
-        console.error("boot: failed to start conductor:", e?.message ?? e);
-      }
+      });
     }
 
     // 8. Optionally start metrics poller
@@ -188,12 +185,10 @@ export class AppContext {
     this._removeSignalHandlers();
 
     // 2. Close SSH connection pools
-    try {
+    await safeAsync("shutdown: destroy SSH pools", async () => {
       const { destroyAllPools } = await import("../compute/providers/ec2/pool.js");
       await destroyAllPools();
-    } catch (e: any) {
-      console.error("shutdown: failed to destroy SSH pools:", e?.message ?? e);
-    }
+    });
 
     // 3. Stop metrics poller
     if (this.metricsPoller) {
@@ -236,23 +231,18 @@ export class AppContext {
 
   private _startMetricsPoller(): { stop(): void } {
     const handle = setInterval(async () => {
-      try {
+      await safeAsync("metrics: poll computes", async () => {
         const store = await import("./store.js");
         const computes = store.listCompute({ status: "running" });
         for (const c of computes) {
-          // Poll metrics for each running compute
-          try {
+          await safeAsync(`metrics: poll compute "${c.name}"`, async () => {
             const compute = await import("./compute.js");
             if (typeof compute.pollMetrics === "function") {
               await compute.pollMetrics(c.name);
             }
-          } catch (e: any) {
-            console.error(`metrics: failed to poll compute "${c.name}":`, e?.message ?? e);
-          }
+          });
         }
-      } catch (e: any) {
-        console.error("metrics: failed to list running computes:", e?.message ?? e);
-      }
+      });
     }, 30_000);
 
     return { stop: () => clearInterval(handle) };

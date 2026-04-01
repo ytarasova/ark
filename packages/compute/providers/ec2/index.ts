@@ -36,6 +36,7 @@ import { SSH_FAST_CMD, parseSnapshot } from "./metrics.js";
 import { setupTunnels, setupReverseTunnel, probeRemotePorts } from "./ports.js";
 import { hourlyRate } from "./cost.js";
 import { sleep, poll } from "../../util.js";
+import { safeAsync } from "../../../core/safe.js";
 import { resolveRepoUrl, getRepoName, cloneRepoOnRemote, trustRemoteDirectory, autoAcceptChannelPrompt } from "./remote-setup.js";
 import { getOrCreatePool, destroyPool, destroyAllPools, type SSHPool } from "./pool.js";
 import { SSHQueue } from "./queue.js";
@@ -147,11 +148,7 @@ async function syncRemoteCredentials(
   key: string, ip: string, computeName: string, onLog: (msg: string) => void,
 ): Promise<void> {
   onLog("Syncing credentials...");
-  try {
-    await syncToHost(key, ip, { direction: "push", onLog });
-  } catch (e: any) {
-    onLog(`Credential sync failed: ${e?.message ?? e}`);
-  }
+  await safeAsync("[ec2] syncRemoteCredentials", () => syncToHost(key, ip, { direction: "push", onLog }));
 
   // Set up Claude auth on remote
   const hasAuth = !!process.env.CLAUDE_CODE_OAUTH_TOKEN
@@ -532,15 +529,12 @@ export class EC2Provider implements ComputeProvider {
 
   async killAgent(compute: Compute, session: Session): Promise<void> {
     if (!session.session_id) return;
-    try {
-      const { queue } = this.getQueue(compute);
-      await queue.command(async (p) => {
+    const { queue } = this.getQueue(compute);
+    await safeAsync(`[ec2] killAgent: tmux kill-session '${session.session_id}' on ${compute.name}`, () =>
+      queue.command(async (p) => {
         await p.exec(`tmux kill-session -t '${session.session_id}'`, { timeout: 10_000 });
-      });
-    } catch (e: any) {
-      // Session may already be dead or host unreachable
-      console.error(`[ec2] killAgent: tmux kill-session '${session.session_id}' on ${compute.name} failed:`, e?.message ?? e);
-    }
+      }),
+    );
   }
 
   async captureOutput(compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
@@ -564,15 +558,12 @@ export class EC2Provider implements ComputeProvider {
   async cleanupSession(compute: Compute, session: Session): Promise<void> {
     const remoteWorkdir = (session.config as SessionConfig)?.remoteWorkdir;
     if (!remoteWorkdir) return;
-    try {
-      const { queue } = this.getQueue(compute);
-      await queue.command(async (p) => {
+    const { queue } = this.getQueue(compute);
+    await safeAsync(`[ec2] cleanupSession: rm remote workdir for ${session.id} on ${compute.name}`, () =>
+      queue.command(async (p) => {
         await p.exec(`rm -rf '${remoteWorkdir}'`, { timeout: 15_000 });
-      });
-    } catch (e: any) {
-      // Best effort cleanup — remote may be unreachable
-      console.error(`[ec2] cleanupSession: rm remote workdir for ${session.id} on ${compute.name} failed:`, e?.message ?? e);
-    }
+      }),
+    );
   }
 
   async attach(compute: Compute, session: Session): Promise<void> {
