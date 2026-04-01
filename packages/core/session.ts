@@ -72,6 +72,7 @@ export function startSession(opts: {
   summary?: string;
   repo?: string;
   flow?: string;
+  agent?: string | null;
   compute_name?: string;
   workdir?: string;
   group_name?: string;
@@ -94,6 +95,11 @@ export function startSession(opts: {
   }
 
   const session = store.createSession(mergedOpts);
+
+  // Apply agent override if specified
+  if (opts.agent) {
+    store.updateSession(session.id, { agent: opts.agent });
+  }
 
   // Set first stage
   const firstStage = flow.getFirstStage(mergedOpts.flow ?? "default");
@@ -151,7 +157,8 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   // Build task with handoff context
   log("Building task...");
   const task = await buildTaskWithHandoff(session, stage, agentName);
-  const claudeArgs = agentRegistry.buildClaudeArgs(agent, { autonomy });
+  // Skill injection happens inside buildClaudeArgs via projectRoot
+  const claudeArgs = agentRegistry.buildClaudeArgs(agent, { autonomy, projectRoot });
 
   // Launch in tmux
   log("Launching agent...");

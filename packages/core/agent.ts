@@ -133,17 +133,32 @@ export function resolveAgent(name: string, session: Record<string, unknown>, pro
 // ── Build claude CLI args ───────────────────────────────────────────────────
 
 import * as claude from "./claude.js";
+import { loadSkill } from "./skill.js";
 
 export function buildClaudeArgs(agent: AgentDefinition, opts?: {
   task?: string;
   sessionId?: string;
   headless?: boolean;
   autonomy?: string;
+  projectRoot?: string;
 }): string[] {
+  let systemPrompt = agent.system_prompt;
+
+  // Inject skill prompts into system prompt
+  if (agent.skills?.length) {
+    const skillPrompts = agent.skills
+      .map((name: string) => loadSkill(name, opts?.projectRoot))
+      .filter(Boolean)
+      .map((s: any) => `## Skill: ${s.name}\n${s.prompt}`);
+    if (skillPrompts.length) {
+      systemPrompt += "\n\n" + skillPrompts.join("\n\n");
+    }
+  }
+
   return claude.buildArgs({
     model: agent.model,
     maxTurns: agent.max_turns,
-    systemPrompt: agent.system_prompt,
+    systemPrompt,
     mcpServers: agent.mcp_servers,
     task: opts?.task,
     sessionId: opts?.sessionId,
