@@ -108,6 +108,41 @@
       </ul>
       <p>Set up by pointing a GitHub webhook at your conductor's <code>/api/webhook/github</code> endpoint.</p>
 
+      <h2>Skills</h2>
+      <p>Skills are reusable prompt fragments that can be attached to agents. They encapsulate domain knowledge, coding patterns, or procedural instructions into standalone files that agents include in their context.</p>
+      <p>Skills use three-tier resolution (highest priority first):</p>
+      <ul>
+        <li><strong>project</strong>: <code>.ark/skills/</code> in the repo</li>
+        <li><strong>global</strong>: <code>~/.ark/skills/</code></li>
+        <li><strong>builtin</strong>: <code>skills/</code> shipped with Ark</li>
+      </ul>
+      <p>Attach skills to agents via the <code>skills</code> field in agent YAML. Manage with <code>ark skill list</code> and <code>ark skill show</code>.</p>
+
+      <h2>Recipes</h2>
+      <p>Recipes are session templates with variables and a repo field. They let you quick-launch sessions from presets without manually filling in flow, agent, summary, and compute each time.</p>
+      <p>Recipes use the same three-tier resolution as skills: <code>.ark/recipes/</code> (project), <code>~/.ark/recipes/</code> (global), <code>recipes/</code> (builtin).</p>
+      <p>Built-in recipes: <code>quick-fix</code>, <code>feature-build</code>, <code>code-review</code>. You can create a recipe from an existing session with <code>sessionToRecipe</code>.</p>
+
+      <h2>Intelligence Features</h2>
+      <p>Ark includes several intelligence features that enhance agent autonomy:</p>
+      <ul>
+        <li><strong>Fail-loopback</strong>: when a stage fails, Ark retries it with error context injected into the agent prompt (up to 3 retries). Configured via <code>on_failure: "retry(3)"</code> in flow stage definitions.</li>
+        <li><strong>Sub-agent fan-out</strong>: decompose a task into N parallel child sessions. The parent waits for all children to complete before advancing. Use <code>ark session fork</code> and <code>ark session join</code>.</li>
+        <li><strong>Skill extraction</strong>: analyze agent conversations for reusable procedures and save them as skills for future sessions.</li>
+        <li><strong>Structured review output</strong>: the reviewer agent produces machine-parseable JSON with P0&ndash;P3 severity levels for each finding.</li>
+      </ul>
+
+      <h2>Guardrails</h2>
+      <p>Guardrails are pattern-based tool authorization rules that restrict what agents can do. They block dangerous commands (e.g. <code>rm -rf /</code>, <code>git push --force</code>) before the agent executes them. Guardrails are evaluated at the tool-call level and apply regardless of the agent's permission mode.</p>
+
+      <h2>Remote Sync</h2>
+      <p>When dispatching to remote compute targets, Ark syncs project-local configuration to the remote environment. The following paths are pushed at dispatch time:</p>
+      <ul>
+        <li><code>.claude/commands/</code></li>
+        <li><code>.claude/skills/</code></li>
+        <li><code>CLAUDE.md</code></li>
+      </ul>
+
       <h2>Focus System</h2>
       <p>The TUI uses a focus stack for keyboard input ownership. When a form or overlay opens, it pushes onto the focus stack and takes ownership of all keyboard input (including Tab). App-level shortcuts only fire when no child component owns focus. This prevents key conflicts between overlays and the main navigation.</p>
 

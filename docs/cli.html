@@ -282,6 +282,34 @@
       <p>Show full flow definition including stage breakdown, agents, and gates.</p>
       <pre><code><span class="prompt">$</span> ark flow show default</code></pre>
 
+      <!-- ── ark skill ────────────────────────────────────────────────────── -->
+      <h2>ark skill</h2>
+      <p>Manage reusable prompt fragments (skills) for agents. Skills are resolved with three-tier lookup: builtin (<code>skills/</code>), global (<code>~/.ark/skills/</code>), project (<code>.ark/skills/</code>).</p>
+
+      <h3>ark skill list</h3>
+      <p>List all available skills across all tiers.</p>
+      <pre><code><span class="prompt">$</span> ark skill list</code></pre>
+
+      <h3>ark skill show &lt;name&gt;</h3>
+      <p>Show the full content of a skill.</p>
+      <pre><code><span class="prompt">$</span> ark skill show code-review</code></pre>
+
+      <!-- ── ark recipe ───────────────────────────────────────────────────── -->
+      <h2>ark recipe</h2>
+      <p>Manage session templates (recipes) with variables and repo fields. Recipes enable quick-launch sessions from presets. Three-tier resolution: builtin (<code>recipes/</code>), global (<code>~/.ark/recipes/</code>), project (<code>.ark/recipes/</code>).</p>
+
+      <h3>ark recipe list</h3>
+      <p>List all available recipes across all tiers.</p>
+      <pre><code><span class="prompt">$</span> ark recipe list</code></pre>
+
+      <h3>ark recipe show &lt;name&gt;</h3>
+      <p>Show the full definition of a recipe including variables and defaults.</p>
+      <pre><code><span class="prompt">$</span> ark recipe show quick-fix</code></pre>
+
+      <div class="callout info">
+        <strong>Built-in recipes:</strong> <code>quick-fix</code>, <code>feature-build</code>, <code>code-review</code>. You can also create a recipe from an existing session with <code>sessionToRecipe</code>.
+      </div>
+
       <!-- ── ark compute ─────────────────────────────────────────────────── -->
       <h2>ark compute</h2>
       <p>Manage compute resources (local, Docker, EC2). See <a href="compute.html">Compute Providers</a> for setup details.</p>

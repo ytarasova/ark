@@ -35,7 +35,7 @@
       <ol>
         <li><strong>Sessions</strong> &mdash; manage agent sessions</li>
         <li><strong>Agents</strong> &mdash; create, edit, copy, delete agent definitions</li>
-        <li><strong>Tools</strong> &mdash; (coming soon)</li>
+        <li><strong>Tools</strong> &mdash; browse and manage tools available to agents</li>
         <li><strong>Flows</strong> &mdash; view flow definitions</li>
         <li><strong>History</strong> &mdash; browse and import Claude Code sessions</li>
         <li><strong>Compute</strong> &mdash; manage compute resources</li>
@@ -116,6 +116,27 @@
           <tr><td><kbd>e</kbd></td><td>Edit agent</td></tr>
           <tr><td><kbd>c</kbd></td><td>Copy agent</td></tr>
           <tr><td><kbd>x</kbd></td><td>Delete agent</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Tools Tab (3)</h2>
+      <p>Browse all tools available to agents in the current project. Tools are organized into 6 categories:</p>
+      <ul>
+        <li><strong>MCP Servers</strong> &mdash; from <code>.mcp.json</code></li>
+        <li><strong>Commands</strong> &mdash; from <code>.claude/commands/</code></li>
+        <li><strong>Claude Skills</strong> &mdash; from <code>.claude/skills/</code></li>
+        <li><strong>Ark Skills</strong> &mdash; from <code>skills/</code> (builtin, global, project)</li>
+        <li><strong>Recipes</strong> &mdash; from <code>recipes/</code> (builtin, global, project)</li>
+        <li><strong>Context</strong> &mdash; from <code>CLAUDE.md</code></li>
+      </ul>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>Navigate tools</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>View tool details</td></tr>
+          <tr><td><kbd>x</kbd></td><td>Delete tool (with confirmation)</td></tr>
         </tbody>
       </table>
 

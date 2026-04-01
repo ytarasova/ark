@@ -93,6 +93,46 @@
         <li><strong>condition</strong>: evaluates an expression</li>
       </ul>
 
+      <h2>Skill Definitions</h2>
+      <p>Skills are reusable prompt fragments for agents. They live in three locations (highest priority first):</p>
+      <table>
+        <thead>
+          <tr><th>Location</th><th>Scope</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.ark/skills/&lt;name&gt;.md</code></td><td>Project-local (committed to repo)</td></tr>
+          <tr><td><code>~/.ark/skills/&lt;name&gt;.md</code></td><td>Global (user-wide)</td></tr>
+          <tr><td><code>skills/&lt;name&gt;.md</code></td><td>Builtin (shipped with Ark)</td></tr>
+        </tbody>
+      </table>
+      <p>Attach skills to agents via the <code>skills</code> field in agent YAML. A skill is a markdown file containing instructions, patterns, or domain knowledge that gets injected into the agent context.</p>
+
+      <h2>Recipe Definitions</h2>
+      <p>Recipes are session templates with variables. They live in three locations (highest priority first):</p>
+      <table>
+        <thead>
+          <tr><th>Location</th><th>Scope</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.ark/recipes/&lt;name&gt;.yaml</code></td><td>Project-local</td></tr>
+          <tr><td><code>~/.ark/recipes/&lt;name&gt;.yaml</code></td><td>Global</td></tr>
+          <tr><td><code>recipes/&lt;name&gt;.yaml</code></td><td>Builtin</td></tr>
+        </tbody>
+      </table>
+      <p>Recipe schema:</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">quick-fix</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"Fast bugfix with bare flow"</span>
+<span class="yaml-key">repo</span>: <span class="yaml-value">.</span>
+<span class="yaml-key">flow</span>: <span class="yaml-value">bare</span>
+<span class="yaml-key">summary</span>: <span class="yaml-value">"Fix: {issue}"</span>
+<span class="yaml-key">variables</span>:
+  - <span class="yaml-key">name</span>: <span class="yaml-value">issue</span>
+    <span class="yaml-key">prompt</span>: <span class="yaml-value">"Describe the issue"</span></code></pre>
+      <p>Built-in recipes: <code>quick-fix</code>, <code>feature-build</code>, <code>code-review</code>. Create a recipe from an existing session with <code>sessionToRecipe</code>.</p>
+
+      <h2>Guardrails</h2>
+      <p>Guardrails are pattern-based tool authorization rules defined in agent or flow configuration. They block dangerous commands before execution. Example patterns: <code>rm -rf /</code>, <code>git push --force</code>, <code>DROP TABLE</code>.</p>
+
       <h2>Environment Variables</h2>
       <table>
         <thead>
@@ -174,6 +214,14 @@
           <tr>
             <td><code>~/.ark/flows/</code></td>
             <td>User flow definitions</td>
+          </tr>
+          <tr>
+            <td><code>~/.ark/skills/</code></td>
+            <td>Global skill definitions</td>
+          </tr>
+          <tr>
+            <td><code>~/.ark/recipes/</code></td>
+            <td>Global recipe definitions</td>
           </tr>
           <tr>
             <td><code>~/.claude/projects/</code></td>

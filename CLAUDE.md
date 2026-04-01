@@ -10,6 +10,8 @@ make test             # bun test (NOT vitest - tests use bun:test)
 make dev              # tsc --watch
 make tui              # ark tui
 ./ark <command>       # run CLI directly via bun
+ark skill list        # list available skills
+ark recipe list       # list available recipes
 ark search <query>    # search sessions, events, messages (--transcripts for JSONL, --index to rebuild FTS5)
 ark index             # rebuild transcript FTS5 search index
 ark claude list       # list Claude Code sessions on disk (--project to filter)
@@ -27,7 +29,8 @@ packages/
   tui/       → React + Ink terminal dashboard
 agents/      → Agent YAML definitions (planner, implementer, reviewer, documenter, worker)
 flows/       → Flow YAML definitions (default, quick, bare, parallel)
-recipes/     → Flow recipe templates
+skills/      → Builtin skill definitions (reusable prompt fragments)
+recipes/     → Recipe templates (quick-fix, feature-build, code-review)
 ```
 
 No workspaces config - packages are coordinated manually via relative imports.
@@ -129,6 +132,8 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 | `~/.ark/ark.db` | SQLite database (WAL mode, 10s busy timeout) |
 | `~/.ark/tracks/<sessionId>/` | Launcher scripts, channel configs |
 | `~/.ark/worktrees/<sessionId>/` | Git worktrees for isolated sessions |
+| `~/.ark/skills/` | Global skill definitions |
+| `~/.ark/recipes/` | Global recipe definitions |
 | `~/.claude/projects/` | Claude Code session transcripts (JSONL) - read by search and import |
 | `.claude/settings.local.json` | Per-session hook config (written at dispatch, cleaned on stop) |
 
@@ -164,6 +169,35 @@ stages:
     gate: auto
 ```
 
+## Skills
+
+Reusable prompt fragments for agents. Three-tier resolution (highest priority first):
+- **project**: `.ark/skills/<name>.md` in the repo
+- **global**: `~/.ark/skills/<name>.md`
+- **builtin**: `skills/<name>.md` shipped with Ark
+
+Attach to agents via the `skills` field in agent YAML. CLI: `ark skill list`, `ark skill show <name>`.
+
+## Recipes
+
+Session templates with variables and repo field. Quick-launch sessions from presets. Three-tier resolution like skills: `.ark/recipes/` (project), `~/.ark/recipes/` (global), `recipes/` (builtin).
+
+Built-in recipes: `quick-fix`, `feature-build`, `code-review`. Create from existing session with `sessionToRecipe`.
+
+CLI: `ark recipe list`, `ark recipe show <name>`.
+
+## Intelligence Features
+
+- **Fail-loopback**: retry failed stages with error context injected (max 3 retries). Configured via `on_failure: "retry(3)"` in flow stage YAML.
+- **Sub-agent fan-out**: decompose tasks into N parallel child sessions. Parent waits for all children. Use `ark session fork` / `ark session join`.
+- **Skill extraction**: analyze conversations for reusable procedures, save as skills.
+- **Structured review output**: reviewer produces machine-parseable JSON with P0-P3 severity levels.
+- **Guardrails**: pattern-based tool authorization rules that block dangerous commands (e.g. `rm -rf /`, `git push --force`) before execution. Evaluated at the tool-call level regardless of permission mode.
+
+## Remote Sync
+
+At dispatch to remote compute, Ark syncs `.claude/commands/`, `.claude/skills/`, and `CLAUDE.md` to the remote target.
+
 ## TUI Keyboard Shortcuts
 
 **Sessions tab (1):**
@@ -176,6 +210,8 @@ stages:
 | `c` | Clone session | `m` | Move to group |
 | `i` | Inbox/threads | `g` | Group manager |
 | `Tab` | Focus detail pane | `e` | Expand events |
+
+**Tools tab (3):** `Enter`:view `x`:delete (6 categories: MCP Servers, Commands, Claude Skills, Ark Skills, Recipes, Context)
 
 **History tab (5):** `Enter`:import `r`:refresh+reindex `s`:search
 
