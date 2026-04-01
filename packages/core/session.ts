@@ -225,7 +225,9 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
 
   // Clean up hook config from working directory
   if (session.workdir) {
-    safeAsync(`stop ${sessionId}: removeHooksConfig`, () => Promise.resolve(claude.removeHooksConfig(session.workdir!)));
+    try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
+      console.error(`stop ${sessionId}: removeHooksConfig:`, e?.message ?? e);
+    }
   }
 
   // Preserve claude_session_id so restart can --resume the conversation
@@ -466,7 +468,9 @@ export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boole
 
   // 2. Clean up hook config (not provider-dependent)
   if (session.workdir) {
-    safeAsync(`delete ${sessionId}: removeHooksConfig`, () => Promise.resolve(claude.removeHooksConfig(session.workdir!)));
+    try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
+      console.error(`delete ${sessionId}: removeHooksConfig:`, e?.message ?? e);
+    }
   }
 
   // 3. Delete DB rows (instant)

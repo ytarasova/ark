@@ -5,6 +5,14 @@
 
 /** Run an async function, log errors instead of throwing. Returns true on success. */
 export async function safeAsync(label: string, fn: () => Promise<void>): Promise<boolean> {
-  try { await fn(); return true; }
-  catch (e: any) { console.error(`${label}:`, e?.message ?? e); return false; }
+  try {
+    await fn();
+    return true;
+  } catch (e: any) {
+    console.error(`${label}:`, e instanceof Error ? e.message : e);
+    if (e instanceof Error && e.stack) {
+      console.error(e.stack);
+    }
+    return false;
+  }
 }

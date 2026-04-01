@@ -15,7 +15,6 @@ import { dirname } from "path";
 
 import * as tmux from "./tmux.js";
 import { TRACKS_DIR } from "./store.js";
-import { safeAsync } from "./safe.js";
 // TRACKS_DIR is now a function — call it at usage sites, not module level
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -460,13 +459,14 @@ export async function deliverTask(
   try {
     // Try arkd delivery first
     if (opts?.arkdUrl) {
-      const delivered = await safeAsync(`deliverTask: arkd delivery for session ${sessionId}`, async () => {
+      try {
         const { ArkdClient } = await import("../arkd/client.js");
-        const client = new ArkdClient(opts!.arkdUrl!);
+        const client = new ArkdClient(opts.arkdUrl);
         const result = await client.channelDeliver({ channelPort, payload });
-        if (!result.delivered) throw new Error("arkd delivery returned false");
-      });
-      if (delivered) return;
+        if (result.delivered) return;
+      } catch (e: any) {
+        console.error(`deliverTask: arkd delivery failed for session ${sessionId}, falling back to direct:`, e?.message ?? e);
+      }
     }
 
     // Fallback: direct HTTP to channel port with retry
