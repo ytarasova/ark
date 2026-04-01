@@ -1,0 +1,15 @@
+name: fan-out
+description: Plan then execute tasks in parallel
+stages:
+  - name: plan
+    agent: planner
+    gate: manual
+    task: |
+      Analyze {summary} and decompose into independent sub-tasks.
+      Output a JSON array of tasks: [{"summary": "...", "agent": "implementer"}, ...]
+  - name: execute
+    type: fan_out
+    gate: auto
+  - name: review
+    agent: reviewer
+    gate: auto
