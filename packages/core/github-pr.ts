@@ -5,7 +5,7 @@
  */
 
 import { createHmac } from "crypto";
-import { getDb } from "./store.js";
+import { getDb, safeParseConfig } from "./store.js";
 import * as store from "./store.js";
 import { safeAsync } from "./safe.js";
 
@@ -108,7 +108,7 @@ export function findSessionByPR(prUrl: string): store.Session | null {
     ticket: row.jira_key,
     summary: row.jira_summary,
     flow: row.pipeline,
-    config: JSON.parse(row.config ?? "{}"),
+    config: safeParseConfig(row.config),
   };
 }
 

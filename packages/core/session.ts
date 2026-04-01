@@ -1054,6 +1054,9 @@ export interface ReportResult {
  */
 export function applyReport(sessionId: string, report: OutboundMessage): ReportResult {
   const session = store.getSession(sessionId);
+  if (!session) {
+    return { updates: {}, logEvents: [], busEvents: [] };
+  }
   const result: ReportResult = { updates: {}, logEvents: [], busEvents: [] };
 
   // Log event
@@ -1099,18 +1102,16 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
   switch (report.type) {
     case "completed": {
       // Save completion data to session config for display in detail pane
-      if (session) {
-        const cfg = {
-          ...(session.config as any),
-          completion_summary: (report as any).summary,
-          filesChanged: (report as any).filesChanged,
-          commits: (report as any).commits,
-        };
-        result.updates.config = cfg;
-      }
+      const cfg = {
+        ...(session.config as any),
+        completion_summary: (report as any).summary,
+        filesChanged: (report as any).filesChanged,
+        commits: (report as any).commits,
+      };
+      result.updates.config = cfg;
 
       // Check gate type — manual gates keep session running (user decides when done)
-      const stageDef = session ? flow.getStage(session.flow, session.stage ?? "") : null;
+      const stageDef = flow.getStage(session.flow, session.stage ?? "");
       const isManualGate = stageDef?.gate === "manual";
 
       if (isManualGate) {
@@ -1118,7 +1119,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
         result.logEvents!.push({
           type: "agent_completed",
           opts: {
-            stage: session?.stage ?? undefined,
+            stage: session.stage ?? undefined,
             actor: "agent",
             data: { summary: (report as any).summary },
           },
@@ -1144,7 +1145,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
       break;
     case "progress": {
       // Agent is actively reporting — ensure status reflects that.
-      if (session && session.status === "waiting") {
+      if (session.status === "waiting") {
         result.updates.status = "running";
         result.updates.breakpoint_reason = null;
       }
@@ -1154,7 +1155,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
 
   // PR URL from agent report
   const prUrl = (report as any).pr_url as string | undefined;
-  if (prUrl && session && !session.pr_url) {
+  if (prUrl && !session.pr_url) {
     result.prUrl = prUrl;
   }
 

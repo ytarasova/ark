@@ -100,12 +100,8 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   }
 
   // Apply usage data
-  const usageSession = result.usage ? store.getSession(sessionId) : null;
-  if (result.usage && usageSession) {
-    const config = typeof usageSession.config === "string"
-      ? JSON.parse(usageSession.config) : (usageSession.config ?? {});
-    config.usage = result.usage;
-    store.updateSession(sessionId, { config });
+  if (result.usage) {
+    store.mergeSessionConfig(sessionId, { usage: result.usage });
   }
 
   // Index transcript

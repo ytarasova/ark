@@ -15,7 +15,7 @@ import { loadConfig, type ArkConfig } from "./config.js";
 import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
-import { initSchema as initStoreSchema, setAppStore, clearAppStore } from "./store.js";
+import { initSchema as initStoreSchema, setAppStore, clearAppStore, safeParseConfig } from "./store.js";
 import type { Compute, Session } from "./store.js";
 import { setProviderResolver, clearProviderResolver } from "./session.js";
 
@@ -89,7 +89,7 @@ export class AppContext {
     const row = this._db?.prepare("SELECT * FROM compute WHERE name = ?").get(computeName) as
       { name: string; provider: string; status: string; config: string; created_at: string; updated_at: string } | undefined;
     if (!row) return { provider: null, compute: null };
-    const compute: Compute = { ...row, config: JSON.parse(row.config || "{}") };
+    const compute: Compute = { ...row, config: safeParseConfig(row.config) };
     const provider = this.getProvider(compute.provider);
     return { provider: provider ?? null, compute };
   }

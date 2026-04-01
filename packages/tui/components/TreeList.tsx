@@ -75,6 +75,9 @@ export function TreeList<T>({
     return <Text dimColor>{`  ${emptyMessage}`}</Text>;
   }
 
+  // Clamp sel to valid range to handle one-render-cycle delay from useListNavigation
+  const clampedSel = items.length > 0 ? Math.min(sel, items.length - 1) : 0;
+
   // Build flat list of renderable rows for ScrollBox
   const rows: React.ReactNode[] = [];
   let selRow = 0;
@@ -92,7 +95,7 @@ export function TreeList<T>({
       rows.push(<Text key={`empty-${groupName}`} dimColor>{"    (empty)"}</Text>);
     }
     for (const { item, flatIndex } of entries) {
-      const isSel = visualIdx === sel;
+      const isSel = visualIdx === clampedSel;
       visualIdx++;
       if (isSel) { selRow = rows.length; selectedItem = item; }
       rows.push(
