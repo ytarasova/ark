@@ -591,38 +591,6 @@ recipeCmd.command("show")
     }
   });
 
-recipeCmd.command("use")
-  .description("Create a session from a recipe")
-  .argument("<name>", "Recipe name")
-  .option("-s, --summary <text>", "Override task summary")
-  .option("-r, --repo <path>", "Override repository")
-  .option("-d, --dispatch", "Dispatch immediately")
-  .action(async (name: string, opts: { summary?: string; repo?: string; dispatch?: boolean }) => {
-    const recipe = core.loadRecipe(name, core.findProjectRoot(process.cwd()) ?? undefined);
-    if (!recipe) { console.error(chalk.red(`Recipe not found: ${name}`)); process.exit(1); }
-    const values: Record<string, string> = {};
-    if (opts.summary) values.summary = opts.summary;
-    if (opts.repo) values.repo = opts.repo;
-    const instance = core.instantiateRecipe(recipe, values);
-    const session = core.startSession({
-      summary: instance.summary ?? recipe.description,
-      repo: instance.repo,
-      flow: instance.flow,
-      agent: instance.agent,
-      compute_name: instance.compute,
-      group_name: instance.group,
-    });
-    console.log(`Session ${session.id} created from recipe '${name}'`);
-    if (opts.dispatch) {
-      const result = await core.dispatch(session.id);
-      if (result.ok) {
-        console.log(`Dispatched ${session.id}`);
-      } else {
-        console.error(chalk.red(`Dispatch failed: ${result.message}`));
-      }
-    }
-  });
-
 // ── Compute commands ────────────────────────────────────────────────────────
 
 const computeCmd = program.command("compute").description("Manage compute resources");
