@@ -8,6 +8,7 @@ import { describe, it, expect } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { App } from "../App.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 describe("TUI App rendering", () => {
   it("renders without crashing", () => {
@@ -44,8 +45,8 @@ describe("TUI App rendering", () => {
     // Press "6" to switch to Compute tab (key 6 in new layout)
     stdin.write("6");
 
-    // Allow React to re-render
-    await new Promise((r) => setTimeout(r, 50));
+    // Wait for React to re-render
+    await waitFor(() => lastFrame()!.includes("Compute"));
 
     const frame = lastFrame()!;
     // The Compute tab should now be active

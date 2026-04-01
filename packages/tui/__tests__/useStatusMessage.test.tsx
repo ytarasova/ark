@@ -7,6 +7,7 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 let statusRef: ReturnType<typeof useStatusMessage> | null = null;
 
@@ -27,7 +28,7 @@ describe("useStatusMessage", () => {
   it("show() sets the message", async () => {
     const { lastFrame, unmount } = render(<StatusInspector clearMs={5000} />);
     statusRef!.show("Hello");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => statusRef!.message === "Hello");
     expect(statusRef!.message).toBe("Hello");
     expect(lastFrame()!).toContain("Hello");
     unmount();
@@ -36,11 +37,11 @@ describe("useStatusMessage", () => {
   it("clear() removes the message immediately", async () => {
     const { lastFrame, unmount } = render(<StatusInspector clearMs={5000} />);
     statusRef!.show("Visible");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => statusRef!.message === "Visible");
     expect(statusRef!.message).toBe("Visible");
 
     statusRef!.clear();
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => statusRef!.message === null);
     expect(statusRef!.message).toBeNull();
     expect(lastFrame()!).toContain("empty");
     unmount();
@@ -49,10 +50,11 @@ describe("useStatusMessage", () => {
   it("auto-clears after timeout", async () => {
     const { lastFrame, unmount } = render(<StatusInspector clearMs={200} />);
     statusRef!.show("Temporary");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => statusRef!.message === "Temporary");
     expect(statusRef!.message).toBe("Temporary");
 
-    await new Promise(r => setTimeout(r, 300));
+    // Wait for the auto-clear timer to fire (this is testing timer behavior)
+    await waitFor(() => statusRef!.message === null, { timeout: 2000 });
     expect(statusRef!.message).toBeNull();
     expect(lastFrame()!).toContain("empty");
     unmount();
@@ -72,7 +74,7 @@ describe("useStatusMessage", () => {
     expect(statusRef!.message).toBe("Second");
 
     // Wait for the remaining time + buffer for the auto-clear
-    await new Promise(r => setTimeout(r, 200));
+    await waitFor(() => statusRef!.message === null, { timeout: 2000 });
     expect(statusRef!.message).toBeNull();
     unmount();
   });

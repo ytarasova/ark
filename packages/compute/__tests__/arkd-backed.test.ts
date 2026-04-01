@@ -12,6 +12,7 @@ import { ArkdBackedProvider } from "../providers/arkd-backed.js";
 import type {
   Compute, Session, ProvisionOpts, SyncOpts, IsolationMode,
 } from "../types.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 const TEST_PORT = 19360;
 let server: { stop(): void };
@@ -92,8 +93,10 @@ describe("ArkdBackedProvider agent lifecycle", () => {
     });
     expect(result).toBe(TMUX_NAME);
 
-    // Give tmux time to start
-    await new Promise(r => setTimeout(r, 500));
+    // Wait for tmux session to start
+    await waitFor(async () => {
+      return await provider.checkSession(compute, TMUX_NAME);
+    }, { timeout: 5000 });
   });
 
   it("checkSession returns true for running session", async () => {
@@ -107,7 +110,10 @@ describe("ArkdBackedProvider agent lifecycle", () => {
   });
 
   it("captureOutput returns tmux pane content", async () => {
-    await new Promise(r => setTimeout(r, 1000));
+    await waitFor(async () => {
+      const o = await provider.captureOutput(compute, makeSession(TMUX_NAME));
+      return o.includes("arkd-backed-running");
+    }, { timeout: 5000 });
     const output = await provider.captureOutput(compute, makeSession(TMUX_NAME));
     expect(output).toContain("arkd-backed-running");
   });

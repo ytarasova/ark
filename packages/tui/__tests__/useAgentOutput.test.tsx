@@ -7,6 +7,7 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 function OutputCapture({ sessionId, tmuxName, isRunning, pollMs }: {
   sessionId: string | null;
@@ -23,7 +24,7 @@ describe("useAgentOutput", () => {
     const { lastFrame, unmount } = render(
       <OutputCapture sessionId={null} tmuxName="some-tmux" isRunning={true} />
     );
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => lastFrame()!.includes("no-output"));
     expect(lastFrame()!).toContain("no-output");
     unmount();
   });
@@ -32,7 +33,7 @@ describe("useAgentOutput", () => {
     const { lastFrame, unmount } = render(
       <OutputCapture sessionId="sess-1" tmuxName={null} isRunning={true} />
     );
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => lastFrame()!.includes("no-output"));
     expect(lastFrame()!).toContain("no-output");
     unmount();
   });
@@ -41,7 +42,7 @@ describe("useAgentOutput", () => {
     const { lastFrame, unmount } = render(
       <OutputCapture sessionId="sess-1" tmuxName="some-tmux" isRunning={false} />
     );
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => lastFrame()!.includes("no-output"));
     expect(lastFrame()!).toContain("no-output");
     unmount();
   });
@@ -56,7 +57,7 @@ describe("useAgentOutput", () => {
       />
     );
     // Wait for the initial poll to complete (capturePaneAsync returns "" for missing sessions)
-    await new Promise(r => setTimeout(r, 300));
+    await waitFor(() => lastFrame()!.includes("no-output"), { timeout: 5000 });
     expect(lastFrame()!).toContain("no-output");
     unmount();
   });

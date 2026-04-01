@@ -3,6 +3,7 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { Text, Box } from "ink";
 import { useFormNavigation } from "../components/form/useFormNavigation.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 function TestForm({ onCancel, onSubmit }: { onCancel: () => void; onSubmit?: () => void }) {
   const { active, fields } = useFormNavigation({
@@ -34,7 +35,7 @@ describe("useFormNavigation", () => {
   it("Tab moves to next field", async () => {
     const { lastFrame, stdin, unmount } = render(<TestForm onCancel={() => {}} />);
     stdin.write("\t");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[color]"));
     expect(lastFrame()!).toContain("[color]");
     unmount();
   });
@@ -45,7 +46,7 @@ describe("useFormNavigation", () => {
     stdin.write("\t");
     stdin.write("\t");
     stdin.write("\t");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[path]"));
     expect(lastFrame()!).toContain("[path]");
     unmount();
   });

@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { FormTextArea } from "../components/form/index.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 describe("FormTextArea", () => {
   it("shows preview of value when not editing", () => {
@@ -25,8 +26,8 @@ describe("FormTextArea", () => {
       <FormTextArea label="Prompt" value="hello" onChange={() => {}} active={true} />
     );
     stdin.write("\r");
-    await new Promise(r => setTimeout(r, 50));
     // In edit mode, the FormField prefix changes from "> " to "* "
+    await waitFor(() => lastFrame()!.includes("*"));
     expect(lastFrame()!).toContain("*");
     // The cursor block (inverse space) appears after the text in edit mode
     expect(lastFrame()!).toContain("hello");

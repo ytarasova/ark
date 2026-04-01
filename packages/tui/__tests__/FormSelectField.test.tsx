@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { FormSelectField } from "../components/form/index.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 const items = [
   { label: "Option A", value: "a" },
@@ -53,7 +54,7 @@ describe("FormSelectField", () => {
     );
     // Press Enter to select first item
     stdin.write("\r");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => selected === "a");
     expect(selected).toBe("a");
     unmount();
   });

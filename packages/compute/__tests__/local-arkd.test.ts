@@ -22,6 +22,7 @@ import {
   LocalFirecrackerProvider,
 } from "../providers/local-arkd.js";
 import type { Compute, Session } from "../types.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 // Use the default arkd port (19300) that local providers expect
 const ARKD_PORT = 19300;
@@ -156,7 +157,9 @@ describe("LocalWorktreeProvider", () => {
         ports: [],
       });
       expect(result).toBe(TMUX_NAME);
-      await new Promise(r => setTimeout(r, 500));
+      await waitFor(async () => {
+        return await provider.checkSession(compute, TMUX_NAME);
+      }, { timeout: 5000 });
     });
 
     it("checkSession returns true for running session", async () => {
@@ -165,7 +168,10 @@ describe("LocalWorktreeProvider", () => {
     });
 
     it("captureOutput returns content from tmux", async () => {
-      await new Promise(r => setTimeout(r, 1000));
+      await waitFor(async () => {
+        const o = await provider.captureOutput(compute, makeSession(TMUX_NAME));
+        return o.includes("local-wt-running");
+      }, { timeout: 5000 });
       const output = await provider.captureOutput(compute, makeSession(TMUX_NAME));
       expect(output).toContain("local-wt-running");
     });
@@ -255,7 +261,10 @@ describe("LocalDockerProvider", () => {
         ports: [],
       });
 
-      await new Promise(r => setTimeout(r, 500));
+      await waitFor(() => {
+        const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
+        return existsSync(scriptPath);
+      }, { timeout: 5000 });
 
       // The script on disk is the wrapper (agentLaunch overwrites the writeFile content)
       const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
@@ -306,7 +315,10 @@ describe("LocalDevcontainerProvider", () => {
         ports: [],
       });
 
-      await new Promise(r => setTimeout(r, 500));
+      await waitFor(() => {
+        const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
+        return existsSync(scriptPath);
+      }, { timeout: 5000 });
 
       // The script on disk is the wrapper (agentLaunch overwrites the writeFile content)
       const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
@@ -367,7 +379,10 @@ describe("LocalFirecrackerProvider", () => {
         ports: [],
       });
 
-      await new Promise(r => setTimeout(r, 500));
+      await waitFor(() => {
+        const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
+        return existsSync(scriptPath);
+      }, { timeout: 5000 });
 
       // The script on disk is the SSH wrapper (agentLaunch overwrites the writeFile content)
       const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;

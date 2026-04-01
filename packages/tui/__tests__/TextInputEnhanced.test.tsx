@@ -2,8 +2,7 @@ import { describe, it, expect } from "bun:test";
 import React, { useState } from "react";
 import { render } from "ink-testing-library";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
-
-const delay = (ms = 50) => new Promise(r => setTimeout(r, ms));
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 // Escape sequences for terminal key input
 const KEYS = {
@@ -49,7 +48,7 @@ describe("TextInputEnhanced", () => {
     it("accepts typed characters", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput />);
       stdin.write("hello");
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("hello"));
       expect(stripAnsi(lastFrame()!)).toContain("hello");
       unmount();
     });
@@ -60,9 +59,9 @@ describe("TextInputEnhanced", () => {
       stdin.write(KEYS.left);
       stdin.write(KEYS.left);
       stdin.write(KEYS.left);
-      await delay();
+      await waitFor(() => true); // yield for key processing
       stdin.write("e");
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("hello"));
       expect(stripAnsi(lastFrame()!)).toContain("hello");
       unmount();
     });
@@ -71,9 +70,9 @@ describe("TextInputEnhanced", () => {
   describe("character navigation", () => {
     it("left arrow moves cursor left", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="abc" />);
-      // Cursor starts at end. Move left once → cursor on 'c'
+      // Cursor starts at end. Move left once -> cursor on 'c'
       stdin.write(KEYS.left);
-      await delay();
+      await waitFor(() => lastFrame()!.includes("ab"));
       const frame = lastFrame()!;
       // 'c' should be the inverse (cursor) character, with 'ab' before it
       expect(frame).toContain("ab");
@@ -82,11 +81,11 @@ describe("TextInputEnhanced", () => {
 
     it("right arrow moves cursor right", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="abc" />);
-      // Move to beginning, then right once → cursor on 'b'
+      // Move to beginning, then right once -> cursor on 'b'
       stdin.write(KEYS.ctrlA);
-      await delay();
+      await waitFor(() => true);
       stdin.write(KEYS.right);
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("abc"));
       const frame = stripAnsi(lastFrame()!);
       expect(frame).toContain("abc");
       unmount();
@@ -95,10 +94,10 @@ describe("TextInputEnhanced", () => {
     it("Ctrl+B moves cursor left", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="abc" />);
       stdin.write(KEYS.ctrlB);
-      await delay();
+      await waitFor(() => true);
       // Typing should insert before 'c'
       stdin.write("x");
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("abxc"));
       expect(stripAnsi(lastFrame()!)).toContain("abxc");
       unmount();
     });
@@ -106,11 +105,11 @@ describe("TextInputEnhanced", () => {
     it("Ctrl+F moves cursor right", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="abc" />);
       stdin.write(KEYS.ctrlA);
-      await delay();
+      await waitFor(() => true);
       stdin.write(KEYS.ctrlF);
-      await delay();
+      await waitFor(() => true);
       stdin.write("x");
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("axbc"));
       expect(stripAnsi(lastFrame()!)).toContain("axbc");
       unmount();
     });
@@ -121,9 +120,9 @@ describe("TextInputEnhanced", () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello world" />);
       // Cursor at end. Option+Left should jump to start of "world"
       stdin.write(KEYS.optLeft);
-      await delay();
+      await waitFor(() => true);
       stdin.write("x");
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("hello xworld"));
       expect(stripAnsi(lastFrame()!)).toContain("hello xworld");
       unmount();
     });
@@ -131,12 +130,12 @@ describe("TextInputEnhanced", () => {
     it("Option+Right jumps to next word boundary", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello world" />);
       stdin.write(KEYS.ctrlA);
-      await delay();
+      await waitFor(() => true);
       // Option+Right should jump past "hello"
       stdin.write(KEYS.optRight);
-      await delay();
+      await waitFor(() => true);
       stdin.write("x");
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("hellox world"));
       expect(stripAnsi(lastFrame()!)).toContain("hellox world");
       unmount();
     });
@@ -144,11 +143,11 @@ describe("TextInputEnhanced", () => {
     it("Option+Left at beginning stays at beginning", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello" />);
       stdin.write(KEYS.ctrlA);
-      await delay();
+      await waitFor(() => true);
       stdin.write(KEYS.optLeft);
-      await delay();
+      await waitFor(() => true);
       stdin.write("x");
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("xhello"));
       expect(stripAnsi(lastFrame()!)).toContain("xhello");
       unmount();
     });
@@ -158,9 +157,9 @@ describe("TextInputEnhanced", () => {
     it("Ctrl+A moves to beginning of line", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello" />);
       stdin.write(KEYS.ctrlA);
-      await delay();
+      await waitFor(() => true);
       stdin.write("x");
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("xhello"));
       expect(stripAnsi(lastFrame()!)).toContain("xhello");
       unmount();
     });
@@ -168,11 +167,11 @@ describe("TextInputEnhanced", () => {
     it("Ctrl+E moves to end of line", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello" />);
       stdin.write(KEYS.ctrlA);
-      await delay();
+      await waitFor(() => true);
       stdin.write(KEYS.ctrlE);
-      await delay();
+      await waitFor(() => true);
       stdin.write("x");
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("hellox"));
       expect(stripAnsi(lastFrame()!)).toContain("hellox");
       unmount();
     });
@@ -182,7 +181,7 @@ describe("TextInputEnhanced", () => {
     it("deletes character before cursor", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello" />);
       stdin.write(KEYS.backspace);
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("hell"));
       expect(stripAnsi(lastFrame()!)).toContain("hell");
       unmount();
     });
@@ -190,9 +189,9 @@ describe("TextInputEnhanced", () => {
     it("does nothing at beginning of line", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hi" />);
       stdin.write(KEYS.ctrlA);
-      await delay();
+      await waitFor(() => true);
       stdin.write(KEYS.backspace);
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("hi"));
       expect(stripAnsi(lastFrame()!)).toContain("hi");
       unmount();
     });
@@ -202,7 +201,7 @@ describe("TextInputEnhanced", () => {
     it("Option+Backspace deletes word backward", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello world" />);
       stdin.write(KEYS.optBackspace);
-      await delay();
+      await waitFor(() => !stripAnsi(lastFrame()!).includes("world"));
       expect(stripAnsi(lastFrame()!)).toContain("hello");
       expect(stripAnsi(lastFrame()!)).not.toContain("world");
       unmount();
@@ -217,9 +216,9 @@ describe("TextInputEnhanced", () => {
       stdin.write(KEYS.left);
       stdin.write(KEYS.left);
       stdin.write(KEYS.left);
-      await delay();
+      await waitFor(() => true);
       stdin.write(KEYS.optBackspace);
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("one  three"));
       expect(stripAnsi(lastFrame()!)).toContain("one  three");
       unmount();
     });
@@ -227,7 +226,7 @@ describe("TextInputEnhanced", () => {
     it("Ctrl+W deletes word backward", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello world" />);
       stdin.write(KEYS.ctrlW);
-      await delay();
+      await waitFor(() => !stripAnsi(lastFrame()!).includes("world"));
       expect(stripAnsi(lastFrame()!)).toContain("hello");
       expect(stripAnsi(lastFrame()!)).not.toContain("world");
       unmount();
@@ -236,9 +235,9 @@ describe("TextInputEnhanced", () => {
     it("Option+Backspace at beginning does nothing", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello" />);
       stdin.write(KEYS.ctrlA);
-      await delay();
+      await waitFor(() => true);
       stdin.write(KEYS.optBackspace);
-      await delay();
+      await waitFor(() => stripAnsi(lastFrame()!).includes("hello"));
       expect(stripAnsi(lastFrame()!)).toContain("hello");
       unmount();
     });
@@ -249,9 +248,9 @@ describe("TextInputEnhanced", () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello world" />);
       // Move cursor to before "world"
       stdin.write(KEYS.optLeft);
-      await delay();
+      await waitFor(() => true);
       stdin.write(KEYS.ctrlU);
-      await delay();
+      await waitFor(() => !stripAnsi(lastFrame()!).includes("hello"));
       expect(stripAnsi(lastFrame()!)).toContain("world");
       expect(stripAnsi(lastFrame()!)).not.toContain("hello");
       unmount();
@@ -260,9 +259,9 @@ describe("TextInputEnhanced", () => {
     it("Ctrl+K deletes to end of line", async () => {
       const { lastFrame, stdin, unmount } = render(<TestInput initial="hello world" />);
       stdin.write(KEYS.optLeft);
-      await delay();
+      await waitFor(() => true);
       stdin.write(KEYS.ctrlK);
-      await delay();
+      await waitFor(() => !stripAnsi(lastFrame()!).includes("world"));
       expect(stripAnsi(lastFrame()!)).toContain("hello");
       expect(stripAnsi(lastFrame()!)).not.toContain("world");
       unmount();
@@ -274,7 +273,7 @@ describe("TextInputEnhanced", () => {
         <TestInput initial="hello" onValue={(v) => { lastValue = v; }} />
       );
       stdin.write(KEYS.ctrlU);
-      await delay();
+      await waitFor(() => lastValue === "");
       expect(lastValue).toBe("");
       unmount();
     });
@@ -305,7 +304,7 @@ describe("TextInputEnhanced", () => {
         <TestInput onValue={(v) => { captured = v; }} />
       );
       stdin.write("line1\nline2\nline3");
-      await delay();
+      await waitFor(() => captured.includes("\n"));
       expect(captured).toContain("\n");
       expect(captured.split("\n").length).toBe(3);
       unmount();
@@ -364,7 +363,7 @@ describe("TextInputEnhanced", () => {
       }
       const { stdin, unmount } = render(<SubmitTest />);
       stdin.write("\r"); // Enter
-      await delay();
+      await waitFor(() => submitted === multiLine);
       expect(submitted).toBe(multiLine);
       expect(submitted.split("\n").length).toBe(5);
       unmount();
@@ -376,7 +375,7 @@ describe("TextInputEnhanced", () => {
         <TestInput onValue={(v) => { captured = v; }} />
       );
       stdin.write("line1\r\nline2\r\nline3");
-      await delay();
+      await waitFor(() => captured.split("\n").length === 3);
       expect(captured).not.toContain("\r");
       expect(captured.split("\n").length).toBe(3);
       unmount();

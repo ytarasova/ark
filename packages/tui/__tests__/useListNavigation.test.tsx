@@ -7,6 +7,7 @@ import React, { useState } from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import { useListNavigation } from "../hooks/useListNavigation.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 function TestList({ items, active = true }: { items: string[]; active?: boolean }) {
   const { sel } = useListNavigation(items.length, { active });
@@ -34,7 +35,7 @@ describe("useListNavigation", () => {
       <TestList items={["a", "b", "c"]} />
     );
     stdin.write("j");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[b]"));
     expect(lastFrame()!).toContain("[b]");
     unmount();
   });
@@ -45,9 +46,9 @@ describe("useListNavigation", () => {
     );
     stdin.write("j");
     stdin.write("j");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[c]"));
     stdin.write("k");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[b]"));
     expect(lastFrame()!).toContain("[b]");
     unmount();
   });
@@ -59,7 +60,7 @@ describe("useListNavigation", () => {
     stdin.write("j");
     stdin.write("j");
     stdin.write("j");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[b]"));
     expect(lastFrame()!).toContain("[b]");
     unmount();
   });
@@ -69,7 +70,7 @@ describe("useListNavigation", () => {
       <TestList items={["a", "b"]} />
     );
     stdin.write("k");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[a]"));
     expect(lastFrame()!).toContain("[a]");
     unmount();
   });
@@ -82,11 +83,11 @@ describe("useListNavigation", () => {
     stdin.write("j");
     stdin.write("j");
     stdin.write("j");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[d]"));
     expect(lastFrame()!).toContain("[d]");
     // g -> jump to first
     stdin.write("g");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[a]"));
     expect(lastFrame()!).toContain("[a]");
     unmount();
   });
@@ -96,7 +97,7 @@ describe("useListNavigation", () => {
       <TestList items={["a", "b", "c", "d", "e"]} />
     );
     stdin.write("G");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[e]"));
     expect(lastFrame()!).toContain("[e]");
     unmount();
   });
@@ -107,7 +108,7 @@ describe("useListNavigation", () => {
       <TestList items={["a", "b", "c", "d", "e"]} />
     );
     stdin.write("f");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[e]"));
     expect(lastFrame()!).toContain("[e]");
     unmount();
   });
@@ -118,11 +119,11 @@ describe("useListNavigation", () => {
     );
     // Move to end first
     stdin.write("G");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[e]"));
     expect(lastFrame()!).toContain("[e]");
     // b -> page up, clamps to 0
     stdin.write("b");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[a]"));
     expect(lastFrame()!).toContain("[a]");
     unmount();
   });
@@ -158,7 +159,7 @@ describe("useListNavigation", () => {
     expect(lastFrame()!).toContain("sel=0");
     stdin.write("j");
     stdin.write("k");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("sel=0"));
     expect(lastFrame()!).toContain("sel=0");
     unmount();
   });
@@ -172,7 +173,7 @@ describe("useListNavigation", () => {
     stdin.write("k");
     stdin.write("k");
     stdin.write("b"); // page up from 0
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[a]"));
     expect(lastFrame()!).toContain("[a]");
     unmount();
   });
@@ -182,7 +183,7 @@ describe("useListNavigation", () => {
       <TestList items={["a", "b", "c"]} active={false} />
     );
     stdin.write("j");
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => lastFrame()!.includes("[a]"));
     expect(lastFrame()!).toContain("[a]");
     unmount();
   });

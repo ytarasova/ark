@@ -10,6 +10,7 @@ import { useComputeMetrics } from "../hooks/useComputeMetrics.js";
 import { registerProvider, clearProviders } from "../../compute/index.js";
 import { AppContext, setApp, clearApp } from "../../core/index.js";
 import type { Compute } from "../../core/index.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -117,7 +118,7 @@ describe("useComputeMetrics", () => {
     );
 
     captured!.addLog("box-1", "booting up");
-    await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() => (captured!.logs.get("box-1")?.length ?? 0) === 1);
 
     const entries = captured!.logs.get("box-1");
     expect(entries).toBeDefined();
@@ -136,7 +137,7 @@ describe("useComputeMetrics", () => {
     for (let i = 0; i < 60; i++) {
       captured!.addLog("box-cap", `msg-${i}`);
     }
-    await new Promise((r) => setTimeout(r, 100));
+    await waitFor(() => (captured!.logs.get("box-cap")?.length ?? 0) === 50);
 
     const entries = captured!.logs.get("box-cap");
     expect(entries).toBeDefined();
@@ -179,7 +180,7 @@ describe("useComputeMetrics", () => {
     captured!.addLog("alpha", "started");
     captured!.addLog("beta", "ready");
     captured!.addLog("alpha", "running task");
-    await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() => (captured!.logs.get("alpha")?.length ?? 0) === 2);
 
     const alphaEntries = captured!.logs.get("alpha");
     const betaEntries = captured!.logs.get("beta");

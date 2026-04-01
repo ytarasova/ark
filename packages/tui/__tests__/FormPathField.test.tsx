@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { FormPathField } from "../components/form/index.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 describe("FormPathField", () => {
   it("shows path value when not editing", () => {
@@ -26,8 +27,8 @@ describe("FormPathField", () => {
       <FormPathField label="Repo" value="/tmp" onChange={() => {}} active={true} />
     );
     stdin.write("\r");
-    await new Promise(r => setTimeout(r, 50));
     // In edit mode, shows * indicator
+    await waitFor(() => lastFrame()!.includes("*"));
     expect(lastFrame()!).toContain("*");
     unmount();
   });

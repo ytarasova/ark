@@ -8,6 +8,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { startArkd } from "../server.js";
 import { ArkdClient, ArkdClientError } from "../client.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 const TEST_PORT = 19351;
 let server: { stop(): void };
@@ -154,12 +155,18 @@ describe("client agent lifecycle", () => {
     });
     expect(launch.ok).toBe(true);
 
-    await new Promise(r => setTimeout(r, 500));
+    await waitFor(async () => {
+      const s = await client.agentStatus({ sessionName: SESSION_NAME });
+      return s.running === true;
+    }, { timeout: 5000 });
 
     const status = await client.agentStatus({ sessionName: SESSION_NAME });
     expect(status.running).toBe(true);
 
-    await new Promise(r => setTimeout(r, 1000));
+    await waitFor(async () => {
+      const c = await client.captureOutput({ sessionName: SESSION_NAME });
+      return c.output.includes("client agent up");
+    }, { timeout: 5000 });
     const capture = await client.captureOutput({ sessionName: SESSION_NAME });
     expect(capture.output).toContain("client agent up");
 

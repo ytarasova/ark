@@ -48,8 +48,7 @@ describe("useEventLog", () => {
   it("returns empty array when no sessions exist", async () => {
     const { unmount } = render(<EventCapture expanded={false} />);
     await waitFor(() => capturedEvents !== null);
-    // Give effect time to fire
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => Array.isArray(capturedEvents));
     expect(capturedEvents).toBeInstanceOf(Array);
     expect(capturedEvents.length).toBe(0);
     unmount();

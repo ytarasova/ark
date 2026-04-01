@@ -7,6 +7,7 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import { ScrollBox } from "../components/ScrollBox.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 describe("ScrollBox", () => {
   it("renders children", () => {
@@ -40,10 +41,9 @@ describe("ScrollBox", () => {
     stdin.write("j");
     stdin.write("j");
     stdin.write("j");
-    await new Promise(r => setTimeout(r, 50));
-    const after = lastFrame()!;
-
     // The frame should be unchanged because j/k are ignored in follow mode
+    await waitFor(() => lastFrame()! === before);
+    const after = lastFrame()!;
     expect(after).toBe(before);
     unmount();
   });

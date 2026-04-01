@@ -7,6 +7,7 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import { useAsync } from "../hooks/useAsync.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 function AsyncInspector({ onComplete }: { onComplete?: () => void }) {
   const async = useAsync(onComplete);
@@ -34,10 +35,10 @@ describe("useAsync", () => {
     asyncRef!.run("Test action", async () => {
       await new Promise(r => setTimeout(r, 100));
     });
-    await new Promise(r => setTimeout(r, 50));
+    await waitFor(() => asyncRef!.loading === true);
     // Should be loading
     expect(asyncRef!.loading).toBe(true);
-    await new Promise(r => setTimeout(r, 200));
+    await waitFor(() => asyncRef!.loading === false, { timeout: 2000 });
     unmount();
   });
 
@@ -51,7 +52,7 @@ describe("useAsync", () => {
     const { unmount } = render(<Capture />);
 
     asyncRef!.run("Action 1", () => {});
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => completed === 1);
     expect(completed).toBe(1);
     unmount();
   });
@@ -75,7 +76,7 @@ describe("useAsync", () => {
     });
     asyncRef!.run("Third", () => { order.push("third"); });
 
-    await new Promise(r => setTimeout(r, 300));
+    await waitFor(() => order.length === 3, { timeout: 2000 });
     expect(order).toEqual(["first", "second", "third"]);
     unmount();
   });
@@ -93,7 +94,7 @@ describe("useAsync", () => {
     asyncRef!.run("B", () => {});
     asyncRef!.run("C", () => {});
 
-    await new Promise(r => setTimeout(r, 200));
+    await waitFor(() => completed === 3, { timeout: 2000 });
     expect(completed).toBe(3);
     unmount();
   });
@@ -111,7 +112,7 @@ describe("useAsync", () => {
     asyncRef!.run("Bad", () => { throw new Error("boom"); });
     asyncRef!.run("After", () => { order.push("after"); });
 
-    await new Promise(r => setTimeout(r, 200));
+    await waitFor(() => order.includes("after"), { timeout: 2000 });
     expect(order).toContain("good");
     expect(order).toContain("after");
     unmount();
@@ -127,7 +128,7 @@ describe("useAsync", () => {
     const { unmount } = render(<Capture />);
 
     asyncRef!.run("Sync", () => { ran = true; });
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => ran === true);
     expect(ran).toBe(true);
     unmount();
   });

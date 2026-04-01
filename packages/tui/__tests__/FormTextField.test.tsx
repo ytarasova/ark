@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { FormTextField } from "../components/form/index.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 describe("FormTextField", () => {
   it("shows value when not editing", () => {
@@ -44,8 +45,7 @@ describe("FormTextField", () => {
       <FormTextField label="Name" value="test" onChange={() => {}} active={true} />
     );
     stdin.write("\r");
-    await new Promise(r => setTimeout(r, 50));
-    // In edit mode, shows * indicator
+    await waitFor(() => lastFrame()!.includes("*"), { timeout: 2000, message: "Expected * indicator for edit mode" });
     expect(lastFrame()!).toContain("*");
     unmount();
   });
