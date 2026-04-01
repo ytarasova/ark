@@ -86,9 +86,3 @@ export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review
 
 // Guardrails
 export { evaluateGuardrail, DEFAULT_RULES, type GuardrailRule } from "./guardrails.js";
-
-// Skills
-export { listSkills, loadSkill, saveSkill, deleteSkill, type SkillDefinition } from "./skill.js";
-
-// Recipes
-export { listRecipes, loadRecipe, instantiateRecipe, type RecipeDefinition, type RecipeVariable, type RecipeInstance } from "./recipe.js";
