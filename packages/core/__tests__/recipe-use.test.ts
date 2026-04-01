@@ -58,4 +58,50 @@ describe("recipe use", () => {
 
     expect(session.summary).toBe(recipe.description);
   });
+
+  it("passes agent from recipe instance to startSession", () => {
+    const recipe = loadRecipe("quick-fix")!;
+    expect(recipe).not.toBeNull();
+
+    const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test agent" });
+    const session = startSession({
+      summary: instance.summary ?? recipe.description,
+      repo: instance.repo,
+      flow: instance.flow,
+      agent: instance.agent,
+      compute_name: instance.compute,
+      group_name: instance.group,
+    });
+
+    // Agent should be set from the recipe (or null if recipe has no agent)
+    const fetched = store.getSession(session.id)!;
+    if (recipe.agent) {
+      expect(fetched.agent).toBe(recipe.agent);
+    } else {
+      expect(fetched.agent).toBeNull();
+    }
+  });
+
+  it("startSession with explicit agent sets it on the session", () => {
+    const session = startSession({
+      summary: "test-agent-param",
+      repo: "/tmp/test",
+      flow: "bare",
+      agent: "worker",
+    });
+
+    const fetched = store.getSession(session.id)!;
+    expect(fetched.agent).toBe("worker");
+  });
+
+  it("startSession without agent leaves it null", () => {
+    const session = startSession({
+      summary: "test-no-agent",
+      repo: "/tmp/test",
+      flow: "bare",
+    });
+
+    const fetched = store.getSession(session.id)!;
+    expect(fetched.agent).toBeNull();
+  });
 });

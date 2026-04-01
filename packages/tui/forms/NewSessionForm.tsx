@@ -21,6 +21,11 @@ export interface SessionPrefill {
   name?: string;
   repo?: string;
   claudeSessionId?: string;
+  agent?: string;
+  compute?: string;
+  group?: string;
+  flow?: string;
+  summary?: string;
 }
 
 interface NewSessionFormProps {
@@ -33,12 +38,12 @@ interface NewSessionFormProps {
 // Isolation choices are provider-driven — see ComputeProvider.isolationModes
 
 export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessionFormProps) {
-  const [name, setName] = useState(prefill?.name || generateName());
+  const [name, setName] = useState(prefill?.summary || prefill?.name || generateName());
   const [repoPath, setRepoPath] = useState(prefill?.repo || process.cwd());
   const [isolation, setIsolation] = useState("worktree");
-  const [groupName, setGroupName] = useState("");
-  const [computeName, setComputeName] = useState("local");
-  const [flowName, setFlowName] = useState("bare");
+  const [groupName, setGroupName] = useState(prefill?.group || "");
+  const [computeName, setComputeName] = useState(prefill?.compute || "local");
+  const [flowName, setFlowName] = useState(prefill?.flow || "bare");
 
   const isGitRepo = useMemo(() => {
     const rp = resolvePath(repoPath);
@@ -119,6 +124,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
           summary: sanitized,
           repo,
           flow: flowName,
+          agent: prefill?.agent || undefined,
           workdir,
           compute_name: computeName || undefined,
           group_name: groupName || undefined,
