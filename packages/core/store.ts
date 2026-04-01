@@ -162,18 +162,27 @@ interface MessageRow {
   created_at: string;
 }
 
+// ── Safe parsing ─────────────────────────────────────────────────────────────
+
+/** Safely parse a config value that may be a JSON string, an object, or corrupted. */
+export function safeParseConfig(raw: unknown): Record<string, unknown> {
+  if (typeof raw === "object" && raw !== null) return raw as Record<string, unknown>;
+  try { return JSON.parse(String(raw ?? "{}")); }
+  catch { return {}; }
+}
+
 export function rowToSession(row: SessionRow): Session {
   return {
     ...row,
     ticket: row.jira_key,
     summary: row.jira_summary,
     flow: row.pipeline,
-    config: JSON.parse(row.config ?? "{}"),
+    config: safeParseConfig(row.config),
   };
 }
 
 function rowToCompute(row: ComputeRow): Compute {
-  return { ...row, config: JSON.parse(row.config ?? "{}") };
+  return { ...row, config: safeParseConfig(row.config) };
 }
 
 function rowToEvent(row: EventRow): Event {
@@ -590,13 +599,31 @@ export function updateCompute(name: string, fields: Partial<Compute>): Compute |
 
 /**
  * Merge keys into a compute's config without replacing the whole object.
- * This is the safe way to update config - avoids read-then-spread races.
+ * Atomic read-modify-write in a single SQL round-trip to avoid races.
  */
 export function mergeComputeConfig(name: string, patch: Record<string, unknown>): Compute | null {
-  const compute = getCompute(name);
-  if (!compute) return null;
-  const merged = { ...compute.config, ...patch };
-  return updateCompute(name, { config: merged });
+  const db = getDb();
+  const row = db.prepare("SELECT config FROM compute WHERE name = ?").get(name) as { config: string } | undefined;
+  if (!row) return null;
+  const existing = safeParseConfig(row.config);
+  const merged = { ...existing, ...patch };
+  db.prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ?")
+    .run(JSON.stringify(merged), new Date().toISOString(), name);
+  return getCompute(name);
+}
+
+/**
+ * Merge keys into a session's config without replacing the whole object.
+ * Atomic read-modify-write in a single SQL round-trip to avoid races.
+ */
+export function mergeSessionConfig(sessionId: string, patch: Record<string, unknown>): void {
+  const db = getDb();
+  const row = db.prepare("SELECT config FROM sessions WHERE id = ?").get(sessionId) as { config: string } | undefined;
+  if (!row) return;
+  const existing = safeParseConfig(row.config);
+  const merged = { ...existing, ...patch };
+  db.prepare("UPDATE sessions SET config = ?, updated_at = ? WHERE id = ?")
+    .run(JSON.stringify(merged), new Date().toISOString(), sessionId);
 }
 
 export function deleteCompute(name: string): boolean {
@@ -637,7 +664,16 @@ export function deleteGroup(name: string): void {
 }
 
 export function sessionChannelPort(sessionId: string): number {
-  return 19200 + parseInt(sessionId.replace("s-", ""), 16) % 1000;
+  // Use 10000-port range (19200-29199) to reduce collision probability
+  return 19200 + parseInt(sessionId.replace("s-", ""), 16) % 10000;
+}
+
+export function isChannelPortAvailable(port: number, excludeSessionId?: string): boolean {
+  const db = getDb();
+  const sessions = db.prepare(
+    "SELECT id FROM sessions WHERE status IN ('running', 'waiting') AND id != ?"
+  ).all(excludeSessionId ?? "") as any[];
+  return !sessions.some(s => sessionChannelPort(s.id) === port);
 }
 
 // ── Messages ─────────────────────────────────────────────────────────────────

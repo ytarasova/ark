@@ -5,7 +5,7 @@
  * Both Chat (1:1) and Threads (multi-session) consume this hook.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import * as core from "../../core/index.js";
 
 export interface ThreadMessage {
@@ -41,6 +41,8 @@ export function useMessages(opts: UseMessagesOpts): UseMessagesResult {
   const [error, setError] = useState<string | null>(null);
 
   // Use refs for values that change frequently but shouldn't reset the poll interval
+  const sessionIdRef = useRef(sessionId);
+  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
   const limitRef = useRef(limit);
@@ -48,8 +50,9 @@ export function useMessages(opts: UseMessagesOpts): UseMessagesResult {
 
   const loadMessages = useCallback(() => {
     const currentLimit = limitRef.current;
-    if (sessionId) {
-      const msgs = core.getMessages(sessionId, { limit: currentLimit });
+    const currentSessionId = sessionIdRef.current;
+    if (currentSessionId) {
+      const msgs = core.getMessages(currentSessionId, { limit: currentLimit });
       setMessages(msgs.map(m => ({
         ...m,
         sessionName: "",
@@ -67,10 +70,14 @@ export function useMessages(opts: UseMessagesOpts): UseMessagesResult {
       all.sort((a, b) => a.id - b.id);
       setMessages(all.slice(-currentLimit));
     }
+  }, []);
+
+  // Reload immediately when sessionId changes
+  useEffect(() => {
+    loadMessages();
   }, [sessionId]);
 
   useEffect(() => {
-    loadMessages();
     const t = setInterval(loadMessages, pollMs);
     return () => clearInterval(t);
   }, [loadMessages, pollMs]);

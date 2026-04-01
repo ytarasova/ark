@@ -54,12 +54,14 @@ export function ScrollBox({ children, reserveRows = 6, active = true, followInde
   // Follow mode: auto-scroll to keep followIndex visible
   useEffect(() => {
     if (followIndex === undefined) return;
+    const maxFollow = Math.max(0, total - 1);
+    const clamped = Math.max(0, Math.min(followIndex, maxFollow));
     setOffset(prev => {
-      if (followIndex < prev) return followIndex;
-      if (followIndex >= prev + displayHeight) return followIndex - displayHeight + 1;
+      if (clamped < prev) return clamped;
+      if (clamped >= prev + displayHeight) return Math.max(0, clamped - displayHeight + 1);
       return prev;
     });
-  }, [followIndex, displayHeight]);
+  }, [followIndex, displayHeight, total]);
 
   // Self-managed scroll (only when not in follow mode)
   useInput((input, key) => {

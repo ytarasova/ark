@@ -48,6 +48,24 @@ describe("ScrollBox", () => {
     unmount();
   });
 
+  it("followIndex beyond item count does not cause negative offset", () => {
+    const items = Array.from({ length: 5 }, (_, i) => <Text key={i}>Item {i}</Text>);
+
+    // followIndex=100 is way beyond the 5 items — should clamp, not go negative
+    const { lastFrame, unmount } = render(
+      <ScrollBox followIndex={100} reserveRows={6}>
+        {items}
+      </ScrollBox>
+    );
+
+    const frame = lastFrame()!;
+    // All 5 items should be visible (they fit in the terminal)
+    expect(frame).toContain("Item 0");
+    expect(frame).toContain("Item 4");
+    // No crash, no negative offset artifacts
+    unmount();
+  });
+
   it("shows scroll indicator when content overflows", () => {
     // Create more items than can fit in the terminal (default 40 - 6 reserve = 34 rows)
     const items = Array.from({ length: 50 }, (_, i) => <Text key={i}>Item {i}</Text>);
