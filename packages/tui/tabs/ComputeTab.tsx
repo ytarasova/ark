@@ -114,8 +114,7 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
             groupBy={h => h.provider}
             renderRow={(h) => {
               const icon = h.status === "destroyed" ? "\u2715" /* ✕ cross */ : h.status === "running" ? "\u25CF" /* ● circle */ : "\u25CB";
-              const marker = computes.indexOf(h) === sel ? ">" : " ";
-              return ` ${marker} ${icon} ${h.name.padEnd(16)} ${h.provider}`;
+              return `${icon} ${h.name.padEnd(16)} ${h.provider}`;
             }}
             renderColoredRow={(h) => {
               const iconColor = (h.status === "running" ? "green" : h.status === "provisioning" ? "yellow" : h.status === "destroyed" ? "red" : "gray") as any;

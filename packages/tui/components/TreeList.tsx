@@ -91,11 +91,11 @@ export function TreeList<T>({
       rows.push(
         <Box key={`item-${flatIndex}`} flexDirection="column">
           {isSel ? (
-            <ListRow selected>{renderRow(item, true)}</ListRow>
+            <ListRow selected>{`> ${renderRow(item, true)}`}</ListRow>
           ) : (
             renderColoredRow
               ? renderColoredRow(item)
-              : <Text wrap="truncate">{renderRow(item, false)}</Text>
+              : <Text wrap="truncate">{`  ${renderRow(item, false)}`}</Text>
           )}
           {renderChildren?.(item)}
         </Box>

@@ -88,9 +88,8 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
       left={
         <TreeList
           items={agents}
-          renderRow={(a, isSelected) => {
-            const marker = isSelected ? ">" : " ";
-            return `${marker} ${a.name.padEnd(18)} ${a.model.padEnd(8)} ${a.description}`;
+          renderRow={(a) => {
+            return `${a.name.padEnd(18)} ${a.model.padEnd(8)} ${a.description}`;
           }}
           sel={sel}
           emptyMessage="No agents found."

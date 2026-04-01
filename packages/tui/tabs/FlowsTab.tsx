@@ -26,9 +26,8 @@ export function FlowsTab({ flows, pane }: FlowsTabProps) {
         <TreeList
           items={flows}
           renderRow={(p) => {
-            const marker = flows.indexOf(p) === sel ? ">" : " ";
             const source = p.source === "user" ? "*" : " ";
-            return `${marker} ${source} ${p.name.padEnd(16)} ${p.stages.length} stages`;
+            return `${source} ${p.name.padEnd(16)} ${p.stages.length} stages`;
           }}
           sel={sel}
           emptyMessage="No flows found."

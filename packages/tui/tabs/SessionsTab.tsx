@@ -233,15 +233,14 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
             items={topLevel}
             groupBy={s => s.group_name ?? ""}
             emptyGroups={groups}
-            renderRow={(s, selected) => {
+            renderRow={(s) => {
               const icon = ICON[s.status] ?? "?";
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
-              const marker = topLevel.indexOf(s) === sel ? ">" : " ";
               const unread = unreadCounts.get(s.id) ?? 0;
               const badge = unread > 0 ? ` (${unread})` : "";
-              return ` ${marker} ${icon} ${summary} ${stage} ${age}${badge}`;
+              return `${icon} ${summary} ${stage} ${age}${badge}`;
             }}
             renderColoredRow={(s) => {
               const icon = ICON[s.status] ?? "?";

@@ -141,9 +141,8 @@ export function ToolsTab({ pane, asyncState, refresh }: ToolsTabProps) {
           items={items}
           groupBy={groupLabel}
           emptyGroups={ALL_GROUPS}
-          renderRow={(item, isSelected) => {
-            const marker = isSelected ? ">" : " ";
-            return `${marker} ${item.name.padEnd(20)} ${item.description}`;
+          renderRow={(item) => {
+            return `${item.name.padEnd(20)} ${item.description}`;
           }}
           sel={sel}
           emptyMessage="No tools found."
