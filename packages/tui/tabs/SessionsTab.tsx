@@ -12,6 +12,7 @@ import { useSessionActions } from "../hooks/useSessionActions.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useAuthStatus } from "../hooks/useAuthStatus.js";
 import { useGroupActions } from "../hooks/useGroupActions.js";
+import { useFocus } from "../hooks/useFocus.js";
 import { SessionDetail } from "./SessionDetail.js";
 import { MoveToGroup } from "./MoveToGroup.js";
 import { GroupManager } from "./GroupManager.js";
@@ -27,13 +28,12 @@ interface SessionsTabProps extends StoreData {
   pane: "left" | "right";
   onShowForm: () => void;
   onSelectionChange?: (session: core.Session | null) => void;
-  onInputActive?: (active: boolean) => void;
-  onOverlayChange?: (overlay: string | null) => void;
   formOverlay?: React.ReactNode;
   refresh: () => void;
 }
 
-export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, onInputActive, onOverlayChange, formOverlay }: SessionsTabProps) {
+export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, async: asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
+  const focus = useFocus();
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -56,19 +56,15 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const hasOverlay = formOverlay || overlay;
   const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !hasOverlay });
 
-  // Signal parent when an overlay with text input is active
+  // Push/pop focus when overlay opens/closes
   useEffect(() => {
-    onInputActive?.(!!hasOverlay);
-  }, [!!hasOverlay, onInputActive]);
-
-  // Signal parent which overlay is active (for status bar hints)
-  useEffect(() => {
-    onOverlayChange?.(overlay);
-  }, [overlay, onOverlayChange]);
+    if (overlay) focus.push(overlay);
+    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("clone"), focus.pop("search");
+  }, [overlay]);
 
   const selected = topLevel[sel] ?? null;
 
-  // Notify parent of selection/pane changes for status bar
+  // Notify parent of selection changes for status bar
   useEffect(() => {
     onSelectionChange?.(selected);
   }, [selected?.id, selected?.status, onSelectionChange]);

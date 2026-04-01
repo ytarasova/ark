@@ -61,7 +61,7 @@ describe("EC2 SSH primitives", () => {
       expect(args[0]).toBe("rsync");
       expect(args).toContain("-avz");
       expect(args).toContain("--update");
-      expect(args).toContain("--timeout=15");
+      expect(args).toContain("--timeout=30");
       expect(args).toContain("-e");
       expect(args).toContain("/local/dir/");
       expect(args[args.length - 1]).toBe("ubuntu@1.2.3.4:/remote/dir/");

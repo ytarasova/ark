@@ -95,7 +95,7 @@ export function TreeList<T>({
           ) : (
             renderColoredRow
               ? renderColoredRow(item)
-              : <Text>{renderRow(item, false)}</Text>
+              : <Text wrap="truncate">{renderRow(item, false)}</Text>
           )}
           {renderChildren?.(item)}
         </Box>

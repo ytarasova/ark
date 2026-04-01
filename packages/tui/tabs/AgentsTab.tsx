@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import * as core from "../../core/index.js";
 import { SplitPane } from "../components/SplitPane.js";
@@ -7,6 +7,7 @@ import { DetailPanel } from "../components/DetailPanel.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
+import { useFocus } from "../hooks/useFocus.js";
 import { AgentForm } from "../forms/AgentForm.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
@@ -14,11 +15,11 @@ import type { AsyncState } from "../hooks/useAsync.js";
 interface AgentsTabProps extends StoreData {
   pane: "left" | "right";
   asyncState: AsyncState;
-  onOverlayChange?: (overlay: string | null) => void;
   refresh: () => void;
 }
 
-export function AgentsTab({ agents, pane, asyncState, onOverlayChange, refresh }: AgentsTabProps) {
+export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps) {
+  const focus = useFocus();
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
   const hasOverlay = formMode !== null;
   const { sel } = useListNavigation(agents.length, { active: pane === "left" && !hasOverlay });
@@ -27,8 +28,9 @@ export function AgentsTab({ agents, pane, asyncState, onOverlayChange, refresh }
 
   const selected = agents[sel] ?? null;
 
-  React.useEffect(() => {
-    onOverlayChange?.(formMode ? "form" : null);
+  useEffect(() => {
+    if (formMode) focus.push("form");
+    else focus.pop("form");
   }, [formMode]);
 
   const closeForm = useCallback(() => {
@@ -88,8 +90,7 @@ export function AgentsTab({ agents, pane, asyncState, onOverlayChange, refresh }
           items={agents}
           renderRow={(a) => {
             const marker = agents.indexOf(a) === sel ? ">" : " ";
-            const src = a._source === "project" ? "P" : a._source === "global" ? "G" : "B";
-            return `${marker} ${src} ${a.name.padEnd(16)} ${a.model.padEnd(8)} ${a.description.slice(0, 30)}`;
+            return `${marker} ${a.name.padEnd(18)} ${a.model.padEnd(8)} ${a.description}`;
           }}
           sel={sel}
           emptyMessage="No agents found."
@@ -138,12 +139,13 @@ function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
 
   return (
     <DetailPanel active={pane === "right"}>
-      <Text bold>{` ${a.name}`}<Text dimColor>{` (${a._source})`}</Text></Text>
+      <Text bold>{` ${a.name}`}</Text>
       {a.description && <Text dimColor>{` ${a.description}`}</Text>}
       {statusMessage && <Text color="yellow">{` ${statusMessage}`}</Text>}
 
       <Text> </Text>
       <SectionHeader title="Config" />
+      <Text>{`  Source:     ${a._source}`}</Text>
       <Text>{`  Model:      ${a.model}`}</Text>
       <Text>{`  Max turns:  ${a.max_turns}`}</Text>
       <Text>{`  Permission: ${a.permission_mode}`}</Text>

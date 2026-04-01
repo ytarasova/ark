@@ -12,8 +12,7 @@ export function KeyHint({ k, label }: { k: string; label: string }) {
   );
 }
 
-let sepId = 0;
-const sep = () => <Text key={`sep-${sepId++}`} dimColor>{" | "}</Text>;
+const sep = (id: number) => <Text key={`sep-${id}`} dimColor>{" | "}</Text>;
 
 /** Navigation hints shared by all left panes */
 const NAV_HINTS = [
@@ -72,12 +71,11 @@ export function getRightPaneHints(tab?: Tab): React.ReactNode[] {
 }
 
 export function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
-  sepId = 0;
   const hints: React.ReactNode[] = [];
 
   // Navigation
   hints.push(...NAV_HINTS);
-  hints.push(sep());
+  hints.push(sep(0));
 
   // Sessions
   if (s) {
@@ -112,7 +110,7 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
   }
   hints.push(<KeyHint key="n" k="n" label="new" />);
   hints.push(<KeyHint key="o" k="o" label="groups" />);
-  hints.push(sep());
+  hints.push(sep(1));
 
   // App
   hints.push(<KeyHint key="q" k="q" label="quit" />);
@@ -120,45 +118,41 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
 }
 
 export function getComputeHints(): React.ReactNode[] {
-  sepId = 0;
   return [
-    ...NAV_HINTS, sep(),
+    ...NAV_HINTS, sep(0),
     <KeyHint key="enter" k="Enter" label="provision" />,
     <KeyHint key="s" k="s" label="start/stop" />,
     <KeyHint key="R" k="R" label="reboot" />,
     <KeyHint key="t" k="t" label="test" />,
     <KeyHint key="x" k="x" label="delete" />,
     <KeyHint key="c" k="c" label="clean" />,
-    <KeyHint key="n" k="n" label="new" />, sep(),
+    <KeyHint key="n" k="n" label="new" />, sep(1),
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
 
 export function getHistoryHints(): React.ReactNode[] {
-  sepId = 0;
   return [
-    ...NAV_HINTS, sep(),
+    ...NAV_HINTS, sep(0),
     <KeyHint key="enter" k="Enter" label="import" />,
     <KeyHint key="r" k="r/R" label="refresh/rebuild" />,
-    <KeyHint key="s" k="s" label="search" />, sep(),
+    <KeyHint key="s" k="s" label="search" />, sep(1),
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
 
 export function getAgentsHints(): React.ReactNode[] {
-  sepId = 0;
   return [
-    ...NAV_HINTS, sep(),
+    ...NAV_HINTS, sep(0),
     <KeyHint key="n" k="n" label="new" />,
     <KeyHint key="e" k="e" label="edit" />,
     <KeyHint key="c" k="c" label="copy" />,
-    <KeyHint key="x" k="x" label="delete" />, sep(),
+    <KeyHint key="x" k="x" label="delete" />, sep(1),
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }
 
 export function getToolsHints(): React.ReactNode[] {
-  sepId = 0;
   return [
     <KeyHint key="q" k="q" label="quit" />,
   ];

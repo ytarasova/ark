@@ -11,13 +11,13 @@ import { KeyValue } from "../components/KeyValue.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
+import { useFocus } from "../hooks/useFocus.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 interface HistoryTabProps extends StoreData {
   pane: "left" | "right";
   async: AsyncState;
-  onOverlayChange?: (overlay: string | null) => void;
   onImport?: (prefill: { name?: string; repo?: string; claudeSessionId?: string }) => void;
 }
 
@@ -66,16 +66,18 @@ function buildHistoryItems(arkSessions: any[], claudeSessions: core.ClaudeSessio
   return items;
 }
 
-export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, refresh, onOverlayChange, onImport }: HistoryTabProps) {
+export function HistoryTab({ sessions: arkSessions, pane, async: asyncState, refresh, onImport }: HistoryTabProps) {
+  const focus = useFocus();
   const [claudeSessions, setClaudeSessions] = useState<core.ClaudeSession[]>([]);
   const [searchResults, setSearchResults] = useState<core.SearchResult[]>([]);
   const [mode, setMode] = useState<"recent" | "search">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const status = useStatusMessage();
 
-  // Signal parent which overlay is active (for status bar hints)
+  // Push/pop focus when search mode is active
   useEffect(() => {
-    onOverlayChange?.(mode === "search" ? "search" : null);
+    if (mode === "search") focus.push("search");
+    else focus.pop("search");
   }, [mode]);
 
   const historyItems = buildHistoryItems(arkSessions, claudeSessions);

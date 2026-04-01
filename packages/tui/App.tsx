@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import { execFile } from "child_process";
 import { useStore } from "./hooks/useStore.js";
 import { useAsync } from "./hooks/useAsync.js";
+import { FocusProvider, useFocus } from "./hooks/useFocus.js";
 import { TabBar } from "./components/TabBar.js";
 import type { Tab } from "./components/TabBar.js";
 import type { Pane } from "./components/SplitPane.js";
@@ -17,8 +18,17 @@ import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
 
 export function App() {
+  return (
+    <FocusProvider>
+      <AppInner />
+    </FocusProvider>
+  );
+}
+
+function AppInner() {
   const { exit } = useApp();
   const store = useStore();
+  const focus = useFocus();
   const sessionsAsync = useAsync(store.refresh);
   const agentsAsync = useAsync(store.refresh);
   const historyAsync = useAsync(store.refresh);
@@ -29,19 +39,27 @@ export function App() {
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
   const [selectedSession, setSelectedSession] = useState<import("../core/store.js").Session | null>(null);
   const [pane, setPane] = useState<Pane>("left");
-  const [childInputActive, setChildInputActive] = useState(false);
-  const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;
 
   const switchTab = useCallback((t: Tab) => { setTab(t); setPane("left"); }, []);
 
-  // Active tab's async state — used for TabBar/StatusBar indicators
+  // Push/pop focus when App-level form opens/closes
+  useEffect(() => {
+    if (showForm) focus.push("form");
+    else focus.pop("form");
+  }, [showForm]);
+
+  // Auto-focus right pane when any child takes focus
+  useEffect(() => {
+    if (!focus.appActive) setPane("right");
+  }, [focus.appActive]);
+
+  // Active tab's async state
   const asyncState = tab === "agents" ? agentsAsync : tab === "history" ? historyAsync : tab === "compute" ? computeAsync : sessionsAsync;
 
   const takeSnapshot = useCallback(() => {
     if (!process.env.TMUX) return;
-    // Run snapshot async to not block TUI
     asyncState.run("Copying screen...", async () => {
       await new Promise<void>((resolve) => {
         execFile("tmux", ["capture-pane", "-S", "-"], { stdio: "pipe" }, () => {
@@ -57,19 +75,17 @@ export function App() {
     });
   }, [asyncState]);
 
+  // App-level shortcuts only fire when no child owns focus
   useInput((input, key) => {
-    // When a text input is active, only allow Ctrl-based shortcuts
-    if (showForm || childInputActive) return;
+    if (!focus.appActive) return;
 
     if (input === "q") { exit(); return; }
     if (input === "p") { takeSnapshot(); return; }
 
-    // Tab switches pane focus (all tabs with SplitPane)
     if (key.tab) {
       setPane(p => p === "left" ? "right" : "left");
       return;
     }
-    // Esc returns to list pane
     if (key.escape && pane === "right") {
       setPane("left");
       return;
@@ -103,8 +119,6 @@ export function App() {
           async={sessionsAsync}
           onShowForm={() => setShowForm("session")}
           onSelectionChange={setSelectedSession}
-          onInputActive={setChildInputActive}
-          onOverlayChange={setActiveOverlay}
 
           formOverlay={showForm === "session" ? (
             <NewSessionForm
@@ -120,7 +134,6 @@ export function App() {
           {...store}
           pane={pane}
           asyncState={agentsAsync}
-          onOverlayChange={setActiveOverlay}
           refresh={store.refresh}
         />
       ) : tab === "tools" ? (
@@ -134,7 +147,6 @@ export function App() {
           {...store}
           pane={pane}
           async={historyAsync}
-          onOverlayChange={setActiveOverlay}
 
           onImport={(prefill) => {
             setSessionPrefill(prefill);
@@ -166,7 +178,7 @@ export function App() {
         error={asyncState.error}
         label={asyncState.label}
         pane={pane}
-        overlay={showForm ? "form" : activeOverlay}
+        overlay={focus.owner}
       />
     </Box>
   );
