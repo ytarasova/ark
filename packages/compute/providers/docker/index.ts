@@ -24,6 +24,7 @@ import type {
 import type { Compute, Session } from "../../../core/store.js";
 import { mergeComputeConfig, updateCompute } from "../../../core/store.js";
 import { buildDevcontainer, detectDevcontainer } from "./devcontainer.js";
+import { safeAsync } from "../../../core/safe.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -33,21 +34,32 @@ const DEFAULT_IMAGE = "ubuntu:22.04";
 
 /** Run a command asynchronously, return trimmed stdout or "" on failure. */
 async function run(cmd: string, args: string[]): Promise<string> {
-  try {
+  let result = "";
+  await safeAsync(`[docker] run: ${cmd} ${args[0] ?? ""}`, async () => {
     const { stdout } = await execFileAsync(cmd, args, {
       timeout: 30_000,
       encoding: "utf-8",
     });
-    return stdout.trim();
-  } catch (e: any) {
-    console.error('[docker] run: command failed:', e?.message ?? e);
-    return "";
-  }
+    result = stdout.trim();
+  });
+  return result;
 }
 
 /** Build the container name from a host name. */
 export function containerName(hostName: string): string {
   return `ark-${hostName}`;
+}
+
+/** Check if a port is listening on the local host. */
+async function checkHostPort(port: number): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync("lsof", ["-i", `:${port}`, "-sTCP:LISTEN"], {
+      encoding: "utf-8", timeout: 5000,
+    });
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /** Check whether Docker daemon is reachable. */
@@ -68,6 +80,11 @@ export class DockerProvider implements ComputeProvider {
   readonly isolationModes = [
     { value: "container", label: "Docker container (isolated)" },
   ];
+  readonly canReboot = false;
+  readonly canDelete = true;
+  readonly supportsWorktree = false;
+  readonly initialStatus = "stopped";
+  readonly needsAuth = false;
 
   // ── Provision ────────────────────────────────────────────────────────────
 
@@ -173,14 +190,9 @@ export class DockerProvider implements ComputeProvider {
 
   async stop(compute: Compute): Promise<void> {
     const name = containerName(compute.name);
-    try {
-      await execFileAsync("docker", ["stop", name], {
-        timeout: 15_000,
-      });
-    } catch (e: any) {
-      // Container may already be stopped
-      console.error(`[docker] stop: container ${name} failed:`, e?.message ?? e);
-    }
+    await safeAsync(`[docker] stop: container ${name}`, async () => {
+      await execFileAsync("docker", ["stop", name], { timeout: 15_000 });
+    });
     updateCompute(compute.name, { status: "stopped" });
   }
 
@@ -188,14 +200,9 @@ export class DockerProvider implements ComputeProvider {
 
   async destroy(compute: Compute): Promise<void> {
     const name = containerName(compute.name);
-    try {
-      await execFileAsync("docker", ["rm", "-f", name], {
-        timeout: 15_000,
-      });
-    } catch (e: any) {
-      // Container may not exist
-      console.error(`[docker] destroy: rm container ${name} failed:`, e?.message ?? e);
-    }
+    await safeAsync(`[docker] destroy: rm container ${name}`, async () => {
+      await execFileAsync("docker", ["rm", "-f", name], { timeout: 15_000 });
+    });
     updateCompute(compute.name, { status: "destroyed" });
   }
 
@@ -234,30 +241,22 @@ export class DockerProvider implements ComputeProvider {
   // ── Session lifecycle ─────────────────────────────────────────────────
 
   async killAgent(_compute: Compute, session: Session): Promise<void> {
-    // Docker sessions run via tmux wrapping docker exec
-    if (session.session_id) {
-      const { killSessionAsync } = await import("../../../core/tmux.js");
-      await killSessionAsync(session.session_id);
-    }
+    if (!session.session_id) return;
+    const { killSessionAsync } = await import("../../../core/tmux.js");
+    await killSessionAsync(session.session_id);
   }
 
   async captureOutput(_compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
     if (!session.session_id) return "";
-    const { capturePane } = await import("../../../core/tmux.js");
-    return capturePane(session.session_id, opts);
+    const { capturePaneAsync } = await import("../../../core/tmux.js");
+    return capturePaneAsync(session.session_id, opts);
   }
 
   async cleanupSession(compute: Compute, _session: Session): Promise<void> {
-    // Docker: stop the container (don't destroy — that's a compute-level op)
     const name = containerName(compute.name);
-    try {
-      await execFileAsync("docker", ["stop", name], {
-        timeout: 15_000,
-      });
-    } catch (e: any) {
-      // Container may already be stopped
-      console.error(`[docker] cleanupSession: stop container ${name} failed:`, e?.message ?? e);
-    }
+    await safeAsync(`[docker] cleanupSession: stop container ${name}`, async () => {
+      await execFileAsync("docker", ["stop", name], { timeout: 15_000 });
+    });
   }
 
   // ── Metrics ──────────────────────────────────────────────────────────────
@@ -392,32 +391,16 @@ export class DockerProvider implements ComputeProvider {
     const name = containerName(compute.name);
 
     return Promise.all(ports.map(async (decl) => {
-      let listening = false;
-      try {
-        // Try inside the container first (common for containerized services)
-        const out = await run("docker", [
-          "exec", name, "bash", "-c",
-          `cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk '{print $2}' | grep -i ':${decl.port.toString(16).padStart(4, "0").toUpperCase()}'`,
-        ]);
-        if (out) listening = true;
-      } catch (e: any) {
-        // Port not listening inside container
-        console.error(`[docker] probePorts: container ${name} port ${decl.port} check failed:`, e?.message ?? e);
-      }
+      // Try inside the container first
+      const hexPort = decl.port.toString(16).padStart(4, "0").toUpperCase();
+      const out = await run("docker", [
+        "exec", name, "bash", "-c",
+        `cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk '{print $2}' | grep -i ':${hexPort}'`,
+      ]);
+      if (out) return { ...decl, listening: true };
 
-      if (!listening) {
-        // Fallback: check on the host side (port mapping)
-        try {
-          const { stdout } = await execFileAsync("lsof", ["-i", `:${decl.port}`, "-sTCP:LISTEN"], {
-            encoding: "utf-8", timeout: 5000,
-          });
-          listening = stdout.trim().length > 0;
-        } catch (e: any) {
-          // Port not listening on host
-          console.error(`[docker] probePorts: host port ${decl.port} check failed:`, e?.message ?? e);
-        }
-      }
-
+      // Fallback: check on the host side (port mapping)
+      const listening = await checkHostPort(decl.port);
       return { ...decl, listening };
     }));
   }
@@ -427,6 +410,28 @@ export class DockerProvider implements ComputeProvider {
   async syncEnvironment(_compute: Compute, _opts: SyncOpts): Promise<void> {
     // Docker uses volume mounts, not sync.
     // Credentials are mounted at container creation time.
+  }
+
+  async checkSession(_compute: Compute, tmuxSessionId: string): Promise<boolean> {
+    const { sessionExistsAsync } = await import("../../../core/tmux.js");
+    return sessionExistsAsync(tmuxSessionId);
+  }
+
+  getAttachCommand(_compute: Compute, session: Session): string[] {
+    if (!session.session_id) return [];
+    return ["tmux", "attach", "-t", session.session_id];
+  }
+
+  buildChannelConfig(sessionId: string, stage: string, channelPort: number, _opts?: { conductorUrl?: string }): Record<string, unknown> {
+    return {
+      sessionId,
+      stage,
+      channelPort,
+    };
+  }
+
+  buildLaunchEnv(_session: Session): Record<string, string> {
+    return {};
   }
 }
 

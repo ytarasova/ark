@@ -11,6 +11,7 @@ import { join } from "path";
 
 import { rsyncPush, rsyncPull, sshExec } from "./ssh.js";
 import { REMOTE_USER, REMOTE_HOME } from "./constants.js";
+import { safeAsync } from "../../../core/safe.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -95,24 +96,19 @@ async function syncGitPull(_key: string, _ip: string): Promise<void> {
 }
 
 async function syncGhPush(key: string, ip: string): Promise<void> {
-  try {
+  await safeAsync("[ec2] syncGhPush: gh auth token", async () => {
     const { stdout } = await execFileAsync("gh", ["auth", "token"], {
       encoding: "utf-8",
       timeout: 10_000,
     });
     const token = stdout.trim();
-    if (token) {
-      // Write token to temp file, pipe it — avoids quoting issues with echo
-      const encoded = Buffer.from(token).toString("base64");
-      await sshExec(key, ip,
-        `echo ${encoded} | base64 -d | gh auth login --with-token 2>/dev/null`,
-        { timeout: 15_000 },
-      );
-    }
-  } catch (e: any) {
-    // gh CLI not installed or not authenticated - skip
-    console.error('[ec2] syncGhPush: gh auth token failed (gh CLI missing or not authenticated):', e?.message ?? e);
-  }
+    if (!token) return;
+    const encoded = Buffer.from(token).toString("base64");
+    await sshExec(key, ip,
+      `echo ${encoded} | base64 -d | gh auth login --with-token 2>/dev/null`,
+      { timeout: 15_000 },
+    );
+  });
 }
 
 async function syncGhPull(_key: string, _ip: string): Promise<void> {
@@ -192,6 +188,17 @@ async function syncClaudePull(key: string, ip: string): Promise<void> {
   }
 }
 
+/** Rewrite paths in a single JSON file, logging errors without throwing. */
+function rewriteSingleJsonFile(path: string, direction: "push" | "pull"): void {
+  try {
+    const content = readFileSync(path, "utf-8");
+    const rewritten = rewritePaths(content, direction);
+    if (rewritten !== content) writeFileSync(path, rewritten);
+  } catch (e: any) {
+    console.error(`[ec2] rewriteJsonFiles: failed to process ${path}:`, e?.message ?? e);
+  }
+}
+
 /** Recursively find and rewrite JSON files in a directory. */
 function rewriteJsonFiles(dir: string, direction: "push" | "pull"): void {
   if (!existsSync(dir)) return;
@@ -200,15 +207,7 @@ function rewriteJsonFiles(dir: string, direction: "push" | "pull"): void {
     if (entry.isDirectory()) {
       rewriteJsonFiles(full, direction);
     } else if (entry.name.endsWith(".json")) {
-      try {
-        const content = readFileSync(full, "utf-8");
-        const rewritten = rewritePaths(content, direction);
-        if (rewritten !== content) {
-          writeFileSync(full, rewritten);
-        }
-      } catch (e: any) {
-        console.error(`[ec2] rewriteJsonFiles: failed to process ${full}:`, e?.message ?? e);
-      }
+      rewriteSingleJsonFile(full, direction);
     }
   }
 }
@@ -292,14 +291,13 @@ export async function syncProjectFiles(
   await sshExec(key, ip, `mkdir -p ${remoteDir}`);
   for (const file of files) {
     const localPath = join(localDir, file);
-    if (existsSync(localPath)) {
-      // Ensure remote subdirectories exist for nested paths
-      const parts = file.split("/");
-      if (parts.length > 1) {
-        const subdir = parts.slice(0, -1).join("/");
-        await sshExec(key, ip, `mkdir -p ${remoteDir}/${subdir}`);
-      }
-      await rsyncPush(key, ip, localPath, `${remoteDir}/${file}`);
+    if (!existsSync(localPath)) continue;
+
+    const parts = file.split("/");
+    if (parts.length > 1) {
+      const subdir = parts.slice(0, -1).join("/");
+      await sshExec(key, ip, `mkdir -p ${remoteDir}/${subdir}`);
     }
+    await rsyncPush(key, ip, localPath, `${remoteDir}/${file}`);
   }
 }

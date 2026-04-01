@@ -12,6 +12,7 @@
 import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 import { ArkdBackedProvider } from "./arkd-backed.js";
+import { safeAsync } from "../../core/safe.js";
 import type {
   Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
 } from "../types.js";
@@ -179,10 +180,10 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     const { destroyStack } = await import("./ec2/provision.js");
     const { destroyPool } = await import("./ec2/pool.js");
     const { updateCompute } = await import("../../core/store.js");
-    try {
+    await safeAsync(`[remote] destroy: ${compute.name}`, async () => {
       await destroyStack(compute.name);
       destroyPool(compute.name);
-    } catch {}
+    });
     updateCompute(compute.name, { status: "destroyed" });
   }
 
@@ -203,16 +204,18 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     await ec2.send(new StartInstancesCommand({ InstanceIds: [cfg.instance_id] }));
 
     // Poll for public IP
-    const ip = await poll(
+    let ip: string | null = null;
+    await poll(
       async () => {
         const desc = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [cfg.instance_id!] }));
-        return desc.Reservations?.[0]?.Instances?.[0]?.PublicIpAddress ?? null;
+        ip = desc.Reservations?.[0]?.Instances?.[0]?.PublicIpAddress ?? null;
+        return ip !== null;
       },
       { maxAttempts: 30, delayMs: 5000 },
     );
 
     mergeComputeConfig(compute.name, {
-      ip,
+      ip: ip!,
       arkd_url: `http://${ip}:${ARKD_REMOTE_PORT}`,
     });
     updateCompute(compute.name, { status: "running" });
@@ -245,6 +248,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     const { sshKeyPath } = await import("./ec2/ssh.js");
     const { syncToHost } = await import("./ec2/sync.js");
     await syncToHost(sshKeyPath(compute.name), cfg.ip, {
+      direction: opts.direction,
       categories: opts.categories,
       onLog: opts.onLog,
     });
@@ -286,12 +290,11 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   }
 
   async cleanupSession(compute: Compute, session: Session): Promise<void> {
-    // Remote cleanup: remove session workdir via arkd
     if (!session.workdir) return;
-    try {
-      const client = this.getClient(compute);
-      await client.run({ command: "rm", args: ["-rf", session.workdir] });
-    } catch {}
+    const client = this.getClient(compute);
+    await safeAsync(`[remote] cleanupSession: rm workdir for ${session.id} on ${compute.name}`, async () => {
+      await client.run({ command: "rm", args: ["-rf", session.workdir!] });
+    });
   }
 }
 

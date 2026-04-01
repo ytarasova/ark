@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, rmSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { SSH_OPTS } from "./ssh.js";
+import { safeAsync } from "../../../core/safe.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -148,13 +149,13 @@ export class SSHPool {
     await this.connect();
     await this.acquire();
     try {
-      await execFileAsync("rsync", [
-        "-avz", "--update", "--timeout=30",
-        "-e", this.rsyncSshOpt(),
-        local, `ubuntu@${this.ip}:${remote}`,
-      ], { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS });
-    } catch (e: any) {
-      console.error(`[ec2] SSHPool.rsyncPush: failed (${local} -> ${this.ip}:${remote}):`, e?.message ?? e);
+      await safeAsync(`[ec2] SSHPool.rsyncPush: (${local} -> ${this.ip}:${remote})`, async () => {
+        await execFileAsync("rsync", [
+          "-avz", "--update", "--timeout=30",
+          "-e", this.rsyncSshOpt(),
+          local, `ubuntu@${this.ip}:${remote}`,
+        ], { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS });
+      });
     } finally {
       this.release();
     }
@@ -164,13 +165,13 @@ export class SSHPool {
     await this.connect();
     await this.acquire();
     try {
-      await execFileAsync("rsync", [
-        "-avz", "--update", "--timeout=30",
-        "-e", this.rsyncSshOpt(),
-        `ubuntu@${this.ip}:${remote}`, local,
-      ], { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS });
-    } catch (e: any) {
-      console.error(`[ec2] SSHPool.rsyncPull: failed (${this.ip}:${remote} -> ${local}):`, e?.message ?? e);
+      await safeAsync(`[ec2] SSHPool.rsyncPull: (${this.ip}:${remote} -> ${local})`, async () => {
+        await execFileAsync("rsync", [
+          "-avz", "--update", "--timeout=30",
+          "-e", this.rsyncSshOpt(),
+          `ubuntu@${this.ip}:${remote}`, local,
+        ], { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS });
+      });
     } finally {
       this.release();
     }
@@ -262,10 +263,9 @@ export function getOrCreatePool(computeName: string, key: string, ip: string): S
 
 export async function destroyPool(computeName: string): Promise<void> {
   const pool = pools.get(computeName);
-  if (pool) {
-    await pool.close();
-    pools.delete(computeName);
-  }
+  if (!pool) return;
+  await pool.close();
+  pools.delete(computeName);
 }
 
 export async function destroyAllPools(): Promise<void> {

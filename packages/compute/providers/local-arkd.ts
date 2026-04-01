@@ -13,6 +13,7 @@ import { existsSync, rmSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { ArkdBackedProvider } from "./arkd-backed.js";
+import { safeAsync } from "../../core/safe.js";
 import type {
   Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
 } from "../types.js";
@@ -101,12 +102,12 @@ export class LocalWorktreeProvider extends LocalArkdBase {
         cp.on("close", (code: number | null) => resolve(code === 0));
         cp.on("error", () => resolve(false));
       });
-      if (!ok) {
-        try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
-      }
-    } else {
-      try { rmSync(wtPath, { recursive: true, force: true }); } catch {}
+      if (ok) return;
     }
+    // Fallback: direct rmSync
+    await safeAsync(`[local] cleanupSession: rmSync worktree for ${session.id}`, async () => {
+      rmSync(wtPath, { recursive: true, force: true });
+    });
   }
 }
 
@@ -171,7 +172,9 @@ export class LocalDockerProvider extends LocalArkdBase {
     const { promisify } = await import("util");
     const execFileAsync = promisify(execFile);
     const name = this.containerName(compute);
-    try { await execFileAsync("docker", ["rm", "-f", name], { timeout: 15_000 }); } catch {}
+    await safeAsync(`[docker] destroy: rm container ${name}`, async () => {
+      await execFileAsync("docker", ["rm", "-f", name], { timeout: 15_000 });
+    });
     const { updateCompute } = await import("../../core/store.js");
     updateCompute(compute.name, { status: "destroyed" });
   }
@@ -191,7 +194,9 @@ export class LocalDockerProvider extends LocalArkdBase {
     const { promisify } = await import("util");
     const execFileAsync = promisify(execFile);
     const name = this.containerName(compute);
-    try { await execFileAsync("docker", ["stop", name], { timeout: 15_000 }); } catch {}
+    await safeAsync(`[docker] stop: container ${name}`, async () => {
+      await execFileAsync("docker", ["stop", name], { timeout: 15_000 });
+    });
     const { updateCompute } = await import("../../core/store.js");
     updateCompute(compute.name, { status: "stopped" });
   }
@@ -201,7 +206,9 @@ export class LocalDockerProvider extends LocalArkdBase {
     const { promisify } = await import("util");
     const execFileAsync = promisify(execFile);
     const name = this.containerName(compute);
-    try { await execFileAsync("docker", ["stop", name], { timeout: 15_000 }); } catch {}
+    await safeAsync(`[docker] cleanupSession: stop container ${name}`, async () => {
+      await execFileAsync("docker", ["stop", name], { timeout: 15_000 });
+    });
   }
 
   async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {

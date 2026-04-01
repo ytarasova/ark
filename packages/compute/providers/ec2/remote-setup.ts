@@ -109,6 +109,31 @@ const CLAUDE_WORKING_MARKERS = [
   "esc to interrupt",
 ];
 
+/** Single iteration of the channel prompt poll loop. */
+async function pollChannelPrompt(
+  key: string, ip: string, tmuxName: string, attempt: number, max: number,
+): Promise<"done" | "retry"> {
+  try {
+    const { stdout } = await sshExecAsync(key, ip,
+      `tmux capture-pane -t ${tmuxName} -p 2>/dev/null | tail -30`,
+      { timeout: 10_000 });
+
+    if (CHANNEL_PROMPT_MARKERS.some(m => stdout.includes(m))) {
+      await sshExecAsync(key, ip, `tmux send-keys -t ${tmuxName} 1`, { timeout: 5_000 });
+      const { sleep } = await import("../../util.js");
+      await sleep(300);
+      await sshExecAsync(key, ip, `tmux send-keys -t ${tmuxName} Enter`, { timeout: 5_000 });
+      return "retry";
+    }
+
+    if (CLAUDE_WORKING_MARKERS.some(m => stdout.includes(m))) return "done";
+    return "retry";
+  } catch (e: any) {
+    console.error(`[ec2] autoAcceptChannelPrompt: ssh to ${tmuxName} failed (attempt ${attempt + 1}/${max}):`, e?.message ?? e);
+    return "retry";
+  }
+}
+
 /**
  * Auto-accept the development channels prompt on remote tmux.
  *
@@ -126,27 +151,7 @@ export async function autoAcceptChannelPrompt(
 
   for (let i = 0; i < max; i++) {
     await sleep(delay);
-    try {
-      const { stdout } = await sshExecAsync(key, ip,
-        `tmux capture-pane -t ${tmuxName} -p 2>/dev/null | tail -30`,
-        { timeout: 10_000 });
-
-      // Found the prompt — send "1" + Enter to accept, keep polling
-      if (CHANNEL_PROMPT_MARKERS.some(m => stdout.includes(m))) {
-        await sshExecAsync(key, ip,
-          `tmux send-keys -t ${tmuxName} 1`, { timeout: 5_000 });
-        await sleep(300);
-        await sshExecAsync(key, ip,
-          `tmux send-keys -t ${tmuxName} Enter`, { timeout: 5_000 });
-        continue;
-      }
-
-      // Claude is actively working — done
-      if (CLAUDE_WORKING_MARKERS.some(m => stdout.includes(m))) {
-        return;
-      }
-    } catch (e: any) {
-      console.error(`[ec2] autoAcceptChannelPrompt: ssh to ${tmuxName} failed (attempt ${i + 1}/${max}):`, e?.message ?? e);
-    }
+    const result = await pollChannelPrompt(key, ip, tmuxName, i, max);
+    if (result === "done") return;
   }
 }

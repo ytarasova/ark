@@ -16,6 +16,19 @@ import type {
 import { WORKTREES_DIR } from "../../../core/store.js";
 import * as tmux from "../../../core/tmux.js";
 import { collectLocalMetrics } from "./metrics.js";
+import { safeAsync } from "../../../core/safe.js";
+
+/** Check if a port is listening locally. */
+async function checkLocalPort(port: number): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync("lsof", ["-i", `:${port}`, "-sTCP:LISTEN"], {
+      encoding: "utf-8", timeout: 5000,
+    });
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
 
 export class LocalProvider implements ComputeProvider {
   readonly name = "local";
@@ -54,9 +67,8 @@ export class LocalProvider implements ComputeProvider {
   }
 
   async killAgent(_compute: Compute, session: Session): Promise<void> {
-    if (session.session_id) {
-      await tmux.killSessionAsync(session.session_id);
-    }
+    if (!session.session_id) return;
+    await tmux.killSessionAsync(session.session_id);
   }
 
   async captureOutput(_compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
@@ -65,7 +77,6 @@ export class LocalProvider implements ComputeProvider {
   }
 
   async cleanupSession(_compute: Compute, session: Session): Promise<void> {
-    // Only clean up worktree if one exists — direct repos are a noop
     const wtPath = join(WORKTREES_DIR(), session.id);
     if (!existsSync(wtPath)) return;
 
@@ -76,16 +87,12 @@ export class LocalProvider implements ComputeProvider {
         cp.on("close", (code: number | null) => resolve(code === 0));
         cp.on("error", () => resolve(false));
       });
-      if (!ok) {
-        try { rmSync(wtPath, { recursive: true, force: true }); } catch (e: any) {
-          console.error(`[local] cleanupSession: rmSync worktree fallback for ${session.id}:`, e?.message ?? e);
-        }
-      }
-    } else {
-      try { rmSync(wtPath, { recursive: true, force: true }); } catch (e: any) {
-        console.error(`[local] cleanupSession: rmSync worktree for ${session.id}:`, e?.message ?? e);
-      }
+      if (ok) return;
     }
+    // Fallback: direct rmSync
+    await safeAsync(`[local] cleanupSession: rmSync worktree for ${session.id}`, async () => {
+      rmSync(wtPath, { recursive: true, force: true });
+    });
   }
 
   /**
@@ -98,16 +105,7 @@ export class LocalProvider implements ComputeProvider {
 
   async probePorts(_compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
     return Promise.all(ports.map(async (decl) => {
-      let listening = false;
-      try {
-        const { stdout } = await execFileAsync("lsof", ["-i", `:${decl.port}`, "-sTCP:LISTEN"], {
-          encoding: "utf-8", timeout: 5000,
-        });
-        listening = stdout.trim().length > 0;
-      } catch (e: any) {
-        // Port not listening
-        console.error(`[local] probePorts: port ${decl.port} check failed:`, e?.message ?? e);
-      }
+      const listening = await checkLocalPort(decl.port);
       return { ...decl, listening };
     }));
   }

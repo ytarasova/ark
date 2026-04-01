@@ -72,6 +72,16 @@ interface EC2HostConfig {
   tags?: Record<string, string>;
 }
 
+/** Try to read oauth token from ~/.ark/claude-oauth-token. Returns null on failure. */
+function readOauthTokenFromDisk(): string | null {
+  try {
+    const { ARK_DIR } = require("../../../core/store.js");
+    const p = join(ARK_DIR(), "claude-oauth-token");
+    if (existsSync(p)) return readFileSync(p, "utf-8").trim();
+  } catch {}
+  return null;
+}
+
 function createEc2Client(cfg: EC2HostConfig): EC2Client {
   return new EC2Client({
     region: cfg.region ?? "us-east-1",
@@ -148,7 +158,7 @@ async function syncRemoteCredentials(
   key: string, ip: string, computeName: string, onLog: (msg: string) => void,
 ): Promise<void> {
   onLog("Syncing credentials...");
-  await safeAsync("[ec2] syncRemoteCredentials", () => syncToHost(key, ip, { direction: "push", onLog }));
+  await safeAsync("[ec2] syncRemoteCredentials", async () => { await syncToHost(key, ip, { direction: "push", onLog }); });
 
   // Set up Claude auth on remote
   const hasAuth = !!process.env.CLAUDE_CODE_OAUTH_TOKEN
@@ -156,30 +166,29 @@ async function syncRemoteCredentials(
     || !!process.env.ANTHROPIC_API_KEY;
   if (!hasAuth) {
     onLog("⚠ No Claude auth — run 'ark auth', set CLAUDE_CODE_OAUTH_TOKEN, then restart");
-  } else {
-    // Credentials exist locally — verify they synced to remote
-    const { exitCode: authCheck } = await sshExecAsync(key, ip,
-      "test -f ~/.claude/.credentials.json",
-      { timeout: 10_000 });
-    if (authCheck === 0) {
-      onLog("Claude credentials synced ✓");
-    } else {
-      // Re-sync just the credentials file
-      onLog("Re-syncing Claude credentials...");
-      try {
-        const { execFileAsync: efa } = await import("child_process").then(m => ({ execFileAsync: promisify(m.execFile) }));
-        const localCredFile = join(homedir(), ".claude", ".credentials.json");
-        await efa("scp", [
-          "-i", key, "-o", "StrictHostKeyChecking=no",
-          localCredFile, `${REMOTE_USER}@${ip}:${REMOTE_HOME}/.claude/.credentials.json`,
-        ], { timeout: 15_000 });
-        onLog("Claude credentials synced ✓");
-      } catch (e: any) {
-        console.error(`[ec2] syncRemoteCredentials: scp credentials to ${computeName} failed:`, e?.message ?? e);
-        onLog("Failed to sync credentials — run 'ark auth --host " + computeName + "'");
-      }
-    }
+    return;
   }
+
+  // Credentials exist locally — verify they synced to remote
+  const { exitCode: authCheck } = await sshExecAsync(key, ip,
+    "test -f ~/.claude/.credentials.json",
+    { timeout: 10_000 });
+  if (authCheck === 0) {
+    onLog("Claude credentials synced ✓");
+    return;
+  }
+
+  // Re-sync just the credentials file
+  onLog("Re-syncing Claude credentials...");
+  const ok = await safeAsync(`[ec2] syncRemoteCredentials: scp credentials to ${computeName}`, async () => {
+    const { execFileAsync: efa } = await import("child_process").then(m => ({ execFileAsync: promisify(m.execFile) }));
+    const localCredFile = join(homedir(), ".claude", ".credentials.json");
+    await efa("scp", [
+      "-i", key, "-o", "StrictHostKeyChecking=no",
+      localCredFile, `${REMOTE_USER}@${ip}:${REMOTE_HOME}/.claude/.credentials.json`,
+    ], { timeout: 15_000 });
+  });
+  onLog(ok ? "Claude credentials synced ✓" : "Failed to sync credentials — run 'ark auth --host " + computeName + "'");
 }
 
 // ── Extracted helpers for launch() ───────────────────────────────────────────
@@ -616,15 +625,15 @@ export class EC2Provider implements ComputeProvider {
 
     // Periodically refresh auth token on remote (piggyback on metrics cycle)
     if (process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN) {
-      queue.command(async (p) => {
-        const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN!;
-        await p.exec(
-          `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN '${token}' 2>/dev/null; done`,
-          { timeout: 10_000 },
-        );
-      }).catch((e: any) => {
-      console.error(`[ec2] getMetrics: token refresh on ${compute.name} failed:`, e?.message ?? e);
-    }); // fire-and-forget
+      const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
+      safeAsync(`[ec2] getMetrics: token refresh on ${compute.name}`, () =>
+        queue.command(async (p) => {
+          await p.exec(
+            `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN '${token}' 2>/dev/null; done`,
+            { timeout: 10_000 },
+          );
+        }),
+      ); // fire-and-forget
     }
 
     const result = await queue.metrics(async (p) => {
@@ -713,18 +722,7 @@ export class EC2Provider implements ComputeProvider {
     const env: Record<string, string> = {};
     const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
     if (token) env.CLAUDE_CODE_SESSION_ACCESS_TOKEN = token;
-    let oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
-    if (!oauthToken) {
-      try {
-        const { existsSync: ex, readFileSync: rf } = require("fs");
-        const { join: j } = require("path");
-        const { ARK_DIR } = require("../../../core/store.js");
-        const p = j(ARK_DIR(), "claude-oauth-token");
-        if (ex(p)) oauthToken = rf(p, "utf-8").trim();
-      } catch (e: any) {
-        console.error('[ec2] buildLaunchEnv: failed to read claude-oauth-token:', e?.message ?? e);
-      }
-    }
+    const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN ?? readOauthTokenFromDisk();
     if (oauthToken) env.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
     return env;
   }
