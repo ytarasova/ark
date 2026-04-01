@@ -11,24 +11,30 @@ import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useFocus } from "../hooks/useFocus.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
-// ── Kind labels for TreeList groups ─────────────────────────────────────────
+// ── Grouping: global vs project-scoped ──────────────────────────────────────
 
-const KIND_LABELS: Record<ToolEntry["kind"], string> = {
-  "mcp-server": "MCP Servers",
-  "command": "Commands",
-  "claude-skill": "Skills",
-  "ark-skill": "Skills",
-  "ark-recipe": "Recipes",
-  "context": "Context",
-};
+const PROJECT_KINDS = new Set<ToolEntry["kind"]>(["mcp-server", "command", "context", "claude-skill"]);
 
 function groupLabel(entry: ToolEntry): string {
-  // Merge claude-skill and ark-skill into one "Skills" group
-  return KIND_LABELS[entry.kind] ?? entry.kind;
+  if (PROJECT_KINDS.has(entry.kind)) {
+    switch (entry.kind) {
+      case "mcp-server": return "Project: MCP Servers";
+      case "command": return "Project: Commands";
+      case "context": return "Project: Context";
+      case "claude-skill": return "Project: Skills";
+      default: return "Project";
+    }
+  }
+  switch (entry.kind) {
+    case "ark-skill": return "Skills";
+    case "ark-recipe": return "Recipes";
+    default: return entry.kind;
+  }
 }
 
-// All group names in display order
-const ALL_GROUPS = ["MCP Servers", "Commands", "Skills", "Recipes", "Context"];
+// Global groups always shown; project groups only when projectRoot exists
+const GLOBAL_GROUPS = ["Skills", "Recipes"];
+const PROJECT_GROUPS = ["Project: MCP Servers", "Project: Commands", "Project: Skills", "Project: Context"];
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
@@ -140,7 +146,7 @@ export function ToolsTab({ pane, asyncState, refresh }: ToolsTabProps) {
         <TreeList
           items={items}
           groupBy={groupLabel}
-          emptyGroups={ALL_GROUPS}
+          emptyGroups={projectRoot ? [...GLOBAL_GROUPS, ...PROJECT_GROUPS] : GLOBAL_GROUPS}
           renderRow={(item) => {
             return `${item.name.padEnd(20)} ${item.description}`;
           }}
