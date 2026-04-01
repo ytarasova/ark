@@ -1,0 +1,11 @@
+name: quick-fix
+description: Quick single-agent bug fix
+flow: bare
+agent: worker
+variables:
+  - name: repo
+    description: Repository path
+    required: true
+  - name: summary
+    description: What to fix
+    required: true

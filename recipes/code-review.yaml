@@ -1,0 +1,10 @@
+name: code-review
+description: Review current branch changes
+flow: bare
+agent: reviewer
+variables:
+  - name: repo
+    description: Repository path
+    required: true
+defaults:
+  summary: "Review the code changes on this branch"

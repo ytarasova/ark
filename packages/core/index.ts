@@ -44,6 +44,9 @@ export { loadAgent, listAgents, saveAgent, deleteAgent, resolveAgent, buildClaud
 // Skill
 export { listSkills, loadSkill, saveSkill, deleteSkill, type SkillDefinition } from "./skill.js";
 
+// Recipe
+export { listRecipes, loadRecipe, instantiateRecipe, type RecipeDefinition, type RecipeVariable, type RecipeInstance } from "./recipe.js";
+
 // Claude integration
 export * as claude from "./claude.js";
 

@@ -1,0 +1,12 @@
+name: feature-build
+description: Full plan-implement-review cycle
+flow: default
+variables:
+  - name: repo
+    description: Repository path
+    required: true
+  - name: summary
+    description: Feature description
+    required: true
+  - name: ticket
+    description: Ticket ID (optional)
