@@ -67,26 +67,50 @@ describe("ftsTableExists", () => {
   });
 });
 
-// ── MIN_MESSAGE_COUNT allows short conversations ────────────────────────────
+// ── MIN_MESSAGE_COUNT filters trivial conversations ─────────────────────────
 
-describe("MIN_MESSAGE_COUNT = 1 allows short conversations", () => {
-  it("includes sessions with just 1 message", async () => {
+describe("MIN_MESSAGE_COUNT filters trivial conversations", () => {
+  it("excludes sessions with fewer than 5 messages", async () => {
     const bd = join(getCtx().arkDir, "claude-projects");
     const projectDir = join(bd, "-short-conv");
     mkdirSync(projectDir, { recursive: true });
 
-    // Write a transcript with only 1 user + 1 assistant message (2 total)
+    // Write a transcript with only 2 messages (below threshold of 5)
     const lines = [
-      JSON.stringify({ type: "user", sessionId: "short-sess", message: { role: "user", content: "quick question about auth" }, timestamp: "2026-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "assistant", sessionId: "short-sess", message: { role: "assistant", content: "here is the answer to your auth question" }, timestamp: "2026-01-01T00:02:00Z" }),
+      JSON.stringify({ type: "user", sessionId: "short-sess", message: { role: "user", content: "quick question" }, timestamp: "2026-01-01T00:01:00Z" }),
+      JSON.stringify({ type: "assistant", sessionId: "short-sess", message: { role: "assistant", content: "quick answer" }, timestamp: "2026-01-01T00:02:00Z" }),
     ];
     writeFileSync(join(projectDir, "short-sess.jsonl"), lines.join("\n"));
 
     await refreshClaudeSessionsCache({ baseDir: bd });
     const sessions = listClaudeSessions();
 
-    // With MIN_MESSAGE_COUNT=1, this 2-message session should be included
+    // With MIN_MESSAGE_COUNT=5, this 2-message session should be excluded
     const found = sessions.find(s => s.sessionId === "short-sess");
+    expect(found).toBeUndefined();
+  });
+
+  it("includes sessions with 5+ messages", async () => {
+    const bd = join(getCtx().arkDir, "claude-projects");
+    const projectDir = join(bd, "-real-conv");
+    mkdirSync(projectDir, { recursive: true });
+
+    // Write a transcript with 6 messages (above threshold)
+    const lines = [];
+    for (let i = 0; i < 6; i++) {
+      const role = i % 2 === 0 ? "user" : "assistant";
+      lines.push(JSON.stringify({
+        type: role, sessionId: "real-sess",
+        message: { role, content: `message ${i} with enough content to be real` },
+        timestamp: `2026-01-01T00:0${i}:00Z`,
+      }));
+    }
+    writeFileSync(join(projectDir, "real-sess.jsonl"), lines.join("\n"));
+
+    await refreshClaudeSessionsCache({ baseDir: bd });
+    const sessions = listClaudeSessions();
+
+    const found = sessions.find(s => s.sessionId === "real-sess");
     expect(found).toBeDefined();
   });
 });
