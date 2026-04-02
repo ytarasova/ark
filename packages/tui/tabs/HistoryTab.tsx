@@ -98,7 +98,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
     // Use claude session ID for Claude sessions, ark session ID for ark sessions
     const convId = selectedItem.claudeSession?.sessionId || selectedItem.arkSession?.claude_session_id || selectedItem.id;
     try {
-      const turns = core.getSessionConversation(convId, { limit: 20 });
+      const turns = core.getSessionConversation(convId, { limit: 50 });
       setConversationPreview(turns.map(t => {
         const role = t.role === "user" ? "You" : "Claude";
         return `${role}: ${t.content}`;
@@ -136,7 +136,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
       return;
     }
 
-    if (key.escape && mode === "search") { setMode("recent"); return; }
+    if (key.escape && mode === "search") { setMode("recent"); setSearchQuery(""); setSearchResults([]); return; }
 
     // R (shift) — force full rebuild (clear cache first)
     if (input === "R" && mode !== "search") {
@@ -200,7 +200,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
                   value={searchQuery}
                   onChange={setSearchQuery}
                   onSubmit={() => doSearch(searchQuery)}
-                  placeholder="search transcripts..."
+                  placeholder="search sessions and transcripts..."
                 />
               </Box>
             )}
@@ -228,6 +228,8 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
                 sel={sel}
                 emptyMessage="  No sessions found."
               />
+            ) : asyncState.loading ? (
+              <Text><Spinner type="dots" /> <Text dimColor>{asyncState.label || "searching..."}</Text></Text>
             ) : (
               <TreeList
                 items={searchResults}

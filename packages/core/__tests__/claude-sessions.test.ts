@@ -305,7 +305,7 @@ describe("getClaudeSession", () => {
 // ── Filtering ────────────────────────────────────────────────────────────────
 
 describe("claude sessions filtering", () => {
-  it("sessions with <10 messages are filtered out", async () => {
+  it("sessions with few messages are included (MIN_MESSAGE_COUNT=1)", async () => {
     // Write a session with only 4 user+assistant messages (8 total lines with system)
     const fewMsgs: object[] = [
       { type: "system", sessionId: "few-msgs", timestamp: "2026-03-24T10:00:00Z" },
@@ -323,7 +323,8 @@ describe("claude sessions filtering", () => {
     await refreshClaudeSessionsCache({ baseDir: baseDir() });
     const sessions = listClaudeSessions();
     const found = sessions.find(s => s.sessionId === "few-msgs");
-    expect(found).toBeUndefined();
+    // With MIN_MESSAGE_COUNT=1, short conversations should be included
+    expect(found).toBeDefined();
   });
 
   it("sessions with >=10 messages are included", async () => {

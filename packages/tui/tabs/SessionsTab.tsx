@@ -65,6 +65,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
   const selected = topLevel[sel] ?? null;
 
+  // Clear search state when selected session changes
+  useEffect(() => { setSearchResults(null); setSearchQuery(""); }, [selected?.id]);
+
   // Notify parent of selection changes for status bar
   useEffect(() => {
     onSelectionChange?.(selected);

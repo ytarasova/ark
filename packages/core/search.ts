@@ -8,8 +8,13 @@ import { join } from "path";
 import { homedir } from "os";
 import { getDb } from "./store.js";
 
-/** Max bytes to read from the tail of large transcript files for indexing */
-const MAX_TRANSCRIPT_TAIL_BYTES = 65536;
+/**
+ * Max bytes to read from the tail of large transcript files for indexing.
+ * Trade-off: larger value captures more conversation but costs more I/O.
+ * 256KB captures ~4x more context than the previous 64KB default while
+ * staying fast enough for interactive use.
+ */
+const MAX_TRANSCRIPT_TAIL_BYTES = 262144;
 
 /** Number of context words for FTS5 snippet() results */
 const FTS_SNIPPET_WORDS = 30;
@@ -79,17 +84,26 @@ export function searchSessions(query: string, opts?: SearchOpts): SearchResult[]
   return results.slice(0, limit);
 }
 
+/** Check if the FTS5 transcript_index table exists in the database */
+export function ftsTableExists(): boolean {
+  const db = getDb();
+  const row = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='transcript_index'"
+  ).get();
+  return !!row;
+}
+
 export function searchTranscripts(query: string, opts?: SearchOpts): SearchResult[] {
   const limit = opts?.limit ?? 50;
 
   // Try FTS5 index first
-  const db = getDb();
-  try {
+  if (ftsTableExists()) {
+    const db = getDb();
     const count = (db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as any)?.c ?? 0;
     if (count > 0) {
       return searchTranscriptsFTS(query, limit);
     }
-  } catch { /* FTS table may not exist — fall back to file scan */ }
+  }
 
   // Fallback to file scanning
   return searchTranscriptsFiles(query, opts);
@@ -162,6 +176,7 @@ function searchTranscriptsFiles(query: string, opts?: SearchOpts): SearchResult[
 
 /** Get conversation turns for a specific session, ordered chronologically */
 export function getSessionConversation(sessionId: string, opts?: { limit?: number }): { role: string; content: string; timestamp: string }[] {
+  if (!ftsTableExists()) return [];
   const db = getDb();
   const limit = opts?.limit ?? 100;
   try {
@@ -174,6 +189,7 @@ export function getSessionConversation(sessionId: string, opts?: { limit?: numbe
 
 /** Search within a specific session's conversation */
 export function searchSessionConversation(sessionId: string, query: string, opts?: { limit?: number }): SearchResult[] {
+  if (!ftsTableExists()) return [];
   const db = getDb();
   const limit = opts?.limit ?? 20;
   const ftsQuery = escapeFtsQuery(query);

@@ -127,6 +127,7 @@ export function ToolsTab({ pane, asyncState, refresh, onUseRecipe }: ToolsTabPro
         }
         const instance = core.instantiateRecipe(recipe, recipe.defaults ?? {});
         onUseRecipe?.(instance);
+        status.show(`Session created from recipe '${selected.name}'`);
       }
       return;
     }

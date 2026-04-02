@@ -12,6 +12,7 @@ import { Link } from "../components/Link.js";
 import { KeyValue } from "../components/KeyValue.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
+import { useListNavigation } from "../hooks/useListNavigation.js";
 
 export interface SessionDetailProps {
   session: core.Session | null;
@@ -53,6 +54,18 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
   }, [s?.id, s?.claude_session_id, s?.status]);
 
   const channelPort = useMemo(() => s ? core.sessionChannelPort(s.id) : 0, [s?.id]);
+
+  // Sort search results by timestamp
+  const sortedSearchResults = useMemo(() => {
+    if (!searchResults) return null;
+    return [...searchResults].sort((a, b) => (a.timestamp ?? "").localeCompare(b.timestamp ?? ""));
+  }, [searchResults]);
+
+  // Navigation for search results
+  const { sel: searchSel } = useListNavigation(
+    sortedSearchResults?.length ?? 0,
+    { active: searchMode && pane === "right" && sortedSearchResults !== null && sortedSearchResults.length > 0 },
+  );
 
   // Search mode: / to enter, Esc to exit
   useInput((input, key) => {
@@ -186,16 +199,17 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
       )}
 
       {/* Conversation history or search results */}
-      {searchMode && searchResults !== null ? (
+      {searchMode && sortedSearchResults !== null ? (
         <>
           <Text> </Text>
-          <SectionHeader title={`Search Results (${searchResults.length})`} />
-          {searchResults.length === 0 && (
+          <SectionHeader title={`Search Results (${sortedSearchResults.length})`} />
+          {sortedSearchResults.length === 0 && (
             <Text dimColor>{"  No matches found."}</Text>
           )}
-          {searchResults.map((r, idx) => (
-            <Text key={`${r.source}-${r.timestamp ?? idx}`} wrap="wrap">
-              {"  "}<Text dimColor>{r.timestamp?.slice(0, 16) ?? ""}</Text>
+          {sortedSearchResults.map((r, idx) => (
+            <Text key={`${r.source}-${r.timestamp ?? idx}`} wrap="wrap" inverse={idx === searchSel}>
+              {"  "}<Text dimColor>{r.sessionId?.slice(0, 8) ?? ""} </Text>
+              <Text dimColor>{r.timestamp?.slice(0, 16) ?? ""}</Text>
               <Text>{` ${r.match}`}</Text>
             </Text>
           ))}

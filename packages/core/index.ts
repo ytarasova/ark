@@ -59,7 +59,7 @@ export * from "./tmux.js";
 export * from "./hooks.js";
 
 // Search
-export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, type SearchResult, type SearchOpts } from "./search.js";
+export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, ftsTableExists, type SearchResult, type SearchOpts } from "./search.js";
 
 // GitHub PR utilities (lookup, formatting)
 export { findSessionByPR, formatReviewPrompt, extractComments } from "./github-pr.js";

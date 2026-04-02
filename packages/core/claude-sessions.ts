@@ -21,7 +21,7 @@ const TRANSCRIPT_HEAD_BYTES = 16384;
 const TRANSCRIPT_TAIL_BYTES = 2048;
 
 /** Minimum message count to include a session in the cache */
-const MIN_MESSAGE_COUNT = 10;
+const MIN_MESSAGE_COUNT = 1;
 
 export interface ClaudeSession {
   sessionId: string;
