@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { exportSession, importSessionFromFile } from "../session-share.js";
+import { exportSession, exportSessionToFile, importSessionFromFile } from "../session-share.js";
 import { createSession, getSession } from "../store.js";
 import { withTestContext } from "./test-helpers.js";
 import { writeFileSync, mkdtempSync } from "fs";
@@ -45,5 +45,32 @@ describe("session sharing", () => {
     writeFileSync(filePath, "not json");
     const result = importSessionFromFile(filePath);
     expect(result.ok).toBe(false);
+  });
+
+  it("exportSessionToFile writes to disk and is re-importable", () => {
+    const s = createSession({ summary: "roundtrip test", repo: "/tmp/repo" });
+    const dir = mkdtempSync(join(tmpdir(), "ark-export-"));
+    const filePath = join(dir, "export.json");
+
+    const ok = exportSessionToFile(s.id, filePath);
+    expect(ok).toBe(true);
+
+    // Verify the file was created
+    const content = JSON.parse(require("fs").readFileSync(filePath, "utf-8"));
+    expect(content.version).toBe(1);
+    expect(content.session.summary).toBe("roundtrip test");
+
+    // Re-import it
+    const result = importSessionFromFile(filePath);
+    expect(result.ok).toBe(true);
+    expect(result.sessionId).toBeDefined();
+  });
+
+  it("exportSessionToFile returns false for missing session", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ark-export-"));
+    const filePath = join(dir, "missing.json");
+
+    const ok = exportSessionToFile("nonexistent", filePath);
+    expect(ok).toBe(false);
   });
 });

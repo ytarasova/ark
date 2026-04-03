@@ -18,7 +18,7 @@ let execFileShouldThrow = false;
 import { ARK_DIR } from "../store.js";
 import * as store from "../store.js";
 import { createSession } from "../store.js";
-import { pollPRReviews, checkSessionPR, setGhExec } from "../pr-poller.js";
+import { pollPRReviews, checkSessionPR, fetchPRReviews, processReviewFeedback, setGhExec } from "../pr-poller.js";
 import { withTestContext } from "./test-helpers.js";
 
 // ── Test setup ───────────────────────────────────────────────────────────────
@@ -238,5 +238,110 @@ describe("checkSessionPR", () => {
     const events = store.getEvents(session.id);
     const approvals = events.filter(e => e.type === "pr_approved");
     expect(approvals).toHaveLength(0);
+  });
+});
+
+// ── fetchPRReviews ──────────────────────────────────────────────────────────
+
+describe("fetchPRReviews", () => {
+  it("parses PR data from gh CLI output", async () => {
+    const mockExec = async () => ({
+      stdout: JSON.stringify({
+        title: "My PR",
+        number: 99,
+        state: "OPEN",
+        reviews: [
+          { author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" },
+        ],
+      }),
+    });
+
+    const result = await fetchPRReviews("https://github.com/org/repo/pull/99", mockExec);
+    expect(result).not.toBeNull();
+    expect(result!.title).toBe("My PR");
+    expect(result!.number).toBe(99);
+    expect(result!.reviews).toHaveLength(1);
+    expect(result!.reviews[0].author.login).toBe("alice");
+  });
+
+  it("returns null on gh CLI failure", async () => {
+    const mockExec = async () => { throw new Error("not found"); };
+    const result = await fetchPRReviews("https://github.com/org/repo/pull/404", mockExec);
+    expect(result).toBeNull();
+  });
+
+  it("returns null on invalid JSON", async () => {
+    const mockExec = async () => ({ stdout: "not json" });
+    const result = await fetchPRReviews("https://github.com/org/repo/pull/1", mockExec);
+    expect(result).toBeNull();
+  });
+});
+
+// ── processReviewFeedback ───────────────────────────────────────────────────
+
+describe("processReviewFeedback", () => {
+  it("skips when no new reviews detected", async () => {
+    const session = createReviewSession();
+    const config = { review_count: 1, last_review_time: "2026-03-27T12:00:00Z" };
+    const data = {
+      title: "PR", number: 42, state: "OPEN",
+      reviews: [{ author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
+    };
+
+    await processReviewFeedback(session, data, config);
+
+    const events = store.getEvents(session.id);
+    const prEvents = events.filter(e => e.type.startsWith("pr_"));
+    expect(prEvents).toHaveLength(0);
+  });
+
+  it("logs pr_approved event for new approval", async () => {
+    const session = createReviewSession();
+    const config = { review_count: 0, last_review_time: "" };
+    const data = {
+      title: "PR", number: 42, state: "OPEN",
+      reviews: [{ author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
+    };
+
+    await processReviewFeedback(session, data, config);
+
+    const events = store.getEvents(session.id);
+    const approvals = events.filter(e => e.type === "pr_approved");
+    expect(approvals).toHaveLength(1);
+  });
+
+  it("stores feedback message for changes_requested", async () => {
+    const session = createReviewSession({ status: "blocked" });
+    const config = { review_count: 0, last_review_time: "" };
+    const data = {
+      title: "Fix bug", number: 42, state: "OPEN",
+      reviews: [{ author: { login: "bob" }, body: "Needs rework", state: "CHANGES_REQUESTED", submittedAt: "2026-03-27T12:00:00Z" }],
+    };
+
+    await processReviewFeedback(session, data, config);
+
+    const events = store.getEvents(session.id);
+    const feedback = events.filter(e => e.type === "pr_review_feedback");
+    expect(feedback).toHaveLength(1);
+
+    // Should have stored a message
+    const messages = store.getMessages(session.id);
+    const systemMsgs = messages.filter(m => m.role === "system");
+    expect(systemMsgs.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("updates session config with review count", async () => {
+    const session = createReviewSession();
+    const config = { review_count: 0, last_review_time: "" };
+    const data = {
+      title: "PR", number: 42, state: "OPEN",
+      reviews: [{ author: { login: "alice" }, body: "ok", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
+    };
+
+    await processReviewFeedback(session, data, config);
+
+    const updated = store.getSession(session.id)!;
+    const updatedConfig = updated.config as Record<string, any>;
+    expect(updatedConfig.review_count).toBe(1);
   });
 });

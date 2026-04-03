@@ -12,6 +12,7 @@ import {
   issueAlreadyTracked,
   createSessionFromIssue,
   pollIssues,
+  startIssuePoller,
   setGhExec,
   type GhIssue,
 } from "../issue-poller.js";
@@ -195,5 +196,27 @@ describe("pollIssues", () => {
     await pollIssues({ label: "agent" });
 
     expect(capturedArgs).toContain("agent");
+  });
+});
+
+// ── startIssuePoller ──────────────────────────────────────────────────────
+
+describe("startIssuePoller", () => {
+  it("returns a handle with a stop function", () => {
+    setGhExec(async () => ({ stdout: "[]" }));
+
+    const handle = startIssuePoller({ intervalMs: 60_000 });
+    expect(typeof handle.stop).toBe("function");
+
+    // Clean up the interval immediately
+    handle.stop();
+  });
+
+  it("stop() cleans up the interval", () => {
+    setGhExec(async () => ({ stdout: "[]" }));
+
+    const handle = startIssuePoller({ intervalMs: 100_000 });
+    // Should not throw on stop
+    handle.stop();
   });
 });

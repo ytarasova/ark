@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { buildSandboxCommand, isDockerAvailable } from "../sandbox.js";
+import { buildSandboxCommand, isDockerAvailable, listSandboxContainers } from "../sandbox.js";
 
 describe("sandbox", () => {
   it("builds basic docker command", () => {
@@ -37,4 +37,15 @@ describe("sandbox", () => {
     const result = isDockerAvailable();
     expect(typeof result).toBe("boolean");
   }, 10_000);
+
+  it("listSandboxContainers returns an array", () => {
+    // May return empty if no containers running, but should not throw
+    const result = listSandboxContainers();
+    expect(Array.isArray(result)).toBe(true);
+  }, 10_000);
+
+  it("adds extra volumes", () => {
+    const cmd = buildSandboxCommand("/proj", "cmd", { extraVolumes: ["/data:/data:ro"] });
+    expect(cmd).toContain("-v /data:/data:ro");
+  });
 });

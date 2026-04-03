@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
-import { truncateLog, logDir } from "../log-manager.js";
+import { truncateLog, logDir, cleanupLogs } from "../log-manager.js";
+import { createSession } from "../store.js";
 import { withTestContext } from "./test-helpers.js";
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
@@ -35,5 +36,49 @@ describe("log manager", () => {
   it("truncateLog handles missing file", () => {
     truncateLog("/tmp/nonexistent.log", 10);
     // Should not throw
+  });
+});
+
+describe("cleanupLogs", () => {
+  it("returns zeros when log directory does not exist", () => {
+    const result = cleanupLogs();
+    expect(result).toEqual({ truncated: 0, removed: 0 });
+  });
+
+  it("removes orphaned log files for sessions that no longer exist", () => {
+    const dir = logDir();
+    mkdirSync(dir, { recursive: true });
+
+    // Create a session so we know its ID format
+    const session = createSession({ summary: "keep me" });
+
+    // Write a log for the real session and a fake one
+    writeFileSync(join(dir, `ark-${session.id}.log`), "real log");
+    writeFileSync(join(dir, `ark-s-deadbeef.log`), "orphan log");
+
+    const result = cleanupLogs({ removeOrphans: true });
+    expect(result.removed).toBe(1);
+    expect(existsSync(join(dir, `ark-${session.id}.log`))).toBe(true);
+    expect(existsSync(join(dir, `ark-s-deadbeef.log`))).toBe(false);
+  });
+
+  it("truncates oversized log files", () => {
+    const dir = logDir();
+    mkdirSync(dir, { recursive: true });
+
+    const session = createSession({ summary: "large log" });
+    const logPath = join(dir, `ark-${session.id}.log`);
+
+    // Create a file that's over 1MB (use small maxSizeMb for testing)
+    const bigContent = Array.from({ length: 20000 }, (_, i) => `line ${i}`).join("\n");
+    writeFileSync(logPath, bigContent);
+
+    // Use tiny maxSizeMb so the file counts as oversized
+    const result = cleanupLogs({ maxSizeMb: 0.001, maxLines: 100, removeOrphans: false });
+    expect(result.truncated).toBe(1);
+
+    const after = readFileSync(logPath, "utf-8");
+    const afterLines = after.split("\n");
+    expect(afterLines.length).toBe(100);
   });
 });

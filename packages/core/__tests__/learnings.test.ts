@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { recordLearning, getLearnings, getPolicies } from "../learnings.js";
+import { recordLearning, getLearnings, getPolicies, conductorLearningsDir } from "../learnings.js";
 import { mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -154,5 +154,17 @@ describe("conductor learnings advanced", () => {
     for (let i = 0; i < 10; i++) {
       expect(learnings.find(l => l.title === `Learning ${i}`)).toBeDefined();
     }
+  });
+});
+
+describe("conductorLearningsDir", () => {
+  it("returns path under the provided arkDir", () => {
+    const result = conductorLearningsDir("/tmp/my-ark");
+    expect(result).toBe("/tmp/my-ark/conductor");
+  });
+
+  it("handles nested paths", () => {
+    const result = conductorLearningsDir("/home/user/.ark");
+    expect(result).toBe("/home/user/.ark/conductor");
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "bun:test";
-import { AppContext } from "../app.js";
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { existsSync } from "fs";
 
 let app: AppContext | null = null;
@@ -80,5 +80,31 @@ describe("AppContext", () => {
     await app.boot();
     expect(app.eventBus).toBeDefined();
     expect(typeof app.eventBus.emit).toBe("function");
+  });
+});
+
+describe("getApp / setApp / clearApp", () => {
+  afterEach(() => {
+    clearApp();
+  });
+
+  it("getApp throws when no app is set", () => {
+    clearApp();
+    expect(() => getApp()).toThrow("AppContext not initialized");
+  });
+
+  it("setApp + getApp returns the same instance", async () => {
+    const testApp = AppContext.forTest();
+    setApp(testApp);
+    expect(getApp()).toBe(testApp);
+    await testApp.shutdown();
+  });
+
+  it("clearApp resets the singleton", async () => {
+    const testApp = AppContext.forTest();
+    setApp(testApp);
+    clearApp();
+    expect(() => getApp()).toThrow();
+    await testApp.shutdown();
   });
 });
