@@ -109,7 +109,7 @@ export type { ToolDriver } from "./tool-driver.js";
 export { getToolDriver, listToolDrivers, registerToolDriver } from "./tools/registry.js";
 
 // Cost tracking
-export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, type SessionCost } from "./costs.js";
+export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, type SessionCost, type BudgetConfig, type BudgetStatus } from "./costs.js";
 
 // Conductor learnings
 export { recordLearning, getLearnings, getPolicies, conductorLearningsDir, type Learning, type Policy } from "./learnings.js";
@@ -155,3 +155,6 @@ export { registerInstance, activeInstanceCount } from "./instance-lock.js";
 
 // Theme
 export { getTheme, setThemeMode, getThemeMode, type Theme, type ThemeMode } from "./theme.js";
+
+// UI state persistence
+export { loadUiState, saveUiState, type UiState } from "./ui-state.js";

@@ -18,6 +18,8 @@ import type { ComputeProvider } from "../compute/types.js";
 import { initSchema as initStoreSchema, setAppStore, clearAppStore, safeParseConfig, purgeExpiredDeletes } from "./store.js";
 import type { Compute, Session } from "./store.js";
 import { setProviderResolver, clearProviderResolver } from "./session.js";
+import { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
+import { startNotifyDaemon } from "./notify-daemon.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,8 @@ export class AppContext {
   private _forceExitCount = 0;
   private _orphanedSessions: Session[] = [];
   private _purgeInterval: ReturnType<typeof setInterval> | null = null;
+  private _tmuxStatusInterval: ReturnType<typeof setInterval> | null = null;
+  private _notifyDaemon: { stop(): void } | null = null;
 
   /** Sessions detected as orphaned during boot (running but tmux dead). */
   get orphanedSessions(): Session[] {
@@ -194,6 +198,14 @@ export class AppContext {
       purgeExpiredDeletes(90);
     }, 30_000);
 
+    // 12. Update tmux status bar every 5s
+    this._tmuxStatusInterval = setInterval(() => {
+      updateTmuxStatusBar();
+    }, 5_000);
+
+    // 13. Start notification daemon (if bridge config exists)
+    this._notifyDaemon = startNotifyDaemon();
+
     this.phase = "ready";
   }
 
@@ -214,7 +226,20 @@ export class AppContext {
       await destroyAllPools();
     });
 
-    // 3. Stop purge interval
+    // 3. Stop notification daemon
+    if (this._notifyDaemon) {
+      this._notifyDaemon.stop();
+      this._notifyDaemon = null;
+    }
+
+    // 4. Clear tmux status bar
+    if (this._tmuxStatusInterval) {
+      clearInterval(this._tmuxStatusInterval);
+      this._tmuxStatusInterval = null;
+    }
+    clearTmuxStatusBar();
+
+    // 5. Stop purge interval
     if (this._purgeInterval) {
       clearInterval(this._purgeInterval);
       this._purgeInterval = null;

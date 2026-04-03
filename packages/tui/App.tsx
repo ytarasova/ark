@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import { execFile } from "child_process";
 import { useStore } from "./hooks/useStore.js";
@@ -19,6 +19,7 @@ import { CostsTab } from "./tabs/CostsTab.js";
 import * as core from "../core/index.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
+import { TABS } from "./components/TabBar.js";
 
 export function App() {
   return (
@@ -36,7 +37,28 @@ function AppInner() {
   const agentsAsync = useAsync(store.refresh);
   const historyAsync = useAsync(store.refresh);
   const computeAsync = useAsync(store.refresh);
-  const [tab, setTab] = useState<Tab>("sessions");
+
+  // Multi-instance registration
+  const instanceRef = useRef<{ stop: () => void; isPrimary: () => boolean } | null>(null);
+  useEffect(() => {
+    const id = `tui-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    instanceRef.current = core.registerInstance(id);
+    return () => { instanceRef.current?.stop(); };
+  }, []);
+
+  // Restore persisted tab on mount
+  const savedState = useMemo(() => core.loadUiState(), []);
+  const [tab, setTab] = useState<Tab>(() => {
+    const saved = TABS[savedState.activeTab];
+    return saved ?? "sessions";
+  });
+
+  // Persist tab changes
+  useEffect(() => {
+    const tabIndex = TABS.indexOf(tab);
+    core.saveUiState({ activeTab: tabIndex >= 0 ? tabIndex : 0 });
+  }, [tab]);
+
   const [showForm, setShowForm] = useState<string | null>(null);
   const [sessionPrefill, setSessionPrefill] = useState<SessionPrefill | undefined>();
   const [eventLogExpanded, setEventLogExpanded] = useState(false);

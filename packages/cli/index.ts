@@ -27,7 +27,15 @@ setApp(app);
 const program = new Command()
   .name("ark")
   .description("Ark - autonomous agent ecosystem")
-  .version("0.1.0");
+  .version("0.1.0")
+  .option("-p, --profile <name>", "Use a specific profile");
+
+program.hook("preAction", (thisCommand) => {
+  const opts = thisCommand.opts();
+  if (opts.profile) {
+    core.setActiveProfile(opts.profile);
+  }
+});
 
 // ── Session commands ────────────────────────────────────────────────────────
 
@@ -1517,6 +1525,78 @@ program.command("search-all")
       console.log(`${chalk.cyan(r.projectName)} ${chalk.dim(r.fileName)}`);
       console.log(`  ${r.matchLine.slice(0, 100)}`);
     }
+  });
+
+// ── Try (one-shot sandbox) ──────────────────────────────────────────────────
+
+program.command("try")
+  .description("Run a one-shot sandboxed session (auto-cleans up)")
+  .argument("<task>")
+  .option("--image <image>", "Docker image", "ubuntu:22.04")
+  .action(async (task, opts) => {
+    const workdir = process.cwd();
+    const session = core.startSession({
+      summary: `[try] ${task}`,
+      repo: workdir,
+      workdir,
+      config: { sandbox: true, sandboxImage: opts.image },
+    });
+    console.log(chalk.cyan(`Try session: ${session.id}`));
+    console.log(chalk.dim("Session will be auto-deleted when done."));
+
+    // Dispatch
+    try {
+      await core.dispatch(session.id);
+    } catch (e: any) {
+      console.log(chalk.red(`Dispatch failed: ${e.message}`));
+    }
+
+    // Attach (interactive tmux - requires shell stdio passthrough)
+    try {
+      const cmd = core.attachCommand(session.session_id!);
+      execSync(cmd, { stdio: "inherit" });
+    } catch { /* detached */ }
+
+    // Auto-cleanup
+    await core.deleteSessionAsync(session.id);
+    console.log(chalk.dim("Try session cleaned up."));
+  });
+
+// ── Config ─────────────────────────────────────────────────────────────────
+
+program.command("config")
+  .description("Open Ark config in your editor")
+  .option("--path", "Just print the config path")
+  .action((opts) => {
+    const configPath = join(core.ARK_DIR(), "config.yaml");
+
+    // Create default config if missing
+    if (!existsSync(configPath)) {
+      mkdirSync(require("path").dirname(configPath), { recursive: true });
+      writeFileSync(configPath, [
+        "# Ark configuration",
+        "# See: https://github.com/your-org/ark#configuration",
+        "",
+        "# hotkeys:",
+        "#   delete: x",
+        "#   fork: f",
+        "",
+        "# budgets:",
+        "#   dailyLimit: 50",
+        "#   weeklyLimit: 200",
+        "",
+      ].join("\n"));
+    }
+
+    if (opts.path) {
+      console.log(configPath);
+      return;
+    }
+
+    const editor = process.env.EDITOR ?? process.env.VISUAL ?? "vi";
+    console.log(chalk.dim(`Opening ${configPath} in ${editor}...`));
+    // Interactive editor - requires shell stdio passthrough
+    execSync(`${editor} ${configPath}`, { stdio: "inherit" });
   });
 
 // ── Run ─────────────────────────────────────────────────────────────────────
