@@ -288,7 +288,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               const unread = unreadCounts.get(s.id) ?? 0;
               return (
                 <Text>
-                  {" "} <Text color={color}>{icon}</Text>{` ${summary} ${stage} ${age}`}
+                  {" "} <Text color={color}>{icon}</Text>{` ${summary}`}
+                  {s.branch && <Text color="cyan">{` [${s.branch}]`}</Text>}
+                  {` ${stage} ${age}`}
                   {unread > 0 && <Text color="yellow" bold>{` (${unread})`}</Text>}
                 </Text>
               );

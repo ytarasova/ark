@@ -15,11 +15,14 @@ export interface BridgeConfig {
   slack?: {
     webhookUrl: string;
   };
+  discord?: {
+    webhookUrl: string;
+  };
 }
 
 export interface BridgeMessage {
   text: string;
-  source: "telegram" | "slack" | "system";
+  source: "telegram" | "slack" | "discord" | "system";
 }
 
 type MessageHandler = (msg: BridgeMessage) => void | Promise<void>;
@@ -88,6 +91,22 @@ async function sendSlack(webhookUrl: string, text: string): Promise<boolean> {
   }
 }
 
+// ── Discord ─────────────────────────────────────────────────────────
+
+async function sendDiscord(webhookUrl: string, text: string): Promise<boolean> {
+  try {
+    const resp = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: text }),
+    });
+    return resp.ok;
+  } catch (e: any) {
+    console.error("bridge: discord send failed:", e?.message ?? e);
+    return false;
+  }
+}
+
 // ── Bridge ──────────────────────────────────────────────────────────────
 
 export class Bridge {
@@ -113,6 +132,9 @@ export class Bridge {
     }
     if (this.config.slack) {
       promises.push(sendSlack(this.config.slack.webhookUrl, text));
+    }
+    if (this.config.discord) {
+      promises.push(sendDiscord(this.config.discord.webhookUrl, text));
     }
 
     await Promise.allSettled(promises);
@@ -197,7 +219,7 @@ export function loadBridgeConfig(): BridgeConfig | null {
 export function createBridge(): Bridge | null {
   const config = loadBridgeConfig();
   if (!config) return null;
-  if (!config.telegram && !config.slack) return null;
+  if (!config.telegram && !config.slack && !config.discord) return null;
 
   const bridge = new Bridge(config);
   bridge.start();

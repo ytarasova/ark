@@ -42,6 +42,24 @@ export function getPathCompletions(value: string): string[] {
 export function PathInput({ value, onChange, onSubmit }: PathInputProps) {
   const completions = useMemo(() => getPathCompletions(value), [value]);
 
+  const handleTab = () => {
+    if (completions.length === 1) {
+      // Single match: complete with trailing slash for further navigation
+      onChange(completions[0] + "/");
+    } else if (completions.length > 1) {
+      // Multiple matches: complete to longest common prefix
+      let common = completions[0];
+      for (let i = 1; i < completions.length; i++) {
+        let j = 0;
+        while (j < common.length && j < completions[i].length && common[j] === completions[i][j]) j++;
+        common = common.slice(0, j);
+      }
+      if (common.length > value.length) {
+        onChange(common);
+      }
+    }
+  };
+
   return (
     <Box flexDirection="column">
       <Box>
@@ -50,6 +68,7 @@ export function PathInput({ value, onChange, onSubmit }: PathInputProps) {
           value={value}
           onChange={onChange}
           onSubmit={() => onSubmit(value)}
+          onTab={handleTab}
           placeholder="/path/to/repo"
         />
       </Box>

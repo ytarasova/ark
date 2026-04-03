@@ -154,4 +154,20 @@ describe("Bridge handler invocation", () => {
     // Should not throw — errors are caught internally
     await bridge.notify("test");
   });
+
+  it("notify with discord config does not throw", async () => {
+    const bridge = new Bridge({
+      discord: { webhookUrl: "https://invalid.example.com/webhook" },
+    });
+    await bridge.notify("test");
+  });
+
+  it("notify with all three platforms does not throw", async () => {
+    const bridge = new Bridge({
+      telegram: { botToken: "invalid-token", chatId: "123" },
+      slack: { webhookUrl: "https://invalid.example.com/webhook" },
+      discord: { webhookUrl: "https://invalid.example.com/webhook" },
+    });
+    await bridge.notify("test");
+  });
 });
