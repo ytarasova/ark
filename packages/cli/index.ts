@@ -256,6 +256,14 @@ session.command("send")
     console.log(r.ok ? chalk.green("Sent") : chalk.red(r.message));
   });
 
+session.command("undelete")
+  .description("Restore a recently deleted session (within 90s)")
+  .argument("<id>")
+  .action(async (id) => {
+    const result = await core.undeleteSessionAsync(id);
+    console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
+  });
+
 session.command("clone")
   .description("Clone a session (resumes Claude conversation)")
   .argument("<id>")
@@ -316,12 +324,15 @@ session.command("events")
 session.command("delete")
   .description("Delete sessions")
   .argument("<ids...>")
-  .action((ids: string[]) => {
+  .action(async (ids: string[]) => {
     for (const id of ids) {
-      const s = core.getSession(id);
-      if (s?.session_id) core.killSession(s.session_id);
-      core.deleteSession(id);
-      console.log(chalk.green(`Deleted ${id}`));
+      const result = await core.deleteSessionAsync(id);
+      if (result.ok) {
+        console.log(chalk.green(result.message));
+        console.log(chalk.dim(`  Run 'ark session undelete ${id}' within 90s to undo`));
+      } else {
+        console.log(chalk.red(result.message));
+      }
     }
   });
 
