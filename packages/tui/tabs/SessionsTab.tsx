@@ -21,10 +21,11 @@ import { TalkToSession } from "./TalkToSession.js";
 import { CloneSession } from "./CloneSession.js";
 import { SessionReplay } from "./SessionReplay.js";
 import { McpManager } from "../components/McpManager.js";
+import { SessionSearch } from "../components/SessionSearch.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
-type Overlay = "move" | "group" | "talk" | "inbox" | "clone" | "search" | "replay" | "mcp" | null;
+type Overlay = "move" | "group" | "talk" | "inbox" | "fork" | "search" | "replay" | "mcp" | "find" | null;
 
 interface SessionsTabProps extends StoreData {
   asyncState: AsyncState;
@@ -41,6 +42,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   const confirmation = useConfirmation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<core.SearchResult[] | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const status = useStatusMessage();
 
   // Top-level sessions, sorted by group name to match visual TreeList order
@@ -55,13 +57,24 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     });
   }, [sessions]);
 
+  const filteredTopLevel = useMemo(() => {
+    if (!statusFilter) return topLevel;
+    return topLevel.filter(s => {
+      if (statusFilter === "running") return s.status === "running";
+      if (statusFilter === "waiting") return ["waiting", "blocked"].includes(s.status);
+      if (statusFilter === "stopped") return ["stopped", "completed", "pending"].includes(s.status);
+      if (statusFilter === "failed") return ["failed"].includes(s.status);
+      return true;
+    });
+  }, [topLevel, statusFilter]);
+
   const hasOverlay = formOverlay || overlay;
-  const { sel, setSel } = useListNavigation(topLevel.length, { active: pane === "left" && !hasOverlay });
+  const { sel, setSel } = useListNavigation(filteredTopLevel.length, { active: pane === "left" && !hasOverlay });
 
   // Push/pop focus when overlay opens/closes
   useEffect(() => {
     if (overlay) focus.push(overlay);
-    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("clone"), focus.pop("search"), focus.pop("replay"), focus.pop("mcp");
+    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("fork"), focus.pop("search"), focus.pop("replay"), focus.pop("mcp"), focus.pop("find");
   }, [overlay]);
 
   const selected = topLevel[sel] ?? null;
@@ -98,6 +111,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     if (pane !== "left" || hasOverlay) return;
 
     // Global keys — work regardless of selection
+    if (input === "/") { setOverlay("find"); return; }
     if (input === "n") { onShowForm(); return; }
     if (input === "T") { setOverlay("inbox"); return; }
     if (input === "o") { setOverlay("group"); return; }
@@ -139,14 +153,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       } else if (selected.status === "blocked") {
         actions.restart(selected.id);
       }
-    } else if (input === "c") {
-      // Fork: shallow copy (same config, fresh session)
-      if (selected) {
-        actions.fork(selected.id, selected.group_name);
-      }
-    } else if (input === "C") {
-      // Clone: deep copy with resume (opens name prompt)
-      if (selected) setOverlay("clone");
+    } else if (input === "f") {
+      // Fork: deep copy with conversation continuity (opens name prompt)
+      if (selected) setOverlay("fork");
     } else if (input === "x") {
       if (confirmation.confirm("delete", `Delete '${selected.summary ?? selected.id}'? Press x again to confirm`)) {
         actions.delete(selected.id);
@@ -279,13 +288,13 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         }
         right={
           formOverlay ? formOverlay
-          : overlay === "clone" ? (
+          : overlay === "fork" ? (
             <CloneSession
               session={selected}
               onDone={(name) => {
                 setOverlay(null);
                 if (!selected || !name) return;
-                actions.clone(selected.id, name, selected.group_name);
+                actions.fork(selected.id, name, selected.group_name);
               }}
             />
           )
@@ -340,6 +349,16 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
           : overlay === "replay" && selected ? (
             <SessionReplay
               session={selected}
+              onClose={() => setOverlay(null)}
+            />
+          )
+          : overlay === "find" ? (
+            <SessionSearch
+              sessions={topLevel}
+              onSelect={(s) => {
+                const idx = topLevel.findIndex(t => t.id === s.id);
+                if (idx >= 0) setSel(idx);
+              }}
               onClose={() => setOverlay(null)}
             />
           )

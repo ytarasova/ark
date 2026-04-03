@@ -55,17 +55,8 @@ export function useSessionActions(asyncState: AsyncState) {
       return true;
     },
 
-    fork: (sourceId: string, groupName?: string | null) => {
-      run(`Forking session`, async (updateLabel) => {
-        const result = core.forkSession(sourceId);
-        if (!result.ok) return;
-        if (groupName) core.updateSession(result.sessionId, { group_name: groupName });
-        await core.dispatch(result.sessionId, { onLog: (msg) => updateLabel(msg) });
-      });
-    },
-
-    clone: (sourceId: string, name: string, groupName?: string | null) => {
-      run(`Cloning → ${name}`, async (updateLabel) => {
+    fork: (sourceId: string, name: string, groupName?: string | null) => {
+      run(`Forking → ${name}`, async (updateLabel) => {
         const result = core.cloneSession(sourceId, name);
         if (!result.ok) return;
         if (groupName) core.updateSession(result.sessionId, { group_name: groupName });

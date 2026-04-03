@@ -30,7 +30,7 @@ export function getOverlayHints(overlay: string): React.ReactNode[] {
         <KeyHint key="esc" k="Esc" label="cancel" />,
       ];
     case "move":
-    case "clone":
+    case "fork":
     case "group":
       return [
         <KeyHint key="enter" k="Enter" label="confirm" />,
@@ -51,6 +51,12 @@ export function getOverlayHints(overlay: string): React.ReactNode[] {
       return [
         <KeyHint key="enter" k="Enter" label="search" />,
         <KeyHint key="esc" k="Esc" label="cancel" />,
+      ];
+    case "find":
+      return [
+        <KeyHint key="jk" k="C-j/k" label="move" />,
+        <KeyHint key="enter" k="Enter" label="select" />,
+        <KeyHint key="esc" k="Esc" label="close" />,
       ];
     case "inbox":
       return [
@@ -117,7 +123,7 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
         break;
     }
     // Create / duplicate
-    hints.push(<KeyHint key="cC" k="c/C" label="fork/clone" />);
+    hints.push(<KeyHint key="f" k="f" label="fork" />);
     // Organize
     hints.push(<KeyHint key="m" k="m" label="move" />);
     hints.push(<KeyHint key="M" k="M" label="mcp" />);
@@ -125,6 +131,7 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
   }
   hints.push(<KeyHint key="n" k="n" label="new" />);
   hints.push(<KeyHint key="o" k="o" label="groups" />);
+  hints.push(<KeyHint key="/" k="/" label="find" />);
   hints.push(sep(1));
 
   // App

@@ -264,15 +264,34 @@ session.command("undelete")
     console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
   });
 
-session.command("clone")
-  .description("Clone a session (resumes Claude conversation)")
+session.command("fork")
+  .description("Fork a session (branches the conversation)")
   .argument("<id>")
-  .option("-t, --task <text>", "New task description")
+  .option("-t, --task <text>", "Task description for forked session")
+  .option("-g, --group <name>", "Group for forked session")
   .option("-d, --dispatch", "Auto-dispatch")
   .action(async (id, opts) => {
     const r = core.cloneSession(id, opts.task);
     if (r.ok) {
-      console.log(chalk.green(`Cloned → ${r.sessionId}`));
+      if (opts.group) core.updateSession(r.sessionId, { group_name: opts.group });
+      console.log(chalk.green(`Forked → ${r.sessionId}`));
+      if (opts.dispatch) await core.dispatch(r.sessionId);
+    } else {
+      console.log(chalk.red((r as { ok: false; message: string }).message));
+    }
+  });
+
+session.command("clone")
+  .description("Alias for fork (branches the conversation)")
+  .argument("<id>")
+  .option("-t, --task <text>", "Task description for forked session")
+  .option("-g, --group <name>", "Group for forked session")
+  .option("-d, --dispatch", "Auto-dispatch")
+  .action(async (id, opts) => {
+    const r = core.cloneSession(id, opts.task);
+    if (r.ok) {
+      if (opts.group) core.updateSession(r.sessionId, { group_name: opts.group });
+      console.log(chalk.green(`Forked → ${r.sessionId}`));
       if (opts.dispatch) await core.dispatch(r.sessionId);
     } else {
       console.log(chalk.red((r as { ok: false; message: string }).message));
@@ -289,13 +308,13 @@ session.command("handoff")
     console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
   });
 
-session.command("fork")
-  .description("Fork a child session for parallel work")
+session.command("spawn")
+  .description("Spawn a child session for parallel work")
   .argument("<parent-id>")
   .argument("<task>")
   .action((parentId, task) => {
     const r = core.fork(parentId, task);
-    if (r.ok) console.log(chalk.green(`Forked → ${r.sessionId}`));
+    if (r.ok) console.log(chalk.green(`Spawned → ${r.sessionId}`));
     else console.log(chalk.red((r as { ok: false; message: string }).message));
   });
 
@@ -343,6 +362,27 @@ session.command("group")
   .action((id, group) => {
     core.updateSession(id, { group_name: group });
     console.log(chalk.green(`${id} → group '${group}'`));
+  });
+
+session.command("export")
+  .description("Export session to file")
+  .argument("<id>")
+  .argument("[file]")
+  .action((id, file) => {
+    const outPath = file ?? `session-${id}.json`;
+    if (core.exportSessionToFile(id, outPath)) {
+      console.log(chalk.green(`Exported to ${outPath}`));
+    } else {
+      console.log(chalk.red("Session not found"));
+    }
+  });
+
+session.command("import")
+  .description("Import session from file")
+  .argument("<file>")
+  .action((file) => {
+    const result = core.importSessionFromFile(file);
+    console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
   });
 
 // ── PR commands ──────────────────────────────────────────────────────────────
@@ -1417,6 +1457,64 @@ program.command("exec")
 
     await execApp.shutdown();
     process.exit(code);
+  });
+
+// ── Profile commands ────────────────────────────────────────────────────────
+
+const profile = program.command("profile").description("Manage profiles");
+
+profile.command("list")
+  .description("List profiles")
+  .action(() => {
+    const profiles = core.listProfiles();
+    const active = core.getActiveProfile();
+    for (const p of profiles) {
+      const marker = p.name === active ? chalk.green(" (active)") : "";
+      console.log(`  ${p.name}${marker}${p.description ? chalk.dim(` — ${p.description}`) : ""}`);
+    }
+  });
+
+profile.command("create")
+  .description("Create a profile")
+  .argument("<name>")
+  .argument("[description]")
+  .action((name: string, desc: string | undefined) => {
+    try {
+      core.createProfile(name, desc);
+      console.log(chalk.green(`Created profile: ${name}`));
+    } catch (e: any) { console.log(chalk.red(e.message)); }
+  });
+
+profile.command("delete")
+  .description("Delete a profile")
+  .argument("<name>")
+  .action((name: string) => {
+    try {
+      core.deleteProfile(name);
+      console.log(chalk.green(`Deleted profile: ${name}`));
+    } catch (e: any) { console.log(chalk.red(e.message)); }
+  });
+
+// ── Global search command ───────────────────────────────────────────────────
+
+program.command("search-all")
+  .description("Search across all Claude conversations")
+  .argument("<query>")
+  .option("-n, --limit <n>", "Max results", "20")
+  .option("--days <n>", "Recent days to search", "90")
+  .action((query: string, opts: { limit: string; days: string }) => {
+    const results = core.searchAllConversations(query, {
+      maxResults: Number(opts.limit),
+      recentDays: Number(opts.days),
+    });
+    if (results.length === 0) {
+      console.log(chalk.dim("No results"));
+      return;
+    }
+    for (const r of results) {
+      console.log(`${chalk.cyan(r.projectName)} ${chalk.dim(r.fileName)}`);
+      console.log(`  ${r.matchLine.slice(0, 100)}`);
+    }
   });
 
 // ── Run ─────────────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@ export interface CloneSessionProps {
 }
 
 export function CloneSession({ session, onDone }: CloneSessionProps) {
-  const [name, setName] = useState(session ? `${session.summary ?? session.id}-clone` : "");
+  const [name, setName] = useState(session ? `${session.summary ?? session.id}-fork` : "");
 
   useInput((input, key) => {
     if (key.escape) onDone(null);
@@ -19,9 +19,9 @@ export function CloneSession({ session, onDone }: CloneSessionProps) {
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Text bold color="cyan">{" Clone Session "}</Text>
+      <Text bold color="cyan">{" Fork Session "}</Text>
       <Text> </Text>
-      <Text dimColor>{`  Cloning: ${session.summary ?? session.id}`}</Text>
+      <Text dimColor>{`  Forking: ${session.summary ?? session.id}`}</Text>
       <Text dimColor>{`  Repo: ${session.repo}`}</Text>
       <Text dimColor>{`  Claude conversation will be resumed`}</Text>
       <Text> </Text>
