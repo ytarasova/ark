@@ -34,17 +34,14 @@ export function searchAllConversations(query: string, opts?: {
   if (!existsSync(CLAUDE_PROJECTS_DIR)) return [];
 
   try {
-    const projects = readdirSync(CLAUDE_PROJECTS_DIR);
+    // Use withFileTypes to avoid separate stat() calls per directory entry
+    const entries = readdirSync(CLAUDE_PROJECTS_DIR, { withFileTypes: true });
 
-    for (const project of projects) {
+    for (const dirEntry of entries) {
       if (results.length >= maxResults) break;
-      const projectDir = join(CLAUDE_PROJECTS_DIR, project);
-
-      try {
-        const stat = statSync(projectDir);
-        if (!stat.isDirectory()) continue;
-        if (stat.mtimeMs < cutoff) continue;
-      } catch { continue; }
+      if (!dirEntry.isDirectory()) continue;
+      const projectDir = join(CLAUDE_PROJECTS_DIR, dirEntry.name);
+      const projectName = decodeProjectName(dirEntry.name);
 
       // Scan JSONL files in the project directory
       try {
@@ -69,14 +66,14 @@ export function searchAllConversations(query: string, opts?: {
               if (!line.trim()) continue;
 
               try {
-                const entry = JSON.parse(line);
-                const text = entry.message?.content
-                  ?? (typeof entry.content === "string" ? entry.content : "");
+                const jsonEntry = JSON.parse(line);
+                const text = jsonEntry.message?.content
+                  ?? (typeof jsonEntry.content === "string" ? jsonEntry.content : "");
 
                 if (typeof text === "string" && text.toLowerCase().includes(queryLower)) {
                   results.push({
                     projectPath: projectDir,
-                    projectName: decodeProjectName(project),
+                    projectName,
                     fileName: file,
                     matchLine: text.slice(0, 200),
                     lineNumber: i + 1,
