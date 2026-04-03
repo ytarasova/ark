@@ -110,3 +110,6 @@ export { getToolDriver, listToolDrivers, registerToolDriver } from "./tools/regi
 
 // Cost tracking
 export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, type SessionCost } from "./costs.js";
+
+// Conductor learnings
+export { recordLearning, getLearnings, getPolicies, conductorLearningsDir, type Learning, type Policy } from "./learnings.js";
