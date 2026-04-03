@@ -403,7 +403,7 @@ export function listSessions(opts?: {
   limit?: number;
 }): Session[] {
   const db = getDb();
-  let sql = "SELECT * FROM sessions WHERE 1=1";
+  let sql = "SELECT * FROM sessions WHERE status != 'deleting'";
   const params: any[] = [];
 
   if (opts?.status) { sql += " AND status = ?"; params.push(opts.status); }
@@ -448,6 +448,50 @@ export function deleteSession(id: string): boolean {
   db.prepare("DELETE FROM events WHERE track_id = ?").run(id);
   const result = db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
   return result.changes > 0;
+}
+
+/** Soft-delete: set status to "deleting", store previous status + timestamp in config. */
+export function softDeleteSession(id: string): boolean {
+  const session = getSession(id);
+  if (!session) return false;
+  const config = { ...session.config, _pre_delete_status: session.status, _deleted_at: new Date().toISOString() };
+  updateSession(id, { status: "deleting", config });
+  return true;
+}
+
+/** Restore a soft-deleted session to its previous status. */
+export function undeleteSession(id: string): Session | null {
+  const session = getSession(id);
+  if (!session || session.status !== "deleting") return null;
+  const prevStatus = (session.config._pre_delete_status as string) || "pending";
+  const { _pre_delete_status, _deleted_at, ...cleanConfig } = session.config;
+  updateSession(id, { status: prevStatus, config: cleanConfig });
+  return getSession(id);
+}
+
+/** List sessions that are soft-deleted (status = "deleting"). */
+export function listDeletedSessions(): Session[] {
+  const db = getDb();
+  return (db.prepare("SELECT * FROM sessions WHERE status = 'deleting' ORDER BY updated_at DESC").all() as SessionRow[]).map(rowToSession);
+}
+
+/**
+ * Hard-delete sessions whose soft-delete timestamp exceeds ttlSeconds.
+ * Returns array of purged session IDs.
+ */
+export function purgeExpiredDeletes(ttlSeconds: number = 90): string[] {
+  const deleted = listDeletedSessions();
+  const purged: string[] = [];
+  const cutoff = Date.now() - ttlSeconds * 1000;
+
+  for (const s of deleted) {
+    const deletedAt = s.config._deleted_at as string | undefined;
+    if (deletedAt && new Date(deletedAt).getTime() < cutoff) {
+      deleteSession(s.id);
+      purged.push(s.id);
+    }
+  }
+  return purged;
 }
 
 // ── Atomic claim (CAS) ─────────────────────────────────────────────────────
