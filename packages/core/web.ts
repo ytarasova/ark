@@ -50,7 +50,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
   const token = opts?.token;
 
   // SSE clients
-  const sseClients = new Set<ReadableStreamController>();
+  const sseClients = new Set<ReadableStreamDefaultController>();
 
   // Broadcast to all SSE clients
   function broadcast(event: string, data: any) {
@@ -137,7 +137,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/sessions" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json();
+          const body = await req.json() as any;
           const session = startSession({
             summary: body.summary,
             repo: body.repo,

@@ -1,4 +1,4 @@
-.PHONY: install dev tui test test-watch lint clean uninstall help
+.PHONY: install dev tui web test test-watch lint clean uninstall build-web help
 
 BUN := bun
 ARK_BIN := /usr/local/bin/ark
@@ -28,8 +28,14 @@ test-watch: ## Run tests in watch mode
 lint: ## Lint the codebase
 	$(BUN) run lint
 
+web: ## Launch the web dashboard
+	./ark web
+
+build-web: ## Build the web frontend
+	$(BUN) run packages/web/build.ts
+
 clean: ## Remove build artifacts
-	rm -rf dist node_modules/.cache
+	rm -rf dist packages/web/dist node_modules/.cache
 
 uninstall: ## Remove the ark symlink
 	rm -f $(ARK_BIN)
