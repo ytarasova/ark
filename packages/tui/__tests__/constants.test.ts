@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { ICON, COLOR } from "../constants.js";
+import { ICON, COLOR, getStatusColor } from "../constants.js";
 
 const ALL_STATUSES = [
   "running", "ready", "pending", "stopped",
@@ -121,6 +121,22 @@ describe("ICON and COLOR alignment", () => {
       expect(ICON[status]).toBeTruthy();
       expect(COLOR[status]).toBeTruthy();
     }
+  });
+});
+
+describe("getStatusColor", () => {
+  it("returns a color string for all known statuses", () => {
+    for (const status of ALL_STATUSES) {
+      const color = getStatusColor(status);
+      expect(typeof color).toBe("string");
+      expect(color.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("returns a fallback for unknown status", () => {
+    const color = getStatusColor("unknown_status");
+    expect(typeof color).toBe("string");
+    expect(color.length).toBeGreaterThan(0);
   });
 });
 

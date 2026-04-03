@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import * as core from "../../core/index.js";
-import { COLOR } from "../constants.js";
-import { ICON } from "../constants.js";
+import { ICON, getStatusColor } from "../constants.js";
 import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter } from "../helpers/sessionFormatting.js";
@@ -111,7 +110,7 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
       <SectionHeader title="Info" />
       <KeyValue label="Session">{`${s.id}  ${s.summary ?? ""}`}</KeyValue>
       <KeyValue label="Status">
-        <Text color={(COLOR[s.status] ?? "white") as any} bold>
+        <Text color={getStatusColor(s.status) as any} bold>
           {`${ICON[s.status] ?? "?"} ${s.error ? s.error : s.status}`}
         </Text>
       </KeyValue>

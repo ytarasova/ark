@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import * as core from "../../core/index.js";
-import { COLOR } from "../constants.js";
+import { getTheme } from "../../core/theme.js";
 import { ScrollBox } from "../components/ScrollBox.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
@@ -159,11 +159,12 @@ export function SessionReplay({ session, onClose }: SessionReplayProps) {
 
 /** Color coding for event types */
 function eventTypeColor(type: string): string {
-  if (type.includes("error") || type.includes("failed") || type.includes("crashed")) return "red";
-  if (type.includes("completed") || type.includes("done") || type.includes("joined")) return "green";
-  if (type.includes("started") || type.includes("resumed") || type.includes("dispatch")) return "cyan";
-  if (type.includes("ready") || type.includes("waiting") || type.includes("paused")) return "yellow";
-  if (type.includes("progress")) return "blue";
-  if (type.includes("stopped")) return "gray";
-  return "white";
+  const theme = getTheme();
+  if (type.includes("error") || type.includes("failed") || type.includes("crashed")) return theme.error;
+  if (type.includes("completed") || type.includes("done") || type.includes("joined")) return theme.running;
+  if (type.includes("started") || type.includes("resumed") || type.includes("dispatch")) return theme.accent;
+  if (type.includes("ready") || type.includes("waiting") || type.includes("paused")) return theme.waiting;
+  if (type.includes("progress")) return theme.accent;
+  if (type.includes("stopped")) return theme.dimText;
+  return theme.text;
 }

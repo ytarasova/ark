@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Box, Text } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { Tab } from "./TabBar.js";
 import type { Session } from "../../core/index.js";
 import {
@@ -27,6 +28,7 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ tab, sessions, selectedSession, loading, error, label, pane, overlay }: StatusBarProps) {
+  const theme = getTheme();
   const nRun = sessions.filter((s) => s.status === "running").length;
   const nErr = sessions.filter((s) => s.status === "failed").length;
 
@@ -47,13 +49,13 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
     <Box flexDirection="column">
       {error && (
         <Box>
-          <Text color="red">{` ${error}`}</Text>
+          <Text color={theme.error}>{` ${error}`}</Text>
         </Box>
       )}
       <Box>
         <Text bold>{` ${sessions.length} sessions`}</Text>
-        {!loading && nRun > 0 && <Text color="green">{`  ● ${nRun} running`}</Text>}
-        {nErr > 0 && <Text color="red">{`  ✕ ${nErr} failed`}</Text>}
+        {!loading && nRun > 0 && <Text color={theme.running}>{`  ● ${nRun} running`}</Text>}
+        {nErr > 0 && <Text color={theme.error}>{`  ✕ ${nErr} failed`}</Text>}
         <Text>{"   "}</Text>
         {hints}
       </Box>

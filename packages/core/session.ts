@@ -33,6 +33,7 @@ import { indexSession } from "./search.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { safeAsync } from "./safe.js";
 import { saveCheckpoint } from "./checkpoint.js";
+import { profileGroupPrefix } from "./profiles.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 function sessionAsVars(session: store.Session): Record<string, unknown> {
@@ -81,11 +82,16 @@ export function startSession(opts: {
   const repoDir = opts.workdir ?? opts.repo;
   const repoConfig = repoDir ? loadRepoConfig(repoDir) : {};
 
+  // Prepend active profile prefix to group name for session scoping
+  const prefix = profileGroupPrefix();
+  const rawGroup = opts.group_name ?? repoConfig.group;
+  const groupName = prefix ? `${prefix}${rawGroup ?? ""}` : (rawGroup ?? undefined);
+
   const mergedOpts = {
     ...opts,
     flow: opts.flow ?? repoConfig.flow,
     compute_name: opts.compute_name ?? repoConfig.compute,
-    group_name: opts.group_name ?? repoConfig.group,
+    group_name: groupName,
   };
 
   // Resolve GitHub repo URL from git remote

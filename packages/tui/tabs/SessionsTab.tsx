@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import * as core from "../../core/index.js";
-import { ICON, COLOR } from "../constants.js";
+import { ICON, getStatusColor } from "../constants.js";
 import { ago } from "../helpers.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
@@ -24,6 +24,7 @@ import { McpManager } from "../components/McpManager.js";
 import { SessionSearch } from "../components/SessionSearch.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
+import { matchesHotkey } from "../../core/hotkeys.js";
 
 type Overlay = "move" | "group" | "talk" | "inbox" | "fork" | "search" | "replay" | "mcp" | "find" | null;
 
@@ -111,13 +112,13 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     if (pane !== "left" || hasOverlay) return;
 
     // Global keys — work regardless of selection
-    if (input === "/") { setOverlay("find"); return; }
-    if (input === "n") { onShowForm(); return; }
-    if (input === "T") { setOverlay("inbox"); return; }
-    if (input === "o") { setOverlay("group"); return; }
+    if (matchesHotkey("search", input, key)) { setOverlay("find"); return; }
+    if (matchesHotkey("newSession", input, key)) { onShowForm(); return; }
+    if (matchesHotkey("inbox", input, key)) { setOverlay("inbox"); return; }
+    if (matchesHotkey("group", input, key)) { setOverlay("group"); return; }
 
     // Ctrl+Z: undo last delete
-    if (input === "z" && key.ctrl) {
+    if (matchesHotkey("undo", input, key)) {
       if (actions.undoDelete()) {
         status.show("Session restored");
       }
@@ -125,29 +126,29 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     }
 
     // Status filter shortcuts
-    if (input === "!") {
+    if (matchesHotkey("filterRunning", input, key)) {
       setStatusFilter(f => f === "running" ? null : "running");
       return;
     }
-    if (input === "@") {
+    if (matchesHotkey("filterWaiting", input, key)) {
       setStatusFilter(f => f === "waiting" ? null : "waiting");
       return;
     }
-    if (input === "#") {
+    if (matchesHotkey("filterStopped", input, key)) {
       setStatusFilter(f => f === "stopped" ? null : "stopped");
       return;
     }
-    if (input === "$") {
+    if (matchesHotkey("filterFailed", input, key)) {
       setStatusFilter(f => f === "failed" ? null : "failed");
       return;
     }
-    if (input === "0") {
+    if (matchesHotkey("filterClear", input, key)) {
       setStatusFilter(null);
       return;
     }
 
     // Cancel pending confirms on unrelated keys
-    if (confirmation.pending && input !== "d" && input !== "x") {
+    if (confirmation.pending && !matchesHotkey("complete", input, key) && !matchesHotkey("delete", input, key)) {
       confirmation.cancel();
       status.clear();
     }
@@ -165,25 +166,25 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       } else if (["failed", "stopped", "completed"].includes(selected.status)) {
         actions.restart(selected.id);
       }
-    } else if (input === "s") {
+    } else if (matchesHotkey("stop", input, key)) {
       if (!["completed", "failed", "stopped"].includes(selected.status)) {
         actions.stop(selected.id);
       }
-    } else if (input === "r") {
+    } else if (matchesHotkey("restart", input, key)) {
       if (["completed", "stopped", "failed"].includes(selected.status)) {
         setOverlay("replay");
       } else if (selected.status === "blocked") {
         actions.restart(selected.id);
       }
-    } else if (input === "f") {
+    } else if (matchesHotkey("fork", input, key)) {
       // Fork: deep copy with conversation continuity (opens name prompt)
       if (selected) setOverlay("fork");
-    } else if (input === "x") {
+    } else if (matchesHotkey("delete", input, key)) {
       if (confirmation.confirm("delete", `Delete '${selected.summary ?? selected.id}'? Press x again to confirm`)) {
         actions.delete(selected.id);
         status.show("Deleted. Ctrl+Z to undo (90s)");
       }
-    } else if (input === "a") {
+    } else if (matchesHotkey("attach", input, key)) {
       if (selected?.session_id) {
         const sid = selected.session_id;
         const selectedId = selected.id;
@@ -230,17 +231,17 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
           }, 100);
         });
       }
-    } else if (input === "m") {
+    } else if (matchesHotkey("move", input, key)) {
       if (selected) setOverlay("move");
-    } else if (input === "M") {
+    } else if (matchesHotkey("mcp", input, key)) {
       if (selected?.workdir) setOverlay("mcp");
-    } else if (input === "d") {
+    } else if (matchesHotkey("complete", input, key)) {
       if (selected && selected.status === "running") {
         if (confirmation.confirm("complete", `Done with '${selected.summary ?? selected.id}'? Press d again to confirm`)) {
           actions.complete(selected.id);
         }
       }
-    } else if (input === "t") {
+    } else if (matchesHotkey("talk", input, key)) {
       if (selected?.status === "running" || selected?.status === "waiting") setOverlay("talk");
     } else if (input === "S") {
       if (selectedGroup && groupSessions.length > 0) {
@@ -281,7 +282,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
             }}
             renderColoredRow={(s) => {
               const icon = ICON[s.status] ?? "?";
-              const color = (COLOR[s.status] ?? "white") as any;
+              const color = getStatusColor(s.status) as any;
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
@@ -301,7 +302,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               if (children.length === 0) return null;
               return children.map(child => {
                 const childIcon = ICON[child.status] ?? "?";
-                const childColor = (COLOR[child.status] ?? "white") as any;
+                const childColor = getStatusColor(child.status) as any;
                 const childSummary = (child.summary ?? "---").slice(0, 20);
                 return <Text key={child.id} dimColor>{"   | "}<Text color={childColor}>{childIcon}</Text>{` ${childSummary}`}</Text>;
               });

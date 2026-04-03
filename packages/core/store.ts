@@ -400,6 +400,7 @@ export function listSessions(opts?: {
   repo?: string;
   group_name?: string;
   parent_id?: string;
+  groupPrefix?: string;
   limit?: number;
 }): Session[] {
   const db = getDb();
@@ -410,6 +411,7 @@ export function listSessions(opts?: {
   if (opts?.repo) { sql += " AND repo = ?"; params.push(opts.repo); }
   if (opts?.group_name) { sql += " AND group_name = ?"; params.push(opts.group_name); }
   if (opts?.parent_id) { sql += " AND parent_id = ?"; params.push(opts.parent_id); }
+  if (opts?.groupPrefix) { sql += " AND group_name LIKE ?"; params.push(opts.groupPrefix + "%"); }
 
   sql += ` ORDER BY created_at DESC LIMIT ?`;
   params.push(opts?.limit ?? 100);

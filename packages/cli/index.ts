@@ -141,7 +141,7 @@ session.command("list")
   .option("-r, --repo <repo>", "Filter by repo")
   .option("-g, --group <group>", "Filter by group")
   .action((opts) => {
-    const sessions = core.listSessions(opts);
+    const sessions = core.listSessions({ ...opts, groupPrefix: core.profileGroupPrefix() || undefined });
     if (!sessions.length) {
       console.log(chalk.dim("No sessions. Start one: ark session start --repo . --summary 'task'"));
       return;
@@ -402,7 +402,7 @@ const pr = program.command("pr").description("Manage PR-bound sessions");
 pr.command("list")
   .description("List sessions bound to PRs")
   .action(() => {
-    const sessions = core.listSessions({ limit: 50 });
+    const sessions = core.listSessions({ limit: 50, groupPrefix: core.profileGroupPrefix() || undefined });
     const prSessions = sessions.filter((s: any) => s.pr_url);
     if (prSessions.length === 0) {
       console.log(chalk.yellow("No PR-bound sessions."));
@@ -1334,7 +1334,7 @@ program.command("costs")
   .description("Show cost summary across sessions")
   .option("-n, --limit <n>", "Number of sessions to show", "20")
   .action((opts) => {
-    const sessions = core.listSessions({ limit: 500 });
+    const sessions = core.listSessions({ limit: 500, groupPrefix: core.profileGroupPrefix() || undefined });
     const { sessions: costs, total } = core.getAllSessionCosts(sessions);
 
     if (costs.length === 0) {

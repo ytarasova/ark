@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix } from "../profiles.js";
+import { createSession, listSessions } from "../store.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -55,5 +56,38 @@ describe("profiles", () => {
     setActiveProfile("work");
     expect(profileGroupPrefix()).toBe("work/");
     setActiveProfile("default"); // reset
+  });
+});
+
+describe("profile-scoped session listing", () => {
+  it("listSessions with groupPrefix filters by prefix", () => {
+    createSession({ summary: "work-task", group_name: "work/frontend" });
+    createSession({ summary: "personal-task", group_name: "personal/blog" });
+
+    const workSessions = listSessions({ groupPrefix: "work/" });
+    expect(workSessions.every(s => s.group_name?.startsWith("work/"))).toBe(true);
+    expect(workSessions.some(s => s.summary === "work-task")).toBe(true);
+    expect(workSessions.some(s => s.summary === "personal-task")).toBe(false);
+
+    const personalSessions = listSessions({ groupPrefix: "personal/" });
+    expect(personalSessions.every(s => s.group_name?.startsWith("personal/"))).toBe(true);
+    expect(personalSessions.some(s => s.summary === "personal-task")).toBe(true);
+    expect(personalSessions.some(s => s.summary === "work-task")).toBe(false);
+  });
+
+  it("listSessions without groupPrefix returns all", () => {
+    createSession({ summary: "all-1", group_name: "work/a" });
+    createSession({ summary: "all-2", group_name: "personal/b" });
+    const all = listSessions();
+    expect(all.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("groupPrefix does not match sessions without group_name", () => {
+    createSession({ summary: "ungrouped" });
+    createSession({ summary: "grouped", group_name: "work/misc" });
+
+    const workSessions = listSessions({ groupPrefix: "work/" });
+    expect(workSessions.some(s => s.summary === "ungrouped")).toBe(false);
+    expect(workSessions.some(s => s.summary === "grouped")).toBe(true);
   });
 });

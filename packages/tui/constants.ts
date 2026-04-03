@@ -1,5 +1,7 @@
 // ── Icons & Colors ───────────────────────────────────────────────────────────
 
+import { getTheme } from "../core/theme.js";
+
 export const ICON: Record<string, string> = {
   running: "●",    // filled green = active
   ready: "◎",      // target = ready to dispatch
@@ -11,6 +13,23 @@ export const ICON: Record<string, string> = {
   failed: "✖",     // heavy x = error
 };
 
+/** Session status to theme color mapping. Uses theme for dynamic dark/light support. */
+export function getStatusColor(status: string): string {
+  const theme = getTheme();
+  const map: Record<string, string> = {
+    running: theme.running,
+    ready: theme.accent,
+    pending: theme.dimText,
+    stopped: theme.dimText,
+    waiting: theme.waiting,
+    blocked: theme.waiting,
+    completed: theme.running,
+    failed: theme.error,
+  };
+  return map[status] ?? theme.dimText;
+}
+
+// Static fallback for compatibility — prefers getStatusColor() for theme support
 export const COLOR: Record<string, string> = {
   running: "green",
   ready: "cyan",
