@@ -15,7 +15,7 @@ import { loadConfig, type ArkConfig } from "./config.js";
 import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
-import { initSchema as initStoreSchema, setAppStore, clearAppStore, safeParseConfig } from "./store.js";
+import { initSchema as initStoreSchema, setAppStore, clearAppStore, safeParseConfig, purgeExpiredDeletes } from "./store.js";
 import type { Compute, Session } from "./store.js";
 import { setProviderResolver, clearProviderResolver } from "./session.js";
 
@@ -51,6 +51,7 @@ export class AppContext {
   private _signalHandlers: { signal: string; handler: () => void }[] = [];
   private _forceExitCount = 0;
   private _orphanedSessions: Session[] = [];
+  private _purgeInterval: ReturnType<typeof setInterval> | null = null;
 
   /** Sessions detected as orphaned during boot (running but tmux dead). */
   get orphanedSessions(): Session[] {
@@ -188,6 +189,11 @@ export class AppContext {
       }
     });
 
+    // 11. Purge expired soft-deletes every 30s
+    this._purgeInterval = setInterval(() => {
+      purgeExpiredDeletes(90);
+    }, 30_000);
+
     this.phase = "ready";
   }
 
@@ -208,7 +214,13 @@ export class AppContext {
       await destroyAllPools();
     });
 
-    // 3. Stop metrics poller
+    // 3. Stop purge interval
+    if (this._purgeInterval) {
+      clearInterval(this._purgeInterval);
+      this._purgeInterval = null;
+    }
+
+    // 4. Stop metrics poller
     if (this.metricsPoller) {
       this.metricsPoller.stop();
       this.metricsPoller = null;
