@@ -101,6 +101,14 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     if (input === "T") { setOverlay("inbox"); return; }
     if (input === "o") { setOverlay("group"); return; }
 
+    // Ctrl+Z: undo last delete
+    if (input === "z" && key.ctrl) {
+      if (actions.undoDelete()) {
+        status.show("Session restored");
+      }
+      return;
+    }
+
     // Cancel pending confirms on unrelated keys
     if (confirmation.pending && input !== "d" && input !== "x") {
       confirmation.cancel();
@@ -141,6 +149,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     } else if (input === "x") {
       if (confirmation.confirm("delete", `Delete '${selected.summary ?? selected.id}'? Press x again to confirm`)) {
         actions.delete(selected.id);
+        status.show("Deleted. Ctrl+Z to undo (90s)");
       }
     } else if (input === "a") {
       if (selected?.session_id) {

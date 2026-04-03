@@ -4,11 +4,13 @@
  * (configured via useAsync's onComplete callback).
  */
 
+import { useRef } from "react";
 import * as core from "../../core/index.js";
 import type { AsyncState } from "./useAsync.js";
 
 export function useSessionActions(asyncState: AsyncState) {
   const run = asyncState.run;
+  const lastDeletedRef = useRef<string | null>(null);
 
   return {
     dispatch: (id: string) => {
@@ -24,8 +26,6 @@ export function useSessionActions(asyncState: AsyncState) {
 
     restart: (id: string) => {
       run(`Restarting ${id}`, async (updateLabel) => {
-        // resume sets status to ready, then dispatches
-        // Pass onLog so progress shows in the spinner
         await core.resume(id, { onLog: (msg) => updateLabel(msg) });
       });
     },
@@ -39,7 +39,20 @@ export function useSessionActions(asyncState: AsyncState) {
     },
 
     delete: (id: string) => {
-      run(`Deleting ${id}`, async () => { await core.deleteSessionAsync(id); });
+      run(`Deleting ${id}`, async () => {
+        await core.deleteSessionAsync(id);
+        lastDeletedRef.current = id;
+      });
+    },
+
+    undoDelete: () => {
+      const id = lastDeletedRef.current;
+      if (!id) return false;
+      run("Restoring session", async () => {
+        const result = await core.undeleteSessionAsync(id);
+        if (result.ok) lastDeletedRef.current = null;
+      });
+      return true;
     },
 
     fork: (sourceId: string, groupName?: string | null) => {
@@ -87,6 +100,7 @@ export function useSessionActions(asyncState: AsyncState) {
         for (const s of sessions) {
           await core.deleteSessionAsync(s.id);
         }
+        if (sessions.length > 0) lastDeletedRef.current = sessions[sessions.length - 1].id;
       });
     },
   };
