@@ -65,4 +65,58 @@ describe("web server", () => {
     const resp = await fetch("http://localhost:18426/api/sessions/nonexistent");
     expect(resp.status).toBe(404);
   });
+
+  it("creates a session via POST", async () => {
+    server = startWebServer({ port: 18430 });
+    const resp = await fetch("http://localhost:18430/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ summary: "web-create-test", repo: "." }),
+    });
+    expect(resp.status).toBe(200);
+    const data = await resp.json();
+    expect(data.ok).toBe(true);
+    expect(data.session).toBeDefined();
+    expect(data.session.summary).toBe("web-create-test");
+  });
+
+  it("returns system status", async () => {
+    createSession({ summary: "status-test-1" });
+    createSession({ summary: "status-test-2" });
+    server = startWebServer({ port: 18431 });
+    const resp = await fetch("http://localhost:18431/api/status");
+    expect(resp.status).toBe(200);
+    const data = await resp.json();
+    expect(data).toHaveProperty("total");
+    expect(data).toHaveProperty("byStatus");
+    expect(typeof data.total).toBe("number");
+    expect(data.total).toBeGreaterThanOrEqual(2);
+  });
+
+  it("returns groups", async () => {
+    server = startWebServer({ port: 18432 });
+    const resp = await fetch("http://localhost:18432/api/groups");
+    expect(resp.status).toBe(200);
+    const data = await resp.json();
+    expect(Array.isArray(data)).toBe(true);
+  });
+
+  it("handles CORS preflight", async () => {
+    server = startWebServer({ port: 18433 });
+    const resp = await fetch("http://localhost:18433/api/sessions", { method: "OPTIONS" });
+    expect(resp.status).toBe(204);
+    expect(resp.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+
+  it("rejects POST in read-only mode", async () => {
+    server = startWebServer({ port: 18434, readOnly: true });
+    const resp = await fetch("http://localhost:18434/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ summary: "should-fail" }),
+    });
+    const data = await resp.json();
+    expect(data.ok).toBe(false);
+    expect(data.message).toContain("Read-only");
+  });
 });
