@@ -493,10 +493,21 @@ export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boole
     }
   }
 
-  // 3. Delete DB rows (instant)
-  store.deleteSession(sessionId);
+  // 3. Soft-delete (keeps DB row for 90s undo window)
+  store.softDeleteSession(sessionId);
 
-  return { ok: true, message: "Session deleted" };
+  store.logEvent(sessionId, "session_deleted", { actor: "user" });
+
+  return { ok: true, message: "Session deleted (undo available for 90s)" };
+}
+
+export async function undeleteSessionAsync(sessionId: string): Promise<{ ok: boolean; message: string }> {
+  const restored = store.undeleteSession(sessionId);
+  if (!restored) return { ok: false, message: `Session ${sessionId} not found or not deleted` };
+
+  store.logEvent(sessionId, "session_undeleted", { actor: "user" });
+
+  return { ok: true, message: `Session restored (status: ${restored.status})` };
 }
 
 // ── Provider resolution ──────────────────────────────────────────────────────

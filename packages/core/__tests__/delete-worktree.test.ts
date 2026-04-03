@@ -40,7 +40,10 @@ describe("deleteSessionAsync worktree cleanup", () => {
     await deleteSessionAsync(session.id);
 
     expect(existsSync(wtPath)).toBe(false);
-    expect(getSession(session.id)).toBeNull();
+    // Soft-delete: session still exists in DB with status "deleting"
+    const after = getSession(session.id);
+    expect(after).not.toBeNull();
+    expect(after!.status).toBe("deleting");
   });
 
   it("succeeds when no worktree directory exists", async () => {
@@ -51,7 +54,10 @@ describe("deleteSessionAsync worktree cleanup", () => {
 
     const result = await deleteSessionAsync(session.id);
     expect(result.ok).toBe(true);
-    expect(getSession(session.id)).toBeNull();
+    // Soft-delete: session still exists in DB with status "deleting"
+    const after = getSession(session.id);
+    expect(after).not.toBeNull();
+    expect(after!.status).toBe("deleting");
   });
 
   it("deletes session even if worktree cleanup fails gracefully", async () => {
@@ -63,7 +69,10 @@ describe("deleteSessionAsync worktree cleanup", () => {
 
     const result = await deleteSessionAsync(session.id);
     expect(result.ok).toBe(true);
-    expect(getSession(session.id)).toBeNull();
+    // Soft-delete: session still exists in DB with status "deleting"
+    const after = getSession(session.id);
+    expect(after).not.toBeNull();
+    expect(after!.status).toBe("deleting");
     // Without a repo, falls back to rmSync — directory should be cleaned up
     expect(existsSync(wtPath)).toBe(false);
   });

@@ -34,7 +34,7 @@ afterEach(async () => {
 // ── Unit tests ──────────────────────────────────────────────────────────────
 
 describe("deleteSessionAsync", () => {
-  it("deletes session from database", async () => {
+  it("soft-deletes session from database", async () => {
     const session = core.startSession({
       repo: "/tmp/fake-repo",
       summary: "delete-db-test",
@@ -46,13 +46,15 @@ describe("deleteSessionAsync", () => {
 
     const result = await deleteSessionAsync(session.id);
     expect(result.ok).toBe(true);
-    expect(result.message).toBe("Session deleted");
+    expect(result.message).toBe("Session deleted (undo available for 90s)");
 
-    // Verify it's gone
-    expect(core.getSession(session.id)).toBeNull();
+    // Soft-delete: session still exists in DB with status "deleting"
+    const after = core.getSession(session.id);
+    expect(after).not.toBeNull();
+    expect(after!.status).toBe("deleting");
   });
 
-  it("deletes associated events", async () => {
+  it("preserves events after soft-delete", async () => {
     const session = core.startSession({
       repo: "/tmp/fake-repo",
       summary: "delete-events-test",
@@ -69,9 +71,9 @@ describe("deleteSessionAsync", () => {
 
     await deleteSessionAsync(session.id);
 
-    // Verify events are gone
+    // Soft-delete preserves events (plus session_deleted event)
     const eventsAfter = core.getEvents(session.id);
-    expect(eventsAfter.length).toBe(0);
+    expect(eventsAfter.length).toBeGreaterThan(eventsBefore.length);
   });
 
   it("returns ok:false for nonexistent session", async () => {
@@ -96,8 +98,10 @@ describe("deleteSessionAsync", () => {
 
     // Worktree directory should be gone (rmSync fallback)
     expect(existsSync(wtPath)).toBe(false);
-    // Session should be gone from DB
-    expect(core.getSession(session.id)).toBeNull();
+    // Soft-delete: session still exists in DB with status "deleting"
+    const after = core.getSession(session.id);
+    expect(after).not.toBeNull();
+    expect(after!.status).toBe("deleting");
   });
 
   it("does NOT touch filesystem when no worktree exists", async () => {
@@ -122,8 +126,10 @@ describe("deleteSessionAsync", () => {
     // The repo dir should still exist and be intact
     expect(existsSync(repoDir)).toBe(true);
     expect(readFileSync(join(repoDir, "file.txt"), "utf-8")).toBe("important");
-    // Session should be gone from DB
-    expect(core.getSession(session.id)).toBeNull();
+    // Soft-delete: session still exists in DB with status "deleting"
+    const after = core.getSession(session.id);
+    expect(after).not.toBeNull();
+    expect(after!.status).toBe("deleting");
   });
 
   it("removes hook config from workdir", async () => {
@@ -156,8 +162,10 @@ describe("deleteSessionAsync", () => {
       // All ark hooks should be removed (hooks key should be absent or empty)
       expect(afterSettings.hooks).toBeUndefined();
     }
-    // Session should be gone
-    expect(core.getSession(session.id)).toBeNull();
+    // Soft-delete: session still exists in DB with status "deleting"
+    const after = core.getSession(session.id);
+    expect(after).not.toBeNull();
+    expect(after!.status).toBe("deleting");
   });
 
   // ── Integration patterns ──────────────────────────────────────────────────
@@ -175,8 +183,11 @@ describe("deleteSessionAsync", () => {
     // Should not throw
     const result = await deleteSessionAsync(session.id);
     expect(result.ok).toBe(true);
-    expect(result.message).toBe("Session deleted");
-    expect(core.getSession(session.id)).toBeNull();
+    expect(result.message).toBe("Session deleted (undo available for 90s)");
+    // Soft-delete: session still exists with status "deleting"
+    const after1 = core.getSession(session.id);
+    expect(after1).not.toBeNull();
+    expect(after1!.status).toBe("deleting");
   });
 
   it("works when session has no compute (compute_name is null)", async () => {
@@ -193,7 +204,10 @@ describe("deleteSessionAsync", () => {
     // Should not throw
     const result = await deleteSessionAsync(session.id);
     expect(result.ok).toBe(true);
-    expect(result.message).toBe("Session deleted");
-    expect(core.getSession(session.id)).toBeNull();
+    expect(result.message).toBe("Session deleted (undo available for 90s)");
+    // Soft-delete: session still exists with status "deleting"
+    const after = core.getSession(session.id);
+    expect(after).not.toBeNull();
+    expect(after!.status).toBe("deleting");
   });
 });

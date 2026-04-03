@@ -68,3 +68,34 @@ describe("soft delete", () => {
     expect(getSession(s.id)).not.toBeNull();
   });
 });
+
+import { deleteSessionAsync, undeleteSessionAsync } from "../session.js";
+
+describe("deleteSessionAsync with soft delete", () => {
+  it("soft-deletes instead of hard-deleting", async () => {
+    const s = createSession({ summary: "soft-kill" });
+    updateSession(s.id, { status: "running", session_id: "test-tmux" });
+    const result = await deleteSessionAsync(s.id);
+    expect(result.ok).toBe(true);
+    const after = getSession(s.id);
+    expect(after).not.toBeNull();
+    expect(after!.status).toBe("deleting");
+  });
+});
+
+describe("undeleteSessionAsync", () => {
+  it("restores a soft-deleted session", async () => {
+    const s = createSession({ summary: "restore" });
+    updateSession(s.id, { status: "stopped" });
+    await deleteSessionAsync(s.id);
+    const result = await undeleteSessionAsync(s.id);
+    expect(result.ok).toBe(true);
+    const after = getSession(s.id);
+    expect(after!.status).toBe("stopped");
+  });
+
+  it("fails for non-existent session", async () => {
+    const result = await undeleteSessionAsync("nope");
+    expect(result.ok).toBe(false);
+  });
+});

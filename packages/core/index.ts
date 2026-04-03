@@ -29,7 +29,7 @@ export { loadConfig, type ArkConfig } from "./config.js";
 export {
   startSession, dispatch, advance, stop, resume, complete, pause,
   forkSession, cloneSession, handoff, fork, joinFork, getOutput, send,
-  deleteSessionAsync, waitForCompletion, approveReviewGate,
+  deleteSessionAsync, undeleteSessionAsync, waitForCompletion, approveReviewGate,
   applyHookStatus, applyReport, cleanupOnTerminal,
   retryWithContext, fanOut,
   type HookStatusResult, type ReportResult, type SessionOpResult,
