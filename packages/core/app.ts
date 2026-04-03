@@ -206,6 +206,12 @@ export class AppContext {
     // 13. Start notification daemon (if bridge config exists)
     this._notifyDaemon = startNotifyDaemon();
 
+    // 14. Clean up logs on boot (non-blocking)
+    safeAsync("boot: cleanup logs", async () => {
+      const { cleanupLogs } = await import("./log-manager.js");
+      cleanupLogs();
+    });
+
     this.phase = "ready";
   }
 

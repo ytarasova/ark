@@ -1544,6 +1544,10 @@ program.command("try")
     console.log(chalk.cyan(`Try session: ${session.id}`));
     console.log(chalk.dim("Session will be auto-deleted when done."));
 
+    if (!core.isDockerAvailable()) {
+      console.log(chalk.yellow("Warning: Docker not available. Running without sandbox."));
+    }
+
     // Dispatch
     try {
       await core.dispatch(session.id);
@@ -1633,4 +1637,10 @@ program.command("mcp-proxy")
 // ── Run ─────────────────────────────────────────────────────────────────────
 
 await program.parseAsync(process.argv);
+
+// Non-blocking update check
+core.checkForUpdate().then(latest => {
+  if (latest) console.error(chalk.yellow(`Update available: v${latest}`));
+}).catch(() => {});
+
 await app.shutdown();

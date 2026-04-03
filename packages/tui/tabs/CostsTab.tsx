@@ -1,9 +1,14 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Box, Text } from "ink";
 import * as core from "../../core/index.js";
 
 export function CostsTab() {
-  const sessions = useMemo(() => core.listSessions({ limit: 500 }), []);
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setRefreshKey(k => k + 1), 10_000);
+    return () => clearInterval(interval);
+  }, []);
+  const sessions = useMemo(() => core.listSessions({ limit: 500 }), [refreshKey]);
   const { sessions: costs, total } = useMemo(() => core.getAllSessionCosts(sessions), [sessions]);
 
   // Per-model aggregation

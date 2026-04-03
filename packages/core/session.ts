@@ -1022,8 +1022,19 @@ export async function getOutput(sessionId: string, opts?: { lines?: number; ansi
 export async function send(sessionId: string, message: string): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session?.session_id) return { ok: false, message: "No active session" };
-  await tmux.sendTextAsync(session.session_id, message);
-  return { ok: true, message: "Sent" };
+
+  const { sendReliable } = await import("./send-reliable.js");
+  const result = await sendReliable(session.session_id, message, { waitForReady: false, maxRetries: 3 });
+  return { ok: result.ok, message: result.message };
+}
+
+/** Detect session status from tmux content (fallback when hooks don't fire). */
+export async function detectStatus(sessionId: string): Promise<string | null> {
+  const session = store.getSession(sessionId);
+  if (!session?.session_id) return null;
+  const { detectSessionStatus } = await import("./status-detect.js");
+  const detected = await detectSessionStatus(session.session_id);
+  return detected === "unknown" ? null : detected;
 }
 
 // ── Hook status logic (extracted from conductor) ─────────────────────────────
