@@ -947,6 +947,46 @@ computeCmd.command("ssh")
     }
   });
 
+// ── Worktree commands ──────────────────────────────────────────────────────
+
+const worktree = program.command("worktree").description("Git worktree operations");
+
+worktree.command("finish")
+  .description("Merge worktree branch, remove worktree, delete session")
+  .argument("<session-id>")
+  .option("--into <branch>", "Target branch to merge into", "main")
+  .option("--no-merge", "Skip merge, just remove worktree and delete session")
+  .option("--keep-branch", "Don't delete the branch after merge")
+  .action(async (sessionId: string, opts: any) => {
+    const result = await core.finishWorktree(sessionId, {
+      into: opts.into,
+      noMerge: opts.noMerge,
+      keepBranch: opts.keepBranch,
+    });
+    console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
+  });
+
+worktree.command("list")
+  .description("List sessions with active worktrees")
+  .action(() => {
+    const sessions = core.listSessions({ limit: 500 });
+    const withWorktrees = sessions.filter(s => {
+      const wtDir = join(core.WORKTREES_DIR(), s.id);
+      return existsSync(wtDir);
+    });
+
+    if (withWorktrees.length === 0) {
+      console.log(chalk.dim("No sessions with active worktrees"));
+      return;
+    }
+
+    for (const s of withWorktrees) {
+      const branch = s.branch ?? "?";
+      const status = s.status;
+      console.log(`${s.id}  ${chalk.cyan(branch.padEnd(30))}  ${status.padEnd(10)}  ${s.summary ?? ""}`);
+    }
+  });
+
 // ── Claude session discovery ────────────────────────────────────────────────
 
 const claudeCmd = program.command("claude").description("Interact with Claude Code sessions");

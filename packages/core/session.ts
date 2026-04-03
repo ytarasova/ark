@@ -896,6 +896,88 @@ async function setupWorktree(repoPath: string, sessionId: string, branch?: strin
   return null;
 }
 
+// ── Worktree finish ─────────────────────────────────────────────────────
+
+/**
+ * Finish a worktree session: merge branch into target, remove worktree, delete session.
+ * Aborts safely on merge conflict without losing work.
+ */
+export async function finishWorktree(sessionId: string, opts?: {
+  into?: string;  // target branch (default: "main")
+  noMerge?: boolean;  // skip merge, just cleanup
+  keepBranch?: boolean;  // don't delete the branch after merge
+}): Promise<{ ok: boolean; message: string }> {
+  const session = store.getSession(sessionId);
+  if (!session) return { ok: false, message: `Session ${sessionId} not found` };
+
+  const workdir = session.workdir;
+  const repo = session.repo;
+  if (!workdir || !repo) return { ok: false, message: "Session has no workdir or repo" };
+
+  // Determine the worktree path and branch
+  const wtDir = join(store.WORKTREES_DIR(), sessionId);
+  const isWorktree = existsSync(wtDir);
+
+  // Get the branch name from the worktree
+  let branch: string | null = session.branch;
+  if (!branch && isWorktree) {
+    try {
+      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8" });
+      branch = stdout.trim();
+    } catch { /* ignore */ }
+  }
+
+  if (!branch) return { ok: false, message: "Cannot determine worktree branch" };
+
+  const targetBranch = opts?.into ?? "main";
+
+  // 1. Stop the session if running
+  if (!["completed", "failed", "stopped", "pending"].includes(session.status)) {
+    await stop(sessionId);
+  }
+
+  // 2. Merge branch into target (unless --no-merge)
+  if (!opts?.noMerge) {
+    try {
+      // Checkout target branch in the main repo
+      await execFileAsync("git", ["-C", repo, "checkout", targetBranch], { encoding: "utf-8" });
+      // Merge the worktree branch
+      await execFileAsync("git", ["-C", repo, "merge", branch, "--no-edit"], { encoding: "utf-8" });
+    } catch (e: any) {
+      // Abort merge on conflict to preserve state
+      try { await execFileAsync("git", ["-C", repo, "merge", "--abort"], { encoding: "utf-8" }); } catch { /* ignore */ }
+      return { ok: false, message: `Merge conflict: ${branch} into ${targetBranch}. Resolve manually. Worktree preserved.` };
+    }
+  }
+
+  // 3. Remove worktree
+  if (isWorktree) {
+    try {
+      await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], { encoding: "utf-8" });
+    } catch (e: any) {
+      console.error(`finishWorktree: remove worktree failed:`, e?.message ?? e);
+    }
+  }
+
+  // 4. Delete branch (unless --keep-branch)
+  if (!opts?.keepBranch && branch !== targetBranch) {
+    try {
+      await execFileAsync("git", ["-C", repo, "branch", "-d", branch], { encoding: "utf-8" });
+    } catch (e: any) {
+      // Branch may not exist or not be fully merged — try force delete
+      try { await execFileAsync("git", ["-C", repo, "branch", "-D", branch], { encoding: "utf-8" }); } catch { /* ignore */ }
+    }
+  }
+
+  // 5. Delete the session
+  await deleteSessionAsync(sessionId);
+
+  const mergeMsg = opts?.noMerge ? "skipped merge" : `merged ${branch} → ${targetBranch}`;
+  store.logEvent(sessionId, "worktree_finished", { actor: "user", data: { branch, targetBranch, merged: !opts?.noMerge } });
+
+  return { ok: true, message: `Finished: ${mergeMsg}, worktree removed, session deleted` };
+}
+
 // ── Wait ────────────────────────────────────────────────────────────────
 
 /** Wait for a session to reach a terminal state. Returns the final session. */

@@ -31,7 +31,7 @@ export {
   forkSession, cloneSession, handoff, fork, joinFork, getOutput, send,
   deleteSessionAsync, undeleteSessionAsync, waitForCompletion, approveReviewGate,
   applyHookStatus, applyReport, cleanupOnTerminal,
-  retryWithContext, fanOut,
+  retryWithContext, fanOut, finishWorktree,
   type HookStatusResult, type ReportResult, type SessionOpResult,
 } from "./session.js";
 
