@@ -99,3 +99,87 @@ describe("undeleteSessionAsync", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe("soft delete edge cases", () => {
+  it("softDeleteSession returns false for non-existent session", () => {
+    expect(softDeleteSession("nonexistent")).toBe(false);
+  });
+
+  it("softDeleteSession on already-deleted session overwrites state", () => {
+    const s = createSession({ summary: "double-delete" });
+    updateSession(s.id, { status: "running" });
+    softDeleteSession(s.id);
+    // Delete again — should update _deleted_at
+    const before = getSession(s.id)!;
+    const beforeTime = before.config._deleted_at;
+    // Small delay to ensure different timestamp
+    softDeleteSession(s.id);
+    const after = getSession(s.id)!;
+    expect(after.status).toBe("deleting");
+    expect(after.config._pre_delete_status).toBe("deleting");
+  });
+
+  it("undeleteSession returns null for non-existent session", () => {
+    expect(undeleteSession("nonexistent")).toBeNull();
+  });
+
+  it("undeleteSession returns null for non-deleting session", () => {
+    const s = createSession({ summary: "not-deleted" });
+    updateSession(s.id, { status: "running" });
+    expect(undeleteSession(s.id)).toBeNull();
+  });
+
+  it("listSessions with status filter still excludes deleting", () => {
+    const s1 = createSession({ summary: "active" });
+    const s2 = createSession({ summary: "deleted-running" });
+    updateSession(s1.id, { status: "running" });
+    updateSession(s2.id, { status: "running" });
+    softDeleteSession(s2.id);
+    const running = listSessions({ status: "running" });
+    expect(running.find(x => x.id === s1.id)).toBeDefined();
+    expect(running.find(x => x.id === s2.id)).toBeUndefined();
+  });
+
+  it("purgeExpiredDeletes returns empty array when nothing to purge", () => {
+    const purged = purgeExpiredDeletes(90);
+    expect(purged).toEqual([]);
+  });
+
+  it("softDeleteSession preserves config fields other than delete metadata", () => {
+    const s = createSession({ summary: "with-config" });
+    updateSession(s.id, { status: "running", config: { custom: "data", nested: { a: 1 } } });
+    softDeleteSession(s.id);
+    const after = getSession(s.id)!;
+    expect(after.config.custom).toBe("data");
+    expect((after.config.nested as any).a).toBe(1);
+    expect(after.config._pre_delete_status).toBe("running");
+  });
+
+  it("undeleteSession preserves config fields other than delete metadata", () => {
+    const s = createSession({ summary: "restore-config" });
+    updateSession(s.id, { status: "stopped", config: { myData: "preserved" } });
+    softDeleteSession(s.id);
+    undeleteSession(s.id);
+    const after = getSession(s.id)!;
+    expect(after.config.myData).toBe("preserved");
+    expect(after.config._pre_delete_status).toBeUndefined();
+    expect(after.config._deleted_at).toBeUndefined();
+  });
+
+  it("undeleteSessionAsync returns error message for non-deleted session", async () => {
+    const s = createSession({ summary: "not-deleted-async" });
+    updateSession(s.id, { status: "running" });
+    const result = await undeleteSessionAsync(s.id);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("not found or not deleted");
+  });
+
+  it("deleteSessionAsync logs session_deleted event", async () => {
+    const { getEvents } = await import("../store.js");
+    const s = createSession({ summary: "event-check" });
+    updateSession(s.id, { status: "pending" });
+    await deleteSessionAsync(s.id);
+    const events = getEvents(s.id);
+    expect(events.some(e => e.type === "session_deleted")).toBe(true);
+  });
+});

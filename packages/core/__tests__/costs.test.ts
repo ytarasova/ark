@@ -115,3 +115,84 @@ describe("getAllSessionCosts", () => {
     expect(result.sessions[0].sessionId).toBe(s1.id);
   });
 });
+
+describe("calculateCost edge cases", () => {
+  it("returns 0 for zero tokens", () => {
+    const usage: TranscriptUsage = {
+      input_tokens: 0, output_tokens: 0,
+      cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 0,
+    };
+    expect(calculateCost(usage, "opus")).toBe(0);
+  });
+
+  it("handles cache-only usage", () => {
+    const usage: TranscriptUsage = {
+      input_tokens: 0, output_tokens: 0,
+      cache_read_input_tokens: 1_000_000, cache_creation_input_tokens: 500_000,
+      total_tokens: 1_500_000,
+    };
+    const cost = calculateCost(usage, "sonnet");
+    // cacheRead: 1M * 0.30/1M = 0.30, cacheWrite: 500K * 3.75/1M = 1.875
+    expect(cost).toBeCloseTo(2.175, 2);
+  });
+
+  it("handles undefined model same as null", () => {
+    const usage: TranscriptUsage = {
+      input_tokens: 1_000_000, output_tokens: 0,
+      cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 1_000_000,
+    };
+    expect(calculateCost(usage, undefined)).toBeCloseTo(calculateCost(usage, null), 10);
+  });
+});
+
+describe("formatCost edge cases", () => {
+  it("formats exactly one cent", () => expect(formatCost(0.01)).toBe("$0.01"));
+  it("formats very large cost", () => expect(formatCost(1234.56)).toBe("$1234.56"));
+  it("formats negative (edge case)", () => expect(formatCost(-1)).toBe("<$0.01"));
+});
+
+describe("getAllSessionCosts edge cases", () => {
+  it("returns empty for no sessions", () => {
+    const result = getAllSessionCosts([]);
+    expect(result.sessions).toEqual([]);
+    expect(result.total).toBe(0);
+  });
+
+  it("skips sessions with zero cost", () => {
+    const s = createSession({ summary: "no-tokens" });
+    const store = require("../store.js");
+    const result = getAllSessionCosts([store.getSession(s.id)]);
+    expect(result.sessions).toHaveLength(0);
+  });
+
+  it("uses config.model over agent field for cost calculation", () => {
+    const s = createSession({ summary: "model-priority" });
+    updateSession(s.id, {
+      agent: "worker",  // not a model name
+      config: {
+        model: "opus",
+        usage: {
+          input_tokens: 1_000_000, output_tokens: 0,
+          cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 1_000_000,
+        },
+      },
+    });
+    const store = require("../store.js");
+    const result = getSessionCost(store.getSession(s.id));
+    // opus input: 1M * 15/1M = 15.00
+    expect(result.cost).toBeCloseTo(15.00, 2);
+  });
+
+  it("handles multiple sessions with different models", () => {
+    const s1 = createSession({ summary: "opus-session" });
+    const s2 = createSession({ summary: "haiku-session" });
+    const usage = { input_tokens: 100_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 100_000 };
+    updateSession(s1.id, { agent: "opus", config: { usage } });
+    updateSession(s2.id, { agent: "haiku", config: { usage } });
+    const store = require("../store.js");
+    const result = getAllSessionCosts([store.getSession(s1.id), store.getSession(s2.id)]);
+    expect(result.sessions).toHaveLength(2);
+    expect(result.sessions[0].cost).toBeGreaterThan(result.sessions[1].cost); // opus > haiku
+    expect(result.total).toBeGreaterThan(0);
+  });
+});
