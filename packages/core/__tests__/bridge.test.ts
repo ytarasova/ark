@@ -11,7 +11,7 @@ describe("Bridge", () => {
   it("registers message handlers", () => {
     const bridge = new Bridge({});
     const messages: BridgeMessage[] = [];
-    bridge.onMessage((msg) => messages.push(msg));
+    bridge.onMessage((msg) => { messages.push(msg); });
     expect(messages).toHaveLength(0);
   });
 
@@ -136,8 +136,8 @@ describe("Bridge handler invocation", () => {
     const bridge = new Bridge({});
     const results: string[] = [];
 
-    bridge.onMessage((msg) => results.push(`h1:${msg.text}`));
-    bridge.onMessage((msg) => results.push(`h2:${msg.text}`));
+    bridge.onMessage((msg) => { results.push(`h1:${msg.text}`); });
+    bridge.onMessage((msg) => { results.push(`h2:${msg.text}`); });
 
     // Directly simulate — we can't trigger pollTelegram in tests
     // but we can verify the handler registration pattern
