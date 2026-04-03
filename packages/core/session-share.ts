@@ -3,6 +3,8 @@
  */
 
 import { readFileSync, writeFileSync } from "fs";
+// Uses store.createSession directly (not session.startSession) because imported sessions
+// are bare data — no flow initialization, repo config, or dispatch. The user can dispatch after import.
 import { getSession, createSession, updateSession, getEvents, type Session, type Event } from "./store.js";
 
 export interface SessionExport {

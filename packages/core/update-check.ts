@@ -2,7 +2,8 @@
  * Auto-update check — looks for newer versions on GitHub.
  */
 
-const REPO = "your-org/ark";  // placeholder
+// TODO: Set to actual repo when published (e.g., "yana/ark")
+const REPO = process.env.ARK_GITHUB_REPO ?? "yana/ark";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 import { readFileSync, writeFileSync, existsSync } from "fs";

@@ -245,25 +245,25 @@ export class AppContext {
       this._purgeInterval = null;
     }
 
-    // 4. Stop metrics poller
+    // 6. Stop metrics poller
     if (this.metricsPoller) {
       this.metricsPoller.stop();
       this.metricsPoller = null;
     }
 
-    // 3. Stop conductor
+    // 7. Stop conductor
     if (this.conductor) {
       this.conductor.stop();
       this.conductor = null;
     }
 
-    // 4. Clear event bus
+    // 8. Clear event bus
     if (this._eventBus) {
       this._eventBus.clear();
       this._eventBus = null;
     }
 
-    // 5. Clear provider resolver + app store bindings + close database
+    // 9. Clear provider resolver + app store bindings + close database
     clearProviderResolver();
     clearAppStore();
     if (this._db) {

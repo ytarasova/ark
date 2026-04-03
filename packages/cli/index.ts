@@ -1551,11 +1551,14 @@ program.command("try")
       console.log(chalk.red(`Dispatch failed: ${e.message}`));
     }
 
-    // Attach (interactive tmux - requires shell stdio passthrough)
-    try {
-      const cmd = core.attachCommand(session.session_id!);
-      execSync(cmd, { stdio: "inherit" });
-    } catch { /* detached */ }
+    // Re-fetch session (dispatch updates session_id in DB)
+    const updated = core.getSession(session.id);
+    if (updated?.session_id) {
+      try {
+        const cmd = core.attachCommand(updated.session_id);
+        execSync(cmd, { stdio: "inherit" });
+      } catch { /* detached */ }
+    }
 
     // Auto-cleanup
     await core.deleteSessionAsync(session.id);
