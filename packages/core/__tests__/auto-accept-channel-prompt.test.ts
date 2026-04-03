@@ -2,44 +2,41 @@
  * Tests for autoAcceptChannelPrompt — verifies that the channel development
  * prompt is properly detected and accepted, including the resume-fallback
  * scenario where the prompt appears twice.
+ *
+ * Uses spyOn instead of mock.module to avoid poisoning the tmux module
+ * for other test files in the same bun test run.
  */
 
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterAll, spyOn } from "bun:test";
+import * as tmux from "../tmux.js";
+import { autoAcceptChannelPrompt } from "../claude.js";
 
-// ── Mock tmux module before importing claude ─────────────────────────────────
+// ── Spy setup ──────────────────────────────────────────────────────────────
 
 let captureResponses: string[] = [];
 let captureIndex = 0;
 const sentKeys: string[][] = [];
 
-const mockCapture = mock(async (_name: string, _opts?: any) => {
-  const response = captureResponses[captureIndex] ?? "";
-  captureIndex = Math.min(captureIndex + 1, captureResponses.length - 1);
-  return response;
+const captureSpy = spyOn(tmux, "capturePaneAsync").mockImplementation(
+  async (_name: string, _opts?: any) => {
+    const response = captureResponses[captureIndex] ?? "";
+    captureIndex = Math.min(captureIndex + 1, captureResponses.length - 1);
+    return response;
+  }
+);
+
+const sendKeysSpy = spyOn(tmux, "sendKeysAsync").mockImplementation(
+  async (_name: string, ...keys: string[]) => {
+    sentKeys.push(keys);
+  }
+);
+
+// ── Restore after all tests ────────────────────────────────────────────────
+
+afterAll(() => {
+  captureSpy.mockRestore();
+  sendKeysSpy.mockRestore();
 });
-
-const mockSendKeys = mock(async (_name: string, ...keys: string[]) => {
-  sentKeys.push(keys);
-});
-
-mock.module("../tmux.js", () => ({
-  capturePaneAsync: mockCapture,
-  sendKeysAsync: mockSendKeys,
-  // Stubs for other tmux exports that claude.ts doesn't use in autoAccept
-  writeLauncher: mock(() => "/tmp/launch.sh"),
-  killSessionAsync: mock(async () => true),
-  createSessionAsync: mock(async () => {}),
-  sessionExists: mock(() => false),
-  sessionExistsAsync: mock(async () => false),
-  hasTmux: mock(() => true),
-  killSession: mock(() => true),
-  capturePaneSync: mock(() => ""),
-  sendTextAsync: mock(async () => {}),
-  attachCommand: mock(() => ""),
-  listArkSessionsAsync: mock(async () => []),
-}));
-
-const { autoAcceptChannelPrompt } = await import("../claude.js");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -71,8 +68,8 @@ beforeEach(() => {
   captureResponses = [];
   captureIndex = 0;
   sentKeys.length = 0;
-  mockCapture.mockClear();
-  mockSendKeys.mockClear();
+  captureSpy.mockClear();
+  sendKeysSpy.mockClear();
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────────

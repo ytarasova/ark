@@ -163,11 +163,11 @@ describe("CLI: session lifecycle", () => {
     const id = match![1];
 
     const out = ark("session", "delete", id);
-    expect(out).toContain(`Deleted ${id}`);
+    expect(out).toContain("Session deleted");
 
-    // Verify it's gone
+    // Session is soft-deleted (status "deleting") for 90s undo window
     const showOut = arkSafe("session", "show", id);
-    expect(showOut).toContain("not found");
+    expect(showOut).toContain("deleting");
   }, 30_000);
 });
 

@@ -343,15 +343,17 @@ session.command("events")
 session.command("delete")
   .description("Delete sessions")
   .argument("<ids...>")
-  .action(async (ids: string[]) => {
+  .action((ids: string[]) => {
     for (const id of ids) {
-      const result = await core.deleteSessionAsync(id);
-      if (result.ok) {
-        console.log(chalk.green(result.message));
-        console.log(chalk.dim(`  Run 'ark session undelete ${id}' within 90s to undo`));
-      } else {
-        console.log(chalk.red(result.message));
-      }
+      const s = core.getSession(id);
+      if (!s) { console.log(chalk.red(`Session ${id} not found`)); continue; }
+      // Kill tmux if running (fast, no provider import needed)
+      if (s.session_id) try { core.killSession(s.session_id); } catch { /* ignore */ }
+      // Soft-delete for undo
+      core.softDeleteSession(id);
+      core.logEvent(id, "session_deleted", { actor: "user" });
+      console.log(chalk.green("Session deleted (undo available for 90s)"));
+      console.log(chalk.dim(`  Run 'ark session undelete ${id}' within 90s to undo`));
     }
   });
 
