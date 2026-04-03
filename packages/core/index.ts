@@ -146,3 +146,6 @@ export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./not
 
 // Global search
 export { searchAllConversations, type GlobalSearchResult } from "./global-search.js";
+
+// Multi-instance coordination
+export { registerInstance, activeInstanceCount } from "./instance-lock.js";
