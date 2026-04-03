@@ -1082,6 +1082,54 @@ conductorCmd.command("learn")
     }
   });
 
+conductorCmd.command("bridge")
+  .description("Start the messaging bridge (Telegram/Slack)")
+  .action(async () => {
+    const bridge = core.createBridge();
+    if (!bridge) {
+      console.log(chalk.red("No bridge config found. Create ~/.ark/bridge.json with telegram/slack settings."));
+      console.log(chalk.dim("\nExample ~/.ark/bridge.json:"));
+      console.log(chalk.dim(JSON.stringify({
+        telegram: { botToken: "123:ABC...", chatId: "12345" },
+        slack: { webhookUrl: "https://hooks.slack.com/services/..." },
+      }, null, 2)));
+      return;
+    }
+
+    // Handle common commands
+    bridge.onMessage(async (msg) => {
+      const text = msg.text.trim().toLowerCase();
+      if (text === "/status" || text === "status") {
+        await bridge.notifyStatusSummary();
+      } else if (text === "/sessions" || text === "sessions") {
+        const sessions = core.listSessions({ limit: 20 });
+        const lines = sessions.map(s => `\u2022 ${s.summary ?? s.id} (${s.status})`);
+        await bridge.notify(lines.join("\n") || "No sessions");
+      } else {
+        await bridge.notify(`Unknown command: ${text}`);
+      }
+    });
+
+    console.log(chalk.green("Bridge started. Ctrl+C to stop."));
+
+    // Keep alive
+    await new Promise(() => {});
+  });
+
+conductorCmd.command("notify")
+  .description("Send a test notification via bridge")
+  .argument("<message>")
+  .action(async (message) => {
+    const bridge = core.createBridge();
+    if (!bridge) {
+      console.log(chalk.red("No bridge config. Create ~/.ark/bridge.json"));
+      return;
+    }
+    await bridge.notify(message);
+    bridge.stop();
+    console.log(chalk.green("Notification sent"));
+  });
+
 // ── ArkD (universal agent daemon) ────────────────────────────────────────────
 
 program.command("arkd")

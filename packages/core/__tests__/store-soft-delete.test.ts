@@ -74,7 +74,7 @@ import { deleteSessionAsync, undeleteSessionAsync } from "../session.js";
 describe("deleteSessionAsync with soft delete", () => {
   it("soft-deletes instead of hard-deleting", async () => {
     const s = createSession({ summary: "soft-kill" });
-    updateSession(s.id, { status: "running", session_id: "test-tmux" });
+    updateSession(s.id, { status: "running" });
     const result = await deleteSessionAsync(s.id);
     expect(result.ok).toBe(true);
     const after = getSession(s.id);

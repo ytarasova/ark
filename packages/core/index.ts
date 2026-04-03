@@ -113,3 +113,6 @@ export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, type Ses
 
 // Conductor learnings
 export { recordLearning, getLearnings, getPolicies, conductorLearningsDir, type Learning, type Policy } from "./learnings.js";
+
+// Messaging bridge
+export { Bridge, loadBridgeConfig, createBridge, type BridgeConfig, type BridgeMessage } from "./bridge.js";
