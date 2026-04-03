@@ -62,3 +62,44 @@ export function getAllSessionCosts(sessions: Session[]): { sessions: SessionCost
   const total = costs.reduce((sum, c) => sum + c.cost, 0);
   return { sessions: costs, total };
 }
+
+export interface BudgetConfig {
+  dailyLimit?: number;
+  weeklyLimit?: number;
+  monthlyLimit?: number;
+}
+
+export interface BudgetStatus {
+  daily: { spent: number; limit: number | null; pct: number; warning: boolean; exceeded: boolean };
+  weekly: { spent: number; limit: number | null; pct: number; warning: boolean; exceeded: boolean };
+  monthly: { spent: number; limit: number | null; pct: number; warning: boolean; exceeded: boolean };
+}
+
+/** Check budget status against configured limits. */
+export function checkBudget(sessions: Session[], budgets: BudgetConfig): BudgetStatus {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const weekStart = new Date(now.getTime() - now.getDay() * 86400000);
+  weekStart.setHours(0, 0, 0, 0);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  const dailySessions = sessions.filter(s => s.updated_at >= todayStart);
+  const weeklySessions = sessions.filter(s => s.updated_at >= weekStart.toISOString());
+  const monthlySessions = sessions.filter(s => s.updated_at >= monthStart);
+
+  const dailySpent = getAllSessionCosts(dailySessions).total;
+  const weeklySpent = getAllSessionCosts(weeklySessions).total;
+  const monthlySpent = getAllSessionCosts(monthlySessions).total;
+
+  function bucket(spent: number, limit: number | undefined | null) {
+    const lim = limit ?? null;
+    const pct = lim ? (spent / lim) * 100 : 0;
+    return { spent, limit: lim, pct, warning: pct >= 80, exceeded: pct >= 100 };
+  }
+
+  return {
+    daily: bucket(dailySpent, budgets.dailyLimit),
+    weekly: bucket(weeklySpent, budgets.weeklyLimit),
+    monthly: bucket(monthlySpent, budgets.monthlyLimit),
+  };
+}

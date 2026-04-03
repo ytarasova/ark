@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { calculateCost, formatCost, getSessionCost, getAllSessionCosts } from "../costs.js";
+import { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget } from "../costs.js";
 import type { TranscriptUsage } from "../claude.js";
 import { createSession, getSession, updateSession } from "../store.js";
 import { withTestContext } from "./test-helpers.js";
@@ -194,5 +194,39 @@ describe("getAllSessionCosts edge cases", () => {
     expect(result.sessions).toHaveLength(2);
     expect(result.sessions[0].cost).toBeGreaterThan(result.sessions[1].cost); // opus > haiku
     expect(result.total).toBeGreaterThan(0);
+  });
+});
+
+describe("checkBudget", () => {
+  it("detects daily limit exceeded", () => {
+    const s = createSession({ summary: "budget-test" });
+    updateSession(s.id, {
+      agent: "opus",
+      config: { usage: { input_tokens: 10_000_000, output_tokens: 1_000_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 11_000_000 } },
+    });
+    const store = require("../store.js");
+    const sessions = [store.getSession(s.id)];
+    const status = checkBudget(sessions, { dailyLimit: 10 });
+    expect(status.daily.exceeded).toBe(true);
+    expect(status.daily.warning).toBe(true);
+  });
+
+  it("no warning when under budget", () => {
+    const s = createSession({ summary: "cheap" });
+    updateSession(s.id, {
+      agent: "haiku",
+      config: { usage: { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 1100 } },
+    });
+    const store = require("../store.js");
+    const sessions = [store.getSession(s.id)];
+    const status = checkBudget(sessions, { dailyLimit: 100 });
+    expect(status.daily.exceeded).toBe(false);
+    expect(status.daily.warning).toBe(false);
+  });
+
+  it("handles no limits configured", () => {
+    const status = checkBudget([], {});
+    expect(status.daily.limit).toBeNull();
+    expect(status.daily.exceeded).toBe(false);
   });
 });
