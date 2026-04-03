@@ -124,6 +124,28 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       return;
     }
 
+    // Status filter shortcuts
+    if (input === "!") {
+      setStatusFilter(f => f === "running" ? null : "running");
+      return;
+    }
+    if (input === "@") {
+      setStatusFilter(f => f === "waiting" ? null : "waiting");
+      return;
+    }
+    if (input === "#") {
+      setStatusFilter(f => f === "stopped" ? null : "stopped");
+      return;
+    }
+    if (input === "$") {
+      setStatusFilter(f => f === "failed" ? null : "failed");
+      return;
+    }
+    if (input === "0") {
+      setStatusFilter(null);
+      return;
+    }
+
     // Cancel pending confirms on unrelated keys
     if (confirmation.pending && input !== "d" && input !== "x") {
       confirmation.cancel();
@@ -241,11 +263,11 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
         focus={overlay === "talk" || overlay === "inbox" ? "right" : pane}
-        leftTitle="Sessions"
+        leftTitle={statusFilter ? `Sessions [${statusFilter}]` : "Sessions"}
         rightTitle="Details"
         left={
           <TreeList
-            items={topLevel}
+            items={filteredTopLevel}
             groupBy={s => s.group_name ?? ""}
             emptyGroups={groups}
             renderRow={(s) => {
@@ -283,7 +305,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               });
             }}
             sel={sel}
-            emptyMessage="No sessions. Press n to create."
+            emptyMessage={statusFilter ? `No ${statusFilter} sessions. Press 0 to clear filter.` : "No sessions. Press n to create."}
           />
         }
         right={
@@ -356,7 +378,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
             <SessionSearch
               sessions={topLevel}
               onSelect={(s) => {
-                const idx = topLevel.findIndex(t => t.id === s.id);
+                const idx = filteredTopLevel.findIndex(t => t.id === s.id);
                 if (idx >= 0) setSel(idx);
               }}
               onClose={() => setOverlay(null)}
