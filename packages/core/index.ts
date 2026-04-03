@@ -147,5 +147,11 @@ export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./not
 // Global search
 export { searchAllConversations, type GlobalSearchResult } from "./global-search.js";
 
+// Tmux content-based status detection
+export { detectStatusFromContent, detectSessionStatus, stripAnsi, type DetectedStatus } from "./status-detect.js";
+
 // Multi-instance coordination
 export { registerInstance, activeInstanceCount } from "./instance-lock.js";
+
+// Theme
+export { getTheme, setThemeMode, getThemeMode, type Theme, type ThemeMode } from "./theme.js";
