@@ -103,3 +103,6 @@ export { discoverTools, removeMcpServer, removeCommand, getCommand, addMcpServer
 
 // Replay
 export { buildReplay, type ReplayStep } from "./replay.js";
+
+// Cost tracking
+export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, type SessionCost } from "./costs.js";

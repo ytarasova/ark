@@ -6,6 +6,7 @@ import { ICON } from "../constants.js";
 import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter } from "../helpers/sessionFormatting.js";
+import { getSessionCost, formatCost } from "../../core/costs.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { Link } from "../components/Link.js";
@@ -54,6 +55,7 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
   }, [s?.id, s?.claude_session_id, s?.status]);
 
   const channelPort = useMemo(() => s ? core.sessionChannelPort(s.id) : 0, [s?.id]);
+  const costInfo = useMemo(() => s ? getSessionCost(s) : null, [s?.id, s?.config]);
 
   // Sort search results by timestamp
   const sortedSearchResults = useMemo(() => {
@@ -152,6 +154,9 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
       {/* Token usage */}
       {formatTokenDisplay(s) && (
         <KeyValue label="Tokens">{formatTokenDisplay(s)}</KeyValue>
+      )}
+      {costInfo && costInfo.cost > 0 && (
+        <KeyValue label="Cost">{formatCost(costInfo.cost)}</KeyValue>
       )}
 
       {/* Files changed - as a collapsible list */}

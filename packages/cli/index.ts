@@ -1143,6 +1143,38 @@ program.command("index")
     console.log(chalk.green(`Indexed ${count} entries from ${stats.sessions} sessions`));
   });
 
+// ── Costs ──────────────────────────────────────────────────────────────────
+
+program.command("costs")
+  .description("Show cost summary across sessions")
+  .option("-n, --limit <n>", "Number of sessions to show", "20")
+  .action((opts) => {
+    const sessions = core.listSessions({ limit: 500 });
+    const { sessions: costs, total } = core.getAllSessionCosts(sessions);
+
+    if (costs.length === 0) {
+      console.log(chalk.dim("No cost data yet. Costs are tracked when sessions complete."));
+      return;
+    }
+
+    console.log(chalk.bold(`\nTotal cost: ${core.formatCost(total)}\n`));
+    console.log(chalk.dim("Session".padEnd(40) + "Model".padEnd(10) + "Cost".padEnd(10) + "Tokens"));
+    console.log(chalk.dim("\u2500".repeat(75)));
+
+    const limit = Number(opts.limit);
+    for (const c of costs.slice(0, limit)) {
+      const name = (c.summary ?? c.sessionId).slice(0, 38).padEnd(40);
+      const model = (c.model ?? "?").padEnd(10);
+      const cost = core.formatCost(c.cost).padEnd(10);
+      const tokens = c.usage ? `${(c.usage.total_tokens / 1000).toFixed(0)}K` : "?";
+      console.log(`${name}${model}${cost}${tokens}`);
+    }
+
+    if (costs.length > limit) {
+      console.log(chalk.dim(`\n... and ${costs.length - limit} more sessions`));
+    }
+  });
+
 // ── Schedules ───────────────────────────────────────────────────────────────
 
 const schedule = program.command("schedule").description("Manage scheduled recurring sessions");
