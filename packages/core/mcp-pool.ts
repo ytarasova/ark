@@ -12,7 +12,7 @@
 
 import { spawn, type ChildProcess } from "child_process";
 import { createServer, createConnection, type Server, type Socket } from "net";
-import { existsSync, unlinkSync } from "fs";
+import { existsSync, unlinkSync, readdirSync } from "fs";
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -357,7 +357,6 @@ export function destroyMcpPool(): void {
 
 /** Discover existing pool sockets on disk. */
 export function discoverPoolSockets(): string[] {
-  const { readdirSync } = require("fs");
   try {
     return readdirSync("/tmp")
       .filter((f: string) => f.startsWith("ark-mcp-") && f.endsWith(".sock"))

@@ -29,6 +29,7 @@ export function calculateCost(usage: TranscriptUsage, model?: string | null): nu
 /** Format cost as string: "$1.23" or "<$0.01" */
 export function formatCost(cost: number): string {
   if (cost === 0) return "$0.00";
+  if (cost < 0) return `-$${Math.abs(cost).toFixed(2)}`;
   if (cost < 0.01) return "<$0.01";
   return `$${cost.toFixed(2)}`;
 }

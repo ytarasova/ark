@@ -148,7 +148,8 @@ describe("calculateCost edge cases", () => {
 describe("formatCost edge cases", () => {
   it("formats exactly one cent", () => expect(formatCost(0.01)).toBe("$0.01"));
   it("formats very large cost", () => expect(formatCost(1234.56)).toBe("$1234.56"));
-  it("formats negative (edge case)", () => expect(formatCost(-1)).toBe("<$0.01"));
+  it("formats negative cost", () => expect(formatCost(-1)).toBe("-$1.00"));
+  it("formats small negative cost", () => expect(formatCost(-0.05)).toBe("-$0.05"));
 });
 
 describe("getAllSessionCosts edge cases", () => {

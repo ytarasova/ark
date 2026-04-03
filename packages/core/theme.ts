@@ -2,6 +2,8 @@
  * Theme support - dark/light/system.
  */
 
+import { execSync } from "child_process";
+
 export type ThemeMode = "dark" | "light" | "system";
 
 export interface Theme {
@@ -39,7 +41,6 @@ const LIGHT: Theme = {
 
 function detectSystemTheme(): "dark" | "light" {
   try {
-    const { execSync } = require("child_process");
     const result = execSync("defaults read -g AppleInterfaceStyle 2>/dev/null", { encoding: "utf-8" }).trim();
     return result === "Dark" ? "dark" : "light";
   } catch {

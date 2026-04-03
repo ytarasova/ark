@@ -3,7 +3,7 @@
  * Scans ~/.claude/projects/ for JSONL transcripts.
  */
 
-import { readdirSync, readFileSync, statSync, existsSync, opendirSync } from "fs";
+import { readdirSync, readFileSync, statSync, existsSync, opendirSync, openSync, readSync, closeSync, fstatSync } from "fs";
 import { join, basename } from "path";
 
 export interface GlobalSearchResult {
@@ -100,7 +100,6 @@ function decodeProjectName(encoded: string): string {
 
 /** Read the last N bytes of a file. */
 function readLastBytes(filePath: string, bytes: number): string {
-  const { openSync, readSync, closeSync, fstatSync } = require("fs");
   const fd = openSync(filePath, "r");
   try {
     const stat = fstatSync(fd);

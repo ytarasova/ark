@@ -8,7 +8,7 @@
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
-import { execFile } from "child_process";
+import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
 import { homedir } from "os";
 
@@ -47,7 +47,6 @@ function sessionAsVars(session: store.Session): Record<string, unknown> {
 function resolveGitHubUrl(dir?: string | null): string | null {
   if (!dir) return null;
   try {
-    const { execFileSync } = require("child_process");
     const remote = execFileSync("git", ["-C", dir, "remote", "get-url", "origin"], {
       encoding: "utf-8", timeout: 5_000,
     }).trim();
