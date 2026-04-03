@@ -119,3 +119,30 @@ export { sendReliable, hasPasteMarker, isReadyForInput, type SendOptions } from 
 
 // Messaging bridge
 export { Bridge, loadBridgeConfig, createBridge, type BridgeConfig, type BridgeMessage } from "./bridge.js";
+
+// Docker sandbox
+export { buildSandboxCommand, isDockerAvailable, listSandboxContainers, type SandboxConfig } from "./sandbox.js";
+
+// Hotkey remapping
+export { getHotkeys, matchesHotkey, resetHotkeys, hotkeyLabel, type HotkeyMap } from "./hotkeys.js";
+
+// Log management
+export { truncateLog, cleanupLogs, logDir, type LogManagerOptions } from "./log-manager.js";
+
+// Session sharing
+export { exportSession, exportSessionToFile, importSessionFromFile, type SessionExport } from "./session-share.js";
+
+// Auto-update check
+export { checkForUpdate, getCurrentVersion } from "./update-check.js";
+
+// Tmux status bar notifications
+export { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
+
+// Profiles
+export { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix, type Profile } from "./profiles.js";
+
+// Notification daemon
+export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./notify-daemon.js";
+
+// Global search
+export { searchAllConversations, type GlobalSearchResult } from "./global-search.js";

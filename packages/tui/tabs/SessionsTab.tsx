@@ -77,7 +77,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("fork"), focus.pop("search"), focus.pop("replay"), focus.pop("mcp"), focus.pop("find");
   }, [overlay]);
 
-  const selected = topLevel[sel] ?? null;
+  const selected = filteredTopLevel[sel] ?? null;
 
   // Clear search state when selected session changes
   useEffect(() => { setSearchResults(null); setSearchQuery(""); }, [selected?.id]);
@@ -90,8 +90,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   // Helper: get all sessions in the same group as selected
   const selectedGroup = selected?.group_name ?? "";
   const groupSessions = useMemo(
-    () => topLevel.filter(s => (s.group_name ?? "") === selectedGroup),
-    [topLevel, selectedGroup],
+    () => filteredTopLevel.filter(s => (s.group_name ?? "") === selectedGroup),
+    [filteredTopLevel, selectedGroup],
   );
 
   // Memoize group list — depends on sessions (groups derived from session group_names + groups table)

@@ -3,7 +3,7 @@
  * Scans ~/.claude/projects/ for JSONL transcripts.
  */
 
-import { readdirSync, readFileSync, statSync, existsSync } from "fs";
+import { readdirSync, readFileSync, statSync, existsSync, opendirSync } from "fs";
 import { join, basename } from "path";
 
 export interface GlobalSearchResult {
