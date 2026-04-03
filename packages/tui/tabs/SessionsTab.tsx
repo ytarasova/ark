@@ -20,10 +20,11 @@ import { GroupManager } from "./GroupManager.js";
 import { TalkToSession } from "./TalkToSession.js";
 import { CloneSession } from "./CloneSession.js";
 import { SessionReplay } from "./SessionReplay.js";
+import { McpManager } from "../components/McpManager.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
-type Overlay = "move" | "group" | "talk" | "inbox" | "clone" | "search" | "replay" | null;
+type Overlay = "move" | "group" | "talk" | "inbox" | "clone" | "search" | "replay" | "mcp" | null;
 
 interface SessionsTabProps extends StoreData {
   asyncState: AsyncState;
@@ -60,7 +61,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   // Push/pop focus when overlay opens/closes
   useEffect(() => {
     if (overlay) focus.push(overlay);
-    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("clone"), focus.pop("search"), focus.pop("replay");
+    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("clone"), focus.pop("search"), focus.pop("replay"), focus.pop("mcp");
   }, [overlay]);
 
   const selected = topLevel[sel] ?? null;
@@ -200,6 +201,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       }
     } else if (input === "m") {
       if (selected) setOverlay("move");
+    } else if (input === "M") {
+      if (selected?.workdir) setOverlay("mcp");
     } else if (input === "d") {
       if (selected && selected.status === "running") {
         if (confirmation.confirm("complete", `Done with '${selected.summary ?? selected.id}'? Press d again to confirm`)) {
@@ -325,6 +328,13 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
                 }
                 setOverlay(null);
               }}
+            />
+          )
+          : overlay === "mcp" && selected ? (
+            <McpManager
+              session={selected}
+              onClose={() => setOverlay(null)}
+              onApply={() => { refresh(); }}
             />
           )
           : overlay === "replay" && selected ? (

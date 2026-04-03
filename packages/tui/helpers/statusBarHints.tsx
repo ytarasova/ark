@@ -36,6 +36,12 @@ export function getOverlayHints(overlay: string): React.ReactNode[] {
         <KeyHint key="enter" k="Enter" label="confirm" />,
         <KeyHint key="esc" k="Esc" label="cancel" />,
       ];
+    case "mcp":
+      return [
+        <KeyHint key="space" k="Space" label="toggle" />,
+        <KeyHint key="enter" k="Enter" label="apply" />,
+        <KeyHint key="esc" k="Esc" label="cancel" />,
+      ];
     case "talk":
       return [
         <KeyHint key="enter" k="Enter" label="send" />,
@@ -114,6 +120,7 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
     hints.push(<KeyHint key="cC" k="c/C" label="fork/clone" />);
     // Organize
     hints.push(<KeyHint key="m" k="m" label="move" />);
+    hints.push(<KeyHint key="M" k="M" label="mcp" />);
     hints.push(<KeyHint key="x" k="x" label="delete" />);
   }
   hints.push(<KeyHint key="n" k="n" label="new" />);
