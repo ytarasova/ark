@@ -1602,6 +1602,34 @@ program.command("config")
     execSync(`${editor} ${configPath}`, { stdio: "inherit" });
   });
 
+// ── Web dashboard ──────────────────────────────────────────────────────────
+
+program.command("web")
+  .description("Start web dashboard")
+  .option("--port <port>", "Listen port", "8420")
+  .option("--read-only", "Read-only mode")
+  .option("--token <token>", "Bearer token for auth")
+  .action(async (opts) => {
+    const server = core.startWebServer({
+      port: Number(opts.port),
+      readOnly: opts.readOnly,
+      token: opts.token,
+    });
+    console.log(chalk.green(`Ark web dashboard: ${server.url}`));
+    console.log(chalk.dim("Press Ctrl+C to stop"));
+    process.on("SIGINT", () => { server.stop(); process.exit(0); });
+    await new Promise(() => {});
+  });
+
+// ── MCP proxy (internal, used by pooled MCP configs) ────────────────────────
+
+program.command("mcp-proxy")
+  .description("Bridge stdin/stdout to a pooled MCP socket (internal)")
+  .argument("<socket-path>")
+  .action((socketPath) => {
+    core.runMcpProxy(socketPath);
+  });
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 
 await program.parseAsync(process.argv);

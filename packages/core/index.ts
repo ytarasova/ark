@@ -158,3 +158,9 @@ export { getTheme, setThemeMode, getThemeMode, type Theme, type ThemeMode } from
 
 // UI state persistence
 export { loadUiState, saveUiState, type UiState } from "./ui-state.js";
+
+// MCP Socket Pool
+export { McpPool, getMcpPool, destroyMcpPool, discoverPoolSockets, runMcpProxy, type McpServerDef, type PoolConfig } from "./mcp-pool.js";
+
+// Web dashboard
+export { startWebServer, type WebServerOptions } from "./web.js";
