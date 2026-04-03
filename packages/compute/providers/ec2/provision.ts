@@ -1,21 +1,29 @@
 /**
- * Pulumi Automation API for managing EC2 infrastructure as stacks.
+ * EC2 provisioning via direct AWS SDK calls.
  *
- * Provides fully programmatic provisioning and teardown of EC2 instances
- * using Pulumi's inline program model with a local file-based backend.
+ * Replaces the former Pulumi Automation API with lightweight AWS SDK
+ * operations. State is stored in compute.config (SQLite), no external
+ * state directory needed.
  */
 
-import * as path from "node:path";
-import { homedir } from "node:os";
-import { mkdirSync } from "node:fs";
-import * as aws from "@pulumi/aws";
-import * as pulumi from "@pulumi/pulumi";
-import { LocalWorkspace } from "@pulumi/pulumi/automation/index.js";
-import type {
-  LocalWorkspaceOptions,
-  InlineProgramArgs,
-} from "@pulumi/pulumi/automation/index.js";
-import { ConfigValue } from "@pulumi/pulumi/automation/index.js";
+import { readFileSync } from "node:fs";
+import {
+  EC2Client,
+  RunInstancesCommand,
+  TerminateInstancesCommand,
+  DescribeInstancesCommand,
+  CreateSecurityGroupCommand,
+  AuthorizeSecurityGroupIngressCommand,
+  DeleteSecurityGroupCommand,
+  ImportKeyPairCommand,
+  DeleteKeyPairCommand,
+  DescribeSubnetsCommand,
+  DescribeVpcsCommand,
+  DescribeImagesCommand,
+  CreateTagsCommand,
+  waitUntilInstanceRunning,
+} from "@aws-sdk/client-ec2";
+import { fromIni } from "@aws-sdk/credential-providers";
 
 // ---------------------------------------------------------------------------
 // Instance size tiers - maps size label to [x64_type, arm_type]
@@ -44,19 +52,10 @@ const AMI_PATTERNS: Record<string, string> = {
   arm: "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*",
 };
 
-// Ingress CIDRs for private subnet SGs - configure per-host via host.config.ingress_cidrs
-
 // ---------------------------------------------------------------------------
 // resolveInstanceType
 // ---------------------------------------------------------------------------
 
-/**
- * Resolve a size label (xs/s/m/l/xl/xxl/xxxl) + arch (x64/arm) to an
- * EC2 instance type string.
- *
- * If `size` is not a known label, it is treated as a literal instance type.
- * If `size` is undefined/empty, returns `fallback` (default "m6i.2xlarge").
- */
 export function resolveInstanceType(
   size?: string,
   arch: string = "x64",
@@ -67,7 +66,7 @@ export function resolveInstanceType(
     const tier = INSTANCE_SIZES[size];
     return arch === "arm" ? tier.types[1] : tier.types[0];
   }
-  return size; // literal instance type passthrough
+  return size;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,279 +99,199 @@ export interface DestroyStackOpts {
   region?: string;
   stackName?: string;
   awsProfile?: string;
+  /** Resource IDs to clean up (from ProvisionResult stored in compute config) */
+  sg_id?: string;
+  key_name?: string;
+  instance_id?: string;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function stackName(hostName: string): string {
-  return `ark-compute-${hostName}`;
+function createClient(region: string, awsProfile?: string): EC2Client {
+  return new EC2Client({
+    region,
+    ...(awsProfile ? { credentials: fromIni({ profile: awsProfile }) } : {}),
+  });
 }
 
-function workspaceOpts(region: string, awsProfile?: string): LocalWorkspaceOptions {
-  const stateDir = path.join(homedir(), ".ark", "pulumi");
-  mkdirSync(stateDir, { recursive: true });
+async function findLatestAmi(client: EC2Client, arch: string): Promise<string> {
+  const pattern = AMI_PATTERNS[arch] ?? AMI_PATTERNS["x64"];
+  const result = await client.send(new DescribeImagesCommand({
+    Owners: ["099720109477"], // Canonical
+    Filters: [
+      { Name: "name", Values: [pattern] },
+      { Name: "virtualization-type", Values: ["hvm"] },
+      { Name: "state", Values: ["available"] },
+    ],
+  }));
 
-  return {
-    envVars: {
-      PULUMI_CONFIG_PASSPHRASE: "",
-      AWS_DEFAULT_REGION: region,
-      ...(awsProfile ? { AWS_PROFILE: awsProfile } : {}),
-    },
-    projectSettings: {
-      name: "ark-ec2",
-      runtime: "nodejs",
-      backend: { url: `file://${stateDir}` },
-    },
-  };
+  const images = (result.Images ?? []).sort((a, b) =>
+    (b.CreationDate ?? "").localeCompare(a.CreationDate ?? "")
+  );
+  if (images.length === 0) throw new Error(`No AMI found for pattern: ${pattern}`);
+  return images[0].ImageId!;
 }
 
 // ---------------------------------------------------------------------------
-// Pulumi inline program builder
+// ensurePulumi - no longer needed, kept as no-op for backward compat
 // ---------------------------------------------------------------------------
 
-function makePulumiProgram(
-  instanceType: string,
-  hostName: string,
-  opts: {
-    arch: string;
-    keyName?: string;
-    sshPublicKeyPath?: string;
-    subnetId?: string;
-    securityGroupId?: string;
-    userData?: string;
-    tags?: Record<string, string>;
-  },
-) {
-  return async function pulumiProgram() {
-    const arch = opts.arch || "x64";
-    const amiPattern = AMI_PATTERNS[arch] ?? AMI_PATTERNS["x64"];
-
-    // Instance tags
-    const instanceTags: Record<string, string> = {
-      Name: `ark-compute-${hostName}`,
-      Component: "ark",
-      ...(opts.tags ?? {}),
-    };
-
-    // Resolve AMI - latest Ubuntu 22.04 for the target architecture
-    const ami = aws.ec2.getAmi({
-      mostRecent: true,
-      owners: ["099720109477"], // Canonical
-      filters: [
-        { name: "name", values: [amiPattern] },
-        { name: "virtualization-type", values: ["hvm"] },
-      ],
-    });
-
-    // Security group - use provided or create one
-    let sgIds: pulumi.Input<string>[];
-
-    if (opts.securityGroupId) {
-      sgIds = [opts.securityGroupId];
-    } else if (opts.subnetId) {
-      // Look up VPC from the subnet so the SG is in the right VPC
-      const subnetInfo = aws.ec2.getSubnet({ id: opts.subnetId });
-      const vpcInfo = subnetInfo.then((s) => aws.ec2.getVpc({ id: s.vpcId }));
-
-      const allowedCidrs = vpcInfo.then((v) => [v.cidrBlock]);
-
-      const sg = new aws.ec2.SecurityGroup(`ark-sg-${hostName}`, {
-        vpcId: subnetInfo.then((s) => s.vpcId),
-        description: `Ark compute ${hostName} - SSH access`,
-        ingress: [
-          {
-            protocol: "tcp",
-            fromPort: 22,
-            toPort: 22,
-            cidrBlocks: allowedCidrs,
-            description: "SSH from VPC + VPN",
-          },
-        ],
-        egress: [
-          {
-            protocol: "-1",
-            fromPort: 0,
-            toPort: 0,
-            cidrBlocks: ["0.0.0.0/0"],
-          },
-        ],
-        tags: {
-          Name: `ark-sg-${hostName}`,
-          Component: "ark",
-        },
-      });
-
-      sgIds = [sg.id];
-    } else {
-      // No subnet - use default VPC, allow SSH from anywhere
-      const sg = new aws.ec2.SecurityGroup(`ark-sg-${hostName}`, {
-        description: `Ark compute ${hostName} - SSH access`,
-        ingress: [
-          {
-            protocol: "tcp",
-            fromPort: 22,
-            toPort: 22,
-            cidrBlocks: ["0.0.0.0/0"],
-            description: "SSH",
-          },
-        ],
-        egress: [
-          {
-            protocol: "-1",
-            fromPort: 0,
-            toPort: 0,
-            cidrBlocks: ["0.0.0.0/0"],
-          },
-        ],
-        tags: {
-          Name: `ark-sg-${hostName}`,
-          Component: "ark",
-        },
-      });
-
-      sgIds = [sg.id];
-    }
-
-    // SSH key pair - import public key to EC2
-    let resolvedKeyName: any = opts.keyName;
-    if (!resolvedKeyName && opts.sshPublicKeyPath) {
-      const { readFileSync } = require("fs");
-      const pubKey = readFileSync(opts.sshPublicKeyPath, "utf-8").trim();
-      const keyPair = new aws.ec2.KeyPair(`ark-key-${hostName}`, {
-        keyName: `ark-${hostName}`,
-        publicKey: pubKey,
-      });
-      resolvedKeyName = keyPair.keyName;
-    }
-
-    // EC2 instance
-    const instance = new aws.ec2.Instance("ark-compute", {
-      instanceType,
-      ami: ami.then((a) => a.id),
-      keyName: resolvedKeyName,
-      vpcSecurityGroupIds: sgIds,
-      subnetId: opts.subnetId,
-      userData: opts.userData,
-      rootBlockDevice: {
-        volumeSize: 256,
-        volumeType: "gp3",
-        deleteOnTermination: true,
-      },
-      tags: instanceTags,
-    });
-
-    // Return outputs - use privateIp when in a private subnet, publicIp otherwise
-    return {
-      ip: opts.subnetId ? instance.privateIp : instance.publicIp,
-      instance_id: instance.id,
-    };
-  };
+export async function ensurePulumi(_onLog?: (msg: string) => void): Promise<void> {
+  // No-op: Pulumi is no longer required. Direct AWS SDK calls are used.
 }
 
 // ---------------------------------------------------------------------------
 // provisionStack
 // ---------------------------------------------------------------------------
 
-/**
- * Provision an EC2 instance via Pulumi Automation API.
- *
- * Creates or selects a Pulumi stack named "ark-compute-{hostName}", defines
- * the EC2 resources inline, and runs `stack.up()` to deploy.
- */
-export async function ensurePulumi(onLog?: (msg: string) => void): Promise<void> {
-  const { execFile } = require("child_process");
-  const { promisify } = require("util");
-  const { existsSync } = require("fs");
-  const { join } = require("path");
-  const { homedir: home } = require("os");
-
-  const execFileAsync = promisify(execFile);
-
-  // Check PATH first
-  try {
-    await execFileAsync("pulumi", ["version"], { timeout: 5000 });
-    return;
-  } catch { /* not in PATH */ }
-
-  // Check ~/.pulumi/bin (installed but not in PATH)
-  const pulumiBin = join(home(), ".pulumi", "bin");
-  const pulumiPath = join(pulumiBin, "pulumi");
-  if (existsSync(pulumiPath)) {
-    process.env.PATH = `${pulumiBin}:${process.env.PATH}`;
-    return;
-  }
-
-  // Auto-install using curl + sh
-  const log = onLog ?? (() => {});
-  log("Pulumi CLI not found - installing...");
-  try {
-    // Download installer script, then run it
-    await execFileAsync("bash", ["-c", "curl -fsSL https://get.pulumi.com | sh"], {
-      timeout: 120_000,
-      env: { ...process.env, PULUMI_SKIP_UPDATE_CHECK: "true" },
-    });
-    process.env.PATH = `${pulumiBin}:${process.env.PATH}`;
-    const { stdout } = await execFileAsync(pulumiPath, ["version"], { encoding: "utf-8", timeout: 5000 });
-    log(`Pulumi ${stdout.trim()} installed`);
-  } catch (e: any) {
-    throw new Error(`Failed to install Pulumi: ${e.message ?? e}`);
-  }
-}
-
 export async function provisionStack(
   hostName: string,
   opts: ProvisionStackOpts,
 ): Promise<ProvisionResult> {
-  // Note: caller should run ensurePulumi() before calling this
   const arch = opts.arch ?? "x64";
   const region = opts.region ?? "us-east-1";
   const instanceType = resolveInstanceType(opts.size, arch);
+  const log = opts.onOutput ?? (() => {});
+  const client = createClient(region, opts.awsProfile);
 
-  const sName = stackName(hostName);
+  const tags = [
+    { Key: "Name", Value: `ark-compute-${hostName}` },
+    { Key: "Component", Value: "ark" },
+    ...Object.entries(opts.tags ?? {}).map(([Key, Value]) => ({ Key, Value })),
+  ];
 
-  const program = makePulumiProgram(instanceType, hostName, {
-    arch,
-    keyName: opts.keyName,
-    sshPublicKeyPath: opts.sshKeyPath ? `${opts.sshKeyPath}.pub` : undefined,
-    subnetId: opts.subnetId,
-    securityGroupId: opts.securityGroupId,
-    userData: opts.userData,
-    tags: opts.tags,
-  });
+  // 1. Find AMI
+  log("Finding latest Ubuntu 22.04 AMI...");
+  const amiId = await findLatestAmi(client, arch);
+  log(`AMI: ${amiId}`);
 
-  const args: InlineProgramArgs = {
-    stackName: sName,
-    projectName: "ark-ec2",
-    program,
-  };
+  // 2. Security group
+  let sgId = opts.securityGroupId;
+  let createdSg = false;
 
-  const stack = await LocalWorkspace.createOrSelectStack(
-    args,
-    workspaceOpts(region, opts.awsProfile),
+  if (!sgId) {
+    log("Creating security group...");
+    const sgParams: any = {
+      GroupName: `ark-sg-${hostName}-${Date.now()}`,
+      Description: `Ark compute ${hostName} - SSH access`,
+    };
+
+    if (opts.subnetId) {
+      const subnetResult = await client.send(new DescribeSubnetsCommand({ SubnetIds: [opts.subnetId] }));
+      const vpcId = subnetResult.Subnets?.[0]?.VpcId;
+      if (vpcId) sgParams.VpcId = vpcId;
+    }
+
+    const sgResult = await client.send(new CreateSecurityGroupCommand(sgParams));
+    sgId = sgResult.GroupId!;
+    createdSg = true;
+
+    // Determine ingress CIDR
+    let ingressCidr = "0.0.0.0/0";
+    if (opts.subnetId) {
+      const subnetResult = await client.send(new DescribeSubnetsCommand({ SubnetIds: [opts.subnetId] }));
+      const vpcId = subnetResult.Subnets?.[0]?.VpcId;
+      if (vpcId) {
+        const vpcResult = await client.send(new DescribeVpcsCommand({ VpcIds: [vpcId] }));
+        ingressCidr = vpcResult.Vpcs?.[0]?.CidrBlock ?? "0.0.0.0/0";
+      }
+    }
+
+    await client.send(new AuthorizeSecurityGroupIngressCommand({
+      GroupId: sgId,
+      IpPermissions: [{
+        IpProtocol: "tcp",
+        FromPort: 22,
+        ToPort: 22,
+        IpRanges: [{ CidrIp: ingressCidr, Description: "SSH" }],
+      }],
+    }));
+
+    await client.send(new CreateTagsCommand({
+      Resources: [sgId],
+      Tags: [{ Key: "Name", Value: `ark-sg-${hostName}` }, { Key: "Component", Value: "ark" }],
+    }));
+
+    log(`Security group: ${sgId}`);
+  }
+
+  // 3. SSH key pair
+  let keyName = opts.keyName;
+  let createdKey = false;
+
+  if (!keyName && opts.sshKeyPath) {
+    const pubKeyPath = `${opts.sshKeyPath}.pub`;
+    const pubKey = readFileSync(pubKeyPath, "utf-8").trim();
+    keyName = `ark-${hostName}`;
+
+    try {
+      await client.send(new ImportKeyPairCommand({
+        KeyName: keyName,
+        PublicKeyMaterial: Buffer.from(pubKey),
+      }));
+      createdKey = true;
+    } catch (e: any) {
+      if (e.Code === "InvalidKeyPair.Duplicate") {
+        // Key already exists — reuse it
+        log(`Key pair ${keyName} already exists, reusing`);
+      } else {
+        throw e;
+      }
+    }
+
+    log(`Key pair: ${keyName}`);
+  }
+
+  // 4. Launch instance
+  log(`Launching ${instanceType} instance...`);
+  const runResult = await client.send(new RunInstancesCommand({
+    ImageId: amiId,
+    InstanceType: instanceType as any,
+    MinCount: 1,
+    MaxCount: 1,
+    KeyName: keyName,
+    SecurityGroupIds: sgId ? [sgId] : undefined,
+    SubnetId: opts.subnetId,
+    UserData: opts.userData ? Buffer.from(opts.userData).toString("base64") : undefined,
+    BlockDeviceMappings: [{
+      DeviceName: "/dev/sda1",
+      Ebs: { VolumeSize: 256, VolumeType: "gp3", DeleteOnTermination: true },
+    }],
+    TagSpecifications: [{
+      ResourceType: "instance",
+      Tags: tags,
+    }],
+  }));
+
+  const instanceId = runResult.Instances?.[0]?.InstanceId;
+  if (!instanceId) throw new Error("Failed to launch EC2 instance — no instance ID returned");
+
+  log(`Instance launched: ${instanceId}`);
+
+  // 5. Wait for running state
+  log("Waiting for instance to reach running state...");
+  await waitUntilInstanceRunning(
+    { client, maxWaitTime: 300, minDelay: 5, maxDelay: 10 },
+    { InstanceIds: [instanceId] },
   );
 
-  // Set AWS region in stack config
-  await stack.setConfig("aws:region", { value: region } as ConfigValue);
+  // 6. Get IP address
+  const descResult = await client.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
+  const instance = descResult.Reservations?.[0]?.Instances?.[0];
+  const ip = opts.subnetId
+    ? instance?.PrivateIpAddress ?? null
+    : instance?.PublicIpAddress ?? null;
 
-  // Deploy - pipe Pulumi output to callback
-  const log = opts.onOutput ?? console.log;
-  const result = await stack.up({
-    onOutput: (msg: string) => {
-      const line = msg.trim();
-      if (line) log(line);
-    },
-  });
-
-  const ip = result.outputs["ip"]?.value as string | undefined ?? null;
-  const instanceId = (result.outputs["instance_id"]?.value as string) ?? "";
+  log(`Instance running: ${instanceId} (IP: ${ip ?? "pending"})`);
 
   return {
     ip,
     instance_id: instanceId,
-    stack_name: sName,
-    key_name: opts.keyName,
+    stack_name: `ark-compute-${hostName}`,
+    sg_id: createdSg ? sgId : undefined,
+    key_name: createdKey ? keyName : undefined,
   };
 }
 
@@ -380,27 +299,42 @@ export async function provisionStack(
 // destroyStack
 // ---------------------------------------------------------------------------
 
-/**
- * Destroy and remove the Pulumi stack for a given host.
- */
 export async function destroyStack(
   hostName: string,
   opts?: DestroyStackOpts,
 ): Promise<void> {
   const region = opts?.region ?? "us-east-1";
-  const sName = opts?.stackName ?? stackName(hostName);
+  const client = createClient(region, opts?.awsProfile);
 
-  const args: InlineProgramArgs = {
-    stackName: sName,
-    projectName: "ark-ec2",
-    program: async () => {},
-  };
+  const instanceId = opts?.instance_id;
+  if (instanceId) {
+    console.log(`Terminating instance ${instanceId}...`);
+    try {
+      await client.send(new TerminateInstancesCommand({ InstanceIds: [instanceId] }));
+    } catch (e: any) {
+      console.error(`Failed to terminate instance: ${e.message}`);
+    }
+  }
 
-  const stack = await LocalWorkspace.selectStack(
-    args,
-    workspaceOpts(region, opts?.awsProfile),
-  );
+  // Clean up security group (if we created it)
+  const sgId = opts?.sg_id;
+  if (sgId) {
+    // Wait a moment for instance to start terminating before deleting SG
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      await client.send(new DeleteSecurityGroupCommand({ GroupId: sgId }));
+    } catch (e: any) {
+      console.error(`Failed to delete security group ${sgId}: ${e.message}`);
+    }
+  }
 
-  await stack.destroy({ onOutput: console.log });
-  await stack.workspace.removeStack(sName);
+  // Clean up key pair (if we created it)
+  const keyName = opts?.key_name;
+  if (keyName) {
+    try {
+      await client.send(new DeleteKeyPairCommand({ KeyName: keyName }));
+    } catch (e: any) {
+      console.error(`Failed to delete key pair ${keyName}: ${e.message}`);
+    }
+  }
 }

@@ -30,7 +30,7 @@ import type { Compute, Session } from "../../../core/store.js";
 import { updateCompute, mergeComputeConfig, sessionChannelPort } from "../../../core/store.js";
 import { sshKeyPath, sshExec, sshExecAsync, waitForSsh, waitForSshAsync, generateSshKey, rsyncPush } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
-import { provisionStack, destroyStack, resolveInstanceType, ensurePulumi } from "./provision.js";
+import { provisionStack, destroyStack, resolveInstanceType } from "./provision.js";
 import { syncToHost, syncProjectFiles, refreshRemoteToken } from "./sync.js";
 import { SSH_FAST_CMD, parseSnapshot } from "./metrics.js";
 import { setupTunnels, setupReverseTunnel, probeRemotePorts } from "./ports.js";
@@ -302,9 +302,6 @@ export class EC2Provider implements ComputeProvider {
     const cfg = compute.config as EC2HostConfig;
     updateCompute(compute.name, { status: "provisioning" });
 
-    // Ensure Pulumi CLI is available (auto-installs if missing)
-    await ensurePulumi(log);
-
     // Generate SSH key pair for this compute
     log("Generating SSH key pair...");
     const { privateKeyPath } = await generateSshKey(compute.name);
@@ -315,8 +312,8 @@ export class EC2Provider implements ComputeProvider {
       idleMinutes: cfg.idle_minutes ?? 60,
     });
 
-    // Provision via Pulumi
-    log("Creating Pulumi stack...");
+    // Provision via direct AWS SDK
+    log("Launching EC2 instance...");
     const result = await provisionStack(compute.name, {
       size: opts?.size ?? cfg.size ?? "m",
       arch: opts?.arch ?? cfg.arch ?? "x64",
@@ -327,12 +324,7 @@ export class EC2Provider implements ComputeProvider {
       userData,
       tags: opts?.tags ?? cfg.tags,
       sshKeyPath: privateKeyPath,
-      onOutput: (msg) => {
-        // Filter Pulumi output - show resource creation events
-        if (msg.includes("creating") || msg.includes("created") || msg.includes("updated")) {
-          log(`Pulumi: ${msg.slice(0, 120)}`);
-        }
-      },
+      onOutput: log,
     });
 
     // Update compute with runtime state
@@ -385,6 +377,9 @@ export class EC2Provider implements ComputeProvider {
       region: cfg.region ?? "us-east-1",
       stackName: cfg.stack_name,
       awsProfile: cfg.aws_profile,
+      instance_id: cfg.instance_id,
+      sg_id: cfg.sg_id,
+      key_name: cfg.key_name,
     });
     updateCompute(compute.name, { status: "destroyed" });
     mergeComputeConfig(compute.name, { instance_id: null, ip: null });
