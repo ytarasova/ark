@@ -132,6 +132,7 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
   hints.push(<KeyHint key="n" k="n" label="new" />);
   hints.push(<KeyHint key="o" k="o" label="groups" />);
   hints.push(<KeyHint key="/" k="/" label="find" />);
+  hints.push(<KeyHint key="filter" k="!/@/#/$" label="filter" />);
   hints.push(sep(1));
 
   // App
@@ -187,6 +188,12 @@ export function getFlowsHints(): React.ReactNode[] {
   return [
     ...NAV_HINTS,
     <KeyHint key="tab" k="Tab" label="detail" />, sep(0),
+    <KeyHint key="q" k="q" label="quit" />,
+  ];
+}
+
+export function getCostsHints(): React.ReactNode[] {
+  return [
     <KeyHint key="q" k="q" label="quit" />,
   ];
 }

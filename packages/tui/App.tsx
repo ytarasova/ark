@@ -15,6 +15,7 @@ import { AgentsTab } from "./tabs/AgentsTab.js";
 import { FlowsTab } from "./tabs/FlowsTab.js";
 import { HistoryTab } from "./tabs/HistoryTab.js";
 import { ToolsTab } from "./tabs/ToolsTab.js";
+import { CostsTab } from "./tabs/CostsTab.js";
 import * as core from "../core/index.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
@@ -107,6 +108,8 @@ function AppInner() {
       switchTab("history");
     } else if (input === "6") {
       switchTab("compute");
+    } else if (input === "7") {
+      switchTab("costs");
     }
   });
 
@@ -182,6 +185,8 @@ function AppInner() {
             <NewComputeForm asyncState={computeAsync} onDone={() => { setShowForm(null); store.refresh(); }} />
           ) : undefined}
         />
+      ) : tab === "costs" ? (
+        <CostsTab />
       ) : null}
 
       <EventLog

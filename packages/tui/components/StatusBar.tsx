@@ -11,6 +11,7 @@ import {
   getFlowsHints,
   getComputeHints,
   getHistoryHints,
+  getCostsHints,
   getGenericHints,
 } from "../helpers/statusBarHints.js";
 
@@ -38,6 +39,7 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
     : tab === "flows" ? getFlowsHints()
     : tab === "compute" ? getComputeHints()
     : tab === "history" ? getHistoryHints()
+    : tab === "costs" ? getCostsHints()
     : getGenericHints(),
   [tab, pane, overlay, selectedSession]);
 
