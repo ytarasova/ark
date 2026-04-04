@@ -11,8 +11,9 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
-import { resolve, basename, join } from "path";
+import { resolve, basename, join, dirname } from "path";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { homedir } from "os";
 import { execSync, execFileSync } from "child_process";
 import YAML from "yaml";
 import * as core from "../core/index.js";
@@ -1187,7 +1188,19 @@ computeCmd.command("default")
   .action((name) => {
     const compute = core.getCompute(name);
     if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
-    console.log(chalk.green(`Default compute set to '${name}' (will be wired in a future release)`));
+    const envPath = join(homedir(), ".ark", ".env");
+    mkdirSync(dirname(envPath), { recursive: true });
+    // Read existing, update or append
+    let content = "";
+    try { content = readFileSync(envPath, "utf-8"); } catch { /* new file */ }
+    if (content.includes("ARK_DEFAULT_COMPUTE=")) {
+      content = content.replace(/ARK_DEFAULT_COMPUTE=.*/g, `ARK_DEFAULT_COMPUTE=${name}`);
+    } else {
+      content += `\nARK_DEFAULT_COMPUTE=${name}\n`;
+    }
+    writeFileSync(envPath, content.trimStart());
+    process.env.ARK_DEFAULT_COMPUTE = name;
+    console.log(chalk.green(`Default compute set to '${name}'`));
   });
 
 computeCmd.command("ssh")
