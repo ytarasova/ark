@@ -160,6 +160,12 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   // Resolve autonomy level from flow stage definition
   const autonomy = stageDef?.autonomy ?? "full";
 
+  // Check for stage-level or session-level model override
+  const modelOverride = stageDef?.model ?? (session.config as any)?.model_override;
+  if (modelOverride) {
+    agent.model = modelOverride;
+  }
+
   // Build task with handoff context
   log("Building task...");
   const task = await buildTaskWithHandoff(session, stage, agentName);
@@ -1365,4 +1371,75 @@ export function fanOut(
   });
 
   return { ok: true, childIds };
+}
+
+// ── Subagents ────────────────────────────────────────────────────────────────
+
+/**
+ * Spawn a subagent — an independent child session with its own model/agent.
+ * Unlike fork (which copies the parent's config), subagents can use different
+ * models and agents for cost optimization or specialization.
+ */
+export function spawnSubagent(parentId: string, opts: {
+  task: string;
+  agent?: string;       // override agent (default: parent's agent)
+  model?: string;       // override model (e.g., "haiku" for cheap tasks)
+  group_name?: string;
+  extensions?: string[]; // MCP extensions to enable
+}): { ok: boolean; sessionId?: string; message: string } {
+  const parent = store.getSession(parentId);
+  if (!parent) return { ok: false, message: "Parent session not found" };
+
+  const session = store.createSession({
+    summary: opts.task,
+    repo: parent.repo || undefined,
+    flow: "quick",  // subagents use single-stage flow
+    compute_name: parent.compute_name || undefined,
+    workdir: parent.workdir || undefined,
+    group_name: opts.group_name ?? parent.group_name ?? undefined,
+    config: {
+      parent_id: parentId,
+      subagent: true,
+      model_override: opts.model,
+      extensions: opts.extensions,
+    },
+  });
+
+  const agentName = opts.agent ?? parent.agent;
+  store.updateSession(session.id, { agent: agentName, parent_id: parentId });
+
+  // Set first stage so the subagent is dispatchable
+  const firstStage = flow.getFirstStage("quick");
+  if (firstStage) {
+    store.updateSession(session.id, { stage: firstStage, status: "ready" });
+  }
+
+  store.logEvent(session.id, "subagent_spawned", {
+    actor: "system",
+    data: { parent_id: parentId, task: opts.task, agent: agentName, model: opts.model },
+  });
+
+  return { ok: true, sessionId: session.id, message: `Subagent ${session.id} spawned` };
+}
+
+/**
+ * Spawn multiple subagents in parallel and optionally wait for all to complete.
+ */
+export async function spawnParallelSubagents(parentId: string, tasks: Array<{
+  task: string;
+  agent?: string;
+  model?: string;
+}>): Promise<{ ok: boolean; sessionIds: string[]; message: string }> {
+  const ids: string[] = [];
+  for (const t of tasks) {
+    const result = spawnSubagent(parentId, t);
+    if (result.ok && result.sessionId) {
+      ids.push(result.sessionId);
+    }
+  }
+
+  // Dispatch all in parallel
+  await Promise.allSettled(ids.map(id => dispatch(id).catch(() => {})));
+
+  return { ok: true, sessionIds: ids, message: `${ids.length} subagents spawned and dispatched` };
 }

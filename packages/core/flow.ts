@@ -24,6 +24,7 @@ export interface StageDefinition {
   autonomy?: "full" | "execute" | "edit" | "read-only";
   on_failure?: string;
   optional?: boolean;
+  model?: string;  // override model for this stage (e.g., "opus" for planning, "haiku" for docs)
   // Fork-specific
   strategy?: string;
   max_parallel?: number;
