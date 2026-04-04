@@ -1783,6 +1783,63 @@ program.command("mcp-proxy")
     core.runMcpProxy(socketPath);
   });
 
+// ── ACP (headless JSON-RPC protocol) ──────────────────────────────────────
+
+program.command("acp")
+  .description("Start headless ACP server on stdin/stdout (JSON-RPC)")
+  .action(() => {
+    core.runAcpServer();
+  });
+
+// ── Repo map ──────────────────────────────────────────────────────────────
+
+program.command("repo-map")
+  .description("Generate repository structure map")
+  .argument("[dir]", "Directory to scan", ".")
+  .option("--max-files <n>", "Max files to include", "500")
+  .option("--max-depth <n>", "Max directory depth", "10")
+  .option("--json", "Output as JSON instead of text")
+  .action((dir, opts) => {
+    const rootDir = resolve(dir);
+    const map = core.generateRepoMap(rootDir, {
+      maxFiles: Number(opts.maxFiles),
+      maxDepth: Number(opts.maxDepth),
+    });
+
+    if (opts.json) {
+      console.log(JSON.stringify(map, null, 2));
+    } else {
+      console.log(chalk.bold(`Repository map: ${rootDir}`));
+      console.log(chalk.dim(`${map.totalFiles} files\n`));
+      console.log(map.summary);
+    }
+  });
+
+// ── Recipe eval ───────────────────────────────────────────────────────────
+
+program.command("eval")
+  .description("Evaluate a recipe by creating N test sessions")
+  .argument("<recipe>", "Recipe name")
+  .option("-n, --iterations <n>", "Number of iterations", "3")
+  .action((recipe, opts) => {
+    const result = core.evaluateRecipeSetup(recipe, Number(opts.iterations));
+    if (result.iterations === 0) {
+      console.log(chalk.red(`Recipe '${recipe}' not found.`));
+      return;
+    }
+    console.log(chalk.bold(`Evaluation: ${recipe} (${result.iterations} iterations)\n`));
+    for (const r of result.results) {
+      const icon = r.status === "error" ? chalk.red("x") : chalk.green("ok");
+      console.log(`  ${icon} ${r.sessionId || "N/A"} - ${r.status} (${r.durationMs}ms, $${r.cost.toFixed(4)})`);
+      if (r.error) console.log(chalk.red(`     ${r.error}`));
+    }
+    console.log(`\n${chalk.bold("Summary:")}`);
+    console.log(`  Success rate: ${(result.summary.successRate * 100).toFixed(0)}%`);
+    console.log(`  Avg duration: ${result.summary.avgDurationMs.toFixed(0)}ms`);
+    console.log(`  Avg cost:     $${result.summary.avgCost.toFixed(4)}`);
+    console.log(`  Total cost:   $${result.summary.totalCost.toFixed(4)}`);
+  });
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 
 await program.parseAsync(process.argv);

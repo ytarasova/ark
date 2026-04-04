@@ -211,3 +211,15 @@ export { detectHandoff, hasHandoff, type HandoffSignal } from "./handoff.js";
 
 // Per-agent message filtering
 export { filterMessages, parseMessageFilter, type MessageFilter, type FilteredMessage } from "./message-filter.js";
+
+// Task/progress ledger
+export { loadLedger, saveLedger, addEntry, updateEntry, detectStall, formatLedgerForPrompt, type Ledger, type LedgerEntry } from "./ledger.js";
+
+// Recipe evaluation
+export { evaluateRecipeSetup, type RecipeEvalResult } from "./recipe-eval.js";
+
+// Agent Client Protocol (headless JSON-RPC)
+export { handleAcpRequest, runAcpServer, type AcpRequest, type AcpResponse } from "./acp.js";
+
+// Repository map generation
+export { generateRepoMap, extractExports, formatRepoMap, type RepoMap, type RepoMapEntry } from "./repo-map.js";
