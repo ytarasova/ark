@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Box, Text } from "ink";
 import { getTheme } from "../../core/theme.js";
+import { getActiveProfile } from "../../core/index.js";
 import type { Tab } from "./TabBar.js";
 import type { Session } from "../../core/index.js";
 import {
@@ -29,8 +30,19 @@ interface StatusBarProps {
 
 export function StatusBar({ tab, sessions, selectedSession, loading, error, label, pane, overlay }: StatusBarProps) {
   const theme = getTheme();
-  const nRun = sessions.filter((s) => s.status === "running").length;
-  const nErr = sessions.filter((s) => s.status === "failed").length;
+  const profile = useMemo(() => { try { return getActiveProfile(); } catch { return "default"; } }, []);
+
+  const counts = useMemo(() => {
+    const c = { running: 0, waiting: 0, stopped: 0, completed: 0, failed: 0 };
+    for (const s of sessions) {
+      if (s.status === "running") c.running++;
+      else if (s.status === "waiting" || s.status === "blocked") c.waiting++;
+      else if (s.status === "stopped") c.stopped++;
+      else if (s.status === "completed") c.completed++;
+      else if (s.status === "failed") c.failed++;
+    }
+    return c;
+  }, [sessions]);
 
   const hints = useMemo(() =>
     overlay ? getOverlayHints(overlay)
@@ -53,9 +65,12 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
         </Box>
       )}
       <Box>
+        {profile !== "default" && <Text color="magenta">{` [${profile}]`}</Text>}
         <Text bold>{` ${sessions.length} sessions`}</Text>
-        {!loading && nRun > 0 && <Text color={theme.running}>{`  ● ${nRun} running`}</Text>}
-        {nErr > 0 && <Text color={theme.error}>{`  ✕ ${nErr} failed`}</Text>}
+        {!loading && counts.running > 0 && <Text color={theme.running}>{`  ● ${counts.running}`}</Text>}
+        {counts.waiting > 0 && <Text color={theme.waiting}>{`  ◑ ${counts.waiting}`}</Text>}
+        {counts.completed > 0 && <Text color={theme.running}>{`  ✔ ${counts.completed}`}</Text>}
+        {counts.failed > 0 && <Text color={theme.error}>{`  ✕ ${counts.failed}`}</Text>}
         <Text>{"   "}</Text>
         {hints}
       </Box>

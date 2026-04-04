@@ -36,6 +36,8 @@ const DEFAULTS: HotkeyMap = {
   markUnread: "u",
   skills: "K",
   settings: "P",
+  advance: "A",
+  worktreeFinish: "W",
 };
 
 let _hotkeys: HotkeyMap | null = null;

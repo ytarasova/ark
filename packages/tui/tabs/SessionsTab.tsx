@@ -266,6 +266,22 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       }
     } else if (matchesHotkey("talk", input, key)) {
       if (selected?.status === "running" || selected?.status === "waiting") setOverlay("talk");
+    } else if (matchesHotkey("advance", input, key)) {
+      if (selected && ["running", "waiting", "blocked"].includes(selected.status)) {
+        asyncState.run("Advancing...", async () => {
+          const result = core.advance(selected.id, true);
+          status.show(result.ok ? "Advanced to next stage" : result.message);
+          refresh();
+        });
+      }
+    } else if (matchesHotkey("worktreeFinish", input, key)) {
+      if (selected && selected.workdir) {
+        asyncState.run("Finishing worktree...", async () => {
+          const result = await core.finishWorktree(selected.id, { noMerge: false });
+          status.show(result.ok ? result.message : `Worktree: ${result.message}`);
+          refresh();
+        });
+      }
     } else if (input === "S") {
       if (selectedGroup && groupSessions.length > 0) {
         actions.stopGroup(groupSessions);

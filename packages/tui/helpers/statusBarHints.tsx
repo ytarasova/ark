@@ -114,12 +114,14 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
       case "ready":
       case "blocked":
         hints.push(<KeyHint key="enter" k="Enter" label="dispatch" />);
+        hints.push(<KeyHint key="A3" k="A" label="advance" />);
         break;
       case "running":
         hints.push(<KeyHint key="a" k="a" label="attach" />);
         hints.push(<KeyHint key="tT" k="t/T" label="chat/threads" />);
         hints.push(<KeyHint key="s" k="s" label="stop" />);
         hints.push(<KeyHint key="d" k="d" label="done" />);
+        hints.push(<KeyHint key="A" k="A" label="advance" />);
         break;
       case "stopped":
       case "failed":
@@ -131,10 +133,12 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
         hints.push(<KeyHint key="a" k="a" label="attach" />);
         hints.push(<KeyHint key="tT2" k="t/T" label="chat/threads" />);
         hints.push(<KeyHint key="s" k="s" label="stop" />);
+        hints.push(<KeyHint key="A2" k="A" label="advance" />);
         break;
     }
     // Create / duplicate
     hints.push(<KeyHint key="f" k="f" label="fork" />);
+    hints.push(<KeyHint key="W" k="W" label="worktree" />);
     // Organize
     hints.push(<KeyHint key="u" k="u" label="unread" />);
     hints.push(<KeyHint key="m" k="m" label="move" />);
