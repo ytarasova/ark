@@ -79,6 +79,28 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   const payload = await req.json() as Record<string, unknown>;
   const event = String(payload.hook_event_name ?? "");
 
+  // Guardrail evaluation for PreToolUse events
+  if (event === "PreToolUse") {
+    const toolName = String(payload.tool_name ?? "");
+    const toolInput = (payload.tool_input ?? {}) as Record<string, any>;
+    const { evaluateToolCall } = await import("./guardrails.js");
+    const evalResult = evaluateToolCall(toolName, toolInput);
+
+    if (evalResult.action === "block") {
+      store.logEvent(sessionId, "guardrail_blocked", {
+        actor: "system",
+        data: { tool: toolName, pattern: evalResult.rule?.pattern, input: toolInput },
+      });
+    } else if (evalResult.action === "warn") {
+      store.logEvent(sessionId, "guardrail_warning", {
+        actor: "system",
+        data: { tool: toolName, pattern: evalResult.rule?.pattern },
+      });
+    }
+
+    return Response.json({ status: "ok", guardrail: evalResult.action });
+  }
+
   // Delegate business logic to session.ts
   const result = session.applyHookStatus(s, event, payload);
 

@@ -163,6 +163,7 @@ function buildHooksConfig(sessionId: string, conductorUrl: string): Record<strin
   return {
     SessionStart: [{ matcher: "startup|resume", hooks: [hook] }],
     UserPromptSubmit: [{ hooks: [hook] }],
+    PreToolUse: [{ hooks: [hook] }],
     Stop: [{ hooks: [hook] }],
     StopFailure: [{ hooks: [hook] }],
     SessionEnd: [{ hooks: [hook] }],

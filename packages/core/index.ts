@@ -93,7 +93,7 @@ export { extractSkillCandidates, type SkillCandidate, type ConversationTurn } fr
 export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review.js";
 
 // Guardrails
-export { evaluateGuardrail, DEFAULT_RULES, type GuardrailRule } from "./guardrails.js";
+export { evaluateGuardrail, evaluateToolCall, DEFAULT_RULES, type GuardrailRule } from "./guardrails.js";
 
 // Checkpoint and crash recovery
 export { saveCheckpoint, getCheckpoint, listCheckpoints, findOrphanedSessions, recoverSession, type Checkpoint } from "./checkpoint.js";

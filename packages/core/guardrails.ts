@@ -52,3 +52,24 @@ export const DEFAULT_RULES: GuardrailRule[] = [
   { tool: "Write", pattern: "\\.env\"", action: "warn" },
   { tool: "Write", pattern: "credentials", action: "warn" },
 ];
+
+/** Evaluate a tool call against default + custom rules. Returns action and matching rule. */
+export function evaluateToolCall(
+  toolName: string,
+  toolInput: Record<string, any>,
+  customRules?: GuardrailRule[],
+): { action: "block" | "warn" | "allow"; rule?: GuardrailRule } {
+  const rules = [...DEFAULT_RULES, ...(customRules ?? [])];
+  const inputStr = JSON.stringify(toolInput);
+
+  for (const rule of rules) {
+    if (rule.tool !== toolName) continue;
+    try {
+      if (new RegExp(rule.pattern).test(inputStr)) {
+        return { action: rule.action, rule };
+      }
+    } catch { /* skip invalid regex */ }
+  }
+
+  return { action: "allow" };
+}
