@@ -34,16 +34,79 @@ async function apiPost<T>(path: string, body?: any): Promise<T> {
 }
 
 export const api = {
+  // Sessions
   getSessions: () => fetchApi<any[]>("/api/sessions"),
   getSession: (id: string) => fetchApi<any>(`/api/sessions/${id}`),
-  getCosts: () => fetchApi<any>("/api/costs"),
-  getStatus: () => fetchApi<any>("/api/status"),
-  getGroups: () => fetchApi<string[]>("/api/groups"),
   getOutput: (id: string) => fetchApi<any>(`/api/sessions/${id}/output`),
+  getEvents: (id: string) => fetchApi<any[]>(`/api/sessions/${id}/events`),
+  exportSession: (id: string) => fetchApi<any>(`/api/sessions/${id}/export`),
   createSession: (data: any) => apiPost<any>("/api/sessions", data),
+  importSession: (data: any) => apiPost<any>("/api/sessions/import", data),
   dispatch: (id: string) => apiPost<any>(`/api/sessions/${id}/dispatch`),
   stop: (id: string) => apiPost<any>(`/api/sessions/${id}/stop`),
   restart: (id: string) => apiPost<any>(`/api/sessions/${id}/restart`),
   deleteSession: (id: string) => apiPost<any>(`/api/sessions/${id}/delete`),
   undelete: (id: string) => apiPost<any>(`/api/sessions/${id}/undelete`),
+  fork: (id: string, name?: string) => apiPost<any>(`/api/sessions/${id}/fork`, { name }),
+  send: (id: string, message: string) => apiPost<any>(`/api/sessions/${id}/send`, { message }),
+  pause: (id: string, reason?: string) => apiPost<any>(`/api/sessions/${id}/pause`, { reason }),
+  advance: (id: string) => apiPost<any>(`/api/sessions/${id}/advance`),
+  complete: (id: string) => apiPost<any>(`/api/sessions/${id}/complete`),
+  spawnSubagent: (id: string, data: any) => apiPost<any>(`/api/sessions/${id}/spawn-subagent`, data),
+
+  // Costs
+  getCosts: () => fetchApi<any>("/api/costs"),
+  exportCosts: (format: string) => fetchApi<any>(`/api/costs/export?format=${format}`),
+
+  // Search
+  search: (q: string) => fetchApi<any>(`/api/search?q=${encodeURIComponent(q)}`),
+  searchGlobal: (q: string) => fetchApi<any>(`/api/search/global?q=${encodeURIComponent(q)}`),
+
+  // System
+  getStatus: () => fetchApi<any>("/api/status"),
+  getGroups: () => fetchApi<string[]>("/api/groups"),
+  getConfig: () => fetchApi<any>("/api/config"),
+
+  // Profiles
+  getProfiles: () => fetchApi<any[]>("/api/profiles"),
+  createProfile: (name: string, desc?: string) => apiPost<any>("/api/profiles", { name, description: desc }),
+  deleteProfile: (name: string) => fetchApi<any>(`/api/profiles/${name}`, { method: "DELETE" }),
+
+  // Tools & MCP
+  getTools: (dir?: string) => fetchApi<any[]>(`/api/tools${dir ? `?dir=${encodeURIComponent(dir)}` : ""}`),
+  attachMcp: (dir: string, name: string, config: any) => apiPost<any>("/api/mcp/attach", { dir, name, config }),
+  detachMcp: (dir: string, name: string) => apiPost<any>("/api/mcp/detach", { dir, name }),
+
+  // Skills & Recipes
+  getSkills: () => fetchApi<any[]>("/api/skills"),
+  getRecipes: () => fetchApi<any[]>("/api/recipes"),
+
+  // Agents & Flows
+  getAgents: () => fetchApi<any[]>("/api/agents"),
+  getFlows: () => fetchApi<any[]>("/api/flows"),
+
+  // Worktrees
+  getWorktrees: () => fetchApi<any[]>("/api/worktrees"),
+  finishWorktree: (id: string, opts?: any) => apiPost<any>(`/api/worktrees/${id}/finish`, opts),
+  cleanupWorktrees: () => apiPost<any>("/api/worktrees/cleanup"),
+
+  // Conductor
+  getLearnings: () => fetchApi<any>("/api/conductor/learnings"),
+  recordLearning: (title: string, desc: string) => apiPost<any>("/api/conductor/learn", { title, description: desc }),
+
+  // Memory
+  getMemories: (scope?: string) => fetchApi<any[]>(`/api/memory${scope ? `?scope=${encodeURIComponent(scope)}` : ""}`),
+  recallMemory: (q: string) => fetchApi<any[]>(`/api/memory/recall?q=${encodeURIComponent(q)}`),
+  addMemory: (content: string, opts?: any) => apiPost<any>("/api/memory", { content, ...opts }),
+  forgetMemory: (id: string) => fetchApi<any>(`/api/memory/${id}`, { method: "DELETE" }),
+
+  // Knowledge
+  ingestKnowledge: (path: string, opts?: any) => apiPost<any>("/api/knowledge/ingest", { path, ...opts }),
+
+  // Compute
+  getCompute: () => fetchApi<any[]>("/api/compute"),
+  getComputeDetail: (name: string) => fetchApi<any>(`/api/compute/${name}`),
+
+  // Repo Map
+  getRepoMap: (dir?: string) => fetchApi<any>(`/api/repo-map${dir ? `?dir=${encodeURIComponent(dir)}` : ""}`),
 };
