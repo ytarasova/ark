@@ -710,6 +710,79 @@ recipeCmd.command("show")
     }
   });
 
+// ── Memory commands ────────────────────────────────────────────────────────
+
+const memoryCmd = program.command("memory").description("Manage cross-session memory");
+
+memoryCmd.command("list")
+  .description("List stored memories")
+  .option("-s, --scope <scope>", "Filter by scope")
+  .action((opts) => {
+    const memories = core.listMemories(opts.scope);
+    if (!memories.length) {
+      console.log(chalk.dim("No memories stored."));
+      return;
+    }
+    for (const m of memories) {
+      const tags = m.tags.length ? chalk.dim(` [${m.tags.join(", ")}]`) : "";
+      const scope = chalk.dim(`(${m.scope})`);
+      console.log(`  ${m.id}  ${scope} ${m.content.slice(0, 60)}${m.content.length > 60 ? "..." : ""}${tags}`);
+    }
+    console.log(chalk.dim(`\n${memories.length} memories total`));
+  });
+
+memoryCmd.command("recall")
+  .description("Recall memories relevant to a query")
+  .argument("<query>", "Search query")
+  .option("-s, --scope <scope>", "Filter by scope")
+  .option("-n, --limit <n>", "Max results", "10")
+  .action((query: string, opts) => {
+    const results = core.recall(query, { scope: opts.scope, limit: Number(opts.limit) });
+    if (!results.length) {
+      console.log(chalk.dim("No relevant memories found."));
+      return;
+    }
+    for (const m of results) {
+      const tags = m.tags.length ? chalk.dim(` [${m.tags.join(", ")}]`) : "";
+      console.log(`  ${chalk.bold(m.id)}  ${m.content.slice(0, 80)}${m.content.length > 80 ? "..." : ""}${tags}`);
+    }
+  });
+
+memoryCmd.command("forget")
+  .description("Forget a specific memory")
+  .argument("<id>", "Memory ID")
+  .action((id: string) => {
+    const ok = core.forget(id);
+    console.log(ok ? chalk.green(`Forgot ${id}`) : chalk.red(`Memory ${id} not found`));
+  });
+
+// ── Knowledge commands ─────────────────────────────────────────────────────
+
+const knowledgeCmd = program.command("knowledge").description("Knowledge ingestion");
+
+knowledgeCmd.command("ingest")
+  .description("Ingest files into the knowledge base")
+  .argument("<path>", "File or directory to ingest")
+  .option("-s, --scope <scope>", "Scope for ingested knowledge", "knowledge")
+  .option("-t, --tag <tag>", "Tag (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+  .action((path: string, opts) => {
+    const resolved = resolve(path);
+    if (!existsSync(resolved)) {
+      console.log(chalk.red(`Path not found: ${resolved}`));
+      return;
+    }
+    const stat = require("fs").statSync(resolved);
+    if (stat.isDirectory()) {
+      const result = core.ingestDirectory(resolved, { scope: opts.scope, tags: opts.tag });
+      console.log(chalk.green(`Ingested ${result.files} files (${result.chunks} chunks) from ${resolved}`));
+    } else {
+      const chunks = core.ingestFile(resolved, { scope: opts.scope, tags: opts.tag });
+      console.log(chunks > 0
+        ? chalk.green(`Ingested ${resolved} (${chunks} chunks)`)
+        : chalk.yellow(`Skipped ${resolved} (unsupported or empty)`));
+    }
+  });
+
 // ── Compute commands ────────────────────────────────────────────────────────
 
 const computeCmd = program.command("compute").description("Manage compute resources");

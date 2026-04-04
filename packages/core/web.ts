@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { listSessions, getSession, getEvents, getGroups, type Session } from "./store.js";
 import { getAllSessionCosts, formatCost } from "./costs.js";
+import { handleIssueWebhook, type IssueWebhookConfig } from "./github-webhook.js";
 import {
   startSession,
   dispatch,
@@ -174,6 +175,24 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/sessions" && req.method === "GET") {
         const sessions = listSessions({ limit: 200 });
         return jsonResponse(sessions);
+      }
+
+      // POST /api/webhooks/github/issues
+      if (url.pathname === "/api/webhooks/github/issues" && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const payload = await req.json() as any;
+          const config: IssueWebhookConfig = {
+            triggerLabel: url.searchParams.get("label") ?? "ark",
+            autoDispatch: url.searchParams.get("dispatch") === "true",
+            flow: url.searchParams.get("flow") ?? undefined,
+            group: url.searchParams.get("group") ?? undefined,
+          };
+          const result = await handleIssueWebhook(payload, config);
+          return jsonResponse(result, result.ok ? 200 : 400);
+        } catch (err) {
+          return errorResponse(err);
+        }
       }
 
       // Session-specific routes: /api/sessions/:id/...

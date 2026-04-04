@@ -196,3 +196,18 @@ export { evaluateTermination, parseTermination, maxTurns, maxTokens, timeout, te
 
 // Flow state persistence
 export { saveFlowState, loadFlowState, markStageCompleted, setCurrentStage, isStageCompleted, deleteFlowState, type FlowState } from "./flow-state.js";
+
+// Cross-session memory
+export { remember, recall, forget, listMemories, clearMemories, formatMemoriesForPrompt, type MemoryEntry } from "./memory.js";
+
+// Knowledge ingestion
+export { ingestFile, ingestDirectory, queryKnowledge, chunkText } from "./knowledge.js";
+
+// GitHub issue webhook
+export { handleIssueWebhook, type IssueWebhookPayload, type IssueWebhookConfig } from "./github-webhook.js";
+
+// Agent-initiated handoff
+export { detectHandoff, hasHandoff, type HandoffSignal } from "./handoff.js";
+
+// Per-agent message filtering
+export { filterMessages, parseMessageFilter, type MessageFilter, type FilteredMessage } from "./message-filter.js";
