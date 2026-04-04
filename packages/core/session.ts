@@ -165,6 +165,22 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
     return { ok: false, message: `Compute '${session.compute_name}' not found. Delete and recreate the session.` };
   }
 
+  // Check task summary for prompt injection
+  try {
+    const injection = detectInjection(session.summary ?? "");
+    if (injection.severity === "high") {
+      store.logEvent(sessionId, "prompt_injection_blocked", {
+        actor: "system", data: { patterns: injection.patterns, context: "dispatch" },
+      });
+      return { ok: false, message: "Dispatch blocked: potential prompt injection in task summary" };
+    }
+    if (injection.detected) {
+      store.logEvent(sessionId, "prompt_injection_warning", {
+        actor: "system", data: { patterns: injection.patterns, severity: injection.severity, context: "dispatch" },
+      });
+    }
+  } catch { /* skip guard on error */ }
+
   // Check if fork stage
   const stageDef = flow.getStage(session.flow, stage);
   if (stageDef?.type === "fork") {
