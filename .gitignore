@@ -6,3 +6,4 @@ dist/
 !packages/**/*.d.ts
 !shims/**/*.js
 .env
+.worktrees/
