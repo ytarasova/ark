@@ -32,6 +32,7 @@ export {
   deleteSessionAsync, undeleteSessionAsync, waitForCompletion, approveReviewGate,
   applyHookStatus, applyReport, cleanupOnTerminal,
   retryWithContext, fanOut, finishWorktree, detectStatus,
+  spawnSubagent, spawnParallelSubagents,
   type HookStatusResult, type ReportResult, type SessionOpResult,
 } from "./session.js";
 
@@ -48,7 +49,7 @@ export { loadAgent, listAgents, saveAgent, deleteAgent, resolveAgent, buildClaud
 export { listSkills, loadSkill, saveSkill, deleteSkill, type SkillDefinition } from "./skill.js";
 
 // Recipe
-export { listRecipes, loadRecipe, instantiateRecipe, type RecipeDefinition, type RecipeVariable, type RecipeInstance } from "./recipe.js";
+export { listRecipes, loadRecipe, instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecipes, type RecipeDefinition, type RecipeVariable, type RecipeParameter, type RecipeInstance, type SubRecipeRef } from "./recipe.js";
 
 // Claude integration
 export * as claude from "./claude.js";
@@ -162,5 +163,23 @@ export { loadUiState, saveUiState, type UiState } from "./ui-state.js";
 // MCP Socket Pool
 export { McpPool, getMcpPool, destroyMcpPool, discoverPoolSockets, runMcpProxy, type McpServerDef, type PoolConfig } from "./mcp-pool.js";
 
+// Prompt injection detection
+export { detectInjection, hasInjection, type InjectionResult } from "./prompt-guard.js";
+
+// Telemetry
+export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry, isTelemetryEnabled, type TelemetryEvent } from "./telemetry.js";
+
+// OpenAPI spec
+export { generateOpenApiSpec } from "./openapi.js";
+
 // Web dashboard
 export { startWebServer, type WebServerOptions } from "./web.js";
+
+// Evals framework
+export { loadEvalSuite, scoreOutput, saveEvalResults, listEvalSuites, summarizeResults, type EvalScenario, type EvalResult, type EvalSuite } from "./evals.js";
+
+// Observability hooks
+export { configureObservability, getObservabilityConfig, recordEvent, flush as flushObservability, getEventBuffer, resetObservability, type ObservabilityConfig, type ObservabilityEvent } from "./observability.js";
+
+// Extension catalog
+export { EXTENSION_CATALOG, searchCatalog, getCatalogByCategory, getCatalogEntry, type ExtensionEntry } from "./extension-catalog.js";
