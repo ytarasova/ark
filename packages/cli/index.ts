@@ -12,7 +12,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { resolve, basename, join } from "path";
-import { existsSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { execSync, execFileSync } from "child_process";
 import YAML from "yaml";
 import * as core from "../core/index.js";
@@ -673,6 +673,63 @@ skillCmd.command("show")
       console.log(`\n${chalk.bold("Prompt:")}`);
       console.log(skill.prompt);
     }
+  });
+
+skillCmd.command("create")
+  .description("Create a new skill")
+  .argument("[name]", "Skill name (required unless --from)")
+  .option("--from <file>", "Create from YAML file")
+  .option("-d, --description <desc>", "Skill description")
+  .option("-p, --prompt <prompt>", "Skill prompt")
+  .option("-s, --scope <scope>", "Scope: global or project", "global")
+  .option("--tags <tags>", "Comma-separated tags")
+  .action((name: string | undefined, opts: any) => {
+    const scope = opts.scope as "global" | "project";
+    const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
+
+    if (opts.from) {
+      let content: string;
+      try { content = readFileSync(opts.from, "utf-8"); }
+      catch { console.error(chalk.red(`Cannot read file: ${opts.from}`)); process.exit(1); }
+      const skill = YAML.parse(content);
+      if (!skill.name) { console.error(chalk.red("YAML must have a 'name' field")); process.exit(1); }
+      core.saveSkill(skill, scope, projectRoot);
+      console.log(chalk.green(`Created skill: ${skill.name} (${scope})`));
+      return;
+    }
+
+    if (!name) { console.error(chalk.red("Name required (or use --from)")); process.exit(1); }
+    if (!opts.prompt) { console.error(chalk.red("--prompt required")); process.exit(1); }
+
+    core.saveSkill({
+      name,
+      description: opts.description ?? "",
+      prompt: opts.prompt,
+      tags: opts.tags?.split(",").map((t: string) => t.trim()) ?? [],
+    }, scope, projectRoot);
+    console.log(chalk.green(`Created skill: ${name} (${scope})`));
+  });
+
+skillCmd.command("delete")
+  .description("Delete a skill (global or project only)")
+  .argument("<name>", "Skill name")
+  .option("-s, --scope <scope>", "Scope: global or project", "global")
+  .action((name: string, opts: any) => {
+    const scope = opts.scope as "global" | "project";
+    const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
+
+    const skill = core.loadSkill(name, projectRoot);
+    if (skill && skill._source === "builtin") {
+      console.error(chalk.red(`Cannot delete builtin skill: ${name}`));
+      process.exit(1);
+    }
+    if (!skill) {
+      console.error(chalk.red(`Skill not found: ${name}`));
+      process.exit(1);
+    }
+
+    core.deleteSkill(name, scope, projectRoot);
+    console.log(chalk.green(`Deleted skill: ${name}`));
   });
 
 // ── Recipe commands ─────────────────────────────────────────────────────────
