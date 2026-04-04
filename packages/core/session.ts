@@ -34,6 +34,17 @@ import type { OutboundMessage } from "./channel-types.js";
 import { safeAsync } from "./safe.js";
 import { saveCheckpoint } from "./checkpoint.js";
 import { profileGroupPrefix } from "./profiles.js";
+import { parseGraphFlow, getSuccessors } from "./graph-flow.js";
+import { evaluateTermination, parseTermination, type TerminationContext } from "./termination.js";
+import { markStageCompleted, setCurrentStage } from "./flow-state.js";
+import { recall, formatMemoriesForPrompt } from "./memory.js";
+import { detectHandoff } from "./handoff.js";
+import { filterMessages, parseMessageFilter } from "./message-filter.js";
+import { logError, logInfo, logWarn } from "./structured-log.js";
+import { recordEvent } from "./observability.js";
+import { track } from "./telemetry.js";
+import { detectInjection } from "./prompt-guard.js";
+import { generateRepoMap, formatRepoMap } from "./repo-map.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 function sessionAsVars(session: store.Session): Record<string, unknown> {
@@ -62,7 +73,7 @@ function resolveGitHubUrl(dir?: string | null): string | null {
     // Expected: "not a git repo" or no remote configured. Unexpected errors should be visible.
     const msg = String(e?.message ?? e);
     if (!msg.includes("not a git repository") && !msg.includes("No such remote")) {
-      console.error("resolveGitHubUrl:", msg);
+      logWarn("session", `resolveGitHubUrl: ${msg}`);
     }
     return null;
   }
@@ -101,6 +112,9 @@ export function startSession(opts: {
   }
 
   const session = store.createSession(mergedOpts);
+
+  // Telemetry: track session creation
+  track("session_created", { flow: mergedOpts.flow ?? "default" });
 
   // Apply agent override if specified
   if (opts.agent) {
@@ -168,7 +182,28 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
 
   // Build task with handoff context
   log("Building task...");
-  const task = await buildTaskWithHandoff(session, stage, agentName);
+  let task = await buildTaskWithHandoff(session, stage, agentName);
+
+  // Inject relevant memories into agent context
+  try {
+    const memories = recall(session.summary ?? "", { scope: session.repo ?? undefined, limit: 5 });
+    const memoryContext = formatMemoriesForPrompt(memories);
+    if (memoryContext) {
+      task = task + memoryContext;
+    }
+  } catch { /* skip memory recall on error */ }
+
+  // Inject repo map into agent context for codebase awareness
+  if (session.repo) {
+    try {
+      const repoMap = generateRepoMap(session.workdir ?? session.repo, { maxFiles: 200 });
+      if (repoMap.entries.length > 0) {
+        const mapStr = formatRepoMap(repoMap.entries, 1500);
+        task = task + `\n\n## Repository Structure\n\`\`\`\n${mapStr}\n\`\`\`\n`;
+      }
+    } catch { /* skip repo map on error */ }
+  }
+
   // Skill injection happens inside buildClaudeArgs via projectRoot
   const claudeArgs = agentRegistry.buildClaudeArgs(agent, { autonomy, projectRoot });
 
@@ -186,8 +221,15 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
     },
   });
 
+  // Persist flow state: mark current stage
+  try { setCurrentStage(sessionId, session.stage!, session.flow); } catch { /* skip flow-state on error */ }
+
   // Checkpoint after successful dispatch
   saveCheckpoint(sessionId);
+
+  // Observability + telemetry
+  recordEvent({ type: "session_start", sessionId, data: { agent: session.agent ?? agentName, flow: session.flow } });
+  track("session_dispatched", { agent: agentName });
 
   return { ok: true, message: tmuxName };
 }
@@ -207,9 +249,32 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
   // Checkpoint before advancing to next stage
   saveCheckpoint(sessionId);
 
+  // Observability: track stage advancement
+  recordEvent({ type: "agent_turn", sessionId, data: { stage } });
+
+  // Graph flow routing: if flow definition has edges, use DAG successor resolution
+  try {
+    const flowDef = flow.loadFlow(flowName);
+    if (flowDef && (flowDef as any).edges?.length > 0) {
+      const graphFlow = parseGraphFlow(flowDef);
+      const successors = getSuccessors(graphFlow, stage, session.config);
+      if (successors.length > 0) {
+        const graphNextStage = successors[0];
+        // Persist flow state before advancing
+        try { markStageCompleted(sessionId, stage); } catch { /* skip */ }
+        try { setCurrentStage(sessionId, graphNextStage, flowName); } catch { /* skip */ }
+        store.updateSession(sessionId, { stage: graphNextStage, status: "ready" });
+        store.logEvent(sessionId, "stage_advanced", { actor: "system", stage: graphNextStage, data: { via: "graph-flow", successors } });
+        saveCheckpoint(sessionId);
+        return { ok: true, message: `Advanced to ${graphNextStage} (graph-flow)` };
+      }
+    }
+  } catch { /* graph flow not applicable, fall through to linear */ }
+
   const nextStage = flow.getNextStage(flowName, stage);
   if (!nextStage) {
-    // Flow complete
+    // Flow complete -- persist final stage completion
+    try { markStageCompleted(sessionId, stage); } catch { /* skip */ }
     store.updateSession(sessionId, { status: "completed" });
     store.logEvent(sessionId, "session_completed", {
       stage, actor: "system",
@@ -219,6 +284,10 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
     store.markMessagesRead(sessionId);
     return { ok: true, message: "Flow completed" };
   }
+
+  // Persist flow state: mark completed + set next
+  try { markStageCompleted(sessionId, stage); } catch { /* skip */ }
+  try { setCurrentStage(sessionId, nextStage, flowName); } catch { /* skip */ }
 
   const nextAction = flow.getStageAction(flowName, nextStage);
   store.updateSession(sessionId, { stage: nextStage, status: "ready", error: null });
@@ -257,7 +326,7 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
   // Clean up hook config from working directory
   if (session.workdir) {
     try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
-      console.error(`stop ${sessionId}: removeHooksConfig:`, e?.message ?? e);
+      logError("session", `stop ${sessionId}: removeHooksConfig: ${e?.message ?? e}`);
     }
   }
 
@@ -267,6 +336,10 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
     stage: session.stage, actor: "user",
     data: { session_id: session.session_id, agent: session.agent },
   });
+
+  // Observability: track session stop
+  recordEvent({ type: "session_end", sessionId, data: { status: "stopped" } });
+
   return { ok: true, message: "Session stopped" };
 }
 
@@ -500,7 +573,7 @@ export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boole
   // 2. Clean up hook config (not provider-dependent)
   if (session.workdir) {
     try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
-      console.error(`delete ${sessionId}: removeHooksConfig:`, e?.message ?? e);
+      logError("session", `delete ${sessionId}: removeHooksConfig: ${e?.message ?? e}`);
     }
   }
 
@@ -844,6 +917,28 @@ async function appendPreviousStageContext(session: store.Session): Promise<strin
 async function buildTaskWithHandoff(session: store.Session, stage: string, agentName: string): Promise<string> {
   const header = formatTaskHeader(session, stage, agentName);
   const context = await appendPreviousStageContext(session);
+
+  // Apply message filter if agent config specifies one
+  try {
+    const projectRoot = agentRegistry.findProjectRoot(session.workdir || session.repo) ?? undefined;
+    const agent = agentRegistry.loadAgent(agentName, projectRoot);
+    if (agent) {
+      const mFilter = parseMessageFilter(agent);
+      if (mFilter) {
+        const messages = store.getMessages(session.id).map(m => ({
+          role: m.role, content: m.content, agent: (m as any).agent, timestamp: m.created_at,
+        }));
+        const filtered = filterMessages(messages, mFilter);
+        if (filtered.length > 0) {
+          context.push("\n## Filtered conversation context:");
+          for (const m of filtered) {
+            context.push(`[${m.role}]: ${m.content.slice(0, 500)}`);
+          }
+        }
+      }
+    }
+  } catch { /* skip message filtering on error */ }
+
   return [...header, ...context].join("\n");
 }
 
@@ -882,7 +977,7 @@ async function setupWorktree(repoPath: string, sessionId: string, branch?: strin
       return wtPath;
     } catch (e: any) {
       if (!String(e).includes("already exists")) {
-        console.error(`setupWorktree: new branch '${branchName}' failed:`, e?.message ?? e);
+        logError("session", `setupWorktree: new branch '${branchName}' failed: ${e?.message ?? e}`);
       }
     }
     // Try existing branch
@@ -891,7 +986,7 @@ async function setupWorktree(repoPath: string, sessionId: string, branch?: strin
       return wtPath;
     } catch (e: any) {
       if (!String(e).includes("already checked out") && !String(e).includes("already exists")) {
-        console.error(`setupWorktree: existing branch '${branchName}' failed:`, e?.message ?? e);
+        logError("session", `setupWorktree: existing branch '${branchName}' failed: ${e?.message ?? e}`);
       }
     }
     // Unique branch
@@ -899,10 +994,10 @@ async function setupWorktree(repoPath: string, sessionId: string, branch?: strin
       await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], { encoding: "utf-8" });
       return wtPath;
     } catch (e: any) {
-      console.error(`setupWorktree: all worktree strategies failed for ${sessionId}:`, e?.message ?? e);
+      logError("session", `setupWorktree: all strategies failed for ${sessionId}: ${e?.message ?? e}`);
     }
   } catch (e: any) {
-    console.error(`setupWorktree: worktree prune failed:`, e?.message ?? e);
+    logError("session", `setupWorktree: worktree prune failed: ${e?.message ?? e}`);
   }
   return null;
 }
@@ -966,7 +1061,7 @@ export async function finishWorktree(sessionId: string, opts?: {
     try {
       await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], { encoding: "utf-8" });
     } catch (e: any) {
-      console.error(`finishWorktree: remove worktree failed:`, e?.message ?? e);
+      logError("session", `finishWorktree: remove worktree failed: ${e?.message ?? e}`);
     }
   }
 
@@ -1033,6 +1128,18 @@ export async function getOutput(sessionId: string, opts?: { lines?: number; ansi
 export async function send(sessionId: string, message: string): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session?.session_id) return { ok: false, message: "No active session" };
+
+  // Check for prompt injection in user messages
+  try {
+    const injection = detectInjection(message);
+    if (injection.severity === "high") {
+      store.logEvent(sessionId, "prompt_injection_blocked", { actor: "system", data: { patterns: injection.patterns } });
+      return { ok: false, message: "Message blocked: potential prompt injection detected" };
+    }
+    if (injection.detected) {
+      store.logEvent(sessionId, "prompt_injection_warning", { actor: "system", data: { patterns: injection.patterns, severity: injection.severity } });
+    }
+  } catch { /* skip prompt guard on error */ }
 
   const { sendReliable } = await import("./send-reliable.js");
   const result = await sendReliable(session.session_id, message, { waitForReady: false, maxRetries: 3 });
@@ -1134,6 +1241,29 @@ export function applyHookStatus(
     result.newStatus = newStatus;
   }
 
+  // Check termination conditions from flow stage config
+  try {
+    const flowDef = flow.loadFlow(session.flow);
+    const termStageDef = flowDef?.stages?.find((s: any) => s.name === session.stage);
+    const termConfig = (termStageDef as any)?.termination;
+    if (termConfig) {
+      const condition = parseTermination(termConfig);
+      if (condition) {
+        const ctx: TerminationContext = {
+          session,
+          turnCount: (session.config as any)?.turns ?? 0,
+          tokenCount: (session.config as any)?.usage?.total_tokens ?? 0,
+          elapsedMs: Date.now() - new Date(session.updated_at).getTime(),
+          lastOutput: "",
+        };
+        if (evaluateTermination(condition, ctx)) {
+          result.newStatus = "completed";
+          result.events = [...(result.events ?? []), { type: "termination_triggered", opts: { actor: "system", data: { condition: termConfig } } }];
+        }
+      }
+    }
+  } catch { /* skip termination check on error */ }
+
   // Track token usage from transcript on Stop and SessionEnd
   const transcriptPath = payload.transcript_path as string | undefined;
   if (transcriptPath && (hookEvent === "Stop" || hookEvent === "SessionEnd")) {
@@ -1142,7 +1272,7 @@ export function applyHookStatus(
       if (usage.total_tokens > 0) {
         result.usage = usage;
       }
-    } catch (e: any) { console.error("transcript parsing failed:", e?.message ?? e); }
+    } catch (e: any) { logError("session", "transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) }); }
 
     // Index transcript for FTS5 search — only if the transcript belongs to THIS session's agent
     const hookClaudeSession = payload.session_id as string | undefined;
@@ -1151,6 +1281,21 @@ export function applyHookStatus(
       result.shouldIndex = true;
       result.indexTranscript = { transcriptPath, sessionId: session.id };
     }
+  }
+
+  // Check for agent-initiated handoff on session end (fire-and-forget async)
+  if (hookEvent === "SessionEnd" || hookEvent === "Stop") {
+    getOutput(session.id, { lines: 50 }).then(output => {
+      try {
+        const handoff = detectHandoff(output);
+        if (handoff) {
+          store.logEvent(session.id, "handoff_detected", {
+            actor: "system", data: { targetAgent: handoff.targetAgent, reason: handoff.reason },
+          });
+          store.mergeSessionConfig(session.id, { _pending_handoff: handoff });
+        }
+      } catch { /* skip handoff detection on error */ }
+    }).catch(() => { /* skip if output unavailable */ });
   }
 
   return result;

@@ -31,6 +31,8 @@ import { pollPRReviews } from "./pr-poller.js";
 import { pollIssues } from "./issue-poller.js";
 import { ArkdClient } from "../arkd/client.js";
 import { safeAsync } from "./safe.js";
+import { addEntry } from "./ledger.js";
+import { logError, logInfo } from "./structured-log.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -112,6 +114,11 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
     });
   }
 
+  // Track progress in conductor ledger
+  if (result.newStatus) {
+    try { addEntry("default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId); } catch { /* skip ledger on error */ }
+  }
+
   return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
 }
 
@@ -180,7 +187,7 @@ export function startConductor(port = DEFAULT_PORT, opts?: {
     },
   });
 
-  if (!opts?.quiet) console.log(`Ark conductor listening on localhost:${port}`);
+  if (!opts?.quiet) logInfo("conductor", `Ark conductor listening on localhost:${port}`);
 
   // Schedule poller — check every 60 seconds
   const scheduleTimer = setInterval(() => safeAsync("schedule polling", async () => {

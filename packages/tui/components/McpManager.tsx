@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import * as core from "../../core/index.js";
+import { EXTENSION_CATALOG } from "../../core/extension-catalog.js";
 
 interface McpManagerProps {
   session: core.Session;
@@ -8,29 +9,10 @@ interface McpManagerProps {
   onApply: () => void;
 }
 
-// Common MCP servers that users might want to attach
-const MCP_CATALOG: Record<string, { command: string; args: string[]; env?: Record<string, string>; description: string }> = {
-  "sequential-thinking": {
-    command: "npx",
-    args: ["-y", "@modelcontextprotocol/server-sequential-thinking"],
-    description: "Sequential thinking for complex reasoning",
-  },
-  "filesystem": {
-    command: "npx",
-    args: ["-y", "@modelcontextprotocol/server-filesystem", "."],
-    description: "Filesystem access",
-  },
-  "memory": {
-    command: "npx",
-    args: ["-y", "@modelcontextprotocol/server-memory"],
-    description: "Persistent memory across sessions",
-  },
-  "playwright": {
-    command: "npx",
-    args: ["-y", "@anthropics/playwright-mcp"],
-    description: "Browser automation via Playwright",
-  },
-};
+// Build catalog from extension-catalog module (single source of truth)
+const MCP_CATALOG: Record<string, { command: string; args: string[]; env?: Record<string, string>; description: string }> = Object.fromEntries(
+  EXTENSION_CATALOG.map(e => [e.name, { command: e.command, args: e.args, env: e.env ?? {}, description: e.description }])
+);
 
 export function McpManager({ session, onClose, onApply }: McpManagerProps) {
   const projectDir = session.workdir ?? ".";

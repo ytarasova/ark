@@ -20,6 +20,8 @@ import type { Compute, Session } from "./store.js";
 import { setProviderResolver, clearProviderResolver } from "./session.js";
 import { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
 import { startNotifyDaemon } from "./notify-daemon.js";
+import { track } from "./telemetry.js";
+import { logError, logWarn, logInfo } from "./structured-log.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -188,7 +190,7 @@ export class AppContext {
       if (orphaned.length > 0) {
         this._orphanedSessions = orphaned;
         for (const s of orphaned) {
-          console.warn(`[ark] Orphaned session detected: ${s.id} (status: ${s.status}, stage: ${s.stage})`);
+          logWarn("session", `Orphaned session detected: ${s.id} (status: ${s.status}, stage: ${s.stage})`);
         }
       }
     });
@@ -211,6 +213,9 @@ export class AppContext {
       const { cleanupLogs } = await import("./log-manager.js");
       cleanupLogs();
     });
+
+    // 15. Telemetry: track app boot
+    track("app_boot");
 
     this.phase = "ready";
   }
@@ -275,7 +280,7 @@ export class AppContext {
     if (this._db) {
       try { this._db.close(); } catch (e: any) {
         // DB may already be closed — log but don't fail shutdown
-        console.error("shutdown: failed to close database:", e?.message ?? e);
+        logError("general", `shutdown: failed to close database: ${e?.message ?? e}`);
       }
       this._db = null;
     }
@@ -319,7 +324,7 @@ export class AppContext {
           process.exit(1);
         }
         this.shutdown().catch((err) => {
-          console.error(`Error during ${signal} shutdown:`, err);
+          logError("general", `Error during ${signal} shutdown: ${err}`);
           process.exit(1);
         });
       };
