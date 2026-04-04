@@ -15,6 +15,11 @@ export interface RollbackSettings {
   health_url: string | null;
 }
 
+export interface TelemetrySettings {
+  enabled: boolean;
+  endpoint?: string;
+}
+
 export interface ArkConfig {
   arkDir: string;
   dbPath: string;
@@ -26,6 +31,8 @@ export interface ArkConfig {
   env: "production" | "test";
   otlp: OtlpSettings;
   rollback: RollbackSettings;
+  telemetry: TelemetrySettings;
+  default_compute: string | null;
 }
 
 export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
@@ -44,6 +51,8 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
     env: process.env.ARK_TEST_DIR !== undefined ? "test" : "production",
     otlp: { enabled: false },
     rollback: { enabled: false, timeout: 600, on_timeout: "ignore", auto_merge: false, health_url: null },
+    telemetry: { enabled: process.env.ARK_TELEMETRY === "1" },
+    default_compute: process.env.ARK_DEFAULT_COMPUTE ?? null,
   };
 
   if (overrides) {

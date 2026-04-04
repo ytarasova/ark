@@ -21,7 +21,7 @@ import type { Compute, Session } from "./store.js";
 import { setProviderResolver, clearProviderResolver } from "./session.js";
 import { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
 import { startNotifyDaemon } from "./notify-daemon.js";
-import { track } from "./telemetry.js";
+import { track, configureTelemetry } from "./telemetry.js";
 import { logError, logWarn, logInfo } from "./structured-log.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -171,6 +171,7 @@ export class AppContext {
 
     // 6c. Store rollback config for conductor webhook handler
     (globalThis as any).__arkRollbackConfig = this.config.rollback;
+    configureTelemetry(this.config.telemetry);
 
     // 7. Optionally start conductor (dynamic import to avoid circular deps)
     if (!this.options.skipConductor) {

@@ -24,7 +24,7 @@ export { getContext, type StoreContext } from "./context.js";
 
 // App context
 export { AppContext, getApp, setApp, clearApp } from "./app.js";
-export { loadConfig, type ArkConfig, type OtlpSettings, type RollbackSettings } from "./config.js";
+export { loadConfig, type ArkConfig, type OtlpSettings, type RollbackSettings, type TelemetrySettings } from "./config.js";
 
 // Session lifecycle (the main API)
 export {
@@ -169,7 +169,7 @@ export { McpPool, getMcpPool, destroyMcpPool, discoverPoolSockets, runMcpProxy, 
 export { detectInjection, hasInjection, type InjectionResult } from "./prompt-guard.js";
 
 // Telemetry
-export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry, isTelemetryEnabled, type TelemetryEvent } from "./telemetry.js";
+export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry, isTelemetryEnabled, configureTelemetry, type TelemetryEvent, type TelemetryConfig } from "./telemetry.js";
 
 // OpenAPI spec
 export { generateOpenApiSpec } from "./openapi.js";
