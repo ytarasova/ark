@@ -31,7 +31,7 @@ beforeEach(() => {
 // ── approveReviewGate ─────────────────────────────────────────────────────
 
 describe("approveReviewGate", () => {
-  it("advances a session at a review stage", () => {
+  it("advances a session at a review stage", async () => {
     writeUserFlow("pr-flow", {
       name: "pr-flow",
       stages: [
@@ -43,7 +43,7 @@ describe("approveReviewGate", () => {
 
     const session = startSession({ flow: "pr-flow", summary: "test review gate" });
     // startSession puts us at stage "code" — advance past auto gate to "wait-review"
-    const adv = advance(session.id, true);
+    const adv = await advance(session.id, true);
     expect(adv.ok).toBe(true);
     expect(adv.message).toContain("wait-review");
 
@@ -51,12 +51,12 @@ describe("approveReviewGate", () => {
     expect(atReview.stage).toBe("wait-review");
 
     // Normal advance should be blocked by review gate
-    const blocked = advance(session.id);
+    const blocked = await advance(session.id);
     expect(blocked.ok).toBe(false);
     expect(blocked.message).toContain("awaiting PR approval");
 
     // approveReviewGate force-advances
-    const result = approveReviewGate(session.id);
+    const result = await approveReviewGate(session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toContain("deploy");
 
@@ -64,13 +64,13 @@ describe("approveReviewGate", () => {
     expect(after.stage).toBe("deploy");
   });
 
-  it("returns error for nonexistent session", () => {
-    const result = approveReviewGate("s-nonexistent");
+  it("returns error for nonexistent session", async () => {
+    const result = await approveReviewGate("s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
 
-  it("logs review_approved event", () => {
+  it("logs review_approved event", async () => {
     writeUserFlow("rev-evt", {
       name: "rev-evt",
       stages: [
@@ -80,7 +80,7 @@ describe("approveReviewGate", () => {
     });
 
     const session = startSession({ flow: "rev-evt", summary: "event test" });
-    approveReviewGate(session.id);
+    await approveReviewGate(session.id);
 
     const events = store.getEvents(session.id, { type: "review_approved" });
     expect(events.length).toBe(1);
@@ -92,7 +92,7 @@ describe("approveReviewGate", () => {
 // ── Review gate blocks until approved ────────────────────────────────────
 
 describe("review gate blocking", () => {
-  it("session with review gate blocks until approved", () => {
+  it("session with review gate blocks until approved", async () => {
     writeUserFlow("block-flow", {
       name: "block-flow",
       stages: [
@@ -109,11 +109,11 @@ describe("review gate blocking", () => {
     expect(gateResult.canProceed).toBe(false);
 
     // Normal advance blocked
-    const advResult = advance(session.id);
+    const advResult = await advance(session.id);
     expect(advResult.ok).toBe(false);
 
     // Approve unblocks
-    const approved = approveReviewGate(session.id);
+    const approved = await approveReviewGate(session.id);
     expect(approved.ok).toBe(true);
 
     const final = store.getSession(session.id)!;

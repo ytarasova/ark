@@ -269,7 +269,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     } else if (matchesHotkey("advance", input, key)) {
       if (selected && ["running", "waiting", "blocked"].includes(selected.status)) {
         asyncState.run("Advancing...", async () => {
-          const result = core.advance(selected.id, true);
+          const result = await core.advance(selected.id, true);
           status.show(result.ok ? "Advanced to next stage" : result.message);
           refresh();
         });

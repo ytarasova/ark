@@ -208,16 +208,16 @@ session.command("advance")
   .description("Advance to the next flow stage")
   .argument("<id>")
   .option("-f, --force", "Force past gate")
-  .action((id, opts) => {
-    const r = core.advance(id, opts.force);
+  .action(async (id, opts) => {
+    const r = await core.advance(id, opts.force);
     console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
   });
 
 session.command("complete")
   .description("Mark current stage done and advance")
   .argument("<id>")
-  .action((id) => {
-    const r = core.complete(id);
+  .action(async (id) => {
+    const r = await core.complete(id);
     console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
   });
 
@@ -356,8 +356,8 @@ session.command("join")
   .description("Join all forked children")
   .argument("<parent-id>")
   .option("-f, --force")
-  .action((parentId, opts) => {
-    const r = core.joinFork(parentId, opts.force);
+  .action(async (parentId, opts) => {
+    const r = await core.joinFork(parentId, opts.force);
     console.log(r.ok ? chalk.green(r.message) : chalk.yellow(r.message));
   });
 

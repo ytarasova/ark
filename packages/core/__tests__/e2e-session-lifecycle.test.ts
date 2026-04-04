@@ -249,7 +249,7 @@ describe("core lifecycle: complete", () => {
     await core.dispatch(session.id);
 
     // Complete the current stage
-    const result = core.complete(session.id);
+    const result = await core.complete(session.id);
     expect(result.ok).toBe(true);
 
     const completed = core.getSession(session.id)!;

@@ -50,7 +50,7 @@ function extractPathSegment(path: string, index: number): string | null {
 
 async function handleChannelReport(req: Request, sessionId: string): Promise<Response> {
   const report = (await req.json()) as OutboundMessage;
-  handleReport(sessionId, report);
+  await handleReport(sessionId, report);
   return Response.json({ status: "ok" });
 }
 
@@ -362,7 +362,7 @@ export async function deliverToChannel(
   } catch { /* channel not reachable — expected when agent hasn't started channel yet */ }
 }
 
-function handleReport(sessionId: string, report: OutboundMessage): void {
+async function handleReport(sessionId: string, report: OutboundMessage): Promise<void> {
   // Delegate business logic to session.ts
   const result = session.applyReport(sessionId, report);
 
@@ -393,7 +393,7 @@ function handleReport(sessionId: string, report: OutboundMessage): void {
 
   // Handle advance + auto-dispatch for completed reports
   if (result.shouldAdvance) {
-    const advResult = session.advance(sessionId);
+    const advResult = await session.advance(sessionId);
     const updated = (result.shouldAutoDispatch && advResult.ok) ? store.getSession(sessionId) : null;
     if (updated?.status === "ready" && updated.stage) {
       const nextAction = flow.getStageAction(updated.flow, updated.stage);

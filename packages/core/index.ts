@@ -87,7 +87,7 @@ export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
 export { createSchedule, listSchedules, getSchedule, deleteSchedule, enableSchedule, updateScheduleLastRun, cronMatches, type Schedule } from "./schedule.js";
 
 // Skill extraction
-export { extractSkillCandidates, type SkillCandidate, type ConversationTurn } from "./skill-extractor.js";
+export { extractSkillCandidates, extractAndSaveSkills, type SkillCandidate, type ConversationTurn } from "./skill-extractor.js";
 
 // Structured review output
 export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review.js";

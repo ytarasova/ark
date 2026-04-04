@@ -6,6 +6,8 @@
  * Returns candidate skills with confidence scores.
  */
 
+import { saveSkill } from "./skill.js";
+
 export interface ConversationTurn {
   role: string;
   content: string;
@@ -57,4 +59,25 @@ export function extractSkillCandidates(conversation: ConversationTurn[]): SkillC
   }
 
   return candidates;
+}
+
+const MIN_CONFIDENCE = 0.6;
+
+/** Extract skill candidates from conversation and save high-confidence ones. */
+export function extractAndSaveSkills(sessionId: string, conversation: ConversationTurn[]): number {
+  const candidates = extractSkillCandidates(conversation);
+  let saved = 0;
+
+  for (const candidate of candidates) {
+    if (candidate.confidence < MIN_CONFIDENCE) continue;
+    saveSkill({
+      name: `extracted-${sessionId}-${saved}`,
+      description: candidate.description,
+      prompt: candidate.prompt,
+      tags: ["extracted", `session:${sessionId}`],
+    }, "global");
+    saved++;
+  }
+
+  return saved;
 }

@@ -315,11 +315,11 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
                 return jsonResponse(result);
               }
               case "advance": {
-                const result = advance(id);
+                const result = await advance(id);
                 return jsonResponse(result);
               }
               case "complete": {
-                const result = complete(id);
+                const result = await complete(id);
                 return jsonResponse(result);
               }
               case "spawn-subagent": {

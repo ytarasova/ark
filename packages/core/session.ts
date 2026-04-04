@@ -245,7 +245,7 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   return { ok: true, message: tmuxName };
 }
 
-export function advance(sessionId: string, force = false): { ok: boolean; message: string } {
+export async function advance(sessionId: string, force = false): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -307,6 +307,17 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
       cost_usd: usage?.cost, turns: (s?.config as any)?.turns,
     });
     flushSpans();
+
+    // Extract skills from completed session transcript
+    try {
+      const { extractAndSaveSkills } = await import("./skill-extractor.js");
+      const { getSessionConversation } = await import("./search.js");
+      const conv = getSessionConversation(sessionId);
+      if (conv.length > 0) {
+        const turns = conv.map(c => ({ role: c.source === "message" ? "user" : "assistant", content: c.match }));
+        extractAndSaveSkills(sessionId, turns);
+      }
+    } catch { /* skill extraction is best-effort */ }
 
     return { ok: true, message: "Flow completed" };
   }
@@ -397,7 +408,7 @@ export async function resume(sessionId: string, opts?: { onLog?: (msg: string) =
   return await dispatch(sessionId, opts);
 }
 
-export function complete(sessionId: string): { ok: boolean; message: string } {
+export async function complete(sessionId: string): Promise<{ ok: boolean; message: string }> {
   const session = store.getSession(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -407,7 +418,7 @@ export function complete(sessionId: string): { ok: boolean; message: string } {
   });
   store.markMessagesRead(sessionId);
   store.updateSession(sessionId, { status: "ready", session_id: null });
-  return advance(sessionId, true);
+  return await advance(sessionId, true);
 }
 
 export function pause(sessionId: string, reason?: string): { ok: boolean; message: string } {
@@ -425,7 +436,7 @@ export function pause(sessionId: string, reason?: string): { ok: boolean; messag
 // ── Review gate ─────────────────────────────────────────────────────────────
 
 /** Open a review gate — called when PR is approved via webhook. */
-export function approveReviewGate(sessionId: string): { ok: boolean; message: string } {
+export async function approveReviewGate(sessionId: string): Promise<{ ok: boolean; message: string }> {
   const s = store.getSession(sessionId);
   if (!s) return { ok: false, message: "Session not found" };
 
@@ -434,7 +445,7 @@ export function approveReviewGate(sessionId: string): { ok: boolean; message: st
   });
 
   // Force-advance past the review gate
-  return advance(sessionId, true);
+  return await advance(sessionId, true);
 }
 
 // ── Clone & Handoff ─────────────────────────────────────────────────────────
@@ -571,7 +582,7 @@ function dispatchFork(sessionId: string, stageDef: flow.StageDefinition): { ok: 
   return { ok: true, message: `Forked into ${children.length} sessions` };
 }
 
-export function joinFork(parentId: string, force = false): { ok: boolean; message: string } {
+export async function joinFork(parentId: string, force = false): Promise<{ ok: boolean; message: string }> {
   const children = store.getChildren(parentId);
   if (!children.length) return { ok: false, message: "No children" };
 
@@ -582,7 +593,7 @@ export function joinFork(parentId: string, force = false): { ok: boolean; messag
 
   store.logEvent(parentId, "fork_joined", { actor: "user", data: { children: children.length } });
   store.updateSession(parentId, { status: "ready", fork_group: null });
-  return advance(parentId, true);
+  return await advance(parentId, true);
 }
 
 // ── Delete ──────────────────────────────────────────────────────────────────
