@@ -229,3 +229,6 @@ export { handleAcpRequest, runAcpServer, type AcpRequest, type AcpResponse } fro
 
 // Repository map generation
 export { generateRepoMap, extractExports, formatRepoMap, type RepoMap, type RepoMapEntry } from "./repo-map.js";
+
+// Hybrid search
+export { hybridSearch, mergeAndDeduplicate, type HybridSearchResult, type HybridSearchOpts } from "./hybrid-search.js";

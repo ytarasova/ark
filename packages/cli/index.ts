@@ -1510,6 +1510,7 @@ program.command("search")
   .option("-l, --limit <n>", "Max results", "20")
   .option("-t, --transcripts", "Also search Claude transcripts (slower)")
   .option("--index", "Rebuild transcript search index before searching")
+  .option("--hybrid", "Use hybrid search (memory + knowledge + transcripts with LLM re-ranking)")
   .action(async (query, opts) => {
     if (opts.index) {
       console.log(chalk.dim("Indexing transcripts..."));
@@ -1529,6 +1530,24 @@ program.command("search")
     if (opts.transcripts) {
       const transcriptResults = core.searchTranscripts(query, { limit });
       results.push(...transcriptResults);
+    }
+
+    if (opts.hybrid) {
+      const hybridResults = await core.hybridSearch(query, { limit, rerank: true });
+      if (hybridResults.length === 0) {
+        console.log(chalk.yellow("No hybrid search results found."));
+        return;
+      }
+      console.log(chalk.bold(`Found ${hybridResults.length} result(s) via hybrid search for "${query}":\n`));
+      for (const r of hybridResults) {
+        const sourceColor = r.source === "memory" ? chalk.blue
+          : r.source === "knowledge" ? chalk.cyan
+          : chalk.magenta;
+        const score = chalk.dim(`(${r.score.toFixed(2)})`);
+        const content = r.content.length > 120 ? r.content.slice(0, 120) + "..." : r.content;
+        console.log(`  ${sourceColor(`[${r.source}]`)} ${score}  ${content}`);
+      }
+      return;
     }
 
     if (results.length === 0) {
