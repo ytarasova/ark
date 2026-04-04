@@ -2,9 +2,10 @@
  * Ark Core - public API.
  */
 
-// Store (excluding createSession which is wrapped by session.ts)
+// Store (createSession is also exported directly for use in tests/recipes; session.ts wraps it with richer logic)
 export {
   ARK_DIR, DB_PATH, TRACKS_DIR, WORKTREES_DIR,
+  createSession,
   getDb, getSession, listSessions, updateSession, deleteSession,
   softDeleteSession, undeleteSession, listDeletedSessions, purgeExpiredDeletes,
   logEvent, getEvents, getChildren, getGroups, createGroup, deleteGroup, claimSession,
