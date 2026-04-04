@@ -33,6 +33,7 @@ export {
   applyHookStatus, applyReport, cleanupOnTerminal,
   retryWithContext, fanOut, finishWorktree, detectStatus,
   spawnSubagent, spawnParallelSubagents,
+  findOrphanedWorktrees, cleanupWorktrees,
   type HookStatusResult, type ReportResult, type SessionOpResult,
 } from "./session.js";
 
@@ -110,7 +111,7 @@ export type { ToolDriver } from "./tool-driver.js";
 export { getToolDriver, listToolDrivers, registerToolDriver } from "./tools/registry.js";
 
 // Cost tracking
-export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, type SessionCost, type BudgetConfig, type BudgetStatus } from "./costs.js";
+export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, syncCosts, exportCostsCsv, type SessionCost, type BudgetConfig, type BudgetStatus } from "./costs.js";
 
 // Conductor learnings
 export { recordLearning, getLearnings, getPolicies, conductorLearningsDir, type Learning, type Policy } from "./learnings.js";
@@ -180,6 +181,9 @@ export { loadEvalSuite, scoreOutput, saveEvalResults, listEvalSuites, summarizeR
 
 // Observability hooks
 export { configureObservability, getObservabilityConfig, recordEvent, flush as flushObservability, getEventBuffer, resetObservability, type ObservabilityConfig, type ObservabilityEvent } from "./observability.js";
+
+// Structured JSONL logging
+export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponents, type LogComponent, type LogLevel } from "./structured-log.js";
 
 // Extension catalog
 export { EXTENSION_CATALOG, searchCatalog, getCatalogByCategory, getCatalogEntry, type ExtensionEntry } from "./extension-catalog.js";

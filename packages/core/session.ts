@@ -6,7 +6,7 @@
  */
 
 import { randomUUID } from "crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from "fs";
 import { join } from "path";
 import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
@@ -1442,4 +1442,51 @@ export async function spawnParallelSubagents(parentId: string, tasks: Array<{
   await Promise.allSettled(ids.map(id => dispatch(id).catch(() => {})));
 
   return { ok: true, sessionIds: ids, message: `${ids.length} subagents spawned and dispatched` };
+}
+
+// ── Worktree cleanup ──────────────────────────────────────────────────────
+
+/** Find orphaned worktrees — worktree dirs with no matching session. */
+export function findOrphanedWorktrees(): string[] {
+  const wtDir = store.WORKTREES_DIR();
+  if (!existsSync(wtDir)) return [];
+
+  const sessionIds = new Set(store.listSessions({ limit: 1000 }).map(s => s.id));
+  const orphans: string[] = [];
+
+  try {
+    for (const entry of readdirSync(wtDir)) {
+      if (!sessionIds.has(entry)) {
+        orphans.push(entry);
+      }
+    }
+  } catch { /* ignore */ }
+
+  return orphans;
+}
+
+/** Remove orphaned worktrees. Returns count of removed. */
+export async function cleanupWorktrees(): Promise<{ removed: number; errors: string[] }> {
+  const orphans = findOrphanedWorktrees();
+  let removed = 0;
+  const errors: string[] = [];
+
+  for (const id of orphans) {
+    const wtPath = join(store.WORKTREES_DIR(), id);
+    try {
+      // Try git worktree remove first
+      await execFileAsync("git", ["worktree", "remove", wtPath, "--force"], { encoding: "utf-8" });
+      removed++;
+    } catch {
+      // Fallback: just remove the directory
+      try {
+        rmSync(wtPath, { recursive: true, force: true });
+        removed++;
+      } catch (e: any) {
+        errors.push(`${id}: ${e.message}`);
+      }
+    }
+  }
+
+  return { removed, errors };
 }

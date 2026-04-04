@@ -1063,6 +1063,26 @@ worktree.command("list")
     }
   });
 
+worktree.command("cleanup")
+  .description("Find and remove orphaned worktrees")
+  .option("--dry-run", "Only show what would be removed")
+  .action(async (opts) => {
+    const orphans = core.findOrphanedWorktrees();
+    if (orphans.length === 0) {
+      console.log(chalk.dim("No orphaned worktrees found"));
+      return;
+    }
+    console.log(chalk.yellow(`Found ${orphans.length} orphaned worktrees:`));
+    for (const id of orphans) console.log(`  ${id}`);
+    if (opts.dryRun) return;
+    const result = await core.cleanupWorktrees();
+    console.log(chalk.green(`Removed: ${result.removed}`));
+    if (result.errors.length) {
+      console.log(chalk.red(`Errors: ${result.errors.length}`));
+      for (const e of result.errors) console.log(chalk.dim(`  ${e}`));
+    }
+  });
+
 // ── Claude session discovery ────────────────────────────────────────────────
 
 const claudeCmd = program.command("claude").description("Interact with Claude Code sessions");
@@ -1383,6 +1403,28 @@ program.command("costs")
 
     if (costs.length > limit) {
       console.log(chalk.dim(`\n... and ${costs.length - limit} more sessions`));
+    }
+  });
+
+program.command("costs-sync")
+  .description("Backfill cost data from Claude transcripts")
+  .action(() => {
+    const result = core.syncCosts();
+    console.log(chalk.green(`Synced: ${result.synced} sessions, Skipped: ${result.skipped}`));
+  });
+
+program.command("costs-export")
+  .description("Export cost data")
+  .option("--format <format>", "csv or json", "json")
+  .option("-o, --output <file>", "Output file")
+  .action((opts) => {
+    const sessions = core.listSessions({ limit: 500 });
+    const data = opts.format === "csv" ? core.exportCostsCsv(sessions) : JSON.stringify(core.getAllSessionCosts(sessions), null, 2);
+    if (opts.output) {
+      writeFileSync(opts.output, data);
+      console.log(chalk.green(`Exported to ${opts.output}`));
+    } else {
+      console.log(data);
     }
   });
 

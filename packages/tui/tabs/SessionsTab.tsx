@@ -21,12 +21,14 @@ import { TalkToSession } from "./TalkToSession.js";
 import { CloneSession } from "./CloneSession.js";
 import { SessionReplay } from "./SessionReplay.js";
 import { McpManager } from "../components/McpManager.js";
+import { SkillsManager } from "../components/SkillsManager.js";
+import { SettingsPanel } from "../components/SettingsPanel.js";
 import { SessionSearch } from "../components/SessionSearch.js";
 import type { StoreData } from "../hooks/useStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { matchesHotkey } from "../../core/hotkeys.js";
 
-type Overlay = "move" | "group" | "talk" | "inbox" | "fork" | "search" | "replay" | "mcp" | "find" | null;
+type Overlay = "move" | "group" | "talk" | "inbox" | "fork" | "search" | "replay" | "mcp" | "skills" | "settings" | "find" | null;
 
 interface SessionsTabProps extends StoreData {
   asyncState: AsyncState;
@@ -75,7 +77,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   // Push/pop focus when overlay opens/closes
   useEffect(() => {
     if (overlay) focus.push(overlay);
-    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("fork"), focus.pop("search"), focus.pop("replay"), focus.pop("mcp"), focus.pop("find");
+    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("fork"), focus.pop("search"), focus.pop("replay"), focus.pop("mcp"), focus.pop("skills"), focus.pop("settings"), focus.pop("find");
   }, [overlay]);
 
   const selected = filteredTopLevel[sel] ?? null;
@@ -147,6 +149,9 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
       return;
     }
 
+    // Settings (no selection needed)
+    if (matchesHotkey("settings", input, key)) { setOverlay("settings"); return; }
+
     // Cancel pending confirms on unrelated keys
     if (confirmation.pending && !matchesHotkey("complete", input, key) && !matchesHotkey("delete", input, key)) {
       confirmation.cancel();
@@ -155,6 +160,24 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
     // Everything below requires a selected session
     if (!selected) return;
+
+    // Skills manager
+    if (matchesHotkey("skills", input, key)) { setOverlay("skills"); return; }
+
+    // Mark as waiting (unread)
+    if (matchesHotkey("markUnread", input, key)) {
+      core.updateSession(selected.id, { status: "waiting" });
+      status.show("Marked as waiting");
+      return;
+    }
+
+    // Import hint
+    if (input === "i") {
+      asyncState.run("Scanning tmux sessions...", async () => {
+        status.show("Import: use 'ark session start --claude-session <id>' from CLI");
+      });
+      return;
+    }
 
     if (key.return) {
       if (selected.status === "ready" || selected.status === "blocked") {
@@ -374,6 +397,17 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
           : overlay === "replay" && selected ? (
             <SessionReplay
               session={selected}
+              onClose={() => setOverlay(null)}
+            />
+          )
+          : overlay === "skills" && selected ? (
+            <SkillsManager
+              session={selected}
+              onClose={() => { setOverlay(null); refresh(); }}
+            />
+          )
+          : overlay === "settings" ? (
+            <SettingsPanel
               onClose={() => setOverlay(null)}
             />
           )

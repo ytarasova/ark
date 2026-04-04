@@ -132,6 +132,19 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         return jsonResponse(getGroups());
       }
 
+      // GET /api/costs/export
+      if (url.pathname === "/api/costs/export" && req.method === "GET") {
+        const format = url.searchParams.get("format") ?? "json";
+        const sessions = listSessions({ limit: 500 });
+        if (format === "csv") {
+          const { exportCostsCsv } = await import("./costs.js");
+          const csv = exportCostsCsv(sessions);
+          return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=ark-costs.csv", ...CORS } });
+        }
+        const costs = getAllSessionCosts(sessions);
+        return jsonResponse(costs);
+      }
+
       // GET /api/costs
       if (url.pathname === "/api/costs") {
         const sessions = listSessions({ limit: 500 });

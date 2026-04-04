@@ -19,6 +19,7 @@ import { CostsTab } from "./tabs/CostsTab.js";
 import * as core from "../core/index.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
+import { HelpOverlay } from "./components/HelpOverlay.js";
 import { TABS } from "./components/TabBar.js";
 
 export function App() {
@@ -62,6 +63,7 @@ function AppInner() {
   const [showForm, setShowForm] = useState<string | null>(null);
   const [sessionPrefill, setSessionPrefill] = useState<SessionPrefill | undefined>();
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [selectedSession, setSelectedSession] = useState<import("../core/store.js").Session | null>(null);
   const [pane, setPane] = useState<Pane>("left");
   const { stdout } = useStdout();
@@ -100,11 +102,18 @@ function AppInner() {
     });
   }, [asyncState]);
 
+  // Push/pop focus for help overlay
+  useEffect(() => {
+    if (showHelp) focus.push("help");
+    else focus.pop("help");
+  }, [showHelp]);
+
   // App-level shortcuts only fire when no child owns focus
   useInput((input, key) => {
     if (!focus.appActive) return;
 
     if (input === "q") { exit(); return; }
+    if (input === "?") { setShowHelp(true); return; }
     if (input === "p") { takeSnapshot(); return; }
 
     if (key.tab) {
@@ -210,6 +219,10 @@ function AppInner() {
       ) : tab === "costs" ? (
         <CostsTab />
       ) : null}
+
+      {showHelp && (
+        <HelpOverlay onClose={() => setShowHelp(false)} />
+      )}
 
       <EventLog
         expanded={eventLogExpanded}

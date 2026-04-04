@@ -33,6 +33,9 @@ const DEFAULTS: HotkeyMap = {
   filterFailed: "$",
   filterClear: "0",
   undo: "ctrl+z",
+  markUnread: "u",
+  skills: "K",
+  settings: "P",
 };
 
 let _hotkeys: HotkeyMap | null = null;

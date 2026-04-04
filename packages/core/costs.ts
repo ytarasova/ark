@@ -4,7 +4,10 @@
  */
 
 import type { TranscriptUsage } from "./claude.js";
-import type { Session } from "./store.js";
+import { parseTranscriptUsage } from "./claude.js";
+import { listSessions, getSession, updateSession, type Session } from "./store.js";
+import { readdirSync, statSync, existsSync } from "fs";
+import { join } from "path";
 
 // Pricing per million tokens
 const PRICING: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
@@ -103,4 +106,69 @@ export function checkBudget(sessions: Session[], budgets: BudgetConfig): BudgetS
     weekly: bucket(weeklySpent, budgets.weeklyLimit),
     monthly: bucket(monthlySpent, budgets.monthlyLimit),
   };
+}
+
+/** Sync cost data from Claude transcripts into session configs. */
+export function syncCosts(): { synced: number; skipped: number } {
+  const sessions = listSessions({ limit: 1000 });
+  let synced = 0;
+  let skipped = 0;
+
+  const claudeDir = join(process.env.HOME ?? "~", ".claude", "projects");
+  if (!existsSync(claudeDir)) return { synced: 0, skipped: 0 };
+
+  for (const session of sessions) {
+    // Skip sessions that already have usage data
+    if ((session.config as any)?.usage?.total_tokens > 0) { skipped++; continue; }
+
+    // Try to find transcript by claude_session_id
+    if (!session.claude_session_id) { skipped++; continue; }
+
+    // Search for the transcript file
+    try {
+      const projects = readdirSync(claudeDir);
+      for (const project of projects) {
+        const projectDir = join(claudeDir, project);
+        try {
+          const files = readdirSync(projectDir).filter(f => f.endsWith(".jsonl"));
+          for (const file of files) {
+            if (file.includes(session.claude_session_id!)) {
+              const transcriptPath = join(projectDir, file);
+              const usage = parseTranscriptUsage(transcriptPath);
+              if (usage.total_tokens > 0) {
+                updateSession(session.id, {
+                  config: { ...session.config, usage },
+                });
+                synced++;
+              }
+              break;
+            }
+          }
+        } catch { continue; }
+      }
+    } catch { skipped++; }
+  }
+
+  return { synced, skipped };
+}
+
+/** Export cost data as CSV string. */
+export function exportCostsCsv(sessions: Session[]): string {
+  const costs = getAllSessionCosts(sessions);
+  const lines = ["session_id,summary,model,cost_usd,input_tokens,output_tokens,cache_read,cache_write,total_tokens"];
+  for (const c of costs.sessions) {
+    const u = c.usage;
+    lines.push([
+      c.sessionId,
+      `"${(c.summary ?? "").replace(/"/g, '""')}"`,
+      c.model ?? "",
+      c.cost.toFixed(4),
+      u?.input_tokens ?? 0,
+      u?.output_tokens ?? 0,
+      u?.cache_read_input_tokens ?? 0,
+      u?.cache_creation_input_tokens ?? 0,
+      u?.total_tokens ?? 0,
+    ].join(","));
+  }
+  return lines.join("\n");
 }
