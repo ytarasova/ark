@@ -111,6 +111,12 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // --- API routes ---
 
+      // GET /api/openapi.json
+      if (url.pathname === "/api/openapi.json") {
+        const { generateOpenApiSpec } = await import("./openapi.js");
+        return jsonResponse(generateOpenApiSpec());
+      }
+
       // GET /api/status
       if (url.pathname === "/api/status" && req.method === "GET") {
         const sessions = listSessions({ limit: 500 });

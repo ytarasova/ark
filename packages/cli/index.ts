@@ -326,6 +326,32 @@ session.command("spawn")
     else console.log(chalk.red((r as { ok: false; message: string }).message));
   });
 
+session.command("spawn-subagent")
+  .description("Spawn a subagent with optional model/agent override")
+  .argument("<parent-id>")
+  .argument("<task>")
+  .option("-m, --model <model>", "Model override (e.g., haiku, sonnet, opus)")
+  .option("-a, --agent <agent>", "Agent override")
+  .option("-g, --group <name>", "Group name")
+  .option("-d, --dispatch", "Auto-dispatch after spawning")
+  .action(async (parentId, task, opts) => {
+    const r = core.spawnSubagent(parentId, {
+      task,
+      model: opts.model,
+      agent: opts.agent,
+      group_name: opts.group,
+    });
+    if (r.ok) {
+      console.log(chalk.green(`Subagent spawned → ${r.sessionId}`));
+      if (opts.dispatch && r.sessionId) {
+        const d = await core.dispatch(r.sessionId);
+        console.log(d.ok ? chalk.green(`Dispatched: ${d.message}`) : chalk.red(d.message));
+      }
+    } else {
+      console.log(chalk.red(r.message));
+    }
+  });
+
 session.command("join")
   .description("Join all forked children")
   .argument("<parent-id>")
@@ -1623,6 +1649,14 @@ program.command("web")
     console.log(chalk.dim("Press Ctrl+C to stop"));
     process.on("SIGINT", () => { server.stop(); process.exit(0); });
     await new Promise(() => {});
+  });
+
+// ── OpenAPI spec ──────────────────────────────────────────────────────────────
+
+program.command("openapi")
+  .description("Generate OpenAPI spec")
+  .action(() => {
+    console.log(JSON.stringify(core.generateOpenApiSpec(), null, 2));
   });
 
 // ── MCP proxy (internal, used by pooled MCP configs) ────────────────────────

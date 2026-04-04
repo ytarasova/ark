@@ -20,6 +20,21 @@ export interface RecipeVariable {
   default?: string;
 }
 
+export interface RecipeParameter {
+  key: string;
+  type: "string" | "number" | "boolean" | "select" | "file";
+  description?: string;
+  required?: boolean;
+  default?: string;
+  options?: string[];  // for "select" type
+}
+
+export interface SubRecipeRef {
+  name: string;        // identifier for this sub-recipe
+  recipe: string;      // recipe name to invoke
+  values?: Record<string, string>;  // pre-filled parameter values
+}
+
 export interface RecipeDefinition {
   name: string;
   description: string;
@@ -29,7 +44,9 @@ export interface RecipeDefinition {
   compute?: string;
   group?: string;
   variables: RecipeVariable[];
+  parameters?: RecipeParameter[];
   defaults?: Record<string, string>;
+  sub_recipes?: SubRecipeRef[];
   _source?: "builtin" | "project" | "global";
 }
 
@@ -118,6 +135,46 @@ export function deleteRecipe(name: string, scope: "project" | "global", projectR
     const path = join(dir, `${name}${ext}`);
     if (existsSync(path)) { unlinkSync(path); return; }
   }
+}
+
+/** Resolve a sub-recipe reference into a full recipe instance. */
+export function resolveSubRecipe(ref: SubRecipeRef, parentVars?: Record<string, string>): {
+  recipe: RecipeDefinition | null;
+  instance: RecipeInstance | null;
+} {
+  const recipe = loadRecipe(ref.recipe);
+  if (!recipe) return { recipe: null, instance: null };
+
+  const mergedValues = { ...parentVars, ...ref.values };
+  const instance = instantiateRecipe(recipe, mergedValues);
+  return { recipe, instance };
+}
+
+/** List sub-recipes available in a recipe. */
+export function listSubRecipes(recipeName: string): SubRecipeRef[] {
+  const recipe = loadRecipe(recipeName);
+  return recipe?.sub_recipes ?? [];
+}
+
+/** Validate parameter values against recipe parameter definitions. */
+export function validateRecipeParams(recipe: RecipeDefinition, values: Record<string, string>): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+  for (const param of recipe.parameters ?? []) {
+    const val = values[param.key];
+    if (param.required && !val && !param.default) {
+      errors.push(`Required parameter '${param.key}' is missing`);
+    }
+    if (val && param.type === "number" && isNaN(Number(val))) {
+      errors.push(`Parameter '${param.key}' must be a number`);
+    }
+    if (val && param.type === "boolean" && !["true", "false"].includes(val)) {
+      errors.push(`Parameter '${param.key}' must be true or false`);
+    }
+    if (val && param.type === "select" && param.options && !param.options.includes(val)) {
+      errors.push(`Parameter '${param.key}' must be one of: ${param.options.join(", ")}`);
+    }
+  }
+  return { ok: errors.length === 0, errors };
 }
 
 /** Create a recipe from an existing session's config */
