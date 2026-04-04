@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "bun:test";
 import { startWebServer } from "../web.js";
 import { withTestContext } from "./test-helpers.js";
 import { createSession } from "../store.js";
+import { remember } from "../memory.js";
 
 withTestContext();
 
@@ -118,5 +119,87 @@ describe("web server", () => {
     const data = await resp.json() as any;
     expect(data.ok).toBe(false);
     expect(data.message).toContain("Read-only");
+  });
+
+  // --- New endpoint tests ---
+
+  it("POST /api/sessions/:id/fork clones a session", async () => {
+    const s = createSession({ summary: "fork-me" });
+    server = startWebServer({ port: 18535 });
+    const resp = await fetch(`http://localhost:18535/api/sessions/${s.id}/fork`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "forked-copy" }),
+    });
+    expect(resp.status).toBe(200);
+    const data = await resp.json() as any;
+    expect(data.ok).toBe(true);
+    expect(data.sessionId).toBeDefined();
+  });
+
+  it("GET /api/profiles returns profile list", async () => {
+    server = startWebServer({ port: 18536 });
+    const resp = await fetch("http://localhost:18536/api/profiles");
+    expect(resp.status).toBe(200);
+    const data = await resp.json() as any;
+    expect(Array.isArray(data)).toBe(true);
+    expect(data.some((p: any) => p.name === "default")).toBe(true);
+  });
+
+  it("GET /api/search requires q param", async () => {
+    server = startWebServer({ port: 18538 });
+    const resp = await fetch("http://localhost:18538/api/search");
+    expect(resp.status).toBe(400);
+  });
+
+  it("GET /api/agents returns agent list", async () => {
+    server = startWebServer({ port: 18539 });
+    const resp = await fetch("http://localhost:18539/api/agents");
+    expect(resp.status).toBe(200);
+    const data = await resp.json() as any;
+    expect(Array.isArray(data)).toBe(true);
+  });
+
+  it("GET /api/memory returns memory list", async () => {
+    server = startWebServer({ port: 18540 });
+    const resp = await fetch("http://localhost:18540/api/memory");
+    expect(resp.status).toBe(200);
+    const data = await resp.json() as any;
+    expect(Array.isArray(data)).toBe(true);
+  });
+
+  it("GET /api/compute returns compute list", async () => {
+    server = startWebServer({ port: 18541 });
+    const resp = await fetch("http://localhost:18541/api/compute");
+    expect(resp.status).toBe(200);
+    const data = await resp.json() as any;
+    expect(Array.isArray(data)).toBe(true);
+  });
+
+  it("GET /api/config returns system config", async () => {
+    server = startWebServer({ port: 18542 });
+    const resp = await fetch("http://localhost:18542/api/config");
+    expect(resp.status).toBe(200);
+    const data = await resp.json() as any;
+    expect(data).toHaveProperty("hotkeys");
+    expect(data).toHaveProperty("theme");
+    expect(data).toHaveProperty("profile");
+  });
+
+  it("GET /api/sessions/:id/events returns events standalone", async () => {
+    const s = createSession({ summary: "events-test" });
+    server = startWebServer({ port: 18543 });
+    const resp = await fetch(`http://localhost:18543/api/sessions/${s.id}/events`);
+    expect(resp.status).toBe(200);
+    const data = await resp.json() as any;
+    expect(Array.isArray(data)).toBe(true);
+  });
+
+  it("GET /api/flows returns flow list", async () => {
+    server = startWebServer({ port: 18544 });
+    const resp = await fetch("http://localhost:18544/api/flows");
+    expect(resp.status).toBe(200);
+    const data = await resp.json() as any;
+    expect(Array.isArray(data)).toBe(true);
   });
 });
