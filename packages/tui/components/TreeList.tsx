@@ -71,9 +71,8 @@ export function TreeList<T>({
     return { sortedKeys: sk, groupMap: gm };
   }, [items, groupBy, emptyGroups]);
 
-  if (items.length === 0 && sortedKeys.filter(k => k !== "").length === 0) {
-    return <Text dimColor>{`  ${emptyMessage}`}</Text>;
-  }
+  // Hooks MUST be called before any early return (React rules of hooks)
+  const prevSelRef = useRef<T | null>(null);
 
   // Clamp sel to valid range to handle one-render-cycle delay from useListNavigation
   const clampedSel = items.length > 0 ? Math.min(sel, items.length - 1) : 0;
@@ -84,43 +83,50 @@ export function TreeList<T>({
   let visualIdx = 0;
   let selectedItem: T | null = null;
 
-  for (const groupName of sortedKeys) {
-    const entries = groupMap.get(groupName)!;
-    if (groupName) {
-      rows.push(
-        <Text key={`grp-${groupName}`} backgroundColor="gray" color="white">{` ${groupName} `}</Text>
-      );
-    }
-    if (entries.length === 0 && groupName) {
-      rows.push(<Text key={`empty-${groupName}`} dimColor>{"    (empty)"}</Text>);
-    }
-    for (const { item, flatIndex } of entries) {
-      const isSel = visualIdx === clampedSel;
-      visualIdx++;
-      if (isSel) { selRow = rows.length; selectedItem = item; }
-      rows.push(
-        <Box key={`item-${flatIndex}`} flexDirection="column">
-          {isSel ? (
-            <ListRow selected>{`> ${renderRow(item, true)}`}</ListRow>
-          ) : (
-            renderColoredRow
-              ? renderColoredRow(item)
-              : <Text wrap="truncate">{`  ${renderRow(item, false)}`}</Text>
-          )}
-          {renderChildren?.(item)}
-        </Box>
-      );
+  const isEmpty = items.length === 0 && sortedKeys.filter(k => k !== "").length === 0;
+
+  if (!isEmpty) {
+    for (const groupName of sortedKeys) {
+      const entries = groupMap.get(groupName)!;
+      if (groupName) {
+        rows.push(
+          <Text key={`grp-${groupName}`} backgroundColor="gray" color="white">{` ${groupName} `}</Text>
+        );
+      }
+      if (entries.length === 0 && groupName) {
+        rows.push(<Text key={`empty-${groupName}`} dimColor>{"    (empty)"}</Text>);
+      }
+      for (const { item, flatIndex } of entries) {
+        const isSel = visualIdx === clampedSel;
+        visualIdx++;
+        if (isSel) { selRow = rows.length; selectedItem = item; }
+        rows.push(
+          <Box key={`item-${flatIndex}`} flexDirection="column">
+            {isSel ? (
+              <ListRow selected>{`> ${renderRow(item, true)}`}</ListRow>
+            ) : (
+              renderColoredRow
+                ? renderColoredRow(item)
+                : <Text wrap="truncate">{`  ${renderRow(item, false)}`}</Text>
+            )}
+            {renderChildren?.(item)}
+          </Box>
+        );
+      }
     }
   }
 
   // Notify caller of selected item (avoids index mismatch when groupBy reorders)
-  const prevSelRef = useRef<T | null>(null);
   useEffect(() => {
     if (onSelect && selectedItem !== prevSelRef.current) {
       prevSelRef.current = selectedItem;
       onSelect(selectedItem);
     }
   }, [sel, items]);
+
+  if (isEmpty) {
+    return <Text dimColor>{`  ${emptyMessage}`}</Text>;
+  }
 
   return (
     <ScrollBox followIndex={selRow} active={false} reserveRows={9}>
