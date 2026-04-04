@@ -50,7 +50,7 @@ export { loadAgent, listAgents, saveAgent, deleteAgent, resolveAgent, buildClaud
 export { listSkills, loadSkill, saveSkill, deleteSkill, type SkillDefinition } from "./skill.js";
 
 // Recipe
-export { listRecipes, loadRecipe, instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecipes, type RecipeDefinition, type RecipeVariable, type RecipeParameter, type RecipeInstance, type SubRecipeRef } from "./recipe.js";
+export { listRecipes, loadRecipe, instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecipes, saveRecipe, deleteRecipe, sessionToRecipe, type RecipeDefinition, type RecipeVariable, type RecipeParameter, type RecipeInstance, type SubRecipeRef } from "./recipe.js";
 
 // Claude integration
 export * as claude from "./claude.js";
