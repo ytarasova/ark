@@ -23,7 +23,7 @@ export { getContext, type StoreContext } from "./context.js";
 
 // App context
 export { AppContext, getApp, setApp, clearApp } from "./app.js";
-export { loadConfig, type ArkConfig, type OtlpSettings } from "./config.js";
+export { loadConfig, type ArkConfig, type OtlpSettings, type RollbackSettings } from "./config.js";
 
 // Session lifecycle (the main API)
 export {
@@ -184,6 +184,9 @@ export { configureObservability, getObservabilityConfig, recordEvent, flush as f
 
 // OTLP observability
 export { configureOtlp, resetOtlp, flushSpans, startSpan, endSpan, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId, type OtlpConfig } from "./otlp.js";
+
+// Auto-rollback
+export { watchMergedPR, shouldRollback, allCompleted, createRevertPayload, pollCheckSuites, type RollbackConfig, type CheckSuiteResult, type RevertPayload } from "./rollback.js";
 
 // Structured JSONL logging
 export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponents, type LogComponent, type LogLevel } from "./structured-log.js";

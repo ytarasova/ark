@@ -7,6 +7,14 @@ export interface OtlpSettings {
   headers?: Record<string, string>;
 }
 
+export interface RollbackSettings {
+  enabled: boolean;
+  timeout: number;
+  on_timeout: "rollback" | "ignore";
+  auto_merge: boolean;
+  health_url: string | null;
+}
+
 export interface ArkConfig {
   arkDir: string;
   dbPath: string;
@@ -17,6 +25,7 @@ export interface ArkConfig {
   conductorUrl: string;
   env: "production" | "test";
   otlp: OtlpSettings;
+  rollback: RollbackSettings;
 }
 
 export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
@@ -34,6 +43,7 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
     conductorUrl: process.env.ARK_CONDUCTOR_URL ?? `http://localhost:${conductorPort}`,
     env: process.env.ARK_TEST_DIR !== undefined ? "test" : "production",
     otlp: { enabled: false },
+    rollback: { enabled: false, timeout: 600, on_timeout: "ignore", auto_merge: false, health_url: null },
   };
 
   if (overrides) {

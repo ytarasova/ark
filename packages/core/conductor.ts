@@ -7,6 +7,7 @@
  *   GET  /api/sessions           - list sessions
  *   GET  /api/sessions/:id       - get session detail
  *   GET  /api/events/:id         - get events
+ *   POST /hooks/github/merge     - GitHub PR merge webhook (auto-rollback)
  *   GET  /health                 - health check
  */
 
@@ -33,6 +34,7 @@ import { ArkdClient } from "../arkd/client.js";
 import { safeAsync } from "./safe.js";
 import { addEntry } from "./ledger.js";
 import { logError, logInfo } from "./structured-log.js";
+import { watchMergedPR, type RollbackConfig } from "./rollback.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -147,6 +149,61 @@ function handleRestApi(path: string): Response {
   return new Response("Not found", { status: 404 });
 }
 
+async function handlePRMergeWebhook(req: Request): Promise<Response> {
+  const payload = await req.json() as any;
+  if (payload.action !== "closed" || !payload.pull_request?.merged) {
+    return Response.json({ status: "ignored" });
+  }
+
+  const pr = payload.pull_request;
+  const repo = payload.repository;
+
+  // Find Ark session by branch or PR URL
+  const sessions = store.listSessions();
+  const matchedSession = sessions.find(s => {
+    const cfg = s.config as any;
+    return cfg?.pr_url === pr.html_url || cfg?.branch === pr.head?.ref;
+  });
+
+  if (!matchedSession) return Response.json({ status: "no_session" });
+
+  const config: RollbackConfig = (globalThis as any).__arkRollbackConfig ?? {
+    enabled: false, timeout: 600, on_timeout: "ignore", auto_merge: false, health_url: null,
+  };
+
+  if (!config.enabled) return Response.json({ status: "rollback_disabled" });
+
+  const ghToken = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+  const fetcher = async (sha: string) => {
+    const res = await fetch(
+      `https://api.github.com/repos/${repo.full_name}/commits/${sha}/check-suites`,
+      { headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json" } },
+    );
+    return res.json();
+  };
+
+  const healthFetcher = config.health_url
+    ? async () => { try { const res = await fetch(config.health_url!); return res.ok; } catch { return false; } }
+    : undefined;
+
+  const onRevert = async (revertPayload: any) => {
+    await fetch(`https://api.github.com/repos/${repo.full_name}/pulls`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+      body: JSON.stringify(revertPayload),
+    });
+  };
+
+  watchMergedPR({
+    sessionId: matchedSession.id, sha: pr.merge_commit_sha, owner: repo.owner.login,
+    repo: repo.name, prNumber: pr.number, prTitle: pr.title,
+    branch: pr.head.ref, baseBranch: pr.base.ref,
+    config, fetcher, healthFetcher, onRevert,
+  }).catch(e => logError("conductor", `rollback watcher error: ${e}`));
+
+  return Response.json({ status: "watching" });
+}
+
 // ── Server ──────────────────────────────────────────────────────────────────
 
 export function startConductor(port = DEFAULT_PORT, opts?: {
@@ -174,6 +231,10 @@ export function startConductor(port = DEFAULT_PORT, opts?: {
 
         if (req.method === "POST" && path === "/hooks/status") {
           return handleHookStatus(req, url);
+        }
+
+        if (req.method === "POST" && path === "/hooks/github/merge") {
+          return handlePRMergeWebhook(req);
         }
 
         if (req.method === "GET") {

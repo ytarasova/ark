@@ -169,6 +169,9 @@ export class AppContext {
     // 6b. Configure OTLP exporter
     configureOtlp(this.config.otlp);
 
+    // 6c. Store rollback config for conductor webhook handler
+    (globalThis as any).__arkRollbackConfig = this.config.rollback;
+
     // 7. Optionally start conductor (dynamic import to avoid circular deps)
     if (!this.options.skipConductor) {
       await safeAsync("boot: start conductor", async () => {
