@@ -1,14 +1,14 @@
 {
   "mcpServers": {
     "ark-channel": {
-      "command": "/home/ubuntu/.ark/bin/ark",
+      "command": "/Users/yana/.bun/bin/bun",
       "args": [
-        "channel"
+        "/Users/yana/Projects/ark/.worktrees/gap-closure/packages/core/channel.ts"
       ],
       "env": {
-        "ARK_SESSION_ID": "s-a9b0f2",
+        "ARK_SESSION_ID": "s-6c1a01",
         "ARK_STAGE": "work",
-        "ARK_CHANNEL_PORT": "20082",
+        "ARK_CHANNEL_PORT": "23745",
         "ARK_CONDUCTOR_URL": "http://localhost:19100"
       }
     }
