@@ -187,3 +187,12 @@ export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponent
 
 // Extension catalog
 export { EXTENSION_CATALOG, searchCatalog, getCatalogByCategory, getCatalogEntry, type ExtensionEntry } from "./extension-catalog.js";
+
+// Graph-based flow definitions
+export { parseGraphFlow, getSuccessors, getPredecessors, isJoinNode, isFanOutNode, topologicalSort, validateGraphFlow, type GraphFlow, type FlowNode, type FlowEdge } from "./graph-flow.js";
+
+// Composable termination conditions
+export { evaluateTermination, parseTermination, maxTurns, maxTokens, timeout, textMention, and, or, type TerminationCondition, type TerminationContext } from "./termination.js";
+
+// Flow state persistence
+export { saveFlowState, loadFlowState, markStageCompleted, setCurrentStage, isStageCompleted, deleteFlowState, type FlowState } from "./flow-state.js";
