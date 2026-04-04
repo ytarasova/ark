@@ -5,6 +5,11 @@ import { SessionList } from "./components/SessionList.js";
 import { SessionDetail } from "./components/SessionDetail.js";
 import { CostsView } from "./components/CostsView.js";
 import { StatusView } from "./components/StatusView.js";
+import { AgentsView } from "./components/AgentsView.js";
+import { ToolsView } from "./components/ToolsView.js";
+import { FlowsView } from "./components/FlowsView.js";
+import { ComputeView } from "./components/ComputeView.js";
+import { HistoryView } from "./components/HistoryView.js";
 import { NewSessionModal } from "./components/NewSessionModal.js";
 import { api } from "./hooks/useApi.js";
 import { useSse } from "./hooks/useSse.js";
@@ -69,7 +74,11 @@ function App() {
     }
   }
 
-  const viewTitles: Record<string, string> = { sessions: "Sessions", costs: "Costs", status: "System Status" };
+  const viewTitles: Record<string, string> = {
+    sessions: "Sessions", agents: "Agents", tools: "Tools",
+    flows: "Flows", history: "History", compute: "Compute",
+    costs: "Costs", status: "System",
+  };
 
   return (
     <div className="app">
@@ -89,6 +98,11 @@ function App() {
               onNewSession={() => setShowNew(true)} readOnly={readOnly}
             />
           )}
+          {view === "agents" && <AgentsView />}
+          {view === "tools" && <ToolsView />}
+          {view === "flows" && <FlowsView />}
+          {view === "history" && <HistoryView />}
+          {view === "compute" && <ComputeView />}
           {view === "costs" && <CostsView />}
           {view === "status" && <StatusView sessions={sessions} />}
         </div>

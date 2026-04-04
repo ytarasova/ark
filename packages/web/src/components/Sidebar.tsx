@@ -6,8 +6,13 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { id: "sessions", icon: "\u25B6", label: "Sessions" },
+  { id: "agents", icon: "\u2699", label: "Agents" },
+  { id: "tools", icon: "\u2692", label: "Tools" },
+  { id: "flows", icon: "\u21C4", label: "Flows" },
+  { id: "history", icon: "\u23F0", label: "History" },
+  { id: "compute", icon: "\u2601", label: "Compute" },
   { id: "costs", icon: "$", label: "Costs" },
-  { id: "status", icon: "\u2261", label: "System Status" },
+  { id: "status", icon: "\u2261", label: "System" },
 ];
 
 export function Sidebar({ activeView, onNavigate, readOnly }: SidebarProps) {
