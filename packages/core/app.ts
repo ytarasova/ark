@@ -12,6 +12,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 import { loadConfig, type ArkConfig } from "./config.js";
+import { configureOtlp } from "./otlp.js";
 import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
@@ -164,6 +165,9 @@ export class AppContext {
     // 6. Set up event bus
     this._eventBus = eventBus;
     this._eventBus.clear();
+
+    // 6b. Configure OTLP exporter
+    configureOtlp(this.config.otlp);
 
     // 7. Optionally start conductor (dynamic import to avoid circular deps)
     if (!this.options.skipConductor) {

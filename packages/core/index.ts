@@ -23,7 +23,7 @@ export { getContext, type StoreContext } from "./context.js";
 
 // App context
 export { AppContext, getApp, setApp, clearApp } from "./app.js";
-export { loadConfig, type ArkConfig } from "./config.js";
+export { loadConfig, type ArkConfig, type OtlpSettings } from "./config.js";
 
 // Session lifecycle (the main API)
 export {
@@ -181,6 +181,9 @@ export { loadEvalSuite, scoreOutput, saveEvalResults, listEvalSuites, summarizeR
 
 // Observability hooks
 export { configureObservability, getObservabilityConfig, recordEvent, flush as flushObservability, getEventBuffer, resetObservability, type ObservabilityConfig, type ObservabilityEvent } from "./observability.js";
+
+// OTLP observability
+export { configureOtlp, resetOtlp, flushSpans, startSpan, endSpan, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId, type OtlpConfig } from "./otlp.js";
 
 // Structured JSONL logging
 export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponents, type LogComponent, type LogLevel } from "./structured-log.js";

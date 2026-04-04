@@ -43,6 +43,7 @@ import { filterMessages, parseMessageFilter } from "./message-filter.js";
 import { logError, logInfo, logWarn } from "./structured-log.js";
 import { recordEvent } from "./observability.js";
 import { track } from "./telemetry.js";
+import { emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "./otlp.js";
 import { detectInjection } from "./prompt-guard.js";
 import { generateRepoMap, formatRepoMap } from "./repo-map.js";
 
@@ -130,6 +131,16 @@ export function startSession(opts: {
       stage: firstStage, actor: "system",
       data: { stage: firstStage, gate: "auto", stage_type: action.type, stage_agent: action.agent },
     });
+
+    emitSessionSpanStart(session.id, {
+      flow: mergedOpts.flow ?? "default",
+      repo: opts.repo,
+      agent: opts.agent ?? undefined,
+    });
+    if (firstStage) {
+      const stageAction = flow.getStageAction(mergedOpts.flow ?? "default", firstStage);
+      emitStageSpanStart(session.id, { stage: firstStage, agent: stageAction.agent, gate: "auto" });
+    }
   }
   return store.getSession(session.id)!;
 }
@@ -265,6 +276,10 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
         try { setCurrentStage(sessionId, graphNextStage, flowName); } catch { /* skip */ }
         store.updateSession(sessionId, { stage: graphNextStage, status: "ready" });
         store.logEvent(sessionId, "stage_advanced", { actor: "system", stage: graphNextStage, data: { via: "graph-flow", successors } });
+        emitStageSpanEnd(sessionId, { status: "completed" });
+        const graphAction = flow.getStageAction(flowName, graphNextStage);
+        const graphStageDef = flow.getStage(flowName, graphNextStage);
+        emitStageSpanStart(sessionId, { stage: graphNextStage, agent: graphAction?.agent, gate: graphStageDef?.gate });
         saveCheckpoint(sessionId);
         return { ok: true, message: `Advanced to ${graphNextStage} (graph-flow)` };
       }
@@ -282,6 +297,17 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
     });
     // Auto-clear unread badge so completed sessions don't show stale notifications
     store.markMessagesRead(sessionId);
+
+    emitStageSpanEnd(sessionId, { status: "completed" });
+    const s = store.getSession(sessionId);
+    const usage = (s?.config as any)?.usage;
+    emitSessionSpanEnd(sessionId, {
+      status: "completed",
+      tokens_in: usage?.input, tokens_out: usage?.output, tokens_cache: usage?.cache,
+      cost_usd: usage?.cost, turns: (s?.config as any)?.turns,
+    });
+    flushSpans();
+
     return { ok: true, message: "Flow completed" };
   }
 
@@ -299,6 +325,10 @@ export function advance(sessionId: string, force = false): { ok: boolean; messag
       forced: force,
     },
   });
+
+  emitStageSpanEnd(sessionId, { status: "completed" });
+  const nextStageDef = flow.getStage(flowName, nextStage);
+  emitStageSpanStart(sessionId, { stage: nextStage, agent: nextAction?.agent, gate: nextStageDef?.gate });
 
   // Checkpoint after advancing to new stage
   saveCheckpoint(sessionId);
@@ -339,6 +369,10 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
 
   // Observability: track session stop
   recordEvent({ type: "session_end", sessionId, data: { status: "stopped" } });
+
+  emitStageSpanEnd(sessionId, { status: "stopped" });
+  emitSessionSpanEnd(sessionId, { status: "stopped" });
+  flushSpans();
 
   return { ok: true, message: "Session stopped" };
 }

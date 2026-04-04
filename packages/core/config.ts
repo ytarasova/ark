@@ -1,6 +1,12 @@
 import { join } from "path";
 import { homedir } from "os";
 
+export interface OtlpSettings {
+  enabled: boolean;
+  endpoint?: string;
+  headers?: Record<string, string>;
+}
+
 export interface ArkConfig {
   arkDir: string;
   dbPath: string;
@@ -10,6 +16,7 @@ export interface ArkConfig {
   conductorPort: number;
   conductorUrl: string;
   env: "production" | "test";
+  otlp: OtlpSettings;
 }
 
 export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
@@ -26,6 +33,7 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
     conductorPort,
     conductorUrl: process.env.ARK_CONDUCTOR_URL ?? `http://localhost:${conductorPort}`,
     env: process.env.ARK_TEST_DIR !== undefined ? "test" : "production",
+    otlp: { enabled: false },
   };
 
   if (overrides) {
