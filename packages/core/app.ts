@@ -282,6 +282,15 @@ export class AppContext {
       this._eventBus = null;
     }
 
+    // 8b. Flush telemetry and OTLP before shutdown
+    try {
+      const { flush: flushTelemetry } = await import("./telemetry.js");
+      const { flushSpans, resetOtlp } = await import("./otlp.js");
+      await flushTelemetry();
+      await flushSpans();
+      resetOtlp();
+    } catch { /* best-effort */ }
+
     // 9. Clear provider resolver + app store bindings + close database
     clearProviderResolver();
     clearAppStore();

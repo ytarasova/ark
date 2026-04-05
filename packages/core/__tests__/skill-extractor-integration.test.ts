@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext, type TestContext } from "../context.js";
+import { describe, it, expect } from "bun:test";
+import { withTestContext } from "./test-helpers.js";
 import { extractAndSaveSkills } from "../skill-extractor.js";
 import { listSkills } from "../skill.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+withTestContext();
 
 describe("skill extraction integration", () => {
   it("extractAndSaveSkills saves high-confidence candidates as global skills", () => {

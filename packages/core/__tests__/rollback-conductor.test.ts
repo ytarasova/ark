@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext, type TestContext } from "../context.js";
+import { describe, it, expect } from "bun:test";
+import { withTestContext } from "./test-helpers.js";
 import { watchMergedPR, type RollbackConfig, type CheckSuiteResult } from "../rollback.js";
 import { createSession } from "../store.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+withTestContext();
 
 const config: RollbackConfig = {
   enabled: true, timeout: 2, on_timeout: "ignore", auto_merge: false, health_url: null,
@@ -55,5 +53,38 @@ describe("watchMergedPR integration", () => {
       onRevert: async () => {},
     });
     expect(result.action).toBe("none");
+  });
+
+  it("triggers rollback on timeout when on_timeout=rollback", async () => {
+    const session = createSession({ summary: "test" });
+    let reverted = false;
+    const fetcher = async () => ({
+      check_suites: [{ id: 1, conclusion: null, status: "in_progress" }] as CheckSuiteResult[],
+    });
+    const timeoutConfig = { ...config, timeout: 0, on_timeout: "rollback" as const };
+    const result = await watchMergedPR({
+      sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
+      prTitle: "test", branch: "feat/x", config: timeoutConfig, fetcher,
+      onRevert: async () => { reverted = true; },
+    });
+    expect(result.action).toBe("rollback");
+    expect(reverted).toBe(true);
+  });
+
+  it("triggers rollback when health check fails", async () => {
+    const session = createSession({ summary: "test" });
+    let reverted = false;
+    const fetcher = async () => ({
+      check_suites: [{ id: 1, conclusion: "success", status: "completed" }] as CheckSuiteResult[],
+    });
+    const healthConfig = { ...config, health_url: "http://localhost:19999/health" };
+    const result = await watchMergedPR({
+      sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
+      prTitle: "test", branch: "feat/x", config: healthConfig, fetcher,
+      healthFetcher: async () => false,
+      onRevert: async () => { reverted = true; },
+    });
+    expect(result.action).toBe("rollback");
+    expect(reverted).toBe(true);
   });
 });

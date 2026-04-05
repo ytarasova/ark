@@ -13,7 +13,7 @@ export interface OtlpConfig {
   headers?: Record<string, string>;
 }
 
-interface OtlpSpan {
+export interface OtlpSpan {
   traceId: string;
   spanId: string;
   parentSpanId?: string;

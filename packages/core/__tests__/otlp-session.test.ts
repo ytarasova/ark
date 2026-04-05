@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext, type TestContext } from "../context.js";
+import { withTestContext } from "./test-helpers.js";
 import { configureOtlp, resetOtlp, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId } from "../otlp.js";
 
-let ctx: TestContext;
+withTestContext();
+
 beforeEach(() => {
-  ctx = createTestContext(); setContext(ctx);
   resetOtlp();
   configureOtlp({ enabled: true, endpoint: "http://localhost:9999/v1/traces" });
 });
-afterEach(() => { resetOtlp(); ctx.cleanup(); });
+afterEach(() => { resetOtlp(); });
 
 describe("OTLP session integration", () => {
   it("emitSessionSpanStart creates a root span", () => {

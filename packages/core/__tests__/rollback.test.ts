@@ -1,13 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext, type TestContext } from "../context.js";
+import { describe, it, expect } from "bun:test";
+import { withTestContext } from "./test-helpers.js";
 import {
   pollCheckSuites, shouldRollback, createRevertPayload,
   type CheckSuiteResult, type RollbackConfig,
 } from "../rollback.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+withTestContext();
 
 const defaultConfig: RollbackConfig = {
   enabled: true, timeout: 10, on_timeout: "ignore", auto_merge: false, health_url: null,

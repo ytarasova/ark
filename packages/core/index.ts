@@ -184,7 +184,7 @@ export { loadEvalSuite, scoreOutput, saveEvalResults, listEvalSuites, summarizeR
 export { configureObservability, getObservabilityConfig, recordEvent, flush as flushObservability, getEventBuffer, resetObservability, type ObservabilityConfig, type ObservabilityEvent } from "./observability.js";
 
 // OTLP observability
-export { configureOtlp, resetOtlp, flushSpans, startSpan, endSpan, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId, type OtlpConfig } from "./otlp.js";
+export { configureOtlp, resetOtlp, flushSpans, startSpan, endSpan, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId, type OtlpConfig, type OtlpSpan } from "./otlp.js";
 
 // Auto-rollback
 export { watchMergedPR, shouldRollback, allCompleted, createRevertPayload, pollCheckSuites, type RollbackConfig, type CheckSuiteResult, type RevertPayload } from "./rollback.js";

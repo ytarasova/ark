@@ -3,7 +3,6 @@
  */
 
 import * as store from "./store.js";
-import { stop } from "./session.js";
 import { eventBus } from "./hooks.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -77,6 +76,7 @@ export async function watchMergedPR(opts: {
   fetcher: CheckSuiteFetcher;
   healthFetcher?: () => Promise<boolean>;
   onRevert: (payload: RevertPayload) => Promise<void>;
+  onStop?: (sessionId: string) => Promise<any>;
 }): Promise<{ action: "none" | "rollback"; reason?: string }> {
   const { config, fetcher } = opts;
   const deadline = Date.now() + config.timeout * 1000;
@@ -92,7 +92,7 @@ export async function watchMergedPR(opts: {
         baseBranch: opts.baseBranch, failedChecks,
       });
       await opts.onRevert(payload);
-      await stop(opts.sessionId);
+      if (opts.onStop) await opts.onStop(opts.sessionId);
       store.logEvent(opts.sessionId, "rollback", {
         actor: "system",
         data: { prNumber: opts.prNumber, failedChecks, revertBranch: payload.head },
@@ -114,7 +114,7 @@ export async function watchMergedPR(opts: {
             failedChecks: [`Health check failed: ${config.health_url}`],
           });
           await opts.onRevert(payload);
-          await stop(opts.sessionId);
+          if (opts.onStop) await opts.onStop(opts.sessionId);
           return { action: "rollback", reason: `Health check failed: ${config.health_url}` };
         }
       }

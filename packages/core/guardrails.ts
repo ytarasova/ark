@@ -47,6 +47,7 @@ export const DEFAULT_RULES: GuardrailRule[] = [
   { tool: "Bash", pattern: "DROP\\s+TABLE|DROP\\s+DATABASE", action: "block" },
   { tool: "Bash", pattern: ":\\(\\)\\{\\s*:|:&\\s*\\};:", action: "block" },
   { tool: "Bash", pattern: "mkfs\\.|fdisk|dd\\s+if=", action: "block" },
+  { tool: "Bash", pattern: "git\\s+push.*--force|git\\s+push.*-f\\b", action: "block" },
   { tool: "Read", pattern: "\\.env\"", action: "warn" },
   { tool: "Read", pattern: "credentials", action: "warn" },
   { tool: "Write", pattern: "\\.env\"", action: "warn" },

@@ -226,6 +226,7 @@ async function handlePRMergeWebhook(req: Request): Promise<Response> {
     repo: repo.name, prNumber: pr.number, prTitle: pr.title,
     branch: pr.head.ref, baseBranch: pr.base.ref,
     config, fetcher, healthFetcher, onRevert,
+    onStop: async (id) => { await session.stop(id); },
   }).catch(e => logError("conductor", `rollback watcher error: ${e}`));
 
   return Response.json({ status: "watching" });

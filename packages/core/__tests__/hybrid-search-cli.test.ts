@@ -1,12 +1,10 @@
 // packages/core/__tests__/hybrid-search-cli.test.ts
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext, type TestContext } from "../context.js";
+import { describe, it, expect } from "bun:test";
+import { withTestContext } from "./test-helpers.js";
 import { hybridSearch } from "../hybrid-search.js";
 import { remember } from "../memory.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+withTestContext();
 
 describe("hybridSearch sources filter", () => {
   it("queries only specified sources", async () => {
