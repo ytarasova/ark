@@ -132,7 +132,7 @@ export async function watchMergedPR(opts: {
       baseBranch: opts.baseBranch, failedChecks: ["Timeout: CI did not complete"],
     });
     await opts.onRevert(payload);
-    await stop(opts.sessionId);
+    if (opts.onStop) await opts.onStop(opts.sessionId);
     return { action: "rollback", reason: "Timeout" };
   }
 
