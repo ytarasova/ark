@@ -55,6 +55,34 @@ budgets:
 # Theme mode for the TUI. Options: dark, light, system
 # "system" auto-detects macOS dark mode setting.
 theme: dark
+
+# ── Default Compute ────────────────────────────────────────────────
+# Name of a provisioned compute resource to use by default.
+# Also settable via ARK_DEFAULT_COMPUTE env var.
+default_compute: null
+
+# ── OTLP (OpenTelemetry Traces) ───────────────────────────────────
+# Export session + stage spans to any OTLP/HTTP collector.
+otlp:
+  enabled: false
+  endpoint: http://localhost:4318/v1/traces
+  headers:
+    Authorization: "Bearer ..."
+
+# ── Rollback (Auto-Revert on CI Failure) ──────────────────────────
+# Revert merged PRs when CI fails post-merge.
+rollback:
+  enabled: false
+  timeout: 600        # seconds to wait for CI
+  on_timeout: ignore  # rollback | ignore
+  auto_merge: false   # auto-merge revert PR
+  health_url: null    # optional custom health endpoint
+
+# ── Telemetry ─────────────────────────────────────────────────────
+# Optional usage telemetry. Also enabled via ARK_TELEMETRY=1.
+telemetry:
+  enabled: false
+  endpoint: null      # HTTP endpoint for telemetry events
 ```
 
 ### Hotkey Remapping
@@ -111,6 +139,80 @@ budgets:
 All values are in USD. Omit a field to have no limit for that period. When a limit is approached or exceeded, Ark displays a warning before dispatching new sessions.
 
 Budget tracking uses token usage data collected from completed sessions.
+
+### OTLP (OpenTelemetry Traces)
+
+Export session and stage spans as OpenTelemetry traces.
+
+```yaml
+otlp:
+  enabled: true
+  endpoint: http://localhost:4318/v1/traces
+  headers:
+    Authorization: "Bearer ..."
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable OTLP trace export |
+| `endpoint` | string | -- | HTTP endpoint for OTLP/HTTP JSON traces |
+| `headers` | object | -- | Optional headers (e.g. auth tokens) sent with each request |
+
+When enabled, Ark emits one trace per session with child spans for each flow stage. Spans include session ID, agent, stage name, and duration. Compatible with any OTLP/HTTP collector (Jaeger, Grafana Tempo, Honeycomb, etc.).
+
+### Rollback (Auto-Revert on CI Failure)
+
+Automatically revert merged PRs when CI fails after merge.
+
+```yaml
+rollback:
+  enabled: false
+  timeout: 600        # seconds to wait for CI
+  on_timeout: ignore  # rollback | ignore
+  auto_merge: false   # auto-merge the revert PR
+  health_url: null    # optional custom health endpoint
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable auto-rollback pipeline |
+| `timeout` | number | `600` | Seconds to wait for CI check suites to complete |
+| `on_timeout` | `"rollback"` \| `"ignore"` | `"ignore"` | Action when CI times out |
+| `auto_merge` | boolean | `false` | Automatically merge the generated revert PR |
+| `health_url` | string \| null | `null` | Optional URL to poll after merge (returns non-2xx = failure) |
+
+When a session's PR is merged, the conductor receives a GitHub webhook at `POST /hooks/github/merge`. It polls CI check suites for the merge commit. If any check fails (or the health URL returns non-2xx), Ark creates a revert PR. If `auto_merge` is true, the revert PR is merged automatically.
+
+### Telemetry
+
+Optional anonymous usage telemetry.
+
+```yaml
+telemetry:
+  enabled: false
+  endpoint: null      # HTTP endpoint for telemetry events
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable telemetry event collection |
+| `endpoint` | string \| null | `null` | HTTP endpoint to POST telemetry events to |
+
+Disabled by default. Can also be enabled via the `ARK_TELEMETRY=1` environment variable. Events are buffered and flushed periodically or at shutdown.
+
+### Default Compute
+
+Set a default compute resource for new sessions.
+
+```yaml
+default_compute: my-ec2
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `default_compute` | string \| null | `null` | Name of the compute resource to use by default |
+
+Can also be set via the `ARK_DEFAULT_COMPUTE` environment variable. CLI flags and per-repo `.ark.yaml` `compute` field override this value.
 
 ### Theme Configuration
 
@@ -312,5 +414,7 @@ ark session start --repo . --flow bare
 | `ARK_SESSION_ID` | -- | Set in channel context |
 | `ARK_STAGE` | -- | Current flow stage in channel |
 | `ARK_PROFILE` | `default` | Active profile name |
+| `ARK_DEFAULT_COMPUTE` | -- | Default compute resource name for new sessions |
+| `ARK_TELEMETRY` | -- | Set to `1` to enable telemetry (overrides config) |
 | `ARK_TEST_DIR` | -- | Temp directory for test isolation (development only) |
 | `EDITOR` | `vi` | Editor for `ark config` and `ark agent create/edit` |
