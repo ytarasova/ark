@@ -1,0 +1,44 @@
+import {
+  createResponse, createErrorResponse, ErrorCodes,
+  type JsonRpcRequest, type JsonRpcResponse, type JsonRpcError,
+} from "../protocol/types.js";
+
+export type Handler = (params: Record<string, unknown>) => Promise<unknown>;
+
+export class Router {
+  private handlers = new Map<string, Handler>();
+  private initialized = false;
+  private requireInit = false;
+
+  handle(method: string, handler: Handler): void {
+    this.handlers.set(method, handler);
+  }
+
+  requireInitialization(): void {
+    this.requireInit = true;
+  }
+
+  markInitialized(): void {
+    this.initialized = true;
+  }
+
+  async dispatch(req: JsonRpcRequest): Promise<JsonRpcResponse | JsonRpcError> {
+    if (this.requireInit && !this.initialized && req.method !== "initialize") {
+      return createErrorResponse(req.id, ErrorCodes.NOT_INITIALIZED, "Not initialized — call initialize first");
+    }
+
+    const handler = this.handlers.get(req.method);
+    if (!handler) {
+      return createErrorResponse(req.id, ErrorCodes.METHOD_NOT_FOUND, `Unknown method: ${req.method}`);
+    }
+
+    try {
+      const result = await handler(req.params ?? {});
+      return createResponse(req.id, result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const code = (err as any)?.code ?? ErrorCodes.INTERNAL_ERROR;
+      return createErrorResponse(req.id, code, message);
+    }
+  }
+}
