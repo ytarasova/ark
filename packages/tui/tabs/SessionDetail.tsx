@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import type { Session, Event, SearchResult } from "../../core/index.js";
 import { ICON, getStatusColor } from "../constants.js";
 import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
@@ -13,30 +13,28 @@ import { KeyValue } from "../components/KeyValue.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 
 export interface SessionDetailProps {
-  session: core.Session | null;
-  sessions: core.Session[];
+  session: Session | null;
+  sessions: Session[];
   pane: "left" | "right";
   searchMode: boolean;
   searchQuery: string;
-  searchResults: core.SearchResult[] | null;
+  searchResults: SearchResult[] | null;
   onSearchToggle: (on: boolean) => void;
   onSearchQueryChange: (q: string) => void;
   onSearchSubmit: (q: string) => void;
 }
 
 export function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResults, onSearchToggle, onSearchQueryChange, onSearchSubmit }: SessionDetailProps) {
-  const [events, setEvents] = useState<core.Event[]>([]);
+  const ark = useArkClient();
+  const [events, setEvents] = useState<Event[]>([]);
   const [conversation, setConversation] = useState<{ role: string; content: string; timestamp: string }[]>([]);
 
   useEffect(() => {
     if (!s) { setEvents([]); return; }
-    try {
-      setEvents(core.getEvents(s.id, { limit: 50 }));
-    } catch {
-      setEvents([]);
-    }
+    ark.sessionEvents(s.id, 50).then(setEvents).catch(() => setEvents([]));
   }, [s?.id, s?.status]);
 
   // Load conversation history from Claude transcript (local sessions only)
@@ -46,14 +44,14 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
     // Only load FTS5 conversation for sessions with a local claude_session_id
     // Remote sessions would match wrong transcripts (e.g. our own session mentioning the ID)
     if (!s.claude_session_id) { setConversation([]); return; }
-    try {
-      setConversation(core.getSessionConversation(s.claude_session_id, { limit: 100 }));
-    } catch {
-      setConversation([]);
-    }
+    ark.sessionConversation(s.claude_session_id, 100).then(setConversation).catch(() => setConversation([]));
   }, [s?.id, s?.claude_session_id, s?.status]);
 
-  const channelPort = useMemo(() => s ? core.sessionChannelPort(s.id) : 0, [s?.id]);
+  // Channel port is deterministic: 19200 + (parseInt(id.replace("s-",""),16) % 1000)
+  const channelPort = useMemo(() => {
+    if (!s) return 0;
+    return 19200 + (parseInt(s.id.replace("s-", ""), 16) % 1000);
+  }, [s?.id]);
   const costInfo = useMemo(() => s ? getSessionCost(s) : null, [s?.id, s?.config]);
 
   // Sort search results by timestamp

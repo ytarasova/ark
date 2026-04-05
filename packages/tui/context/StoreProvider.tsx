@@ -7,8 +7,8 @@
  */
 
 import React, { createContext, useContext } from "react";
-import { useStore } from "../hooks/useStore.js";
-import type { StoreData } from "../hooks/useStore.js";
+import { useArkStore } from "../hooks/useArkStore.js";
+import type { StoreData } from "../hooks/useArkStore.js";
 
 const StoreContext = createContext<StoreData | null>(null);
 
@@ -19,7 +19,7 @@ interface StoreProviderProps {
 }
 
 export function StoreProvider({ children, store }: StoreProviderProps) {
-  const live = useStore();
+  const live = useArkStore();
   return (
     <StoreContext.Provider value={store ?? live}>
       {children}

@@ -4,9 +4,20 @@ import * as core from "../../core/index.js";
 export function registerResourceHandlers(router: Router): void {
   router.handle("agent/list", async () => ({ agents: core.listAgents() }));
   router.handle("flow/list", async () => ({ flows: core.listFlows() }));
+  router.handle("flow/read", async (p) => {
+    const flow = core.loadFlow(p.name as string);
+    if (!flow) throw new Error(`Flow '${p.name}' not found`);
+    return { flow };
+  });
   router.handle("skill/list", async () => ({ skills: core.listSkills() }));
   router.handle("skill/read", async (p) => ({ skill: core.loadSkill(p.name as string) }));
   router.handle("recipe/list", async () => ({ recipes: core.listRecipes() }));
+  router.handle("recipe/read", async (p) => {
+    const recipe = core.loadRecipe(p.name as string);
+    if (!recipe) throw new Error(`Recipe '${p.name}' not found`);
+    return { recipe };
+  });
+
   router.handle("recipe/use", async (p) => {
     const recipe = core.loadRecipe(p.name as string);
     if (!recipe) throw new Error(`Recipe '${p.name}' not found`);

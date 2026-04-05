@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
-import * as core from "../../core/index.js";
+import type { ClaudeSession, SearchResult } from "../../core/index.js";
 import { ago } from "../helpers.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
@@ -12,7 +12,8 @@ import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useFocus } from "../hooks/useFocus.js";
-import type { StoreData } from "../hooks/useStore.js";
+import { useArkClient } from "../hooks/useArkClient.js";
+import type { StoreData } from "../hooks/useArkStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 interface HistoryTabProps extends StoreData {
@@ -31,10 +32,10 @@ interface HistoryItem {
   summary: string;
   messageCount: number;
   arkSession?: any;
-  claudeSession?: core.ClaudeSession;
+  claudeSession?: ClaudeSession;
 }
 
-function buildHistoryItems(arkSessions: any[], claudeSessions: core.ClaudeSession[]): HistoryItem[] {
+function buildHistoryItems(arkSessions: any[], claudeSessions: ClaudeSession[]): HistoryItem[] {
   const items: HistoryItem[] = [];
   const boundClaudeIds = new Set(arkSessions.map(s => s.claude_session_id).filter(Boolean));
 
@@ -67,9 +68,10 @@ function buildHistoryItems(arkSessions: any[], claudeSessions: core.ClaudeSessio
 }
 
 export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, onImport }: HistoryTabProps) {
+  const ark = useArkClient();
   const focus = useFocus();
-  const [claudeSessions, setClaudeSessions] = useState<core.ClaudeSession[]>([]);
-  const [searchResults, setSearchResults] = useState<core.SearchResult[]>([]);
+  const [claudeSessions, setClaudeSessions] = useState<ClaudeSession[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [mode, setMode] = useState<"recent" | "search">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const status = useStatusMessage();
@@ -97,24 +99,23 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
     }
     // Use claude session ID for Claude sessions, ark session ID for ark sessions
     const convId = selectedItem.claudeSession?.sessionId || selectedItem.arkSession?.claude_session_id || selectedItem.id;
-    try {
-      const turns = core.getSessionConversation(convId, { limit: 50 });
-      setConversationPreview(turns.map(t => {
+    ark.sessionConversation(convId, 50).then((turns: any[]) => {
+      setConversationPreview(turns.map((t: any) => {
         const role = t.role === "user" ? "You" : "Claude";
         return `${role}: ${t.content}`;
       }));
-    } catch { setConversationPreview([]); }
+    }).catch(() => setConversationPreview([]));
   }, [selectedItem?.id]);
 
   // Load from cache (instant), then always refresh in background
   useEffect(() => {
-    const cached = core.listClaudeSessions({ limit: RECENT_LIMIT });
-    setClaudeSessions(cached);
+    ark.historyList(RECENT_LIMIT).then(setClaudeSessions);
 
     // Always refresh cache in background — picks up new sessions + fixes summaries
     asyncState.run("Refreshing...", async () => {
-      await core.refreshClaudeSessionsCache();
-      setClaudeSessions(core.listClaudeSessions({ limit: RECENT_LIMIT }));
+      await ark.historyRefresh();
+      const items = await ark.historyList(RECENT_LIMIT);
+      setClaudeSessions(items);
     });
   }, []);
 
@@ -141,18 +142,10 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
     // R (shift) — force full rebuild (clear cache first)
     if (input === "R" && mode !== "search") {
       asyncState.run("Full rebuild...", async () => {
-        const db = (await import("../../core/store.js")).getDb();
-        db.exec("DELETE FROM claude_sessions_cache");
-        db.exec("DELETE FROM transcript_index");
-        const sessionCount = await core.refreshClaudeSessionsCache({
-          onProgress: (done, total) => { status.show(`Scanning ${done}/${total} files...`); },
-        });
-        const indexCount = await core.indexTranscripts({
-          onProgress: (indexed, files) => { status.show(`Indexing ${files} files, ${indexed} entries...`); },
-        });
-        const sessions = core.listClaudeSessions({ limit: RECENT_LIMIT });
-        setClaudeSessions(sessions);
-        status.show(`Rebuilt: ${sessionCount} sessions, ${indexCount} indexed`);
+        status.show("Rebuilding...");
+        const result = await ark.historyRebuildFts();
+        setClaudeSessions(result.items);
+        status.show(`Rebuilt: ${result.sessionCount} sessions, ${result.indexCount} indexed`);
       });
       return;
     }
@@ -160,16 +153,10 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
     // r — incremental refresh + reindex
     if (input === "r" && mode !== "search") {
       asyncState.run("Refreshing...", async () => {
-        const sessionCount = await core.refreshClaudeSessionsCache({
-          onProgress: (done, total) => { status.show(`Scanning ${done}/${total} files...`); },
-        });
-        status.show(`Scanned ${sessionCount} sessions, indexing...`);
-        const indexCount = await core.indexTranscripts({
-          onProgress: (indexed, files) => { status.show(`Indexing ${files} files, ${indexed} entries...`); },
-        });
-        const sessions = core.listClaudeSessions({ limit: RECENT_LIMIT });
-        setClaudeSessions(sessions);
-        status.show(`${sessionCount} sessions, ${indexCount} indexed`);
+        status.show("Refreshing and indexing...");
+        const result = await ark.historyRefreshAndIndex();
+        setClaudeSessions(result.items);
+        status.show(`${result.sessionCount} sessions, ${result.indexCount} indexed`);
       });
       return;
     }
@@ -178,10 +165,9 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
   const doSearch = (query: string) => {
     if (!query.trim()) return;
     asyncState.run("Searching...", async () => {
-      const dbResults = core.searchSessions(query, { limit: 20 });
-      const txResults = core.searchTranscripts(query, { limit: 20 });
-      setSearchResults([...dbResults, ...txResults]);
-      status.show(`Found ${dbResults.length + txResults.length} result(s)`);
+      const results = await ark.historySearch(query, 20);
+      setSearchResults(results);
+      status.show(`Found ${results.length} result(s)`);
     });
   };
 

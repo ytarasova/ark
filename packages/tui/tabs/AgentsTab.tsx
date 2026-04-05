@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import { findProjectRoot, loadAgent, saveAgent, deleteAgent } from "../../core/index.js";
+import type { AgentDefinition } from "../../core/index.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
@@ -9,7 +10,7 @@ import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useFocus } from "../hooks/useFocus.js";
 import { AgentForm } from "../forms/AgentForm.js";
-import type { StoreData } from "../hooks/useStore.js";
+import type { StoreData } from "../hooks/useArkStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 interface AgentsTabProps extends StoreData {
@@ -24,7 +25,7 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
   const hasOverlay = formMode !== null;
   const { sel } = useListNavigation(agents.length, { active: pane === "left" && !hasOverlay });
   const status = useStatusMessage();
-  const projectRoot = useMemo(() => core.findProjectRoot(process.cwd()) ?? undefined, []);
+  const projectRoot = useMemo(() => findProjectRoot(process.cwd()) ?? undefined, []);
 
   const selected = agents[sel] ?? null;
 
@@ -58,7 +59,7 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
       const copyName = `${selected.name}-copy`;
       const scope = projectRoot ? "project" : "global";
       asyncState.run("Copying agent...", async () => {
-        core.saveAgent({ ...selected, name: copyName } as core.AgentDefinition, scope, scope === "project" ? projectRoot : undefined);
+        saveAgent({ ...selected, name: copyName } as AgentDefinition, scope, scope === "project" ? projectRoot : undefined);
         status.show(`Copied -> '${copyName}' (${scope})`);
         refresh();
       });
@@ -72,7 +73,7 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
       }
       const scope = selected._source as "project" | "global";
       asyncState.run("Deleting agent...", async () => {
-        core.deleteAgent(selected.name, scope, scope === "project" ? projectRoot : undefined);
+        deleteAgent(selected.name, scope, scope === "project" ? projectRoot : undefined);
         status.show(`Deleted '${selected.name}'`);
         refresh();
       });
@@ -114,7 +115,7 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
 // ── Detail ──────────────────────────────────────────────────────────────────
 
 function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
-  agent: core.AgentDefinition | null;
+  agent: AgentDefinition | null;
   pane: "left" | "right";
   statusMessage: string | null;
   projectRoot?: string;
@@ -124,7 +125,7 @@ function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
   }
 
   const a = useMemo(() => {
-    try { return core.loadAgent(agent.name, projectRoot); } catch { return null; }
+    try { return loadAgent(agent.name, projectRoot); } catch { return null; }
   }, [agent.name, projectRoot]);
   if (!a) return <Text dimColor>{"  Failed to load agent"}</Text>;
 

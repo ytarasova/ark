@@ -1,12 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Box, Text } from "ink";
-import * as core from "../../core/index.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
-import type { StoreData } from "../hooks/useStore.js";
+import { useArkClient } from "../hooks/useArkClient.js";
+import type { StoreData } from "../hooks/useArkStore.js";
 
 interface FlowsTabProps extends StoreData {
   pane: "left" | "right";
@@ -41,20 +41,25 @@ export function FlowsTab({ flows, pane }: FlowsTabProps) {
 // ── Detail ──────────────────────────────────────────────────────────────────
 
 interface FlowDetailProps {
-  flow: ReturnType<typeof core.listFlows>[number] | null;
+  flow: any | null;
   pane: "left" | "right";
 }
 
 function FlowDetail({ flow, pane }: FlowDetailProps) {
+  const ark = useArkClient();
+  const [p, setP] = useState<any>(null);
+
+  useEffect(() => {
+    if (!flow) { setP(null); return; }
+    ark.flowRead(flow.name).then(setP).catch(() => setP(null));
+  }, [flow?.name]);
+
   if (!flow) {
     return <Box flexGrow={1}><Text dimColor>{"  No flow selected."}</Text></Box>;
   }
 
-  const p = useMemo(() => {
-    try { return core.loadFlow(flow.name); } catch { return null; }
-  }, [flow.name]);
   if (!p) {
-    return <Text dimColor>{"  Failed to load flow"}</Text>;
+    return <Text dimColor>{"  Loading..."}</Text>;
   }
 
   return (
@@ -64,7 +69,7 @@ function FlowDetail({ flow, pane }: FlowDetailProps) {
 
       <Text> </Text>
       <SectionHeader title="Stages" />
-      {p.stages.map((s, i) => {
+      {p.stages.map((s: any, i: number) => {
         const type = s.type ?? (s.action ? "action" : "agent");
         const detail = s.agent ?? s.action ?? "";
         const opt = s.optional ? " (optional)" : "";

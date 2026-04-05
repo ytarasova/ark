@@ -1,6 +1,7 @@
 import type { Router } from "../router.js";
 import * as core from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
+import { getAllSessionCosts } from "../../core/costs.js";
 
 export function registerMetricsHandlers(router: Router): void {
   router.handle("metrics/snapshot", async (p) => {
@@ -13,5 +14,9 @@ export function registerMetricsHandlers(router: Router): void {
     return { snapshot };
   });
 
-  router.handle("costs/read", async () => ({ costs: [] }));
+  router.handle("costs/read", async () => {
+    const sessions = core.listSessions({ limit: 500 });
+    const { sessions: costs, total } = getAllSessionCosts(sessions);
+    return { costs, total };
+  });
 }

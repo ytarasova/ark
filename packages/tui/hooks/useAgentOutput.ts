@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import * as core from "../../core/index.js";
+import { getOutput } from "../../core/index.js";
 
 /**
  * Poll agent output for a running session via the provider-aware getOutput().
@@ -16,7 +16,7 @@ export function useAgentOutput(sessionId: string | null, tmuxName: string | null
 
     const poll = async () => {
       try {
-        const text = await core.getOutput(sessionId, { lines: 15 });
+        const text = await getOutput(sessionId, { lines: 15 });
         setOutput(text.trim());
       } catch {
         // session may be gone

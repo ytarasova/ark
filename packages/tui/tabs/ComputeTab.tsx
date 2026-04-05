@@ -4,7 +4,7 @@ import Spinner from "ink-spinner";
 import { execFile } from "child_process";
 import { join } from "path";
 import { homedir } from "os";
-import * as core from "../../core/index.js";
+import type { Session, Compute } from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
 import type { ComputeSnapshot } from "../../compute/types.js";
 import { SplitPane } from "../components/SplitPane.js";
@@ -17,7 +17,7 @@ import { DataTable } from "../components/DataTable.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useComputeActions } from "../hooks/useComputeActions.js";
 import { useFocus } from "../hooks/useFocus.js";
-import type { StoreData } from "../hooks/useStore.js";
+import type { StoreData } from "../hooks/useArkStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useConfirmation } from "../hooks/useConfirmation.js";
@@ -162,7 +162,7 @@ interface ComputePort {
   source: string;
 }
 
-function getComputePorts(sessions: core.Session[], computeName: string): ComputePort[] {
+function getComputePorts(sessions: Session[], computeName: string): ComputePort[] {
   const ports: ComputePort[] = [];
   for (const s of sessions) {
     if (s.compute_name !== computeName || s.status !== "running") continue;
@@ -175,10 +175,10 @@ function getComputePorts(sessions: core.Session[], computeName: string): Compute
 // -- Detail ------------------------------------------------------------------
 
 interface ComputeDetailProps {
-  compute: core.Compute | null;
+  compute: Compute | null;
   snapshot?: ComputeSnapshot;
   computeLogs?: string[];
-  sessions: core.Session[];
+  sessions: Session[];
   pane: "left" | "right";
 }
 
@@ -332,7 +332,7 @@ function ComputeDetail({ compute: h, snapshot, computeLogs, sessions, pane }: Co
 
 // -- Port list (memoized) ----------------------------------------------------
 
-function ComputePortList({ sessions, computeName }: { sessions: core.Session[]; computeName: string }) {
+function ComputePortList({ sessions, computeName }: { sessions: Session[]; computeName: string }) {
   const ports = useMemo(() => getComputePorts(sessions, computeName), [sessions, computeName]);
   if (ports.length === 0) return null;
   return (

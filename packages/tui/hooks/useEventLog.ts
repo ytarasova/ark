@@ -3,8 +3,8 @@
  * Polls on an interval via useEffect; data transform is pure.
  */
 
-import { useState, useEffect } from "react";
-import * as core from "../../core/index.js";
+import { useState, useEffect, useRef } from "react";
+import { listSessions, getEvents } from "../../core/index.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 
 export interface EventLogEntry {
@@ -30,10 +30,10 @@ function fetchEvents(expanded: boolean): EventLogEntry[] {
   const allEvents: EventLogEntry[] = [];
 
   try {
-    const sessions = core.listSessions({ limit: 15 });
+    const sessions = listSessions({ limit: 15 });
     for (const s of sessions) {
       try {
-        const evts = core.getEvents(s.id, { limit: expanded ? 10 : 3 });
+        const evts = getEvents(s.id, { limit: expanded ? 10 : 3 });
         for (const ev of evts) {
           const source = (s.summary ?? s.id).slice(0, 20);
           allEvents.push({

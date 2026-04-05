@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import type { Session } from "../../core/index.js";
 import { ScrollBox } from "../components/ScrollBox.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useMessages } from "../hooks/useMessages.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 export interface TalkToSessionProps {
-  session: core.Session | null;
+  session: Session | null;
   asyncState: AsyncState;
   onDone: (message?: string) => void;
 }
@@ -20,6 +20,7 @@ export function TalkToSession({ session, asyncState, onDone }: TalkToSessionProp
     sessionId: session?.id,
     pollMs: 2000,
     limit: 20,
+    asyncState,
   });
 
   useInput((input, key) => {

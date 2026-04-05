@@ -13,8 +13,27 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useArkClient } from "./useArkClient.js";
-import type { StoreData } from "./useStore.js";
 import type { ComputeSnapshot } from "../../compute/types.js";
+
+export interface StoreData {
+  sessions: any[];
+  computes: any[];
+  agents: any[];
+  flows: any[];
+  /** Unread message counts per session ID. */
+  unreadCounts: Map<string, number>;
+  /** Compute metrics snapshots by compute name. */
+  snapshots: Map<string, ComputeSnapshot>;
+  /** Activity logs per compute name. */
+  computeLogs: Map<string, string[]>;
+  /** Add a log entry for a compute. */
+  addComputeLog: (name: string, message: string) => void;
+  refreshing: boolean;
+  /** True until the first data fetch completes. */
+  initialLoading: boolean;
+  /** Force an immediate refresh (call after mutations like delete/stop). */
+  refresh: () => void;
+}
 
 export function useArkStore(): StoreData {
   const ark = useArkClient();

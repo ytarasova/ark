@@ -6,7 +6,7 @@
 import React from "react";
 import { render } from "ink-testing-library";
 import { StoreProvider, createMockStore } from "../context/StoreProvider.js";
-import type { StoreData } from "../hooks/useStore.js";
+import type { StoreData } from "../hooks/useArkStore.js";
 import type { Session, Compute } from "../../core/index.js";
 
 /** Render a component wrapped in StoreProvider with mock data. */

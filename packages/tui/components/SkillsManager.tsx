@@ -1,14 +1,18 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import { useArkClient } from "../hooks/useArkClient.js";
+import type { AsyncState } from "../hooks/useAsync.js";
 
 interface SkillsManagerProps {
   session: { id: string; workdir?: string | null; config: Record<string, unknown> };
+  asyncState?: AsyncState;
   onClose: () => void;
 }
 
-export function SkillsManager({ session, onClose }: SkillsManagerProps) {
-  const allSkills = useMemo(() => core.listSkills(), []);
+export function SkillsManager({ session, asyncState, onClose }: SkillsManagerProps) {
+  const ark = useArkClient();
+  const [allSkills, setAllSkills] = useState<any[]>([]);
+  useEffect(() => { ark.skillList().then(setAllSkills); }, []);
   const attached = useMemo(() => {
     const cfg = session.config as any;
     return (cfg?.skills as string[]) ?? [];
@@ -34,8 +38,14 @@ export function SkillsManager({ session, onClose }: SkillsManagerProps) {
       setToggleState(prev => { const next = new Map(prev); next.set(name, !next.get(name)); return next; });
     }
     if (key.return) {
-      const selected = skillNames.filter(n => toggleState.get(n));
-      core.updateSession(session.id, { config: { ...session.config, skills: selected } });
+      const sel = skillNames.filter(n => toggleState.get(n));
+      if (asyncState) {
+        asyncState.run("Updating skills...", async () => {
+          await ark.sessionUpdate(session.id, { config: { ...session.config, skills: sel } });
+        });
+      } else {
+        ark.sessionUpdate(session.id, { config: { ...session.config, skills: sel } });
+      }
       onClose();
     }
   });

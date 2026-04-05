@@ -1,20 +1,20 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import { buildReplay } from "../../core/index.js";
+import type { Session, ReplayStep } from "../../core/index.js";
 import { getTheme } from "../../core/theme.js";
 import { ScrollBox } from "../components/ScrollBox.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
-import type { ReplayStep } from "../../core/index.js";
 
 export interface SessionReplayProps {
-  session: core.Session;
+  session: Session;
   onClose: () => void;
 }
 
 /** Replay overlay - step through a session's event timeline */
 export function SessionReplay({ session, onClose }: SessionReplayProps) {
-  const steps = useMemo(() => core.buildReplay(session.id), [session.id]);
+  const steps = useMemo(() => buildReplay(session.id), [session.id]);
   const [sel, setSel] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [searchMode, setSearchMode] = useState(false);
@@ -77,7 +77,6 @@ export function SessionReplay({ session, onClose }: SessionReplayProps) {
   const clampedSel = Math.min(sel, Math.max(0, max));
   const selectedStep = filtered[clampedSel] ?? null;
 
-  const ago = session.updated_at ? core.safeParseConfig({}) /* unused, just for type */ : null;
   const flowLabel = session.flow ?? "default";
 
   return (

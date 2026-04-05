@@ -171,6 +171,15 @@ export class ArkClient {
     return turns;
   }
 
+  async sessionSearchConversation(sessionId: string, query: string): Promise<any[]> {
+    const { results } = await this.rpc("session/search-conversation", { sessionId, query });
+    return results;
+  }
+
+  async worktreeFinish(sessionId: string, opts?: { noMerge?: boolean }): Promise<any> {
+    return this.rpc("worktree/finish", { sessionId, ...opts });
+  }
+
   // ── Messaging ───────────────────────────────────────────────────────────────
 
   async messageSend(sessionId: string, content: string): Promise<void> {
@@ -197,6 +206,11 @@ export class ArkClient {
     return flows;
   }
 
+  async flowRead(name: string): Promise<any> {
+    const { flow } = await this.rpc("flow/read", { name });
+    return flow;
+  }
+
   async skillList(): Promise<any[]> {
     const { skills } = await this.rpc("skill/list");
     return skills;
@@ -210,6 +224,11 @@ export class ArkClient {
   async recipeList(): Promise<any[]> {
     const { recipes } = await this.rpc("recipe/list");
     return recipes;
+  }
+
+  async recipeRead(name: string): Promise<any> {
+    const { recipe } = await this.rpc("recipe/read", { name });
+    return recipe;
   }
 
   async recipeUse(name: string, variables?: Record<string, string>): Promise<any> {
@@ -318,8 +337,25 @@ export class ArkClient {
     return session;
   }
 
-  async historyRefresh(): Promise<{ ok: boolean; count: number }> {
+  async historyRefresh(): Promise<{ ok: boolean; count: number; sessionCount?: number }> {
     return this.rpc("history/refresh");
+  }
+
+  async historyIndex(): Promise<{ ok: boolean; count: number }> {
+    return this.rpc("history/index");
+  }
+
+  async historyRebuildFts(): Promise<{ ok: boolean; sessionCount: number; indexCount: number; items: any[] }> {
+    return this.rpc("history/rebuild-fts");
+  }
+
+  async historyRefreshAndIndex(): Promise<{ ok: boolean; sessionCount: number; indexCount: number; items: any[] }> {
+    return this.rpc("history/refresh-and-index");
+  }
+
+  async historySearch(query: string, limit?: number): Promise<any[]> {
+    const { results } = await this.rpc("history/search", { query, limit });
+    return results;
   }
 
   // ── Tools ───────────────────────────────────────────────────────────────────
@@ -331,6 +367,14 @@ export class ArkClient {
 
   async toolsDelete(id: string): Promise<void> {
     await this.rpc("tools/delete", { id });
+  }
+
+  async toolsDeleteItem(opts: { name: string; kind: string; source?: string; scope?: string; projectRoot?: string }): Promise<void> {
+    await this.rpc("tools/delete", opts);
+  }
+
+  async toolsRead(opts: { name: string; kind: string; projectRoot?: string }): Promise<any> {
+    return this.rpc("tools/read", opts);
   }
 
   async mcpAttach(sessionId: string, server: Record<string, unknown>): Promise<void> {
@@ -348,9 +392,8 @@ export class ArkClient {
     return snapshot;
   }
 
-  async costsRead(): Promise<any[]> {
-    const { costs } = await this.rpc("costs/read");
-    return costs;
+  async costsRead(): Promise<{ costs: any[]; total: number }> {
+    return this.rpc("costs/read");
   }
 
   // ── Teardown ────────────────────────────────────────────────────────────────

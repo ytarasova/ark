@@ -1,15 +1,24 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Box, Text } from "ink";
-import * as core from "../../core/index.js";
+import { useArkClient } from "../hooks/useArkClient.js";
+import { formatCost } from "../../core/costs.js";
 
 export function CostsTab() {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const ark = useArkClient();
+  const [costs, setCosts] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+
   useEffect(() => {
-    const interval = setInterval(() => setRefreshKey(k => k + 1), 10_000);
+    const fetch = () => {
+      ark.costsRead().then((result) => {
+        setCosts(result.costs);
+        setTotal(result.total);
+      }).catch(() => {});
+    };
+    fetch();
+    const interval = setInterval(fetch, 10_000);
     return () => clearInterval(interval);
   }, []);
-  const sessions = useMemo(() => core.listSessions({ limit: 500 }), [refreshKey]);
-  const { sessions: costs, total } = useMemo(() => core.getAllSessionCosts(sessions), [sessions]);
 
   // Per-model aggregation
   const byModel = useMemo(() => {
@@ -36,7 +45,7 @@ export function CostsTab() {
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
-        <Text bold color="green">Total: {core.formatCost(total)}</Text>
+        <Text bold color="green">Total: {formatCost(total)}</Text>
         <Text dimColor>  ({costs.length} sessions with usage data)</Text>
       </Box>
 
@@ -46,7 +55,7 @@ export function CostsTab() {
         {byModel.map(([model, data]) => (
           <Box key={model}>
             <Text>{model.padEnd(15)}</Text>
-            <Text color="yellow">{core.formatCost(data.cost).padEnd(10)}</Text>
+            <Text color="yellow">{formatCost(data.cost).padEnd(10)}</Text>
             <Text dimColor>{(data.tokens / 1000).toFixed(0)}K tokens</Text>
             <Text dimColor>  ({data.count} sessions)</Text>
           </Box>
@@ -59,7 +68,7 @@ export function CostsTab() {
         {costs.slice(0, 15).map((c) => (
           <Box key={c.sessionId}>
             <Text>{(c.summary ?? c.sessionId).slice(0, 35).padEnd(37)}</Text>
-            <Text color="yellow">{core.formatCost(c.cost).padEnd(10)}</Text>
+            <Text color="yellow">{formatCost(c.cost).padEnd(10)}</Text>
             <Text dimColor>{c.model ?? "?"}</Text>
           </Box>
         ))}

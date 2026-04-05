@@ -1,18 +1,21 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import type { Session } from "../../core/index.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 
 export interface MoveToGroupProps {
-  session: core.Session | null;
+  session: Session | null;
   onDone: (group: string | undefined) => void;
 }
 
 export function MoveToGroup({ session, onDone }: MoveToGroupProps) {
+  const ark = useArkClient();
   const [newGroup, setNewGroup] = useState("");
   const [mode, setMode] = useState<"pick" | "new">("pick");
-  const existing = useMemo(() => core.getGroups(), []);
+  const [existing, setExisting] = useState<string[]>([]);
+  useEffect(() => { ark.groupList().then((groups: any[]) => setExisting(groups.map((g: any) => g.name ?? g))); }, []);
 
   useInput((input, key) => {
     if (key.escape) onDone(undefined);

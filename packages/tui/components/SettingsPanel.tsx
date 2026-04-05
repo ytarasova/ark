@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import { getThemeMode, getActiveProfile, setThemeMode } from "../../core/index.js";
 
 interface SettingsPanelProps {
   onClose: () => void;
 }
 
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
-  const theme = core.getThemeMode();
-  const profile = core.getActiveProfile();
+  const theme = getThemeMode();
+  const profile = getActiveProfile();
   const [cursor, setCursor] = useState(0);
 
   const settings = [
@@ -25,7 +25,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       if (s.key === "theme" && s.options) {
         const idx = s.options.indexOf(s.value);
         const next = s.options[(idx + 1) % s.options.length];
-        core.setThemeMode(next as any);
+        setThemeMode(next as any);
       }
     }
   });

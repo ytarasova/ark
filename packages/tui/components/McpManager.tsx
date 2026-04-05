@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import { discoverTools, addMcpServer, removeMcpServer } from "../../core/index.js";
+import type { Session } from "../../core/index.js";
 import { EXTENSION_CATALOG } from "../../core/extension-catalog.js";
 
 interface McpManagerProps {
-  session: core.Session;
+  session: Session;
   onClose: () => void;
   onApply: () => void;
 }
@@ -19,7 +20,7 @@ export function McpManager({ session, onClose, onApply }: McpManagerProps) {
 
   // Discover currently attached servers
   const currentServers = useMemo(() => {
-    const tools = core.discoverTools(projectDir);
+    const tools = discoverTools(projectDir);
     return tools.filter(t => t.kind === "mcp-server").map(t => t.name);
   }, [projectDir]);
 
@@ -75,11 +76,11 @@ export function McpManager({ session, onClose, onApply }: McpManagerProps) {
           // Attach
           const catalogEntry = MCP_CATALOG[name];
           if (catalogEntry) {
-            core.addMcpServer(projectDir, name, catalogEntry);
+            addMcpServer(projectDir, name, catalogEntry);
           }
         } else if (!enabled && wasAttached) {
           // Detach
-          core.removeMcpServer(projectDir, name);
+          removeMcpServer(projectDir, name);
         }
       }
       onApply();

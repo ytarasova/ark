@@ -9,13 +9,13 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import type { Session } from "../../core/index.js";
 import { TextInputEnhanced } from "./TextInputEnhanced.js";
 import { ScrollBox } from "./ScrollBox.js";
 import { useMessages } from "../hooks/useMessages.js";
 
 interface ThreadsPanelProps {
-  sessions: core.Session[];
+  sessions: Session[];
   onDone: () => void;
 }
 
@@ -27,7 +27,7 @@ export function extractMentionPrefix(text: string): string | null {
 
 /** Filter sessions matching a prefix (case-insensitive, matches name or id) */
 export function filterSessionCompletions(
-  sessions: core.Session[],
+  sessions: Session[],
   prefix: string,
 ): { label: string; id: string }[] {
   const lower = prefix.toLowerCase();
@@ -48,7 +48,7 @@ export function filterSessionCompletions(
 export function parseMentions(
   text: string,
   sessionMap: Map<string, string>,
-  sessions: core.Session[],
+  sessions: Session[],
 ): { targetId: string | null; content: string } {
   const atMatch = text.match(/^@(\S+)\s+([\s\S]+)$/);
   let targetId: string | null = null;

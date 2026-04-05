@@ -13,7 +13,7 @@ import {
   FormPathField,
   useFormNavigation,
 } from "../components/form/index.js";
-import type { StoreData } from "../hooks/useStore.js";
+import type { StoreData } from "../hooks/useArkStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 export interface SessionPrefill {

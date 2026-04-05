@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import type { Session } from "../../core/index.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 
 export interface CloneSessionProps {
-  session: core.Session | null;
+  session: Session | null;
   onDone: (name: string | null) => void;
 }
 

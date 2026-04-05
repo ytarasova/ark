@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
-import * as core from "../../core/index.js";
+import type { Session, SearchResult } from "../../core/index.js";
 import { ICON, getStatusColor } from "../constants.js";
 import { ago } from "../helpers.js";
 import { SplitPane } from "../components/SplitPane.js";
@@ -14,6 +14,7 @@ import { useConfirmation } from "../hooks/useConfirmation.js";
 import { useAuthStatus } from "../hooks/useAuthStatus.js";
 import { useGroupActions } from "../hooks/useGroupActions.js";
 import { useFocus } from "../hooks/useFocus.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 import { SessionDetail } from "./SessionDetail.js";
 import { MoveToGroup } from "./MoveToGroup.js";
 import { GroupManager } from "./GroupManager.js";
@@ -24,7 +25,7 @@ import { McpManager } from "../components/McpManager.js";
 import { SkillsManager } from "../components/SkillsManager.js";
 import { SettingsPanel } from "../components/SettingsPanel.js";
 import { SessionSearch } from "../components/SessionSearch.js";
-import type { StoreData } from "../hooks/useStore.js";
+import type { StoreData } from "../hooks/useArkStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { matchesHotkey } from "../../core/hotkeys.js";
 
@@ -34,17 +35,18 @@ interface SessionsTabProps extends StoreData {
   asyncState: AsyncState;
   pane: "left" | "right";
   onShowForm: () => void;
-  onSelectionChange?: (session: core.Session | null) => void;
+  onSelectionChange?: (session: Session | null) => void;
   formOverlay?: React.ReactNode;
   refresh: () => void;
 }
 
 export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
+  const ark = useArkClient();
   const focus = useFocus();
   const [overlay, setOverlay] = useState<Overlay>(null);
   const confirmation = useConfirmation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<core.SearchResult[] | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const status = useStatusMessage();
 
@@ -98,16 +100,21 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
   );
 
   // Memoize group list — depends on sessions (groups derived from session group_names + groups table)
-  const groups = useMemo(() => core.getGroups(), [sessions]);
+  const [groups, setGroups] = useState<any[]>([]);
+  useEffect(() => { ark.groupList().then(setGroups); }, [sessions]);
 
   const actions = useSessionActions(asyncState);
   const groupActions = useGroupActions(asyncState);
 
   // Auth status for selected session's compute target
-  const selectedCompute = useMemo(
-    () => selected?.compute_name ? core.getCompute(selected.compute_name) : null,
-    [selected?.compute_name],
-  );
+  const [selectedCompute, setSelectedCompute] = useState<any>(null);
+  useEffect(() => {
+    if (selected?.compute_name) {
+      ark.computeRead(selected.compute_name).then(setSelectedCompute).catch(() => setSelectedCompute(null));
+    } else {
+      setSelectedCompute(null);
+    }
+  }, [selected?.compute_name]);
   const authStatus = useAuthStatus(selectedCompute);
 
   useInput((input, key) => {
@@ -164,17 +171,18 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     // Skills manager
     if (matchesHotkey("skills", input, key)) { setOverlay("skills"); return; }
 
-    // Mark as waiting (unread)
-    if (matchesHotkey("markUnread", input, key)) {
-      core.updateSession(selected.id, { status: "waiting" });
-      status.show("Marked as waiting");
+    // Clone session (C)
+    if (matchesHotkey("clone", input, key)) {
+      if (selected) setOverlay("fork");
       return;
     }
 
-    // Import hint
-    if (input === "i") {
-      asyncState.run("Scanning tmux sessions...", async () => {
-        status.show("Import: use 'ark session start --claude-session <id>' from CLI");
+    // Mark as waiting (unread)
+    if (matchesHotkey("markUnread", input, key)) {
+      asyncState.run("Marking as waiting...", async () => {
+        await ark.sessionUpdate(selected.id, { status: "waiting" });
+        status.show("Marked as waiting");
+        refresh();
       });
       return;
     }
@@ -212,8 +220,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
         const sid = selected.session_id;
         const selectedId = selected.id;
         asyncState.run("Attaching...", async () => {
-          const compute = selected?.compute_name ? core.getCompute(selected.compute_name) : null;
-          const attachCompute = compute ?? core.getCompute("local")!;
+          const compute = selected?.compute_name ? await ark.computeRead(selected.compute_name).catch(() => null) : null;
+          const attachCompute = compute ?? await ark.computeRead("local");
           const { getProvider } = await import("../../compute/index.js");
           const provider = getProvider(attachCompute.provider);
           if (!provider) { status.show("Provider not found"); return; }
@@ -269,7 +277,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     } else if (matchesHotkey("advance", input, key)) {
       if (selected && ["running", "waiting", "blocked"].includes(selected.status)) {
         asyncState.run("Advancing...", async () => {
-          const result = await core.advance(selected.id, true);
+          const result = await ark.sessionAdvance(selected.id, true);
           status.show(result.ok ? "Advanced to next stage" : result.message);
           refresh();
         });
@@ -277,7 +285,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
     } else if (matchesHotkey("worktreeFinish", input, key)) {
       if (selected && selected.workdir) {
         asyncState.run("Finishing worktree...", async () => {
-          const result = await core.finishWorktree(selected.id, { noMerge: false });
+          const result = await ark.worktreeFinish(selected.id, { noMerge: false });
           status.show(result.ok ? result.message : `Worktree: ${result.message}`);
           refresh();
         });
@@ -393,8 +401,8 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               session={selected}
               onDone={(group) => {
                 if (selected && group !== undefined) {
-                  asyncState.run("Moving session...", () => {
-                    core.updateSession(selected.id, { group_name: group || null });
+                  asyncState.run("Moving session...", async () => {
+                    await ark.sessionUpdate(selected.id, { group_name: group || null });
                     status.show(group ? `Moved to '${group}'` : "Removed from group");
                     refresh();
                   });
@@ -419,6 +427,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
           : overlay === "skills" && selected ? (
             <SkillsManager
               session={selected}
+              asyncState={asyncState}
               onClose={() => { setOverlay(null); refresh(); }}
             />
           )
@@ -452,8 +461,7 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
               onSearchSubmit={(q) => {
                 if (!selected || !q.trim()) return;
                 const convId = selected.claude_session_id || selected.id;
-                const results = core.searchSessionConversation(convId, q.trim());
-                setSearchResults(results);
+                ark.sessionSearchConversation(convId, q.trim()).then(setSearchResults);
               }}
             />
         }

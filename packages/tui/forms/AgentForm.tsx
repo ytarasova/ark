@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import { saveAgent } from "../../core/index.js";
+import type { AgentDefinition } from "../../core/index.js";
 import { useFormNavigation } from "../components/form/useFormNavigation.js";
 import { FormTextField } from "../components/form/FormTextField.js";
 import { FormSelectField } from "../components/form/FormSelectField.js";
@@ -10,7 +11,7 @@ import { openExternalEditor } from "../helpers/openExternalEditor.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 interface AgentFormProps {
-  agent?: core.AgentDefinition | null;
+  agent?: AgentDefinition | null;
   onDone: () => void;
   asyncState: AsyncState;
   projectRoot?: string;
@@ -75,7 +76,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
   submitRef.current = () => {
     if (!isEdit && !name.trim()) return;
 
-    const agentDef: Omit<core.AgentDefinition, "_source" | "_path"> = {
+    const agentDef: Omit<AgentDefinition, "_source" | "_path"> = {
       name: isEdit ? agent!.name : name.trim(),
       description,
       model,
@@ -94,7 +95,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
 
     submitForm({
       create: () => {
-        core.saveAgent(agentDef as core.AgentDefinition, saveScope, saveScope === "project" ? projectRoot : undefined);
+        saveAgent(agentDef as AgentDefinition, saveScope, saveScope === "project" ? projectRoot : undefined);
       },
       onDone,
       asyncState,

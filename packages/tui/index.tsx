@@ -7,6 +7,7 @@ import { AppContext, setApp } from "../core/app.js";
 import { loadConfig } from "../core/config.js";
 import { App } from "./App.js";
 import { AppProvider } from "./context/AppProvider.js";
+import { ArkClientProvider } from "./context/ArkClientProvider.js";
 
 // ── Boot application ────────────────────────────────────────────────────────
 const app = new AppContext(loadConfig());
@@ -47,7 +48,9 @@ try { process.stdin.setRawMode(true); process.stdin.setRawMode(false); } catch {
 try {
   const { waitUntilExit } = render(
     <AppProvider app={app}>
-      <App />
+      <ArkClientProvider>
+        <App />
+      </ArkClientProvider>
     </AppProvider>,
     { patchConsole: false, exitOnCtrlC: true },
   );

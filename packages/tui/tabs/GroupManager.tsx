@@ -1,21 +1,24 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
+import type { Session } from "../../core/index.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useGroupActions } from "../hooks/useGroupActions.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 export interface GroupManagerProps {
-  sessions: core.Session[];
+  sessions: Session[];
   asyncState: AsyncState;
   onDone: (message?: string) => void;
 }
 
 export function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps) {
+  const ark = useArkClient();
   const [action, setAction] = useState<"menu" | "create" | "delete">("menu");
   const [newName, setNewName] = useState("");
-  const existing = useMemo(() => core.getGroups(), []);
+  const [existing, setExisting] = useState<string[]>([]);
+  useEffect(() => { ark.groupList().then((groups: any[]) => setExisting(groups.map((g: any) => g.name ?? g))); }, []);
   const groupActs = useGroupActions(asyncState);
 
   useInput((input, key) => {
