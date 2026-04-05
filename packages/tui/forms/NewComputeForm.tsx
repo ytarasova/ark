@@ -1,9 +1,8 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
-import * as core from "../../core/index.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 import { generateName, getAwsProfiles } from "../helpers.js";
-import { submitForm } from "./submitForm.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
@@ -54,6 +53,7 @@ const PROVIDER_OPTIONS = [
 ];
 
 export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
+  const ark = useArkClient();
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState(generateName());
   const [provider, setProvider] = useState("");
@@ -81,11 +81,9 @@ export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
       setStep("image");
     } else {
       // Create non-EC2/non-Docker compute directly
-      submitForm({
-        create: () => core.createCompute({ name: name.trim(), provider: item.value, config: {} }),
-        onDone,
-        asyncState,
-        confirmLabel: `Created '${name.trim()}'`,
+      onDone();
+      asyncState.run(`Creating '${name.trim()}'...`, async () => {
+        await ark.computeCreate({ name: name.trim(), provider: item.value, config: {} });
       });
     }
   };
@@ -93,11 +91,9 @@ export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
   // Docker: submit image name
   const handleSubmitImage = () => {
     const img = image.trim() || "ubuntu:22.04";
-    submitForm({
-      create: () => core.createCompute({ name: name.trim(), provider: "docker", config: { image: img } }),
-      onDone,
-      asyncState,
-      confirmLabel: `Created '${name.trim()}'  - press Enter to provision`,
+    onDone();
+    asyncState.run(`Creating '${name.trim()}'...`, async () => {
+      await ark.computeCreate({ name: name.trim(), provider: "docker", config: { image: img } });
     });
   };
 
@@ -118,22 +114,18 @@ export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
 
   const handleSelectProfile = (item: { label: string; value: string }) => {
     const trimmedName = name.trim();
-    submitForm({
-      create: () => {
-        core.createCompute({
-          name: trimmedName,
-          provider,
-          config: {
-            size,
-            arch,
-            region,
-            ...(item.value ? { aws_profile: item.value } : {}),
-          },
-        });
-      },
-      onDone,
-      asyncState,
-      confirmLabel: `Created '${trimmedName}'  - press Enter to provision`,
+    onDone();
+    asyncState.run(`Creating '${trimmedName}'...`, async () => {
+      await ark.computeCreate({
+        name: trimmedName,
+        provider,
+        config: {
+          size,
+          arch,
+          region,
+          ...(item.value ? { aws_profile: item.value } : {}),
+        },
+      });
     });
   };
 

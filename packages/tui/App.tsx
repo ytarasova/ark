@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import { execFile } from "child_process";
-import { useStore } from "./hooks/useStore.js";
+import { useArkClient } from "./hooks/useArkClient.js";
+import { useArkStore } from "./hooks/useArkStore.js";
 import { useAsync } from "./hooks/useAsync.js";
 import { FocusProvider, useFocus } from "./hooks/useFocus.js";
 import { TabBar } from "./components/TabBar.js";
@@ -16,7 +17,7 @@ import { FlowsTab } from "./tabs/FlowsTab.js";
 import { HistoryTab } from "./tabs/HistoryTab.js";
 import { ToolsTab } from "./tabs/ToolsTab.js";
 import { CostsTab } from "./tabs/CostsTab.js";
-import * as core from "../core/index.js";
+import { loadUiState, saveUiState } from "../core/ui-state.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
 import { HelpOverlay } from "./components/HelpOverlay.js";
@@ -32,23 +33,16 @@ export function App() {
 
 function AppInner() {
   const { exit } = useApp();
-  const store = useStore();
+  const ark = useArkClient();
+  const store = useArkStore();
   const focus = useFocus();
   const sessionsAsync = useAsync(store.refresh);
   const agentsAsync = useAsync(store.refresh);
   const historyAsync = useAsync(store.refresh);
   const computeAsync = useAsync(store.refresh);
 
-  // Multi-instance registration
-  const instanceRef = useRef<{ stop: () => void; isPrimary: () => boolean } | null>(null);
-  useEffect(() => {
-    const id = `tui-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    instanceRef.current = core.registerInstance(id);
-    return () => { instanceRef.current?.stop(); };
-  }, []);
-
   // Restore persisted tab on mount
-  const savedState = useMemo(() => core.loadUiState(), []);
+  const savedState = useMemo(() => loadUiState(), []);
   const [tab, setTab] = useState<Tab>(() => {
     const saved = TABS[savedState.activeTab];
     return saved ?? "sessions";
@@ -57,7 +51,7 @@ function AppInner() {
   // Persist tab changes
   useEffect(() => {
     const tabIndex = TABS.indexOf(tab);
-    core.saveUiState({ activeTab: tabIndex >= 0 ? tabIndex : 0 });
+    saveUiState({ activeTab: tabIndex >= 0 ? tabIndex : 0 });
   }, [tab]);
 
   const [showForm, setShowForm] = useState<string | null>(null);
@@ -179,7 +173,7 @@ function AppInner() {
           refresh={store.refresh}
           onUseRecipe={(instance) => {
             sessionsAsync.run("Creating session...", async () => {
-              core.startSession({
+              await ark.sessionStart({
                 summary: instance.summary,
                 repo: instance.repo,
                 flow: instance.flow,

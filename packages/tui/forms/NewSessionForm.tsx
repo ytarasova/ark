@@ -2,10 +2,9 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import { existsSync } from "fs";
 import { resolve as resolvePath, basename } from "path";
-import * as core from "../../core/index.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 import { loadRepoConfig } from "../../core/repo-config.js";
 import { getIsolationModes } from "../../compute/index.js";
-import { submitForm } from "./submitForm.js";
 import { addRecentRepo } from "../helpers/recentRepos.js";
 import { generateName } from "../helpers.js";
 import {
@@ -38,6 +37,7 @@ interface NewSessionFormProps {
 // Isolation choices are provider-driven — see ComputeProvider.isolationModes
 
 export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessionFormProps) {
+  const ark = useArkClient();
   const [name, setName] = useState(prefill?.summary || prefill?.name || generateName());
   const [repoPath, setRepoPath] = useState(prefill?.repo || process.cwd());
   const [isolation, setIsolation] = useState("worktree");
@@ -92,13 +92,15 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
     return fromStore;
   }, [store.flows]);
 
-  const groupChoices = useMemo(() => {
-    const existing = core.getGroups();
-    return [
-      { label: "(none)", value: "" },
-      ...existing.map(g => ({ label: g, value: g })),
-    ];
-  }, []);
+  const [groupChoices, setGroupChoices] = useState([{ label: "(none)", value: "" }]);
+  useEffect(() => {
+    ark.groupList().then((groups) => {
+      setGroupChoices([
+        { label: "(none)", value: "" },
+        ...groups.map((g: string) => ({ label: g, value: g })),
+      ]);
+    }).catch(() => { /* keep default */ });
+  }, [ark]);
 
   const submit = () => {
     let workdir: string | undefined;
@@ -117,34 +119,27 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
       .replace(/^-|-$/g, "")
       .slice(0, 60) || generateName();
 
-    let sessionId = "";
-    submitForm({
-      create: () => {
-        const s = core.startSession({
-          summary: sanitized,
-          repo,
-          flow: flowName,
-          agent: prefill?.agent || undefined,
-          workdir,
-          compute_name: computeName || undefined,
-          group_name: groupName || undefined,
-          config: { worktree: isolation === "worktree" },
-        });
-        sessionId = s.id;
-        if (prefill?.claudeSessionId) {
-          core.updateSession(s.id, { claude_session_id: prefill.claudeSessionId });
-        }
-        store.refresh();
-      },
-      onDone,
-      asyncFollowUp: {
-        label: "Dispatching session",
-        action: async (updateLabel) => {
-          await core.dispatch(sessionId, { onLog: (msg) => updateLabel(msg) });
-          store.refresh();
-        },
-      },
-      asyncState,
+    // Close form before async work so React unmount doesn't cancel it
+    onDone();
+
+    asyncState.run("Creating session...", async (updateLabel) => {
+      const s = await ark.sessionStart({
+        summary: sanitized,
+        repo,
+        flow: flowName,
+        agent: prefill?.agent || undefined,
+        workdir,
+        compute_name: computeName || undefined,
+        group_name: groupName || undefined,
+        config: { worktree: isolation === "worktree" },
+      });
+      if (prefill?.claudeSessionId) {
+        await ark.sessionUpdate(s.id, { claude_session_id: prefill.claudeSessionId });
+      }
+      store.refresh();
+      updateLabel("Dispatching session...");
+      await ark.sessionDispatch(s.id);
+      store.refresh();
     });
   };
 
