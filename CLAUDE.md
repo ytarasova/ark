@@ -6,7 +6,7 @@ Autonomous agent ecosystem. Orchestrates Claude agents through multi-stage SDLC 
 
 ```bash
 make install          # bun install + symlink ark to /usr/local/bin
-make test             # bun test (NOT vitest - tests use bun:test)
+make test             # bun test --concurrency 1 (NOT vitest - tests use bun:test, NEVER parallel)
 make dev              # tsc --watch
 make tui              # ark tui
 ./ark <command>       # run CLI directly via bun
@@ -80,15 +80,17 @@ If you add a Session field, update the `fieldMap` in `packages/core/store.ts` â†
 
 Tests use `bun:test`, not vitest. Run with `bun test` or `make test`.
 
-**E2E tests need `dist/` built.** CLI E2E tests (`e2e-cli.test.ts`) and TUI real tests (`e2e-tui-real.test.ts`) import from `dist/` - run `make dev` or `tsc` first. Unit tests run from source.
-
-**Pre-existing flaky tests.** `session-stop-resume.test.ts:182` ("resume returns ok: false for completed session") and `useStore.test.tsx` ("refresh() picks up new data immediately") are known flakes. Don't chase them.
+**NEVER run tests in parallel.** Tests share ports (19100, 19200, 19300), globalThis state, and SQLite databases. Bun runs test files concurrently by default which causes cross-test contamination â€” port collisions, leaked state, phantom failures. Always run tests sequentially with `--concurrency 1`:
 
 ```bash
-bun test                        # all tests
-bun test packages/core          # core only
-bun test --watch                # watch mode
+bun test --concurrency 1                        # all tests (sequential)
+bun test --concurrency 1 packages/core          # core only
+bun test packages/core/__tests__/session.test.ts # single file is always safe
 ```
+
+If you see tests that pass individually but fail in the full suite, it's a parallelism issue, not a code bug.
+
+**E2E tests need `dist/` built.** CLI E2E tests (`e2e-cli.test.ts`) and TUI real tests (`e2e-tui-real.test.ts`) import from `dist/` - run `make dev` or `tsc` first. Unit tests run from source.
 
 **Test isolation pattern** - every test must manually create and clean up context:
 ```ts

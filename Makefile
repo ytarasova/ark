@@ -19,8 +19,8 @@ dev: ## Start TypeScript watcher
 tui: ## Launch the terminal UI
 	./ark tui
 
-test: ## Run tests
-	$(BUN) test
+test: ## Run tests (sequential — never parallel, ports collide)
+	$(BUN) test --concurrency 1
 
 test-watch: ## Run tests in watch mode
 	$(BUN) run test:watch
