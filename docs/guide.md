@@ -391,6 +391,27 @@ ark skill list              # List available skills
 ark skill show code-review  # Show skill content
 ```
 
+### Creating and Deleting Skills
+
+```bash
+# Create a skill inline
+ark skill create my-skill -d "Review checklist" -p "Always check for..."
+
+# Create from a YAML file
+ark skill create --from my-skill.yaml
+
+# Create a project-scoped skill (saved to .ark/skills/)
+ark skill create my-skill -d "..." -p "..." --scope project --tags "review,quality"
+
+# Delete a skill (global or project scope -- cannot delete builtins)
+ark skill delete my-skill
+ark skill delete my-skill --scope project
+```
+
+### Skill Extraction
+
+When a session completes its flow, Ark automatically analyzes the conversation transcript for reusable patterns -- multi-step procedures, repeated methodology, and structured approaches. High-confidence candidates (scored >= 0.6) are saved as global skills with names like `extracted-<sessionId>-0`. This is best-effort and runs silently; extraction failures never block session completion.
+
 ### Recipes
 
 Recipes are session templates with variables. Same three-tier resolution as skills.
@@ -402,6 +423,23 @@ ark session start --recipe quick-fix --repo . --dispatch
 ```
 
 Builtin recipes: `quick-fix`, `feature-build`, `code-review`, `fix-bug`, `new-feature`.
+
+### Creating and Deleting Recipes
+
+```bash
+# Create from a YAML file
+ark recipe create --from my-recipe.yaml
+
+# Create from an existing session (captures its flow, agent, repo, summary as a template)
+ark recipe create --from-session s-a1b2c3 --name my-recipe
+
+# Project-scoped recipe
+ark recipe create --from my-recipe.yaml --scope project
+
+# Delete a recipe (cannot delete builtins)
+ark recipe delete my-recipe
+ark recipe delete my-recipe --scope project
+```
 
 ---
 
@@ -657,6 +695,17 @@ ark search-all "error" --days 30               # Last 30 days only
 ark search-all "refactor" --limit 50           # More results
 ```
 
+### Hybrid Search
+
+Use `--hybrid` to search across memory, knowledge, and transcripts simultaneously. Results are deduplicated and re-ranked by Claude Haiku for relevance (requires `ANTHROPIC_API_KEY`):
+
+```bash
+ark search "authentication" --hybrid           # Unified search with LLM re-ranking
+ark search "auth" --hybrid --limit 30          # More results
+```
+
+Each result shows its source (`memory`, `knowledge`, or `transcript`) and a relevance score. Without an API key, results are returned in score order without LLM re-ranking.
+
 ### FTS5 Index
 
 For fast transcript search, build the full-text search index:
@@ -739,6 +788,168 @@ The OAuth token is saved to `~/.ark/claude-oauth-token` and picked up automatica
 
 ---
 
+## OTLP Observability
+
+Ark can export session and stage lifecycle as OpenTelemetry traces to any OTLP HTTP collector. No OpenTelemetry SDK is required -- Ark posts OTLP JSON directly.
+
+### Configuration
+
+Add an `otlp:` block to `~/.ark/config.yaml`:
+
+```yaml
+otlp:
+  enabled: true
+  endpoint: "http://localhost:4318/v1/traces"
+  headers:
+    Authorization: "Bearer my-token"
+```
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `enabled` | yes | Set to `true` to activate trace export |
+| `endpoint` | yes | OTLP HTTP endpoint (e.g., Jaeger, Grafana Tempo, Honeycomb) |
+| `headers` | no | Extra HTTP headers (auth tokens, API keys) |
+
+### What gets traced
+
+- **Session span**: one span per session lifecycle (start to completion/failure), tagged with session ID, flow, repo, agent, token counts, and cost.
+- **Stage spans**: child spans nested under the session span, one per flow stage (plan, implement, review, etc.), tagged with agent and gate type.
+
+Spans are buffered and flushed every 30 seconds. Export is fire-and-forget -- collector failures do not affect session execution.
+
+---
+
+## Auto-Rollback
+
+Ark can monitor merged PRs for CI failures and automatically create revert PRs when checks fail.
+
+### Configuration
+
+Add a `rollback:` block to `~/.ark/config.yaml`:
+
+```yaml
+rollback:
+  enabled: true
+  timeout: 600          # seconds to wait for CI to complete (default: 600)
+  on_timeout: rollback  # "rollback" or "ignore" when CI doesn't finish in time
+  auto_merge: false     # auto-merge the revert PR (default: false)
+  health_url: null      # optional HTTP URL to check after CI passes
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enabled` | `false` | Activate post-merge monitoring |
+| `timeout` | `600` | Seconds to wait for check suites to complete |
+| `on_timeout` | `"ignore"` | Action when CI times out: `"rollback"` creates a revert PR, `"ignore"` does nothing |
+| `auto_merge` | `false` | Whether to auto-merge the generated revert PR |
+| `health_url` | `null` | HTTP endpoint to probe after all CI checks pass. A non-2xx response triggers rollback |
+
+### How it works
+
+After a session's merge stage completes, Ark polls GitHub check suites on the merge commit SHA every 30 seconds. If any check suite fails, Ark:
+
+1. Creates a `revert-<branch>` branch
+2. Opens a revert PR titled "Revert: <original PR title>" with the list of failed checks
+3. Logs a `rollback` event on the session
+4. Optionally stops the session
+
+If `health_url` is set, Ark also probes that URL after all CI checks pass. A failed health check triggers the same revert flow.
+
+---
+
+## Guardrails
+
+Ark evaluates every tool call against a set of pattern-based guardrail rules before execution. This protects against dangerous commands that an agent might attempt.
+
+### Default Rules
+
+The following patterns are blocked by default:
+
+| Tool | Pattern | Action |
+|------|---------|--------|
+| Bash | `rm -rf /` (excluding `/tmp`) | Block |
+| Bash | `DROP TABLE` / `DROP DATABASE` | Block |
+| Bash | Fork bombs | Block |
+| Bash | `mkfs`, `fdisk`, `dd if=` | Block |
+| Bash | `git push --force` / `git push -f` | Block |
+| Read/Write | `.env` files | Warn |
+| Read/Write | Files named `credentials` | Warn |
+
+**Block** prevents the tool call entirely. **Warn** allows it but logs a warning event.
+
+### How it works
+
+Guardrails are enforced via the `PreToolUse` hook in `.claude/settings.local.json`, which Ark writes at dispatch time. When Claude attempts a tool call, the hook serializes the tool input to JSON and matches each rule's regex against it. The first matching rule determines the action. If no rule matches, the call is allowed.
+
+### Custom Rules
+
+Custom guardrail rules can be added alongside the defaults. They follow the same format:
+
+```typescript
+{ tool: "Bash", pattern: "curl.*\\|.*sh", action: "block" }
+```
+
+---
+
+## Prompt Injection Guard
+
+Ark scans task summaries and user messages for prompt injection attempts using heuristic pattern matching.
+
+### When it runs
+
+- **At dispatch time**: the session's task summary is scanned. High-severity detections block dispatch entirely.
+- **At send time**: messages sent to running agents via `ark session send` are scanned. High-severity detections block the message. Lower-severity detections are logged as warnings but the message is still delivered.
+
+### Detection patterns
+
+The guard checks for common injection techniques:
+
+- "Ignore previous instructions" / "Disregard your rules" (high severity)
+- "You are now a different..." / "Forget everything" (high severity)
+- Fake system prompt tags like `[SYSTEM]` or `system: you are` (medium/high)
+- "Pretend you are..." / "Reveal your system prompt" (medium)
+- Instruction extraction attempts (low)
+
+This is a lightweight heuristic layer, not a security boundary. It catches common patterns but is not exhaustive.
+
+---
+
+## Testing
+
+Tests use `bun:test`. Always run with `bun test` or `make test`, never `npm test` (the package.json test script is wrong).
+
+### Critical: never run tests in parallel
+
+Tests share SQLite databases and hardcoded network ports (19100, 19200, 19300). Running tests in parallel causes port collisions and database corruption. Always use `--concurrency 1`:
+
+```bash
+bun test --concurrency 1              # all tests, sequential
+bun test --concurrency 1 packages/core    # core tests only
+make test                             # uses --concurrency 1 by default
+```
+
+### Test isolation
+
+Every test must create and clean up its own context to avoid leaking state:
+
+```bash
+const ctx = withTestContext();  # handles setup + teardown automatically
+```
+
+Or manually:
+
+```bash
+let ctx: TestContext;
+beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
+afterEach(() => { ctx.cleanup(); });
+```
+
+### E2E tests
+
+CLI and TUI E2E tests import from `dist/`. Build first with `make dev` or `tsc`.
+
+---
+
 ## Environment Variables
 
 | Variable | Default | Purpose |
@@ -752,3 +963,4 @@ The OAuth token is saved to `~/.ark/claude-oauth-token` and picked up automatica
 | `ARK_STAGE` | -- | Current flow stage in channel |
 | `ARK_PROFILE` | `default` | Active profile name |
 | `ARK_TEST_DIR` | -- | Temp directory for test isolation |
+| `ANTHROPIC_API_KEY` | -- | Required for hybrid search LLM re-ranking |
