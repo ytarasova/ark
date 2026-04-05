@@ -1,0 +1,117 @@
+/**
+ * Subprocess executor — runs arbitrary commands as child processes.
+ *
+ * For agent YAML with `runtime: subprocess` and a `command` field.
+ * Spawns the command, tracks the process, buffers output.
+ */
+
+import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
+
+interface TrackedProcess {
+  proc: ReturnType<typeof Bun.spawn>;
+  stdout: string[];
+  stderr: string[];
+  exitCode: number | null;
+  exited: boolean;
+}
+
+const processes = new Map<string, TrackedProcess>();
+
+export const subprocessExecutor: Executor = {
+  name: "subprocess",
+
+  async launch(opts: LaunchOpts): Promise<LaunchResult> {
+    const command = opts.agent.command;
+    if (!command || command.length === 0) {
+      return { ok: false, handle: "", message: "Agent has no command defined" };
+    }
+
+    const handle = `sp-${opts.sessionId}-${Date.now()}`;
+
+    const proc = Bun.spawn(command, {
+      cwd: opts.workdir,
+      env: { ...process.env, ...opts.env, ...(opts.agent.env ?? {}) },
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const tracked: TrackedProcess = {
+      proc,
+      stdout: [],
+      stderr: [],
+      exitCode: null,
+      exited: false,
+    };
+
+    // Stream stdout
+    if (proc.stdout) {
+      const reader = proc.stdout.getReader();
+      (async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            tracked.stdout.push(new TextDecoder().decode(value));
+          }
+        } catch {}
+      })();
+    }
+
+    // Stream stderr
+    if (proc.stderr) {
+      const reader = proc.stderr.getReader();
+      (async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            tracked.stderr.push(new TextDecoder().decode(value));
+          }
+        } catch {}
+      })();
+    }
+
+    // Track exit
+    proc.exited.then((code) => {
+      tracked.exitCode = code;
+      tracked.exited = true;
+    });
+
+    processes.set(handle, tracked);
+    return { ok: true, handle };
+  },
+
+  async kill(handle: string): Promise<void> {
+    const tracked = processes.get(handle);
+    if (!tracked || tracked.exited) return;
+    tracked.proc.kill();
+  },
+
+  async status(handle: string): Promise<ExecutorStatus> {
+    const tracked = processes.get(handle);
+    if (!tracked) return { state: "not_found" };
+    if (!tracked.exited) return { state: "running", pid: tracked.proc.pid };
+    if (tracked.exitCode === 0) return { state: "completed", exitCode: 0 };
+    return { state: "failed", error: `Exit code ${tracked.exitCode}` };
+  },
+
+  async send(handle: string, message: string): Promise<void> {
+    const tracked = processes.get(handle);
+    if (!tracked || tracked.exited) return;
+    const writer = tracked.proc.stdin?.getWriter();
+    if (writer) {
+      await writer.write(new TextEncoder().encode(message + "\n"));
+      writer.releaseLock();
+    }
+  },
+
+  async capture(handle: string, lines?: number): Promise<string> {
+    const tracked = processes.get(handle);
+    if (!tracked) return "";
+    const all = [...tracked.stdout, ...tracked.stderr].join("");
+    if (!lines) return all;
+    const allLines = all.split("\n");
+    return allLines.slice(-lines).join("\n");
+  },
+};

@@ -25,6 +25,7 @@ import { track, configureTelemetry } from "./telemetry.js";
 import { logError, logWarn, logInfo } from "./structured-log.js";
 import { registerExecutor } from "./executor.js";
 import { claudeCodeExecutor } from "./executors/claude-code.js";
+import { subprocessExecutor } from "./executors/subprocess.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -166,6 +167,7 @@ export class AppContext {
 
     // 5b. Register executors
     registerExecutor(claudeCodeExecutor);
+    registerExecutor(subprocessExecutor);
 
     // 6. Set up event bus
     this._eventBus = eventBus;
