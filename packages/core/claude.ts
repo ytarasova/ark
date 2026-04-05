@@ -158,18 +158,19 @@ function hookCommand(sessionId: string, conductorUrl: string): string {
 
 function buildHooksConfig(sessionId: string, conductorUrl: string): Record<string, unknown[]> {
   const cmd = hookCommand(sessionId, conductorUrl);
-  const hook = { type: "command" as const, command: cmd, async: true };
+  const asyncHook = { type: "command" as const, command: cmd, async: true };
+  const syncHook = { type: "command" as const, command: cmd, async: false };
 
   return {
-    SessionStart: [{ matcher: "startup|resume", hooks: [hook] }],
-    UserPromptSubmit: [{ hooks: [hook] }],
-    PreToolUse: [{ hooks: [hook] }],
-    Stop: [{ hooks: [hook] }],
-    StopFailure: [{ hooks: [hook] }],
-    SessionEnd: [{ hooks: [hook] }],
-    Notification: [{ matcher: "permission_prompt|idle_prompt", hooks: [hook] }],
-    PreCompact: [{ hooks: [hook] }],
-    PostCompact: [{ hooks: [hook] }],
+    PreToolUse: [{ hooks: [syncHook] }],
+    SessionStart: [{ matcher: "startup|resume", hooks: [asyncHook] }],
+    UserPromptSubmit: [{ hooks: [asyncHook] }],
+    Stop: [{ hooks: [asyncHook] }],
+    StopFailure: [{ hooks: [asyncHook] }],
+    SessionEnd: [{ hooks: [asyncHook] }],
+    Notification: [{ matcher: "permission_prompt|idle_prompt", hooks: [asyncHook] }],
+    PreCompact: [{ hooks: [asyncHook] }],
+    PostCompact: [{ hooks: [asyncHook] }],
   };
 }
 

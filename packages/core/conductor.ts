@@ -35,6 +35,7 @@ import { safeAsync } from "./safe.js";
 import { addEntry } from "./ledger.js";
 import { logError, logInfo } from "./structured-log.js";
 import { watchMergedPR, type RollbackConfig } from "./rollback.js";
+import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "./otlp.js";
 
 const DEFAULT_PORT = 19100;
 
@@ -123,6 +124,10 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
     // Clean up provider resources on terminal states (stop container, remove worktree, etc.)
     if (result.newStatus === "completed" || result.newStatus === "failed") {
       session.cleanupOnTerminal(sessionId);
+      // Close OTLP spans for terminal states
+      emitStageSpanEnd(sessionId, { status: result.newStatus });
+      emitSessionSpanEnd(sessionId, { status: result.newStatus });
+      flushSpans();
     }
   }
 

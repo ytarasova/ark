@@ -122,10 +122,10 @@ function formatOtlpJson(spans: OtlpSpan[]): object {
 }
 
 export async function flushSpans(): Promise<void> {
-  if (!_config.enabled || !_config.endpoint || _buffer.length === 0) return;
-
+  if (!_config.enabled || _buffer.length === 0) return;
   const spans = [..._buffer];
   _buffer = [];
+  if (!_config.endpoint) return;
 
   try {
     await fetch(_config.endpoint, {

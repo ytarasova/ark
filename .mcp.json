@@ -3,12 +3,12 @@
     "ark-channel": {
       "command": "/Users/yana/.bun/bin/bun",
       "args": [
-        "/Users/yana/Projects/ark/.worktrees/gap-closure/packages/core/channel.ts"
+        "/Users/yana/Projects/ark/packages/core/channel.ts"
       ],
       "env": {
-        "ARK_SESSION_ID": "s-6c1a01",
+        "ARK_SESSION_ID": "s-9a31e7",
         "ARK_STAGE": "work",
-        "ARK_CHANNEL_PORT": "23745",
+        "ARK_CHANNEL_PORT": "24519",
         "ARK_CONDUCTOR_URL": "http://localhost:19100"
       }
     }
