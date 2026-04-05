@@ -549,12 +549,14 @@ ark search <query> [options]
 | `-l, --limit <n>` | Max results | `20` |
 | `-t, --transcripts` | Also search Claude transcripts (slower) | -- |
 | `--index` | Rebuild transcript search index before searching | -- |
+| `--hybrid` | Use hybrid search (memory + knowledge + transcripts with LLM re-ranking) | -- |
 
 ```bash
 ark search "authentication"
 ark search "auth" --transcripts
 ark search "auth" --index --transcripts
 ark search "auth" --limit 50
+ark search "auth" --hybrid
 ```
 
 ---
@@ -741,6 +743,45 @@ ark skill show <name>
 ark skill show code-review
 ```
 
+### ark skill create
+
+Create a new skill, either inline or from a YAML file.
+
+```
+ark skill create [name] [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--from <file>` | Create from YAML file (name taken from YAML) | -- |
+| `-p, --prompt <prompt>` | Skill prompt (required unless --from) | -- |
+| `-d, --description <desc>` | Skill description | -- |
+| `-s, --scope <scope>` | Scope: global or project | `global` |
+| `--tags <tags>` | Comma-separated tags | -- |
+
+```bash
+ark skill create my-skill -p "Review for security issues" -d "Security review" --tags security,review
+ark skill create --from skill.yaml
+ark skill create my-skill -p "Prompt text" --scope project
+```
+
+### ark skill delete
+
+Delete a skill. Cannot delete builtin skills.
+
+```
+ark skill delete <name> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-s, --scope <scope>` | Scope: global or project | `global` |
+
+```bash
+ark skill delete my-skill
+ark skill delete my-skill --scope project
+```
+
 ---
 
 ## ark recipe
@@ -765,6 +806,46 @@ ark recipe show <name>
 
 ```bash
 ark recipe show quick-fix
+```
+
+### ark recipe create
+
+Create a new recipe from a YAML file or from an existing session.
+
+```
+ark recipe create [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--from <file>` | Create from YAML file | -- |
+| `--from-session <id>` | Create from existing session | -- |
+| `-n, --name <name>` | Recipe name (required with --from-session) | -- |
+| `-s, --scope <scope>` | Scope: global or project | `global` |
+
+Must specify either `--from` or `--from-session`.
+
+```bash
+ark recipe create --from recipe.yaml
+ark recipe create --from-session s-a1b2c3 --name my-recipe
+ark recipe create --from recipe.yaml --scope project
+```
+
+### ark recipe delete
+
+Delete a recipe. Cannot delete builtin recipes.
+
+```
+ark recipe delete <name> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-s, --scope <scope>` | Scope: global or project | `global` |
+
+```bash
+ark recipe delete my-recipe
+ark recipe delete my-recipe --scope project
 ```
 
 ---
@@ -932,10 +1013,14 @@ ark compute update my-ec2 --idle-minutes 30
 
 ### ark compute default
 
-Set the default compute resource.
+Set the default compute resource. Persists the choice to `~/.ark/.env` so it survives restarts.
 
 ```
 ark compute default <name>
+```
+
+```bash
+ark compute default my-ec2
 ```
 
 ---
