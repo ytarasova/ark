@@ -32,6 +32,11 @@ export function track(event: string, properties?: Record<string, string | number
 export function getBuffer(): TelemetryEvent[] { return [..._buffer]; }
 export function clearBuffer(): void { _buffer = []; }
 
+export function resetTelemetry(): void {
+  _config = { enabled: false };
+  _buffer = [];
+}
+
 export async function flush(): Promise<void> {
   if (!_config.enabled || _buffer.length === 0) return;
   const events = [..._buffer];

@@ -39,7 +39,7 @@ describe("OTLP session integration", () => {
     const impl = buffer.find(s => s.name === "stage:implement");
 
     expect(session).toBeDefined();
-    expect(plan!.parentSpanId).toBeDefined();
-    expect(impl!.parentSpanId).toBe(plan!.parentSpanId);  // same parent
+    expect(plan!.parentSpanId).toBe(session!.spanId);
+    expect(impl!.parentSpanId).toBe(session!.spanId);
   });
 });

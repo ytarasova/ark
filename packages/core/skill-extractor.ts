@@ -70,13 +70,15 @@ export function extractAndSaveSkills(sessionId: string, conversation: Conversati
 
   for (const candidate of candidates) {
     if (candidate.confidence < MIN_CONFIDENCE) continue;
-    saveSkill({
-      name: `extracted-${sessionId}-${saved}`,
-      description: candidate.description,
-      prompt: candidate.prompt,
-      tags: ["extracted", `session:${sessionId}`],
-    }, "global");
-    saved++;
+    try {
+      saveSkill({
+        name: `extracted-${sessionId}-${saved}`,
+        description: candidate.description,
+        prompt: candidate.prompt,
+        tags: ["extracted", `session:${sessionId}`],
+      }, "global");
+      saved++;
+    } catch { /* best-effort -- fs errors shouldn't block completion */ }
   }
 
   return saved;

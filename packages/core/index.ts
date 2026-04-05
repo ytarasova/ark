@@ -169,7 +169,7 @@ export { McpPool, getMcpPool, destroyMcpPool, discoverPoolSockets, runMcpProxy, 
 export { detectInjection, hasInjection, type InjectionResult } from "./prompt-guard.js";
 
 // Telemetry
-export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry, isTelemetryEnabled, configureTelemetry, type TelemetryEvent, type TelemetryConfig } from "./telemetry.js";
+export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry, isTelemetryEnabled, configureTelemetry, resetTelemetry, type TelemetryEvent, type TelemetryConfig } from "./telemetry.js";
 
 // OpenAPI spec
 export { generateOpenApiSpec } from "./openapi.js";

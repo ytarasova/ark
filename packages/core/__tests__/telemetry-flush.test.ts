@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from "bun:test";
-import { track, flush, getBuffer, clearBuffer, disableTelemetry, configureTelemetry } from "../telemetry.js";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { track, flush, getBuffer, clearBuffer, disableTelemetry, configureTelemetry, resetTelemetry } from "../telemetry.js";
 
 beforeEach(() => { clearBuffer(); disableTelemetry(); });
+afterEach(() => { resetTelemetry(); });
 
 describe("telemetry flush", () => {
   it("flush sends events and clears buffer", async () => {
