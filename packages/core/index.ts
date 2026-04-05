@@ -53,6 +53,12 @@ export { listSkills, loadSkill, saveSkill, deleteSkill, type SkillDefinition } f
 // Recipe
 export { listRecipes, loadRecipe, instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecipes, saveRecipe, deleteRecipe, sessionToRecipe, type RecipeDefinition, type RecipeVariable, type RecipeParameter, type RecipeInstance, type SubRecipeRef } from "./recipe.js";
 
+// Executor
+export type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "./executor.js";
+export { registerExecutor, getExecutor, listExecutors, resetExecutors } from "./executor.js";
+export { claudeCodeExecutor } from "./executors/claude-code.js";
+export { subprocessExecutor } from "./executors/subprocess.js";
+
 // Claude integration
 export * as claude from "./claude.js";
 

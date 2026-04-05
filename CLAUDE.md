@@ -158,6 +158,27 @@ env:
 
 Template variables: `{ticket}`, `{summary}`, `{workdir}`, `{repo}`, `{branch}` - substituted at dispatch.
 
+## Executor System
+
+Agents dispatch through pluggable executors. The `runtime` field in agent YAML selects which executor launches the agent.
+
+**Built-in executors:**
+- `claude-code` (default) — launches Claude Code in tmux with hooks + MCP channel
+- `subprocess` — spawns any command as a child process
+
+**Executor interface:** 5 methods — `launch`, `kill`, `status`, `send`, `capture`. Defined in `packages/core/executor.ts`.
+
+**Adding a subprocess agent:**
+```yaml
+name: my-linter
+runtime: subprocess
+command: ["node", "scripts/lint.js"]
+env:
+  TARGET: "{workdir}"
+```
+
+Executors are registered at boot in `app.ts`. The registry is in `packages/core/executor.ts`.
+
 ## Adding a Flow
 
 Create `flows/definitions/<name>.yaml`:
