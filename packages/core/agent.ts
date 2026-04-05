@@ -28,6 +28,8 @@ export interface AgentDefinition {
   context: string[];
   permission_mode: string;
   env: Record<string, string>;
+  runtime?: string;
+  command?: string[];
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }
@@ -44,6 +46,8 @@ const DEFAULTS: Omit<AgentDefinition, "name"> = {
   context: [],
   permission_mode: "bypassPermissions",
   env: {},
+  runtime: undefined,
+  command: undefined,
 };
 
 // ── Paths ───────────────────────────────────────────────────────────────────

@@ -46,6 +46,7 @@ import { track } from "./telemetry.js";
 import { emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "./otlp.js";
 import { detectInjection } from "./prompt-guard.js";
 import { generateRepoMap, formatRepoMap } from "./repo-map.js";
+import { getExecutor } from "./executor.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 function sessionAsVars(session: store.Session): Record<string, unknown> {
@@ -231,12 +232,32 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
     } catch { /* skip repo map on error */ }
   }
 
-  // Skill injection happens inside buildClaudeArgs via projectRoot
+  // Resolve executor — defaults to claude-code
+  const runtime = agent.runtime ?? "claude-code";
+  const executor = getExecutor(runtime);
+  if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
+
+  // Build claude args (only relevant for claude-code executor)
   const claudeArgs = agentRegistry.buildClaudeArgs(agent, { autonomy, projectRoot });
 
-  // Launch in tmux
-  log("Launching agent...");
-  const tmuxName = await launchAgentTmux(session, stage, claudeArgs, task, agent, { autonomy, onLog: log });
+  // Launch via executor
+  log(`Launching via ${runtime}...`);
+  const launchResult = await executor.launch({
+    sessionId,
+    workdir: session.workdir ?? session.repo,
+    agent,
+    task,
+    claudeArgs,
+    stage,
+    autonomy,
+    onLog: log,
+    prevClaudeSessionId: session.claude_session_id,
+    sessionName: session.summary ?? session.id,
+    compute: session.compute_name ? store.getCompute(session.compute_name) ?? undefined : undefined,
+  });
+
+  if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
+  const tmuxName = launchResult.handle;
 
   store.updateSession(sessionId, { status: "running", agent: agentName, session_id: tmuxName });
   store.logEvent(sessionId, "stage_started", {
