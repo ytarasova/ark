@@ -153,7 +153,7 @@ describe("dispatch compute: config file writing", () => {
     expect(channelConfig).toBeTruthy();
   });
 
-  it("hooks config contains async: true on all hooks", () => {
+  it("hooks config: PreToolUse is sync, all others are async", () => {
     const workdir = join(ctx.arkDir, "workdir-async-hooks");
     mkdirSync(workdir, { recursive: true });
 
@@ -163,7 +163,11 @@ describe("dispatch compute: config file writing", () => {
     const settingsPath = join(workdir, ".claude", "settings.local.json");
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
 
-    for (const [_event, matchers] of Object.entries(settings.hooks)) {
+    // PreToolUse must be synchronous for guardrail enforcement
+    expect(settings.hooks.PreToolUse[0].hooks[0].async).toBe(false);
+
+    for (const [event, matchers] of Object.entries(settings.hooks)) {
+      if (event === "PreToolUse") continue;
       for (const matcher of matchers as any[]) {
         for (const hook of matcher.hooks) {
           expect(hook.async).toBe(true);

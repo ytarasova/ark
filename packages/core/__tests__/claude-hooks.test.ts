@@ -15,10 +15,11 @@ describe("writeHooksConfig", () => {
     expect(existsSync(join(getCtx().arkDir, ".claude", "settings.local.json"))).toBe(true);
   });
 
-  it("contains hooks for all 8 events", () => {
+  it("contains hooks for all 9 events", () => {
     writeHooksConfig("s-test123", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     const events = Object.keys(settings.hooks);
+    expect(events).toContain("PreToolUse");
     expect(events).toContain("SessionStart");
     expect(events).toContain("UserPromptSubmit");
     expect(events).toContain("Stop");
@@ -27,7 +28,7 @@ describe("writeHooksConfig", () => {
     expect(events).toContain("Notification");
     expect(events).toContain("PreCompact");
     expect(events).toContain("PostCompact");
-    expect(events.length).toBe(8);
+    expect(events.length).toBe(9);
   });
 
   it("PreCompact/PostCompact hooks have no matcher (match all triggers)", () => {
@@ -46,10 +47,14 @@ describe("writeHooksConfig", () => {
     expect(cmd).toContain("s-abc");
   });
 
-  it("all hooks are async", () => {
+  it("PreToolUse hook is sync, all others are async", () => {
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    for (const matchers of Object.values(settings.hooks) as any[][]) {
+    // PreToolUse must be synchronous for guardrail enforcement
+    expect(settings.hooks.PreToolUse[0].hooks[0].async).toBe(false);
+    // All other hooks should be async
+    for (const [event, matchers] of Object.entries(settings.hooks) as [string, any[]][]) {
+      if (event === "PreToolUse") continue;
       for (const matcher of matchers) {
         for (const hook of matcher.hooks) {
           expect(hook.async).toBe(true);
