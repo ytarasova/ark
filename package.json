@@ -1,6 +1,6 @@
 {
   "name": "ark",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Autonomous agent ecosystem — JIRA to production",
   "type": "module",
   "bin": {
