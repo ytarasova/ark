@@ -23,6 +23,8 @@ import { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
 import { startNotifyDaemon } from "./notify-daemon.js";
 import { track, configureTelemetry } from "./telemetry.js";
 import { logError, logWarn, logInfo } from "./structured-log.js";
+import { registerExecutor } from "./executor.js";
+import { claudeCodeExecutor } from "./executors/claude-code.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -161,6 +163,9 @@ export class AppContext {
 
     // 5. Wire provider resolver for session.ts
     setProviderResolver((session) => this.resolveProvider(session));
+
+    // 5b. Register executors
+    registerExecutor(claudeCodeExecutor);
 
     // 6. Set up event bus
     this._eventBus = eventBus;

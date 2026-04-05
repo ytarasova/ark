@@ -711,7 +711,7 @@ export async function cleanupOnTerminal(sessionId: string): Promise<void> {
 // ── Internal ────────────────────────────────────────────────────────────────
 
 /** Setup git worktree + Claude trust for the session working directory. */
-async function setupSessionWorktree(
+export async function setupSessionWorktree(
   session: store.Session,
   compute: store.Compute | null,
   provider: ComputeProvider | undefined,
@@ -766,7 +766,7 @@ async function applyContainerSetup(
 }
 
 /** Prepare remote compute: connectivity check, env sync, docker/devcontainer setup. */
-async function prepareRemoteEnvironment(
+export async function prepareRemoteEnvironment(
   session: store.Session,
   compute: store.Compute,
   provider: ComputeProvider,
