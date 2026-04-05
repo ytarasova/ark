@@ -1986,6 +1986,38 @@ program.command("eval")
     console.log(`  Total cost:   $${result.summary.totalCost.toFixed(4)}`);
   });
 
+// ── Server ──────────────────────────────────────────────────────────────────
+const serverCmd = program.command("server").description("JSON-RPC server");
+
+serverCmd
+  .command("start")
+  .description("Start the Ark server")
+  .option("--stdio", "Use stdio transport (JSONL)")
+  .option("--ws", "Use WebSocket transport")
+  .option("-p, --port <port>", "WebSocket port", "19400")
+  .action(async (opts) => {
+    const { AppContext, loadConfig } = await import("../core/index.js");
+    const { ArkServer } = await import("../server/index.js");
+    const { registerAllHandlers } = await import("../server/register.js");
+
+    const app = new AppContext(loadConfig());
+    await app.boot();
+
+    const server = new ArkServer();
+    registerAllHandlers(server.router);
+
+    if (opts.stdio) {
+      server.startStdio();
+      await new Promise(() => {});
+    } else {
+      const port = parseInt(opts.port);
+      const ws = server.startWebSocket(port);
+      console.log(`Ark server listening on ws://localhost:${port}`);
+      process.on("SIGINT", () => { ws.stop(); app.shutdown(); process.exit(0); });
+      await new Promise(() => {});
+    }
+  });
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 
 await program.parseAsync(process.argv);
