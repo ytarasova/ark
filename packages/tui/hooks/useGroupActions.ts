@@ -4,32 +4,39 @@
  * as useSessionActions and useComputeActions.
  */
 
-import * as core from "../../core/index.js";
+import { useArkClient } from "./useArkClient.js";
 import type { AsyncState } from "./useAsync.js";
 
+interface SessionLike {
+  id: string;
+  session_id: string | null;
+  group_name: string | null;
+}
+
 export function useGroupActions(asyncState: AsyncState) {
+  const ark = useArkClient();
   const run = asyncState.run;
 
   return {
     createGroup: (name: string, onDone?: () => void) => {
-      run("Creating group...", () => {
-        core.createGroup(name);
+      run("Creating group...", async () => {
+        await ark.groupCreate(name);
         onDone?.();
       });
     },
 
-    deleteGroup: (name: string, sessions: core.Session[], onDone?: (count: number) => void) => {
+    deleteGroup: (name: string, sessions: SessionLike[], onDone?: (count: number) => void) => {
       run("Deleting group...", async () => {
-        // Kill and delete all sessions in the group
+        // Stop and delete all sessions in the group
         const groupSessions = sessions.filter(s => s.group_name === name);
         for (const s of groupSessions) {
           if (s.session_id) {
-            try { await core.killSessionAsync(s.session_id); } catch {}
+            try { await ark.sessionStop(s.id); } catch {}
           }
-          core.deleteSession(s.id);
+          await ark.sessionDelete(s.id);
         }
         // Delete the group itself
-        core.deleteGroup(name);
+        await ark.groupDelete(name);
         onDone?.(groupSessions.length);
       });
     },

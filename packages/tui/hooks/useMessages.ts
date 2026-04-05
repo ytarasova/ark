@@ -5,8 +5,9 @@
  * Both Chat (1:1) and Threads (multi-session) consume this hook.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import * as core from "../../core/index.js";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useArkClient } from "./useArkClient.js";
+import type { AsyncState } from "./useAsync.js";
 
 export interface ThreadMessage {
   id: number;
@@ -20,11 +21,17 @@ export interface ThreadMessage {
   time: string;
 }
 
+interface SessionLike {
+  id: string;
+  summary?: string | null;
+}
+
 interface UseMessagesOpts {
   sessionId?: string | null;
-  sessions?: core.Session[];
+  sessions?: SessionLike[];
   pollMs?: number;
   limit?: number;
+  asyncState?: AsyncState;
 }
 
 interface UseMessagesResult {
@@ -35,7 +42,8 @@ interface UseMessagesResult {
 }
 
 export function useMessages(opts: UseMessagesOpts): UseMessagesResult {
-  const { sessionId, sessions, pollMs = 2000, limit = 30 } = opts;
+  const { sessionId, sessions, pollMs = 2000, limit = 30, asyncState } = opts;
+  const ark = useArkClient();
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,29 +56,29 @@ export function useMessages(opts: UseMessagesOpts): UseMessagesResult {
   const limitRef = useRef(limit);
   limitRef.current = limit;
 
-  const loadMessages = useCallback(() => {
+  const loadMessages = useCallback(async () => {
     const currentLimit = limitRef.current;
     const currentSessionId = sessionIdRef.current;
     if (currentSessionId) {
-      const msgs = core.getMessages(currentSessionId, { limit: currentLimit });
-      setMessages(msgs.map(m => ({
+      const msgs = await ark.sessionMessages(currentSessionId, currentLimit);
+      setMessages(msgs.map((m: any) => ({
         ...m,
         sessionName: "",
-        time: m.created_at.slice(11, 16),
+        time: m.created_at?.slice(11, 16) ?? "",
       })));
     } else if (sessionsRef.current?.length) {
       const all: ThreadMessage[] = [];
       for (const s of sessionsRef.current) {
-        const msgs = core.getMessages(s.id, { limit: currentLimit });
+        const msgs = await ark.sessionMessages(s.id, currentLimit);
         const name = s.summary ?? s.id.slice(0, 8);
         for (const m of msgs) {
-          all.push({ ...m, sessionName: name, time: m.created_at.slice(11, 16) });
+          all.push({ ...m, sessionName: name, time: m.created_at?.slice(11, 16) ?? "" });
         }
       }
       all.sort((a, b) => a.id - b.id);
       setMessages(all.slice(-currentLimit));
     }
-  }, []);
+  }, [ark]);
 
   // Reload immediately when sessionId changes
   useEffect(() => {
@@ -83,36 +91,27 @@ export function useMessages(opts: UseMessagesOpts): UseMessagesResult {
   }, [loadMessages, pollMs]);
 
   const send = useCallback((targetSessionId: string, content: string) => {
-    core.addMessage({ session_id: targetSessionId, role: "user", content });
-    loadMessages();
-    core.markMessagesRead(targetSessionId);
-
-    setSending(true);
-    setError(null);
-    const channelPort = core.sessionChannelPort(targetSessionId);
-    fetch(`http://localhost:${channelPort}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "steer",
-        sessionId: targetSessionId,
-        message: content,
-        from: "user",
-      }),
-    })
-      .then(() => { setSending(false); })
-      .catch(() => {
-        core.addMessage({
-          session_id: targetSessionId,
-          role: "system",
-          content: `Failed to deliver (port ${channelPort})`,
-          type: "error",
-        });
-        loadMessages();
+    const doSend = async () => {
+      setSending(true);
+      setError(null);
+      try {
+        await ark.messageSend(targetSessionId, content);
+        await ark.messageMarkRead(targetSessionId);
+        await loadMessages();
         setSending(false);
-        setError(`Failed to deliver to port ${channelPort}`);
-      });
-  }, [loadMessages]);
+      } catch (e: any) {
+        setSending(false);
+        setError(`Failed to deliver: ${e?.message ?? e}`);
+        await loadMessages();
+      }
+    };
+
+    if (asyncState) {
+      asyncState.run("Sending...", doSend);
+    } else {
+      doSend();
+    }
+  }, [ark, loadMessages, asyncState]);
 
   return { messages, send, sending, error };
 }

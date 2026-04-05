@@ -11,4 +11,9 @@ export function registerMessagingHandlers(router: Router): void {
     const result = await core.approveReviewGate(p.sessionId as string);
     return result;
   });
+
+  router.handle("message/markRead", async (p) => {
+    core.markMessagesRead(p.sessionId as string);
+    return { ok: true };
+  });
 }

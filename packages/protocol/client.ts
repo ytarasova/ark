@@ -56,7 +56,7 @@ export class ArkClient {
     }
   }
 
-  private rpc(method: string, params?: Record<string, unknown>): Promise<any> {
+  rpc(method: string, params?: Record<string, unknown>): Promise<any> {
     return new Promise((resolve, reject) => {
       const id = ++this.idCounter;
       this.pending.set(id, { resolve, reject });
@@ -177,6 +177,10 @@ export class ArkClient {
     await this.rpc("message/send", { sessionId, content });
   }
 
+  async messageMarkRead(sessionId: string): Promise<void> {
+    await this.rpc("message/markRead", { sessionId });
+  }
+
   async gateApprove(sessionId: string): Promise<any> {
     return this.rpc("gate/approve", { sessionId });
   }
@@ -225,6 +229,47 @@ export class ArkClient {
 
   async computeDelete(name: string): Promise<void> {
     await this.rpc("compute/delete", { name });
+  }
+
+  async computeUpdate(name: string, fields: Record<string, unknown>): Promise<void> {
+    await this.rpc("compute/update", { name, fields });
+  }
+
+  async computeRead(name: string): Promise<any> {
+    const { compute } = await this.rpc("compute/read", { name });
+    return compute;
+  }
+
+  async computeProvision(name: string): Promise<void> {
+    await this.rpc("compute/provision", { name });
+  }
+
+  async computeStopInstance(name: string): Promise<void> {
+    await this.rpc("compute/stop-instance", { name });
+  }
+
+  async computeStartInstance(name: string): Promise<void> {
+    await this.rpc("compute/start-instance", { name });
+  }
+
+  async computeDestroy(name: string): Promise<void> {
+    await this.rpc("compute/destroy", { name });
+  }
+
+  async computeClean(name: string): Promise<void> {
+    await this.rpc("compute/clean", { name });
+  }
+
+  async computeReboot(name: string): Promise<void> {
+    await this.rpc("compute/reboot", { name });
+  }
+
+  async computePing(name: string): Promise<{ reachable: boolean; message: string }> {
+    return this.rpc("compute/ping", { name });
+  }
+
+  async computeCleanZombies(): Promise<{ cleaned: number }> {
+    return this.rpc("compute/clean-zombies");
   }
 
   async groupList(): Promise<any[]> {

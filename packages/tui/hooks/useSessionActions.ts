@@ -5,42 +5,43 @@
  */
 
 import { useRef } from "react";
-import * as core from "../../core/index.js";
+import { useArkClient } from "./useArkClient.js";
 import type { AsyncState } from "./useAsync.js";
 
+interface SessionLike {
+  id: string;
+  status: string;
+}
+
 export function useSessionActions(asyncState: AsyncState) {
+  const ark = useArkClient();
   const run = asyncState.run;
   const lastDeletedRef = useRef<string | null>(null);
 
   return {
     dispatch: (id: string) => {
-      run(`Dispatching ${id}`, async (updateLabel) => {
-        await core.dispatch(id, {
-          onLog: (msg) => {
-            updateLabel(msg);
-            core.logEvent(id, "dispatch_progress", { actor: "system", data: { message: msg } });
-          },
-        });
+      run(`Dispatching ${id}`, async () => {
+        await ark.sessionDispatch(id);
       });
     },
 
     restart: (id: string) => {
-      run(`Restarting ${id}`, async (updateLabel) => {
-        await core.resume(id, { onLog: (msg) => updateLabel(msg) });
+      run(`Restarting ${id}`, async () => {
+        await ark.sessionDispatch(id);
       });
     },
 
     stop: (id: string) => {
-      run(`Stopping ${id}`, async () => { await core.stop(id); });
+      run(`Stopping ${id}`, async () => { await ark.sessionStop(id); });
     },
 
     complete: (id: string) => {
-      run(`Completing ${id}`, () => { core.complete(id); });
+      run(`Completing ${id}`, async () => { await ark.sessionComplete(id); });
     },
 
     delete: (id: string) => {
       run(`Deleting ${id}`, async () => {
-        await core.deleteSessionAsync(id);
+        await ark.sessionDelete(id);
         lastDeletedRef.current = id;
       });
     },
@@ -49,47 +50,47 @@ export function useSessionActions(asyncState: AsyncState) {
       const id = lastDeletedRef.current;
       if (!id) return false;
       run("Restoring session", async () => {
-        const result = await core.undeleteSessionAsync(id);
-        if (result.ok) lastDeletedRef.current = null;
+        const result = await ark.sessionUndelete(id);
+        if (result?.ok) lastDeletedRef.current = null;
       });
       return true;
     },
 
     fork: (sourceId: string, name: string, groupName?: string | null) => {
-      run(`Forking → ${name}`, async (updateLabel) => {
-        const result = core.cloneSession(sourceId, name);
-        if (!result.ok) return;
-        if (groupName) core.updateSession(result.sessionId, { group_name: groupName });
-        await core.dispatch(result.sessionId, { onLog: (msg) => updateLabel(msg) });
+      run(`Forking → ${name}`, async () => {
+        const session = await ark.sessionClone(sourceId, name);
+        if (!session) return;
+        if (groupName) await ark.sessionUpdate(session.id, { group_name: groupName });
+        await ark.sessionDispatch(session.id);
       });
     },
 
     move: (id: string, group: string | null) => {
-      run("Moving session", () => { core.updateSession(id, { group_name: group }); });
+      run("Moving session", async () => { await ark.sessionUpdate(id, { group_name: group }); });
     },
 
-    stopGroup: (sessions: core.Session[]) => {
-      run("Stopping group", () => {
+    stopGroup: (sessions: SessionLike[]) => {
+      run("Stopping group", async () => {
         for (const s of sessions) {
-          if (!["completed", "failed", "stopped"].includes(s.status)) core.stop(s.id);
+          if (!["completed", "failed", "stopped"].includes(s.status)) await ark.sessionStop(s.id);
         }
       });
     },
 
-    resumeGroup: (sessions: core.Session[]) => {
+    resumeGroup: (sessions: SessionLike[]) => {
       run("Resuming group", async () => {
         for (const s of sessions) {
           if (["blocked", "waiting", "failed", "stopped", "completed"].includes(s.status)) {
-            await core.resume(s.id);
+            await ark.sessionDispatch(s.id);
           }
         }
       });
     },
 
-    deleteGroup: (sessions: core.Session[]) => {
+    deleteGroup: (sessions: SessionLike[]) => {
       run("Deleting group", async () => {
         for (const s of sessions) {
-          await core.deleteSessionAsync(s.id);
+          await ark.sessionDelete(s.id);
         }
         if (sessions.length > 0) lastDeletedRef.current = sessions[sessions.length - 1].id;
       });
