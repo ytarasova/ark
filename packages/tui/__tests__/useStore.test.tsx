@@ -47,7 +47,6 @@ describe("useArkStore (via StoreProvider)", () => {
     expect(captured!.computeLogs).toBeInstanceOf(Map);
     expect(typeof captured!.refresh).toBe("function");
     expect(typeof captured!.addComputeLog).toBe("function");
-    expect(typeof captured!.refreshing).toBe("boolean");
     unmount();
   });
 
@@ -96,7 +95,6 @@ describe("useArkStore (via StoreProvider)", () => {
     expect(store.unreadCounts).toBeInstanceOf(Map);
     expect(store.snapshots).toBeInstanceOf(Map);
     expect(store.computeLogs).toBeInstanceOf(Map);
-    expect(store.refreshing).toBe(false);
     expect(store.initialLoading).toBe(false);
     expect(typeof store.refresh).toBe("function");
     expect(typeof store.addComputeLog).toBe("function");
@@ -105,10 +103,8 @@ describe("useArkStore (via StoreProvider)", () => {
   it("createMockStore applies overrides", () => {
     const store = createMockStore({
       sessions: [{ id: "s-1" }],
-      refreshing: true,
     });
     expect(store.sessions.length).toBe(1);
-    expect(store.refreshing).toBe(true);
     // Defaults preserved for non-overridden fields
     expect(store.computes).toEqual([]);
   });

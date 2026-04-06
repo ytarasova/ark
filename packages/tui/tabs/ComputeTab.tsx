@@ -1,6 +1,5 @@
 import React, { useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import Spinner from "ink-spinner";
 import { execFile } from "child_process";
 import { join } from "path";
 import { homedir } from "os";
@@ -30,7 +29,7 @@ interface ComputeTabProps extends StoreData {
   refresh: () => void;
 }
 
-export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snapshots, computeLogs, addComputeLog, asyncState, onShowForm, formOverlay }: ComputeTabProps) {
+export function ComputeTab({ computes, sessions, refresh, pane, snapshots, computeLogs, addComputeLog, asyncState, onShowForm, formOverlay }: ComputeTabProps) {
   const confirmation = useConfirmation();
   const focus = useFocus();
 
@@ -112,7 +111,6 @@ export function ComputeTab({ computes, sessions, refreshing, refresh, pane, snap
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
         focus={pane}
         leftTitle="Compute"

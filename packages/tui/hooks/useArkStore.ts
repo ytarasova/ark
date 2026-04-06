@@ -28,7 +28,6 @@ export interface StoreData {
   computeLogs: Map<string, string[]>;
   /** Add a log entry for a compute. */
   addComputeLog: (name: string, message: string) => void;
-  refreshing: boolean;
   /** True until the first data fetch completes. */
   initialLoading: boolean;
   /** Force an immediate refresh (call after mutations like delete/stop). */
@@ -45,7 +44,6 @@ export function useArkStore(): StoreData {
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
   const [snapshots, setSnapshots] = useState<Map<string, ComputeSnapshot>>(new Map());
   const [computeLogs, setComputeLogs] = useState<Map<string, string[]>>(new Map());
-  const [refreshing, setRefreshing] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
   // Track in-flight fetch to avoid overlapping refreshes
@@ -56,7 +54,6 @@ export function useArkStore(): StoreData {
   const fetchAll = useCallback(async () => {
     if (running.current) return;
     running.current = true;
-    setRefreshing(true);
     try {
       const [s, c, a, f] = await Promise.all([
         ark.sessionList(),
@@ -104,7 +101,6 @@ export function useArkStore(): StoreData {
     } catch {
       // Non-fatal: leave stale data in place
     }
-    setRefreshing(false);
     running.current = false;
   }, [ark]);
 
@@ -184,7 +180,6 @@ export function useArkStore(): StoreData {
     snapshots,
     computeLogs,
     addComputeLog,
-    refreshing,
     initialLoading,
     refresh: fetchAll,
   };

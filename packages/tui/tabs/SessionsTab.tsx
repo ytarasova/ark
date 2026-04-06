@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import Spinner from "ink-spinner";
 import type { Session, SearchResult } from "../../core/index.js";
 import { ICON, getStatusColor } from "../constants.js";
 import { ago } from "../helpers.js";
@@ -40,7 +39,7 @@ interface SessionsTabProps extends StoreData {
   refresh: () => void;
 }
 
-export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts, asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
+export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
   const ark = useArkClient();
   const focus = useFocus();
   const [overlay, setOverlay] = useState<Overlay>(null);
@@ -308,7 +307,6 @@ export function SessionsTab({ sessions, refreshing, refresh, pane, unreadCounts,
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      {refreshing && <Text><Spinner type="dots" /> <Text dimColor>refreshing...</Text></Text>}
       <SplitPane
         focus={overlay === "talk" || overlay === "inbox" ? "right" : pane}
         leftTitle={statusFilter ? `Sessions [${statusFilter}]` : "Sessions"}
