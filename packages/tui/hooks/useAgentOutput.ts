@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { getOutput } from "../../core/index.js";
+import { useArkClient } from "./useArkClient.js";
 
 /**
  * Poll agent output for a running session via the provider-aware getOutput().
  * Returns the latest captured output, refreshed every pollMs.
  */
 export function useAgentOutput(sessionId: string | null, tmuxName: string | null, isRunning: boolean, pollMs = 2000): string {
+  const ark = useArkClient();
   const [output, setOutput] = useState("");
 
   useEffect(() => {
@@ -14,10 +15,11 @@ export function useAgentOutput(sessionId: string | null, tmuxName: string | null
       return;
     }
 
+    let cancelled = false;
     const poll = async () => {
       try {
-        const text = await getOutput(sessionId, { lines: 15 });
-        setOutput(text.trim());
+        const text = await ark.sessionOutput(sessionId, 15);
+        if (!cancelled) setOutput(text.trim());
       } catch {
         // session may be gone
       }
@@ -25,8 +27,8 @@ export function useAgentOutput(sessionId: string | null, tmuxName: string | null
 
     poll();
     const t = setInterval(poll, pollMs);
-    return () => clearInterval(t);
-  }, [sessionId, tmuxName, isRunning, pollMs]);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [ark, sessionId, tmuxName, isRunning, pollMs]);
 
   return output;
 }

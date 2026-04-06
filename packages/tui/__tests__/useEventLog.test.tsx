@@ -1,6 +1,9 @@
 /**
  * Tests for useEventLog — fetches and transforms session events into display list.
  * Tests the data fetching and transformation logic through the React hook.
+ *
+ * Uses a mock ArkClient that returns data from the local DB, matching the
+ * previous direct-import behavior but going through the ark.* client API.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
@@ -8,20 +11,43 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import {
-  startSession, logEvent, getEvents,
+  startSession, logEvent,
   AppContext, setApp, clearApp,
 } from "../../core/index.js";
+import { listSessions, getEvents } from "../../core/store.js";
 import { useEventLog, type EventLogEntry } from "../hooks/useEventLog.js";
+import { createMockArkClient, MockArkClientProvider } from "./test-helpers.js";
 import { withTestContext, waitFor } from "../../core/__tests__/test-helpers.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 let capturedEvents: EventLogEntry[] = [];
 
+/** Mock ArkClient that delegates to local DB for session/event queries. */
+function createDbBackedClient() {
+  return createMockArkClient({
+    sessionList: async (filters?: any) => {
+      return listSessions({ limit: filters?.limit ?? 50 });
+    },
+    sessionEvents: async (sessionId: string, limit?: number) => {
+      return getEvents(sessionId, { limit: limit ?? 50 });
+    },
+  });
+}
+
 function EventCapture({ expanded }: { expanded: boolean }) {
   const events = useEventLog(expanded);
   capturedEvents = events;
   return <Text>{`count=${events.length}`}</Text>;
+}
+
+function WrappedEventCapture({ expanded }: { expanded: boolean }) {
+  const client = createDbBackedClient();
+  return (
+    <MockArkClientProvider client={client}>
+      <EventCapture expanded={expanded} />
+    </MockArkClientProvider>
+  );
 }
 
 // ── Setup ────────────────────────────────────────────────────────────────────
@@ -46,7 +72,7 @@ afterAll(async () => {
 
 describe("useEventLog", () => {
   it("returns empty array when no sessions exist", async () => {
-    const { unmount } = render(<EventCapture expanded={false} />);
+    const { unmount } = render(<WrappedEventCapture expanded={false} />);
     await waitFor(() => capturedEvents !== null);
     await waitFor(() => Array.isArray(capturedEvents));
     expect(capturedEvents).toBeInstanceOf(Array);
@@ -59,7 +85,7 @@ describe("useEventLog", () => {
     logEvent(s.id, "session_created", { data: { summary: "event-test" } });
     logEvent(s.id, "stage_started", { data: { agent: "planner", stage: "plan" } });
 
-    const { unmount } = render(<EventCapture expanded={false} />);
+    const { unmount } = render(<WrappedEventCapture expanded={false} />);
     await waitFor(() => capturedEvents.length > 0, { timeout: 3000 });
 
     expect(capturedEvents.length).toBeGreaterThan(0);
@@ -81,7 +107,7 @@ describe("useEventLog", () => {
     logEvent(s.id, "session_completed");
     logEvent(s.id, "stage_started", { data: { agent: "impl", stage: "implement" } });
 
-    const { unmount } = render(<EventCapture expanded={true} />);
+    const { unmount } = render(<WrappedEventCapture expanded={true} />);
     await waitFor(() => capturedEvents.length >= 3, { timeout: 3000 });
 
     const errorEntry = capturedEvents.find(e => e.type === "agent_error");
@@ -107,7 +133,7 @@ describe("useEventLog", () => {
 
     // Render collapsed
     let collapsedCount = 0;
-    const { unmount: unmount1 } = render(<EventCapture expanded={false} />);
+    const { unmount: unmount1 } = render(<WrappedEventCapture expanded={false} />);
     await waitFor(() => capturedEvents.length > 0, { timeout: 3000 });
     collapsedCount = capturedEvents.length;
     unmount1();
@@ -116,7 +142,7 @@ describe("useEventLog", () => {
     capturedEvents = [];
 
     // Render expanded
-    const { unmount: unmount2 } = render(<EventCapture expanded={true} />);
+    const { unmount: unmount2 } = render(<WrappedEventCapture expanded={true} />);
     await waitFor(() => capturedEvents.length > 0, { timeout: 3000 });
     const expandedCount = capturedEvents.length;
     unmount2();
@@ -130,7 +156,7 @@ describe("useEventLog", () => {
     const s = startSession({ summary: longSummary, repo: ".", flow: "bare" });
     logEvent(s.id, "session_created", { data: { summary: longSummary } });
 
-    const { unmount } = render(<EventCapture expanded={false} />);
+    const { unmount } = render(<WrappedEventCapture expanded={false} />);
     await waitFor(() => capturedEvents.length > 0, { timeout: 3000 });
 
     for (const entry of capturedEvents) {
@@ -146,7 +172,7 @@ describe("useEventLog", () => {
     await new Promise(r => setTimeout(r, 50));
     logEvent(s.id, "stage_started", { data: { stage: "plan" } });
 
-    const { unmount } = render(<EventCapture expanded={true} />);
+    const { unmount } = render(<WrappedEventCapture expanded={true} />);
     await waitFor(() => capturedEvents.length >= 2, { timeout: 3000 });
 
     // Events should be newest first (descending time)

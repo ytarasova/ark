@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import { discoverTools, addMcpServer, removeMcpServer } from "../../core/index.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 import type { Session } from "../../core/index.js";
 import { EXTENSION_CATALOG } from "../../core/extension-catalog.js";
 
@@ -16,13 +16,16 @@ const MCP_CATALOG: Record<string, { command: string; args: string[]; env?: Recor
 );
 
 export function McpManager({ session, onClose, onApply }: McpManagerProps) {
+  const ark = useArkClient();
   const projectDir = session.workdir ?? ".";
 
-  // Discover currently attached servers
-  const currentServers = useMemo(() => {
-    const tools = discoverTools(projectDir);
-    return tools.filter(t => t.kind === "mcp-server").map(t => t.name);
-  }, [projectDir]);
+  // Discover currently attached servers (async via ark client)
+  const [currentServers, setCurrentServers] = useState<string[]>([]);
+  useEffect(() => {
+    ark.toolsList(projectDir).then(tools => {
+      setCurrentServers(tools.filter((t: any) => t.kind === "mcp-server").map((t: any) => t.name));
+    }).catch(() => {});
+  }, [ark, projectDir]);
 
   // Build list: catalog + any currently attached that aren't in catalog
   const allServers = useMemo(() => {
@@ -43,13 +46,16 @@ export function McpManager({ session, onClose, onApply }: McpManagerProps) {
     return servers;
   }, [currentServers]);
 
-  const [toggleState, setToggleState] = useState<Map<string, boolean>>(() => {
+  const [toggleState, setToggleState] = useState<Map<string, boolean>>(() => new Map());
+
+  // Sync toggle state when allServers changes (initial load)
+  useEffect(() => {
     const state = new Map<string, boolean>();
     for (const [name, info] of allServers) {
       state.set(name, info.attached);
     }
-    return state;
-  });
+    setToggleState(state);
+  }, [allServers]);
 
   const serverNames = useMemo(() => Array.from(allServers.keys()), [allServers]);
   const [cursor, setCursor] = useState(0);
@@ -69,22 +75,22 @@ export function McpManager({ session, onClose, onApply }: McpManagerProps) {
         return next;
       });
     } else if (key.return) {
-      // Apply changes
-      for (const [name, enabled] of toggleState) {
-        const wasAttached = allServers.get(name)?.attached ?? false;
-        if (enabled && !wasAttached) {
-          // Attach
-          const catalogEntry = MCP_CATALOG[name];
-          if (catalogEntry) {
-            addMcpServer(projectDir, name, catalogEntry);
+      // Apply changes async
+      (async () => {
+        for (const [name, enabled] of toggleState) {
+          const wasAttached = allServers.get(name)?.attached ?? false;
+          if (enabled && !wasAttached) {
+            const catalogEntry = MCP_CATALOG[name];
+            if (catalogEntry) {
+              await ark.mcpAttach(session.id, { name, ...catalogEntry });
+            }
+          } else if (!enabled && wasAttached) {
+            await ark.mcpDetach(session.id, name);
           }
-        } else if (!enabled && wasAttached) {
-          // Detach
-          removeMcpServer(projectDir, name);
         }
-      }
-      onApply();
-      onClose();
+        onApply();
+        onClose();
+      })();
     }
   });
 

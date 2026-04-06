@@ -3,8 +3,9 @@
  * Polls on an interval via useEffect; data transform is pure.
  */
 
-import { useState, useEffect, useRef } from "react";
-import { listSessions, getEvents } from "../../core/index.js";
+import { useState, useEffect } from "react";
+import { useArkClient } from "./useArkClient.js";
+import type { ArkClient } from "../../protocol/client.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 
 export interface EventLogEntry {
@@ -26,14 +27,14 @@ function colorForType(type: string): string {
   return "gray";
 }
 
-function fetchEvents(expanded: boolean): EventLogEntry[] {
+async function fetchEvents(ark: ArkClient, expanded: boolean): Promise<EventLogEntry[]> {
   const allEvents: EventLogEntry[] = [];
 
   try {
-    const sessions = listSessions({ limit: 15 });
-    for (const s of sessions) {
+    const sessions = await ark.sessionList({ limit: 15 });
+    await Promise.all(sessions.map(async (s: any) => {
       try {
-        const evts = getEvents(s.id, { limit: expanded ? 10 : 3 });
+        const evts = await ark.sessionEvents(s.id, expanded ? 10 : 3);
         for (const ev of evts) {
           const source = (s.summary ?? s.id).slice(0, 20);
           allEvents.push({
@@ -45,7 +46,7 @@ function fetchEvents(expanded: boolean): EventLogEntry[] {
           });
         }
       } catch {}
-    }
+    }));
   } catch {}
 
   allEvents.sort((a, b) => b.time.localeCompare(a.time));
@@ -53,14 +54,19 @@ function fetchEvents(expanded: boolean): EventLogEntry[] {
 }
 
 export function useEventLog(expanded: boolean): EventLogEntry[] {
+  const ark = useArkClient();
   const [events, setEvents] = useState<EventLogEntry[]>([]);
 
   useEffect(() => {
-    const refresh = () => setEvents(fetchEvents(expanded));
+    let cancelled = false;
+    const refresh = async () => {
+      const result = await fetchEvents(ark, expanded);
+      if (!cancelled) setEvents(result);
+    };
     refresh();
     const t = setInterval(refresh, 5000);
-    return () => clearInterval(t);
-  }, [expanded]);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [ark, expanded]);
 
   return events;
 }

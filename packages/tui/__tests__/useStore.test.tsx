@@ -1,39 +1,40 @@
 /**
- * Tests for useStore hook — central store with fingerprint-based re-renders.
- * Uses refresh() (sync path) instead of waiting for async poll cycle.
+ * Tests for useArkStore / StoreProvider — central store with push-based updates.
+ *
+ * The old useStore hook (direct DB polling) was replaced by useArkStore
+ * (JSON-RPC via ArkClient). These tests validate the StoreData interface
+ * and createMockStore helper used by all TUI component tests.
  */
 
 import { describe, it, expect } from "bun:test";
-import React, { useEffect } from "react";
+import React from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
-import {
-  addMessage,
-} from "../../core/index.js";
-import { createSession } from "../../core/store.js";
-import { useStore } from "../hooks/useStore.js";
-import type { StoreData } from "../hooks/useStore.js";
-import { withTestContext, waitFor } from "../../core/__tests__/test-helpers.js";
+import { StoreProvider, createMockStore, useStoreContext } from "../context/StoreProvider.js";
+import type { StoreData } from "../hooks/useArkStore.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
-withTestContext();
-
-// Captures store data and immediately triggers a sync refresh
 let captured: StoreData | null = null;
 
 function StoreCapture() {
-  const store = useStore(60000); // long poll — we use refresh() manually
+  const store = useStoreContext();
   captured = store;
-
-  // Trigger a sync refresh on mount so data is available immediately
-  useEffect(() => { store.refresh(); }, []);
-
   return <Text>{`s=${store.sessions.length} c=${store.computes.length}`}</Text>;
 }
 
-describe("useStore", () => {
+function renderWithMock(overrides?: Partial<StoreData>) {
+  const store = createMockStore(overrides);
+  return render(
+    <StoreProvider store={store}>
+      <StoreCapture />
+    </StoreProvider>
+  );
+}
+
+describe("useArkStore (via StoreProvider)", () => {
   it("provides all required StoreData fields", async () => {
     captured = null;
-    const { unmount } = render(<StoreCapture />);
+    const { unmount } = renderWithMock();
     await waitFor(() => captured !== null);
 
     expect(captured).not.toBeNull();
@@ -50,10 +51,11 @@ describe("useStore", () => {
     unmount();
   });
 
-  it("includes sessions from the database", async () => {
-    createSession({ summary: "test-session" });
+  it("includes sessions from mock data", async () => {
     captured = null;
-    const { unmount } = render(<StoreCapture />);
+    const { unmount } = renderWithMock({
+      sessions: [{ id: "s-mock01", summary: "test-session", status: "ready" }],
+    });
     await waitFor(() => captured !== null && captured.sessions.length === 1);
 
     expect(captured!.sessions.length).toBe(1);
@@ -61,73 +63,59 @@ describe("useStore", () => {
     unmount();
   });
 
-  it("includes local compute by default", async () => {
+  it("includes computes from mock data", async () => {
     captured = null;
-    const { unmount } = render(<StoreCapture />);
+    const { unmount } = renderWithMock({
+      computes: [{ name: "local", provider: "local", status: "running" }],
+    });
     await waitFor(() => captured !== null && captured.computes.length >= 1);
 
     expect(captured!.computes.length).toBeGreaterThanOrEqual(1);
-    expect(captured!.computes.some(c => c.name === "local")).toBe(true);
+    expect(captured!.computes.some((c: any) => c.name === "local")).toBe(true);
     unmount();
   });
 
-  it("computes unreadCounts from messages table", async () => {
-    const session = createSession({ summary: "msg-test" });
-    addMessage({ session_id: session.id, role: "agent", content: "hello" });
-    addMessage({ session_id: session.id, role: "agent", content: "world" });
+  it("provides unreadCounts as a Map", async () => {
+    const counts = new Map<string, number>();
+    counts.set("s-mock01", 2);
 
     captured = null;
-    const { unmount } = render(<StoreCapture />);
-    await waitFor(() => captured !== null && captured.unreadCounts.get(session.id) === 2);
+    const { unmount } = renderWithMock({ unreadCounts: counts });
+    await waitFor(() => captured !== null && captured.unreadCounts.get("s-mock01") === 2);
 
-    expect(captured!.unreadCounts.get(session.id)).toBe(2);
+    expect(captured!.unreadCounts.get("s-mock01")).toBe(2);
     unmount();
   });
 
-  it("unreadCounts excludes user messages", async () => {
-    const session = createSession({ summary: "user-msg" });
-    addMessage({ session_id: session.id, role: "user", content: "hi" });
-
-    captured = null;
-    const { unmount } = render(<StoreCapture />);
-    await waitFor(() => captured !== null);
-
-    expect(captured!.unreadCounts.has(session.id)).toBe(false);
-    unmount();
+  it("createMockStore returns defaults for all fields", () => {
+    const store = createMockStore();
+    expect(store.sessions).toEqual([]);
+    expect(store.computes).toEqual([]);
+    expect(store.agents).toEqual([]);
+    expect(store.flows).toEqual([]);
+    expect(store.unreadCounts).toBeInstanceOf(Map);
+    expect(store.snapshots).toBeInstanceOf(Map);
+    expect(store.computeLogs).toBeInstanceOf(Map);
+    expect(store.refreshing).toBe(false);
+    expect(store.initialLoading).toBe(false);
+    expect(typeof store.refresh).toBe("function");
+    expect(typeof store.addComputeLog).toBe("function");
   });
 
-  it("refresh() picks up new data immediately", async () => {
-    captured = null;
-    const { unmount } = render(<StoreCapture />);
-    await waitFor(() => captured !== null);
-    expect(captured!.sessions.length).toBe(0);
-
-    createSession({ summary: "after-refresh" });
-    captured!.refresh();
-    await waitFor(() => captured !== null && captured.sessions.length === 1);
-
-    expect(captured!.sessions.length).toBe(1);
-    unmount();
+  it("createMockStore applies overrides", () => {
+    const store = createMockStore({
+      sessions: [{ id: "s-1" }],
+      refreshing: true,
+    });
+    expect(store.sessions.length).toBe(1);
+    expect(store.refreshing).toBe(true);
+    // Defaults preserved for non-overridden fields
+    expect(store.computes).toEqual([]);
   });
 
-  it("addComputeLog appends to computeLogs", async () => {
+  it("snapshots is a Map", async () => {
     captured = null;
-    const { unmount } = render(<StoreCapture />);
-    await waitFor(() => captured !== null);
-
-    captured!.addComputeLog("local", "test log entry");
-    await waitFor(() => (captured!.computeLogs.get("local")?.length ?? 0) >= 1);
-
-    const logs = captured!.computeLogs.get("local");
-    expect(logs).toBeDefined();
-    expect(logs!.length).toBe(1);
-    expect(logs![0]).toContain("test log entry");
-    unmount();
-  });
-
-  it("snapshots map is a Map", async () => {
-    captured = null;
-    const { unmount } = render(<StoreCapture />);
+    const { unmount } = renderWithMock();
     await waitFor(() => captured !== null);
 
     expect(captured!.snapshots).toBeInstanceOf(Map);
