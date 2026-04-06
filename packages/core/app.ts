@@ -26,6 +26,8 @@ import { logError, logWarn, logInfo } from "./structured-log.js";
 import { registerExecutor } from "./executor.js";
 import { claudeCodeExecutor } from "./executors/claude-code.js";
 import { subprocessExecutor } from "./executors/subprocess.js";
+import { SessionRepository, ComputeRepository, EventRepository, MessageRepository } from "./repositories/index.js";
+import { SessionService, ComputeService, HistoryService } from "./services/index.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,17 @@ export class AppContext {
   private _db: Database | null = null;
   private _eventBus: typeof eventBus | null = null;
   private _providers = new Map<string, ComputeProvider>();
+
+  // Repositories
+  private _sessions: SessionRepository | null = null;
+  private _computes: ComputeRepository | null = null;
+  private _events: EventRepository | null = null;
+  private _messages: MessageRepository | null = null;
+
+  // Services
+  private _sessionService: SessionService | null = null;
+  private _computeService: ComputeService | null = null;
+  private _historyService: HistoryService | null = null;
 
   conductor: { stop(): void } | null = null;
   metricsPoller: { stop(): void } | null = null;
@@ -83,6 +96,41 @@ export class AppContext {
   get eventBus(): typeof eventBus {
     if (!this._eventBus) throw new Error("AppContext not booted — eventBus not available");
     return this._eventBus;
+  }
+
+  get sessions(): SessionRepository {
+    if (!this._sessions) throw new Error("AppContext not booted — sessions not available");
+    return this._sessions;
+  }
+
+  get computes(): ComputeRepository {
+    if (!this._computes) throw new Error("AppContext not booted — computes not available");
+    return this._computes;
+  }
+
+  get events(): EventRepository {
+    if (!this._events) throw new Error("AppContext not booted — events not available");
+    return this._events;
+  }
+
+  get messages(): MessageRepository {
+    if (!this._messages) throw new Error("AppContext not booted — messages not available");
+    return this._messages;
+  }
+
+  get sessionService(): SessionService {
+    if (!this._sessionService) throw new Error("AppContext not booted — sessionService not available");
+    return this._sessionService;
+  }
+
+  get computeService(): ComputeService {
+    if (!this._computeService) throw new Error("AppContext not booted — computeService not available");
+    return this._computeService;
+  }
+
+  get historyService(): HistoryService {
+    if (!this._historyService) throw new Error("AppContext not booted — historyService not available");
+    return this._historyService;
   }
 
   // ── Provider registry ──────────────────────────────────────────────────
@@ -145,6 +193,16 @@ export class AppContext {
         "INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at) VALUES ('local', 'local', 'running', '{}', ?, ?)"
       ).run(ts, ts);
     }
+
+    // 3b. Create repositories and services
+    this._sessions = new SessionRepository(this._db);
+    this._computes = new ComputeRepository(this._db);
+    this._events = new EventRepository(this._db);
+    this._messages = new MessageRepository(this._db);
+
+    this._sessionService = new SessionService(this._sessions, this._events, this._messages);
+    this._computeService = new ComputeService(this._computes);
+    this._historyService = new HistoryService(this._db);
 
     // 4. Register compute providers
     await safeAsync("boot: load compute providers", async () => {
@@ -301,6 +359,16 @@ export class AppContext {
     // 9. Clear provider resolver + app store bindings + close database
     clearProviderResolver();
     clearAppStore();
+
+    // Null out services and repositories before closing DB
+    this._historyService = null;
+    this._computeService = null;
+    this._sessionService = null;
+    this._messages = null;
+    this._events = null;
+    this._computes = null;
+    this._sessions = null;
+
     if (this._db) {
       try { this._db.close(); } catch (e: any) {
         // DB may already be closed — log but don't fail shutdown
