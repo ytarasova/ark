@@ -43,6 +43,11 @@ hotkeys:
   filterFailed: "$"
   filterClear: "0"
   undo: ctrl+z
+  markUnread: u
+  skills: K
+  settings: P
+  advance: A
+  worktreeFinish: W
 
 # ── Budgets ─────────────────────────────────────────────────────────
 # Spending limits in USD. Ark warns when approaching/exceeding limits.
@@ -115,6 +120,11 @@ Available actions and their defaults:
 | `filterFailed` | `$` | Filter to failed sessions |
 | `filterClear` | `0` | Clear status filter |
 | `undo` | `ctrl+z` | Undo last delete |
+| `markUnread` | `u` | Mark session as unread |
+| `skills` | `K` | Open skills manager |
+| `settings` | `P` | Open settings |
+| `advance` | `A` | Advance session to next flow stage |
+| `worktreeFinish` | `W` | Finish worktree (merge branch and clean up) |
 
 To disable a shortcut, set it to `null`:
 
@@ -378,6 +388,61 @@ ark session start --repo .
 # Overrides flow to "bare"
 ark session start --repo . --flow bare
 ```
+
+---
+
+## Agent YAML
+
+Agent definitions live in `agents/<name>.yaml` (builtin), `.ark/agents/<name>.yaml` (project), or `~/.ark/agents/<name>.yaml` (global). Create or edit with `ark agent create` / `ark agent edit`.
+
+```yaml
+name: my-agent
+description: What it does
+model: opus            # opus | sonnet | haiku
+max_turns: 200
+system_prompt: |
+  Working on {repo}. Task: {summary}. Ticket: {ticket}.
+tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch]
+permission_mode: bypassPermissions
+skills: [code-review]  # optional - skill names injected into system prompt
+env:
+  CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80"
+runtime:               # optional - executor system configuration
+  type: docker         # local | docker | devcontainer | firecracker
+  image: node:20       # Docker image (docker/devcontainer types)
+```
+
+### Agent Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Agent identifier (matches filename) |
+| `description` | string | Short description shown in `ark agent list` |
+| `model` | string | Model alias: `opus`, `sonnet`, or `haiku` |
+| `max_turns` | number | Maximum conversation turns before stopping |
+| `system_prompt` | string | System prompt. Supports `{ticket}`, `{summary}`, `{workdir}`, `{repo}`, `{branch}` template variables |
+| `tools` | string[] | Allowed Claude tools |
+| `permission_mode` | string | Claude permission mode (e.g. `bypassPermissions`) |
+| `skills` | string[] | Skill names to inject into the system prompt |
+| `env` | object | Environment variables exported before agent launch |
+| `runtime` | object | Executor system configuration (see below) |
+
+### runtime Field
+
+The `runtime` field controls which executor launches the agent process.
+
+```yaml
+runtime:
+  type: docker         # local | docker | devcontainer | firecracker
+  image: node:20       # Docker image (docker and devcontainer types)
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | string | `local` | Executor type: `local`, `docker`, `devcontainer`, or `firecracker` |
+| `image` | string | -- | Docker image to use (required for `docker` and `devcontainer` types) |
+
+When `runtime` is omitted the agent runs in the local environment (same machine, same shell). Use `docker` to isolate the agent in a container, `devcontainer` to run inside the repo's `.devcontainer` config, or `firecracker` for micro-VM isolation.
 
 ---
 

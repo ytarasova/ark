@@ -43,12 +43,18 @@ These work in any tab when no overlay is open.
 | `t` | Talk -- send message to agent | Session is running or waiting |
 | `T` | Open threads / inbox | Session is running or waiting |
 | `f` | Fork session | Any session selected |
+| `C` | Clone session | Any session selected |
+| `A` | Advance to next stage | Session at a gate |
+| `W` | Finish worktree (merge + cleanup) | Session has a worktree |
 | `m` | Move to group | Any session selected |
 | `M` | Open MCP manager | Any session selected |
+| `u` | Mark session unread | Any session selected |
 | `x` | Delete session (soft, 90s undo) | Any session selected |
 | `Ctrl+Z` | Undo last delete | After deletion |
 | `n` | New session | Always |
 | `o` | Open group manager | Always |
+| `K` | Open skills manager | Always |
+| `P` | Open settings | Always |
 | `/` | Fuzzy search sessions | Always |
 | `r` | Open session replay | Session is stopped, failed, or completed |
 

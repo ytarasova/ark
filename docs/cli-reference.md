@@ -1286,3 +1286,72 @@ Run the MCP channel server (used by remote agents). Internal command.
 ```
 ark channel
 ```
+
+---
+
+## ark server
+
+JSON-RPC protocol server.
+
+### ark server start
+
+Start the Ark protocol server.
+
+```
+ark server start [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--stdio` | Use stdio transport (JSONL) | -- |
+| `--ws` | Use WebSocket transport | default |
+| `-p, --port <port>` | WebSocket port | `19400` |
+
+Examples:
+
+```bash
+ark server start                   # WebSocket on port 19400
+ark server start --stdio           # JSONL over stdin/stdout
+ark server start --port 9000       # Custom port
+```
+
+The TUI and CLI embed the server in-process. Start it explicitly only for external clients.
+
+---
+
+## ark memory
+
+Cross-session persistent knowledge.
+
+### ark memory list
+
+List stored memories.
+
+```
+ark memory list [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--scope <scope>` | Filter by scope (e.g., "global", "project/myapp") |
+
+### ark memory recall
+
+Search memories by query.
+
+```
+ark memory recall <query> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--scope <scope>` | Limit to scope | all |
+| `--limit <n>` | Max results | 10 |
+
+### ark memory forget
+
+Delete a memory entry.
+
+```
+ark memory forget <id>
+```
