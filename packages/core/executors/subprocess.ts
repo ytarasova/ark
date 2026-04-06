@@ -54,7 +54,9 @@ export const subprocessExecutor: Executor = {
             if (done) break;
             tracked.stdout.push(new TextDecoder().decode(value));
           }
-        } catch {}
+        } catch {
+          // Stream ended or errored — expected during process exit
+        }
       })();
     }
 
@@ -68,7 +70,9 @@ export const subprocessExecutor: Executor = {
             if (done) break;
             tracked.stderr.push(new TextDecoder().decode(value));
           }
-        } catch {}
+        } catch {
+          // Stream ended or errored — expected during process exit
+        }
       })();
     }
 

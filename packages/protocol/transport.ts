@@ -44,7 +44,10 @@ export function createStdioTransport(
     try {
       const msg = JsonlCodec.decode(line);
       for (const h of handlers) h(msg);
-    } catch {}
+    } catch (err) {
+      // Malformed JSON-RPC message — log and skip
+      if (process.env.ARK_DEBUG) console.error("[transport] parse error:", err);
+    }
   });
 
   const reader = input.getReader();
@@ -56,7 +59,10 @@ export function createStdioTransport(
         if (done) break;
         splitter.push(decoder.decode(value));
       }
-    } catch {}
+    } catch (err) {
+      // Stream ended or errored — expected during process exit
+      if (process.env.ARK_DEBUG) console.error("[transport] stream error:", err);
+    }
     splitter.flush();
   })();
 

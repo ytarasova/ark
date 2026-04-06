@@ -1,8 +1,15 @@
 import type { Router } from "../router.js";
 import * as core from "../../core/index.js";
+import { ErrorCodes } from "../../protocol/types.js";
 
 export function registerResourceHandlers(router: Router): void {
   router.handle("agent/list", async () => ({ agents: core.listAgents() }));
+  router.handle("agent/read", async (p) => {
+    const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
+    const agent = core.loadAgent(p.name as string, projectRoot);
+    if (!agent) throw new Error(`Agent '${p.name}' not found`);
+    return { agent };
+  });
   router.handle("flow/list", async () => ({ flows: core.listFlows() }));
   router.handle("flow/read", async (p) => {
     const flow = core.loadFlow(p.name as string);
@@ -40,7 +47,7 @@ export function registerResourceHandlers(router: Router): void {
   });
   router.handle("compute/read", async (p) => {
     const compute = core.getCompute(p.name as string);
-    if (!compute) throw Object.assign(new Error("Compute not found"), { code: -32002 });
+    if (!compute) throw Object.assign(new Error("Compute not found"), { code: ErrorCodes.SESSION_NOT_FOUND });
     return { compute };
   });
   router.handle("compute/provision", async (p) => {
@@ -99,11 +106,19 @@ export function registerResourceHandlers(router: Router): void {
   router.handle("compute/clean", async (p) => {
     const compute = core.getCompute(p.name as string);
     if (!compute) throw new Error("Compute not found");
-    const { getProvider } = await import("../../compute/index.js");
-    const provider = getProvider(compute.provider);
-    if (!provider) throw new Error(`Provider '${compute.provider}' not found`);
-    // Provider clean uses cleanupSession per-session — here we just expose a generic hook
-    return { ok: true };
+    const { listArkSessionsAsync, killSessionAsync } = await import("../../core/tmux.js");
+    const tmuxSessions = await listArkSessionsAsync();
+    let cleaned = 0;
+    for (const ts of tmuxSessions) {
+      const sessionId = ts.name.replace("ark-", "");
+      const dbSession = core.getSession(sessionId);
+      if (!dbSession || ["failed", "completed"].includes(dbSession.status)) {
+        await killSessionAsync(ts.name);
+        if (dbSession) core.updateSession(dbSession.id, { session_id: null });
+        cleaned++;
+      }
+    }
+    return { ok: true, cleaned };
   });
   router.handle("compute/reboot", async (p) => {
     const compute = core.getCompute(p.name as string);
