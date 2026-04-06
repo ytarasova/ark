@@ -76,6 +76,8 @@ export const subprocessExecutor: Executor = {
     proc.exited.then((code) => {
       tracked.exitCode = code;
       tracked.exited = true;
+      // Auto-cleanup after 5 minutes to prevent memory leaks
+      setTimeout(() => { processes.delete(handle); }, 5 * 60 * 1000);
     });
 
     processes.set(handle, tracked);
@@ -84,8 +86,10 @@ export const subprocessExecutor: Executor = {
 
   async kill(handle: string): Promise<void> {
     const tracked = processes.get(handle);
-    if (!tracked || tracked.exited) return;
-    tracked.proc.kill();
+    if (!tracked) return;
+    if (!tracked.exited) tracked.proc.kill();
+    // Clean up after kill
+    setTimeout(() => { processes.delete(handle); }, 1000);
   },
 
   async status(handle: string): Promise<ExecutorStatus> {

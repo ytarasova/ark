@@ -56,10 +56,18 @@ export class ArkClient {
     }
   }
 
-  rpc(method: string, params?: Record<string, unknown>): Promise<any> {
+  private rpc(method: string, params?: Record<string, unknown>, timeoutMs = 30000): Promise<any> {
+    const id = ++this.idCounter;
     return new Promise((resolve, reject) => {
-      const id = ++this.idCounter;
-      this.pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`RPC timeout: ${method} (${timeoutMs}ms)`));
+      }, timeoutMs);
+
+      this.pending.set(id, {
+        resolve: (v) => { clearTimeout(timer); resolve(v); },
+        reject: (e) => { clearTimeout(timer); reject(e); },
+      });
       this.transport.send(createRequest(id, method, params));
     });
   }
@@ -394,6 +402,92 @@ export class ArkClient {
 
   async costsRead(): Promise<{ costs: any[]; total: number }> {
     return this.rpc("costs/read");
+  }
+
+  // ── Session extended ────────────────────────────────────────────────────────
+
+  async sessionOutput(sessionId: string, lines?: number): Promise<string> {
+    const { output } = await this.rpc("session/output", { sessionId, lines });
+    return output;
+  }
+
+  async sessionHandoff(sessionId: string, agent: string, instructions?: string): Promise<any> {
+    return this.rpc("session/handoff", { sessionId, agent, instructions });
+  }
+
+  async sessionJoin(sessionId: string, force?: boolean): Promise<any> {
+    return this.rpc("session/join", { sessionId, force });
+  }
+
+  async sessionSpawn(sessionId: string, opts: { task: string; agent?: string; model?: string; group_name?: string }): Promise<any> {
+    return this.rpc("session/spawn", { sessionId, ...opts });
+  }
+
+  async sessionResume(sessionId: string): Promise<any> {
+    return this.rpc("session/resume", { sessionId });
+  }
+
+  async sessionPause(sessionId: string, reason?: string): Promise<any> {
+    return this.rpc("session/pause", { sessionId, reason });
+  }
+
+  // ── Memory ─────────────────────────────────────────────────────────────────
+
+  async memoryList(scope?: string): Promise<any[]> {
+    const { memories } = await this.rpc("memory/list", { scope });
+    return memories;
+  }
+
+  async memoryRecall(query: string, opts?: { scope?: string; limit?: number }): Promise<any[]> {
+    const { results } = await this.rpc("memory/recall", { query, ...opts });
+    return results;
+  }
+
+  async memoryForget(id: string): Promise<boolean> {
+    const { ok } = await this.rpc("memory/forget", { id });
+    return ok;
+  }
+
+  // ── Profile extended ───────────────────────────────────────────────────────
+
+  async profileCreate(name: string, description?: string): Promise<any> {
+    const { profile } = await this.rpc("profile/create", { name, description });
+    return profile;
+  }
+
+  async profileDelete(name: string): Promise<void> {
+    await this.rpc("profile/delete", { name });
+  }
+
+  // ── Schedule ───────────────────────────────────────────────────────────────
+
+  async scheduleList(): Promise<any[]> {
+    const { schedules } = await this.rpc("schedule/list");
+    return schedules;
+  }
+
+  async scheduleCreate(opts: Record<string, unknown>): Promise<any> {
+    const { schedule } = await this.rpc("schedule/create", opts);
+    return schedule;
+  }
+
+  async scheduleDelete(id: string): Promise<boolean> {
+    const { ok } = await this.rpc("schedule/delete", { id });
+    return ok;
+  }
+
+  async scheduleEnable(id: string): Promise<void> {
+    await this.rpc("schedule/enable", { id });
+  }
+
+  async scheduleDisable(id: string): Promise<void> {
+    await this.rpc("schedule/disable", { id });
+  }
+
+  // ── History extended ───────────────────────────────────────────────────────
+
+  async indexStats(): Promise<any> {
+    return this.rpc("history/index-stats");
   }
 
   // ── Teardown ────────────────────────────────────────────────────────────────

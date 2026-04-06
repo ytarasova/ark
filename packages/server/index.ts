@@ -1,4 +1,4 @@
-import { Router, type Handler } from "./router.js";
+import { Router, type Handler, type NotifyFn } from "./router.js";
 import {
   createNotification, isRequest, isNotification, parseMessage,
   type JsonRpcMessage, type JsonRpcNotification,
@@ -37,7 +37,7 @@ export class ArkServer {
         if (msg.method === "initialize" && msg.params?.subscribe) {
           conn.subscriptions = msg.params.subscribe as string[];
         }
-        const response = await this.router.dispatch(msg);
+        const response = await this.router.dispatch(msg, this.notify.bind(this));
         transport.send(response);
 
         // After initialize response, mark as initialized
@@ -110,29 +110,29 @@ export class ArkServer {
       websocket: {
         open(ws) {
           const connId = `ws-${++self.connCounter}`;
+          const handlers: ((msg: JsonRpcMessage) => void)[] = [];
+
           const conn: ServerConnection = {
             id: connId,
             transport: {
               send(msg) { ws.send(JSON.stringify(msg)); },
-              onMessage() {},
+              onMessage(handler) { handlers.push(handler); },
               close() { ws.close(); },
             },
             subscriptions: [],
           };
+
           self.connections.set(connId, conn);
           (ws as any)._arkConnId = connId;
+          (ws as any)._arkHandlers = handlers;
 
-          // Wire message handler
-          conn.transport.onMessage = (handler) => {
-            (ws as any)._arkHandler = handler;
-          };
-          // Re-run addConnection logic for the websocket transport
+          // Wire message routing (same as addConnection)
           conn.transport.onMessage(async (msg) => {
             if (isRequest(msg)) {
               if (msg.method === "initialize" && msg.params?.subscribe) {
                 conn.subscriptions = msg.params.subscribe as string[];
               }
-              const response = await self.router.dispatch(msg);
+              const response = await self.router.dispatch(msg, self.notify.bind(self));
               conn.transport.send(response);
               if (msg.method === "initialize" && "result" in response) {
                 self.router.markInitialized();
@@ -143,8 +143,8 @@ export class ArkServer {
         message(ws, data) {
           try {
             const msg = parseMessage(typeof data === "string" ? data : new TextDecoder().decode(data as ArrayBuffer));
-            const handler = (ws as any)._arkHandler;
-            if (handler) handler(msg);
+            const handlers = (ws as any)._arkHandlers;
+            if (handlers) for (const h of handlers) h(msg);
           } catch {}
         },
         close(ws) {
