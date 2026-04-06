@@ -1,57 +1,50 @@
 # Ark User Guide
 
-## Getting Started
+Ark orchestrates AI coding agents through multi-stage workflows. You define the workflow, Ark manages the agents.
 
-### Installation
+## Quickstart (60 seconds)
 
-Ark requires [Bun](https://bun.sh), [tmux](https://github.com/tmux/tmux), and the [Claude CLI](https://docs.anthropic.com/en/docs/claude-cli).
+### Install
 
 ```bash
-# Install Bun (if not already installed)
+# Prerequisites: Bun, tmux, Claude CLI
+brew install tmux
 curl -fsSL https://bun.sh/install | bash
 
-# Install tmux (macOS)
-brew install tmux
-
-# Clone and install Ark
+# Install Ark
 git clone https://github.com/your-org/ark.git
-cd ark
-make install
+cd ark && make install
 ```
 
-This installs dependencies and symlinks `ark` to `/usr/local/bin` so it is available system-wide.
-
-### First Session
-
-Create a session and dispatch an agent in one command:
+### Fix a bug
 
 ```bash
-ark session start --repo . --summary "Add user authentication" --dispatch
+ark session start --repo . --summary "Fix the login timeout bug" --dispatch --attach
 ```
 
-This creates a session record, resolves the flow and agent, and spawns a Claude agent in a tmux session. The agent works autonomously until the flow stage completes.
+That's it. Ark creates a session, assigns an agent, launches it in tmux, and attaches you to watch it work. The agent reads your codebase, writes code, runs tests, and commits.
 
-To attach to the running agent and watch it work:
+### Build a feature (multi-stage)
 
 ```bash
-ark session start --repo . --summary "Add user auth" --dispatch --attach
+ark session start --repo . --summary "Add OAuth2 login" --flow default --dispatch
 ```
 
-### Launching the TUI
+The `default` flow runs: plan > implement > PR > review > merge. Each stage uses a specialized agent. Gates between stages let you review before the next agent starts.
+
+### Use the dashboard
 
 ```bash
-ark tui
+ark tui    # Terminal dashboard (7 tabs, keyboard-driven)
+ark web    # Web dashboard (browser-based, SSE live updates)
 ```
 
-The terminal dashboard gives you a full-screen view of sessions, agents, tools, flows, history, compute resources, and costs. See the [TUI Reference](tui-reference.md) for all keyboard shortcuts.
-
-### Launching the Web Dashboard
+### Use a recipe template
 
 ```bash
-ark web
+ark recipe list                                          # See available templates
+ark session start --recipe quick-fix --repo . --dispatch # One-command session from template
 ```
-
-Opens a web dashboard at `http://localhost:8420` with session management, cost tracking, and live updates via SSE.
 
 ---
 
@@ -331,6 +324,26 @@ ark agent copy implementer fast   # Copy agent for customization
 ark agent delete my-agent         # Delete a custom agent
 ```
 
+### Executor System
+
+Agents dispatch through pluggable executors. The `runtime` field selects which executor launches the agent:
+
+- `claude-code` (default) -- launches Claude Code in tmux with hooks + MCP channel
+- `subprocess` -- spawns any command as a child process
+
+```yaml
+# Custom subprocess agent
+name: my-linter
+runtime: subprocess
+command: ["node", "scripts/lint.js"]
+env:
+  TARGET: "{workdir}"
+```
+
+```bash
+ark agent list    # Shows all agents with their runtime type
+```
+
 ### Flow Definitions
 
 Flows define multi-stage workflows:
@@ -547,6 +560,28 @@ Learnings are stored in `~/.ark/conductor/`.
 
 ---
 
+## Protocol Server
+
+Ark includes a JSON-RPC 2.0 server that provides a standard interface for all clients.
+
+### Starting the server
+
+```bash
+ark server start              # WebSocket on port 19400
+ark server start --stdio      # JSONL over stdin/stdout (for embedding)
+ark server start --port 9000  # Custom WebSocket port
+```
+
+The TUI and CLI embed the server in-process automatically -- you only need to start it explicitly for external clients (IDE extensions, custom dashboards).
+
+### Protocol
+
+The server exposes 80+ methods covering sessions, agents, flows, skills, recipes, compute, search, memory, and costs. Clients connect via WebSocket and receive push notifications for session state changes.
+
+See `packages/protocol/types.ts` for the full method list.
+
+---
+
 ## Messaging Bridges
 
 Connect Ark to external messaging platforms for remote monitoring and control.
@@ -760,6 +795,100 @@ ark schedule list
 ark schedule enable sched-abc123
 ark schedule disable sched-abc123
 ark schedule delete sched-abc123
+```
+
+---
+
+## Use Cases
+
+### Quick bug fix
+
+The fastest path from bug report to fix:
+
+```bash
+ark session start --repo . --summary "Fix: users can't log in when session expires" --flow bare --dispatch --attach
+```
+
+Single agent, no gates, auto-attach. Watch it work, detach when satisfied.
+
+### Feature development with review
+
+Multi-stage flow with human checkpoints:
+
+```bash
+ark session start --repo . --summary "Add rate limiting to API" --flow default --dispatch
+```
+
+The agent plans first (creates PLAN.md), then implements, creates a PR, and waits for review. You approve each gate in the TUI before the next stage starts.
+
+### Parallel task decomposition
+
+Break a large task into parallel workstreams:
+
+```bash
+# Parent session
+ark session start --repo . --summary "Migrate to new auth system" --flow bare
+# Spawn parallel children
+ark session spawn s-parent "Migrate user model"
+ark session spawn s-parent "Migrate API middleware"
+ark session spawn s-parent "Migrate tests"
+# Wait for all to complete
+ark session join s-parent
+```
+
+### Code review
+
+Use the review-focused flow:
+
+```bash
+ark session start --repo . --summary "Review PR #142" --flow pr-review --dispatch
+```
+
+The reviewer agent produces structured JSON feedback with P0-P3 severity levels.
+
+### CI/CD automation
+
+Run headless in a CI pipeline:
+
+```bash
+ark exec --repo . --summary "Run linter and fix violations" --flow bare --timeout 300
+```
+
+Exits with the session's exit code. Use `--output json` for machine-readable results.
+
+### Custom subprocess agent
+
+Run any command as an Ark agent (no Claude needed):
+
+```yaml
+# agents/my-linter.yaml
+name: my-linter
+runtime: subprocess
+command: ["node", "scripts/lint-and-fix.js"]
+env:
+  TARGET: "{workdir}"
+```
+
+```bash
+ark session start --repo . --summary "Lint pass" --agent my-linter --dispatch
+```
+
+### Remote compute (EC2)
+
+Run agents on powerful cloud machines:
+
+```bash
+ark compute create gpu-box --provider ec2 --size xl --region us-east-1
+ark compute provision gpu-box
+ark session start --repo . --summary "Train model" --compute gpu-box --dispatch
+```
+
+### Scheduled nightly tasks
+
+Automate recurring work:
+
+```bash
+ark schedule add --cron "0 2 * * *" --summary "Nightly test suite" --repo . --flow bare
 ```
 
 ---
