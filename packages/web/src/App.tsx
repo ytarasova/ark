@@ -10,6 +10,7 @@ import { ToolsView } from "./components/ToolsView.js";
 import { FlowsView } from "./components/FlowsView.js";
 import { ComputeView } from "./components/ComputeView.js";
 import { HistoryView } from "./components/HistoryView.js";
+import { MemoryView } from "./components/MemoryView.js";
 import { NewSessionModal } from "./components/NewSessionModal.js";
 import { api } from "./hooks/useApi.js";
 import { useSse } from "./hooks/useSse.js";
@@ -77,7 +78,7 @@ function App() {
   const viewTitles: Record<string, string> = {
     sessions: "Sessions", agents: "Agents", tools: "Tools",
     flows: "Flows", history: "History", compute: "Compute",
-    costs: "Costs", status: "System",
+    memory: "Memory", costs: "Costs", status: "System",
   };
 
   return (
@@ -103,6 +104,7 @@ function App() {
           {view === "flows" && <FlowsView />}
           {view === "history" && <HistoryView />}
           {view === "compute" && <ComputeView />}
+          {view === "memory" && <MemoryView />}
           {view === "costs" && <CostsView />}
           {view === "status" && <StatusView sessions={sessions} />}
         </div>

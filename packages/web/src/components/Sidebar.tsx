@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { id: "flows", icon: "\u21C4", label: "Flows" },
   { id: "history", icon: "\u23F0", label: "History" },
   { id: "compute", icon: "\u2601", label: "Compute" },
+  { id: "memory", icon: "\u2691", label: "Memory" },
   { id: "costs", icon: "$", label: "Costs" },
   { id: "status", icon: "\u2261", label: "System" },
 ];
