@@ -7,6 +7,7 @@
 import { ArkClient } from "../protocol/client.js";
 import { ArkServer } from "../server/index.js";
 import { registerAllHandlers } from "../server/register.js";
+import { getApp } from "../core/app.js";
 import type { Transport } from "../protocol/transport.js";
 import type { JsonRpcMessage } from "../protocol/types.js";
 
@@ -36,7 +37,7 @@ export async function getArkClient(): Promise<ArkClient> {
   if (_client) return _client;
 
   _server = new ArkServer();
-  registerAllHandlers(_server.router);
+  registerAllHandlers(_server.router, getApp());
 
   const { clientTransport, serverTransport } = createInMemoryPair();
   _server.addConnection(serverTransport);

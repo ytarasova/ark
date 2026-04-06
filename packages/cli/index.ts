@@ -2091,7 +2091,7 @@ serverCmd
     await app.boot();
 
     const server = new ArkServer();
-    registerAllHandlers(server.router);
+    registerAllHandlers(server.router, app);
 
     if (opts.stdio) {
       server.startStdio();

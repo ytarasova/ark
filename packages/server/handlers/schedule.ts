@@ -1,7 +1,13 @@
 import type { Router } from "../router.js";
+import type { AppContext } from "../../core/app.js";
+import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
+import type {
+  ScheduleDeleteParams,
+  ScheduleIdParams,
+} from "../../types/index.js";
 
-export function registerScheduleHandlers(router: Router): void {
+export function registerScheduleHandlers(router: Router, app: AppContext): void {
   router.handle("schedule/list", async () => ({
     schedules: core.listSchedules(),
   }));
@@ -10,17 +16,20 @@ export function registerScheduleHandlers(router: Router): void {
     schedule: core.createSchedule(p as any),
   }));
 
-  router.handle("schedule/delete", async (p) => ({
-    ok: core.deleteSchedule(p.id as string),
-  }));
+  router.handle("schedule/delete", async (p) => {
+    const { id } = extract<ScheduleDeleteParams>(p, ["id"]);
+    return { ok: core.deleteSchedule(id) };
+  });
 
   router.handle("schedule/enable", async (p) => {
-    core.enableSchedule(p.id as string, true);
+    const { id } = extract<ScheduleIdParams>(p, ["id"]);
+    core.enableSchedule(id, true);
     return { ok: true };
   });
 
   router.handle("schedule/disable", async (p) => {
-    core.enableSchedule(p.id as string, false);
+    const { id } = extract<ScheduleIdParams>(p, ["id"]);
+    core.enableSchedule(id, false);
     return { ok: true };
   });
 }

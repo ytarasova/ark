@@ -1,34 +1,54 @@
 import type { Router } from "../router.js";
+import type { AppContext } from "../../core/app.js";
+import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
 import { ErrorCodes } from "../../protocol/types.js";
+import type {
+  AgentReadParams,
+  FlowReadParams,
+  SkillReadParams,
+  RecipeReadParams,
+  RecipeUseParams,
+  ComputeNameParams,
+  ComputeUpdateParams,
+  GroupCreateParams,
+  GroupDeleteParams,
+} from "../../types/index.js";
 
-export function registerResourceHandlers(router: Router): void {
+export function registerResourceHandlers(router: Router, app: AppContext): void {
   router.handle("agent/list", async () => ({ agents: core.listAgents() }));
   router.handle("agent/read", async (p) => {
+    const { name } = extract<AgentReadParams>(p, ["name"]);
     const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-    const agent = core.loadAgent(p.name as string, projectRoot);
-    if (!agent) throw new Error(`Agent '${p.name}' not found`);
+    const agent = core.loadAgent(name, projectRoot);
+    if (!agent) throw new Error(`Agent '${name}' not found`);
     return { agent };
   });
   router.handle("flow/list", async () => ({ flows: core.listFlows() }));
   router.handle("flow/read", async (p) => {
-    const flow = core.loadFlow(p.name as string);
-    if (!flow) throw new Error(`Flow '${p.name}' not found`);
+    const { name } = extract<FlowReadParams>(p, ["name"]);
+    const flow = core.loadFlow(name);
+    if (!flow) throw new Error(`Flow '${name}' not found`);
     return { flow };
   });
   router.handle("skill/list", async () => ({ skills: core.listSkills() }));
-  router.handle("skill/read", async (p) => ({ skill: core.loadSkill(p.name as string) }));
+  router.handle("skill/read", async (p) => {
+    const { name } = extract<SkillReadParams>(p, ["name"]);
+    return { skill: core.loadSkill(name) };
+  });
   router.handle("recipe/list", async () => ({ recipes: core.listRecipes() }));
   router.handle("recipe/read", async (p) => {
-    const recipe = core.loadRecipe(p.name as string);
-    if (!recipe) throw new Error(`Recipe '${p.name}' not found`);
+    const { name } = extract<RecipeReadParams>(p, ["name"]);
+    const recipe = core.loadRecipe(name);
+    if (!recipe) throw new Error(`Recipe '${name}' not found`);
     return { recipe };
   });
 
   router.handle("recipe/use", async (p) => {
-    const recipe = core.loadRecipe(p.name as string);
-    if (!recipe) throw new Error(`Recipe '${p.name}' not found`);
-    const instance = core.instantiateRecipe(recipe, (p.variables ?? {}) as Record<string, string>);
+    const { name, variables } = extract<RecipeUseParams>(p, ["name"]);
+    const recipe = core.loadRecipe(name);
+    if (!recipe) throw new Error(`Recipe '${name}' not found`);
+    const instance = core.instantiateRecipe(recipe, (variables ?? {}) as Record<string, string>);
     const session = core.startSession(instance);
     return { session };
   });
@@ -38,20 +58,24 @@ export function registerResourceHandlers(router: Router): void {
     return { compute };
   });
   router.handle("compute/delete", async (p) => {
-    core.deleteCompute(p.name as string);
+    const { name } = extract<ComputeNameParams>(p, ["name"]);
+    core.deleteCompute(name);
     return { ok: true };
   });
   router.handle("compute/update", async (p) => {
-    core.updateCompute(p.name as string, p.fields as Record<string, unknown>);
+    const { name, fields } = extract<ComputeUpdateParams>(p, ["name", "fields"]);
+    core.updateCompute(name, fields as Record<string, unknown>);
     return { ok: true };
   });
   router.handle("compute/read", async (p) => {
-    const compute = core.getCompute(p.name as string);
+    const { name } = extract<ComputeNameParams>(p, ["name"]);
+    const compute = core.getCompute(name);
     if (!compute) throw Object.assign(new Error("Compute not found"), { code: ErrorCodes.SESSION_NOT_FOUND });
     return { compute };
   });
   router.handle("compute/provision", async (p) => {
-    const compute = core.getCompute(p.name as string);
+    const { name } = extract<ComputeNameParams>(p, ["name"]);
+    const compute = core.getCompute(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
@@ -62,7 +86,8 @@ export function registerResourceHandlers(router: Router): void {
     return { ok: true };
   });
   router.handle("compute/stop-instance", async (p) => {
-    const compute = core.getCompute(p.name as string);
+    const { name } = extract<ComputeNameParams>(p, ["name"]);
+    const compute = core.getCompute(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
@@ -84,7 +109,8 @@ export function registerResourceHandlers(router: Router): void {
     return { ok: true };
   });
   router.handle("compute/start-instance", async (p) => {
-    const compute = core.getCompute(p.name as string);
+    const { name } = extract<ComputeNameParams>(p, ["name"]);
+    const compute = core.getCompute(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
@@ -94,7 +120,8 @@ export function registerResourceHandlers(router: Router): void {
     return { ok: true };
   });
   router.handle("compute/destroy", async (p) => {
-    const compute = core.getCompute(p.name as string);
+    const { name } = extract<ComputeNameParams>(p, ["name"]);
+    const compute = core.getCompute(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
@@ -104,7 +131,8 @@ export function registerResourceHandlers(router: Router): void {
     return { ok: true };
   });
   router.handle("compute/clean", async (p) => {
-    const compute = core.getCompute(p.name as string);
+    const { name } = extract<ComputeNameParams>(p, ["name"]);
+    const compute = core.getCompute(name);
     if (!compute) throw new Error("Compute not found");
     const { listArkSessionsAsync, killSessionAsync } = await import("../../core/tmux.js");
     const tmuxSessions = await listArkSessionsAsync();
@@ -121,7 +149,8 @@ export function registerResourceHandlers(router: Router): void {
     return { ok: true, cleaned };
   });
   router.handle("compute/reboot", async (p) => {
-    const compute = core.getCompute(p.name as string);
+    const { name } = extract<ComputeNameParams>(p, ["name"]);
+    const compute = core.getCompute(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
@@ -130,7 +159,8 @@ export function registerResourceHandlers(router: Router): void {
     return { ok: true };
   });
   router.handle("compute/ping", async (p) => {
-    const compute = core.getCompute(p.name as string);
+    const { name } = extract<ComputeNameParams>(p, ["name"]);
+    const compute = core.getCompute(name);
     if (!compute) throw new Error("Compute not found");
     const cfg = compute.config as any;
     const ip = cfg?.ip;
@@ -173,11 +203,13 @@ export function registerResourceHandlers(router: Router): void {
   });
   router.handle("group/list", async () => ({ groups: core.getGroups() }));
   router.handle("group/create", async (p) => {
-    const group = core.createGroup(p.name as string);
+    const { name } = extract<GroupCreateParams>(p, ["name"]);
+    const group = core.createGroup(name);
     return { group };
   });
   router.handle("group/delete", async (p) => {
-    core.deleteGroup(p.name as string);
+    const { name } = extract<GroupDeleteParams>(p, ["name"]);
+    core.deleteGroup(name);
     return { ok: true };
   });
 }

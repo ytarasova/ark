@@ -3,6 +3,7 @@ import { ArkClientContext } from "../hooks/useArkClient.js";
 import { ArkClient } from "../../protocol/client.js";
 import { ArkServer } from "../../server/index.js";
 import { registerAllHandlers } from "../../server/register.js";
+import { getApp } from "../../core/app.js";
 import type { Transport } from "../../protocol/transport.js";
 import type { JsonRpcMessage } from "../../protocol/types.js";
 
@@ -36,7 +37,7 @@ export function ArkClientProvider({ children, onReady }: Props) {
 
   useEffect(() => {
     const server = new ArkServer();
-    registerAllHandlers(server.router);
+    registerAllHandlers(server.router, getApp());
     serverRef.current = server;
 
     const { clientTransport, serverTransport } = createInMemoryPair();

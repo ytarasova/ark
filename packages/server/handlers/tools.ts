@@ -1,34 +1,41 @@
 import { unlinkSync, existsSync } from "fs";
 import type { Router } from "../router.js";
+import type { AppContext } from "../../core/app.js";
+import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
+import type {
+  ToolsListParams,
+  ToolsDeleteParams,
+  ToolsReadParams,
+  McpAttachParams,
+  McpDetachParams,
+} from "../../types/index.js";
 
-export function registerToolsHandlers(router: Router): void {
+export function registerToolsHandlers(router: Router, app: AppContext): void {
   router.handle("tools/list", async (p) => {
-    const tools = core.discoverTools((p.projectRoot as string) ?? undefined);
+    const { projectRoot } = extract<ToolsListParams>(p, []);
+    const tools = core.discoverTools(projectRoot ?? undefined);
     return { tools };
   });
 
   router.handle("tools/delete", async (p) => {
-    const kind = p.kind as string;
-    const name = p.name as string;
-    const projectRoot = (p.projectRoot as string) ?? undefined;
+    const { kind, name, projectRoot, source, scope } = extract<ToolsDeleteParams>(p, []);
     switch (kind) {
       case "mcp-server":
-        if (projectRoot) core.removeMcpServer(projectRoot, name);
+        if (projectRoot) core.removeMcpServer(projectRoot, name as string);
         break;
       case "command":
-        if (projectRoot) core.removeCommand(projectRoot, name);
+        if (projectRoot) core.removeCommand(projectRoot, name as string);
         break;
       case "claude-skill": {
-        const source = p.source as string | undefined;
         if (source && source !== "builtin") {
           if (existsSync(source)) unlinkSync(source);
         }
         break;
       }
       case "ark-skill": {
-        const scope = (p.scope as "project" | "global") ?? "global";
-        if (p.source !== "builtin") core.deleteSkill(name, scope, projectRoot);
+        const resolvedScope = (scope as "project" | "global") ?? "global";
+        if (source !== "builtin") core.deleteSkill(name as string, resolvedScope, projectRoot);
         break;
       }
     }
@@ -36,9 +43,7 @@ export function registerToolsHandlers(router: Router): void {
   });
 
   router.handle("tools/read", async (p) => {
-    const kind = p.kind as string;
-    const name = p.name as string;
-    const projectRoot = (p.projectRoot as string) ?? undefined;
+    const { kind, name, projectRoot } = extract<ToolsReadParams>(p, ["name", "kind"]);
     if (kind === "command") {
       const content = core.getCommand(projectRoot ?? ".", name);
       return { content };
@@ -55,17 +60,18 @@ export function registerToolsHandlers(router: Router): void {
   });
 
   router.handle("mcp/attach", async (p) => {
-    const session = core.getSession(p.sessionId as string);
+    const { sessionId, server } = extract<McpAttachParams>(p, ["sessionId", "server"]);
+    const session = core.getSession(sessionId);
     if (!session) throw new Error("Session not found");
-    const server = p.server as Record<string, unknown>;
     core.addMcpServer(session.workdir ?? session.repo, server.name as string, server);
     return { ok: true };
   });
 
   router.handle("mcp/detach", async (p) => {
-    const session = core.getSession(p.sessionId as string);
+    const { sessionId, serverName } = extract<McpDetachParams>(p, ["sessionId", "serverName"]);
+    const session = core.getSession(sessionId);
     if (!session) throw new Error("Session not found");
-    core.removeMcpServer(session.workdir ?? session.repo, p.serverName as string);
+    core.removeMcpServer(session.workdir ?? session.repo, serverName);
     return { ok: true };
   });
 }
