@@ -229,6 +229,7 @@ ark web --token my-secret-token      # Require Bearer token auth
 
 - **Session management**: create, dispatch, stop, restart, delete sessions
 - **Cost tracking**: per-session and aggregate cost display
+- **Memory view**: add, search, and delete cross-session memories from the sidebar
 - **System status**: conductor health, active sessions count
 - **SSE live updates**: real-time session status changes pushed to the browser
 - **Token auth**: protect the dashboard with a Bearer token
@@ -704,6 +705,42 @@ env:
 ```
 
 These defaults are used when starting sessions in that repository. CLI flags override repo config values.
+
+---
+
+## Memory
+
+Ark maintains cross-session persistent memory -- knowledge that agents can recall during future sessions. Memories are stored in `~/.ark/memories.json` with tags, scopes, and importance scores.
+
+### CLI
+
+```bash
+ark memory list                                  # List all memories
+ark memory list --scope project                  # Filter by scope
+ark memory add "Always run tests before merging" --tags "process,testing"
+ark memory add "API uses OAuth2" --scope project --importance 0.8
+ark memory recall "authentication"               # Search by keyword
+ark memory forget mem-1234567890-abc123          # Delete a specific memory
+ark memory clear --scope project --force         # Clear all project memories
+```
+
+### TUI
+
+Press `Y` in the Sessions tab to open the Memory Manager. Use `j/k` to navigate, `n` to add, `x` to delete, `Esc` to close.
+
+### Web Dashboard
+
+The web dashboard includes a Memory view accessible from the sidebar. Add, search, and delete memories from the browser.
+
+### How memories work
+
+At dispatch time, Ark recalls memories relevant to the session summary (keyword overlap scoring) and injects them into the agent's task prompt. This gives agents context from prior sessions without explicit configuration.
+
+Memories have:
+- **content** -- the knowledge to remember
+- **tags** -- categorical labels for retrieval
+- **scope** -- "global", "project", or custom scopes
+- **importance** -- 0-1 score affecting recall ranking
 
 ---
 

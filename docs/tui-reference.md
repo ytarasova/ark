@@ -54,6 +54,7 @@ These work in any tab when no overlay is open.
 | `n` | New session | Always |
 | `o` | Open group manager | Always |
 | `K` | Open skills manager | Always |
+| `Y` | Open memory manager | Always |
 | `P` | Open settings | Always |
 | `/` | Fuzzy search sessions | Always |
 | `r` | Open session replay | Session is stopped, failed, or completed |
@@ -215,6 +216,15 @@ When a form or overlay is open, these shortcuts replace the normal tab shortcuts
 | `Enter` | Expand event details |
 | `/` | Search within replay |
 | `Esc` | Close replay |
+
+### Memory Manager (Y)
+
+| Key | Action |
+|-----|--------|
+| `j/k` | Navigate memories |
+| `n` | Add new memory |
+| `x` | Delete selected memory |
+| `Esc` | Close |
 
 ### Inbox / Threads
 

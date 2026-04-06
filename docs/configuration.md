@@ -45,6 +45,7 @@ hotkeys:
   undo: ctrl+z
   markUnread: u
   skills: K
+  memory: Y
   settings: P
   advance: A
   worktreeFinish: W

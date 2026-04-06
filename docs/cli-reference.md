@@ -1348,6 +1348,28 @@ ark memory recall <query> [options]
 | `--scope <scope>` | Limit to scope | all |
 | `--limit <n>` | Max results | 10 |
 
+### ark memory add
+
+Store a new memory.
+
+```
+ark memory add <content> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-t, --tags <tags>` | Comma-separated tags | -- |
+| `-s, --scope <scope>` | Memory scope | `global` |
+| `-i, --importance <n>` | Importance score (0-1) | `0.5` |
+
+Examples:
+
+```bash
+ark memory add "API uses rate limiting with 100 req/min"
+ark memory add "Deploy to staging first" --tags "process,deploy" --scope project
+ark memory add "Critical: never delete prod data" --importance 1.0
+```
+
 ### ark memory forget
 
 Delete a memory entry.
@@ -1355,3 +1377,16 @@ Delete a memory entry.
 ```
 ark memory forget <id>
 ```
+
+### ark memory clear
+
+Clear all memories in a scope.
+
+```
+ark memory clear [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-s, --scope <scope>` | Scope to clear (omit for ALL) |
+| `--force` | Skip confirmation prompt |
