@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Session, SearchResult } from "../../core/index.js";
-import { ICON, getStatusColor } from "../constants.js";
+import { ICON } from "../constants.js";
+import { getStatusColor } from "../helpers/colors.js";
 import { ago } from "../helpers.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
@@ -331,7 +332,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
             }}
             renderColoredRow={(s) => {
               const icon = ICON[s.status] ?? "?";
-              const color = getStatusColor(s.status) as any;
+              const color = getStatusColor(s.status);
               const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
@@ -351,7 +352,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
               if (children.length === 0) return null;
               return children.map(child => {
                 const childIcon = ICON[child.status] ?? "?";
-                const childColor = getStatusColor(child.status) as any;
+                const childColor = getStatusColor(child.status);
                 const childSummary = (child.summary ?? "---").slice(0, 20);
                 return <Text key={child.id} dimColor>{"   | "}<Text color={childColor}>{childIcon}</Text>{` ${childSummary}`}</Text>;
               });

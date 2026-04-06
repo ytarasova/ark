@@ -1,7 +1,14 @@
 import type { Router } from "../router.js";
+import type { AppContext } from "../../core/app.js";
+import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
+import type {
+  ProfileSetParams,
+  ProfileCreateParams,
+  ProfileDeleteParams,
+} from "../../types/index.js";
 
-export function registerConfigHandlers(router: Router): void {
+export function registerConfigHandlers(router: Router, app: AppContext): void {
   router.handle("config/read", async () => ({ config: core.loadConfig() }));
   router.handle("config/write", async () => {
     throw Object.assign(new Error("config/write not yet implemented — edit ~/.ark/config.yaml directly"), { code: -32601 });
@@ -11,17 +18,20 @@ export function registerConfigHandlers(router: Router): void {
     active: core.getActiveProfile(),
   }));
   router.handle("profile/set", async (p) => {
-    core.setActiveProfile(p.name as string);
+    const { name } = extract<ProfileSetParams>(p, ["name"]);
+    core.setActiveProfile(name);
     return { ok: true };
   });
 
   router.handle("profile/create", async (p) => {
-    const profile = core.createProfile(p.name as string, p.description as string | undefined);
+    const { name, description } = extract<ProfileCreateParams>(p, ["name"]);
+    const profile = core.createProfile(name, description);
     return { profile };
   });
 
   router.handle("profile/delete", async (p) => {
-    core.deleteProfile(p.name as string);
+    const { name } = extract<ProfileDeleteParams>(p, ["name"]);
+    core.deleteProfile(name);
     return { ok: true };
   });
 }

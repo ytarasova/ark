@@ -239,3 +239,19 @@ export { generateRepoMap, extractExports, formatRepoMap, type RepoMap, type Repo
 
 // Hybrid search
 export { hybridSearch, mergeAndDeduplicate, type HybridSearchResult, type HybridSearchOpts } from "./hybrid-search.js";
+
+// Types from packages/types — stricter domain types (aliased to avoid collision with store types)
+export type { Session as SessionDomain, SessionStatus, SessionConfig, CreateSessionOpts, SessionListFilters } from "../types/index.js";
+export type { Compute as ComputeDomain, ComputeStatus, ComputeProviderName, ComputeConfig, CreateComputeOpts } from "../types/index.js";
+export type { Event as EventDomain } from "../types/index.js";
+export type { Message as MessageDomain, MessageRole, MessageType } from "../types/index.js";
+export type { ComputeSnapshot, PortDecl } from "../types/index.js";
+export type { AgentDefinition as AgentDefinitionDomain } from "../types/index.js";
+// GateType is from types/flow.ts — FlowDefinition/StageDefinition already come from ./flow.js via export *
+export type { GateType } from "../types/index.js";
+
+// Repositories
+export { SessionRepository, ComputeRepository, EventRepository, MessageRepository } from "./repositories/index.js";
+
+// Services
+export { SessionService, ComputeService, HistoryService } from "./services/index.js";

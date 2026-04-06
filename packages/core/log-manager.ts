@@ -4,8 +4,14 @@
 
 import { readdirSync, statSync, readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./store.js";
-import { listSessions } from "./store.js";
+import { ARK_DIR, listSessions as storeListSessions } from "./store.js";
+import { getApp } from "./app.js";
+
+/** Safe session list — uses AppContext if available, falls back to store (needed during boot). */
+function safeListSessions(opts?: { limit?: number }): any[] {
+  try { return getApp().sessions.list(opts); }
+  catch { return storeListSessions(opts); }
+}
 
 export interface LogManagerOptions {
   maxSizeMb?: number;    // Max log file size (default: 10)
@@ -43,7 +49,7 @@ export function cleanupLogs(opts?: LogManagerOptions): { truncated: number; remo
   let truncated = 0;
   let removed = 0;
 
-  const sessionIds = new Set(listSessions({ limit: 1000 }).map(s => s.id));
+  const sessionIds = new Set(safeListSessions({ limit: 1000 }).map(s => s.id));
   const files = readdirSync(dir).filter(f => f.endsWith(".log"));
 
   for (const file of files) {

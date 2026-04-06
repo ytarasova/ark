@@ -12,6 +12,25 @@ import {
   ARK_VERSION,
   type RequestId, type JsonRpcMessage,
 } from "./types.js";
+import type {
+  Session, Compute, Event, Message, AgentDefinition, FlowDefinition,
+  SessionOpResult, ComputeSnapshot,
+  SessionStartParams, SessionStartResult, SessionListParams, SessionListResult,
+  SessionReadParams, SessionReadResult, SessionUpdateParams, SessionUpdateResult,
+  SessionIdParams, SessionEventsResult, SessionMessagesResult, SessionSearchResult,
+  SessionOutputResult, SessionForkResult, SessionCloneResult,
+  ComputeCreateParams, ComputeCreateResult, ComputeListResult, ComputeReadResult,
+  ComputeUpdateParams, ComputePingResult, ComputeCleanZombiesResult,
+  AgentListResult, AgentReadResult, FlowListResult, FlowReadResult,
+  HistoryListResult, HistoryRefreshResult, HistoryIndexResult, HistorySearchResult,
+  HistoryRebuildFtsResult, HistoryImportResult,
+  MetricsSnapshotResult, CostsReadResult,
+  MemoryListResult, MemoryRecallResult, MemoryForgetResult, MemoryAddResult, MemoryClearResult,
+  ScheduleListResult, ScheduleCreateResult, ScheduleDeleteResult,
+  ProfileListResult, ProfileCreateResult,
+  GroupListResult, GroupCreateResult,
+  IndexStatsResult,
+} from "../types/index.js";
 
 export class ArkClient {
   private transport: Transport;
@@ -57,7 +76,7 @@ export class ArkClient {
     }
   }
 
-  rpc(method: string, params?: Record<string, unknown>, timeoutMs = 30000): Promise<any> {
+  private rpc<T = unknown>(method: string, params?: Record<string, unknown>, timeoutMs = 30000): Promise<T> {
     const id = ++this.idCounter;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -76,7 +95,7 @@ export class ArkClient {
   // ── Lifecycle ───────────────────────────────────────────────────────────────
 
   async initialize(opts?: { subscribe?: string[] }): Promise<{ server: { name: string; version: string } }> {
-    const result = await this.rpc("initialize", {
+    const result = await this.rpc<{ server: { name: string; version: string } }>("initialize", {
       client: { name: "ark-client", version: ARK_VERSION },
       subscribe: opts?.subscribe ?? ["**"],
     });
@@ -105,83 +124,83 @@ export class ArkClient {
 
   // ── Session Lifecycle ───────────────────────────────────────────────────────
 
-  async sessionStart(opts: { summary: string; repo: string; flow?: string; [key: string]: unknown }): Promise<any> {
-    const { session } = await this.rpc("session/start", opts as Record<string, unknown>);
+  async sessionStart(opts: Record<string, unknown>): Promise<Session> {
+    const { session } = await this.rpc<SessionStartResult>("session/start", opts);
     return session;
   }
 
-  async sessionDispatch(sessionId: string): Promise<any> {
-    return this.rpc("session/dispatch", { sessionId });
+  async sessionDispatch(sessionId: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/dispatch", { sessionId });
   }
 
-  async sessionStop(sessionId: string): Promise<void> {
-    await this.rpc("session/stop", { sessionId });
+  async sessionStop(sessionId: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/stop", { sessionId });
   }
 
-  async sessionAdvance(sessionId: string, force?: boolean): Promise<any> {
-    return this.rpc("session/advance", { sessionId, force });
+  async sessionAdvance(sessionId: string, force?: boolean): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/advance", { sessionId, force });
   }
 
-  async sessionComplete(sessionId: string): Promise<void> {
-    await this.rpc("session/complete", { sessionId });
+  async sessionComplete(sessionId: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/complete", { sessionId });
   }
 
-  async sessionDelete(sessionId: string): Promise<void> {
-    await this.rpc("session/delete", { sessionId });
+  async sessionDelete(sessionId: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/delete", { sessionId });
   }
 
-  async sessionUndelete(sessionId: string): Promise<any> {
-    return this.rpc("session/undelete", { sessionId });
+  async sessionUndelete(sessionId: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/undelete", { sessionId });
   }
 
-  async sessionFork(sessionId: string, name?: string, groupName?: string): Promise<any> {
-    const { session } = await this.rpc("session/fork", { sessionId, name, group_name: groupName });
+  async sessionFork(sessionId: string, name?: string, groupName?: string): Promise<Session> {
+    const { session } = await this.rpc<SessionForkResult>("session/fork", { sessionId, name, group_name: groupName });
     return session;
   }
 
-  async sessionClone(sessionId: string, name?: string): Promise<any> {
-    const { session } = await this.rpc("session/clone", { sessionId, name });
+  async sessionClone(sessionId: string, name?: string): Promise<Session> {
+    const { session } = await this.rpc<SessionCloneResult>("session/clone", { sessionId, name });
     return session;
   }
 
-  async sessionUpdate(sessionId: string, fields: Record<string, unknown>): Promise<any> {
-    const { session } = await this.rpc("session/update", { sessionId, fields });
+  async sessionUpdate(sessionId: string, fields: Record<string, unknown>): Promise<Session> {
+    const { session } = await this.rpc<SessionUpdateResult>("session/update", { sessionId, fields });
     return session;
   }
 
-  async sessionList(filters?: Record<string, unknown>): Promise<any[]> {
-    const { sessions } = await this.rpc("session/list", filters);
+  async sessionList(filters?: SessionListParams & Record<string, unknown>): Promise<Session[]> {
+    const { sessions } = await this.rpc<SessionListResult>("session/list", filters as Record<string, unknown>);
     return sessions;
   }
 
-  async sessionRead(sessionId: string, include?: string[]): Promise<{ session: any; events?: any[]; messages?: any[] }> {
-    return this.rpc("session/read", { sessionId, include });
+  async sessionRead(sessionId: string, include?: string[]): Promise<SessionReadResult> {
+    return this.rpc<SessionReadResult>("session/read", { sessionId, include });
   }
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
-  async sessionEvents(sessionId: string, limit?: number): Promise<any[]> {
-    const { events } = await this.rpc("session/events", { sessionId, limit });
+  async sessionEvents(sessionId: string, limit?: number): Promise<Event[]> {
+    const { events } = await this.rpc<SessionEventsResult>("session/events", { sessionId, limit });
     return events;
   }
 
-  async sessionMessages(sessionId: string, limit?: number): Promise<any[]> {
-    const { messages } = await this.rpc("session/messages", { sessionId, limit });
+  async sessionMessages(sessionId: string, limit?: number): Promise<Message[]> {
+    const { messages } = await this.rpc<SessionMessagesResult>("session/messages", { sessionId, limit });
     return messages;
   }
 
   async sessionSearch(query: string): Promise<any[]> {
-    const { results } = await this.rpc("session/search", { query });
+    const { results } = await this.rpc<any>("session/search", { query });
     return results;
   }
 
   async sessionConversation(sessionId: string, limit?: number): Promise<any[]> {
-    const { turns } = await this.rpc("session/conversation", { sessionId, limit });
+    const { turns } = await this.rpc<any>("session/conversation", { sessionId, limit });
     return turns;
   }
 
   async sessionSearchConversation(sessionId: string, query: string): Promise<any[]> {
-    const { results } = await this.rpc("session/search-conversation", { sessionId, query });
+    const { results } = await this.rpc<any>("session/search-conversation", { sessionId, query });
     return results;
   }
 
@@ -199,59 +218,64 @@ export class ArkClient {
     await this.rpc("message/markRead", { sessionId });
   }
 
-  async gateApprove(sessionId: string): Promise<any> {
-    return this.rpc("gate/approve", { sessionId });
+  async gateApprove(sessionId: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("gate/approve", { sessionId });
   }
 
   // ── Resources ───────────────────────────────────────────────────────────────
 
-  async agentList(): Promise<any[]> {
-    const { agents } = await this.rpc("agent/list");
+  async agentList(): Promise<AgentDefinition[]> {
+    const { agents } = await this.rpc<AgentListResult>("agent/list");
     return agents;
   }
 
-  async flowList(): Promise<any[]> {
-    const { flows } = await this.rpc("flow/list");
+  async agentRead(name: string): Promise<AgentDefinition> {
+    const { agent } = await this.rpc<AgentReadResult>("agent/read", { name });
+    return agent;
+  }
+
+  async flowList(): Promise<FlowDefinition[]> {
+    const { flows } = await this.rpc<FlowListResult>("flow/list");
     return flows;
   }
 
-  async flowRead(name: string): Promise<any> {
-    const { flow } = await this.rpc("flow/read", { name });
+  async flowRead(name: string): Promise<FlowDefinition> {
+    const { flow } = await this.rpc<FlowReadResult>("flow/read", { name });
     return flow;
   }
 
   async skillList(): Promise<any[]> {
-    const { skills } = await this.rpc("skill/list");
+    const { skills } = await this.rpc<any>("skill/list");
     return skills;
   }
 
   async skillRead(name: string): Promise<any> {
-    const { skill } = await this.rpc("skill/read", { name });
+    const { skill } = await this.rpc<any>("skill/read", { name });
     return skill;
   }
 
   async recipeList(): Promise<any[]> {
-    const { recipes } = await this.rpc("recipe/list");
+    const { recipes } = await this.rpc<any>("recipe/list");
     return recipes;
   }
 
   async recipeRead(name: string): Promise<any> {
-    const { recipe } = await this.rpc("recipe/read", { name });
+    const { recipe } = await this.rpc<any>("recipe/read", { name });
     return recipe;
   }
 
   async recipeUse(name: string, variables?: Record<string, string>): Promise<any> {
-    const { session } = await this.rpc("recipe/use", { name, variables });
+    const { session } = await this.rpc<any>("recipe/use", { name, variables });
     return session;
   }
 
-  async computeList(): Promise<any[]> {
-    const { targets } = await this.rpc("compute/list");
+  async computeList(): Promise<Compute[]> {
+    const { targets } = await this.rpc<ComputeListResult>("compute/list");
     return targets;
   }
 
-  async computeCreate(opts: Record<string, unknown>): Promise<any> {
-    const { compute } = await this.rpc("compute/create", opts);
+  async computeCreate(opts: Record<string, unknown>): Promise<Compute> {
+    const { compute } = await this.rpc<ComputeCreateResult>("compute/create", opts);
     return compute;
   }
 
@@ -263,8 +287,8 @@ export class ArkClient {
     await this.rpc("compute/update", { name, fields });
   }
 
-  async computeRead(name: string): Promise<any> {
-    const { compute } = await this.rpc("compute/read", { name });
+  async computeRead(name: string): Promise<Compute> {
+    const { compute } = await this.rpc<ComputeReadResult>("compute/read", { name });
     return compute;
   }
 
@@ -292,21 +316,21 @@ export class ArkClient {
     await this.rpc("compute/reboot", { name });
   }
 
-  async computePing(name: string): Promise<{ reachable: boolean; message: string }> {
-    return this.rpc("compute/ping", { name });
+  async computePing(name: string): Promise<ComputePingResult> {
+    return this.rpc<ComputePingResult>("compute/ping", { name });
   }
 
-  async computeCleanZombies(): Promise<{ cleaned: number }> {
-    return this.rpc("compute/clean-zombies");
+  async computeCleanZombies(): Promise<ComputeCleanZombiesResult> {
+    return this.rpc<ComputeCleanZombiesResult>("compute/clean-zombies");
   }
 
   async groupList(): Promise<any[]> {
-    const { groups } = await this.rpc("group/list");
+    const { groups } = await this.rpc<GroupListResult>("group/list");
     return groups;
   }
 
   async groupCreate(name: string): Promise<any> {
-    const { group } = await this.rpc("group/create", { name });
+    const { group } = await this.rpc<GroupCreateResult>("group/create", { name });
     return group;
   }
 
@@ -317,17 +341,17 @@ export class ArkClient {
   // ── Config ──────────────────────────────────────────────────────────────────
 
   async configRead(): Promise<any> {
-    const { config } = await this.rpc("config/read");
+    const { config } = await this.rpc<any>("config/read");
     return config;
   }
 
   async configWrite(config: Record<string, unknown>): Promise<any> {
-    const { config: updated } = await this.rpc("config/write", config);
+    const { config: updated } = await this.rpc<any>("config/write", config);
     return updated;
   }
 
-  async profileList(): Promise<{ profiles: any[]; active: string | null }> {
-    return this.rpc("profile/list");
+  async profileList(): Promise<ProfileListResult> {
+    return this.rpc<ProfileListResult>("profile/list");
   }
 
   async profileSet(name: string): Promise<void> {
@@ -337,40 +361,40 @@ export class ArkClient {
   // ── History ─────────────────────────────────────────────────────────────────
 
   async historyList(limit?: number): Promise<any[]> {
-    const { items } = await this.rpc("history/list", { limit });
+    const { items } = await this.rpc<HistoryListResult>("history/list", { limit });
     return items;
   }
 
-  async historyImport(claudeSessionId: string, opts?: { name?: string; repo?: string }): Promise<any> {
-    const { session } = await this.rpc("history/import", { claudeSessionId, ...opts });
+  async historyImport(claudeSessionId: string, opts?: { name?: string; repo?: string }): Promise<Session> {
+    const { session } = await this.rpc<HistoryImportResult>("history/import", { claudeSessionId, ...opts });
     return session;
   }
 
-  async historyRefresh(): Promise<{ ok: boolean; count: number; sessionCount?: number }> {
-    return this.rpc("history/refresh");
+  async historyRefresh(): Promise<HistoryRefreshResult> {
+    return this.rpc<HistoryRefreshResult>("history/refresh");
   }
 
-  async historyIndex(): Promise<{ ok: boolean; count: number }> {
-    return this.rpc("history/index");
+  async historyIndex(): Promise<HistoryIndexResult> {
+    return this.rpc<HistoryIndexResult>("history/index");
   }
 
-  async historyRebuildFts(): Promise<{ ok: boolean; sessionCount: number; indexCount: number; items: any[] }> {
-    return this.rpc("history/rebuild-fts");
+  async historyRebuildFts(): Promise<HistoryRebuildFtsResult> {
+    return this.rpc<HistoryRebuildFtsResult>("history/rebuild-fts");
   }
 
-  async historyRefreshAndIndex(): Promise<{ ok: boolean; sessionCount: number; indexCount: number; items: any[] }> {
-    return this.rpc("history/refresh-and-index");
+  async historyRefreshAndIndex(): Promise<HistoryRebuildFtsResult> {
+    return this.rpc<HistoryRebuildFtsResult>("history/refresh-and-index");
   }
 
   async historySearch(query: string, limit?: number): Promise<any[]> {
-    const { results } = await this.rpc("history/search", { query, limit });
+    const { results } = await this.rpc<HistorySearchResult>("history/search", { query, limit });
     return results;
   }
 
   // ── Tools ───────────────────────────────────────────────────────────────────
 
   async toolsList(projectRoot?: string): Promise<any[]> {
-    const { tools } = await this.rpc("tools/list", { projectRoot });
+    const { tools } = await this.rpc<any>("tools/list", { projectRoot });
     return tools;
   }
 
@@ -397,72 +421,72 @@ export class ArkClient {
   // ── Metrics ─────────────────────────────────────────────────────────────────
 
   async metricsSnapshot(computeName?: string): Promise<any> {
-    const { snapshot } = await this.rpc("metrics/snapshot", { computeName });
+    const { snapshot } = await this.rpc<MetricsSnapshotResult>("metrics/snapshot", { computeName });
     return snapshot;
   }
 
-  async costsRead(): Promise<{ costs: any[]; total: number }> {
-    return this.rpc("costs/read");
+  async costsRead(): Promise<CostsReadResult> {
+    return this.rpc<CostsReadResult>("costs/read");
   }
 
   // ── Session extended ────────────────────────────────────────────────────────
 
   async sessionOutput(sessionId: string, lines?: number): Promise<string> {
-    const { output } = await this.rpc("session/output", { sessionId, lines });
+    const { output } = await this.rpc<SessionOutputResult>("session/output", { sessionId, lines });
     return output;
   }
 
-  async sessionHandoff(sessionId: string, agent: string, instructions?: string): Promise<any> {
-    return this.rpc("session/handoff", { sessionId, agent, instructions });
+  async sessionHandoff(sessionId: string, agent: string, instructions?: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/handoff", { sessionId, agent, instructions });
   }
 
-  async sessionJoin(sessionId: string, force?: boolean): Promise<any> {
-    return this.rpc("session/join", { sessionId, force });
+  async sessionJoin(sessionId: string, force?: boolean): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/join", { sessionId, force });
   }
 
-  async sessionSpawn(sessionId: string, opts: { task: string; agent?: string; model?: string; group_name?: string }): Promise<any> {
-    return this.rpc("session/spawn", { sessionId, ...opts });
+  async sessionSpawn(sessionId: string, opts: { task: string; agent?: string; model?: string; group_name?: string }): Promise<SessionOpResult & { sessionId?: string }> {
+    return this.rpc<SessionOpResult & { sessionId?: string }>("session/spawn", { sessionId, ...opts });
   }
 
-  async sessionResume(sessionId: string): Promise<any> {
-    return this.rpc("session/resume", { sessionId });
+  async sessionResume(sessionId: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/resume", { sessionId });
   }
 
-  async sessionPause(sessionId: string, reason?: string): Promise<any> {
-    return this.rpc("session/pause", { sessionId, reason });
+  async sessionPause(sessionId: string, reason?: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/pause", { sessionId, reason });
   }
 
   // ── Memory ─────────────────────────────────────────────────────────────────
 
   async memoryList(scope?: string): Promise<any[]> {
-    const { memories } = await this.rpc("memory/list", { scope });
+    const { memories } = await this.rpc<MemoryListResult>("memory/list", { scope });
     return memories;
   }
 
   async memoryRecall(query: string, opts?: { scope?: string; limit?: number }): Promise<any[]> {
-    const { results } = await this.rpc("memory/recall", { query, ...opts });
+    const { results } = await this.rpc<MemoryRecallResult>("memory/recall", { query, ...opts });
     return results;
   }
 
   async memoryForget(id: string): Promise<boolean> {
-    const { ok } = await this.rpc("memory/forget", { id });
+    const { ok } = await this.rpc<MemoryForgetResult>("memory/forget", { id });
     return ok;
   }
 
   async memoryAdd(content: string, opts?: { tags?: string[]; scope?: string; importance?: number }): Promise<any> {
-    const { memory } = await this.rpc("memory/add", { content, ...opts });
+    const { memory } = await this.rpc<MemoryAddResult>("memory/add", { content, ...opts });
     return memory;
   }
 
   async memoryClear(scope?: string): Promise<number> {
-    const { count } = await this.rpc("memory/clear", { scope });
+    const { count } = await this.rpc<MemoryClearResult>("memory/clear", { scope });
     return count;
   }
 
   // ── Profile extended ───────────────────────────────────────────────────────
 
   async profileCreate(name: string, description?: string): Promise<any> {
-    const { profile } = await this.rpc("profile/create", { name, description });
+    const { profile } = await this.rpc<ProfileCreateResult>("profile/create", { name, description });
     return profile;
   }
 
@@ -473,17 +497,17 @@ export class ArkClient {
   // ── Schedule ───────────────────────────────────────────────────────────────
 
   async scheduleList(): Promise<any[]> {
-    const { schedules } = await this.rpc("schedule/list");
+    const { schedules } = await this.rpc<ScheduleListResult>("schedule/list");
     return schedules;
   }
 
   async scheduleCreate(opts: Record<string, unknown>): Promise<any> {
-    const { schedule } = await this.rpc("schedule/create", opts);
+    const { schedule } = await this.rpc<ScheduleCreateResult>("schedule/create", opts);
     return schedule;
   }
 
   async scheduleDelete(id: string): Promise<boolean> {
-    const { ok } = await this.rpc("schedule/delete", { id });
+    const { ok } = await this.rpc<ScheduleDeleteResult>("schedule/delete", { id });
     return ok;
   }
 
@@ -497,8 +521,8 @@ export class ArkClient {
 
   // ── History extended ───────────────────────────────────────────────────────
 
-  async indexStats(): Promise<any> {
-    return this.rpc("history/index-stats");
+  async indexStats(): Promise<IndexStatsResult> {
+    return this.rpc<IndexStatsResult>("history/index-stats");
   }
 
   // ── Teardown ────────────────────────────────────────────────────────────────

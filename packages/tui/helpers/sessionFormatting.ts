@@ -1,13 +1,17 @@
 // ── Session detail pane formatting helpers ───────────────────────────────────
 // Pure functions extracted from SessionsTab detail pane. No side effects, no I/O.
 
+import type { SessionConfig } from "../../types/index.js";
 import { humanTokens } from "../helpers.js";
 
+/** Accepts a full Session or a partial object (for tests that pass bare `{}`). */
+type SessionLike = { config?: Partial<SessionConfig> };
+
 /** Format token usage into a display string, or null if no usage data. */
-export function formatTokenDisplay(session: any): string | null {
-  const u = (session.config as any)?.usage;
+export function formatTokenDisplay(session: SessionLike): string | null {
+  const u = session.config?.usage;
   if (!u) return null;
-  return `${humanTokens(u.total_tokens)} (in:${humanTokens(u.input_tokens)} out:${humanTokens(u.output_tokens)} cache:${humanTokens(u.cache_read_input_tokens ?? 0)})`;
+  return `${humanTokens(u.total_tokens ?? 0)} (in:${humanTokens(u.input_tokens ?? 0)} out:${humanTokens(u.output_tokens ?? 0)} cache:${humanTokens(u.cache_read_input_tokens ?? 0)})`;
 }
 
 export interface FileLink {
@@ -16,10 +20,10 @@ export interface FileLink {
 }
 
 /** Build file link data from session config. Returns null if no files changed. */
-export function buildFileLinks(session: any): FileLink[] | null {
-  const files: string[] | undefined = (session.config as any)?.filesChanged;
+export function buildFileLinks(session: SessionLike): FileLink[] | null {
+  const files = session.config?.filesChanged;
   if (!files?.length) return null;
-  const ghBase = (session.config as any)?.github_url as string | null;
+  const ghBase = session.config?.github_url ?? null;
   return files.map(f => ({
     path: f,
     url: ghBase ? `${ghBase}/blob/main/${f}` : null,
@@ -33,10 +37,10 @@ export interface CommitLink {
 }
 
 /** Build commit link data from session config. Returns null if no commits. */
-export function buildCommitLinks(session: any): CommitLink[] | null {
-  const commits: string[] | undefined = (session.config as any)?.commits;
+export function buildCommitLinks(session: SessionLike): CommitLink[] | null {
+  const commits = session.config?.commits;
   if (!commits?.length) return null;
-  const ghBase = (session.config as any)?.github_url as string | null;
+  const ghBase = session.config?.github_url ?? null;
   return commits.map(c => ({
     sha: c,
     shortSha: c.slice(0, 7),

@@ -1,10 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import { createTestContext, setContext, type TestContext } from "../../core/context.js";
+import { AppContext, setApp, clearApp } from "../../core/app.js";
 import { ArkClient } from "../client.js";
 import { ArkServer } from "../../server/index.js";
 import { registerAllHandlers } from "../../server/register.js";
 import type { Transport } from "../transport.js";
 import type { JsonRpcMessage } from "../types.js";
+
+let app: AppContext;
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 let ctx: TestContext;
 beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
@@ -12,7 +24,7 @@ afterEach(() => { ctx.cleanup(); });
 
 function createPair(): { client: ArkClient; server: ArkServer } {
   const server = new ArkServer();
-  registerAllHandlers(server.router);
+  registerAllHandlers(server.router, app);
 
   let clientHandler: (msg: JsonRpcMessage) => void = () => {};
   let serverHandler: (msg: JsonRpcMessage) => void = () => {};

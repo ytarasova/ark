@@ -21,8 +21,8 @@ import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
   ComputeSnapshot, ComputeMetrics, ComputeProcess, PortDecl, PortStatus,
 } from "../../types.js";
-import type { Compute, Session } from "../../../core/store.js";
-import { mergeComputeConfig, updateCompute } from "../../../core/store.js";
+import type { Compute, Session } from "../../../types/index.js";
+import { getApp } from "../../../core/app.js";
 import { buildDevcontainer, detectDevcontainer } from "./devcontainer.js";
 import { safeAsync } from "../../../core/safe.js";
 
@@ -97,7 +97,7 @@ export class DockerProvider implements ComputeProvider {
     const image = (cfg.image as string) || DEFAULT_IMAGE;
     const extraVolumes = (cfg.volumes as string[]) ?? [];
 
-    updateCompute(compute.name, { status: "provisioning" });
+    getApp().computes.update(compute.name, { status: "provisioning" });
 
     try {
       if (useDevcontainer) {
@@ -110,7 +110,7 @@ export class DockerProvider implements ComputeProvider {
         if (!result.ok) {
           throw new Error(`devcontainer up failed: ${result.error}`);
         }
-        mergeComputeConfig(compute.name, {
+        getApp().computes.mergeConfig(compute.name, {
           container_name: name,
           devcontainer: true,
           workdir,
@@ -158,18 +158,18 @@ export class DockerProvider implements ComputeProvider {
           "inspect", "--format", "{{.Id}}", name,
         ]);
 
-        mergeComputeConfig(compute.name, {
+        getApp().computes.mergeConfig(compute.name, {
           image,
           container_id: containerId || name,
           container_name: name,
         });
       }
 
-      updateCompute(compute.name, { status: "running" });
+      getApp().computes.update(compute.name, { status: "running" });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      mergeComputeConfig(compute.name, { last_error: message });
-      updateCompute(compute.name, { status: "stopped" });
+      getApp().computes.mergeConfig(compute.name, { last_error: message });
+      getApp().computes.update(compute.name, { status: "stopped" });
       throw err;
     }
   }
@@ -185,7 +185,7 @@ export class DockerProvider implements ComputeProvider {
     } catch (err) {
       throw new Error(`Failed to start container ${name}: ${err instanceof Error ? err.message : err}`);
     }
-    updateCompute(compute.name, { status: "running" });
+    getApp().computes.update(compute.name, { status: "running" });
   }
 
   async stop(compute: Compute): Promise<void> {
@@ -193,7 +193,7 @@ export class DockerProvider implements ComputeProvider {
     await safeAsync(`[docker] stop: container ${name}`, async () => {
       await execFileAsync("docker", ["stop", name], { timeout: 15_000 });
     });
-    updateCompute(compute.name, { status: "stopped" });
+    getApp().computes.update(compute.name, { status: "stopped" });
   }
 
   // ── Destroy ──────────────────────────────────────────────────────────────
@@ -203,7 +203,7 @@ export class DockerProvider implements ComputeProvider {
     await safeAsync(`[docker] destroy: rm container ${name}`, async () => {
       await execFileAsync("docker", ["rm", "-f", name], { timeout: 15_000 });
     });
-    updateCompute(compute.name, { status: "destroyed" });
+    getApp().computes.update(compute.name, { status: "destroyed" });
   }
 
   // ── Launch ───────────────────────────────────────────────────────────────

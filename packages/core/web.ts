@@ -8,7 +8,7 @@
 
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { listSessions, getSession, getEvents, getGroups, createSession, updateSession, listCompute, getCompute, type Session } from "./store.js";
+import { listSessions, getSession, getEvents, getGroups, createSession, updateSession, listCompute, getCompute } from "./store.js";
 import { getAllSessionCosts, formatCost } from "./costs.js";
 import { handleIssueWebhook, type IssueWebhookConfig } from "./github-webhook.js";
 import {
@@ -162,17 +162,17 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         const sessions = listSessions({ limit: 500 });
         if (format === "csv") {
           const { exportCostsCsv } = await import("./costs.js");
-          const csv = exportCostsCsv(sessions);
+          const csv = exportCostsCsv(sessions as any);
           return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=ark-costs.csv", ...CORS } });
         }
-        const costs = getAllSessionCosts(sessions);
+        const costs = getAllSessionCosts(sessions as any);
         return jsonResponse(costs);
       }
 
       // GET /api/costs
       if (url.pathname === "/api/costs") {
         const sessions = listSessions({ limit: 500 });
-        const costs = getAllSessionCosts(sessions);
+        const costs = getAllSessionCosts(sessions as any);
         return jsonResponse(costs);
       }
 

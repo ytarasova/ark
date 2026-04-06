@@ -6,11 +6,12 @@
 
 import React from "react";
 import { Text } from "ink";
+import type { InkColor } from "../helpers/colors.js";
 
 interface LinkProps {
   url: string;
   children?: React.ReactNode;
-  color?: string;
+  color?: InkColor;
 }
 
 export function Link({ url, children, color = "blue" }: LinkProps) {
@@ -19,13 +20,13 @@ export function Link({ url, children, color = "blue" }: LinkProps) {
   const linked = `\x1b]8;;${url}\x07${typeof label === "string" ? label : ""}\x1b]8;;\x07`;
 
   if (typeof label === "string") {
-    return <Text color={color as any}>{linked}</Text>;
+    return <Text color={color}>{linked}</Text>;
   }
   // For non-string children, wrap with escape codes
   return (
     <Text>
       {`\x1b]8;;${url}\x07`}
-      <Text color={color as any}>{label}</Text>
+      <Text color={color}>{label}</Text>
       {`\x1b]8;;\x07`}
     </Text>
   );

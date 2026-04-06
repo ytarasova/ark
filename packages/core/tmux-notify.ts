@@ -6,13 +6,13 @@
  * and all arguments are internally constructed (no user input).
  */
 
-import { listSessions } from "./store.js";
+import { getApp } from "./app.js";
 import { execFileSync } from "child_process";
 
 /** Update tmux status bar with waiting session indicators. */
 export function updateTmuxStatusBar(): void {
   try {
-    const sessions = listSessions({ limit: 100 });
+    const sessions = getApp().sessions.list({ limit: 100 });
     const waiting = sessions.filter(s => ["waiting", "blocked"].includes(s.status));
 
     if (waiting.length === 0) {

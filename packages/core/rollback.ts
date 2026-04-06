@@ -2,7 +2,7 @@
  * Auto-rollback pipeline — monitors merged PRs, polls CI, creates revert PRs on failure.
  */
 
-import * as store from "./store.js";
+import { logEvent as storeLogEvent } from "./store.js";
 import { eventBus } from "./hooks.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ export async function watchMergedPR(opts: {
       });
       await opts.onRevert(payload);
       if (opts.onStop) await opts.onStop(opts.sessionId);
-      store.logEvent(opts.sessionId, "rollback", {
+      storeLogEvent(opts.sessionId, "rollback", {
         actor: "system",
         data: { prNumber: opts.prNumber, failedChecks, revertBranch: payload.head },
       });
@@ -116,7 +116,7 @@ export async function watchMergedPR(opts: {
           });
           await opts.onRevert(payload);
           if (opts.onStop) await opts.onStop(opts.sessionId);
-          store.logEvent(opts.sessionId, "rollback", {
+          storeLogEvent(opts.sessionId, "rollback", {
             actor: "system",
             data: { prNumber: opts.prNumber, failedChecks, revertBranch: payload.head },
           });
@@ -142,7 +142,7 @@ export async function watchMergedPR(opts: {
     });
     await opts.onRevert(payload);
     if (opts.onStop) await opts.onStop(opts.sessionId);
-    store.logEvent(opts.sessionId, "rollback", {
+    storeLogEvent(opts.sessionId, "rollback", {
       actor: "system",
       data: { prNumber: opts.prNumber, failedChecks, revertBranch: payload.head },
     });

@@ -17,7 +17,7 @@ export function EventLog({ expanded }: EventLogProps) {
           {"Events "}
           {latest
             ? <Text>
-                <Text color={latest.color as any}>{latest.message}</Text>
+                <Text color={latest.color}>{latest.message}</Text>
                 <Text dimColor>{` ${latest.time.slice(0, 5)} `}</Text>
                 <Text dimColor bold>{"(e:expand)"}</Text>
               </Text>
@@ -34,7 +34,7 @@ export function EventLog({ expanded }: EventLogProps) {
       {events.map((ev, idx) => (
         <Text key={`${ev.time}-${ev.source}-${idx}`}>
           <Text dimColor>{`  ${ev.time.slice(0, 5)}  `}</Text>
-          <Text color={ev.color as any}>{ev.message}</Text>
+          <Text color={ev.color}>{ev.message}</Text>
           <Text dimColor>{`  ${ev.source}`}</Text>
         </Text>
       ))}

@@ -14,12 +14,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useArkClient } from "./useArkClient.js";
 import type { ComputeSnapshot } from "../../compute/types.js";
+import type { Session, Compute, AgentDefinition, FlowDefinition } from "../../types/index.js";
 
 export interface StoreData {
-  sessions: any[];
-  computes: any[];
-  agents: any[];
-  flows: any[];
+  sessions: Session[];
+  computes: Compute[];
+  agents: AgentDefinition[];
+  flows: FlowDefinition[];
   /** Unread message counts per session ID. */
   unreadCounts: Map<string, number>;
   /** Compute metrics snapshots by compute name. */
@@ -37,10 +38,10 @@ export interface StoreData {
 export function useArkStore(): StoreData {
   const ark = useArkClient();
 
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [computes, setComputes] = useState<any[]>([]);
-  const [agents, setAgents] = useState<any[]>([]);
-  const [flows, setFlows] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [computes, setComputes] = useState<Compute[]>([]);
+  const [agents, setAgents] = useState<AgentDefinition[]>([]);
+  const [flows, setFlows] = useState<FlowDefinition[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
   const [snapshots, setSnapshots] = useState<Map<string, ComputeSnapshot>>(new Map());
   const [computeLogs, setComputeLogs] = useState<Map<string, string[]>>(new Map());

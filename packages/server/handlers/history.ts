@@ -1,20 +1,29 @@
 import type { Router } from "../router.js";
+import type { AppContext } from "../../core/app.js";
+import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
+import type {
+  HistoryListParams,
+  HistoryImportParams,
+  HistorySearchParams,
+} from "../../types/index.js";
 
-export function registerHistoryHandlers(router: Router): void {
+export function registerHistoryHandlers(router: Router, app: AppContext): void {
   router.handle("history/list", async (p) => {
-    const items = core.listClaudeSessions({ limit: (p.limit as number) ?? 100 });
+    const { limit } = extract<HistoryListParams>(p, []);
+    const items = core.listClaudeSessions({ limit: limit ?? 100 });
     return { items };
   });
 
   router.handle("history/import", async (p) => {
+    const { claudeSessionId, name, repo } = extract<HistoryImportParams>(p, []);
     const session = core.startSession({
-      summary: (p.name as string) ?? "import",
-      repo: (p.repo as string) ?? ".",
+      summary: name ?? "import",
+      repo: repo ?? ".",
       flow: "bare",
     });
-    if (p.claudeSessionId) {
-      core.updateSession(session.id, { claude_session_id: p.claudeSessionId as string });
+    if (claudeSessionId) {
+      core.updateSession(session.id, { claude_session_id: claudeSessionId });
     }
     return { session };
   });
@@ -35,8 +44,8 @@ export function registerHistoryHandlers(router: Router): void {
   router.handle("history/rebuild-fts", async () => {
     const { getDb } = await import("../../core/store.js");
     const db = getDb();
-    db.exec("DELETE FROM claude_sessions_cache");
-    db.exec("DELETE FROM transcript_index");
+    db.run("DELETE FROM claude_sessions_cache");
+    db.run("DELETE FROM transcript_index");
     const sessionCount = await core.refreshClaudeSessionsCache({});
     const indexCount = await core.indexTranscripts({});
     const items = core.listClaudeSessions();
@@ -56,10 +65,9 @@ export function registerHistoryHandlers(router: Router): void {
   });
 
   router.handle("history/search", async (p) => {
-    const query = p.query as string;
-    const limit = (p.limit as number) ?? 20;
-    const dbResults = core.searchSessions(query, { limit });
-    const txResults = core.searchTranscripts(query, { limit });
+    const { query, limit } = extract<HistorySearchParams>(p, ["query"]);
+    const dbResults = core.searchSessions(query, { limit: limit ?? 20 });
+    const txResults = core.searchTranscripts(query, { limit: limit ?? 20 });
     return { results: [...dbResults, ...txResults] };
   });
 }

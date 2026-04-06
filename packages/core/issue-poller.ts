@@ -8,7 +8,9 @@
 
 import { execFile } from "child_process";
 import { promisify } from "util";
-import * as store from "./store.js";
+import type { Session } from "../types/index.js";
+import { getApp } from "./app.js";
+import { listSessions as storeListSessions, logEvent as storeLogEvent } from "./store.js";
 import { safeAsync } from "./safe.js";
 
 const execFileAsync = promisify(execFile);
@@ -72,7 +74,9 @@ export async function fetchLabeledIssues(
  * Ticket format is "#<number>" (e.g. "#42").
  */
 export function issueAlreadyTracked(ticket: string): boolean {
-  const sessions = store.listSessions({ limit: 500 });
+  let sessions;
+  try { sessions = getApp().sessions.list({ limit: 500 }); }
+  catch { sessions = storeListSessions({ limit: 500 }); }
   return sessions.some(s => s.ticket === ticket);
 }
 
@@ -83,7 +87,7 @@ export function issueAlreadyTracked(ticket: string): boolean {
 export async function createSessionFromIssue(
   issue: GhIssue,
   opts?: { autoDispatch?: boolean },
-): Promise<store.Session | null> {
+): Promise<Session | null> {
   const ticket = `#${issue.number}`;
 
   if (issueAlreadyTracked(ticket)) return null;
@@ -101,14 +105,16 @@ export async function createSessionFromIssue(
     },
   });
 
-  store.logEvent(session.id, "issue_imported", {
+  const evOpts = {
     actor: "github",
     data: {
       issue_number: issue.number,
       issue_url: issue.url,
       title: issue.title,
     },
-  });
+  };
+  try { getApp().events.log(session.id, "issue_imported", evOpts); }
+  catch { storeLogEvent(session.id, "issue_imported", evOpts); }
 
   if (opts?.autoDispatch) {
     await safeAsync(`issue-poller: dispatch ${session.id}`, async () => {
@@ -116,7 +122,7 @@ export async function createSessionFromIssue(
     });
   }
 
-  return session;
+  return session as Session;
 }
 
 /**

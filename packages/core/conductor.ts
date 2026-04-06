@@ -20,7 +20,9 @@ declare const Bun: {
   }): { stop(): void };
 };
 
-import * as store from "./store.js";
+import { sessionChannelPort, mergeSessionConfig, getSession as storeGetSession, listSessions as storeListSessions, getEvents as storeGetEvents, logEvent as storeLogEvent, updateSession as storeUpdateSession, getCompute as storeGetCompute, addMessage as storeAddMessage } from "./store.js";
+import type { Session } from "../types/index.js";
+import { getApp } from "./app.js";
 import * as session from "./session.js";
 import * as flow from "./flow.js";
 import { eventBus } from "./hooks.js";
@@ -61,11 +63,11 @@ async function handleAgentRelay(req: Request): Promise<Response> {
     target: string;
     message: string;
   };
-  const targetSession = store.getSession(target);
+  const targetSession = storeGetSession(target);
   if (targetSession) {
-    const channelPort = store.sessionChannelPort(target);
+    const channelPort = sessionChannelPort(target);
     const payload = { type: "steer", message, from, sessionId: target };
-    await deliverToChannel(targetSession, channelPort, payload);
+    await deliverToChannel(targetSession as Session, channelPort, payload);
   }
   return Response.json({ status: "relayed" });
 }
@@ -74,7 +76,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   const sessionId = url.searchParams.get("session");
   if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
 
-  const s = store.getSession(sessionId);
+  const s = storeGetSession(sessionId);
   if (!s) return Response.json({ error: "session not found" }, { status: 404 });
 
   const payload = await req.json() as Record<string, unknown>;
@@ -88,12 +90,12 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
     const evalResult = evaluateToolCall(toolName, toolInput);
 
     if (evalResult.action === "block") {
-      store.logEvent(sessionId, "guardrail_blocked", {
+      storeLogEvent(sessionId, "guardrail_blocked", {
         actor: "system",
         data: { tool: toolName, pattern: evalResult.rule?.pattern, input: toolInput },
       });
     } else if (evalResult.action === "warn") {
-      store.logEvent(sessionId, "guardrail_warning", {
+      storeLogEvent(sessionId, "guardrail_warning", {
         actor: "system",
         data: { tool: toolName, pattern: evalResult.rule?.pattern },
       });
@@ -107,12 +109,12 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
   // Apply events
   for (const evt of result.events ?? []) {
-    store.logEvent(sessionId, evt.type, evt.opts);
+    storeLogEvent(sessionId, evt.type, evt.opts);
   }
 
   // Apply store updates
   if (result.updates) {
-    store.updateSession(sessionId, result.updates);
+    storeUpdateSession(sessionId, result.updates);
   }
 
   // Emit to event bus
@@ -133,7 +135,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
   // Apply usage data
   if (result.usage) {
-    store.mergeSessionConfig(sessionId, { usage: result.usage });
+    mergeSessionConfig(sessionId, { usage: result.usage });
   }
 
   // Index transcript
@@ -153,11 +155,11 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
 function handleRestApi(path: string): Response {
   if (path === "/api/sessions")
-    return Response.json(store.listSessions());
+    return Response.json(storeListSessions());
   if (path.startsWith("/api/sessions/")) {
     const id = extractPathSegment(path, 3);
     if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-    const s = store.getSession(id);
+    const s = storeGetSession(id);
     return s
       ? Response.json(s)
       : Response.json({ error: "not found" }, { status: 404 });
@@ -165,12 +167,12 @@ function handleRestApi(path: string): Response {
   if (path.startsWith("/api/events/")) {
     const id = extractPathSegment(path, 3);
     if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-    return Response.json(store.getEvents(id));
+    return Response.json(storeGetEvents(id));
   }
   if (path === "/health") {
     return Response.json({
       status: "ok",
-      sessions: store.listSessions().length,
+      sessions: storeListSessions().length,
     });
   }
   return new Response("Not found", { status: 404 });
@@ -186,7 +188,7 @@ async function handlePRMergeWebhook(req: Request): Promise<Response> {
   const repo = payload.repository;
 
   // Find Ark session by branch or PR URL
-  const sessions = store.listSessions();
+  const sessions = storeListSessions();
   const matchedSession = sessions.find(s => {
     const cfg = s.config as any;
     return cfg?.pr_url === pr.html_url || cfg?.branch === pr.head?.ref;
@@ -302,7 +304,7 @@ export function startConductor(port = DEFAULT_PORT, opts?: {
         });
         await session.dispatch(s.id);
         updateScheduleLastRun(sched.id);
-        store.logEvent(s.id, "scheduled_dispatch", {
+        storeLogEvent(s.id, "scheduled_dispatch", {
           actor: "scheduler",
           data: { schedule_id: sched.id, cron: sched.cron },
         });
@@ -341,13 +343,13 @@ export function startConductor(port = DEFAULT_PORT, opts?: {
  * Falls back to direct HTTP to the channel port for local sessions.
  */
 export async function deliverToChannel(
-  targetSession: store.Session,
+  targetSession: Session,
   channelPort: number,
   payload: Record<string, unknown>,
 ): Promise<void> {
   // Try arkd delivery first (works for both local and remote)
   const computeName = targetSession.compute_name || "local";
-  const compute = store.getCompute(computeName);
+  const compute = storeGetCompute(computeName);
   const provider = compute ? getProvider(compute.provider) : null;
   if (provider && typeof (provider as any).getArkdUrl === "function") {
     try {
@@ -374,17 +376,12 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
   // Log events
   for (const evt of result.logEvents ?? []) {
-    store.logEvent(sessionId, evt.type, evt.opts);
+    storeLogEvent(sessionId, evt.type, evt.opts);
   }
 
   // Store message for TUI chat view
   if (result.message) {
-    store.addMessage({
-      session_id: sessionId,
-      role: result.message.role,
-      content: result.message.content,
-      type: result.message.type,
-    });
+    storeAddMessage({ session_id: sessionId, role: result.message.role, content: result.message.content, type: result.message.type });
   }
 
   // Emit bus events
@@ -394,13 +391,13 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
   // Apply store updates
   if (Object.keys(result.updates).length > 0) {
-    store.updateSession(sessionId, result.updates);
+    storeUpdateSession(sessionId, result.updates);
   }
 
   // Handle advance + auto-dispatch for completed reports
   if (result.shouldAdvance) {
     const advResult = await session.advance(sessionId);
-    const updated = (result.shouldAutoDispatch && advResult.ok) ? store.getSession(sessionId) : null;
+    const updated = (result.shouldAutoDispatch && advResult.ok) ? storeGetSession(sessionId) : null;
     if (updated?.status === "ready" && updated.stage) {
       const nextAction = flow.getStageAction(updated.flow, updated.stage);
       if (nextAction.type === "agent" || nextAction.type === "fork") {
@@ -413,8 +410,8 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
   // PR URL detection
   if (result.prUrl) {
-    store.updateSession(sessionId, { pr_url: result.prUrl });
-    store.logEvent(sessionId, "pr_detected", {
+    storeUpdateSession(sessionId, { pr_url: result.prUrl });
+    storeLogEvent(sessionId, "pr_detected", {
       actor: "agent",
       data: { pr_url: result.prUrl },
     });

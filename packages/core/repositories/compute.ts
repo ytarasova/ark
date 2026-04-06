@@ -1,0 +1,138 @@
+import { Database } from "bun:sqlite";
+import type {
+  Compute,
+  ComputeStatus,
+  ComputeProviderName,
+  ComputeConfig,
+  CreateComputeOpts,
+} from "../../types/index.js";
+
+// ── Row type (config stored as JSON string) ─────────────────────────────────
+
+interface ComputeRow {
+  name: string;
+  provider: string;
+  status: string;
+  config: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function now(): string {
+  return new Date().toISOString();
+}
+
+function safeParseConfig(raw: unknown): ComputeConfig {
+  if (typeof raw === "object" && raw !== null) return raw as ComputeConfig;
+  try { return JSON.parse(String(raw ?? "{}")); }
+  catch { return {}; }
+}
+
+function rowToCompute(row: ComputeRow): Compute {
+  return {
+    ...row,
+    provider: row.provider as ComputeProviderName,
+    status: row.status as ComputeStatus,
+    config: safeParseConfig(row.config),
+  };
+}
+
+// Valid compute columns (from schema).
+const COMPUTE_COLUMNS = new Set([
+  "provider", "status", "config", "updated_at",
+]);
+
+// ── Repository ──────────────────────────────────────────────────────────────
+
+export class ComputeRepository {
+  constructor(private db: Database) {}
+
+  create(opts: CreateComputeOpts): Compute {
+    const ts = now();
+    const provider = opts.provider ?? "local";
+
+    let initialStatus: ComputeStatus = provider === "local" ? "running" : "stopped";
+    try {
+      const { getProvider } = require("../../../packages/compute/index.js");
+      const providerInstance = getProvider(provider);
+      if (providerInstance?.initialStatus) {
+        initialStatus = providerInstance.initialStatus;
+      }
+    } catch {
+      // Provider registry unavailable; use default
+    }
+
+    this.db.prepare(`
+      INSERT INTO compute (name, provider, status, config, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      opts.name,
+      provider,
+      initialStatus,
+      JSON.stringify(opts.config ?? {}),
+      ts, ts,
+    );
+
+    return this.get(opts.name)!;
+  }
+
+  get(name: string): Compute | null {
+    const row = this.db.prepare("SELECT * FROM compute WHERE name = ?").get(name) as ComputeRow | undefined;
+    if (!row) return null;
+    return rowToCompute(row);
+  }
+
+  list(filters?: { status?: ComputeStatus; provider?: ComputeProviderName; limit?: number }): Compute[] {
+    let sql = "SELECT * FROM compute WHERE 1=1";
+    const params: any[] = [];
+
+    if (filters?.provider) { sql += " AND provider = ?"; params.push(filters.provider); }
+    if (filters?.status) { sql += " AND status = ?"; params.push(filters.status); }
+
+    sql += " ORDER BY created_at DESC LIMIT ?";
+    params.push(filters?.limit ?? 100);
+
+    return (this.db.prepare(sql).all(...params) as ComputeRow[]).map(rowToCompute);
+  }
+
+  update(name: string, fields: Partial<Compute>): Compute | null {
+    const updates: string[] = ["updated_at = ?"];
+    const values: any[] = [now()];
+
+    for (const [key, value] of Object.entries(fields)) {
+      if (key === "name" || key === "created_at") continue;
+      if (!COMPUTE_COLUMNS.has(key)) continue;
+      if (key === "config" && typeof value === "object") {
+        updates.push("config = ?");
+        values.push(JSON.stringify(value));
+      } else {
+        updates.push(`${key} = ?`);
+        values.push(value ?? null);
+      }
+    }
+    values.push(name);
+
+    this.db.prepare(`UPDATE compute SET ${updates.join(", ")} WHERE name = ?`).run(...values);
+    return this.get(name);
+  }
+
+  delete(name: string): boolean {
+    if (name === "local") return false;
+    const result = this.db.prepare("DELETE FROM compute WHERE name = ?").run(name);
+    return result.changes > 0;
+  }
+
+  mergeConfig(name: string, patch: Partial<ComputeConfig>): Compute | null {
+    this.db.transaction(() => {
+      const row = this.db.prepare("SELECT config FROM compute WHERE name = ?").get(name) as { config: string } | undefined;
+      if (!row) return;
+      const existing = safeParseConfig(row.config);
+      const merged = { ...existing, ...patch };
+      this.db.prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ?")
+        .run(JSON.stringify(merged), new Date().toISOString(), name);
+    })();
+    return this.get(name);
+  }
+}

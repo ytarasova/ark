@@ -4,7 +4,7 @@
 
 import { loadRecipe, instantiateRecipe } from "./recipe.js";
 import { startSession } from "./session.js";
-import type { Session } from "./store.js";
+import type { Session } from "../types/index.js";
 import { getSessionCost } from "./costs.js";
 
 export interface RecipeEvalResult {
@@ -50,7 +50,7 @@ export function evaluateRecipeSetup(recipeName: string, iterations: number, vari
         config: { eval: true, evalIteration: i + 1 },
       });
 
-      const cost = getSessionCost(session);
+      const cost = getSessionCost(session as any);
       results.push({
         sessionId: session.id,
         status: session.status,

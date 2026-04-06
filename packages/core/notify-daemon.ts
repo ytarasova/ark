@@ -3,8 +3,16 @@
  * and sends bridge notifications with adaptive polling.
  */
 
-import { listSessions, type Session } from "./store.js";
+import type { Session } from "../types/index.js";
+import { getApp } from "./app.js";
+import { listSessions as storeListSessions } from "./store.js";
 import { Bridge, loadBridgeConfig } from "./bridge.js";
+
+/** Safe session list — uses AppContext if available, falls back to store. */
+function safeListSessions(opts?: { limit?: number }): any[] {
+  try { return getApp().sessions.list(opts); }
+  catch { return storeListSessions(opts); }
+}
 
 export interface NotifyDaemonOptions {
   /** Polling interval when sessions are running (ms). Default: 3000. */
@@ -51,7 +59,7 @@ export class NotifyDaemon {
     if (!this.running) return;
 
     try {
-      const sessions = listSessions({ limit: 200 });
+      const sessions = safeListSessions({ limit: 200 });
       let hasRunning = false;
       let hasWaiting = false;
 

@@ -5,7 +5,9 @@
  * session's history event-by-event.
  */
 
-import { getEvents, getSession, type Event } from "./store.js";
+import type { Event } from "../types/index.js";
+import { getApp } from "./app.js";
+import { getEvents as storeGetEvents, getSession as storeGetSession } from "./store.js";
 
 export interface ReplayStep {
   index: number;
@@ -123,10 +125,10 @@ function buildDetail(type: string, data: Record<string, unknown> | null): string
 
 /** Build a replay timeline from a session's events */
 export function buildReplay(sessionId: string): ReplayStep[] {
-  const events = getEvents(sessionId, { limit: 1000 });
+  let events, session;
+  try { events = getApp().events.list(sessionId, { limit: 1000 }); session = getApp().sessions.get(sessionId); }
+  catch { events = storeGetEvents(sessionId, { limit: 1000 }) as Event[]; session = storeGetSession(sessionId); }
   if (events.length === 0) return [];
-
-  const session = getSession(sessionId);
   const baseTime = session
     ? new Date(session.created_at).getTime()
     : new Date(events[0].created_at).getTime();

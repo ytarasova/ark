@@ -3,7 +3,7 @@
  * Conditions combine with AND/OR operators.
  */
 
-import type { Session } from "./store.js";
+import type { Session } from "../types/index.js";
 
 export interface TerminationContext {
   session: Session;

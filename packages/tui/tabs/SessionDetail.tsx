@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Session, Event, SearchResult } from "../../core/index.js";
-import { ICON, getStatusColor } from "../constants.js";
+import { ICON } from "../constants.js";
+import { getStatusColor } from "../helpers/colors.js";
+import type { InkColor } from "../helpers/colors.js";
 import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter } from "../helpers/sessionFormatting.js";
@@ -108,7 +110,7 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
       <SectionHeader title="Info" />
       <KeyValue label="Session">{`${s.id}  ${s.summary ?? ""}`}</KeyValue>
       <KeyValue label="Status">
-        <Text color={getStatusColor(s.status) as any} bold>
+        <Text color={getStatusColor(s.status)} bold>
           {`${ICON[s.status] ?? "?"} ${s.error ? s.error : s.status}`}
         </Text>
       </KeyValue>
@@ -222,12 +224,12 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
           <SectionHeader title="Conversation" />
           {conversation.map((turn, idx) => {
             const label = turn.role === "user" ? "You" : turn.role === "assistant" ? "Claude" : turn.role;
-            const color = turn.role === "user" ? "cyan" : undefined;
+            const color: InkColor | undefined = turn.role === "user" ? "cyan" : undefined;
             const dim = turn.role !== "user";
             return (
               <Text key={`${turn.role}-${turn.timestamp}-${idx}`} wrap="wrap">
-                {"  "}<Text color={color as any} dimColor={dim} bold>{label}:</Text>
-                <Text color={color as any} dimColor={dim}>{` ${turn.content}`}</Text>
+                {"  "}<Text color={color} dimColor={dim} bold>{label}:</Text>
+                <Text color={color} dimColor={dim}>{` ${turn.content}`}</Text>
               </Text>
             );
           })}
