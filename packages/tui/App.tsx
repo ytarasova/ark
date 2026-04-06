@@ -142,6 +142,7 @@ function AppInner() {
     <Box flexDirection="column" height={termHeight}>
       <TabBar active={tab} loading={asyncState.loading || store.initialLoading} loadingLabel={store.initialLoading ? "Loading..." : asyncState.label} />
 
+      <Box flexDirection="column" flexGrow={1}>
       {tab === "sessions" ? (
         <SessionsTab
           {...store}
@@ -211,8 +212,9 @@ function AppInner() {
           ) : undefined}
         />
       ) : tab === "costs" ? (
-        <CostsTab />
+        <CostsTab pane={pane} />
       ) : null}
+      </Box>
 
       {showHelp && (
         <HelpOverlay onClose={() => setShowHelp(false)} />

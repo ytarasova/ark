@@ -17,9 +17,47 @@ export function registerHistoryHandlers(router: Router): void {
     return { session };
   });
 
-  router.handle("history/refresh", async () => {
-    await core.refreshClaudeSessionsCache();
+  router.handle("history/refresh", async (p) => {
+    const count = await core.refreshClaudeSessionsCache({
+      onProgress: (p as any).onProgress ?? (() => {}),
+    });
     const items = core.listClaudeSessions();
-    return { ok: true, count: items.length };
+    return { ok: true, count: items.length, sessionCount: count };
+  });
+
+  router.handle("history/index", async () => {
+    const count = await core.indexTranscripts({ onProgress: () => {} });
+    return { ok: true, count };
+  });
+
+  router.handle("history/rebuild-fts", async () => {
+    const { getDb } = await import("../../core/store.js");
+    const db = getDb();
+    db.exec("DELETE FROM claude_sessions_cache");
+    db.exec("DELETE FROM transcript_index");
+    const sessionCount = await core.refreshClaudeSessionsCache({});
+    const indexCount = await core.indexTranscripts({});
+    const items = core.listClaudeSessions();
+    return { ok: true, sessionCount, indexCount, items };
+  });
+
+  router.handle("history/refresh-and-index", async () => {
+    const sessionCount = await core.refreshClaudeSessionsCache({});
+    const indexCount = await core.indexTranscripts({});
+    const items = core.listClaudeSessions();
+    return { ok: true, sessionCount, indexCount, items };
+  });
+
+  router.handle("history/index-stats", async () => {
+    const stats = core.getIndexStats();
+    return { stats };
+  });
+
+  router.handle("history/search", async (p) => {
+    const query = p.query as string;
+    const limit = (p.limit as number) ?? 20;
+    const dbResults = core.searchSessions(query, { limit });
+    const txResults = core.searchTranscripts(query, { limit });
+    return { results: [...dbResults, ...txResults] };
   });
 }

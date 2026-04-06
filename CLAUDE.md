@@ -314,6 +314,7 @@ Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/h
 - React + Ink for TUI components
 - YAML for agent/flow definitions
 - SQLite for persistence (no ORM)
+- **Never use em dashes** (U+2014). Use hyphens (-) or dashes (--) instead. This applies to code, comments, strings, and documentation.
 
 ## Architecture Boundaries
 

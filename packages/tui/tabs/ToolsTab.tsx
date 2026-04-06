@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import * as core from "../../core/index.js";
 import type { ToolEntry } from "../../core/tools.js";
+import type { RecipeInstance } from "../../core/index.js";
+import { findProjectRoot } from "../../core/agent.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
@@ -9,6 +10,7 @@ import { SectionHeader } from "../components/SectionHeader.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useFocus } from "../hooks/useFocus.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 // ── Grouping: global vs project-scoped ──────────────────────────────────────
@@ -42,25 +44,28 @@ interface ToolsTabProps {
   pane: "left" | "right";
   asyncState?: AsyncState;
   refresh?: () => void;
-  onUseRecipe?: (instance: core.RecipeInstance) => void;
+  onUseRecipe?: (instance: RecipeInstance) => void;
 }
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
 export function ToolsTab({ pane, asyncState, refresh, onUseRecipe }: ToolsTabProps) {
+  const ark = useArkClient();
   const focus = useFocus();
   const status = useStatusMessage();
   const [version, setVersion] = useState(0);
-  const projectRoot = useMemo(() => core.findProjectRoot(process.cwd()) ?? undefined, []);
+  const projectRoot = useMemo(() => findProjectRoot(process.cwd()) ?? undefined, []);
 
-  const items = useMemo(() => {
-    const raw = core.discoverTools(projectRoot);
-    // Sort to match TreeList's visual group order (unnamed first, then alphabetical)
-    return raw.sort((a, b) => {
-      const ga = groupLabel(a);
-      const gb = groupLabel(b);
-      if (ga === gb) return a.name.localeCompare(b.name);
-      return ga.localeCompare(gb);
+  const [items, setItems] = useState<ToolEntry[]>([]);
+  useEffect(() => {
+    ark.toolsList(projectRoot).then((raw: ToolEntry[]) => {
+      const sorted = raw.sort((a: ToolEntry, b: ToolEntry) => {
+        const ga = groupLabel(a);
+        const gb = groupLabel(b);
+        if (ga === gb) return a.name.localeCompare(b.name);
+        return ga.localeCompare(gb);
+      });
+      setItems(sorted);
     });
   }, [projectRoot, version]);
 
@@ -93,14 +98,27 @@ export function ToolsTab({ pane, asyncState, refresh, onUseRecipe }: ToolsTabPro
         setConfirmDelete(false);
         if (asyncState) {
           asyncState.run(`Deleting ${item.name}...`, async () => {
-            deleteToolItem(item, projectRoot);
+            await ark.toolsDeleteItem({
+              name: item.name,
+              kind: item.kind,
+              source: item.source,
+              scope: item.source !== "builtin" ? item.source : undefined,
+              projectRoot,
+            });
             status.show(`Deleted '${item.name}'`);
             doRefresh();
           });
         } else {
-          deleteToolItem(item, projectRoot);
-          status.show(`Deleted '${item.name}'`);
-          doRefresh();
+          ark.toolsDeleteItem({
+            name: item.name,
+            kind: item.kind,
+            source: item.source,
+            scope: item.source !== "builtin" ? item.source : undefined,
+            projectRoot,
+          }).then(() => {
+            status.show(`Deleted '${item.name}'`);
+            doRefresh();
+          });
         }
         return;
       }
@@ -118,16 +136,21 @@ export function ToolsTab({ pane, asyncState, refresh, onUseRecipe }: ToolsTabPro
 
     // Use recipe
     if (key.return && selected.kind === "ark-recipe") {
-      const recipe = core.loadRecipe(selected.name, projectRoot);
-      if (recipe) {
-        const missing = recipe.variables.filter(v => v.required && !v.default && !recipe.defaults?.[v.name] && !recipe.repo);
-        if (missing.length > 0) {
-          status.show(`Recipe needs: ${missing.map(v => v.name).join(", ")}`);
-          return;
-        }
-        const instance = core.instantiateRecipe(recipe, recipe.defaults ?? {});
-        onUseRecipe?.(instance);
-        status.show(`Session created from recipe '${selected.name}'`);
+      if (asyncState) {
+        asyncState.run("Loading recipe...", async () => {
+          const recipe = await ark.recipeRead(selected.name);
+          if (recipe) {
+            const missing = recipe.variables.filter((v: any) => v.required && !v.default && !recipe.defaults?.[v.name] && !recipe.repo);
+            if (missing.length > 0) {
+              status.show(`Recipe needs: ${missing.map((v: any) => v.name).join(", ")}`);
+              return;
+            }
+            // Use server-side recipe/use which instantiates + starts session
+            const session = await ark.recipeUse(selected.name, recipe.defaults ?? {});
+            onUseRecipe?.({ ...recipe, ...session });
+            status.show(`Session created from recipe '${selected.name}'`);
+          }
+        });
       }
       return;
     }
@@ -272,9 +295,13 @@ function ToolDetail({ item, pane, statusMessage }: {
 // ── Sub-detail components ───────────────────────────────────────────────────
 
 function CommandContent({ source }: { source: string }) {
-  const content = useMemo(() => {
-    try { return core.getCommand(require("path").dirname(require("path").dirname(require("path").dirname(source))), require("path").basename(source, ".md")); }
-    catch { return null; }
+  const ark = useArkClient();
+  const [content, setContent] = useState<string | null>(null);
+  useEffect(() => {
+    const path = require("path");
+    const projectRoot = path.dirname(path.dirname(path.dirname(source)));
+    const name = path.basename(source, ".md");
+    ark.toolsRead({ name, kind: "command", projectRoot }).then((r: any) => setContent(r?.content ?? null)).catch(() => setContent(null));
   }, [source]);
 
   if (!content) return null;
@@ -283,7 +310,7 @@ function CommandContent({ source }: { source: string }) {
     <>
       <Text> </Text>
       <SectionHeader title="Content" />
-      {content.split("\n").slice(0, 30).map((line, i) => (
+      {content.split("\n").slice(0, 30).map((line: string, i: number) => (
         <Text key={i} dimColor>{`  ${line}`}</Text>
       ))}
       {content.split("\n").length > 30 && (
@@ -318,8 +345,11 @@ function SkillFileContent({ source }: { source: string }) {
 }
 
 function ArkSkillDetail({ name }: { name: string }) {
-  const projectRoot = useMemo(() => core.findProjectRoot(process.cwd()) ?? undefined, []);
-  const skill = useMemo(() => core.loadSkill(name, projectRoot), [name, projectRoot]);
+  const ark = useArkClient();
+  const [skill, setSkill] = useState<any>(null);
+  useEffect(() => {
+    ark.skillRead(name).then(setSkill).catch(() => setSkill(null));
+  }, [name]);
   if (!skill) return null;
 
   return (
@@ -347,8 +377,11 @@ function ArkSkillDetail({ name }: { name: string }) {
 }
 
 function ArkRecipeDetail({ name }: { name: string }) {
-  const projectRoot = useMemo(() => core.findProjectRoot(process.cwd()) ?? undefined, []);
-  const recipe = useMemo(() => core.loadRecipe(name, projectRoot), [name, projectRoot]);
+  const ark = useArkClient();
+  const [recipe, setRecipe] = useState<any>(null);
+  useEffect(() => {
+    ark.recipeRead(name).then(setRecipe).catch(() => setRecipe(null));
+  }, [name]);
   if (!recipe) return null;
 
   return (
@@ -362,7 +395,7 @@ function ArkRecipeDetail({ name }: { name: string }) {
         <>
           <Text> </Text>
           <SectionHeader title={`Variables (${recipe.variables.length})`} />
-          {recipe.variables.map((v) => (
+          {recipe.variables.map((v: any) => (
             <Text key={v.name}>{`  ${v.name}${v.required ? " *" : ""} - ${v.description}`}</Text>
           ))}
         </>
@@ -404,29 +437,4 @@ function isDeletable(item: ToolEntry): boolean {
   return true;
 }
 
-function deleteToolItem(item: ToolEntry, projectRoot?: string): void {
-  switch (item.kind) {
-    case "mcp-server":
-      if (projectRoot) core.removeMcpServer(projectRoot, item.name);
-      break;
-    case "command":
-      if (projectRoot) core.removeCommand(projectRoot, item.name);
-      break;
-    case "claude-skill": {
-      // Delete the .md file directly
-      try {
-        const { unlinkSync, existsSync } = require("fs");
-        if (existsSync(item.source)) unlinkSync(item.source);
-      } catch { /* skip */ }
-      break;
-    }
-    case "ark-skill":
-      if (item.source !== "builtin") {
-        core.deleteSkill(item.name, item.source as "project" | "global", projectRoot);
-      }
-      break;
-    case "ark-recipe":
-    case "context":
-      break;
-  }
-}
+// deleteToolItem is now handled server-side via ark.toolsDeleteItem()

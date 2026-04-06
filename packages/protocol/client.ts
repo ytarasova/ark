@@ -449,6 +449,16 @@ export class ArkClient {
     return ok;
   }
 
+  async memoryAdd(content: string, opts?: { tags?: string[]; scope?: string; importance?: number }): Promise<any> {
+    const { memory } = await this.rpc("memory/add", { content, ...opts });
+    return memory;
+  }
+
+  async memoryClear(scope?: string): Promise<number> {
+    const { count } = await this.rpc("memory/clear", { scope });
+    return count;
+  }
+
   // ── Profile extended ───────────────────────────────────────────────────────
 
   async profileCreate(name: string, description?: string): Promise<any> {

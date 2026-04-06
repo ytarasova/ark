@@ -80,6 +80,13 @@ export function getOverlayHints(overlay: string): React.ReactNode[] {
         <KeyHint key="/" k="/" label="search" />,
         <KeyHint key="esc" k="Esc" label="close" />,
       ];
+    case "memory":
+      return [
+        <KeyHint key="jk" k="j/k" label="move" />,
+        <KeyHint key="n" k="n" label="add" />,
+        <KeyHint key="x" k="x" label="delete" />,
+        <KeyHint key="esc" k="Esc" label="close" />,
+      ];
     default:
       return [
         <KeyHint key="esc" k="Esc" label="cancel" />,
@@ -137,13 +144,14 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
         break;
     }
     // Create / duplicate
-    hints.push(<KeyHint key="f" k="f" label="fork" />);
+    hints.push(<KeyHint key="fC" k="f/C" label="fork/clone" />);
     hints.push(<KeyHint key="W" k="W" label="worktree" />);
     // Organize
     hints.push(<KeyHint key="u" k="u" label="unread" />);
     hints.push(<KeyHint key="m" k="m" label="move" />);
     hints.push(<KeyHint key="M" k="M" label="mcp" />);
     hints.push(<KeyHint key="K" k="K" label="skills" />);
+    hints.push(<KeyHint key="Y" k="Y" label="memory" />);
     hints.push(<KeyHint key="x" k="x" label="delete" />);
   }
   hints.push(<KeyHint key="n" k="n" label="new" />);
@@ -176,7 +184,7 @@ export function getComputeHints(): React.ReactNode[] {
 export function getHistoryHints(): React.ReactNode[] {
   return [
     ...NAV_HINTS, sep(0),
-    <KeyHint key="enter" k="Enter" label="import" />,
+    <KeyHint key="enter" k="Enter" label="import Claude" />,
     <KeyHint key="r" k="r/R" label="refresh/rebuild" />,
     <KeyHint key="s" k="s" label="search" />, sep(1),
     <KeyHint key="q" k="q" label="quit" />,
@@ -197,7 +205,7 @@ export function getAgentsHints(): React.ReactNode[] {
 export function getToolsHints(): React.ReactNode[] {
   return [
     ...NAV_HINTS, sep(0),
-    <KeyHint key="enter" k="Enter" label="use" />,
+    <KeyHint key="enter" k="Enter" label="use recipe" />,
     <KeyHint key="x" k="x" label="delete" />, sep(1),
     <KeyHint key="q" k="q" label="quit" />,
   ];

@@ -20,6 +20,7 @@ import * as core from "../core/index.js";
 import { getProvider } from "../compute/index.js";
 import { AppContext, setApp } from "../core/app.js";
 import { loadConfig } from "../core/config.js";
+import { getArkClient, closeArkClient } from "./client.js";
 
 const app = new AppContext(loadConfig(), { skipConductor: true, skipMetrics: true });
 await app.boot();
@@ -55,6 +56,7 @@ session.command("start")
   .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
   .option("--recipe <name>", "Create session from a recipe template")
   .action(async (ticket, opts) => {
+    const ark = await getArkClient();
     let workdir: string | undefined;
     let repo = opts.repo;
     if (repo) {
@@ -83,27 +85,30 @@ session.command("start")
     // Load recipe defaults if specified (CLI flags override recipe values)
     let recipeAgent: string | undefined;
     if (opts.recipe) {
-      const recipe = core.loadRecipe(opts.recipe, core.findProjectRoot(process.cwd()) ?? undefined);
-      if (!recipe) { console.error(chalk.red(`Recipe not found: ${opts.recipe}`)); process.exit(1); }
-      const instance = core.instantiateRecipe(recipe, {
-        ...(opts.summary ? { summary: opts.summary } : {}),
-        ...(opts.repo ? { repo: opts.repo } : {}),
-      });
-      if (!opts.summary && instance.summary) opts.summary = instance.summary;
-      if (!opts.summary) opts.summary = recipe.description;
-      if (!opts.flow || opts.flow === "default") opts.flow = instance.flow;
-      if (!opts.compute && instance.compute) opts.compute = instance.compute;
-      if (!opts.group && instance.group) opts.group = instance.group;
-      if (!repo && instance.repo) { repo = instance.repo; }
-      recipeAgent = instance.agent;
-      console.log(chalk.dim(`Using recipe '${recipe.name}' (${recipe._source})`));
+      try {
+        const recipe = await ark.recipeRead(opts.recipe);
+        const instance = core.instantiateRecipe(recipe, {
+          ...(opts.summary ? { summary: opts.summary } : {}),
+          ...(opts.repo ? { repo: opts.repo } : {}),
+        });
+        if (!opts.summary && instance.summary) opts.summary = instance.summary;
+        if (!opts.summary) opts.summary = recipe.description;
+        if (!opts.flow || opts.flow === "default") opts.flow = instance.flow;
+        if (!opts.compute && instance.compute) opts.compute = instance.compute;
+        if (!opts.group && instance.group) opts.group = instance.group;
+        if (!repo && instance.repo) { repo = instance.repo; }
+        recipeAgent = instance.agent;
+        console.log(chalk.dim(`Using recipe '${recipe.name}' (${recipe._source})`));
+      } catch {
+        console.error(chalk.red(`Recipe not found: ${opts.recipe}`)); process.exit(1);
+      }
     }
 
     // Sanitize session name: alphanumeric, dash, underscore only
     const rawName = opts.summary ?? ticket ?? "";
     const summary = rawName.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || rawName;
 
-    const s = core.startSession({
+    const s = await ark.sessionStart({
       ticket, summary,
       repo, flow: opts.flow, compute_name: opts.compute,
       agent: recipeAgent,
@@ -111,7 +116,7 @@ session.command("start")
     });
 
     if (claudeSessionId) {
-      core.updateSession(s.id, { claude_session_id: claudeSessionId });
+      await ark.sessionUpdate(s.id, { claude_session_id: claudeSessionId });
       console.log(chalk.dim(`  Bound to Claude session: ${claudeSessionId.slice(0, 8)} (will use --resume on dispatch)`));
     }
 
@@ -123,7 +128,7 @@ session.command("start")
     if (workdir) console.log(`  Workdir:  ${workdir}`);
 
     if (opts.dispatch || opts.attach) {
-      const result = await core.dispatch(s.id);
+      const result = await ark.sessionDispatch(s.id);
       if (result.ok) {
         console.log(chalk.green(`Agent dispatched - session: ${result.message}`));
         if (opts.attach) {
@@ -141,8 +146,9 @@ session.command("list")
   .option("-s, --status <status>", "Filter by status")
   .option("-r, --repo <repo>", "Filter by repo")
   .option("-g, --group <group>", "Filter by group")
-  .action((opts) => {
-    const sessions = core.listSessions({ ...opts, groupPrefix: core.profileGroupPrefix() || undefined });
+  .action(async (opts) => {
+    const ark = await getArkClient();
+    const sessions = await ark.sessionList({ ...opts, groupPrefix: core.profileGroupPrefix() || undefined });
     if (!sessions.length) {
       console.log(chalk.dim("No sessions. Start one: ark session start --repo . --summary 'task'"));
       return;
@@ -167,8 +173,9 @@ session.command("list")
 session.command("show")
   .description("Show session details")
   .argument("<id>", "Session ID")
-  .action((id) => {
-    const s = core.getSession(id);
+  .action(async (id) => {
+    const ark = await getArkClient();
+    const { session: s } = await ark.sessionRead(id);
     if (!s) { console.log(chalk.red(`Session ${id} not found`)); return; }
     console.log(chalk.bold(`\n${s.ticket ?? s.id}: ${s.summary ?? ""}`));
     console.log(`  ID:       ${s.id}`);
@@ -185,7 +192,8 @@ session.command("dispatch")
   .description("Dispatch the agent for the current stage")
   .argument("<id>", "Session ID")
   .action(async (id) => {
-    const r = await core.dispatch(id);
+    const ark = await getArkClient();
+    const r = await ark.sessionDispatch(id);
     console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
   });
 
@@ -193,15 +201,21 @@ session.command("stop")
   .description("Stop a session")
   .argument("<id>")
   .action(async (id) => {
-    const r = await core.stop(id);
-    console.log(r.ok ? chalk.yellow("Stopped") : chalk.red(r.message));
+    const ark = await getArkClient();
+    try {
+      await ark.sessionStop(id);
+      console.log(chalk.yellow("Stopped"));
+    } catch (e: any) {
+      console.log(chalk.red(e.message));
+    }
   });
 
 session.command("resume")
   .description("Resume a stopped/paused session")
   .argument("<id>")
   .action(async (id) => {
-    const r = await core.resume(id);
+    const ark = await getArkClient();
+    const r = await ark.sessionResume(id);
     console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
   });
 
@@ -210,7 +224,8 @@ session.command("advance")
   .argument("<id>")
   .option("-f, --force", "Force past gate")
   .action(async (id, opts) => {
-    const r = await core.advance(id, opts.force);
+    const ark = await getArkClient();
+    const r = await ark.sessionAdvance(id, opts.force);
     console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
   });
 
@@ -218,16 +233,22 @@ session.command("complete")
   .description("Mark current stage done and advance")
   .argument("<id>")
   .action(async (id) => {
-    const r = await core.complete(id);
-    console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
+    const ark = await getArkClient();
+    try {
+      await ark.sessionComplete(id);
+      console.log(chalk.green("Completed"));
+    } catch (e: any) {
+      console.log(chalk.red(e.message));
+    }
   });
 
 session.command("pause")
   .description("Pause a session")
   .argument("<id>")
   .option("-r, --reason <text>")
-  .action((id, opts) => {
-    const r = core.pause(id, opts.reason);
+  .action(async (id, opts) => {
+    const ark = await getArkClient();
+    const r = await ark.sessionPause(id, opts.reason);
     console.log(r.ok ? chalk.yellow("Paused") : chalk.red(r.message));
   });
 
@@ -235,13 +256,14 @@ session.command("attach")
   .description("Attach to a running agent session")
   .argument("<id>")
   .action(async (id) => {
-    let s = core.getSession(id);
+    const ark = await getArkClient();
+    let { session: s } = await ark.sessionRead(id);
     if (!s) { console.log(chalk.red("Not found")); return; }
     if (!s.session_id) {
       console.log(chalk.yellow("No active session. Dispatching..."));
-      const r = await core.dispatch(id);
+      const r = await ark.sessionDispatch(id);
       if (!r.ok) { console.log(chalk.red(r.message)); return; }
-      s = core.getSession(id)!;
+      s = (await ark.sessionRead(id)).session;
     }
     const cmd = core.attachCommand(s.session_id!);
     require("child_process").execSync(cmd, { stdio: "inherit" });
@@ -252,7 +274,8 @@ session.command("output")
   .argument("<id>")
   .option("-n, --lines <n>", "Number of lines", "30")
   .action(async (id, opts) => {
-    const output = await core.getOutput(id, { lines: Number(opts.lines) });
+    const ark = await getArkClient();
+    const output = await ark.sessionOutput(id, Number(opts.lines));
     console.log(output || chalk.dim("No output"));
   });
 
@@ -261,16 +284,26 @@ session.command("send")
   .argument("<id>")
   .argument("<message>")
   .action(async (id, message) => {
-    const r = await core.send(id, message);
-    console.log(r.ok ? chalk.green("Sent") : chalk.red(r.message));
+    const ark = await getArkClient();
+    try {
+      await ark.messageSend(id, message);
+      console.log(chalk.green("Sent"));
+    } catch (e: any) {
+      console.log(chalk.red(e.message));
+    }
   });
 
 session.command("undelete")
   .description("Restore a recently deleted session (within 90s)")
   .argument("<id>")
   .action(async (id) => {
-    const result = await core.undeleteSessionAsync(id);
-    console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
+    const ark = await getArkClient();
+    try {
+      const result = await ark.sessionUndelete(id);
+      console.log(chalk.green(result?.message ?? "Restored"));
+    } catch (e: any) {
+      console.log(chalk.red(e.message));
+    }
   });
 
 session.command("fork")
@@ -280,13 +313,14 @@ session.command("fork")
   .option("-g, --group <name>", "Group for forked session")
   .option("-d, --dispatch", "Auto-dispatch")
   .action(async (id, opts) => {
-    const r = core.cloneSession(id, opts.task);
-    if (r.ok) {
-      if (opts.group) core.updateSession(r.sessionId, { group_name: opts.group });
-      console.log(chalk.green(`Forked → ${r.sessionId}`));
-      if (opts.dispatch) await core.dispatch(r.sessionId);
-    } else {
-      console.log(chalk.red((r as { ok: false; message: string }).message));
+    const ark = await getArkClient();
+    try {
+      const forked = await ark.sessionClone(id, opts.task);
+      if (opts.group) await ark.sessionUpdate(forked.id, { group_name: opts.group });
+      console.log(chalk.green(`Forked → ${forked.id}`));
+      if (opts.dispatch) await ark.sessionDispatch(forked.id);
+    } catch (e: any) {
+      console.log(chalk.red(e.message));
     }
   });
 
@@ -297,13 +331,14 @@ session.command("clone")
   .option("-g, --group <name>", "Group for forked session")
   .option("-d, --dispatch", "Auto-dispatch")
   .action(async (id, opts) => {
-    const r = core.cloneSession(id, opts.task);
-    if (r.ok) {
-      if (opts.group) core.updateSession(r.sessionId, { group_name: opts.group });
-      console.log(chalk.green(`Forked → ${r.sessionId}`));
-      if (opts.dispatch) await core.dispatch(r.sessionId);
-    } else {
-      console.log(chalk.red((r as { ok: false; message: string }).message));
+    const ark = await getArkClient();
+    try {
+      const cloned = await ark.sessionClone(id, opts.task);
+      if (opts.group) await ark.sessionUpdate(cloned.id, { group_name: opts.group });
+      console.log(chalk.green(`Forked → ${cloned.id}`));
+      if (opts.dispatch) await ark.sessionDispatch(cloned.id);
+    } catch (e: any) {
+      console.log(chalk.red(e.message));
     }
   });
 
@@ -313,7 +348,8 @@ session.command("handoff")
   .argument("<agent>")
   .option("-i, --instructions <text>")
   .action(async (id, agent, opts) => {
-    const r = await core.handoff(id, agent, opts.instructions);
+    const ark = await getArkClient();
+    const r = await ark.sessionHandoff(id, agent, opts.instructions);
     console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
   });
 
@@ -321,10 +357,14 @@ session.command("spawn")
   .description("Spawn a child session for parallel work")
   .argument("<parent-id>")
   .argument("<task>")
-  .action((parentId, task) => {
-    const r = core.fork(parentId, task);
-    if (r.ok) console.log(chalk.green(`Spawned → ${r.sessionId}`));
-    else console.log(chalk.red((r as { ok: false; message: string }).message));
+  .action(async (parentId, task) => {
+    const ark = await getArkClient();
+    try {
+      const forked = await ark.sessionFork(parentId, task);
+      console.log(chalk.green(`Spawned → ${forked.id}`));
+    } catch (e: any) {
+      console.log(chalk.red(e.message));
+    }
   });
 
 session.command("spawn-subagent")
@@ -336,16 +376,17 @@ session.command("spawn-subagent")
   .option("-g, --group <name>", "Group name")
   .option("-d, --dispatch", "Auto-dispatch after spawning")
   .action(async (parentId, task, opts) => {
-    const r = core.spawnSubagent(parentId, {
+    const ark = await getArkClient();
+    const r = await ark.sessionSpawn(parentId, {
       task,
-      model: opts.model,
       agent: opts.agent,
+      model: opts.model,
       group_name: opts.group,
     });
     if (r.ok) {
       console.log(chalk.green(`Subagent spawned → ${r.sessionId}`));
       if (opts.dispatch && r.sessionId) {
-        const d = await core.dispatch(r.sessionId);
+        const d = await ark.sessionDispatch(r.sessionId);
         console.log(d.ok ? chalk.green(`Dispatched: ${d.message}`) : chalk.red(d.message));
       }
     } else {
@@ -358,7 +399,8 @@ session.command("join")
   .argument("<parent-id>")
   .option("-f, --force")
   .action(async (parentId, opts) => {
-    const r = await core.joinFork(parentId, opts.force);
+    const ark = await getArkClient();
+    const r = await ark.sessionJoin(parentId, opts.force);
     console.log(r.ok ? chalk.green(r.message) : chalk.yellow(r.message));
   });
 
@@ -366,8 +408,9 @@ session.command("events")
   .description("Show event history")
   .argument("<id>")
   .action(async (id) => {
+    const ark = await getArkClient();
     const { formatEvent } = await import("../tui/helpers/formatEvent.js");
-    const events = core.getEvents(id);
+    const events = await ark.sessionEvents(id);
     for (const e of events) {
       const ts = e.created_at.slice(11, 16);
       const msg = formatEvent(e.type, e.data ?? undefined);
@@ -378,17 +421,16 @@ session.command("events")
 session.command("delete")
   .description("Delete sessions")
   .argument("<ids...>")
-  .action((ids: string[]) => {
+  .action(async (ids: string[]) => {
+    const ark = await getArkClient();
     for (const id of ids) {
-      const s = core.getSession(id);
-      if (!s) { console.log(chalk.red(`Session ${id} not found`)); continue; }
-      // Kill tmux if running (fast, no provider import needed)
-      if (s.session_id) try { core.killSession(s.session_id); } catch { /* ignore */ }
-      // Soft-delete for undo
-      core.softDeleteSession(id);
-      core.logEvent(id, "session_deleted", { actor: "user" });
-      console.log(chalk.green("Session deleted (undo available for 90s)"));
-      console.log(chalk.dim(`  Run 'ark session undelete ${id}' within 90s to undo`));
+      try {
+        await ark.sessionDelete(id);
+        console.log(chalk.green("Session deleted (undo available for 90s)"));
+        console.log(chalk.dim(`  Run 'ark session undelete ${id}' within 90s to undo`));
+      } catch (e: any) {
+        console.log(chalk.red(`Session ${id}: ${e.message}`));
+      }
     }
   });
 
@@ -396,8 +438,9 @@ session.command("group")
   .description("Assign a session to a group")
   .argument("<id>")
   .argument("<group>")
-  .action((id, group) => {
-    core.updateSession(id, { group_name: group });
+  .action(async (id, group) => {
+    const ark = await getArkClient();
+    await ark.sessionUpdate(id, { group_name: group });
     console.log(chalk.green(`${id} → group '${group}'`));
   });
 
@@ -428,8 +471,9 @@ const pr = program.command("pr").description("Manage PR-bound sessions");
 
 pr.command("list")
   .description("List sessions bound to PRs")
-  .action(() => {
-    const sessions = core.listSessions({ limit: 50, groupPrefix: core.profileGroupPrefix() || undefined });
+  .action(async () => {
+    const ark = await getArkClient();
+    const sessions = await ark.sessionList({ limit: 50, groupPrefix: core.profileGroupPrefix() || undefined });
     const prSessions = sessions.filter((s: any) => s.pr_url);
     if (prSessions.length === 0) {
       console.log(chalk.yellow("No PR-bound sessions."));
@@ -494,25 +538,29 @@ program.command("watch")
 
 const agent = program.command("agent").description("Manage agent definitions");
 
-agent.command("list").description("List agents").option("--project <dir>", "Project root").action((opts) => {
-  const projectRoot = opts.project ?? core.findProjectRoot(process.cwd()) ?? undefined;
-  for (const a of core.listAgents(projectRoot)) {
+agent.command("list").description("List agents").option("--project <dir>", "Project root").action(async (opts) => {
+  const ark = await getArkClient();
+  const agents = await ark.agentList();
+  for (const a of agents) {
     const src = (a._source === "project" ? "P" : a._source === "global" ? "G" : "B").padEnd(2);
     console.log(`  ${src} ${a.name.padEnd(16)} ${a.model.padEnd(8)} T:${a.tools.length} M:${a.mcp_servers.length} S:${a.skills.length} R:${a.memories.length}  ${a.description.slice(0, 40)}`);
   }
 });
 
-agent.command("show").description("Show agent details").argument("<name>").action((name) => {
-  const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-  const a = core.loadAgent(name, projectRoot);
-  if (!a) { console.log(chalk.red("Not found")); return; }
-  console.log(chalk.bold(`\n${a.name}`) + chalk.dim(` (${a._source})`));
-  console.log(`  Model:      ${a.model}`);
-  console.log(`  Max turns:  ${a.max_turns}`);
-  console.log(`  Tools:      ${a.tools.join(", ")}`);
-  console.log(`  MCPs:       ${a.mcp_servers.length ? a.mcp_servers.join(", ") : "-"}`);
-  console.log(`  Skills:     ${a.skills.length ? a.skills.join(", ") : "-"}`);
-  console.log(`  Memories:   ${a.memories.length ? a.memories.join(", ") : "-"}`);
+agent.command("show").description("Show agent details").argument("<name>").action(async (name) => {
+  const ark = await getArkClient();
+  try {
+    const { agent: a } = await ark.rpc("agent/read", { name });
+    console.log(chalk.bold(`\n${a.name}`) + chalk.dim(` (${a._source})`));
+    console.log(`  Model:      ${a.model}`);
+    console.log(`  Max turns:  ${a.max_turns}`);
+    console.log(`  Tools:      ${a.tools.join(", ")}`);
+    console.log(`  MCPs:       ${a.mcp_servers.length ? a.mcp_servers.join(", ") : "-"}`);
+    console.log(`  Skills:     ${a.skills.length ? a.skills.join(", ") : "-"}`);
+    console.log(`  Memories:   ${a.memories.length ? a.memories.join(", ") : "-"}`);
+  } catch {
+    console.log(chalk.red("Not found"));
+  }
 });
 
 agent.command("create").description("Create a new agent").argument("<name>")
@@ -626,21 +674,27 @@ agent.command("copy").description("Copy an agent for customization").argument("<
 
 const pipe = program.command("flow").description("Manage flows");
 
-pipe.command("list").description("List flows").action(() => {
-  for (const p of core.listFlows()) {
+pipe.command("list").description("List flows").action(async () => {
+  const ark = await getArkClient();
+  const flows = await ark.flowList();
+  for (const p of flows) {
     console.log(`  ${p.name.padEnd(16)} ${p.stages.join(" > ")}  ${chalk.dim(p.description.slice(0, 40))}`);
   }
 });
 
-pipe.command("show").description("Show flow").argument("<name>").action((name) => {
-  const p = core.loadFlow(name);
-  if (!p) { console.log(chalk.red("Not found")); return; }
-  console.log(chalk.bold(`\n${p.name}`));
-  if (p.description) console.log(chalk.dim(`  ${p.description}`));
-  for (const [i, s] of p.stages.entries()) {
-    const type = s.type ?? (s.action ? "action" : "agent");
-    const detail = s.agent ?? s.action ?? "";
-    console.log(`  ${i + 1}. ${s.name.padEnd(14)} [${type}:${detail}] gate=${s.gate}${s.optional ? " (optional)" : ""}`);
+pipe.command("show").description("Show flow").argument("<name>").action(async (name) => {
+  const ark = await getArkClient();
+  try {
+    const p = await ark.flowRead(name);
+    console.log(chalk.bold(`\n${p.name}`));
+    if (p.description) console.log(chalk.dim(`  ${p.description}`));
+    for (const [i, s] of p.stages.entries()) {
+      const type = s.type ?? (s.action ? "action" : "agent");
+      const detail = s.agent ?? s.action ?? "";
+      console.log(`  ${i + 1}. ${s.name.padEnd(14)} [${type}:${detail}] gate=${s.gate}${s.optional ? " (optional)" : ""}`);
+    }
+  } catch {
+    console.log(chalk.red("Not found"));
   }
 });
 
@@ -650,8 +704,9 @@ const skillCmd = program.command("skill").description("Manage skills");
 
 skillCmd.command("list")
   .description("List available skills")
-  .action(() => {
-    const skills = core.listSkills(core.findProjectRoot(process.cwd()) ?? undefined);
+  .action(async () => {
+    const ark = await getArkClient();
+    const skills = await ark.skillList();
     if (!skills.length) {
       console.log(chalk.dim("No skills found."));
       return;
@@ -664,8 +719,9 @@ skillCmd.command("list")
 skillCmd.command("show")
   .description("Show skill details")
   .argument("<name>", "Skill name")
-  .action((name: string) => {
-    const skill = core.loadSkill(name, core.findProjectRoot(process.cwd()) ?? undefined);
+  .action(async (name: string) => {
+    const ark = await getArkClient();
+    const skill = await ark.skillRead(name);
     if (!skill) { console.log(chalk.red(`Skill not found: ${name}`)); return; }
     console.log(chalk.bold(`\n${skill.name}`) + chalk.dim(` (${skill._source})`));
     console.log(`  Description: ${skill.description}`);
@@ -739,8 +795,9 @@ const recipeCmd = program.command("recipe").description("Manage recipes");
 
 recipeCmd.command("list")
   .description("List available recipes")
-  .action(() => {
-    const recipes = core.listRecipes(core.findProjectRoot(process.cwd()) ?? undefined);
+  .action(async () => {
+    const ark = await getArkClient();
+    const recipes = await ark.recipeList();
     if (!recipes.length) {
       console.log(chalk.dim("No recipes found."));
       return;
@@ -753,18 +810,23 @@ recipeCmd.command("list")
 recipeCmd.command("show")
   .description("Show recipe details")
   .argument("<name>", "Recipe name")
-  .action((name: string) => {
-    const recipe = core.loadRecipe(name, core.findProjectRoot(process.cwd()) ?? undefined);
-    if (!recipe) { console.log(chalk.red(`Recipe not found: ${name}`)); return; }
-    console.log(chalk.bold(`\n${recipe.name}`) + chalk.dim(` (${recipe._source})`));
-    console.log(`  Description: ${recipe.description}`);
-    console.log(`  Flow:        ${recipe.flow}`);
-    if (recipe.agent) console.log(`  Agent:       ${recipe.agent}`);
-    if (recipe.variables?.length) {
-      console.log(chalk.bold(`\n  Variables:`));
-      for (const v of recipe.variables) {
-        console.log(`    ${v.name}${v.required ? " *" : ""}  ${v.description}${v.default ? ` (default: ${v.default})` : ""}`);
+  .action(async (name: string) => {
+    const ark = await getArkClient();
+    try {
+      const recipe = await ark.recipeRead(name);
+      if (!recipe) { console.log(chalk.red(`Recipe not found: ${name}`)); return; }
+      console.log(chalk.bold(`\n${recipe.name}`) + chalk.dim(` (${recipe._source})`));
+      console.log(`  Description: ${recipe.description}`);
+      console.log(`  Flow:        ${recipe.flow}`);
+      if (recipe.agent) console.log(`  Agent:       ${recipe.agent}`);
+      if (recipe.variables?.length) {
+        console.log(chalk.bold(`\n  Variables:`));
+        for (const v of recipe.variables) {
+          console.log(`    ${v.name}${v.required ? " *" : ""}  ${v.description}${v.default ? ` (default: ${v.default})` : ""}`);
+        }
       }
+    } catch {
+      console.log(chalk.red(`Recipe not found: ${name}`));
     }
   });
 
@@ -774,13 +836,14 @@ recipeCmd.command("create")
   .option("--from-session <id>", "Create from existing session")
   .option("-n, --name <name>", "Recipe name (required with --from-session)")
   .option("-s, --scope <scope>", "Scope: global or project", "global")
-  .action((opts: any) => {
+  .action(async (opts: any) => {
     const scope = opts.scope as "global" | "project";
     const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
 
     if (opts.fromSession) {
       if (!opts.name) { console.error(chalk.red("--name required with --from-session")); process.exit(1); }
-      const session = core.getSession(opts.fromSession);
+      const ark = await getArkClient();
+      const { session } = await ark.sessionRead(opts.fromSession);
       if (!session) { console.error(chalk.red(`Session not found: ${opts.fromSession}`)); process.exit(1); }
       const recipe = core.sessionToRecipe(session, opts.name);
       core.saveRecipe(recipe, scope, projectRoot);
@@ -832,8 +895,9 @@ const memoryCmd = program.command("memory").description("Manage cross-session me
 memoryCmd.command("list")
   .description("List stored memories")
   .option("-s, --scope <scope>", "Filter by scope")
-  .action((opts) => {
-    const memories = core.listMemories(opts.scope);
+  .action(async (opts) => {
+    const ark = await getArkClient();
+    const memories = await ark.memoryList(opts.scope);
     if (!memories.length) {
       console.log(chalk.dim("No memories stored."));
       return;
@@ -851,8 +915,9 @@ memoryCmd.command("recall")
   .argument("<query>", "Search query")
   .option("-s, --scope <scope>", "Filter by scope")
   .option("-n, --limit <n>", "Max results", "10")
-  .action((query: string, opts) => {
-    const results = core.recall(query, { scope: opts.scope, limit: Number(opts.limit) });
+  .action(async (query: string, opts) => {
+    const ark = await getArkClient();
+    const results = await ark.memoryRecall(query, { scope: opts.scope, limit: Number(opts.limit) });
     if (!results.length) {
       console.log(chalk.dim("No relevant memories found."));
       return;
@@ -866,9 +931,42 @@ memoryCmd.command("recall")
 memoryCmd.command("forget")
   .description("Forget a specific memory")
   .argument("<id>", "Memory ID")
-  .action((id: string) => {
-    const ok = core.forget(id);
+  .action(async (id: string) => {
+    const ark = await getArkClient();
+    const ok = await ark.memoryForget(id);
     console.log(ok ? chalk.green(`Forgot ${id}`) : chalk.red(`Memory ${id} not found`));
+  });
+
+memoryCmd.command("add")
+  .description("Store a new memory")
+  .argument("<content>", "Memory content")
+  .option("-t, --tags <tags>", "Comma-separated tags")
+  .option("-s, --scope <scope>", "Scope (default: global)")
+  .option("-i, --importance <n>", "Importance 0-1 (default: 0.5)")
+  .action(async (content: string, opts: any) => {
+    const ark = await getArkClient();
+    const memory = await ark.memoryAdd(content, {
+      tags: opts.tags ? opts.tags.split(",").map((t: string) => t.trim()) : undefined,
+      scope: opts.scope,
+      importance: opts.importance ? parseFloat(opts.importance) : undefined,
+    });
+    console.log(chalk.green(`Remembered: ${memory.id}`));
+    if (memory.tags.length) console.log(chalk.dim(`Tags: ${memory.tags.join(", ")}`));
+  });
+
+memoryCmd.command("clear")
+  .description("Clear all memories in a scope")
+  .option("-s, --scope <scope>", "Scope to clear (omit for ALL)")
+  .option("--force", "Skip confirmation")
+  .action(async (opts: any) => {
+    const ark = await getArkClient();
+    if (!opts.force) {
+      const label = opts.scope ? `scope '${opts.scope}'` : "ALL memories";
+      console.log(chalk.yellow(`This will delete ${label}. Use --force to confirm.`));
+      return;
+    }
+    const count = await ark.memoryClear(opts.scope);
+    console.log(chalk.green(`Cleared ${count} memories`));
   });
 
 // ── Knowledge commands ─────────────────────────────────────────────────────
@@ -917,12 +1015,13 @@ computeCmd.command("create")
   .option("--image <image>", "Docker image (default: ubuntu:22.04)")
   .option("--devcontainer", "Use devcontainer.json from project")
   .option("--volume <mount>", "Extra volume mount (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
-  .action((name, opts) => {
+  .action(async (name, opts) => {
     if (opts.provider === "local") {
       console.log(chalk.red("Local compute is auto-created. Use 'ec2' or 'docker' provider."));
       return;
     }
     try {
+      const ark = await getArkClient();
       let config: Record<string, unknown>;
 
       if (opts.provider === "docker") {
@@ -949,7 +1048,7 @@ computeCmd.command("create")
         config = {};
       }
 
-      const compute = core.createCompute({
+      const compute = await ark.computeCreate({
         name,
         provider: opts.provider,
         config,
@@ -985,18 +1084,14 @@ computeCmd.command("provision")
   .description("Provision a compute resource (create infrastructure)")
   .argument("<name>", "Compute name")
   .action(async (name) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
-    const provider = getProvider(compute.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
+    const ark = await getArkClient();
     try {
+      const compute = await ark.computeRead(name);
       console.log(chalk.dim(`Provisioning '${name}' via ${compute.provider}...`));
-      core.updateCompute(name, { status: "provisioning" });
-      await provider.provision(compute);
-      core.updateCompute(name, { status: "running" });
+      await ark.computeProvision(name);
       console.log(chalk.green(`Compute '${name}' provisioned and running`));
     } catch (e: any) {
-      core.updateCompute(name, { status: "stopped" });
+      try { await ark.computeUpdate(name, { status: "stopped" }); } catch { /* ignore */ }
       console.log(chalk.red(`Provision failed: ${e.message}`));
     }
   });
@@ -1005,13 +1100,9 @@ computeCmd.command("start")
   .description("Start a compute resource")
   .argument("<name>", "Compute name")
   .action(async (name) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
-    const provider = getProvider(compute.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
+    const ark = await getArkClient();
     try {
-      await provider.start(compute);
-      core.updateCompute(name, { status: "running" });
+      await ark.computeStartInstance(name);
       console.log(chalk.green(`Compute '${name}' started`));
     } catch (e: any) {
       console.log(chalk.red(`Start failed: ${e.message}`));
@@ -1022,13 +1113,9 @@ computeCmd.command("stop")
   .description("Stop a compute resource")
   .argument("<name>", "Compute name")
   .action(async (name) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
-    const provider = getProvider(compute.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
+    const ark = await getArkClient();
     try {
-      await provider.stop(compute);
-      core.updateCompute(name, { status: "stopped" });
+      await ark.computeStopInstance(name);
       console.log(chalk.yellow(`Compute '${name}' stopped`));
     } catch (e: any) {
       console.log(chalk.red(`Stop failed: ${e.message}`));
@@ -1039,13 +1126,9 @@ computeCmd.command("destroy")
   .description("Destroy a compute resource (remove infrastructure)")
   .argument("<name>", "Compute name")
   .action(async (name) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
-    const provider = getProvider(compute.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
+    const ark = await getArkClient();
     try {
-      await provider.destroy(compute);
-      core.updateCompute(name, { status: "destroyed" });
+      await ark.computeDestroy(name);
       console.log(chalk.green(`Compute '${name}' destroyed`));
     } catch (e: any) {
       console.log(chalk.red(`Destroy failed: ${e.message}`));
@@ -1055,15 +1138,19 @@ computeCmd.command("destroy")
 computeCmd.command("delete")
   .description("Delete a compute record from the database")
   .argument("<name>", "Compute name")
-  .action((name) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
-    if (compute.status === "running") {
-      console.log(chalk.red("Compute is running. Stop or destroy it first."));
-      return;
+  .action(async (name) => {
+    const ark = await getArkClient();
+    try {
+      const compute = await ark.computeRead(name);
+      if (compute.status === "running") {
+        console.log(chalk.red("Compute is running. Stop or destroy it first."));
+        return;
+      }
+      await ark.computeDelete(name);
+      console.log(chalk.green(`Compute '${name}' deleted`));
+    } catch (e: any) {
+      console.log(chalk.red(`Compute '${name}' not found`));
     }
-    core.deleteCompute(name);
-    console.log(chalk.green(`Compute '${name}' deleted`));
   });
 
 computeCmd.command("update")
@@ -1077,36 +1164,41 @@ computeCmd.command("update")
   .option("--ingress <cidrs>", "SSH ingress CIDRs (comma-separated, or 'open' for 0.0.0.0/0)")
   .option("--idle-minutes <min>", "Idle shutdown timeout in minutes")
   .option("--set <key=value>", "Set arbitrary config key", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
-  .action((name, opts) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+  .action(async (name, opts) => {
+    const ark = await getArkClient();
+    try {
+      const compute = await ark.computeRead(name);
 
-    const config = { ...compute.config } as any;
-    if (opts.size) config.size = opts.size;
-    if (opts.arch) config.arch = opts.arch;
-    if (opts.region) config.region = opts.region;
-    if (opts.profile) config.aws_profile = opts.profile;
-    if (opts.subnetId) config.subnet_id = opts.subnetId;
-    if (opts.ingress) {
-      config.ingress_cidrs = opts.ingress === "open"
-        ? ["0.0.0.0/0"]
-        : opts.ingress.split(",").map((s: string) => s.trim());
-    }
-    if (opts.idleMinutes) config.idle_minutes = parseInt(opts.idleMinutes);
-    for (const kv of opts.set) {
-      const [k, ...rest] = kv.split("=");
-      if (k && rest.length) config[k] = rest.join("=");
-    }
+      const config = { ...compute.config } as any;
+      if (opts.size) config.size = opts.size;
+      if (opts.arch) config.arch = opts.arch;
+      if (opts.region) config.region = opts.region;
+      if (opts.profile) config.aws_profile = opts.profile;
+      if (opts.subnetId) config.subnet_id = opts.subnetId;
+      if (opts.ingress) {
+        config.ingress_cidrs = opts.ingress === "open"
+          ? ["0.0.0.0/0"]
+          : opts.ingress.split(",").map((s: string) => s.trim());
+      }
+      if (opts.idleMinutes) config.idle_minutes = parseInt(opts.idleMinutes);
+      for (const kv of opts.set) {
+        const [k, ...rest] = kv.split("=");
+        if (k && rest.length) config[k] = rest.join("=");
+      }
 
-    core.updateCompute(name, { config });
-    console.log(chalk.green(`Compute '${name}' updated`));
-    console.log(JSON.stringify(config, null, 2));
+      await ark.computeUpdate(name, { config });
+      console.log(chalk.green(`Compute '${name}' updated`));
+      console.log(JSON.stringify(config, null, 2));
+    } catch (e: any) {
+      console.log(chalk.red(`Compute '${name}' not found`));
+    }
   });
 
 computeCmd.command("list")
   .description("List all compute")
-  .action(() => {
-    const computes = core.listCompute();
+  .action(async () => {
+    const ark = await getArkClient();
+    const computes = await ark.computeList();
     if (!computes.length) {
       console.log(chalk.dim("No compute. Create one: ark compute create <name> --provider local"));
       return;
@@ -1122,14 +1214,13 @@ computeCmd.command("status")
   .description("Show compute details")
   .argument("<name>", "Compute name")
   .action(async (name) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
-    console.log(JSON.stringify(compute, null, 2));
-    if (compute.status === "running") {
-      const provider = getProvider(compute.provider);
-      if (provider) {
+    const ark = await getArkClient();
+    try {
+      const compute = await ark.computeRead(name);
+      console.log(JSON.stringify(compute, null, 2));
+      if (compute.status === "running") {
         try {
-          const snap = await provider.getMetrics(compute);
+          const snap = await ark.metricsSnapshot(name);
           console.log(chalk.bold("\nMetrics:"));
           console.log(`  CPU:  ${snap.metrics.cpu.toFixed(1)}%`);
           console.log(`  MEM:  ${snap.metrics.memUsedGb.toFixed(1)}/${snap.metrics.memTotalGb.toFixed(1)} GB (${snap.metrics.memPct.toFixed(1)}%)`);
@@ -1138,6 +1229,8 @@ computeCmd.command("status")
           console.log(chalk.dim(`(metrics unavailable: ${e.message})`));
         }
       }
+    } catch (e: any) {
+      console.log(chalk.red(`Compute '${name}' not found`));
     }
   });
 
@@ -1146,8 +1239,9 @@ computeCmd.command("sync")
   .argument("<name>", "Compute name")
   .option("--direction <dir>", "Sync direction (push|pull)", "push")
   .action(async (name, opts) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+    const ark = await getArkClient();
+    let compute: any;
+    try { compute = await ark.computeRead(name); } catch { console.log(chalk.red(`Compute '${name}' not found`)); return; }
     const provider = getProvider(compute.provider);
     if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
     try {
@@ -1163,12 +1257,10 @@ computeCmd.command("metrics")
   .description("Show compute metrics")
   .argument("<name>", "Compute name")
   .action(async (name) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
-    const provider = getProvider(compute.provider);
-    if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
+    const ark = await getArkClient();
     try {
-      const snap = await provider.getMetrics(compute);
+      const snap = await ark.metricsSnapshot(name);
+      if (!snap) { console.log(chalk.red(`No metrics for '${name}'`)); return; }
       console.log(chalk.bold(`\nCompute: ${name}`));
       console.log(`  CPU:       ${snap.metrics.cpu.toFixed(1)}%`);
       console.log(`  MEM:       ${snap.metrics.memUsedGb.toFixed(1)}/${snap.metrics.memTotalGb.toFixed(1)} GB (${snap.metrics.memPct.toFixed(1)}%)`);
@@ -1185,9 +1277,9 @@ computeCmd.command("metrics")
 computeCmd.command("default")
   .description("Set default compute")
   .argument("<name>", "Compute name")
-  .action((name) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+  .action(async (name) => {
+    const ark = await getArkClient();
+    try { await ark.computeRead(name); } catch { console.log(chalk.red(`Compute '${name}' not found`)); return; }
     const envPath = join(homedir(), ".ark", ".env");
     mkdirSync(dirname(envPath), { recursive: true });
     // Read existing, update or append
@@ -1206,9 +1298,10 @@ computeCmd.command("default")
 computeCmd.command("ssh")
   .description("SSH into a compute")
   .argument("<name>", "Compute name")
-  .action((name) => {
-    const compute = core.getCompute(name);
-    if (!compute) { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+  .action(async (name) => {
+    const ark = await getArkClient();
+    let compute: any;
+    try { compute = await ark.computeRead(name); } catch { console.log(chalk.red(`Compute '${name}' not found`)); return; }
     const ip = (compute.config as any).ip;
     const keyPath = (compute.config as any).key_path;
     const user = (compute.config as any).ssh_user ?? "ubuntu";
@@ -1234,18 +1327,16 @@ worktree.command("finish")
   .option("--no-merge", "Skip merge, just remove worktree and delete session")
   .option("--keep-branch", "Don't delete the branch after merge")
   .action(async (sessionId: string, opts: any) => {
-    const result = await core.finishWorktree(sessionId, {
-      into: opts.into,
-      noMerge: opts.noMerge,
-      keepBranch: opts.keepBranch,
-    });
+    const ark = await getArkClient();
+    const result = await ark.worktreeFinish(sessionId, { noMerge: opts.noMerge });
     console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
   });
 
 worktree.command("list")
   .description("List sessions with active worktrees")
-  .action(() => {
-    const sessions = core.listSessions({ limit: 500 });
+  .action(async () => {
+    const ark = await getArkClient();
+    const sessions = await ark.sessionList({ limit: 500 });
     const withWorktrees = sessions.filter(s => {
       const wtDir = join(core.WORKTREES_DIR(), s.id);
       return existsSync(wtDir);
@@ -1292,10 +1383,8 @@ claudeCmd.command("list")
   .option("-p, --project <filter>", "Filter by project path")
   .option("-l, --limit <n>", "Max results", "20")
   .action(async (opts) => {
-    const sessions = await core.listClaudeSessions({
-      project: opts.project,
-      limit: parseInt(opts.limit),
-    });
+    const ark = await getArkClient();
+    const sessions = await ark.historyList(parseInt(opts.limit));
 
     if (sessions.length === 0) {
       console.log(chalk.yellow("No Claude sessions found."));
@@ -1456,9 +1545,9 @@ program.command("auth")
   .action(async (opts) => {
     const { execFileSync } = await import("child_process");
     if (opts.host) {
-      const core = await import("../core/index.js");
-      const compute = core.getCompute(opts.host);
-      if (!compute) { console.error(`Compute '${opts.host}' not found`); process.exit(1); }
+      const ark = await getArkClient();
+      let compute: any;
+      try { compute = await ark.computeRead(opts.host); } catch { console.error(`Compute '${opts.host}' not found`); process.exit(1); }
       const cfg = compute.config as any;
       if (!cfg.ip) { console.error(`No IP for '${opts.host}'`); process.exit(1); }
       const key = `${process.env.HOME}/.ssh/ark-${compute.name}`;
@@ -1525,23 +1614,19 @@ program.command("search")
   .option("--index", "Rebuild transcript search index before searching")
   .option("--hybrid", "Use hybrid search (memory + knowledge + transcripts with LLM re-ranking)")
   .action(async (query, opts) => {
+    const ark = await getArkClient();
     if (opts.index) {
       console.log(chalk.dim("Indexing transcripts..."));
-      const count = await core.indexTranscripts({
-        onProgress: (indexed, files) => {
-          process.stdout.write(`\r  ${chalk.dim(`${files} files, ${indexed} entries...`)}`);
-        },
-      });
-      process.stdout.write("\r" + " ".repeat(60) + "\r");
-      const stats = core.getIndexStats();
-      console.log(chalk.green(`Indexed ${count} entries from ${stats.sessions} sessions\n`));
+      await ark.historyIndex();
+      const { stats } = await ark.indexStats();
+      console.log(chalk.green(`Indexed entries from ${stats?.sessions ?? 0} sessions\n`));
     }
 
     const limit = parseInt(opts.limit);
-    const results = core.searchSessions(query, { limit });
+    const results = await ark.sessionSearch(query);
 
     if (opts.transcripts) {
-      const transcriptResults = core.searchTranscripts(query, { limit });
+      const transcriptResults = await ark.historySearch(query, limit);
       results.push(...transcriptResults);
     }
 
@@ -1582,15 +1667,11 @@ program.command("search")
 program.command("index")
   .description("Build or rebuild the transcript search index")
   .action(async () => {
+    const ark = await getArkClient();
     console.log(chalk.dim("Indexing transcripts..."));
-    const count = await core.indexTranscripts({
-      onProgress: (indexed, files) => {
-        process.stdout.write(`\r  ${chalk.dim(`${files} files, ${indexed} entries...`)}`);
-      },
-    });
-    process.stdout.write("\r" + " ".repeat(60) + "\r");
-    const stats = core.getIndexStats();
-    console.log(chalk.green(`Indexed ${count} entries from ${stats.sessions} sessions`));
+    const result = await ark.historyIndex();
+    const { stats } = await ark.indexStats();
+    console.log(chalk.green(`Indexed ${result.count ?? 0} entries from ${stats?.sessions ?? 0} sessions`));
   });
 
 // ── Costs ──────────────────────────────────────────────────────────────────
@@ -1598,9 +1679,9 @@ program.command("index")
 program.command("costs")
   .description("Show cost summary across sessions")
   .option("-n, --limit <n>", "Number of sessions to show", "20")
-  .action((opts) => {
-    const sessions = core.listSessions({ limit: 500, groupPrefix: core.profileGroupPrefix() || undefined });
-    const { sessions: costs, total } = core.getAllSessionCosts(sessions);
+  .action(async (opts) => {
+    const ark = await getArkClient();
+    const { costs, total } = await ark.costsRead();
 
     if (costs.length === 0) {
       console.log(chalk.dim("No cost data yet. Costs are tracked when sessions complete."));
@@ -1636,8 +1717,9 @@ program.command("costs-export")
   .description("Export cost data")
   .option("--format <format>", "csv or json", "json")
   .option("-o, --output <file>", "Output file")
-  .action((opts) => {
-    const sessions = core.listSessions({ limit: 500 });
+  .action(async (opts) => {
+    const ark = await getArkClient();
+    const sessions = await ark.sessionList({ limit: 500 });
     const data = opts.format === "csv" ? core.exportCostsCsv(sessions) : JSON.stringify(core.getAllSessionCosts(sessions), null, 2);
     if (opts.output) {
       writeFileSync(opts.output, data);
@@ -1659,8 +1741,9 @@ schedule.command("add")
   .option("-s, --summary <text>", "Session summary")
   .option("-c, --compute <name>", "Compute name")
   .option("-g, --group <name>", "Group name")
-  .action((opts) => {
-    const sched = core.createSchedule({
+  .action(async (opts) => {
+    const ark = await getArkClient();
+    const sched = await ark.scheduleCreate({
       cron: opts.cron,
       flow: opts.flow,
       repo: opts.repo,
@@ -1677,8 +1760,9 @@ schedule.command("add")
 
 schedule.command("list")
   .description("List all schedules")
-  .action(() => {
-    const schedules = core.listSchedules();
+  .action(async () => {
+    const ark = await getArkClient();
+    const schedules = await ark.scheduleList();
     if (schedules.length === 0) {
       console.log(chalk.yellow("No schedules."));
       return;
@@ -1693,27 +1777,27 @@ schedule.command("list")
 schedule.command("delete")
   .description("Delete a schedule")
   .argument("<id>", "Schedule ID")
-  .action((id) => {
-    if (core.deleteSchedule(id)) {
-      console.log(chalk.green(`Deleted ${id}`));
-    } else {
-      console.log(chalk.red(`Schedule ${id} not found`));
-    }
+  .action(async (id) => {
+    const ark = await getArkClient();
+    const ok = await ark.scheduleDelete(id);
+    console.log(ok ? chalk.green(`Deleted ${id}`) : chalk.red(`Schedule ${id} not found`));
   });
 
 schedule.command("enable")
   .description("Enable a schedule")
   .argument("<id>", "Schedule ID")
-  .action((id) => {
-    core.enableSchedule(id, true);
+  .action(async (id) => {
+    const ark = await getArkClient();
+    await ark.scheduleEnable(id);
     console.log(chalk.green(`Enabled ${id}`));
   });
 
 schedule.command("disable")
   .description("Disable a schedule")
   .argument("<id>", "Schedule ID")
-  .action((id) => {
-    core.enableSchedule(id, false);
+  .action(async (id) => {
+    const ark = await getArkClient();
+    await ark.scheduleDisable(id);
     console.log(chalk.yellow(`Disabled ${id}`));
   });
 
@@ -1762,9 +1846,9 @@ const profile = program.command("profile").description("Manage profiles");
 
 profile.command("list")
   .description("List profiles")
-  .action(() => {
-    const profiles = core.listProfiles();
-    const active = core.getActiveProfile();
+  .action(async () => {
+    const ark = await getArkClient();
+    const { profiles, active } = await ark.profileList();
     for (const p of profiles) {
       const marker = p.name === active ? chalk.green(" (active)") : "";
       console.log(`  ${p.name}${marker}${p.description ? chalk.dim(` — ${p.description}`) : ""}`);
@@ -1775,9 +1859,10 @@ profile.command("create")
   .description("Create a profile")
   .argument("<name>")
   .argument("[description]")
-  .action((name: string, desc: string | undefined) => {
+  .action(async (name: string, desc: string | undefined) => {
+    const ark = await getArkClient();
     try {
-      core.createProfile(name, desc);
+      await ark.profileCreate(name, desc);
       console.log(chalk.green(`Created profile: ${name}`));
     } catch (e: any) { console.log(chalk.red(e.message)); }
   });
@@ -1785,9 +1870,10 @@ profile.command("create")
 profile.command("delete")
   .description("Delete a profile")
   .argument("<name>")
-  .action((name: string) => {
+  .action(async (name: string) => {
+    const ark = await getArkClient();
     try {
-      core.deleteProfile(name);
+      await ark.profileDelete(name);
       console.log(chalk.green(`Deleted profile: ${name}`));
     } catch (e: any) { console.log(chalk.red(e.message)); }
   });
@@ -1821,8 +1907,9 @@ program.command("try")
   .argument("<task>")
   .option("--image <image>", "Docker image", "ubuntu:22.04")
   .action(async (task, opts) => {
+    const ark = await getArkClient();
     const workdir = process.cwd();
-    const session = core.startSession({
+    const session = await ark.sessionStart({
       summary: `[try] ${task}`,
       repo: workdir,
       workdir,
@@ -1837,13 +1924,13 @@ program.command("try")
 
     // Dispatch
     try {
-      await core.dispatch(session.id);
+      await ark.sessionDispatch(session.id);
     } catch (e: any) {
       console.log(chalk.red(`Dispatch failed: ${e.message}`));
     }
 
     // Re-fetch session (dispatch updates session_id in DB)
-    const updated = core.getSession(session.id);
+    const { session: updated } = await ark.sessionRead(session.id);
     if (updated?.session_id) {
       try {
         const cmd = core.attachCommand(updated.session_id);
@@ -1852,7 +1939,7 @@ program.command("try")
     }
 
     // Auto-cleanup
-    await core.deleteSessionAsync(session.id);
+    await ark.sessionDelete(session.id);
     console.log(chalk.dim("Try session cleaned up."));
   });
 
@@ -2027,4 +2114,5 @@ core.checkForUpdate().then(latest => {
   if (latest) console.error(chalk.yellow(`Update available: v${latest}`));
 }).catch(() => {});
 
+closeArkClient();
 await app.shutdown();

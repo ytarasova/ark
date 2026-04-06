@@ -3,7 +3,8 @@ import {
   type JsonRpcRequest, type JsonRpcResponse, type JsonRpcError,
 } from "../protocol/types.js";
 
-export type Handler = (params: Record<string, unknown>) => Promise<unknown>;
+export type NotifyFn = (method: string, params?: Record<string, unknown>) => void;
+export type Handler = (params: Record<string, unknown>, notify: NotifyFn) => Promise<unknown>;
 
 export class Router {
   private handlers = new Map<string, Handler>();
@@ -22,7 +23,7 @@ export class Router {
     this.initialized = true;
   }
 
-  async dispatch(req: JsonRpcRequest): Promise<JsonRpcResponse | JsonRpcError> {
+  async dispatch(req: JsonRpcRequest, notify?: NotifyFn): Promise<JsonRpcResponse | JsonRpcError> {
     if (this.requireInit && !this.initialized && req.method !== "initialize") {
       return createErrorResponse(req.id, ErrorCodes.NOT_INITIALIZED, "Not initialized — call initialize first");
     }
@@ -33,7 +34,8 @@ export class Router {
     }
 
     try {
-      const result = await handler(req.params ?? {});
+      const noop: NotifyFn = () => {};
+      const result = await handler(req.params ?? {}, notify ?? noop);
       return createResponse(req.id, result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

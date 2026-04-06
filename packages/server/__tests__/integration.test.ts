@@ -88,6 +88,38 @@ describe("end-to-end: server + client", () => {
     client.close();
   });
 
+  it("session mutations emit notifications to subscribed clients", async () => {
+    const { client } = createInMemoryPair();
+    await client.initialize({ subscribe: ["session/*"] });
+
+    const received: any[] = [];
+    client.on("session/created", (data) => received.push({ type: "created", data }));
+    client.on("session/updated", (data) => received.push({ type: "updated", data }));
+    client.on("session/deleted", (data) => received.push({ type: "deleted", data }));
+
+    // Create -> should emit session/created
+    const session = await client.sessionStart({ summary: "notify-test", repo: ".", flow: "bare" });
+    await Bun.sleep(50);
+    expect(received.some(r => r.type === "created")).toBe(true);
+    expect(received.find(r => r.type === "created").data.session.id).toBe(session.id);
+
+    // Update -> should emit session/updated
+    received.length = 0;
+    await client.sessionUpdate(session.id, { summary: "updated" });
+    await Bun.sleep(50);
+    expect(received.some(r => r.type === "updated")).toBe(true);
+    expect(received.find(r => r.type === "updated").data.session.summary).toBe("updated");
+
+    // Delete -> should emit session/deleted
+    received.length = 0;
+    await client.sessionDelete(session.id);
+    await Bun.sleep(50);
+    expect(received.some(r => r.type === "deleted")).toBe(true);
+    expect(received.find(r => r.type === "deleted").data.sessionId).toBe(session.id);
+
+    client.close();
+  });
+
   it("resource queries work", async () => {
     const { client } = createInMemoryPair();
     await client.initialize();
