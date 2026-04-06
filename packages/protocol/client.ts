@@ -9,6 +9,7 @@ import type { Transport } from "./transport.js";
 import {
   createRequest, createNotification,
   isResponse, isError, isNotification,
+  ARK_VERSION,
   type RequestId, type JsonRpcMessage,
 } from "./types.js";
 
@@ -76,7 +77,7 @@ export class ArkClient {
 
   async initialize(opts?: { subscribe?: string[] }): Promise<{ server: { name: string; version: string } }> {
     const result = await this.rpc("initialize", {
-      client: { name: "ark-client", version: "0.8.0" },
+      client: { name: "ark-client", version: ARK_VERSION },
       subscribe: opts?.subscribe ?? ["**"],
     });
     this.transport.send(createNotification("initialized"));
