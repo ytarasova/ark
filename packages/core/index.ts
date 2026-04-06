@@ -240,7 +240,7 @@ export { generateRepoMap, extractExports, formatRepoMap, type RepoMap, type Repo
 // Hybrid search
 export { hybridSearch, mergeAndDeduplicate, type HybridSearchResult, type HybridSearchOpts } from "./hybrid-search.js";
 
-// Types (from packages/types)
+// Types from packages/types — stricter domain types (aliased to avoid collision with store types)
 export type { Session as SessionDomain, SessionStatus, SessionConfig, CreateSessionOpts, SessionListFilters } from "../types/index.js";
 export type { Compute as ComputeDomain, ComputeStatus, ComputeProviderName, ComputeConfig, CreateComputeOpts } from "../types/index.js";
 export type { Event as EventDomain } from "../types/index.js";

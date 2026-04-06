@@ -3,7 +3,7 @@
  * Uses a heartbeat table to detect and coordinate concurrent instances.
  */
 
-import { getDb } from "./context.js";
+import { getDb } from "./store.js";
 
 const HEARTBEAT_INTERVAL_MS = 2000;
 const STALE_THRESHOLD_MS = 10000;

@@ -17,7 +17,7 @@ import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
 import { initSchema as initStoreSchema, setAppStore, clearAppStore, safeParseConfig, purgeExpiredDeletes } from "./store.js";
-import type { Compute, Session } from "./store.js";
+import type { Compute, Session } from "../types/index.js";
 import { setProviderResolver, clearProviderResolver } from "./session.js";
 import { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
 import { startNotifyDaemon } from "./notify-daemon.js";
@@ -154,7 +154,7 @@ export class AppContext {
     const row = this._db?.prepare("SELECT * FROM compute WHERE name = ?").get(computeName) as
       { name: string; provider: string; status: string; config: string; created_at: string; updated_at: string } | undefined;
     if (!row) return { provider: null, compute: null };
-    const compute: Compute = { ...row, config: safeParseConfig(row.config) };
+    const compute = { ...row, config: safeParseConfig(row.config) } as unknown as Compute;
     const provider = this.getProvider(compute.provider);
     return { provider: provider ?? null, compute };
   }
@@ -221,7 +221,7 @@ export class AppContext {
     });
 
     // 5. Wire provider resolver for session.ts
-    setProviderResolver((session) => this.resolveProvider(session));
+    setProviderResolver((session: any) => this.resolveProvider(session));
 
     // 5b. Register executors
     registerExecutor(claudeCodeExecutor);
@@ -390,8 +390,7 @@ export class AppContext {
   private _startMetricsPoller(): { stop(): void } {
     const handle = setInterval(async () => {
       await safeAsync("metrics: poll computes", async () => {
-        const store = await import("./store.js");
-        const computes = store.listCompute({ status: "running" });
+        const computes = this._computes?.list({ status: "running" }) ?? [];
         for (const c of computes) {
           await safeAsync(`metrics: poll compute "${c.name}"`, async () => {
             const compute = await import("../compute/index.js") as any;

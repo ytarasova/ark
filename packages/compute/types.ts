@@ -2,7 +2,7 @@
  * Compute layer types - provider interface and shared models.
  */
 
-import type { Compute, Session } from "../core/store.js";
+import type { Compute, Session } from "../types/index.js";
 
 // Re-export for convenience
 export type { Compute, Session };

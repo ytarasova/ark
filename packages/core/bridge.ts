@@ -3,7 +3,15 @@
  * Supports Telegram and Slack for remote monitoring and control.
  */
 
-import { listSessions, type Session } from "./store.js";
+import type { Session } from "../types/index.js";
+import { getApp } from "./app.js";
+import { listSessions as storeListSessions } from "./store.js";
+
+/** Safe session list — uses AppContext if available, falls back to store. */
+function safeListSessions(opts?: { limit?: number }): any[] {
+  try { return safeListSessions(opts); }
+  catch { return storeListSessions(opts); }
+}
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -155,7 +163,7 @@ export class Bridge {
 
   /** Send a summary of all session statuses. */
   async notifyStatusSummary(): Promise<void> {
-    const sessions = listSessions({ limit: 100 });
+    const sessions = safeListSessions({ limit: 100 });
     const counts: Record<string, number> = {};
     for (const s of sessions) {
       counts[s.status] = (counts[s.status] ?? 0) + 1;

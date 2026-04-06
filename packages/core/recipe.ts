@@ -9,7 +9,7 @@ import { readdirSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, exists
 import { join, basename } from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { ARK_DIR } from "./store.js";
-import type { Session } from "./store.js";
+import type { Session } from "../types/index.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

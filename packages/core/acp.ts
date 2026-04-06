@@ -4,7 +4,8 @@
  */
 
 import { startSession, dispatch, stop, resume, deleteSessionAsync, getOutput, send } from "./session.js";
-import { getSession, listSessions } from "./store.js";
+import { getApp } from "./app.js";
+import { getSession as storeGetSession, listSessions as storeListSessions } from "./store.js";
 
 export interface AcpRequest {
   jsonrpc: "2.0";
@@ -62,12 +63,16 @@ export async function handleAcpRequest(req: AcpRequest): Promise<AcpResponse> {
 
       case "session/get": {
         const sessionId = req.params?.sessionId as string;
-        const session = getSession(sessionId);
+        let session;
+        try { session = getApp().sessions.get(sessionId); }
+        catch { session = storeGetSession(sessionId); }
         return { jsonrpc: "2.0", result: session, id };
       }
 
       case "session/list": {
-        const sessions = listSessions({ limit: req.params?.limit as number ?? 100 });
+        let sessions;
+        try { sessions = getApp().sessions.list({ limit: req.params?.limit as number ?? 100 }); }
+        catch { sessions = storeListSessions({ limit: req.params?.limit as number ?? 100 }); }
         return { jsonrpc: "2.0", result: sessions, id };
       }
 

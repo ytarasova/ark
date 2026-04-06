@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getProvider } from "../../compute/index.js";
-import { updateCompute, mergeComputeConfig } from "../../core/store.js";
-import type { Compute } from "../../core/index.js";
+import { getApp } from "../../core/app.js";
+import type { Compute } from "../../types/index.js";
 import type { ComputeSnapshot } from "../../compute/types.js";
 
 export function useComputeMetrics(computes: Compute[], active: boolean, pollMs = 10000) {
@@ -47,9 +47,9 @@ export function useComputeMetrics(computes: Compute[], active: boolean, pollMs =
             try {
               const realStatus = await provider.checkStatus(h);
               if (realStatus && realStatus !== h.status) {
-                updateCompute(h.name, { status: realStatus });
+                getApp().computes.update(h.name, { status: realStatus } as any);
                 if (realStatus === "destroyed") {
-                  mergeComputeConfig(h.name, { ip: null });
+                  getApp().computes.mergeConfig(h.name, { ip: null });
                   addLog(h.name, "Instance no longer exists — marked as destroyed");
                 } else {
                   addLog(h.name, `Status changed: ${h.status} → ${realStatus}`);

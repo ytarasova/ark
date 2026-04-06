@@ -3,9 +3,9 @@
  */
 
 import { readFileSync, writeFileSync } from "fs";
-// Uses store.createSession directly (not session.startSession) because imported sessions
-// are bare data — no flow initialization, repo config, or dispatch. The user can dispatch after import.
-import { getSession, createSession, updateSession, getEvents, type Session, type Event } from "./store.js";
+import type { Session, Event } from "../types/index.js";
+import { getApp } from "./app.js";
+import { getSession as storeGetSession, getEvents as storeGetEvents, createSession as storeCreateSession, updateSession as storeUpdateSession } from "./store.js";
 
 export interface SessionExport {
   version: 1;
@@ -16,10 +16,10 @@ export interface SessionExport {
 
 /** Export a session to a JSON file. */
 export function exportSession(sessionId: string): SessionExport | null {
-  const session = getSession(sessionId);
+  let session, events;
+  try { session = getApp().sessions.get(sessionId); events = getApp().events.list(sessionId); }
+  catch { session = storeGetSession(sessionId); events = storeGetEvents(sessionId) as Event[]; }
   if (!session) return null;
-
-  const events = getEvents(sessionId);
 
   return {
     version: 1,
@@ -54,17 +54,21 @@ export function importSessionFromFile(filePath: string): { ok: boolean; sessionI
 
     if (data.version !== 1) return { ok: false, message: "Unsupported export version" };
 
-    const session = createSession({
+    let session;
+    const createOpts = {
       ticket: data.session.ticket,
       summary: data.session.summary ? `[imported] ${data.session.summary}` : "[imported session]",
       repo: data.session.repo,
       flow: data.session.flow,
       config: data.session.config,
       group_name: data.session.group_name,
-    });
+    };
+    try { session = getApp().sessions.create(createOpts); }
+    catch { session = storeCreateSession(createOpts); }
 
     if (data.session.agent) {
-      updateSession(session.id, { agent: data.session.agent });
+      try { getApp().sessions.update(session.id, { agent: data.session.agent }); }
+      catch { storeUpdateSession(session.id, { agent: data.session.agent }); }
     }
 
     return { ok: true, sessionId: session.id, message: `Imported as ${session.id}` };

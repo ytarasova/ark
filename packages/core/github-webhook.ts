@@ -3,9 +3,9 @@
  * When an issue gets a specific label, auto-create and dispatch a session.
  */
 
-import { createSession } from "./store.js";
+import { getApp } from "./app.js";
+import { createSession as storeCreateSession, logEvent as storeLogEvent } from "./store.js";
 import { dispatch } from "./session.js";
-import { logEvent } from "./store.js";
 
 export interface IssueWebhookPayload {
   action: string;  // "labeled", "opened", "edited"
@@ -50,7 +50,7 @@ export async function handleIssueWebhook(
   const repo = payload.repository;
 
   // Create session from issue
-  const session = createSession({
+  const createOpts = {
     ticket: `#${issue.number}`,
     summary: issue.title,
     repo: repo.clone_url,
@@ -61,12 +61,14 @@ export async function handleIssueWebhook(
       github_issue_body: issue.body,
       github_repo: repo.full_name,
     },
-  });
+  };
+  let session;
+  try { session = getApp().sessions.create(createOpts); }
+  catch { session = storeCreateSession(createOpts); }
 
-  logEvent(session.id, "issue_webhook_triggered", {
-    actor: "github",
-    data: { issue_number: issue.number, label: config.triggerLabel, repo: repo.full_name },
-  });
+  const evOpts = { actor: "github", data: { issue_number: issue.number, label: config.triggerLabel, repo: repo.full_name } };
+  try { getApp().events.log(session.id, "issue_webhook_triggered", evOpts); }
+  catch { storeLogEvent(session.id, "issue_webhook_triggered", evOpts); }
 
   // Auto-dispatch if configured
   if (config.autoDispatch) {
