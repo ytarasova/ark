@@ -7,24 +7,18 @@ import { useState, useEffect } from "react";
 import { useArkClient } from "./useArkClient.js";
 import type { ArkClient } from "../../protocol/client.js";
 import { formatEvent } from "../helpers/formatEvent.js";
+import { eventLogColor, type InkColor } from "../helpers/colors.js";
 
 export interface EventLogEntry {
   time: string;
   source: string;
   type: string;
   message: string;
-  color: string;
+  color: InkColor;
 }
 
 function hms(iso: string): string {
   try { return new Date(iso).toISOString().slice(11, 19); } catch { return ""; }
-}
-
-function colorForType(type: string): string {
-  if (type.includes("error") || type.includes("exit") || type.includes("fail")) return "red";
-  if (type.includes("complete")) return "green";
-  if (type.includes("start")) return "cyan";
-  return "gray";
 }
 
 async function fetchEvents(ark: ArkClient, expanded: boolean): Promise<EventLogEntry[]> {
@@ -42,7 +36,7 @@ async function fetchEvents(ark: ArkClient, expanded: boolean): Promise<EventLogE
             source,
             type: ev.type,
             message: formatEvent(ev.type, ev.data ?? undefined),
-            color: colorForType(ev.type),
+            color: eventLogColor(ev.type),
           });
         }
       } catch {}

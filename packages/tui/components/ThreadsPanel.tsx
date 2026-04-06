@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Session } from "../../core/index.js";
+import { roleColor } from "../helpers/colors.js";
 import { TextInputEnhanced } from "./TextInputEnhanced.js";
 import { ScrollBox } from "./ScrollBox.js";
 import { useMessages } from "../hooks/useMessages.js";
@@ -165,15 +166,14 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
         >
           {allMessages.map((m) => {
             const isUser = m.role === "user";
-            const isSystem = m.role === "system";
-            const roleColor = isUser ? "cyan" : isSystem ? "gray" : "green";
+            const msgColor = roleColor(m.role);
             const sender = isUser ? "you" : m.sessionName;
             const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
             const prefix = isUser && m.session_id ? ` \u2192${(sessions.find(s => s.id === m.session_id)?.summary ?? m.session_id).slice(0, 15)}` : "";
             return (
               <Text key={m.id} wrap="wrap">
                 <Text dimColor>{`${m.time} `}</Text>
-                <Text color={roleColor as any} bold>{sender}</Text>
+                <Text color={msgColor} bold>{sender}</Text>
                 {prefix && <Text dimColor>{` ${prefix}`}</Text>}
                 {typeTag && <Text dimColor>{typeTag}</Text>}
                 <Text>{` ${m.content}`}</Text>

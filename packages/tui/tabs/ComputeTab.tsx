@@ -5,6 +5,7 @@ import { join } from "path";
 import { homedir } from "os";
 import type { Session, Compute } from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
+import { getComputeStatusColor } from "../helpers/colors.js";
 import type { ComputeSnapshot } from "../../compute/types.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
@@ -124,7 +125,7 @@ export function ComputeTab({ computes, sessions, refresh, pane, snapshots, compu
               return `${icon} ${h.name.padEnd(16)} ${h.provider}`;
             }}
             renderColoredRow={(h) => {
-              const iconColor = (h.status === "running" ? "green" : h.status === "provisioning" ? "yellow" : h.status === "destroyed" ? "red" : "gray") as any;
+              const iconColor = getComputeStatusColor(h.status);
               const icon = h.status === "destroyed" ? "\u2715" /* ✕ cross */ : h.status === "running" ? "\u25CF" /* ● circle */ : "\u25CB";
               return <Text>{" "} <Text color={iconColor}>{icon}</Text>{` ${h.name.padEnd(16)} ${h.provider}`}</Text>;
             }}
@@ -186,12 +187,7 @@ function ComputeDetail({ compute: h, snapshot, computeLogs, sessions, pane }: Co
   }
 
   const cfg = h.config as Record<string, unknown>;
-  const statusColor = (
-    h.status === "running" ? "green"
-    : h.status === "provisioning" ? "yellow"
-    : h.status === "destroyed" ? "red"
-    : "gray"
-  ) as any;
+  const statusColor = getComputeStatusColor(h.status);
 
   const cloudInitDone = cfg.cloud_init_done === true;
 

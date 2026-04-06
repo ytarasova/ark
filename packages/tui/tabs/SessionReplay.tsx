@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { buildReplay } from "../../core/index.js";
 import type { Session, ReplayStep } from "../../core/index.js";
-import { getTheme } from "../../core/theme.js";
+import { eventTypeColor } from "../helpers/colors.js";
 import { ScrollBox } from "../components/ScrollBox.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
@@ -126,7 +126,7 @@ export function SessionReplay({ session, onClose }: SessionReplayProps) {
                 {" "}
                 <Text dimColor>[{step.elapsed}]</Text>
                 {" "}
-                <Text color={typeColor as any}>{step.type}</Text>
+                <Text color={typeColor}>{step.type}</Text>
                 {" - "}
                 <Text color={isSel ? "white" : undefined} dimColor={!isSel}>{step.summary}</Text>
               </Text>
@@ -156,14 +156,3 @@ export function SessionReplay({ session, onClose }: SessionReplayProps) {
   );
 }
 
-/** Color coding for event types */
-function eventTypeColor(type: string): string {
-  const theme = getTheme();
-  if (type.includes("error") || type.includes("failed") || type.includes("crashed")) return theme.error;
-  if (type.includes("completed") || type.includes("done") || type.includes("joined")) return theme.running;
-  if (type.includes("started") || type.includes("resumed") || type.includes("dispatch")) return theme.accent;
-  if (type.includes("ready") || type.includes("waiting") || type.includes("paused")) return theme.waiting;
-  if (type.includes("progress")) return theme.accent;
-  if (type.includes("stopped")) return theme.dimText;
-  return theme.text;
-}

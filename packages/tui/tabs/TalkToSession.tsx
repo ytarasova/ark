@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Session } from "../../core/index.js";
+import { roleColor } from "../helpers/colors.js";
 import { ScrollBox } from "../components/ScrollBox.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useMessages } from "../hooks/useMessages.js";
@@ -47,12 +48,12 @@ export function TalkToSession({ session, asyncState, onDone }: TalkToSessionProp
   });
 
   const messageElements = messages.map((m) => {
-    const roleColor = m.role === "user" ? "cyan" : m.role === "agent" ? "green" : "gray";
+    const color = roleColor(m.role);
     const typeTag = m.type !== "text" ? ` [${m.type}]` : "";
     return (
       <Text key={m.id} wrap="wrap">
         <Text dimColor>{`  ${m.time} `}</Text>
-        <Text color={roleColor as any} bold>{m.role === "user" ? "you" : (session?.agent || "agent")}</Text>
+        <Text color={color} bold>{m.role === "user" ? "you" : (session?.agent || "agent")}</Text>
         {typeTag && <Text dimColor>{typeTag}</Text>}
         <Text>{` ${m.content}`}</Text>
       </Text>

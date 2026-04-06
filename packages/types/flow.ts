@@ -21,4 +21,5 @@ export interface FlowDefinition {
   name: string;
   description?: string;
   stages: StageDefinition[];
+  source?: "builtin" | "user";
 }
