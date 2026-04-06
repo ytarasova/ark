@@ -19,6 +19,8 @@ import {
   type StoreContext, type TestContext,
 } from "./context.js";
 
+import type { SessionStatus, ComputeStatus, ComputeProviderName, MessageRole, MessageType } from "../types/index.js";
+
 // ── Paths ───────────────────────────────────────────────────────────────────
 // Functions (not constants) so they respect ARK_TEST_DIR and setContext()
 // at call time rather than freezing at import time.
@@ -68,7 +70,7 @@ export interface Session {
   session_id: string | null; // tmux session name
   claude_session_id: string | null; // Claude UUID for --resume
   stage: string | null;
-  status: string;
+  status: SessionStatus;
   flow: string;           // DB column: pipeline — flow definition name
   agent: string | null;
   workdir: string | null;
@@ -97,8 +99,8 @@ export interface Event {
 
 export interface Compute {
   name: string;              // unique identifier
-  provider: string;          // "local" | "docker" | "ec2"
-  status: string;            // "stopped" | "running" | "provisioning" | "destroyed"
+  provider: ComputeProviderName;
+  status: ComputeStatus;
   config: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -177,12 +179,18 @@ export function rowToSession(row: SessionRow): Session {
     ticket: row.jira_key,
     summary: row.jira_summary,
     flow: row.pipeline,
+    status: row.status as SessionStatus,
     config: safeParseConfig(row.config),
   };
 }
 
 function rowToCompute(row: ComputeRow): Compute {
-  return { ...row, config: safeParseConfig(row.config) };
+  return {
+    ...row,
+    provider: row.provider as ComputeProviderName,
+    status: row.status as ComputeStatus,
+    config: safeParseConfig(row.config),
+  };
 }
 
 function rowToEvent(row: EventRow): Event {
@@ -190,7 +198,12 @@ function rowToEvent(row: EventRow): Event {
 }
 
 function rowToMessage(row: MessageRow): Message {
-  return { ...row, read: !!row.read };
+  return {
+    ...row,
+    role: row.role as MessageRole,
+    type: row.type as MessageType,
+    read: !!row.read,
+  };
 }
 
 // ── Database ────────────────────────────────────────────────────────────────
@@ -479,7 +492,7 @@ export function softDeleteSession(id: string): boolean {
 export function undeleteSession(id: string): Session | null {
   const session = getSession(id);
   if (!session || session.status !== "deleting") return null;
-  const prevStatus = (session.config._pre_delete_status as string) || "pending";
+  const prevStatus = (session.config._pre_delete_status as SessionStatus) || "pending";
   const { _pre_delete_status, _deleted_at, ...cleanConfig } = session.config;
   updateSession(id, { status: prevStatus, config: cleanConfig });
   return getSession(id);
@@ -749,9 +762,9 @@ export function isChannelPortAvailable(port: number, excludeSessionId?: string):
 export interface Message {
   id: number;
   session_id: string;
-  role: string;    // "user" | "agent" | "system"
+  role: MessageRole;
   content: string;
-  type: string;    // "text" | "progress" | "question" | "completed" | "error"
+  type: MessageType;
   read: boolean;
   created_at: string;
 }
