@@ -107,7 +107,7 @@ export const subprocessExecutor: Executor = {
   async send(handle: string, message: string): Promise<void> {
     const tracked = processes.get(handle);
     if (!tracked || tracked.exited) return;
-    const writer = tracked.proc.stdin?.getWriter();
+    const writer = (tracked.proc.stdin as any)?.getWriter();
     if (writer) {
       await writer.write(new TextEncoder().encode(message + "\n"));
       writer.releaseLock();

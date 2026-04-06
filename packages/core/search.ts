@@ -96,16 +96,17 @@ export function ftsTableExists(): boolean {
 export function searchTranscripts(query: string, opts?: SearchOpts): SearchResult[] {
   const limit = opts?.limit ?? 50;
 
-  // Try FTS5 index first
-  if (ftsTableExists()) {
-    const db = getDb();
-    const count = (db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as any)?.c ?? 0;
-    if (count > 0) {
-      return searchTranscriptsFTS(query, limit);
-    }
+  // When a custom transcriptsDir is provided, always use file scanning (used by tests)
+  if (opts?.transcriptsDir) {
+    return searchTranscriptsFiles(query, opts);
   }
 
-  // Fallback to file scanning
+  // Use FTS5 index when the table exists (even if empty — empty means no transcripts indexed yet)
+  if (ftsTableExists()) {
+    return searchTranscriptsFTS(query, limit);
+  }
+
+  // Fallback to file scanning only when FTS table hasn't been created yet
   return searchTranscriptsFiles(query, opts);
 }
 

@@ -253,7 +253,7 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
     onLog: log,
     prevClaudeSessionId: session.claude_session_id,
     sessionName: session.summary ?? session.id,
-    compute: session.compute_name ? store.getCompute(session.compute_name) ?? undefined : undefined,
+    compute: session.compute_name ? (store.getCompute(session.compute_name) as any) ?? undefined : undefined,
   });
 
   if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
@@ -351,7 +351,7 @@ export async function advance(sessionId: string, force = false): Promise<{ ok: b
       const { getSessionConversation } = await import("./search.js");
       const conv = getSessionConversation(sessionId);
       if (conv.length > 0) {
-        const turns = conv.map(c => ({ role: c.source === "message" ? "user" : "assistant", content: c.match }));
+        const turns = conv.map((c: any) => ({ role: c.source === "message" ? "user" : "assistant", content: c.match ?? c.content }));
         extractAndSaveSkills(sessionId, turns);
       }
     } catch { /* skill extraction is best-effort */ }
@@ -1172,14 +1172,14 @@ export async function finishWorktree(sessionId: string, opts?: {
 export async function waitForCompletion(
   sessionId: string,
   opts?: { timeoutMs?: number; pollMs?: number; onStatus?: (status: string) => void },
-): Promise<{ session: store.Session; timedOut: boolean }> {
+): Promise<{ session: store.Session | null; timedOut: boolean }> {
   const timeout = opts?.timeoutMs ?? 0; // 0 = no timeout
   const pollMs = opts?.pollMs ?? 3000;
   const start = Date.now();
 
   while (true) {
     const session = store.getSession(sessionId);
-    if (!session) return { session: null as any, timedOut: false };
+    if (!session) return { session: null, timedOut: false };
 
     const terminal = ["completed", "failed", "stopped"].includes(session.status);
     if (terminal) return { session, timedOut: false };
@@ -1278,11 +1278,14 @@ export function applyHookStatus(
 
   let newStatus = statusMap[hookEvent];
 
-  // Don't override completed/failed status — late hooks can fire after session is done
+  // Don't override terminal status — late hooks can fire after session is done or manually stopped
   if (newStatus && session.status === "completed" && newStatus !== "completed") {
     newStatus = undefined;
   }
   if (newStatus && session.status === "failed" && newStatus === "running") {
+    newStatus = undefined;
+  }
+  if (newStatus && session.status === "stopped" && newStatus !== "stopped") {
     newStatus = undefined;
   }
 

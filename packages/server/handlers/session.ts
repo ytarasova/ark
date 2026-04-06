@@ -130,7 +130,7 @@ export function registerSessionHandlers(router: Router): void {
 
   router.handle("session/events", async (params, _notify) => {
     const { sessionId, limit } = params as { sessionId: string; limit?: number };
-    const events = core.getEvents(sessionId, limit);
+    const events = core.getEvents(sessionId, { limit });
     return { events };
   });
 

@@ -107,14 +107,22 @@ export async function watchMergedPR(opts: {
       if (config.health_url && opts.healthFetcher) {
         const healthy = await opts.healthFetcher();
         if (!healthy) {
+          const failedChecks = [`Health check failed: ${config.health_url}`];
           const payload = createRevertPayload({
             owner: opts.owner, repo: opts.repo, originalPrNumber: opts.prNumber,
             originalPrTitle: opts.prTitle, originalBranch: opts.branch,
             baseBranch: opts.baseBranch,
-            failedChecks: [`Health check failed: ${config.health_url}`],
+            failedChecks,
           });
           await opts.onRevert(payload);
           if (opts.onStop) await opts.onStop(opts.sessionId);
+          store.logEvent(opts.sessionId, "rollback", {
+            actor: "system",
+            data: { prNumber: opts.prNumber, failedChecks, revertBranch: payload.head },
+          });
+          eventBus.emit("rollback", opts.sessionId, {
+            data: { prNumber: opts.prNumber, revertBranch: payload.head },
+          });
           return { action: "rollback", reason: `Health check failed: ${config.health_url}` };
         }
       }
@@ -126,13 +134,21 @@ export async function watchMergedPR(opts: {
 
   // Timeout
   if (config.on_timeout === "rollback") {
+    const failedChecks = ["Timeout: CI did not complete"];
     const payload = createRevertPayload({
       owner: opts.owner, repo: opts.repo, originalPrNumber: opts.prNumber,
       originalPrTitle: opts.prTitle, originalBranch: opts.branch,
-      baseBranch: opts.baseBranch, failedChecks: ["Timeout: CI did not complete"],
+      baseBranch: opts.baseBranch, failedChecks,
     });
     await opts.onRevert(payload);
     if (opts.onStop) await opts.onStop(opts.sessionId);
+    store.logEvent(opts.sessionId, "rollback", {
+      actor: "system",
+      data: { prNumber: opts.prNumber, failedChecks, revertBranch: payload.head },
+    });
+    eventBus.emit("rollback", opts.sessionId, {
+      data: { prNumber: opts.prNumber, revertBranch: payload.head },
+    });
     return { action: "rollback", reason: "Timeout" };
   }
 

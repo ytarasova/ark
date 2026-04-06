@@ -206,7 +206,7 @@ async function handlePRMergeWebhook(req: Request): Promise<Response> {
       `https://api.github.com/repos/${repo.full_name}/commits/${sha}/check-suites`,
       { headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json" } },
     );
-    return res.json();
+    return res.json() as Promise<{ check_suites: import("./rollback.js").CheckSuiteResult[] }>;
   };
 
   const healthFetcher = config.health_url
@@ -404,7 +404,9 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
     if (updated?.status === "ready" && updated.stage) {
       const nextAction = flow.getStageAction(updated.flow, updated.stage);
       if (nextAction.type === "agent" || nextAction.type === "fork") {
-        session.dispatch(sessionId);
+        session.dispatch(sessionId).catch(err => {
+          console.error(`[conductor] auto-dispatch failed for ${sessionId}:`, err?.message ?? err);
+        });
       }
     }
   }

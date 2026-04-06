@@ -201,28 +201,28 @@ async function uploadSessionConfigs(
   if (existsSync(localMcpJson)) {
     const encoded = Buffer.from(readFileSync(localMcpJson, "utf-8")).toString("base64");
     await sshExecAsync(key, ip,
-      `echo '${encoded}' | base64 -d > ${remoteWorkdir}/.mcp.json`,
+      `echo '${encoded}' | base64 -d > '${remoteWorkdir}/.mcp.json'`,
       { timeout: 15_000 });
   }
   const localHooksConfig = join(opts.workdir, ".claude", "settings.local.json");
   if (existsSync(localHooksConfig)) {
     const encoded = Buffer.from(readFileSync(localHooksConfig, "utf-8")).toString("base64");
     await sshExecAsync(key, ip,
-      `mkdir -p ${remoteWorkdir}/.claude && echo '${encoded}' | base64 -d > ${remoteWorkdir}/.claude/settings.local.json`,
+      `mkdir -p '${remoteWorkdir}/.claude' && echo '${encoded}' | base64 -d > '${remoteWorkdir}/.claude/settings.local.json'`,
       { timeout: 15_000 });
   }
 
   // Sync .claude/commands/ if it exists
   const commandsDir = join(opts.workdir, ".claude", "commands");
   if (existsSync(commandsDir)) {
-    await sshExecAsync(key, ip, `mkdir -p ${remoteWorkdir}/.claude/commands`, { timeout: 15_000 });
+    await sshExecAsync(key, ip, `mkdir -p '${remoteWorkdir}/.claude/commands'`, { timeout: 15_000 });
     await rsyncPush(key, ip, commandsDir + "/", `${remoteWorkdir}/.claude/commands/`);
   }
 
   // Sync .claude/skills/ if it exists
   const skillsDir = join(opts.workdir, ".claude", "skills");
   if (existsSync(skillsDir)) {
-    await sshExecAsync(key, ip, `mkdir -p ${remoteWorkdir}/.claude/skills`, { timeout: 15_000 });
+    await sshExecAsync(key, ip, `mkdir -p '${remoteWorkdir}/.claude/skills'`, { timeout: 15_000 });
     await rsyncPush(key, ip, skillsDir + "/", `${remoteWorkdir}/.claude/skills/`);
   }
 
@@ -231,7 +231,7 @@ async function uploadSessionConfigs(
   if (existsSync(claudeMd)) {
     const encoded = Buffer.from(readFileSync(claudeMd, "utf-8")).toString("base64");
     await sshExecAsync(key, ip,
-      `echo '${encoded}' | base64 -d > ${remoteWorkdir}/CLAUDE.md`,
+      `echo '${encoded}' | base64 -d > '${remoteWorkdir}/CLAUDE.md'`,
       { timeout: 15_000 });
   }
 
@@ -511,7 +511,7 @@ export class EC2Provider implements ComputeProvider {
     await setupRemoteLauncher(key, ip, session, remoteWorkdir, opts);
     const remoteDir = `~/.ark/tracks/${session.id}`;
     await sshExecAsync(key, ip,
-      `tmux new-session -d -s ${opts.tmuxName} -c ${remoteWorkdir} 'bash ${remoteDir}/launch.sh'`,
+      `tmux new-session -d -s '${opts.tmuxName}' -c '${remoteWorkdir}' 'bash ${remoteDir}/launch.sh'`,
       { timeout: 15_000 });
 
     // 5. Auto-accept channel prompt

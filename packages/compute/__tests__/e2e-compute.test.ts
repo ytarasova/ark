@@ -357,22 +357,22 @@ describe("E2E Compute: sessionChannelPort", () => {
     const port1 = sessionChannelPort("s-aaa111");
     const port2 = sessionChannelPort("s-bbb222");
     // Different IDs should (almost certainly) produce different ports
-    // There's a small chance of collision in the mod 1000 space, but
+    // There's a small chance of collision in the mod 10000 space, but
     // these specific hex values should differ
     expect(typeof port1).toBe("number");
     expect(typeof port2).toBe("number");
     expect(port1).toBeGreaterThanOrEqual(19200);
     expect(port2).toBeGreaterThanOrEqual(19200);
-    expect(port1).toBeLessThan(20200);
-    expect(port2).toBeLessThan(20200);
+    expect(port1).toBeLessThan(29200);
+    expect(port2).toBeLessThan(29200);
   });
 
-  it("port is within expected range 19200-20199", () => {
+  it("port is within expected range 19200-29199", () => {
     const testIds = ["s-000000", "s-ffffff", "s-123abc", "s-deadbe"];
     for (const id of testIds) {
       const port = sessionChannelPort(id);
       expect(port).toBeGreaterThanOrEqual(19200);
-      expect(port).toBeLessThan(20200);
+      expect(port).toBeLessThan(29200);
     }
   });
 });

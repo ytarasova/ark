@@ -5,7 +5,7 @@
  * port probing, arc.json resolution, and metrics collection.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
@@ -24,6 +24,19 @@ import {
   listProviders,
   resolvePortDecls,
 } from "../index.js";
+
+import { AppContext, setApp, clearApp } from "../../core/app.js";
+
+let app: AppContext;
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 // ── Shared fixtures ──────────────────────────────────────────────────────────
 

@@ -57,7 +57,8 @@ export function registerToolsHandlers(router: Router): void {
   router.handle("mcp/attach", async (p) => {
     const session = core.getSession(p.sessionId as string);
     if (!session) throw new Error("Session not found");
-    core.addMcpServer(session.workdir ?? session.repo, p.server as Record<string, unknown>);
+    const server = p.server as Record<string, unknown>;
+    core.addMcpServer(session.workdir ?? session.repo, server.name as string, server);
     return { ok: true };
   });
 

@@ -12,8 +12,10 @@ export function registerHistoryHandlers(router: Router): void {
       summary: (p.name as string) ?? "import",
       repo: (p.repo as string) ?? ".",
       flow: "bare",
-      claude_session_id: p.claudeSessionId as string,
     });
+    if (p.claudeSessionId) {
+      core.updateSession(session.id, { claude_session_id: p.claudeSessionId as string });
+    }
     return { session };
   });
 

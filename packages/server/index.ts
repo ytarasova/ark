@@ -142,7 +142,7 @@ export class ArkServer {
         },
         message(ws, data) {
           try {
-            const msg = parseMessage(typeof data === "string" ? data : new TextDecoder().decode(data as ArrayBuffer));
+            const msg = parseMessage(typeof data === "string" ? data : new TextDecoder().decode(data as unknown as ArrayBuffer));
             const handlers = (ws as any)._arkHandlers;
             if (handlers) for (const h of handlers) h(msg);
           } catch {}

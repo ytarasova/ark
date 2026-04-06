@@ -57,7 +57,7 @@ export class ArkClient {
     }
   }
 
-  private rpc(method: string, params?: Record<string, unknown>, timeoutMs = 30000): Promise<any> {
+  rpc(method: string, params?: Record<string, unknown>, timeoutMs = 30000): Promise<any> {
     const id = ++this.idCounter;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {

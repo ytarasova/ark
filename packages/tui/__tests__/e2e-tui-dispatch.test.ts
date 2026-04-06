@@ -74,12 +74,11 @@ describe("e2e TUI dispatch and interaction", () => {
       // Wait for stop to propagate to DB
       await tui.waitUntil(() => {
         const updated = core.getSession(s.id);
-        return updated?.status === "failed";
+        return updated?.status === "stopped";
       }, 8000, 500);
 
       const updated = core.getSession(s.id)!;
-      expect(updated.status).toBe("failed");
-      expect(updated.error).toContain("Stopped by user");
+      expect(updated.status).toBe("stopped");
     } finally {
       tui.stop();
     }
@@ -118,11 +117,15 @@ describe("e2e TUI dispatch and interaction", () => {
       await tui.start();
       await tui.waitFor("tui-delete-target");
 
-      tui.press("x");
+      tui.press("x"); // First press starts delete confirmation
+      await new Promise(r => setTimeout(r, 500));
+      tui.press("x"); // Second press confirms delete
       const gone = await tui.waitForGone("tui-delete-target");
       expect(gone).toBe(true);
 
-      expect(core.getSession(s.id)).toBeNull();
+      // Session is soft-deleted (status "deleting") for 90s undo window
+      const updated = core.getSession(s.id);
+      expect(updated?.status).toBe("deleting");
       tui.untrack(s.id);
     } finally {
       tui.stop();

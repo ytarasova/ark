@@ -68,13 +68,13 @@ import { foo } from "./bar";     // breaks at runtime
 
 If you add a Session field, update the `fieldMap` in `packages/core/store.ts` → `updateSession()`.
 
-**Conductor port 19100 is hardcoded** in conductor.ts, channel.ts, and tests. Channel ports are derived deterministically: `19200 + (parseInt(sessionId.replace("s-",""), 16) % 1000)`.
+**Conductor port 19100 is hardcoded** in conductor.ts, channel.ts, and tests. Channel ports are derived deterministically: `19200 + (parseInt(sessionId.replace("s-",""), 16) % 10000)`.
 
 **ArkD port 19300 is the default** for the universal agent daemon. Local providers use `http://localhost:19300`, remote providers use `http://<ip>:19300`. Channel relay goes through arkd - channel.ts reports to arkd, arkd forwards to conductor.
 
 **No ESLint config file.** The `lint` script exists but no `.eslintrc` or `eslint.config.*` - runs with ESLint defaults.
 
-**`package.json` test script is wrong.** It says `"test": "vitest run"` but the project uses `bun:test`. Always run tests with `bun test` or `make test`, never `npm test`.
+**Bun-only testing.** Tests use `bun:test`. Run with `bun test` or `make test`.
 
 ## Testing
 
@@ -132,7 +132,7 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 
 | Path | Purpose |
 |------|---------|
-| `~/.ark/ark.db` | SQLite database (WAL mode, 10s busy timeout) |
+| `~/.ark/ark.db` | SQLite database (WAL mode, 5s busy timeout) |
 | `~/.ark/tracks/<sessionId>/` | Launcher scripts, channel configs |
 | `~/.ark/worktrees/<sessionId>/` | Git worktrees for isolated sessions |
 | `~/.ark/skills/` | Global skill definitions |

@@ -115,14 +115,14 @@ async function pollChannelPrompt(
 ): Promise<"done" | "retry"> {
   try {
     const { stdout } = await sshExecAsync(key, ip,
-      `tmux capture-pane -t ${tmuxName} -p 2>/dev/null | tail -30`,
+      `tmux capture-pane -t '${tmuxName}' -p 2>/dev/null | tail -30`,
       { timeout: 10_000 });
 
     if (CHANNEL_PROMPT_MARKERS.some(m => stdout.includes(m))) {
-      await sshExecAsync(key, ip, `tmux send-keys -t ${tmuxName} 1`, { timeout: 5_000 });
+      await sshExecAsync(key, ip, `tmux send-keys -t '${tmuxName}' 1`, { timeout: 5_000 });
       const { sleep } = await import("../../util.js");
       await sleep(300);
-      await sshExecAsync(key, ip, `tmux send-keys -t ${tmuxName} Enter`, { timeout: 5_000 });
+      await sshExecAsync(key, ip, `tmux send-keys -t '${tmuxName}' Enter`, { timeout: 5_000 });
       return "retry";
     }
 

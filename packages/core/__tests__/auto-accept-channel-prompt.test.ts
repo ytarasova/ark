@@ -64,7 +64,9 @@ const STARTUP_OUTPUT = `
   Starting new session...
 `;
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Flush any pending Bun.sleep callbacks from previous tests
+  await Bun.sleep(350);
   captureResponses = [];
   captureIndex = 0;
   sentKeys.length = 0;

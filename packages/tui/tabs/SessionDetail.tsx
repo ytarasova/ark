@@ -47,10 +47,10 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
     ark.sessionConversation(s.claude_session_id, 100).then(setConversation).catch(() => setConversation([]));
   }, [s?.id, s?.claude_session_id, s?.status]);
 
-  // Channel port is deterministic: 19200 + (parseInt(id.replace("s-",""),16) % 1000)
+  // Channel port is deterministic: 19200 + (parseInt(id.replace("s-",""),16) % 10000)
   const channelPort = useMemo(() => {
     if (!s) return 0;
-    return 19200 + (parseInt(s.id.replace("s-", ""), 16) % 1000);
+    return 19200 + (parseInt(s.id.replace("s-", ""), 16) % 10000);
   }, [s?.id]);
   const costInfo = useMemo(() => s ? getSessionCost(s) : null, [s?.id, s?.config]);
 

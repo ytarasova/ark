@@ -419,6 +419,19 @@ export function listSessions(opts?: {
   return (db.prepare(sql).all(...params) as SessionRow[]).map(rowToSession);
 }
 
+// Valid session columns (from schema). Used to whitelist dynamic SQL column names.
+const SESSION_COLUMNS = new Set([
+  "jira_key", "jira_summary", "repo", "branch", "compute_name", "session_id",
+  "claude_session_id", "stage", "status", "pipeline", "agent", "workdir",
+  "pr_url", "pr_id", "error", "parent_id", "fork_group", "group_name",
+  "breakpoint_reason", "attached_by", "config", "updated_at",
+]);
+
+// Valid compute columns (from schema).
+const COMPUTE_COLUMNS = new Set([
+  "provider", "status", "config", "updated_at",
+]);
+
 export function updateSession(id: string, fields: Partial<Session>): Session | null {
   const db = getDb();
   const updates: string[] = ["updated_at = ?"];
@@ -430,6 +443,7 @@ export function updateSession(id: string, fields: Partial<Session>): Session | n
   for (const [key, value] of Object.entries(fields)) {
     if (key === "id" || key === "created_at") continue;
     const col = fieldMap[key] ?? key;
+    if (!SESSION_COLUMNS.has(col)) continue; // skip unknown columns
     if (col === "config" && typeof value === "object") {
       updates.push("config = ?");
       values.push(JSON.stringify(value));
@@ -507,9 +521,12 @@ export function claimSession(
   const values: any[] = [newStatus, now()];
 
   if (extraFields) {
+    const fieldMap: Record<string, string> = { ticket: "jira_key", summary: "jira_summary", flow: "pipeline" };
     for (const [key, value] of Object.entries(extraFields)) {
-      updates.push(`${key} = ?`);
-      values.push(key === "config" ? JSON.stringify(value) : value ?? null);
+      const col = fieldMap[key] ?? key;
+      if (!SESSION_COLUMNS.has(col)) continue; // skip unknown columns
+      updates.push(`${col} = ?`);
+      values.push(col === "config" ? JSON.stringify(value) : value ?? null);
     }
   }
   values.push(id, expectedStatus);
@@ -629,6 +646,7 @@ export function updateCompute(name: string, fields: Partial<Compute>): Compute |
 
   for (const [key, value] of Object.entries(fields)) {
     if (key === "name" || key === "created_at") continue;
+    if (!COMPUTE_COLUMNS.has(key)) continue; // skip unknown columns
     if (key === "config" && typeof value === "object") {
       updates.push("config = ?");
       values.push(JSON.stringify(value));
@@ -645,31 +663,35 @@ export function updateCompute(name: string, fields: Partial<Compute>): Compute |
 
 /**
  * Merge keys into a compute's config without replacing the whole object.
- * Atomic read-modify-write in a single SQL round-trip to avoid races.
+ * Uses a transaction to avoid lost updates from concurrent writers.
  */
 export function mergeComputeConfig(name: string, patch: Record<string, unknown>): Compute | null {
   const db = getDb();
-  const row = db.prepare("SELECT config FROM compute WHERE name = ?").get(name) as { config: string } | undefined;
-  if (!row) return null;
-  const existing = safeParseConfig(row.config);
-  const merged = { ...existing, ...patch };
-  db.prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ?")
-    .run(JSON.stringify(merged), new Date().toISOString(), name);
+  db.transaction(() => {
+    const row = db.prepare("SELECT config FROM compute WHERE name = ?").get(name) as { config: string } | undefined;
+    if (!row) return;
+    const existing = safeParseConfig(row.config);
+    const merged = { ...existing, ...patch };
+    db.prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ?")
+      .run(JSON.stringify(merged), new Date().toISOString(), name);
+  })();
   return getCompute(name);
 }
 
 /**
  * Merge keys into a session's config without replacing the whole object.
- * Atomic read-modify-write in a single SQL round-trip to avoid races.
+ * Uses a transaction to avoid lost updates from concurrent writers.
  */
 export function mergeSessionConfig(sessionId: string, patch: Record<string, unknown>): void {
   const db = getDb();
-  const row = db.prepare("SELECT config FROM sessions WHERE id = ?").get(sessionId) as { config: string } | undefined;
-  if (!row) return;
-  const existing = safeParseConfig(row.config);
-  const merged = { ...existing, ...patch };
-  db.prepare("UPDATE sessions SET config = ?, updated_at = ? WHERE id = ?")
-    .run(JSON.stringify(merged), new Date().toISOString(), sessionId);
+  db.transaction(() => {
+    const row = db.prepare("SELECT config FROM sessions WHERE id = ?").get(sessionId) as { config: string } | undefined;
+    if (!row) return;
+    const existing = safeParseConfig(row.config);
+    const merged = { ...existing, ...patch };
+    db.prepare("UPDATE sessions SET config = ?, updated_at = ? WHERE id = ?")
+      .run(JSON.stringify(merged), new Date().toISOString(), sessionId);
+  })();
 }
 
 export function deleteCompute(name: string): boolean {

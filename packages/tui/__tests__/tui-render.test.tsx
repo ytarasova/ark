@@ -2,23 +2,55 @@
  * TUI rendering tests - verifies the main App component renders correctly.
  *
  * Uses ink-testing-library to render the TUI in-memory and assert on output.
+ * Wraps App in ArkClientProvider (required since TUI migration to ArkClient).
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { App } from "../App.js";
-import { waitFor } from "../../core/__tests__/test-helpers.js";
+import { ArkClientProvider } from "../context/ArkClientProvider.js";
+import { AppContext, setApp, clearApp } from "../../core/app.js";
+
+let app: AppContext;
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
+
+/** Render App with ArkClientProvider wrapper and wait for it to initialize. */
+async function renderApp() {
+  let ready = false;
+  const result = render(
+    <ArkClientProvider onReady={() => { ready = true; }}>
+      <App />
+    </ArkClientProvider>
+  );
+  for (let i = 0; i < 100; i++) {
+    await new Promise(r => setTimeout(r, 20));
+    if (ready && result.lastFrame()?.includes("Sessions")) break;
+  }
+  return result;
+}
 
 describe("TUI App rendering", () => {
-  it("renders without crashing", () => {
-    const { lastFrame, unmount } = render(<App />);
-    expect(lastFrame()).toBeTruthy();
+  it("renders without crashing", async () => {
+    const { lastFrame, unmount } = await renderApp();
+    const frame = lastFrame();
+    expect(frame).toBeTruthy();
+    expect(frame!.length).toBeGreaterThan(0);
+    // Allow pending React effects to flush before unmount
+    await new Promise(r => setTimeout(r, 50));
     unmount();
   });
 
-  it("renders tab bar with all 6 tabs", () => {
-    const { lastFrame, unmount } = render(<App />);
+  it("renders tab bar with all 6 tabs", async () => {
+    const { lastFrame, unmount } = await renderApp();
     const frame = lastFrame()!;
 
     expect(frame).toContain("Sessions");
@@ -30,35 +62,33 @@ describe("TUI App rendering", () => {
     unmount();
   });
 
-  it("sessions tab shows empty state when no sessions exist", () => {
-    const { lastFrame, unmount } = render(<App />);
+  it("sessions tab shows empty state when no sessions exist", async () => {
+    const { lastFrame, unmount } = await renderApp();
     const frame = lastFrame()!;
-
-    // The sessions tab renders (may show tab name, empty state, or status bar)
     expect(frame.length).toBeGreaterThan(0);
     unmount();
   });
 
   it("tab switching works via key press", async () => {
-    const { lastFrame, stdin, unmount } = render(<App />);
+    const { lastFrame, stdin, unmount } = await renderApp();
 
-    // Press "6" to switch to Compute tab (key 6 in new layout)
+    // Press "6" to switch to Compute tab
     stdin.write("6");
 
     // Wait for React to re-render
-    await waitFor(() => lastFrame()!.includes("Compute"));
+    for (let i = 0; i < 50; i++) {
+      await new Promise(r => setTimeout(r, 20));
+      if (lastFrame()?.includes("Compute")) break;
+    }
 
     const frame = lastFrame()!;
-    // The Compute tab should now be active
     expect(frame).toContain("Compute");
     unmount();
   });
 
-  it("status bar shows session count", () => {
-    const { lastFrame, unmount } = render(<App />);
+  it("status bar shows session count", async () => {
+    const { lastFrame, unmount } = await renderApp();
     const frame = lastFrame()!;
-
-    // Status bar always shows session count
     expect(frame).toContain("sessions");
     unmount();
   });

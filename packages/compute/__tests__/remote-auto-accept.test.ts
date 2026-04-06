@@ -85,8 +85,8 @@ describe("remote autoAcceptChannelPrompt", () => {
 
     const sendKeysCalls = sshCalls.filter(c => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(2);
-    expect(sendKeysCalls[0].cmd).toContain("send-keys -t ark-test 1");
-    expect(sendKeysCalls[1].cmd).toContain("send-keys -t ark-test Enter");
+    expect(sendKeysCalls[0].cmd).toContain("send-keys -t 'ark-test' 1");
+    expect(sendKeysCalls[1].cmd).toContain("send-keys -t 'ark-test' Enter");
   });
 
   it("stops polling when Claude is working", async () => {
