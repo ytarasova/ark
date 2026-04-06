@@ -550,7 +550,7 @@ agent.command("list").description("List agents").option("--project <dir>", "Proj
 agent.command("show").description("Show agent details").argument("<name>").action(async (name) => {
   const ark = await getArkClient();
   try {
-    const { agent: a } = await ark.rpc("agent/read", { name });
+    const a = await ark.agentRead(name);
     console.log(chalk.bold(`\n${a.name}`) + chalk.dim(` (${a._source})`));
     console.log(`  Model:      ${a.model}`);
     console.log(`  Max turns:  ${a.max_turns}`);
