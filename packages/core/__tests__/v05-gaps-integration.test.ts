@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import * as core from "../index.js";
+import type { RecipeDefinition } from "../../types/index.js";
 
 let app: AppContext;
 beforeEach(async () => { if (app) { await app.shutdown(); clearApp(); } app = AppContext.forTest(); setApp(app); await app.boot(); });
@@ -22,7 +23,7 @@ describe("v0.5 gaps integration", () => {
     core.saveRecipe({
       name: "int-recipe", description: "Integration recipe",
       flow: "bare", variables: [],
-    } as any, "global");
+    } as RecipeDefinition, "global");
     const found = core.listRecipes().find(r => r.name === "int-recipe");
     expect(found).toBeDefined();
 

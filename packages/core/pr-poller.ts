@@ -127,7 +127,7 @@ export async function processReviewFeedback(
   const prompt = formatReviewPrompt(data.title, data.number, comments, newReviews[0]?.state);
 
   // Store as message for TUI
-  getApp().messages.send(session.id, "system" as any, prompt, "text" as any);
+  getApp().messages.send(session.id, "system", prompt, "text");
 
   getApp().events.log(session.id, "pr_review_feedback", {
     actor: "github",

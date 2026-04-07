@@ -227,12 +227,12 @@ describe("writeChannelConfig", () => {
     const config = channelMcpConfig("s-abc123", "work", 19300, {
       conductorUrl: "http://host.docker.internal:19100",
     });
-    expect((config.env as any).ARK_CONDUCTOR_URL).toBe("http://host.docker.internal:19100");
+    expect((config.env as Record<string, string>).ARK_CONDUCTOR_URL).toBe("http://host.docker.internal:19100");
   });
 
   it("channelMcpConfig defaults conductor URL to localhost:19100", () => {
     const config = channelMcpConfig("s-abc123", "work", 19300);
-    expect((config.env as any).ARK_CONDUCTOR_URL).toBe("http://localhost:19100");
+    expect((config.env as Record<string, string>).ARK_CONDUCTOR_URL).toBe("http://localhost:19100");
   });
 
   it("preserves existing .mcp.json content", () => {

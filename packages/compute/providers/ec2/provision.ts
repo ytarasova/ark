@@ -248,7 +248,7 @@ export async function provisionStack(
   log(`Launching ${instanceType} instance...`);
   const runResult = await client.send(new RunInstancesCommand({
     ImageId: amiId,
-    InstanceType: instanceType as any,
+    InstanceType: instanceType as import("@aws-sdk/client-ec2")._InstanceType,
     MinCount: 1,
     MaxCount: 1,
     KeyName: keyName,

@@ -98,7 +98,7 @@ ${numbered}`;
       }),
     });
 
-    const data = await response.json() as any;
+    const data = await response.json() as { content?: Array<{ text?: string }> };
     const text = data.content?.[0]?.text ?? "";
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) return candidates;

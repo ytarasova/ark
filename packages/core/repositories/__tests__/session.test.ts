@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { SessionRepository } from "../session.js";
 import { initSchema } from "../schema.js";
+import type { SessionStatus, SessionConfig } from "../../../types/index.js";
 
 let db: Database;
 let repo: SessionRepository;
@@ -81,7 +82,7 @@ describe("SessionRepository", () => {
   it("list filters by status", () => {
     const s1 = repo.create({});
     repo.create({});
-    repo.update(s1.id, { status: "running" as any });
+    repo.update(s1.id, { status: "running" as SessionStatus });
     const running = repo.list({ status: "running" });
     expect(running.length).toBe(1);
     expect(running[0].id).toBe(s1.id);
@@ -121,7 +122,7 @@ describe("SessionRepository", () => {
 
   it("update changes fields and returns updated session", () => {
     const s = repo.create({});
-    const updated = repo.update(s.id, { status: "running" as any, stage: "plan" });
+    const updated = repo.update(s.id, { status: "running" as SessionStatus, stage: "plan" });
     expect(updated!.status).toBe("running");
     expect(updated!.stage).toBe("plan");
     // updated_at is refreshed (may be same ms in fast tests, so just check it exists)
@@ -130,27 +131,27 @@ describe("SessionRepository", () => {
 
   it("update skips unknown columns", () => {
     const s = repo.create({});
-    const updated = repo.update(s.id, { bogusField: "nope" } as any);
+    const updated = repo.update(s.id, { bogusField: "nope" } as Record<string, unknown>);
     expect(updated).not.toBeNull();
     // Should not throw, just silently ignore
   });
 
   it("update skips id and created_at", () => {
     const s = repo.create({});
-    const updated = repo.update(s.id, { id: "s-hacked", created_at: "1999-01-01" } as any);
+    const updated = repo.update(s.id, { id: "s-hacked", created_at: "1999-01-01" } as Record<string, unknown>);
     expect(updated!.id).toBe(s.id);
     expect(updated!.created_at).toBe(s.created_at);
   });
 
   it("update handles config as JSON", () => {
     const s = repo.create({});
-    const updated = repo.update(s.id, { config: { turns: 10 } } as any);
+    const updated = repo.update(s.id, { config: { turns: 10 } as SessionConfig });
     expect(updated!.config).toEqual({ turns: 10 });
   });
 
   it("update returns null for nonexistent id", () => {
     // update always tries to return get(id) which will be null
-    const result = repo.update("s-ffffff", { status: "running" as any });
+    const result = repo.update("s-ffffff", { status: "running" as SessionStatus });
     expect(result).toBeNull();
   });
 
@@ -179,7 +180,7 @@ describe("SessionRepository", () => {
 
   it("softDelete sets status to deleting and stores previous status", () => {
     const s = repo.create({});
-    repo.update(s.id, { status: "running" as any });
+    repo.update(s.id, { status: "running" as SessionStatus });
     expect(repo.softDelete(s.id)).toBe(true);
     const deleted = repo.get(s.id);
     expect(deleted!.status).toBe("deleting");
@@ -193,7 +194,7 @@ describe("SessionRepository", () => {
 
   it("undelete restores previous status", () => {
     const s = repo.create({});
-    repo.update(s.id, { status: "running" as any });
+    repo.update(s.id, { status: "running" as SessionStatus });
     repo.softDelete(s.id);
     const restored = repo.undelete(s.id);
     expect(restored!.status).toBe("running");
@@ -235,9 +236,9 @@ describe("SessionRepository", () => {
     const s = repo.create({});
     // Manually set _deleted_at to a very old time
     repo.update(s.id, {
-      status: "deleting" as any,
-      config: { _pre_delete_status: "pending", _deleted_at: "2000-01-01T00:00:00.000Z" },
-    } as any);
+      status: "deleting" as SessionStatus,
+      config: { _pre_delete_status: "pending", _deleted_at: "2000-01-01T00:00:00.000Z" } as SessionConfig,
+    });
     const purged = repo.purgeDeleted(1000); // 1 second TTL
     expect(purged).toBe(1);
     expect(repo.get(s.id)).toBeNull();

@@ -15,6 +15,21 @@ export interface Schedule {
   created_at: string;
 }
 
+/** Raw row shape returned by bun:sqlite for the schedules table. */
+interface ScheduleRow {
+  id: string;
+  cron: string;
+  flow: string;
+  repo: string | null;
+  workdir: string | null;
+  summary: string | null;
+  compute_name: string | null;
+  group_name: string | null;
+  enabled: number;
+  last_run: string | null;
+  created_at: string;
+}
+
 function now() { return new Date().toISOString(); }
 function genId() { return `sched-${randomBytes(3).toString("hex")}`; }
 
@@ -40,12 +55,12 @@ export function createSchedule(opts: {
 
 export function listSchedules(): Schedule[] {
   const db = getApp().db;
-  return (db.prepare("SELECT * FROM schedules ORDER BY created_at DESC").all() as any[]).map(mapRow);
+  return (db.prepare("SELECT * FROM schedules ORDER BY created_at DESC").all() as ScheduleRow[]).map(mapRow);
 }
 
 export function getSchedule(id: string): Schedule | null {
   const db = getApp().db;
-  const row = db.prepare("SELECT * FROM schedules WHERE id = ?").get(id) as any;
+  const row = db.prepare("SELECT * FROM schedules WHERE id = ?").get(id) as ScheduleRow | undefined;
   return row ? mapRow(row) : null;
 }
 
@@ -65,7 +80,7 @@ export function enableSchedule(id: string, enabled: boolean): void {
   db.prepare("UPDATE schedules SET enabled = ? WHERE id = ?").run(enabled ? 1 : 0, id);
 }
 
-function mapRow(r: any): Schedule {
+function mapRow(r: ScheduleRow): Schedule {
   return { ...r, enabled: !!r.enabled };
 }
 

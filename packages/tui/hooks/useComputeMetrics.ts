@@ -47,7 +47,7 @@ export function useComputeMetrics(computes: Compute[], active: boolean, pollMs =
             try {
               const realStatus = await provider.checkStatus(h);
               if (realStatus && realStatus !== h.status) {
-                getApp().computes.update(h.name, { status: realStatus } as any);
+                getApp().computes.update(h.name, { status: realStatus as import("../../types/index.js").ComputeStatus });
                 if (realStatus === "destroyed") {
                   getApp().computes.mergeConfig(h.name, { ip: null });
                   addLog(h.name, "Instance no longer exists — marked as destroyed");

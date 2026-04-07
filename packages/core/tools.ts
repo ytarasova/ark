@@ -42,7 +42,7 @@ function discoverMcpServers(projectDir: string): ToolEntry[] {
     return Object.entries(servers).map(([name, config]) => ({
       kind: "mcp-server" as const,
       name,
-      description: (config as any).description ?? `MCP server: ${name}`,
+      description: (config as Record<string, unknown>).description as string ?? `MCP server: ${name}`,
       source: mcpPath,
       config: config as Record<string, unknown>,
     }));

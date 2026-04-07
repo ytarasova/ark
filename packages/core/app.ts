@@ -70,6 +70,8 @@ export class AppContext {
 
   conductor: { stop(): void } | null = null;
   metricsPoller: { stop(): void } | null = null;
+  /** Rollback config stored here so conductor can access it without globalThis. */
+  rollbackConfig: import("./config.js").RollbackSettings | null = null;
 
   private _signalHandlers: { signal: string; handler: () => void }[] = [];
   private _forceExitCount = 0;
@@ -226,7 +228,7 @@ export class AppContext {
     });
 
     // 5. Wire provider resolver for session.ts
-    setProviderResolver((session: any) => this.resolveProvider(session));
+    setProviderResolver((session: Session) => this.resolveProvider(session));
 
     // 5b. Register executors
     registerExecutor(claudeCodeExecutor);
@@ -240,7 +242,7 @@ export class AppContext {
     configureOtlp(this.config.otlp);
 
     // 6c. Store rollback config for conductor webhook handler
-    (globalThis as any).__arkRollbackConfig = this.config.rollback;
+    this.rollbackConfig = this.config.rollback;
     configureTelemetry(this.config.telemetry);
 
     // 7. Optionally start conductor (dynamic import to avoid circular deps)
@@ -278,7 +280,7 @@ export class AppContext {
       const deleted = this._sessions?.listDeleted() ?? [];
       const cutoff = Date.now() - 90 * 1000;
       for (const s of deleted) {
-        const deletedAt = (s.config as any)?._deleted_at as string | undefined;
+        const deletedAt = s.config?._deleted_at as string | undefined;
         if (deletedAt && new Date(deletedAt).getTime() < cutoff) {
           this._sessions?.delete(s.id);
         }
@@ -405,9 +407,9 @@ export class AppContext {
         const computes = this._computes?.list({ status: "running" }) ?? [];
         for (const c of computes) {
           await safeAsync(`metrics: poll compute "${c.name}"`, async () => {
-            const compute = await import("../compute/index.js") as any;
+            const compute = await import("../compute/index.js") as Record<string, unknown>;
             if (typeof compute.pollMetrics === "function") {
-              await compute.pollMetrics(c.name);
+              await (compute.pollMetrics as (name: string) => Promise<void>)(c.name);
             }
           });
         }
@@ -432,7 +434,7 @@ export class AppContext {
         });
       };
       this._signalHandlers.push({ signal, handler });
-      process.on(signal as any, handler);
+      process.on(signal as NodeJS.Signals, handler);
     };
 
     makeHandler("SIGINT");

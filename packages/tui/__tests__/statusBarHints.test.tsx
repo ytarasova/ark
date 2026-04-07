@@ -24,8 +24,11 @@ import type { Session } from "../../core/index.js";
 function extractHintLabels(hints: React.ReactNode[]): { k: string; label: string }[] {
   const result: { k: string; label: string }[] = [];
   for (const h of hints) {
-    if (React.isValidElement(h) && (h as any).props?.k && (h as any).props?.label) {
-      result.push({ k: (h as any).props.k, label: (h as any).props.label });
+    if (React.isValidElement(h)) {
+      const props = h.props as Record<string, unknown>;
+      if (props?.k && props?.label) {
+        result.push({ k: props.k as string, label: props.label as string });
+      }
     }
   }
   return result;

@@ -33,7 +33,7 @@ export function ScrollBox({ children, reserveRows = 6, active = true, followInde
     const flatten = (node: React.ReactNode) => {
       Children.forEach(node, (child) => {
         if (child === null || child === undefined) return;
-        if (typeof child === "object" && "type" in (child as any)) {
+        if (React.isValidElement(child)) {
           const el = child as React.ReactElement;
           if (el.type === React.Fragment) {
             flatten(el.props.children);

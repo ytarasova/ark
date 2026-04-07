@@ -9,7 +9,7 @@
 import { describe, it, expect } from "bun:test";
 import { getApp } from "../app.js";
 import { safeParseConfig } from "../util.js";
-import type { SessionStatus } from "../../types/index.js";
+import type { SessionStatus, MessageRole, MessageType } from "../../types/index.js";
 
 interface SessionRow {
   id: string; ticket: string | null; summary: string | null; repo: string | null;
@@ -90,7 +90,7 @@ describe("rowToSession", () => {
   });
 
   it("handles null config gracefully (defaults to {})", () => {
-    const row = makeRow({ config: null as any });
+    const row = makeRow({ config: null as unknown as string });
     const session = rowToSession(row);
     expect(session.config).toEqual({});
   });
@@ -232,7 +232,7 @@ describe("rowToEvent via DB", () => {
 describe("rowToMessage via DB", () => {
   it("converts read from 0/1 integer to boolean", () => {
     const session = getApp().sessions.create({ summary: "msg test" });
-    const msg = getApp().messages.send(session.id, "agent" as any, "hello");
+    const msg = getApp().messages.send(session.id, "agent" as MessageRole, "hello");
 
     // Freshly created message should have read = false (stored as 0)
     expect(msg.read).toBe(false);
@@ -241,7 +241,7 @@ describe("rowToMessage via DB", () => {
 
   it("read is true after marking messages read", () => {
     const session = getApp().sessions.create({ summary: "read test" });
-    getApp().messages.send(session.id, "agent" as any, "unread");
+    getApp().messages.send(session.id, "agent" as MessageRole, "unread");
 
     getApp().messages.markRead(session.id);
 
@@ -252,7 +252,7 @@ describe("rowToMessage via DB", () => {
 
   it("preserves message fields", () => {
     const session = getApp().sessions.create({ summary: "field test" });
-    const msg = getApp().messages.send(session.id, "user" as any, "test content", "progress" as any);
+    const msg = getApp().messages.send(session.id, "user" as MessageRole, "test content", "progress" as MessageType);
 
     expect(msg.session_id).toBe(session.id);
     expect(msg.role).toBe("user");

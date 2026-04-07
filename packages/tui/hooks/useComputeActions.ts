@@ -24,7 +24,7 @@ export function useComputeActions(
     provision: (compute: ComputeLike) => {
       addLog(compute.name, "Starting provisioning...");
       run(`Provisioning ${compute.name}`, async () => {
-        addLog(compute.name, `Provider: ${compute.provider}, size: ${(compute.config as any)?.size ?? "default"}`);
+        addLog(compute.name, `Provider: ${compute.provider}, size: ${(compute.config as Record<string, unknown>)?.size ?? "default"}`);
         await ark.computeProvision(compute.name);
         addLog(compute.name, "Provisioning complete");
       });
@@ -67,8 +67,8 @@ export function useComputeActions(
     },
 
     ping: (compute: ComputeLike) => {
-      const cfg = compute.config as any;
-      const ip = cfg?.ip;
+      const cfg = compute.config as Record<string, unknown>;
+      const ip = cfg?.ip as string | undefined;
       if (!ip) { addLog(compute.name, "Local — always available"); return; }
       addLog(compute.name, `Checking connectivity to ${ip}...`);
       run(`Pinging ${compute.name}`, async () => {

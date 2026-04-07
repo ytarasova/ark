@@ -85,8 +85,8 @@ export function listCheckpoints(sessionId: string): Checkpoint[] {
  */
 export function findOrphanedSessions(): Session[] {
   const repo = getSessions();
-  const running = repo ? repo.list({ status: "running" } as any) : [];
-  const waiting = repo ? repo.list({ status: "waiting" } as any) : [];
+  const running = repo ? repo.list({ status: "running" }) : [];
+  const waiting = repo ? repo.list({ status: "waiting" }) : [];
   const candidates = [...running, ...waiting];
 
   return candidates.filter((session) => {

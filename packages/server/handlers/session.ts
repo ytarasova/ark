@@ -2,7 +2,7 @@ import { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { searchSessions, getSessionConversation, searchSessionConversation } from "../../core/search.js";
-import { ErrorCodes } from "../../protocol/types.js";
+import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type {
   SessionIdParams,
   SessionStartParams,
@@ -90,9 +90,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { sessionId, name, group_name } = extract<SessionForkParams>(params, ["sessionId"]);
     const result = await app.sessionService.fork(sessionId, name);
     if (!result.ok) {
-      const err = new Error(result.message);
-      (err as any).code = SESSION_NOT_FOUND;
-      throw err;
+      throw new RpcError(result.message, SESSION_NOT_FOUND);
     }
     if (group_name && result.sessionId) {
       app.sessions.update(result.sessionId, { group_name });
@@ -106,9 +104,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { sessionId, name } = extract<SessionCloneParams>(params, ["sessionId"]);
     const result = await app.sessionService.clone(sessionId, name);
     if (!result.ok) {
-      const err = new Error(result.message);
-      (err as any).code = SESSION_NOT_FOUND;
-      throw err;
+      throw new RpcError(result.message, SESSION_NOT_FOUND);
     }
     const session = result.sessionId ? app.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
@@ -119,9 +115,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { sessionId, fields } = extract<SessionUpdateParams>(params, ["sessionId", "fields"]);
     const existing = app.sessions.get(sessionId);
     if (!existing) {
-      const err = new Error(`Session ${sessionId} not found`);
-      (err as any).code = SESSION_NOT_FOUND;
-      throw err;
+      throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     }
     app.sessions.update(sessionId, fields);
     const session = app.sessions.get(sessionId);
@@ -139,9 +133,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { sessionId, include } = extract<SessionReadParams>(params, ["sessionId"]);
     const session = app.sessions.get(sessionId);
     if (!session) {
-      const err = new Error(`Session ${sessionId} not found`);
-      (err as any).code = SESSION_NOT_FOUND;
-      throw err;
+      throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     }
     const result: Record<string, unknown> = { session };
     if (include?.includes("events")) {

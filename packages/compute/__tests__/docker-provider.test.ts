@@ -11,7 +11,7 @@ describe("DockerProvider", () => {
 
   it("implements all ComputeProvider methods", () => {
     for (const method of ["provision", "destroy", "start", "stop", "launch", "attach", "getMetrics", "probePorts", "syncEnvironment"]) {
-      expect(typeof (provider as any)[method]).toBe("function");
+      expect(typeof (provider as Record<string, unknown>)[method]).toBe("function");
     }
   });
 

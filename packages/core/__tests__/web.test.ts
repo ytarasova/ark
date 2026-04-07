@@ -23,16 +23,16 @@ describe("web server", () => {
     server = startWebServer({ port: 18421 });
     const resp = await fetch("http://localhost:18421/api/sessions");
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>[];
     expect(Array.isArray(data)).toBe(true);
-    expect(data.some((s: any) => s.summary === "web-test")).toBe(true);
+    expect(data.some((s) => s.summary === "web-test")).toBe(true);
   });
 
   it("serves costs API", async () => {
     server = startWebServer({ port: 18422 });
     const resp = await fetch("http://localhost:18422/api/costs");
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(data).toHaveProperty("total");
     expect(data).toHaveProperty("sessions");
   });
@@ -56,7 +56,7 @@ describe("web server", () => {
     server = startWebServer({ port: 18425 });
     const resp = await fetch(`http://localhost:18425/api/sessions/${s.id}`);
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(data.session.id).toBe(s.id);
     expect(Array.isArray(data.events)).toBe(true);
   });
@@ -75,7 +75,7 @@ describe("web server", () => {
       body: JSON.stringify({ summary: "web-create-test", repo: "." }),
     });
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(data.ok).toBe(true);
     expect(data.session).toBeDefined();
     expect(data.session.summary).toBe("web-create-test");
@@ -87,7 +87,7 @@ describe("web server", () => {
     server = startWebServer({ port: 18431 });
     const resp = await fetch("http://localhost:18431/api/status");
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(data).toHaveProperty("total");
     expect(data).toHaveProperty("byStatus");
     expect(typeof data.total).toBe("number");
@@ -98,7 +98,7 @@ describe("web server", () => {
     server = startWebServer({ port: 18432 });
     const resp = await fetch("http://localhost:18432/api/groups");
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(Array.isArray(data)).toBe(true);
   });
 
@@ -116,7 +116,7 @@ describe("web server", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ summary: "should-fail" }),
     });
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(data.ok).toBe(false);
     expect(data.message).toContain("Read-only");
   });
@@ -132,7 +132,7 @@ describe("web server", () => {
       body: JSON.stringify({ name: "forked-copy" }),
     });
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(data.ok).toBe(true);
     expect(data.sessionId).toBeDefined();
   });
@@ -141,9 +141,9 @@ describe("web server", () => {
     server = startWebServer({ port: 18536 });
     const resp = await fetch("http://localhost:18536/api/profiles");
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(Array.isArray(data)).toBe(true);
-    expect(data.some((p: any) => p.name === "default")).toBe(true);
+    expect((data as Record<string, unknown>[]).some((p) => p.name === "default")).toBe(true);
   });
 
   it("GET /api/search requires q param", async () => {
@@ -156,7 +156,7 @@ describe("web server", () => {
     server = startWebServer({ port: 18539 });
     const resp = await fetch("http://localhost:18539/api/agents");
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(Array.isArray(data)).toBe(true);
   });
 
@@ -164,7 +164,7 @@ describe("web server", () => {
     server = startWebServer({ port: 18540 });
     const resp = await fetch("http://localhost:18540/api/memory");
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(Array.isArray(data)).toBe(true);
   });
 
@@ -172,7 +172,7 @@ describe("web server", () => {
     server = startWebServer({ port: 18541 });
     const resp = await fetch("http://localhost:18541/api/compute");
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(Array.isArray(data)).toBe(true);
   });
 
@@ -180,7 +180,7 @@ describe("web server", () => {
     server = startWebServer({ port: 18542 });
     const resp = await fetch("http://localhost:18542/api/config");
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(data).toHaveProperty("hotkeys");
     expect(data).toHaveProperty("theme");
     expect(data).toHaveProperty("profile");
@@ -191,7 +191,7 @@ describe("web server", () => {
     server = startWebServer({ port: 18543 });
     const resp = await fetch(`http://localhost:18543/api/sessions/${s.id}/events`);
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(Array.isArray(data)).toBe(true);
   });
 
@@ -199,7 +199,7 @@ describe("web server", () => {
     server = startWebServer({ port: 18544 });
     const resp = await fetch("http://localhost:18544/api/flows");
     expect(resp.status).toBe(200);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(Array.isArray(data)).toBe(true);
   });
 });

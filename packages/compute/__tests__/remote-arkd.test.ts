@@ -14,15 +14,16 @@ import {
   RemoteDevcontainerProvider,
   RemoteFirecrackerProvider,
 } from "../providers/remote-arkd.js";
-import type { Compute } from "../types.js";
+import type { Compute, Session } from "../types.js";
 
 function makeCompute(overrides?: Partial<Compute>): Compute {
   return {
-    id: "test-remote",
     name: "test-remote",
     provider: "ec2",
     status: "running",
     config: { ip: "10.0.1.5" },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     ...overrides,
   } as Compute;
 }
@@ -46,12 +47,12 @@ describe("RemoteWorktreeProvider", () => {
   });
 
   it("getArkdUrl prefers arkd_url from config", () => {
-    const compute = makeCompute({ config: { ip: "10.0.1.5", arkd_url: "http://custom:9999" } } as any);
+    const compute = makeCompute({ config: { ip: "10.0.1.5", arkd_url: "http://custom:9999" } });
     expect(provider.getArkdUrl(compute)).toBe("http://custom:9999");
   });
 
   it("getArkdUrl throws when no IP", () => {
-    const compute = makeCompute({ config: {} } as any);
+    const compute = makeCompute({ config: {} });
     try {
       provider.getArkdUrl(compute);
       expect(true).toBe(false);
@@ -68,7 +69,7 @@ describe("RemoteWorktreeProvider", () => {
     const origKey = process.env.ANTHROPIC_API_KEY;
     process.env.ANTHROPIC_API_KEY = "test-key";
     try {
-      const env = provider.buildLaunchEnv({} as any);
+      const env = provider.buildLaunchEnv({} as Session);
       expect(env.ANTHROPIC_API_KEY).toBe("test-key");
     } finally {
       if (origKey) process.env.ANTHROPIC_API_KEY = origKey;
@@ -79,13 +80,13 @@ describe("RemoteWorktreeProvider", () => {
   it("buildChannelConfig uses remote ark binary", () => {
     const cfg = provider.buildChannelConfig("s-1", "work", 19200);
     expect(cfg.command).toContain("ark");
-    expect((cfg.env as any).ARK_SESSION_ID).toBe("s-1");
+    expect((cfg.env as Record<string, string>).ARK_SESSION_ID).toBe("s-1");
   });
 
   it("getAttachCommand includes ssh", () => {
     const cmd = provider.getAttachCommand(makeCompute(), {
       session_id: "ark-s-test",
-    } as any);
+    } as Session);
     expect(cmd[0]).toBe("ssh");
     expect(cmd).toContain("ubuntu@10.0.1.5");
   });

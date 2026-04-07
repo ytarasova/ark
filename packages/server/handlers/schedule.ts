@@ -13,7 +13,7 @@ export function registerScheduleHandlers(router: Router, app: AppContext): void 
   }));
 
   router.handle("schedule/create", async (p) => ({
-    schedule: core.createSchedule(p as any),
+    schedule: core.createSchedule(p as { cron: string; flow?: string; repo?: string; workdir?: string; summary?: string; compute_name?: string; group_name?: string }),
   }));
 
   router.handle("schedule/delete", async (p) => {

@@ -3,6 +3,7 @@ import { Database } from "bun:sqlite";
 import { ComputeService } from "../compute.js";
 import { ComputeRepository } from "../../repositories/compute.js";
 import { initSchema, seedLocalCompute } from "../../repositories/schema.js";
+import type { ComputeStatus } from "../../../types/index.js";
 
 let db: Database;
 let repo: ComputeRepository;
@@ -62,7 +63,7 @@ describe("ComputeService", () => {
 
   it("update changes fields", () => {
     svc.create({ name: "upd", provider: "docker" });
-    const updated = svc.update("upd", { status: "running" } as any);
+    const updated = svc.update("upd", { status: "running" as ComputeStatus });
     expect(updated!.status).toBe("running");
   });
 

@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
-import { SessionService } from "../session.js";
+import { SessionService, type OutboundMessage } from "../session.js";
 import { SessionRepository } from "../../repositories/session.js";
 import { EventRepository } from "../../repositories/event.js";
 import { MessageRepository } from "../../repositories/message.js";
 import { initSchema } from "../../repositories/schema.js";
-import type { Session, SessionStatus } from "../../../types/index.js";
+import type { Session, SessionStatus, SessionOpResult } from "../../../types/index.js";
 
 let db: Database;
 let sessions: SessionRepository;
@@ -132,7 +132,7 @@ describe("SessionService", () => {
       sessions.update(s.id, { status: "completed" as SessionStatus } as Partial<Session>);
       const result = await svc.resume(s.id);
       expect(result.ok).toBe(false);
-      expect((result as any).message).toContain("completed");
+      expect(result.message).toContain("completed");
     });
 
     it("clears error, breakpoint_reason, attached_by, session_id", async () => {
@@ -409,7 +409,7 @@ describe("SessionService", () => {
         summary: "Done",
         filesChanged: ["a.ts"],
         commits: ["abc123"],
-      } as any);
+      } as OutboundMessage);
       expect(result.updates.status).toBe("ready");
       expect(result.shouldAdvance).toBe(true);
       expect(result.shouldAutoDispatch).toBe(true);
@@ -424,7 +424,7 @@ describe("SessionService", () => {
         sessionId: s.id,
         stage: "plan",
         question: "Which API?",
-      } as any);
+      } as OutboundMessage);
       expect(result.updates.status).toBe("waiting");
       expect(result.updates.breakpoint_reason).toBe("Which API?");
     });
@@ -437,7 +437,7 @@ describe("SessionService", () => {
         sessionId: s.id,
         stage: "implement",
         error: "Build failed",
-      } as any);
+      } as OutboundMessage);
       expect(result.updates.status).toBe("failed");
       expect(result.updates.error).toBe("Build failed");
     });
@@ -450,7 +450,7 @@ describe("SessionService", () => {
         sessionId: s.id,
         stage: "implement",
         message: "Working on it",
-      } as any);
+      } as OutboundMessage);
       expect(result.updates.status).toBe("running");
       expect(result.updates.breakpoint_reason).toBeNull();
     });
@@ -466,7 +466,7 @@ describe("SessionService", () => {
         pr_url: "https://github.com/org/repo/pull/42",
         filesChanged: [],
         commits: [],
-      } as any);
+      } as OutboundMessage);
       expect(result.prUrl).toBe("https://github.com/org/repo/pull/42");
     });
 
@@ -476,7 +476,7 @@ describe("SessionService", () => {
         sessionId: "s-000000",
         stage: "plan",
         message: "working",
-      } as any);
+      } as OutboundMessage);
       expect(result.updates).toEqual({});
     });
 
@@ -488,7 +488,7 @@ describe("SessionService", () => {
         sessionId: s.id,
         stage: "plan",
         message: "working",
-      } as any);
+      } as OutboundMessage);
       expect(result.logEvents!.length).toBeGreaterThanOrEqual(1);
       expect(result.logEvents![0].type).toBe("agent_progress");
     });
@@ -501,7 +501,7 @@ describe("SessionService", () => {
         sessionId: s.id,
         stage: "implement",
         error: "fail",
-      } as any);
+      } as OutboundMessage);
       expect(result.busEvents!.length).toBe(1);
       expect(result.busEvents![0].type).toBe("agent_error");
     });

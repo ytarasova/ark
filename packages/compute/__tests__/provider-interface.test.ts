@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { LocalProvider } from "../providers/local/index.js";
 import { EC2Provider } from "../providers/ec2/index.js";
+import type { Compute, Session } from "../types.js";
 
 describe("ComputeProvider interface", () => {
   const local = new LocalProvider();
@@ -45,19 +46,19 @@ describe("ComputeProvider interface", () => {
   });
 
   it("local.buildLaunchEnv returns an object", () => {
-    const env = local.buildLaunchEnv({} as any);
+    const env = local.buildLaunchEnv({} as Session);
     expect(typeof env).toBe("object");
   });
 
   it("local.getAttachCommand returns array for session with session_id", () => {
-    const cmd = local.getAttachCommand({} as any, { session_id: "ark-s-test" } as any);
+    const cmd = local.getAttachCommand({} as Compute, { session_id: "ark-s-test" } as Session);
     expect(Array.isArray(cmd)).toBe(true);
     expect(cmd.length).toBeGreaterThan(0);
     expect(cmd).toContain("ark-s-test");
   });
 
   it("local.getAttachCommand returns empty array for session without session_id", () => {
-    const cmd = local.getAttachCommand({} as any, {} as any);
+    const cmd = local.getAttachCommand({} as Compute, {} as Session);
     expect(cmd).toEqual([]);
   });
 });

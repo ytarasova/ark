@@ -98,7 +98,7 @@ export function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps
           { label: "Create new group", value: "create" },
           { label: "Delete group", value: "delete" },
         ]}
-        onSelect={(item) => setAction(item.value as any)}
+        onSelect={(item) => setAction(item.value as "create" | "delete")}
       />
       {existing.length > 0 && (
         <>

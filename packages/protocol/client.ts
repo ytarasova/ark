@@ -9,7 +9,7 @@ import type { Transport } from "./transport.js";
 import {
   createRequest, createNotification,
   isResponse, isError, isNotification,
-  ARK_VERSION,
+  ARK_VERSION, RpcError,
   type RequestId, type JsonRpcMessage,
 } from "./types.js";
 import type {
@@ -67,10 +67,7 @@ export class ArkClient {
       const p = this.pending.get(msg.id);
       if (p) {
         this.pending.delete(msg.id);
-        const err = new Error(msg.error.message);
-        (err as any).code = msg.error.code;
-        (err as any).data = msg.error.data;
-        p.reject(err);
+        p.reject(new RpcError(msg.error.message, msg.error.code, msg.error.data));
       }
       return;
     }

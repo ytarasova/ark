@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { Bridge } from "../bridge.js";
 import type { BridgeConfig, BridgeMessage } from "../bridge.js";
-import { withTestContext } from "./test-helpers.js";
+import { withTestContext, mockSession } from "./test-helpers.js";
 
 withTestContext();
 
@@ -32,7 +32,7 @@ describe("Bridge", () => {
     bridge.notify = async (text: string) => { sentText = text; };
 
     await bridge.notifySessionStatus(
-      { id: "s-1", status: "running", summary: "My task" } as any,
+      mockSession({ id: "s-1", status: "running", summary: "My task" }),
       "pending",
       "running",
     );
@@ -46,7 +46,7 @@ describe("Bridge", () => {
     bridge.notify = async (text: string) => { sentText = text; };
 
     await bridge.notifySessionStatus(
-      { id: "s-42", status: "failed" } as any,
+      mockSession({ id: "s-42", status: "failed" }),
       "running",
       "failed",
     );
@@ -94,7 +94,7 @@ describe("Bridge status notifications", () => {
     ];
 
     for (const { to, emoji } of statuses) {
-      await bridge.notifySessionStatus({ id: "s-1", status: to } as any, "prev", to);
+      await bridge.notifySessionStatus(mockSession({ id: "s-1", status: to }), "prev", to);
     }
 
     expect(texts.length).toBe(6);

@@ -39,7 +39,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.mapped).toBe("running");
 
     const updated = getApp().sessions.get(session.id);
@@ -67,7 +67,7 @@ describe("Conductor /hooks/status endpoint", () => {
       error: "agent crashed",
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.mapped).toBe("failed");
 
     const updated = getApp().sessions.get(session.id);
@@ -81,7 +81,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.mapped).toBe("completed");
 
     const updated = getApp().sessions.get(session.id);
@@ -97,7 +97,7 @@ describe("Conductor /hooks/status endpoint", () => {
       matcher: "permission_prompt",
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.mapped).toBe("waiting");
 
     const updated = getApp().sessions.get(session.id);
@@ -109,7 +109,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SessionStart" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.mapped).toBe("running");
 
     const updated = getApp().sessions.get(session.id);
@@ -119,7 +119,7 @@ describe("Conductor /hooks/status endpoint", () => {
   it("returns 404 for unknown session", async () => {
     const resp = await postHook("s-nonexistent", { hook_event_name: "Stop" });
     expect(resp.status).toBe(404);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.error).toBe("session not found");
   });
 
@@ -129,7 +129,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SomeUnknownEvent" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.mapped).toBe("no-op");
 
     const updated = getApp().sessions.get(session.id);
@@ -253,7 +253,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.mapped).toBe("no-op");
 
     const updated = getApp().sessions.get(session.id);
@@ -266,7 +266,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.mapped).toBe("no-op");
 
     const updated = getApp().sessions.get(session.id);
@@ -281,7 +281,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.mapped).toBe("completed");
 
     const updated = getApp().sessions.get(session.id);
@@ -311,7 +311,7 @@ describe("Conductor /hooks/status endpoint", () => {
     const db = getApp().db;
     let count = 0;
     try {
-      const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index WHERE session_id = ?").get(session.id) as any;
+      const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index WHERE session_id = ?").get(session.id) as { c: number } | undefined;
       count = row?.c ?? 0;
     } catch { /* FTS5 table may not exist */ }
     expect(count).toBe(0);
@@ -392,7 +392,7 @@ describe("Conductor /hooks/status endpoint", () => {
       body: JSON.stringify({ hook_event_name: "Stop" }),
     });
     expect(resp.status).toBe(400);
-    const body = await resp.json() as any;
+    const body = await resp.json() as Record<string, unknown>;
     expect(body.error).toBe("missing session param");
   });
 });

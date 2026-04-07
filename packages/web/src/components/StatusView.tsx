@@ -9,8 +9,21 @@ const STATUS_COLORS: Record<string, string> = {
   ready: "#787fa0", deleting: "#565f89",
 };
 
-export function StatusView({ sessions }: { sessions: any[] }) {
-  const [statusData, setStatusData] = useState<any>(null);
+interface StatusData {
+  byStatus: Record<string, number>;
+  total: number;
+}
+
+interface SessionSummary {
+  id: string;
+  status: string;
+  summary?: string;
+  agent?: string;
+  updated_at?: string;
+}
+
+export function StatusView({ sessions }: { sessions: SessionSummary[] }) {
+  const [statusData, setStatusData] = useState<StatusData | null>(null);
 
   useEffect(() => {
     api.getStatus().then(setStatusData);
@@ -19,8 +32,8 @@ export function StatusView({ sessions }: { sessions: any[] }) {
   if (!statusData) return <div className="empty">Loading...</div>;
 
   const entries: [string, number][] = Object.entries(statusData.byStatus || {}).sort(
-    (a: any, b: any) => b[1] - a[1]
-  ) as any;
+    ([, a], [, b]) => b - a
+  );
   const total = statusData.total || 0;
 
   return (
@@ -67,7 +80,7 @@ export function StatusView({ sessions }: { sessions: any[] }) {
               </tr>
             </thead>
             <tbody>
-              {sessions.slice(0, 15).map((s: any) => (
+              {sessions.slice(0, 15).map((s) => (
                 <tr key={s.id}>
                   <td><StatusDot status={s.status} /></td>
                   <td>{s.summary || s.id}</td>

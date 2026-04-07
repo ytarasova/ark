@@ -152,7 +152,7 @@ session.command("list")
     const filters: Record<string, unknown> = { ...opts, groupPrefix: core.profileGroupPrefix() || undefined };
     if (opts.archived) filters.status = "archived";
     delete filters.archived;
-    const sessions = await ark.sessionList(filters as any);
+    const sessions = await ark.sessionList(filters as import("../types/index.js").SessionListParams & Record<string, unknown>);
     if (!sessions.length) {
       console.log(chalk.dim("No sessions. Start one: ark session start --repo . --summary 'task'"));
       return;

@@ -6,7 +6,7 @@ function purgeExpiredDeletes(ttlSeconds: number = 90): string[] {
   const purged: string[] = [];
   const cutoff = Date.now() - ttlSeconds * 1000;
   for (const s of deleted) {
-    const deletedAt = (s.config as any)?._deleted_at as string | undefined;
+    const deletedAt = s.config._deleted_at as string | undefined;
     if (deletedAt && new Date(deletedAt).getTime() < cutoff) {
       getApp().sessions.delete(s.id);
       purged.push(s.id);
@@ -161,7 +161,7 @@ describe("soft delete edge cases", () => {
     getApp().sessions.softDelete(s.id);
     const after = getApp().sessions.get(s.id)!;
     expect(after.config.custom).toBe("data");
-    expect((after.config.nested as any).a).toBe(1);
+    expect((after.config.nested as Record<string, unknown>).a).toBe(1);
     expect(after.config._pre_delete_status).toBe("running");
   });
 

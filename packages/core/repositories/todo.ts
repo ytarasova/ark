@@ -10,6 +10,15 @@ export interface Todo {
   created_at: string;
 }
 
+/** Raw row shape returned by bun:sqlite for the todos table. */
+interface TodoRow {
+  id: number;
+  session_id: string;
+  content: string;
+  done: number;
+  created_at: string;
+}
+
 export class TodoRepository {
   constructor(private db: Database) {}
 
@@ -20,19 +29,19 @@ export class TodoRepository {
     ).run(sessionId, content, ts);
     const row = this.db.prepare(
       "SELECT * FROM todos WHERE session_id = ? ORDER BY id DESC LIMIT 1"
-    ).get(sessionId) as any;
+    ).get(sessionId) as TodoRow;
     return { ...row, done: !!row.done };
   }
 
   list(sessionId: string): Todo[] {
     const rows = this.db.prepare(
       "SELECT * FROM todos WHERE session_id = ? ORDER BY id ASC"
-    ).all(sessionId) as any[];
+    ).all(sessionId) as TodoRow[];
     return rows.map(r => ({ ...r, done: !!r.done }));
   }
 
   toggle(id: number): Todo | null {
-    const row = this.db.prepare("SELECT * FROM todos WHERE id = ?").get(id) as any;
+    const row = this.db.prepare("SELECT * FROM todos WHERE id = ?").get(id) as TodoRow | undefined;
     if (!row) return null;
     const newDone = row.done ? 0 : 1;
     this.db.prepare("UPDATE todos SET done = ? WHERE id = ?").run(newDone, id);

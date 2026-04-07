@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { ComputeRepository } from "../compute.js";
 import { initSchema, seedLocalCompute } from "../schema.js";
+import type { ComputeStatus, ComputeConfig } from "../../../types/index.js";
 
 let db: Database;
 let repo: ComputeRepository;
@@ -96,20 +97,20 @@ describe("ComputeRepository", () => {
 
   it("update changes fields and returns updated compute", () => {
     repo.create({ name: "upd", provider: "docker" });
-    const updated = repo.update("upd", { status: "running" } as any);
+    const updated = repo.update("upd", { status: "running" as ComputeStatus });
     expect(updated!.status).toBe("running");
   });
 
   it("update skips unknown columns", () => {
     repo.create({ name: "upd2" });
-    const updated = repo.update("upd2", { unknownField: "x" } as any);
+    const updated = repo.update("upd2", { unknownField: "x" } as Record<string, unknown>);
     expect(updated).not.toBeNull();
   });
 
   it("update skips name and created_at", () => {
     repo.create({ name: "upd3" });
     const original = repo.get("upd3")!;
-    repo.update("upd3", { name: "hacked", created_at: "1999" } as any);
+    repo.update("upd3", { name: "hacked", created_at: "1999" } as Record<string, unknown>);
     const after = repo.get("upd3")!;
     expect(after.name).toBe("upd3");
     expect(after.created_at).toBe(original.created_at);
@@ -117,12 +118,12 @@ describe("ComputeRepository", () => {
 
   it("update handles config as JSON", () => {
     repo.create({ name: "cfg-upd" });
-    const updated = repo.update("cfg-upd", { config: { region: "eu-west-1" } } as any);
+    const updated = repo.update("cfg-upd", { config: { region: "eu-west-1" } as ComputeConfig });
     expect(updated!.config).toEqual({ region: "eu-west-1" });
   });
 
   it("update returns null for nonexistent", () => {
-    expect(repo.update("no-exist", { status: "running" } as any)).toBeNull();
+    expect(repo.update("no-exist", { status: "running" as ComputeStatus })).toBeNull();
   });
 
   // ── delete ──────────────────────────────────────────────────────────────

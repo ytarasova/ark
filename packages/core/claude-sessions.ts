@@ -113,7 +113,7 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
             const c = msg.content;
             if (typeof c === "string") text = c;
             else if (Array.isArray(c)) {
-              text = c.filter((x: any) => x.type === "text").map((x: any) => x.text).join(" ");
+              text = c.filter((x: { type: string; text?: string }) => x.type === "text").map((x: { type: string; text?: string }) => x.text ?? "").join(" ");
             }
             text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
             if (entry.type === "user" && isRealUserMessage(text)) {
@@ -158,6 +158,26 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
   return { sessionId, timestamp, lastActivity, summary, messageCount };
 }
 
+// ── Row types for bun:sqlite queries ─────────────────────────────────────────
+
+/** Raw row shape from the claude_sessions_cache table. */
+interface ClaudeSessionCacheRow {
+  session_id: string;
+  project: string;
+  project_dir: string;
+  transcript_path: string;
+  summary: string;
+  message_count: number;
+  timestamp: string;
+  last_activity: string;
+  cached_at: string;
+}
+
+/** Result of SELECT MAX(cached_at) query. */
+interface MaxTsRow {
+  max_ts: string | null;
+}
+
 // ── Cache layer ──────────────────────────────────────────────────────────────
 
 /**
@@ -169,7 +189,7 @@ export function listClaudeSessions(opts?: ListOpts): ClaudeSession[] {
   const limit = opts?.limit ?? 100;
 
   let sql = "SELECT * FROM claude_sessions_cache WHERE 1=1";
-  const params: any[] = [];
+  const params: (string | number)[] = [];
 
   if (opts?.project) {
     sql += " AND project LIKE ? COLLATE NOCASE";
@@ -180,7 +200,7 @@ export function listClaudeSessions(opts?: ListOpts): ClaudeSession[] {
   params.push(limit);
 
   try {
-    const rows = db.prepare(sql).all(...params) as any[];
+    const rows = db.prepare(sql).all(...params) as ClaudeSessionCacheRow[];
     return rows.map(r => ({
       sessionId: r.session_id,
       project: r.project,
@@ -208,7 +228,7 @@ export function getClaudeSession(sessionId: string, opts?: ListOpts): ClaudeSess
   try {
     const row = db.prepare(
       "SELECT * FROM claude_sessions_cache WHERE session_id = ? OR session_id LIKE ?"
-    ).get(sessionId, `${sessionId}%`) as any;
+    ).get(sessionId, `${sessionId}%`) as ClaudeSessionCacheRow | undefined;
     if (!row) return null;
     return {
       sessionId: row.session_id, project: row.project, projectDir: row.project_dir,
@@ -242,7 +262,7 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
   // Get the most recent cached_at timestamp for incremental refresh
   let lastCachedAt = "";
   try {
-    const row = db.prepare("SELECT MAX(cached_at) as max_ts FROM claude_sessions_cache").get() as any;
+    const row = db.prepare("SELECT MAX(cached_at) as max_ts FROM claude_sessions_cache").get() as MaxTsRow | undefined;
     lastCachedAt = row?.max_ts ?? "";
   } catch (e: any) {
     // Table may not exist yet on first refresh — that's fine, we'll do a full scan

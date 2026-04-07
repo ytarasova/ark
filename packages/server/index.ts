@@ -100,12 +100,13 @@ export class ArkServer {
   /** Start WebSocket server on a port. Returns stop function. */
   startWebSocket(port: number): { stop(): void } {
     const self = this;
+    const wsMetadata = new WeakMap<object, { connId: string; handlers: ((msg: JsonRpcMessage) => void)[] }>();
     const server = Bun.serve({
       port,
       hostname: "127.0.0.1",
       fetch(req, server) {
         if (server.upgrade(req)) return;
-        return new Response("Ark Server — connect via WebSocket", { status: 200 });
+        return new Response("Ark Server -- connect via WebSocket", { status: 200 });
       },
       websocket: {
         open(ws) {
@@ -123,8 +124,7 @@ export class ArkServer {
           };
 
           self.connections.set(connId, conn);
-          (ws as any)._arkConnId = connId;
-          (ws as any)._arkHandlers = handlers;
+          wsMetadata.set(ws, { connId, handlers });
 
           // Wire message routing (same as addConnection)
           conn.transport.onMessage(async (msg) => {
@@ -143,13 +143,13 @@ export class ArkServer {
         message(ws, data) {
           try {
             const msg = parseMessage(typeof data === "string" ? data : new TextDecoder().decode(data as unknown as ArrayBuffer));
-            const handlers = (ws as any)._arkHandlers;
-            if (handlers) for (const h of handlers) h(msg);
+            const meta = wsMetadata.get(ws);
+            if (meta) for (const h of meta.handlers) h(msg);
           } catch {}
         },
         close(ws) {
-          const connId = (ws as any)._arkConnId;
-          if (connId) self.connections.delete(connId);
+          const meta = wsMetadata.get(ws);
+          if (meta) self.connections.delete(meta.connId);
         },
       },
     });

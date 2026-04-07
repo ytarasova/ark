@@ -19,7 +19,7 @@ import type { CreateSessionOpts, SessionListFilters } from "../types/index.js";
 export function createSession(opts: CreateSessionOpts) { return _getApp().sessions.create(opts); }
 export function getSession(id: string) { return _getApp().sessions.get(id); }
 export function listSessions(filters?: SessionListFilters) { return _getApp().sessions.list(filters); }
-export function updateSession(id: string, fields: Record<string, unknown>) { return _getApp().sessions.update(id, fields as any); }
+export function updateSession(id: string, fields: Partial<import("../types/index.js").Session>) { return _getApp().sessions.update(id, fields); }
 export function softDeleteSession(id: string) { return _getApp().sessions.softDelete(id); }
 export function undeleteSession(id: string) { return _getApp().sessions.undelete(id); }
 export function deleteSession(id: string): boolean { return _getApp().sessions.delete(id); }
@@ -34,10 +34,10 @@ export function getEvents(sessionId: string, filters?: { type?: string }) { retu
 export function logEvent(sessionId: string, type: string, data?: Record<string, unknown>) { return _getApp().events.log(sessionId, type, data); }
 
 // Compute CRUD
-export function createCompute(opts: { name: string; provider: string; [k: string]: unknown }) { return _getApp().computes.create(opts as any); }
+export function createCompute(opts: { name: string; provider: string; [k: string]: unknown }) { return _getApp().computes.create(opts as import("../types/index.js").CreateComputeOpts); }
 export function getCompute(name: string) { return _getApp().computes.get(name); }
 export function listCompute() { return _getApp().computes.list(); }
-export function updateCompute(name: string, fields: Record<string, unknown>) { return _getApp().computes.update(name, fields as any); }
+export function updateCompute(name: string, fields: Partial<import("../types/index.js").Compute>) { return _getApp().computes.update(name, fields); }
 export function mergeComputeConfig(name: string, config: Record<string, unknown>) { return _getApp().computes.mergeConfig(name, config); }
 export function deleteCompute(name: string) { return _getApp().computes.delete(name); }
 

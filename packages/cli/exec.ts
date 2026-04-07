@@ -67,7 +67,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Result
   if (output === "json") {
-    const usage = (final.config as any)?.usage;
+    const usage = final.config?.usage;
     console.log(JSON.stringify({
       status: timedOut ? "timeout" : final.status,
       sessionId: final.id,
@@ -81,7 +81,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
       console.error(chalk.yellow(`Timeout after ${opts.timeout}s`));
     } else if (final.status === "completed") {
       console.log(chalk.green(`Completed`));
-      const usage = (final.config as any)?.usage;
+      const usage = final.config?.usage;
       if (usage) console.log(chalk.dim(`  Tokens: ${(usage.total_tokens / 1000).toFixed(1)}K`));
     } else if (final.status === "failed") {
       console.error(chalk.red(`Failed: ${final.error ?? "unknown"}`));

@@ -101,6 +101,20 @@ export function isNotification(msg: JsonRpcMessage): msg is JsonRpcNotification 
   return "method" in msg && !("id" in msg);
 }
 
+// ── RPC Error class ────────────────────────────────────────────────────────
+
+/** Error with a numeric JSON-RPC error code. Thrown by RPC handlers. */
+export class RpcError extends Error {
+  code: number;
+  data?: unknown;
+  constructor(message: string, code: number, data?: unknown) {
+    super(message);
+    this.name = "RpcError";
+    this.code = code;
+    if (data !== undefined) this.data = data;
+  }
+}
+
 // ── Version ─────────────────────────────────────────────────────────────────
 
 export const ARK_VERSION = "0.8.0";

@@ -1,9 +1,10 @@
 import { describe, it, expect } from "bun:test";
 import { evaluateTermination, parseTermination, maxTurns, maxTokens, timeout, textMention, and, or } from "../termination.js";
 import type { TerminationContext } from "../termination.js";
+import type { Session } from "../../types/index.js";
 
 const ctx: TerminationContext = {
-  session: { status: "running" } as any,
+  session: { status: "running" } as Session,
   turnCount: 10,
   tokenCount: 50000,
   elapsedMs: 30000,

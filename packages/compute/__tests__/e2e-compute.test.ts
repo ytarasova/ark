@@ -79,8 +79,8 @@ describe("E2E Compute: EC2 compute provider resolution", () => {
     expect(provider!.name).toBe("ec2");
 
     // Verify config was stored
-    expect((compute.config as any).size).toBe("m");
-    expect((compute.config as any).region).toBe("us-east-1");
+    expect(compute.config.size).toBe("m");
+    expect(compute.config.region).toBe("us-east-1");
   });
 });
 
@@ -319,15 +319,15 @@ describe("E2E Compute: mergeComputeConfig", () => {
 
     const updated = getApp().computes.mergeConfig(name, { newKey: "hello", count: 99 });
     expect(updated).not.toBeNull();
-    expect((updated!.config as any).existing).toBe("value"); // preserved
-    expect((updated!.config as any).newKey).toBe("hello");   // added
-    expect((updated!.config as any).count).toBe(99);         // overwritten
+    expect((updated!.config).existing).toBe("value"); // preserved
+    expect((updated!.config).newKey).toBe("hello");   // added
+    expect((updated!.config).count).toBe(99);         // overwritten
 
     // Verify via re-read
     const compute = getApp().computes.get(name);
-    expect((compute!.config as any).existing).toBe("value");
-    expect((compute!.config as any).newKey).toBe("hello");
-    expect((compute!.config as any).count).toBe(99);
+    expect((compute!.config).existing).toBe("value");
+    expect((compute!.config).newKey).toBe("hello");
+    expect((compute!.config).count).toBe(99);
   });
 
   it("returns null for non-existent compute", () => {

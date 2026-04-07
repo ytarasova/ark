@@ -105,7 +105,7 @@ describe("compute CRUD", () => {
   it("silently ignores updates to name and created_at", () => {
     getApp().computes.create({ name: "immut", provider: "local" });
     const updated = getApp().computes.update("immut", {
-      name: "renamed" as any,
+      name: "renamed" as unknown,
       created_at: "2000-01-01T00:00:00.000Z",
       status: "running",
     });
@@ -164,9 +164,9 @@ describe("compute CRUD", () => {
     const updated = getApp().computes.update("cfg", { config: { x: 99 } });
     expect(updated).not.toBeNull();
     expect(updated!.config).toEqual({ x: 99 });
-    expect((updated!.config as any).a).toBeUndefined();
-    expect((updated!.config as any).b).toBeUndefined();
-    expect((updated!.config as any).c).toBeUndefined();
+    expect(updated!.config.a).toBeUndefined();
+    expect(updated!.config.b).toBeUndefined();
+    expect(updated!.config.c).toBeUndefined();
   });
 
   it("handles a large nested config object", () => {

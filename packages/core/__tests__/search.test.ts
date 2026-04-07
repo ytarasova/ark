@@ -8,6 +8,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { getApp } from "../app.js";
 import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation } from "../search.js";
+import type { MessageRole } from "../../types/index.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
@@ -50,7 +51,7 @@ describe("searchSessions", () => {
 
   it("finds matches in messages", () => {
     const session = getApp().sessions.create({ summary: "unrelated" });
-    getApp().messages.send(session.id, "agent" as any, "Refactored the payment module");
+    getApp().messages.send(session.id, "agent" as MessageRole, "Refactored the payment module");
     const results = searchSessions("payment module");
     const msg = results.find(r => r.source === "message");
     expect(msg).toBeDefined();
@@ -99,7 +100,7 @@ describe("searchSessions", () => {
 
   it("returns results from multiple sources", () => {
     const session = getApp().sessions.create({ summary: "multi-source alpha" });
-    getApp().messages.send(session.id, "agent" as any, "working on alpha feature");
+    getApp().messages.send(session.id, "agent" as MessageRole, "working on alpha feature");
     getApp().events.log(session.id, "note", { data: { note: "alpha checkpoint" } });
 
     const results = searchSessions("alpha");

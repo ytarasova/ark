@@ -54,7 +54,7 @@ export const claudeCodeExecutor: Executor = {
     claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts.autonomy });
 
     // Build launch env from agent config + provider-specific env
-    const launchEnv = { ...(opts.agent.env ?? {}), ...(provider?.buildLaunchEnv(session as any) ?? {}) };
+    const launchEnv = { ...(opts.agent.env ?? {}), ...(provider?.buildLaunchEnv(session) ?? {}) };
 
     const claudeArgs = opts.claudeArgs ?? [];
     const { content: launchContent, claudeSessionId } = claude.buildLauncher({

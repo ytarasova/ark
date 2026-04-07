@@ -49,7 +49,7 @@ export interface SessionCost {
 
 /** Get cost info for a single session. */
 export function getSessionCost(session: Session): SessionCost {
-  const usage = (session.config?.usage as TranscriptUsage) ?? null;
+  const usage = session.config?.usage as TranscriptUsage | null ?? null;
   const model = (session.config?.model as string) ?? session.agent ?? null;
   const cost = usage ? calculateCost(usage, model) : 0;
   return {
@@ -123,7 +123,7 @@ export function syncCosts(): { synced: number; skipped: number } {
 
   for (const session of sessions) {
     // Skip sessions that already have usage data
-    if ((session.config as any)?.usage?.total_tokens > 0) { skipped++; continue; }
+    if ((session.config?.usage?.total_tokens ?? 0) > 0) { skipped++; continue; }
 
     // Try to find transcript by claude_session_id
     if (!session.claude_session_id) { skipped++; continue; }

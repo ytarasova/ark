@@ -4,9 +4,10 @@
 
 import { describe, it, expect } from "bun:test";
 import { getApp } from "../app.js";
+import type { MessageRole, MessageType } from "../../types/index.js";
 
-function addMessage(opts: { session_id: string; role: string; content: string; type?: string }) {
-  return getApp().messages.send(opts.session_id, opts.role as any, opts.content, opts.type as any);
+function addMessage(opts: { session_id: string; role: MessageRole; content: string; type?: MessageType }) {
+  return getApp().messages.send(opts.session_id, opts.role, opts.content, opts.type);
 }
 function getMessages(sessionId: string, opts?: { limit?: number }) {
   return getApp().messages.list(sessionId, opts);

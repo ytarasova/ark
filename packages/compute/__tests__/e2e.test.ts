@@ -34,7 +34,9 @@ afterAll(async () => {
 
 // ── Shared fixtures ──────────────────────────────────────────────────────────
 
-const fakeSession = {
+import type { Session } from "../types.js";
+
+const fakeSession: Session = {
   id: "s-e2etest",
   ticket: null,
   summary: null,
@@ -148,7 +150,7 @@ describe("E2E: Launch and probe a session", () => {
     const tmuxName = `ark-e2e-test-${Date.now()}`;
     tmuxSessions.push(tmuxName);
 
-    await provider.launch(compute, fakeSession as any, {
+    await provider.launch(compute, fakeSession, {
       tmuxName,
       workdir: "/tmp",
       launcherContent: "#!/bin/bash\nsleep 30",

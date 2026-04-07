@@ -8,6 +8,7 @@ import { render } from "ink-testing-library";
 import { Text } from "ink";
 import { useComputeMetrics } from "../hooks/useComputeMetrics.js";
 import { registerProvider, clearProviders } from "../../compute/index.js";
+import type { ComputeProvider } from "../../compute/types.js";
 import { AppContext, setApp, clearApp } from "../../core/index.js";
 import type { Compute } from "../../core/index.js";
 import { waitFor } from "../../core/__tests__/test-helpers.js";
@@ -165,11 +166,11 @@ describe("useComputeMetrics", () => {
     let fetchCount = 0;
     const provider = mockProvider("track");
     const origGetMetrics = provider.getMetrics;
-    (provider as any).getMetrics = async (...args: any[]) => {
+    provider.getMetrics = async (...args: Parameters<ComputeProvider["getMetrics"]>) => {
       fetchCount++;
-      return (origGetMetrics as any)(...args);
+      return origGetMetrics(...args);
     };
-    registerProvider(provider as any);
+    registerProvider(provider as ComputeProvider);
 
     const computes = [
       makeCompute({ name: "idle-box", provider: "track", status: "running" }),

@@ -242,8 +242,8 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
           // Attach: mute Ink, reset terminal for tmux, spawn+wait, restore Ink
           const origWrite = process.stdout.write.bind(process.stdout);
           const origErrWrite = process.stderr.write.bind(process.stderr);
-          process.stdout.write = (() => true) as any;
-          process.stderr.write = (() => true) as any;
+          process.stdout.write = (() => true) as typeof process.stdout.write;
+          process.stderr.write = (() => true) as typeof process.stderr.write;
           setTimeout(() => {
             process.stdout.write = origWrite;
             process.stderr.write = origErrWrite;

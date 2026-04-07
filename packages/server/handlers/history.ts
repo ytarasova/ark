@@ -30,7 +30,7 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
 
   router.handle("history/refresh", async (p) => {
     const count = await core.refreshClaudeSessionsCache({
-      onProgress: (p as any).onProgress ?? (() => {}),
+      onProgress: () => {},
     });
     const items = core.listClaudeSessions();
     return { ok: true, count: items.length, sessionCount: count };

@@ -14,8 +14,7 @@ export function SkillsManager({ session, asyncState, onClose }: SkillsManagerPro
   const [allSkills, setAllSkills] = useState<any[]>([]);
   useEffect(() => { ark.skillList().then(setAllSkills); }, []);
   const attached = useMemo(() => {
-    const cfg = session.config as any;
-    return (cfg?.skills as string[]) ?? [];
+    return (session.config?.skills as string[] | undefined) ?? [];
   }, [session]);
 
   const [toggleState, setToggleState] = useState<Map<string, boolean>>(() => {

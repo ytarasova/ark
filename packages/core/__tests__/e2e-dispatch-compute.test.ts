@@ -163,7 +163,7 @@ describe("dispatch compute: config file writing", () => {
 
     for (const [event, matchers] of Object.entries(settings.hooks)) {
       if (event === "PreToolUse") continue;
-      for (const matcher of matchers as any[]) {
+      for (const matcher of matchers as Array<{ hooks: Array<{ async: boolean }> }>) {
         for (const hook of matcher.hooks) {
           expect(hook.async).toBe(true);
         }

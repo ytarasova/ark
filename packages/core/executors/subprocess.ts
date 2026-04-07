@@ -107,10 +107,11 @@ export const subprocessExecutor: Executor = {
   async send(handle: string, message: string): Promise<void> {
     const tracked = processes.get(handle);
     if (!tracked || tracked.exited) return;
-    const writer = (tracked.proc.stdin as any)?.getWriter();
-    if (writer) {
-      await writer.write(new TextEncoder().encode(message + "\n"));
-      writer.releaseLock();
+    // Bun's stdin is a FileSink — write directly
+    const sink = tracked.proc.stdin;
+    if (sink) {
+      (sink as { write(data: Uint8Array): number }).write(new TextEncoder().encode(message + "\n"));
+      (sink as { flush?(): void }).flush?.();
     }
   },
 

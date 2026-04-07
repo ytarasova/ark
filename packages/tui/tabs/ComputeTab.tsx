@@ -80,16 +80,16 @@ export function ComputeTab({ computes, sessions, refresh, pane, snapshots, compu
       }
     } else if (input === "a") {
       if (selected?.status === "running") {
-        const ip = (selected.config as any)?.ip;
+        const ip = (selected.config as Record<string, unknown>)?.ip as string | undefined;
         if (!ip) return;
         const keyPath = join(homedir(), ".ssh", `ark-${selected.name}`);
         const sshCmd = `ssh -i ${keyPath} -o StrictHostKeyChecking=no ubuntu@${ip}`;
         asyncState.run("Opening SSH...", async () => {
           await new Promise<void>((resolve, reject) => {
-            execFile("tmux", ["new-window", "-n", `ssh-${selected.name}`, "bash", "-c", sshCmd], ((err) => {
+            execFile("tmux", ["new-window", "-n", `ssh-${selected.name}`, "bash", "-c", sshCmd], (err, _stdout, _stderr) => {
               if (err) { status.show(`Run: ${sshCmd}`); reject(err); }
               else { status.show(`Opened SSH to ${selected.name}`); resolve(); }
-            }) as any);
+            });
           });
         });
       }
@@ -165,8 +165,8 @@ function getComputePorts(sessions: Session[], computeName: string): ComputePort[
   const ports: ComputePort[] = [];
   for (const s of sessions) {
     if (s.compute_name !== computeName || s.status !== "running") continue;
-    const sessionPorts = (s.config as any)?.ports ?? [];
-    ports.push(...sessionPorts);
+    const sessionPorts = s.config?.ports ?? [];
+    ports.push(...sessionPorts.map(p => ({ ...p, source: p.source ?? "session", listening: true })));
   }
   return ports;
 }

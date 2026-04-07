@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { saveRecipe, deleteRecipe, loadRecipe, listRecipes, sessionToRecipe } from "../recipe.js";
+import type { RecipeDefinition } from "../../types/index.js";
 
 let app: AppContext;
 beforeEach(async () => { if (app) { await app.shutdown(); clearApp(); } app = AppContext.forTest(); setApp(app); await app.boot(); });
@@ -11,7 +12,7 @@ describe("recipe create/delete via core", () => {
     saveRecipe({
       name: "test-recipe", description: "Test recipe",
       flow: "bare", variables: [{ name: "repo", description: "Repo path", required: true }],
-    } as any, "global");
+    } as RecipeDefinition, "global");
     const recipe = loadRecipe("test-recipe");
     expect(recipe).not.toBeNull();
     expect(recipe!.name).toBe("test-recipe");
@@ -21,7 +22,7 @@ describe("recipe create/delete via core", () => {
   it("deleteRecipe removes a global recipe", () => {
     saveRecipe({
       name: "tmp-recipe", description: "tmp", flow: "bare", variables: [],
-    } as any, "global");
+    } as RecipeDefinition, "global");
     expect(loadRecipe("tmp-recipe")).not.toBeNull();
     deleteRecipe("tmp-recipe", "global");
     expect(loadRecipe("tmp-recipe")).toBeNull();

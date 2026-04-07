@@ -7,8 +7,17 @@ import type { Session } from "../types/index.js";
 import { getApp } from "./app.js";
 
 
+/** Telegram getUpdates API response shape. */
+interface TelegramResponse {
+  ok: boolean;
+  result?: Array<{
+    update_id: number;
+    message?: { text?: string };
+  }>;
+}
+
 /** Safe session list — uses AppContext if available, falls back to store. */
-function safeListSessions(opts?: { limit?: number }): any[] {
+function safeListSessions(opts?: { limit?: number }): Array<{ status: string }> {
   try { return safeListSessions(opts); }
   catch { return []; }
 }
@@ -69,7 +78,7 @@ async function pollTelegram(
       const resp = await fetch(`${url}?offset=${offset}&timeout=30`, { signal });
       if (!resp.ok) { await Bun.sleep(5000); continue; }
 
-      const data = await resp.json() as any;
+      const data = await resp.json() as TelegramResponse;
       for (const update of data.result ?? []) {
         offset = update.update_id + 1;
         const text = update.message?.text;

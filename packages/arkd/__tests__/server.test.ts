@@ -424,7 +424,7 @@ describe("Error handling", () => {
       body: "not json",
     });
     expect(resp.status).toBe(400);
-    const data = await resp.json() as any;
+    const data = await resp.json() as Record<string, unknown>;
     expect(data.error).toContain("invalid JSON");
   });
 

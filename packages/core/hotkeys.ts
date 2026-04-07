@@ -52,7 +52,7 @@ export function getHotkeys(): HotkeyMap {
 
   try {
     const config = loadConfig();
-    const overrides = (config as any)?.hotkeys ?? {};
+    const overrides = ((config as unknown as Record<string, unknown>)?.hotkeys ?? {}) as HotkeyMap;
     _hotkeys = { ...DEFAULTS, ...overrides };
   } catch {
     _hotkeys = { ...DEFAULTS };

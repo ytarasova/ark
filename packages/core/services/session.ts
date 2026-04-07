@@ -53,7 +53,7 @@ export interface ReportResult {
 
 // ── OutboundMessage (minimal interface for applyReport) ──────────────────────
 
-interface OutboundMessage {
+export interface OutboundMessage {
   type: "progress" | "completed" | "question" | "error";
   sessionId: string;
   stage: string;

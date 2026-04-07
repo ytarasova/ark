@@ -25,7 +25,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       if (s.key === "theme" && s.options) {
         const idx = s.options.indexOf(s.value);
         const next = s.options[(idx + 1) % s.options.length];
-        setThemeMode(next as any);
+        setThemeMode(next as import("../../core/theme.js").ThemeMode);
       }
     }
   });

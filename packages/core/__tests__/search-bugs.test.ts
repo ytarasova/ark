@@ -46,7 +46,7 @@ describe("indexTranscripts transaction safety", () => {
 
     // Data should be committed and queryable
     const db = getApp().db;
-    const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as any;
+    const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as { c: number } | undefined;
     expect(row.c).toBeGreaterThan(0);
   });
 });

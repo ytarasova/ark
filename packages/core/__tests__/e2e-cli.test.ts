@@ -78,7 +78,7 @@ describe("CLI: compute lifecycle", () => {
     core.createCompute({ name, provider: "ec2" });
     core.mergeComputeConfig(name, { foo: "bar" });
     const compute = core.getCompute(name);
-    expect((compute!.config as any).foo).toBe("bar");
+    expect(compute!.config.foo).toBe("bar");
   });
 
   it("rejects deleting a running compute", () => {

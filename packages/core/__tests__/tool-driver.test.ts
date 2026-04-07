@@ -3,6 +3,7 @@ import { getToolDriver, listToolDrivers } from "../tools/registry.js";
 import { registerToolDriver } from "../tools/registry.js";
 import { ClaudeDriver } from "../tools/claude-driver.js";
 import { GeminiDriver } from "../tools/gemini-driver.js";
+import type { ToolDriver } from "../tool-driver.js";
 
 describe("tool driver registry", () => {
   it("lists available drivers", () => {
@@ -86,16 +87,16 @@ describe("tool driver registry advanced", () => {
   });
 
   it("registerToolDriver adds a custom driver", () => {
-    const custom = {
+    const custom: ToolDriver = {
       name: "custom-ai",
       resolveModel: (s: string) => s,
       buildArgs: () => ["custom-ai", "--run"],
-      buildLauncher: (opts: any) => ({ script: "#!/bin/bash\ncustom-ai", sessionId: "test" }),
+      buildLauncher: () => ({ script: "#!/bin/bash\ncustom-ai", sessionId: "test" }),
     };
-    registerToolDriver(custom as any);
+    registerToolDriver(custom);
     const driver = getToolDriver("custom-ai");
     expect(driver.name).toBe("custom-ai");
-    expect(driver.buildArgs({} as any)).toEqual(["custom-ai", "--run"]);
+    expect(driver.buildArgs({ model: "custom" })).toEqual(["custom-ai", "--run"]);
   });
 });
 

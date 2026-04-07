@@ -25,7 +25,7 @@ describe("handleAcpRequest", () => {
     expect(resp.id).toBe(1);
     expect(resp.error).toBeUndefined();
 
-    const result = resp.result as any;
+    const result = resp.result as Record<string, unknown>;
     expect(result.sessionId).toMatch(/^s-/);
     expect(result.status).toBe("ready");
 
@@ -42,7 +42,7 @@ describe("handleAcpRequest", () => {
     const resp = await handleAcpRequest(req("session/list", { limit: 10 }));
 
     expect(resp.error).toBeUndefined();
-    const sessions = resp.result as any[];
+    const sessions = resp.result as Record<string, unknown>[];
     expect(sessions.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -52,7 +52,7 @@ describe("handleAcpRequest", () => {
     const resp = await handleAcpRequest(req("session/get", { sessionId: session.id }));
 
     expect(resp.error).toBeUndefined();
-    const result = resp.result as any;
+    const result = resp.result as Record<string, unknown>;
     expect(result.id).toBe(session.id);
     expect(result.summary).toBe("get test");
   });
@@ -79,7 +79,7 @@ describe("handleAcpRequest", () => {
     const resp = await handleAcpRequest(req("session/delete", { sessionId: session.id }));
 
     expect(resp.error).toBeUndefined();
-    const result = resp.result as any;
+    const result = resp.result as Record<string, unknown>;
     expect(result.ok).toBe(true);
   });
 });

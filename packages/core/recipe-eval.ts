@@ -45,12 +45,12 @@ export function evaluateRecipeSetup(recipeName: string, iterations: number, vari
       const instance = instantiateRecipe(recipe, variables ?? {});
       const session = startSession({
         summary: `[eval] ${recipeName} #${i + 1}`,
-        repo: (instance as any).repo ?? ".",
-        flow: (instance as any).flow ?? recipe.flow ?? "quick",
+        repo: instance.repo ?? ".",
+        flow: instance.flow ?? recipe.flow ?? "quick",
         config: { eval: true, evalIteration: i + 1 },
       });
 
-      const cost = getSessionCost(session as any);
+      const cost = getSessionCost(session);
       results.push({
         sessionId: session.id,
         status: session.status,

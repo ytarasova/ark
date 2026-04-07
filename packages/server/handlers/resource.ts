@@ -57,7 +57,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   });
   router.handle("compute/list", async () => ({ targets: app.computes.list() }));
   router.handle("compute/create", async (p) => {
-    const compute = app.computes.create(p as any);
+    const { name, provider, config } = extract<{ name: string; provider?: import("../../types/index.js").ComputeProviderName; config?: Partial<import("../../types/index.js").ComputeConfig> }>(p, ["name"]);
+    const compute = app.computes.create({ name, provider, config });
     return { compute };
   });
   router.handle("compute/delete", async (p) => {
@@ -165,8 +166,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = app.computes.get(name);
     if (!compute) throw new Error("Compute not found");
-    const cfg = compute.config as any;
-    const ip = cfg?.ip;
+    const cfg = compute.config as Record<string, unknown>;
+    const ip = cfg?.ip as string | undefined;
     if (!ip) return { reachable: false, message: "No IP configured" };
     try {
       const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");

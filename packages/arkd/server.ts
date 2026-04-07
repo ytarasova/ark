@@ -297,7 +297,7 @@ async function runExec(req: ExecReq): Promise<ExecRes> {
 
   if (req.stdin && proc.stdin) {
     // Bun's stdin is a FileSink, not a WritableStream
-    const sink = proc.stdin as any;
+    const sink = proc.stdin as unknown as { write(data: string): number; end(): void };
     sink.write(req.stdin);
     sink.end();
   }
@@ -387,8 +387,9 @@ async function collectMetrics(): Promise<MetricsRes> {
   const cores = cpus();
   let totalIdle = 0, totalTick = 0;
   for (const c of cores) {
-    for (const type in c.times) {
-      totalTick += (c.times as any)[type];
+    const times = c.times as Record<string, number>;
+    for (const type in times) {
+      totalTick += times[type];
     }
     totalIdle += c.times.idle;
   }
@@ -467,7 +468,8 @@ async function getLinuxCpu(): Promise<number> {
   const cores = cpus();
   let totalIdle = 0, totalTick = 0;
   for (const c of cores) {
-    for (const type in c.times) totalTick += (c.times as any)[type];
+    const times = c.times as Record<string, number>;
+    for (const type in times) totalTick += times[type];
     totalIdle += c.times.idle;
   }
   return Math.round((1 - totalIdle / totalTick) * 100);

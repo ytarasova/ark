@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { extract, rpcError } from "../validate.js";
+import { RpcError } from "../../protocol/types.js";
 
 describe("extract<T>", () => {
   it("returns params when all required keys present", () => {
@@ -33,13 +34,13 @@ describe("extract<T>", () => {
     const params = { sessionId: "s-1", extra: "bonus" };
     const result = extract<{ sessionId: string }>(params, ["sessionId"]);
     expect(result.sessionId).toBe("s-1");
-    expect((result as any).extra).toBe("bonus");
+    expect((result as Record<string, unknown>).extra).toBe("bonus");
   });
 
   it("works with empty required array", () => {
     const params = { anything: "goes" };
     const result = extract<Record<string, unknown>>(params, []);
-    expect((result as any).anything).toBe("goes");
+    expect(result.anything).toBe("goes");
   });
 });
 
@@ -47,7 +48,7 @@ describe("rpcError", () => {
   it("creates error with code property", () => {
     const err = rpcError(-32600, "Invalid request");
     expect(err.message).toBe("Invalid request");
-    expect((err as any).code).toBe(-32600);
+    expect((err as RpcError).code).toBe(-32600);
     expect(err instanceof Error).toBe(true);
   });
 });

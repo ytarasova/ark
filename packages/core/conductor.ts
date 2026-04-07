@@ -177,8 +177,27 @@ function handleRestApi(path: string): Response {
   return new Response("Not found", { status: 404 });
 }
 
+/** GitHub PR merge webhook payload (subset of fields we use). */
+interface GitHubPRWebhookPayload {
+  action?: string;
+  pull_request?: {
+    merged?: boolean;
+    html_url?: string;
+    merge_commit_sha?: string;
+    number?: number;
+    title?: string;
+    head?: { ref?: string };
+    base?: { ref?: string };
+  };
+  repository?: {
+    full_name?: string;
+    name?: string;
+    owner?: { login?: string };
+  };
+}
+
 async function handlePRMergeWebhook(req: Request): Promise<Response> {
-  const payload = await req.json() as any;
+  const payload = await req.json() as GitHubPRWebhookPayload;
   if (payload.action !== "closed" || !payload.pull_request?.merged) {
     return Response.json({ status: "ignored" });
   }
@@ -189,13 +208,12 @@ async function handlePRMergeWebhook(req: Request): Promise<Response> {
   // Find Ark session by branch or PR URL
   const sessions = getApp().sessions.list();
   const matchedSession = sessions.find(s => {
-    const cfg = s.config as any;
-    return cfg?.pr_url === pr.html_url || cfg?.branch === pr.head?.ref;
+    return s.config?.github_url === pr.html_url || s.branch === pr.head?.ref;
   });
 
   if (!matchedSession) return Response.json({ status: "no_session" });
 
-  const config: RollbackConfig = (globalThis as any).__arkRollbackConfig ?? {
+  const config: RollbackConfig = getApp().rollbackConfig ?? {
     enabled: false, timeout: 600, on_timeout: "ignore", auto_merge: false, health_url: null,
   };
 
@@ -214,8 +232,8 @@ async function handlePRMergeWebhook(req: Request): Promise<Response> {
     ? async () => { try { const res = await fetch(config.health_url!); return res.ok; } catch { return false; } }
     : undefined;
 
-  const onRevert = async (revertPayload: any) => {
-    await fetch(`https://api.github.com/repos/${repo.full_name}/pulls`, {
+  const onRevert = async (revertPayload: import("./rollback.js").RevertPayload) => {
+    await fetch(`https://api.github.com/repos/${repo?.full_name}/pulls`, {
       method: "POST",
       headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
       body: JSON.stringify(revertPayload),
@@ -350,9 +368,9 @@ export async function deliverToChannel(
   const computeName = targetSession.compute_name || "local";
   const compute = getApp().computes.get(computeName);
   const provider = compute ? getProvider(compute.provider) : null;
-  if (provider && typeof (provider as any).getArkdUrl === "function") {
+  if (provider?.getArkdUrl) {
     try {
-      const arkdUrl = (provider as any).getArkdUrl(compute);
+      const arkdUrl = provider.getArkdUrl(compute!);
       const client = new ArkdClient(arkdUrl);
       const result = await client.channelDeliver({ channelPort, payload });
       if (result.delivered) return;
@@ -380,7 +398,7 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
   // Store message for TUI chat view
   if (result.message) {
-    getApp().messages.send(sessionId, result.message.role as any, result.message.content, result.message.type as any);
+    getApp().messages.send(sessionId, result.message.role, result.message.content, result.message.type);
   }
 
   // Emit bus events
@@ -423,7 +441,7 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
       // Check repo config for auto_pr override (defaults to true)
       const { loadRepoConfig } = await import("./repo-config.js");
       const repoConfig = s.workdir ? loadRepoConfig(s.workdir) : {};
-      const autoPR = (repoConfig as any).auto_pr !== false;
+      const autoPR = repoConfig.auto_pr !== false;
 
       if (autoPR) {
         safeAsync(`auto-pr: ${sessionId}`, async () => {

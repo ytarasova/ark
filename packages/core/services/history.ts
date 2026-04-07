@@ -14,6 +14,15 @@ export interface HistorySearchResult {
   timestamp?: string;
 }
 
+/** Raw row shape from sessions table for history search queries. */
+interface HistoryRow {
+  id: string;
+  ticket: string | null;
+  summary: string | null;
+  repo: string | null;
+  created_at: string;
+}
+
 export class HistoryService {
   constructor(private db: Database) {}
 
@@ -34,7 +43,7 @@ export class HistoryService {
          OR id LIKE ? COLLATE NOCASE)
         AND status != 'deleting'
       ORDER BY created_at DESC LIMIT ?
-    `).all(pattern, pattern, pattern, pattern, limit) as any[];
+    `).all(pattern, pattern, pattern, pattern, limit) as HistoryRow[];
 
     for (const row of rows) {
       results.push({

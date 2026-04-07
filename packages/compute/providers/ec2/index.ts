@@ -560,7 +560,7 @@ export class EC2Provider implements ComputeProvider {
   }
 
   async cleanupSession(compute: Compute, session: Session): Promise<void> {
-    const remoteWorkdir = (session.config as any)?.remoteWorkdir;
+    const remoteWorkdir = session.config?.remoteWorkdir as string | undefined;
     if (!remoteWorkdir) return;
     const { queue } = this.getQueue(compute);
     await safeAsync(`[ec2] cleanupSession: rm remote workdir for ${session.id} on ${compute.name}`, () =>
@@ -577,7 +577,7 @@ export class EC2Provider implements ComputeProvider {
     const key = sshKeyPath(compute.name);
 
     // Re-establish tunnels from session's port list + channel port
-    const ports: PortDecl[] = (session.config as any)?.ports ?? [];
+    const ports: PortDecl[] = (session.config?.ports as PortDecl[] | undefined) ?? [];
     const channelPort = getApp().sessions.channelPort(session.id);
     const channelPortDecl: PortDecl = { port: channelPort, name: "channel", source: "ark" };
     setupTunnels(key, ip, [...ports, channelPortDecl]);

@@ -1,5 +1,5 @@
 import {
-  createResponse, createErrorResponse, ErrorCodes,
+  createResponse, createErrorResponse, ErrorCodes, RpcError,
   type JsonRpcRequest, type JsonRpcResponse, type JsonRpcError,
 } from "../protocol/types.js";
 
@@ -39,7 +39,7 @@ export class Router {
       return createResponse(req.id, result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      const code = (err as any)?.code ?? ErrorCodes.INTERNAL_ERROR;
+      const code = err instanceof RpcError ? err.code : ErrorCodes.INTERNAL_ERROR;
       return createErrorResponse(req.id, code, message);
     }
   }

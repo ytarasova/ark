@@ -71,6 +71,9 @@ export interface ComputeProvider {
   /** Reboot the compute instance and wait for it to come back. */
   reboot?(compute: Compute, opts?: { onLog?: (msg: string) => void; onProgress?: (msg: string) => void }): Promise<void>;
 
+  /** Get the ArkD daemon URL for this compute target. */
+  getArkdUrl?(compute: Compute): string;
+
   syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void>;
 
   // ── Capability flags ────────────────────────────────────────────────────

@@ -7,7 +7,7 @@
 import { createHmac } from "crypto";
 import { getApp } from "./app.js";
 import { safeParseConfig } from "./util.js";
-import type { Session } from "../types/index.js";
+import type { Session, SessionStatus } from "../types/index.js";
 import { safeAsync } from "./safe.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -98,11 +98,39 @@ export function formatReviewPrompt(
 
 // ── Session lookup ──────────────────────────────────────────────────────────
 
+/** Raw row shape from the sessions table (config stored as JSON string). */
+interface SessionRow {
+  id: string;
+  status: SessionStatus;
+  flow: string;
+  stage: string | null;
+  agent: string | null;
+  repo: string | null;
+  branch: string | null;
+  workdir: string | null;
+  ticket: string | null;
+  summary: string | null;
+  pr_url: string | null;
+  pr_id: string | null;
+  error: string | null;
+  config: string | null;
+  parent_id: string | null;
+  fork_group: string | null;
+  group_name: string | null;
+  compute_name: string | null;
+  session_id: string | null;
+  claude_session_id: string | null;
+  breakpoint_reason: string | null;
+  attached_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export function findSessionByPR(prUrl: string): Session | null {
   const db = getApp().db;
   const row = db.prepare(
     "SELECT * FROM sessions WHERE pr_url = ? ORDER BY rowid DESC LIMIT 1"
-  ).get(prUrl) as any;
+  ).get(prUrl) as SessionRow | undefined;
   if (!row) return null;
   return {
     ...row,
@@ -148,7 +176,7 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
     const prompt = formatReviewPrompt(prTitle, prNumber, comments, payload.review?.state);
 
     // Store as a message so TUI shows it
-    getApp().messages.send(session.id, "system" as any, prompt, "text" as any);
+    getApp().messages.send(session.id, "system", prompt, "text");
 
     getApp().events.log(session.id, "webhook_review_steer", {
       actor: "github",

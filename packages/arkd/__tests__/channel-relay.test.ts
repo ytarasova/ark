@@ -24,10 +24,10 @@ let arkdServer: ReturnType<typeof startArkd>;
 let client: ArkdClient;
 
 // Captured requests from mock servers
-let conductorRequests: { path: string; body: any }[] = [];
-let channelRequests: { body: any }[] = [];
-let mockConductor: { stop(): void };
-let mockChannel: { stop(): void };
+let conductorRequests: { path: string; body: Record<string, unknown> }[] = [];
+let channelRequests: { body: Record<string, unknown> }[] = [];
+let mockConductor: { stop(closeActiveConnections?: boolean): void };
+let mockChannel: { stop(closeActiveConnections?: boolean): void };
 
 beforeAll(() => {
   // Start arkd with conductor URL pointing to our mock
@@ -47,7 +47,7 @@ beforeAll(() => {
       conductorRequests.push({ path: url.pathname, body });
       return Response.json({ status: "ok" });
     },
-  }) as any;
+  });
 
   // Mock channel server - captures delivered messages
   mockChannel = Bun.serve({
@@ -59,7 +59,7 @@ beforeAll(() => {
       channelRequests.push({ body });
       return new Response("ok");
     },
-  }) as any;
+  });
 });
 
 afterAll(() => {
@@ -223,7 +223,7 @@ describe("full relay chain", () => {
         commits: ["def456"],
       }),
     });
-    const result = await resp.json() as any;
+    const result = await resp.json() as Record<string, unknown>;
     expect(result.ok).toBe(true);
     expect(result.forwarded).toBe(true);
 
@@ -245,7 +245,7 @@ describe("full relay chain", () => {
         payload: { type: "task", task: "Review the PR", sessionId: "s-deliver", stage: "review" },
       }),
     });
-    const result = await resp.json() as any;
+    const result = await resp.json() as Record<string, unknown>;
     expect(result.ok).toBe(true);
     expect(result.delivered).toBe(true);
 

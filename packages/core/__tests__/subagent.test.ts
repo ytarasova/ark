@@ -33,7 +33,7 @@ describe("spawnSubagent", () => {
     });
     expect(result.ok).toBe(true);
     const child = getApp().sessions.get(result.sessionId!);
-    expect((child!.config as any).model_override).toBe("haiku");
+    expect((child!.config).model_override).toBe("haiku");
   });
 
   it("allows agent override", () => {
@@ -59,8 +59,8 @@ describe("spawnSubagent", () => {
 
     const result = session.spawnSubagent(parent.id, { task: "sub" });
     const child = getApp().sessions.get(result.sessionId!);
-    expect((child!.config as any).subagent).toBe(true);
-    expect((child!.config as any).parent_id).toBe(parent.id);
+    expect((child!.config).subagent).toBe(true);
+    expect((child!.config).parent_id).toBe(parent.id);
   });
 
   it("uses quick flow for subagents", () => {

@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFile);
 import { getApp } from "../app.js";
 import { TRACKS_DIR, WORKTREES_DIR } from "../paths.js";
 import { safeParseConfig } from "../util.js";
-import type { Session, Compute } from "../../types/index.js";
+import type { Session, Compute, MessageRole, MessageType } from "../../types/index.js";
 import * as tmux from "../tmux.js";
 import * as flow from "../flow.js";
 import type { FlowDefinition } from "../flow.js";
@@ -1258,7 +1258,7 @@ export async function worktreeDiff(sessionId: string, opts?: {
       }
 
       // Compare against previously reviewed hashes
-      const prevReviewed = (getApp().sessions.get(sessionId)?.config as any)?.reviewed_files as Record<string, string> | undefined;
+      const prevReviewed = getApp().sessions.get(sessionId)?.config?.reviewed_files as Record<string, string> | undefined;
       if (prevReviewed) {
         for (const file of files) {
           if (prevReviewed[file] && prevReviewed[file] !== fileHashes[file]) {
@@ -1688,7 +1688,7 @@ export interface ReportResult {
   /** Events to log to the store */
   logEvents?: Array<{ type: string; opts: { stage?: string; actor?: string; data?: Record<string, unknown> } }>;
   /** Message to store for TUI chat view */
-  message?: { role: string; content: string; type: string };
+  message?: { role: MessageRole; content: string; type: MessageType };
   /** PR URL detected from report */
   prUrl?: string;
 }

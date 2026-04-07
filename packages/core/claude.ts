@@ -177,9 +177,10 @@ function buildHooksConfig(sessionId: string, conductorUrl: string): Record<strin
 /** Remove all ark-managed hook entries from a hooks object, mutating it in place. */
 function filterOutArkHooks(hooks: Record<string, unknown[]>): void {
   for (const [event, matchers] of Object.entries(hooks)) {
-    hooks[event] = (matchers as any[]).filter(
-      (m: any) => !m.hooks?.some((h: any) => h.command?.includes(ARK_HOOK_MARKER))
-    );
+    hooks[event] = matchers.filter((m) => {
+      const matcher = m as { hooks?: Array<{ command?: string }> };
+      return !matcher.hooks?.some((h) => h.command?.includes(ARK_HOOK_MARKER));
+    });
     if (hooks[event].length === 0) delete hooks[event];
   }
 }
@@ -214,11 +215,13 @@ export function writeHooksConfig(
 
   // Add permission restrictions based on autonomy level
   if (opts?.autonomy === "edit") {
-    existing.permissions = existing.permissions ?? {};
-    (existing.permissions as any).deny = ["Bash"];
+    const perms = (existing.permissions ?? {}) as Record<string, unknown>;
+    perms.deny = ["Bash"];
+    existing.permissions = perms;
   } else if (opts?.autonomy === "read-only") {
-    existing.permissions = existing.permissions ?? {};
-    (existing.permissions as any).deny = ["Bash", "Write", "Edit"];
+    const perms = (existing.permissions ?? {}) as Record<string, unknown>;
+    perms.deny = ["Bash", "Write", "Edit"];
+    existing.permissions = perms;
   }
 
   // Atomic write

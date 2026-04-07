@@ -33,7 +33,7 @@ describe("JSON-RPC message creation", () => {
     const n = createNotification("session/updated", { session: {} });
     expect(n.jsonrpc).toBe("2.0");
     expect(n.method).toBe("session/updated");
-    expect((n as any).id).toBeUndefined();
+    expect((n as Record<string, unknown>).id).toBeUndefined();
   });
 });
 

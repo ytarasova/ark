@@ -67,12 +67,13 @@ export function listFlows(): { name: string; description: string; stages: string
   for (const [dir, source] of [[BUILTIN_DIR, "builtin"], [USER_DIR(), "user"]] as const) {
     if (!existsSync(dir)) continue;
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml"))) {
-      const p = loadYaml(join(dir, file)) as any;
-      const name = p.name ?? file.replace(".yaml", "");
+      const p = loadYaml(join(dir, file)) as Record<string, unknown>;
+      const name = (p.name as string) ?? file.replace(".yaml", "");
+      const stages = (Array.isArray(p.stages) ? p.stages : []) as Array<{ name: string }>;
       result.set(name, {
         name,
-        description: p.description ?? "",
-        stages: (p.stages ?? []).map((s: any) => s.name),
+        description: (p.description as string) ?? "",
+        stages: stages.map(s => s.name),
         source,
       });
     }

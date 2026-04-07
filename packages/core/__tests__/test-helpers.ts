@@ -13,6 +13,7 @@
 import { beforeEach, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
 import { AppContext, setApp, clearApp } from "../app.js";
+import type { Session, SessionStatus, Compute, ComputeProviderName, ComputeStatus } from "../../types/index.js";
 
 /**
  * Snapshot current ark-* tmux sessions. Call before tests start, then pass
@@ -71,6 +72,55 @@ export function withTestContext(): { getCtx: () => AppContext } {
   });
 
   return { getCtx: () => app };
+}
+
+/**
+ * Create a mock Session with sensible defaults. Override any field.
+ * All required fields have defaults so tests don't need to spell them out.
+ */
+export function mockSession(overrides: Partial<Session> = {}): Session {
+  return {
+    id: "s-test01",
+    ticket: null,
+    summary: null,
+    repo: null,
+    branch: null,
+    compute_name: null,
+    session_id: null,
+    claude_session_id: null,
+    stage: null,
+    status: "pending" as SessionStatus,
+    flow: "default",
+    agent: null,
+    workdir: null,
+    pr_url: null,
+    pr_id: null,
+    error: null,
+    parent_id: null,
+    fork_group: null,
+    group_name: null,
+    breakpoint_reason: null,
+    attached_by: null,
+    config: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+/**
+ * Create a mock Compute with sensible defaults. Override any field.
+ */
+export function mockCompute(overrides: Partial<Compute> & { name?: string } = {}): Compute {
+  return {
+    name: "test-compute",
+    provider: "local" as ComputeProviderName,
+    status: "running" as ComputeStatus,
+    config: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  };
 }
 
 /** Poll a condition until it's true or timeout. Better than arbitrary setTimeout. */
