@@ -1,6 +1,7 @@
 export interface SessionOpResult {
   ok: boolean;
   message: string;
+  sessionId?: string;
 }
 
 export interface PortDecl {

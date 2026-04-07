@@ -14,12 +14,11 @@ import type {
   SessionStatus,
   SessionConfig,
   CreateSessionOpts,
+  SessionOpResult,
 } from "../../types/index.js";
 import type { SessionRepository } from "../repositories/session.js";
 import type { EventRepository } from "../repositories/event.js";
 import type { MessageRepository } from "../repositories/message.js";
-
-export type SessionOpResult = { ok: true; sessionId: string } | { ok: false; message: string };
 
 // ── HookStatusResult ─────────────────────────────────────────────────────────
 
@@ -109,7 +108,7 @@ export class SessionService {
 
     // Idempotent: already in terminal state
     if (["stopped", "completed", "failed"].includes(session.status)) {
-      return { ok: true, sessionId: id };
+      return { ok: true, message: "OK", sessionId: id };
     }
 
     // Transition to stopped — preserve claude_session_id for resume
@@ -129,7 +128,7 @@ export class SessionService {
       },
     });
 
-    return { ok: true, sessionId: id };
+    return { ok: true, message: "OK", sessionId: id };
   }
 
   /**
@@ -160,7 +159,7 @@ export class SessionService {
       data: { from_status: session.status },
     });
 
-    return { ok: true, sessionId: id };
+    return { ok: true, message: "OK", sessionId: id };
   }
 
   /**
@@ -181,7 +180,7 @@ export class SessionService {
     this.messages.markRead(id);
     this.sessions.update(id, { status: "ready" as SessionStatus, session_id: null } as Partial<Session>);
 
-    return { ok: true, sessionId: id };
+    return { ok: true, message: "OK", sessionId: id };
   }
 
   /**
@@ -203,7 +202,7 @@ export class SessionService {
       data: { reason, was_status: session.status },
     });
 
-    return { ok: true, sessionId: id };
+    return { ok: true, message: "OK", sessionId: id };
   }
 
   /**
@@ -219,7 +218,7 @@ export class SessionService {
 
     this.events.log(id, "session_deleted", { actor: "user" });
 
-    return { ok: true, sessionId: id };
+    return { ok: true, message: "OK", sessionId: id };
   }
 
   /**
@@ -232,7 +231,7 @@ export class SessionService {
 
     this.events.log(id, "session_undeleted", { actor: "user" });
 
-    return { ok: true, sessionId: id };
+    return { ok: true, message: "OK", sessionId: id };
   }
 
   // ── State machine (fully ported) ──────────────────────────────────────────

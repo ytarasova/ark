@@ -36,16 +36,30 @@ recipes/     → Recipe templates (quick-fix, feature-build, code-review)
 
 No workspaces config - packages are coordinated manually via relative imports.
 
-**Core modules** (in dependency order):
-`context.ts` → `store.ts` → `claude.ts` / `flow.ts` / `agent.ts` / `tmux.ts` / `exec.ts` → `session.ts` → `conductor.ts` → `search.ts` / `claude-sessions.ts` / `hooks.ts` / `app.ts` / `config.ts`
+**Core module layers** (from bottom to top):
+```
+packages/types/          → Domain interfaces (Session, Compute, Event, Message, etc.)
+packages/core/
+  repositories/          → SQL CRUD (SessionRepository, ComputeRepository, etc.)
+  services/              → Business logic (SessionService, ComputeService, HistoryService)
+  app.ts                 → AppContext wires repos + services, boot/shutdown lifecycle
+  session.ts             → Legacy orchestration (dispatch, advance, fork — being migrated to SessionService)
+  store.ts               → Legacy SQL (being migrated to repositories)
+  conductor.ts           → HTTP server (:19100), hook status, channel relay
+packages/server/         → JSON-RPC handlers (delegate to services via AppContext)
+packages/protocol/       → ArkClient (typed JSON-RPC client)
+```
 
-**Key entry point:** `session.ts` - all session lifecycle (startSession, dispatch, advance, stop, resume, complete, fork) plus `applyHookStatus` and `applyReport` (moved from conductor.ts to keep mutation logic in one place). This is the main orchestration API. `index.ts` re-exports everything.
+**Key entry points:**
+- `AppContext` (`app.ts`) — access repos via `app.sessions`, `app.computes`, services via `app.sessionService`
+- `SessionService` (`services/session.ts`) — lifecycle: start, stop, resume, complete, pause, delete, applyHookStatus, applyReport
+- `session.ts` (legacy) — complex ops not yet ported: dispatch, advance, fork, clone, spawn, handoff
 
 ## Key Gotchas
 
 **FTS5 table needs manual creation on existing DBs.** The `transcript_index` FTS5 virtual table is in `initSchema()` but `CREATE VIRTUAL TABLE IF NOT EXISTS` only runs when the DB is first created. If you add new tables, existing `~/.ark/ark.db` files won't get them - run the SQL manually or delete the DB.
 
-**ARK_DIR is static at module load.** `store.ts` sets `ARK_DIR = process.env.ARK_TEST_DIR ?? ~/.ark` once at import time. `createTestContext()` + `setContext()` isolates the DB but NOT filesystem paths like `join(ARK_DIR, "agents")`. For tests writing files to ARK_DIR, clean up in `beforeEach`.
+**ARK_DIR resolved at call time.** `store.ts` ARK_DIR() is a function that reads from AppContext config. Use `AppContext.forTest()` for test isolation — it creates a temp directory and sets up an isolated DB. Legacy `createTestContext()` + `setContext()` still works but `AppContext.forTest()` is preferred.
 
 **Bun-only.** Uses `bun:sqlite`, `Bun.serve()`, `Bun.sleep()`, Bun FFI. Will not run under Node.
 
@@ -59,14 +73,7 @@ import { foo } from "./bar";     // breaks at runtime
 
 **`strict: false` in tsconfig.** Implicit `any` is allowed; no strict null checks.
 
-**Store field mapping.** The SQLite columns differ from TypeScript field names:
-| TS field | SQLite column |
-|----------|---------------|
-| `ticket` | `jira_key` |
-| `summary` | `jira_summary` |
-| `flow` | `pipeline` |
-
-If you add a Session field, update the `fieldMap` in `packages/core/store.ts` → `updateSession()`.
+**SQL columns match TS fields 1:1.** No field mapping needed. The columns are `ticket`, `summary`, `flow` (not the old jira_key/jira_summary/pipeline). Add new Session fields to the column whitelist in `repositories/session.ts`.
 
 **Conductor port 19100 is hardcoded** in conductor.ts, channel.ts, and tests. Channel ports are derived deterministically: `19200 + (parseInt(sessionId.replace("s-",""), 16) % 10000)`.
 
@@ -92,18 +99,18 @@ If you see tests that pass individually but fail in the full suite, it's a paral
 
 **E2E tests need `dist/` built.** CLI E2E tests (`e2e-cli.test.ts`) and TUI real tests (`e2e-tui-real.test.ts`) import from `dist/` - run `make dev` or `tsc` first. Unit tests run from source.
 
-**Test isolation pattern** - every test must manually create and clean up context:
+**Test isolation pattern** — use `AppContext.forTest()` (preferred):
 ```ts
-import { createTestContext, setContext } from "../context.js";
+import { AppContext, setApp, clearApp } from "../app.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+let app: AppContext;
+beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
+afterAll(async () => { await app?.shutdown(); clearApp(); });
 ```
 
-Forgetting `setContext()` pollutes global state. Forgetting `cleanup()` leaks temp dirs under `/tmp/ark-test-*`.
+Access repos directly: `app.sessions.create(...)`, `app.events.log(...)`.
 
-**`withTestContext()` helper** - wraps test setup/teardown into a single call. Preferred over manual `beforeEach`/`afterEach` for new tests:
+**Legacy `withTestContext()` helper** still works for existing tests:
 ```ts
 const ctx = withTestContext();  // handles createTestContext + setContext + cleanup
 ```
@@ -318,14 +325,15 @@ Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/h
 
 ## Architecture Boundaries
 
-- **`context.ts`** - Dependency injection for DB paths. `createTestContext()` for test isolation. Everything reads paths from here.
-- **`store.ts`** - Pure data CRUD. No imports from claude.ts or session.ts (avoids circular deps). If you need cleanup logic that touches both store and claude, put it in session.ts.
-- **`claude.ts`** - ALL Claude Code knowledge (model mapping, args, hooks config, launcher, trust, transcript parsing). Session.ts and agent.ts call into it, never the reverse.
-- **`session.ts`** - Orchestration. All session lifecycle mutations. Calls into store, claude, tmux, flow, agent. The "controller" layer.
-- **`conductor.ts`** - HTTP server (:19100). Channel reports (agent↔human MCP messaging) + hook status (agent status detection). These are SEPARATE concerns - hooks never trigger `session.advance()`. Channel delivery now goes through arkd when available (via `deliverToChannel()`).
-- **`arkd/`** - Stateless HTTP daemon (:19300) that runs on every compute target. Agent lifecycle (tmux), file ops, metrics, port probing, and **channel relay** (forwards reports to conductor, delivers tasks to channel). The transport layer between agents and conductor - solves NAT/firewall for remote compute.
-- **`search.ts`** - Search + FTS5 indexing. `indexTranscripts()` is async (yields every 5 files). `searchTranscripts()` uses FTS5 when index exists, falls back to file scanning.
-- **`claude-sessions.ts`** - Read-only discovery of Claude Code sessions from `~/.claude/projects/`. No writes.
-- **`hooks.ts`** - Internal event bus (pub/sub). NOT Claude Code hooks - those are in claude.ts.
-- **`app.ts`** - Boot/shutdown lifecycle. Owns conductor and metrics polling. CLI skips conductor; TUI runs it.
-- **`packages/tui/hooks/useFocus.ts`** - Focus stack context for TUI keyboard input ownership. Overlays push/pop focus to prevent key conflicts with app-level navigation.
+- **`packages/types/`** - All domain interfaces. Single source of truth. No logic, no dependencies. Imported by every other package.
+- **`repositories/`** - SQL CRUD behind typed classes. Column whitelists prevent injection. `SessionRepository`, `ComputeRepository`, `EventRepository`, `MessageRepository`. Access via `app.sessions`, `app.computes`, etc.
+- **`services/`** - Business logic. `SessionService` owns lifecycle (start, stop, resume, complete, delete, applyHookStatus, applyReport). `ComputeService` owns compute CRUD. Access via `app.sessionService`, `app.computeService`.
+- **`packages/server/validate.ts`** - `extract<T>()` validates RPC params at the boundary. All handlers use it.
+- **`store.ts`** (legacy) - Original SQL CRUD. Being replaced by repositories. Still used by some code paths.
+- **`session.ts`** (legacy) - Original orchestration. Complex functions (dispatch, advance, fork) not yet ported to SessionService.
+- **`claude.ts`** - ALL Claude Code knowledge (model mapping, args, hooks config, launcher, trust, transcript parsing).
+- **`conductor.ts`** - HTTP server (:19100). Channel reports + hook status. Delegates to SessionService for applyHookStatus/applyReport.
+- **`arkd/`** - Stateless HTTP daemon (:19300) on every compute target. Agent lifecycle, file ops, metrics, channel relay.
+- **`search.ts`** - Search + FTS5. Uses FTS5 when index exists, falls back to file scanning only when FTS table is absent.
+- **`app.ts`** - Boot/shutdown. Creates repos, services, providers. CLI skips conductor; TUI runs it.
+- **`packages/tui/hooks/useFocus.ts`** - Focus stack for TUI keyboard input ownership.
