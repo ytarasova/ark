@@ -25,7 +25,7 @@ export function HistoryView() {
 
   return (
     <div>
-      <div className="filter-bar" style={{ marginBottom: 20 }}>
+      <div className="filter-bar" style={{ marginBottom: 16 }}>
         <input
           className="search-input"
           style={{ flex: 1, maxWidth: 480 }}
@@ -41,7 +41,9 @@ export function HistoryView() {
 
       {!searched && (
         <div className="empty">
-          <div className="empty-icon">&#9200;</div>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.15, marginBottom: 16 }}>
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
           <div className="empty-text">Enter a search query to find sessions, events, and transcript content</div>
         </div>
       )}
@@ -54,7 +56,7 @@ export function HistoryView() {
 
       {results.length > 0 && (
         <div className="search-results">
-          <div style={{ color: "#787fa0", fontSize: 12, marginBottom: 12 }}>
+          <div style={{ color: "var(--label-quaternary)", fontSize: 11, marginBottom: 8, fontFamily: "var(--mono)" }}>
             {results.length} result{results.length !== 1 ? "s" : ""}
           </div>
           {results.map((r: any, i: number) => (

@@ -24,6 +24,15 @@ function ComputeActions({ compute, onAction }: { compute: any; onAction: (action
   );
 }
 
+function statusColor(status: string): string {
+  switch (status) {
+    case "running": return "var(--green)";
+    case "stopped": return "var(--red)";
+    case "pending": case "provisioning": return "var(--yellow)";
+    default: return "var(--label-quaternary)";
+  }
+}
+
 export function ComputeView() {
   const [computes, setComputes] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
@@ -71,15 +80,15 @@ export function ComputeView() {
     setTimeout(() => setActionMsg(null), 3000);
   }
 
-  if (!computes.length) return <div className="empty"><div className="empty-icon">&#9729;</div><div className="empty-text">No compute targets</div></div>;
-
-  function statusColor(status: string): string {
-    switch (status) {
-      case "running": return "#9ece6a";
-      case "stopped": return "#f7768e";
-      case "pending": case "provisioning": return "#e0af68";
-      default: return "#787fa0";
-    }
+  if (!computes.length) {
+    return (
+      <div className="empty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.15, marginBottom: 16 }}>
+          <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/>
+        </svg>
+        <div className="empty-text">No compute targets</div>
+      </div>
+    );
   }
 
   return (
@@ -107,7 +116,7 @@ export function ComputeView() {
             <div className="detail-section">
               <ComputeActions compute={selected} onAction={handleAction} />
               {actionMsg && (
-                <div style={{ marginTop: 6, color: actionMsg.type === "error" ? "#f7768e" : "#9ece6a", fontSize: 13 }}>
+                <div style={{ marginTop: 6, color: actionMsg.type === "error" ? "var(--red)" : "var(--green)", fontSize: 12 }}>
                   {actionMsg.text}
                 </div>
               )}
@@ -125,7 +134,7 @@ export function ComputeView() {
                 {selected.ip && (
                   <>
                     <div className="detail-label">IP</div>
-                    <div className="detail-value" style={{ fontFamily: "monospace" }}>{selected.ip}</div>
+                    <div className="detail-value" style={{ fontFamily: "var(--mono)" }}>{selected.ip}</div>
                   </>
                 )}
                 {selected.instanceType && (

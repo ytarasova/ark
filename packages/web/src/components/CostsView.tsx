@@ -9,7 +9,7 @@ export function CostsView() {
     api.getCosts().then(setCosts);
   }, []);
 
-  if (!costs) return <div className="empty">Loading costs...</div>;
+  if (!costs) return <div className="empty"><div className="empty-text">Loading costs...</div></div>;
 
   const byModel: Record<string, { cost: number; count: number }> = {};
   for (const s of costs.sessions || []) {
@@ -36,9 +36,9 @@ export function CostsView() {
       </div>
       {(costs.sessions || []).length > 0 && (
         <div>
-          <h3 style={{ color: "#787fa0", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 12 }}>
+          <div style={{ color: "var(--label-quaternary)", fontSize: 10, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 8 }}>
             Top Sessions by Cost
-          </h3>
+          </div>
           <table className="table">
             <thead>
               <tr>
@@ -52,7 +52,7 @@ export function CostsView() {
                 <tr key={i}>
                   <td>{s.summary || s.sessionId}</td>
                   <td>{s.model || "-"}</td>
-                  <td style={{ textAlign: "right", color: "#9ece6a", fontWeight: 600 }}>{fmtCost(s.cost)}</td>
+                  <td style={{ textAlign: "right", color: "var(--green)", fontWeight: 600, fontFamily: "var(--mono)", fontSize: 12 }}>{fmtCost(s.cost)}</td>
                 </tr>
               ))}
             </tbody>

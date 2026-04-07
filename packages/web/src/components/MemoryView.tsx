@@ -78,8 +78,8 @@ export function MemoryView() {
       {/* Add form */}
       {showAdd && (
         <div style={{
-          marginBottom: 20, padding: 16,
-          background: "#24283b", border: "1px solid #3b4261", borderRadius: 8,
+          marginBottom: 16, padding: 16,
+          background: "var(--surface-0)", backdropFilter: "blur(20px) saturate(150%)", border: "1px solid var(--glass-border)", borderRadius: 12, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
         }}>
           <div className="form-group">
             <label className="form-label">Content</label>
@@ -102,7 +102,7 @@ export function MemoryView() {
                 placeholder="e.g. aws, deploy, config"
               />
             </div>
-            <div className="form-group" style={{ width: 140 }}>
+            <div className="form-group" style={{ width: 120 }}>
               <label className="form-label">Scope</label>
               <select
                 className="form-input"
@@ -123,7 +123,7 @@ export function MemoryView() {
 
       {/* Result count */}
       {displayList.length > 0 && (
-        <div style={{ color: "#787fa0", fontSize: 12, marginBottom: 12 }}>
+        <div style={{ color: "var(--label-quaternary)", fontSize: 11, marginBottom: 8, fontFamily: "var(--mono)" }}>
           {searchResults ? `${displayList.length} result${displayList.length !== 1 ? "s" : ""}` : `${memories.length} memor${memories.length !== 1 ? "ies" : "y"}`}
         </div>
       )}
@@ -131,7 +131,9 @@ export function MemoryView() {
       {/* Empty state */}
       {displayList.length === 0 && (
         <div className="empty">
-          <div className="empty-icon">&#128065;</div>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.15, marginBottom: 16 }}>
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+          </svg>
           <div className="empty-text">
             {searchResults ? `No memories matching "${search}"` : "No memories yet. Add one above."}
           </div>
@@ -145,7 +147,7 @@ export function MemoryView() {
             <div key={m.id} className="session-card" style={{ cursor: "default" }}>
               <div className="session-row">
                 <div className="session-left" style={{ flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
-                  <div style={{ fontSize: 13, color: "#c0caf5", lineHeight: 1.5 }}>{m.content}</div>
+                  <div style={{ fontSize: 12, color: "var(--label)", lineHeight: 1.5 }}>{m.content}</div>
                   <div className="session-meta">
                     <span className="source-badge">{m.scope || "global"}</span>
                     {m.tags?.length > 0 && (

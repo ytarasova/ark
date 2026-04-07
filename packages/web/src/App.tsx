@@ -82,13 +82,36 @@ function App() {
     schedules: "Schedules", memory: "Memory", costs: "Costs", status: "System",
   };
 
+  // Inline status counts for sessions view (only non-zero)
+  const runningCount = sessions.filter(s => s.status === "running").length;
+  const waitingCount = sessions.filter(s => s.status === "waiting").length;
+  const failedCount = sessions.filter(s => s.status === "failed").length;
+
   return (
     <div className="app">
       <Sidebar activeView={view} onNavigate={setView} readOnly={readOnly} />
       <div className="main">
         <div className="main-header">
-          <div className="main-title">{viewTitles[view] || "Dashboard"}</div>
-          <div style={{ color: "#787fa0", fontSize: 13 }}>{sessions.length} sessions</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="main-title">{viewTitles[view] || "Dashboard"}</div>
+            {view === "sessions" && (
+              <div style={{ display: "flex", gap: 8, fontSize: 11, fontFamily: "var(--mono)" }}>
+                {runningCount > 0 && <span style={{ color: "var(--green)" }}>{runningCount}</span>}
+                {waitingCount > 0 && <span style={{ color: "var(--yellow)" }}>{waitingCount}</span>}
+                {failedCount > 0 && <span style={{ color: "var(--red)" }}>{failedCount}</span>}
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--label-quaternary)" }}>
+              {sessions.length}
+            </span>
+            {view === "sessions" && !readOnly && (
+              <button className="btn btn-primary" onClick={() => setShowNew(true)} style={{ fontSize: 11 }}>
+                + New Session
+              </button>
+            )}
+          </div>
         </div>
         <div className="main-body">
           {view === "sessions" && (
@@ -97,7 +120,6 @@ function App() {
               filter={filter} onFilterChange={setFilter}
               search={search} onSearchChange={setSearch}
               groups={groups} groupFilter={groupFilter} onGroupFilter={setGroupFilter}
-              onNewSession={() => setShowNew(true)} readOnly={readOnly}
             />
           )}
           {view === "agents" && <AgentsView />}

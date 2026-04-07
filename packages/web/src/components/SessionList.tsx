@@ -13,8 +13,6 @@ interface SessionListProps {
   groups: string[];
   groupFilter: string;
   onGroupFilter: (g: string) => void;
-  onNewSession: () => void;
-  readOnly: boolean;
 }
 
 const FILTERS = ["all", "running", "waiting", "stopped", "failed", "completed"];
@@ -24,7 +22,6 @@ export function SessionList({
   filter, onFilterChange,
   search, onSearchChange,
   groups, groupFilter, onGroupFilter,
-  onNewSession, readOnly,
 }: SessionListProps) {
   const filtered = useMemo(() => {
     let list = sessions || [];
@@ -63,7 +60,7 @@ export function SessionList({
         {groups && groups.length > 0 && (
           <select
             className="form-input"
-            style={{ width: 140, padding: "5px 8px" }}
+            style={{ width: 120, padding: "4px 8px", fontSize: 11 }}
             value={groupFilter}
             onChange={(e) => onGroupFilter(e.target.value)}
           >
@@ -73,14 +70,20 @@ export function SessionList({
             ))}
           </select>
         )}
-        {!readOnly && (
-          <button className="btn btn-primary" onClick={onNewSession}>+ New Session</button>
-        )}
       </div>
       {filtered.length === 0 ? (
         <div className="empty">
-          <div className="empty-icon">{"\u2205"}</div>
-          <div className="empty-text">No sessions match your filters</div>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+            style={{ opacity: 0.15, marginBottom: 16 }}>
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--label-secondary)", marginBottom: 6 }}>
+            No sessions yet
+          </div>
+          <div style={{ fontSize: 12, color: "var(--label-tertiary)", maxWidth: 280, margin: "0 auto" }}>
+            Create your first session to start orchestrating AI agents
+          </div>
         </div>
       ) : (
         <div className="session-list">
@@ -93,16 +96,22 @@ export function SessionList({
               <div className="session-row">
                 <div className="session-left">
                   <StatusDot status={s.status} />
-                  <span className="session-name">{s.summary || s.id}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="session-name">{s.summary || s.id}</div>
+                    <div className="session-meta">
+                      <span>{s.id}</span>
+                      {s.agent && <span>{s.agent}</span>}
+                      {s.stage && <span style={{ color: "var(--tint)" }}>{s.stage}</span>}
+                      <span>{relTime(s.updated_at)}</span>
+                    </div>
+                  </div>
                 </div>
-                <StatusBadge status={s.status} />
-              </div>
-              <div className="session-meta">
-                <span>{s.id}</span>
-                {s.agent && <span>{s.agent}</span>}
-                {s.group_name && <span>{s.group_name}</span>}
-                {s.repo && <span>{s.repo}</span>}
-                <span>{relTime(s.updated_at)}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {s.flow && s.flow !== "bare" && (
+                    <span style={{ fontSize: 10, color: "var(--label-quaternary)", fontFamily: "var(--mono)" }}>{s.flow}</span>
+                  )}
+                  <StatusBadge status={s.status} />
+                </div>
               </div>
             </div>
           ))}

@@ -242,7 +242,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
     return (
       <div className="detail-panel open">
         <div className="detail-header">
-          <span>Loading...</span>
+          <span style={{ fontSize: 12, color: "var(--label-tertiary)" }}>Loading...</span>
           <button className="detail-close" onClick={onClose}>{"\u2715"}</button>
         </div>
       </div>
@@ -273,9 +273,9 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
   return (
     <div className="detail-panel open">
       <div className="detail-header">
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <StatusBadge status={s.status} />
-          <span style={{ marginLeft: 8, fontWeight: 600 }}>{s.id}</span>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>{s.id}</span>
         </div>
         <button className="detail-close" onClick={onClose}>{"\u2715"}</button>
       </div>
@@ -316,17 +316,19 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {flowStages.length > 1 && s.stage && (
           <div className="detail-section">
             <div className="detail-section-title">Flow Pipeline</div>
-            <div style={{ display: "flex", gap: 0, flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
+            <div style={{ display: "flex", gap: 0, flexWrap: "wrap", alignItems: "center", fontSize: 12 }}>
               {flowStages.map((st: any, i: number) => {
                 const isCurrent = st.name === s.stage;
                 const currentIdx = flowStages.findIndex((x: any) => x.name === s.stage);
                 const isPast = currentIdx > i;
                 return (
                   <span key={st.name} style={{ display: "inline-flex", alignItems: "center" }}>
-                    {i > 0 && <span style={{ color: "#64748b", margin: "0 4px" }}>&gt;</span>}
+                    {i > 0 && <span style={{ color: "var(--label-quaternary)", margin: "0 4px" }}>&gt;</span>}
                     <span style={{
-                      color: isCurrent ? "#818cf8" : isPast ? "#22c55e" : "#64748b",
+                      color: isCurrent ? "var(--tint)" : isPast ? "var(--green)" : "var(--label-quaternary)",
                       fontWeight: isCurrent ? 700 : 400,
+                      fontFamily: "var(--mono)",
+                      fontSize: 11,
                     }}>
                       {isCurrent ? `[${st.name}]` : st.name}
                     </span>
@@ -341,7 +343,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {s.config?.completion_summary && (
           <div className="detail-section">
             <div className="detail-section-title">Completion Summary</div>
-            <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.6 }}>{s.config.completion_summary}</div>
+            <div style={{ fontSize: 12, color: "var(--label-secondary)", lineHeight: 1.6 }}>{s.config.completion_summary}</div>
           </div>
         )}
 
@@ -353,31 +355,31 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
               {s.config.usage.input_tokens != null && (
                 <>
                   <span className="detail-label">Input tokens</span>
-                  <span className="detail-value">{humanTokens(s.config.usage.input_tokens)}</span>
+                  <span className="detail-value" style={{ fontFamily: "var(--mono)" }}>{humanTokens(s.config.usage.input_tokens)}</span>
                 </>
               )}
               {s.config.usage.output_tokens != null && (
                 <>
                   <span className="detail-label">Output tokens</span>
-                  <span className="detail-value">{humanTokens(s.config.usage.output_tokens)}</span>
+                  <span className="detail-value" style={{ fontFamily: "var(--mono)" }}>{humanTokens(s.config.usage.output_tokens)}</span>
                 </>
               )}
               {s.config.usage.cache_read_input_tokens != null && (
                 <>
                   <span className="detail-label">Cache read</span>
-                  <span className="detail-value">{humanTokens(s.config.usage.cache_read_input_tokens)}</span>
+                  <span className="detail-value" style={{ fontFamily: "var(--mono)" }}>{humanTokens(s.config.usage.cache_read_input_tokens)}</span>
                 </>
               )}
               {s.config.usage.total_tokens != null && (
                 <>
                   <span className="detail-label">Total tokens</span>
-                  <span className="detail-value">{humanTokens(s.config.usage.total_tokens)}</span>
+                  <span className="detail-value" style={{ fontFamily: "var(--mono)" }}>{humanTokens(s.config.usage.total_tokens)}</span>
                 </>
               )}
               {s.config.usage.total_cost != null && s.config.usage.total_cost > 0 && (
                 <>
                   <span className="detail-label">Cost</span>
-                  <span className="detail-value" style={{ color: "#e0af68" }}>{formatCost(s.config.usage.total_cost)}</span>
+                  <span className="detail-value" style={{ color: "var(--yellow)", fontFamily: "var(--mono)" }}>{formatCost(s.config.usage.total_cost)}</span>
                 </>
               )}
             </div>
@@ -394,13 +396,13 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
               )}
             </div>
             {prUrl && (
-              <div style={{ marginTop: 6, fontSize: 13 }}>
-                PR: <a href={prUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#58a6ff" }}>{prUrl}</a>
+              <div style={{ marginTop: 6, fontSize: 12 }}>
+                PR: <a href={prUrl} target="_blank" rel="noopener noreferrer">{prUrl}</a>
               </div>
             )}
             {s.pr_url && !prUrl && (
-              <div style={{ marginTop: 6, fontSize: 13 }}>
-                PR: <a href={s.pr_url} target="_blank" rel="noopener noreferrer" style={{ color: "#58a6ff" }}>{s.pr_url}</a>
+              <div style={{ marginTop: 6, fontSize: 12 }}>
+                PR: <a href={s.pr_url} target="_blank" rel="noopener noreferrer">{s.pr_url}</a>
               </div>
             )}
             {showPRForm && (
@@ -411,7 +413,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
                   value={prTitle}
                   onChange={(e) => setPrTitle(e.target.value)}
                 />
-                <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
+                <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 4, color: "var(--label-secondary)" }}>
                   <input type="checkbox" checked={prDraft} onChange={(e) => setPrDraft(e.target.checked)} />
                   Draft PR
                 </label>
@@ -431,15 +433,15 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
               Changes: {diffData.branch} vs {diffData.baseBranch}
               <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => setShowDiff(false)}>Close</button>
             </div>
-            <div style={{ fontSize: 13, color: "#787fa0", marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: "var(--label-tertiary)", marginBottom: 6, fontFamily: "var(--mono)" }}>
               {diffData.filesChanged} files changed, +{diffData.insertions} -{diffData.deletions}
             </div>
             {diffData.modifiedSinceReview?.length > 0 && (
-              <div style={{ color: "#e0af68", fontSize: 12, marginBottom: 8 }}>
+              <div style={{ color: "var(--yellow)", fontSize: 11, marginBottom: 6 }}>
                 Modified since last review: {diffData.modifiedSinceReview.join(", ")}
               </div>
             )}
-            <pre className="output-box" style={{ maxHeight: 400, overflow: "auto", whiteSpace: "pre-wrap", fontSize: 12 }}>
+            <pre className="output-box" style={{ maxHeight: 400, overflow: "auto", whiteSpace: "pre-wrap", fontSize: 11 }}>
               {diffData.stat || diffData.message || "No changes"}
             </pre>
           </div>
@@ -453,7 +455,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
               <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={handleRunVerification}>Run Verification</button>
             )}
           </div>
-          {todos.length === 0 && <div style={{ fontSize: 13, color: "#787fa0" }}>No todos</div>}
+          {todos.length === 0 && <div style={{ fontSize: 12, color: "var(--label-tertiary)" }}>No todos</div>}
           {todos.map((t: any) => (
             <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
               {!readOnly && (
@@ -463,11 +465,11 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
                   onChange={() => handleToggleTodo(t.id)}
                 />
               )}
-              <span style={{ textDecoration: t.done ? "line-through" : "none", flex: 1, fontSize: 13 }}>
+              <span style={{ textDecoration: t.done ? "line-through" : "none", flex: 1, fontSize: 12, color: t.done ? "var(--label-tertiary)" : "var(--label)" }}>
                 {t.content}
               </span>
               {!readOnly && (
-                <button className="btn btn-sm btn-danger" style={{ padding: "0 4px", fontSize: 11 }} onClick={() => handleDeleteTodo(t.id)}>x</button>
+                <button className="btn btn-sm btn-danger" style={{ padding: "0 4px", fontSize: 10 }} onClick={() => handleDeleteTodo(t.id)}>x</button>
               )}
             </div>
           ))}
@@ -490,19 +492,19 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {verifyResult && (
           <div className="detail-section">
             <div className="detail-section-title">
-              Verification: {verifyResult.ok ? <span style={{ color: "#3fb950" }}>PASSED</span> : <span style={{ color: "#f85149" }}>FAILED</span>}
+              Verification: {verifyResult.ok ? <span style={{ color: "var(--green)" }}>PASSED</span> : <span style={{ color: "var(--red)" }}>FAILED</span>}
             </div>
             {!verifyResult.todosResolved && (
-              <div style={{ fontSize: 13, color: "#f85149", marginBottom: 4 }}>
+              <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 4 }}>
                 Pending todos: {verifyResult.pendingTodos?.join(", ")}
               </div>
             )}
             {verifyResult.scriptResults?.map((r: any, i: number) => (
-              <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
-                <span style={{ color: r.passed ? "#3fb950" : "#f85149" }}>{r.passed ? "[PASS]" : "[FAIL]"}</span>{" "}
-                <code>{r.script}</code>
+              <div key={i} style={{ fontSize: 12, marginBottom: 4 }}>
+                <span style={{ color: r.passed ? "var(--green)" : "var(--red)", fontFamily: "var(--mono)", fontSize: 10 }}>{r.passed ? "[PASS]" : "[FAIL]"}</span>{" "}
+                <code style={{ fontFamily: "var(--mono)", fontSize: 11 }}>{r.script}</code>
                 {!r.passed && r.output && (
-                  <pre style={{ fontSize: 11, color: "#787fa0", marginTop: 2, whiteSpace: "pre-wrap" }}>{r.output.slice(0, 500)}</pre>
+                  <pre style={{ fontSize: 10, color: "var(--label-tertiary)", marginTop: 2, whiteSpace: "pre-wrap", fontFamily: "var(--mono)" }}>{r.output.slice(0, 500)}</pre>
                 )}
               </div>
             ))}
@@ -515,7 +517,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
             <div className="detail-section-title">Files Changed ({s.config.filesChanged.length})</div>
             <div style={{ maxHeight: 200, overflowY: "auto" }}>
               {s.config.filesChanged.map((f: string) => (
-                <div key={f} style={{ fontSize: 12, color: "#94a3b8", padding: "2px 0", fontFamily: "monospace" }}>{f}</div>
+                <div key={f} style={{ fontSize: 11, color: "var(--label-secondary)", padding: "1px 0", fontFamily: "var(--mono)" }}>{f}</div>
               ))}
             </div>
           </div>
@@ -530,9 +532,9 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
               const ghBase = s.config?.github_url;
               const commitUrl = ghBase ? `${ghBase}/commit/${c}` : null;
               return (
-                <div key={c} style={{ fontSize: 12, color: "#94a3b8", fontFamily: "monospace", padding: "1px 0" }}>
+                <div key={c} style={{ fontSize: 11, color: "var(--label-secondary)", fontFamily: "var(--mono)", padding: "1px 0" }}>
                   {commitUrl ? (
-                    <a href={commitUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#58a6ff" }}>{shortSha}</a>
+                    <a href={commitUrl} target="_blank" rel="noopener noreferrer">{shortSha}</a>
                   ) : shortSha}
                 </div>
               );
@@ -543,7 +545,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {/* Channel Port */}
         {(s.status === "running" || s.status === "waiting") && s.session_id && (
           <div className="detail-section">
-            <div style={{ fontSize: 12, color: "#22c55e" }}>
+            <div style={{ fontSize: 11, color: "var(--green)", fontFamily: "var(--mono)" }}>
               Channel: port {channelPort}
             </div>
           </div>

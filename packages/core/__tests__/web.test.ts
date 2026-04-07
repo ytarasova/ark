@@ -15,7 +15,7 @@ describe("web server", () => {
     const resp = await fetch("http://localhost:18420/");
     expect(resp.status).toBe(200);
     const html = await resp.text();
-    expect(html).toContain("Ark Dashboard");
+    expect(html).toContain("<title>Ark</title>");
   });
 
   it("serves session list API", async () => {

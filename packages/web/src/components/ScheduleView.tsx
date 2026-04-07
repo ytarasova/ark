@@ -44,15 +44,17 @@ export function ScheduleView() {
   }
 
   function statusColor(enabled: boolean): string {
-    return enabled ? "#9ece6a" : "#787fa0";
+    return enabled ? "var(--green)" : "var(--label-quaternary)";
   }
 
   if (!schedules.length && !showNew) {
     return (
       <div className="empty">
-        <div className="empty-icon">&#9201;</div>
-        <div className="empty-text">No schedules</div>
-        <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => setShowNew(true)}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.15, marginBottom: 16 }}>
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <div style={{ fontSize: 13, color: "var(--label-tertiary)", marginBottom: 12 }}>No schedules</div>
+        <button className="btn btn-primary" onClick={() => setShowNew(true)}>
           New Schedule
         </button>
         {showNew && <NewScheduleModal onClose={() => setShowNew(false)} onSubmit={handleCreate} />}
@@ -65,7 +67,7 @@ export function ScheduleView() {
       <div className="split-view">
         <div className="list-panel">
           <div style={{ padding: "8px 12px" }}>
-            <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => setShowNew(true)}>
+            <button className="btn btn-primary" style={{ width: "100%", fontSize: 11 }} onClick={() => setShowNew(true)}>
               + New Schedule
             </button>
           </div>
@@ -91,9 +93,9 @@ export function ScheduleView() {
                 <div className="detail-section-title">Schedule</div>
                 <div className="detail-grid">
                   <div className="detail-label">ID</div>
-                  <div className="detail-value" style={{ fontFamily: "monospace" }}>{selected.id}</div>
+                  <div className="detail-value" style={{ fontFamily: "var(--mono)" }}>{selected.id}</div>
                   <div className="detail-label">Cron</div>
-                  <div className="detail-value" style={{ fontFamily: "monospace" }}>{selected.cron}</div>
+                  <div className="detail-value" style={{ fontFamily: "var(--mono)" }}>{selected.cron}</div>
                   <div className="detail-label">Status</div>
                   <div className="detail-value">
                     <span className="dot" style={{ background: statusColor(selected.enabled), width: 8, height: 8, display: "inline-block", marginRight: 8 }} />
@@ -104,7 +106,7 @@ export function ScheduleView() {
                   {selected.repo && (
                     <>
                       <div className="detail-label">Repo</div>
-                      <div className="detail-value" style={{ fontFamily: "monospace" }}>{selected.repo}</div>
+                      <div className="detail-value" style={{ fontFamily: "var(--mono)" }}>{selected.repo}</div>
                     </>
                   )}
                   {selected.compute_name && (
@@ -135,11 +137,11 @@ export function ScheduleView() {
               </div>
               <div className="detail-section">
                 <div className="detail-section-title">Actions</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn" onClick={() => handleToggle(selected)}>
+                <div className="btn-group">
+                  <button className="btn btn-sm" onClick={() => handleToggle(selected)}>
                     {selected.enabled ? "Disable" : "Enable"}
                   </button>
-                  <button className="btn" style={{ color: "#f7768e" }} onClick={() => handleDelete(selected)}>
+                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selected)}>
                     Delete
                   </button>
                 </div>

@@ -4,9 +4,9 @@ import { StatusDot, StatusBadge } from "./StatusDot.js";
 import { relTime } from "../util.js";
 
 const STATUS_COLORS: Record<string, string> = {
-  running: "#9ece6a", waiting: "#e0af68", completed: "#7aa2f7",
-  failed: "#f7768e", stopped: "#787fa0", pending: "#787fa0",
-  ready: "#787fa0", deleting: "#565f89",
+  running: "var(--green)", waiting: "var(--yellow)", completed: "var(--blue)",
+  failed: "var(--red)", stopped: "var(--label-quaternary)", pending: "var(--label-quaternary)",
+  ready: "var(--label-quaternary)", deleting: "var(--label-quaternary)",
 };
 
 interface StatusData {
@@ -29,7 +29,7 @@ export function StatusView({ sessions }: { sessions: SessionSummary[] }) {
     api.getStatus().then(setStatusData);
   }, []);
 
-  if (!statusData) return <div className="empty">Loading...</div>;
+  if (!statusData) return <div className="empty"><div className="empty-text">Loading...</div></div>;
 
   const entries: [string, number][] = Object.entries(statusData.byStatus || {}).sort(
     ([, a], [, b]) => b - a
@@ -38,9 +38,9 @@ export function StatusView({ sessions }: { sessions: SessionSummary[] }) {
 
   return (
     <div>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <div style={{ fontSize: 48, fontWeight: 700, color: "#c0caf5" }}>{total}</div>
-        <div style={{ color: "#787fa0", fontSize: 14 }}>Total Sessions</div>
+      <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <div style={{ fontSize: 40, fontWeight: 700, color: "var(--label)", fontFamily: "var(--mono)" }}>{total}</div>
+        <div style={{ color: "var(--label-tertiary)", fontSize: 12 }}>Total Sessions</div>
       </div>
       {/* Status bar */}
       {total > 0 && (
@@ -49,7 +49,7 @@ export function StatusView({ sessions }: { sessions: SessionSummary[] }) {
             <div
               key={status}
               className="status-bar-segment"
-              style={{ width: `${(count / total) * 100}%`, background: STATUS_COLORS[status] || "#565f89" }}
+              style={{ width: `${(count / total) * 100}%`, background: STATUS_COLORS[status] || "var(--label-quaternary)" }}
             />
           ))}
         </div>
@@ -58,17 +58,17 @@ export function StatusView({ sessions }: { sessions: SessionSummary[] }) {
       <div className="status-grid">
         {entries.map(([status, count]) => (
           <div key={status} className="status-card">
-            <div className="status-count" style={{ color: STATUS_COLORS[status] || "#787fa0" }}>{count}</div>
-            <div className="status-label" style={{ color: "#787fa0" }}>{status}</div>
+            <div className="status-count" style={{ color: STATUS_COLORS[status] || "var(--label-tertiary)" }}>{count}</div>
+            <div className="status-label">{status}</div>
           </div>
         ))}
       </div>
       {/* Recent sessions */}
       {sessions && sessions.length > 0 && (
         <div>
-          <h3 style={{ color: "#787fa0", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 12 }}>
+          <div style={{ color: "var(--label-quaternary)", fontSize: 10, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 8 }}>
             Recent Sessions
-          </h3>
+          </div>
           <table className="table">
             <thead>
               <tr>
@@ -86,7 +86,7 @@ export function StatusView({ sessions }: { sessions: SessionSummary[] }) {
                   <td>{s.summary || s.id}</td>
                   <td><StatusBadge status={s.status} /></td>
                   <td>{s.agent || "-"}</td>
-                  <td style={{ color: "#787fa0" }}>{relTime(s.updated_at)}</td>
+                  <td style={{ color: "var(--label-quaternary)", fontFamily: "var(--mono)", fontSize: 11 }}>{relTime(s.updated_at)}</td>
                 </tr>
               ))}
             </tbody>

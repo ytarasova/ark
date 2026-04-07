@@ -12,7 +12,16 @@ export function FlowsView() {
     });
   }, []);
 
-  if (!flows.length) return <div className="empty"><div className="empty-icon">&#8644;</div><div className="empty-text">No flows found</div></div>;
+  if (!flows.length) {
+    return (
+      <div className="empty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.15, marginBottom: 16 }}>
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <div className="empty-text">No flows found</div>
+      </div>
+    );
+  }
 
   return (
     <div className="split-view">
@@ -53,7 +62,7 @@ export function FlowsView() {
                   <tbody>
                     {selected.stages.map((s: any, i: number) => (
                       <tr key={i}>
-                        <td style={{ color: "#565f89" }}>{i + 1}</td>
+                        <td style={{ color: "var(--label-quaternary)", fontFamily: "var(--mono)", fontSize: 11 }}>{i + 1}</td>
                         <td style={{ fontWeight: 600 }}>{s.name}</td>
                         <td>{s.agent || "-"}</td>
                         <td>
