@@ -19,9 +19,18 @@ export function FlowsView() {
   useEffect(() => {
     api.getFlows().then((data) => {
       setFlows(data || []);
-      if (data?.length) setSelected(data[0]);
+      if (data?.length) selectFlow(data[0]);
     });
   }, []);
+
+  function selectFlow(flow: any) {
+    // Fetch detail to get full stage objects (list endpoint only has stage names as strings)
+    api.getFlowDetail(flow.name).then((detail) => {
+      setSelected(detail || flow);
+    }).catch(() => {
+      setSelected(flow);
+    });
+  }
 
   if (!flows.length) {
     return (
@@ -48,7 +57,7 @@ export function FlowsView() {
                 "hover:bg-accent",
                 selected?.name === f.name && "bg-accent border-l-2 border-l-primary font-semibold"
               )}
-              onClick={() => setSelected(f)}
+              onClick={() => selectFlow(f)}
             >
               <span className="text-foreground truncate">{f.name}</span>
               <Badge variant="secondary" className="text-[10px]">{stageCount} stage{stageCount !== 1 ? "s" : ""}</Badge>
@@ -77,18 +86,24 @@ export function FlowsView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {selected.stages.map((s: any, i: number) => (
-                      <tr key={i} className="hover:bg-accent transition-colors">
-                        <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-muted-foreground font-mono text-[11px]">{i + 1}</td>
-                        <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-foreground font-semibold">{s.name}</td>
-                        <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">{s.agent || "-"}</td>
-                        <td className="p-2.5 px-3 text-[13px] border-b border-border/50">
-                          <Badge variant={GATE_VARIANT[s.gate || "auto"] || "success"} className="text-[10px]">
-                            {s.gate || "auto"}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
+                    {selected.stages.map((s: any, i: number) => {
+                      // Handle both object stages (from detail endpoint) and string stages (from list endpoint)
+                      const stageName = typeof s === "string" ? s : s.name;
+                      const agent = typeof s === "string" ? "-" : (s.agent || "-");
+                      const gate = typeof s === "string" ? "auto" : (s.gate || "auto");
+                      return (
+                        <tr key={i} className="hover:bg-accent transition-colors">
+                          <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-muted-foreground font-mono text-[11px]">{i + 1}</td>
+                          <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-foreground font-semibold">{stageName || "-"}</td>
+                          <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">{agent}</td>
+                          <td className="p-2.5 px-3 text-[13px] border-b border-border/50">
+                            <Badge variant={GATE_VARIANT[gate] || "success"} className="text-[10px]">
+                              {gate}
+                            </Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

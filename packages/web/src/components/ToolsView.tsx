@@ -30,9 +30,9 @@ export function ToolsView() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col h-full">
       {/* Tabs */}
-      <div className="flex gap-0 mb-4 border-b border-border">
+      <div className="flex gap-0 border-b border-border shrink-0">
         <button
           className={cn(
             "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
@@ -53,7 +53,8 @@ export function ToolsView() {
         </button>
       </div>
 
-      <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
+      {/* Split view - fills remaining space */}
+      <div className="grid grid-cols-[260px_1fr] overflow-hidden flex-1 min-h-0">
         {/* Left: list panel */}
         <div className="bg-card border-r border-border overflow-y-auto">
           {items.length === 0 && (

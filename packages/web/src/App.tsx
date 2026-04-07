@@ -115,7 +115,9 @@ function App() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-muted-foreground">{sessions.length}</span>
+            {view === "sessions" && (
+              <span className="text-xs font-mono text-muted-foreground">{sessions.length}</span>
+            )}
             {view === "sessions" && !readOnly && (
               <button
                 className="px-3.5 py-1.5 rounded-lg text-[12px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.97] transition-all duration-150"

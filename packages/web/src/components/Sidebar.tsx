@@ -56,10 +56,8 @@ export function Sidebar({ activeView, onNavigate, readOnly }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <Separator className="bg-sidebar-border" />
-      <div className="h-10 flex items-center justify-center text-[11px] text-muted-foreground font-mono shrink-0 no-drag">
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)] mr-1.5" />
-        {readOnly ? "read-only" : "connected"}
+      <div className="h-8 flex items-center justify-center text-[10px] text-muted-foreground/40 font-mono shrink-0 no-drag">
+        {readOnly ? "read-only" : "v0.10.0"}
       </div>
     </div>
   );

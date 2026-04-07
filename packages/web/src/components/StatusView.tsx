@@ -4,7 +4,8 @@ import { cn } from "../lib/utils.js";
 import { StatusDot, StatusBadge } from "./StatusDot.js";
 import { relTime } from "../util.js";
 import { Card } from "./ui/card.js";
-import { LayoutGrid } from "lucide-react";
+import { Badge } from "./ui/badge.js";
+import { LayoutGrid, Server, Calendar } from "lucide-react";
 
 const STATUS_BAR_COLORS: Record<string, string> = {
   running: "bg-emerald-400", waiting: "bg-amber-400", completed: "bg-blue-400",
@@ -33,9 +34,13 @@ interface SessionSummary {
 
 export function StatusView({ sessions }: { sessions: SessionSummary[] }) {
   const [statusData, setStatusData] = useState<StatusData | null>(null);
+  const [computes, setComputes] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
 
   useEffect(() => {
     api.getStatus().then(setStatusData);
+    api.getCompute().then((d) => setComputes(d || [])).catch(() => {});
+    api.getSchedules().then((d) => setSchedules(d || [])).catch(() => {});
   }, []);
 
   if (!statusData) return (
@@ -81,6 +86,56 @@ export function StatusView({ sessions }: { sessions: SessionSummary[] }) {
             <div className="text-[11px] font-semibold uppercase tracking-[0.06em] mt-1.5 text-muted-foreground">{status}</div>
           </Card>
         ))}
+      </div>
+
+      {/* Compute & Schedule summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+        {/* Compute targets */}
+        <div>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2 flex items-center gap-1.5">
+            <Server size={12} className="opacity-50" />
+            Compute Targets
+          </h3>
+          {computes.length === 0 ? (
+            <Card className="p-4 text-sm text-muted-foreground">No compute targets</Card>
+          ) : (
+            <Card className="overflow-hidden">
+              {computes.map((c: any) => (
+                <div key={c.name || c.id} className="flex items-center justify-between px-3 py-2 border-b border-border/50 last:border-b-0">
+                  <div className="flex items-center gap-2">
+                    <span className={cn("inline-block w-2 h-2 rounded-full shrink-0",
+                      c.status === "running" ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]" :
+                      c.status === "stopped" ? "bg-red-400" : "bg-muted-foreground/30"
+                    )} />
+                    <span className="text-[13px] text-foreground">{c.name || c.id}</span>
+                  </div>
+                  <Badge variant="secondary" className="text-[10px]">{c.provider || "local"}</Badge>
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
+        {/* Schedules */}
+        <div>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2 flex items-center gap-1.5">
+            <Calendar size={12} className="opacity-50" />
+            Schedules
+          </h3>
+          {schedules.length === 0 ? (
+            <Card className="p-4 text-sm text-muted-foreground">No schedules</Card>
+          ) : (
+            <Card className="overflow-hidden">
+              {schedules.slice(0, 8).map((s: any) => (
+                <div key={s.id || s.name} className="flex items-center justify-between px-3 py-2 border-b border-border/50 last:border-b-0">
+                  <span className="text-[13px] text-foreground truncate">{s.name || s.id}</span>
+                  <Badge variant={s.enabled ? "success" : "secondary"} className="text-[10px]">
+                    {s.enabled ? "active" : "disabled"}
+                  </Badge>
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
       </div>
 
       {/* Recent sessions table */}

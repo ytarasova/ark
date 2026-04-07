@@ -123,15 +123,17 @@ export function ComputeView() {
         {selected ? (
           <>
             <h2 className="text-lg font-semibold text-foreground mb-1">{selected.name || selected.id}</h2>
-            {/* Actions */}
-            <div className="mb-5">
-              <ComputeActions compute={selected} onAction={handleAction} />
-              {actionMsg && (
-                <div className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-red-400" : "text-emerald-400")}>
-                  {actionMsg.text}
-                </div>
-              )}
-            </div>
+            {/* Actions - hide for local provider */}
+            {selected.provider !== "local" && (
+              <div className="mb-5">
+                <ComputeActions compute={selected} onAction={handleAction} />
+                {actionMsg && (
+                  <div className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-red-400" : "text-emerald-400")}>
+                    {actionMsg.text}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="mb-4">
               <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Details</h3>
               <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
@@ -160,6 +162,24 @@ export function ComputeView() {
                     <span className="text-card-foreground">{selected.region}</span>
                   </>
                 )}
+                {selected.config?.ip && (
+                  <>
+                    <span className="text-muted-foreground">IP</span>
+                    <span className="text-card-foreground font-mono">{selected.config.ip}</span>
+                  </>
+                )}
+                {selected.config?.instanceType && (
+                  <>
+                    <span className="text-muted-foreground">Instance</span>
+                    <span className="text-card-foreground font-mono">{selected.config.instanceType}</span>
+                  </>
+                )}
+                {selected.config?.region && (
+                  <>
+                    <span className="text-muted-foreground">Region</span>
+                    <span className="text-card-foreground font-mono">{selected.config.region}</span>
+                  </>
+                )}
                 {selected.created_at && (
                   <>
                     <span className="text-muted-foreground">Created</span>
@@ -168,6 +188,26 @@ export function ComputeView() {
                 )}
               </div>
             </div>
+            {/* Metrics - show if available */}
+            {selected.config?.metrics && (
+              <div className="mt-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Metrics</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-secondary rounded-md p-3">
+                    <div className="text-xs text-muted-foreground mb-1">CPU</div>
+                    <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.cpu}%</div>
+                  </div>
+                  <div className="bg-secondary rounded-md p-3">
+                    <div className="text-xs text-muted-foreground mb-1">Memory</div>
+                    <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.memPct}%</div>
+                  </div>
+                  <div className="bg-secondary rounded-md p-3">
+                    <div className="text-xs text-muted-foreground mb-1">Disk</div>
+                    <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.diskPct}%</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
