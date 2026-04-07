@@ -19,8 +19,11 @@ dev: install ## Install deps, symlink ark, then start TypeScript watcher
 tui: ## Launch the terminal UI
 	./ark tui
 
-test: build-web ## Run tests (sequential — never parallel, ports collide)
-	$(BUN) test --concurrency 1
+test: build-web ## Run all tests sequentially (never parallel — ports collide)
+	$(BUN) test packages/ --concurrency 1
+
+test-file: ## Run a single test file: make test-file F=packages/core/__tests__/session.test.ts
+	$(BUN) test $(F)
 
 test-watch: ## Run tests in watch mode
 	$(BUN) run test:watch

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { truncateLog, logDir, cleanupLogs } from "../log-manager.js";
-import { createSession } from "../store.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
@@ -50,7 +50,7 @@ describe("cleanupLogs", () => {
     mkdirSync(dir, { recursive: true });
 
     // Create a session so we know its ID format
-    const session = createSession({ summary: "keep me" });
+    const session = getApp().sessions.create({ summary: "keep me" });
 
     // Write a log for the real session and a fake one
     writeFileSync(join(dir, `ark-${session.id}.log`), "real log");
@@ -66,7 +66,7 @@ describe("cleanupLogs", () => {
     const dir = logDir();
     mkdirSync(dir, { recursive: true });
 
-    const session = createSession({ summary: "large log" });
+    const session = getApp().sessions.create({ summary: "large log" });
     const logPath = join(dir, `ark-${session.id}.log`);
 
     // Create a file that's over 1MB (use small maxSizeMb for testing)

@@ -11,7 +11,7 @@ import { join } from "path";
 import YAML from "yaml";
 import { buildArgs, writeHooksConfig } from "../claude.js";
 import { loadFlow, resolveFlow } from "../flow.js";
-import { ARK_DIR } from "../store.js";
+import { ARK_DIR } from "../paths.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();

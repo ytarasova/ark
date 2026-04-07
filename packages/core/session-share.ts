@@ -5,7 +5,6 @@
 import { readFileSync, writeFileSync } from "fs";
 import type { Session, Event } from "../types/index.js";
 import { getApp } from "./app.js";
-import { getSession as storeGetSession, getEvents as storeGetEvents, createSession as storeCreateSession, updateSession as storeUpdateSession } from "./store.js";
 
 export interface SessionExport {
   version: 1;
@@ -16,9 +15,8 @@ export interface SessionExport {
 
 /** Export a session to a JSON file. */
 export function exportSession(sessionId: string): SessionExport | null {
-  let session, events;
-  try { session = getApp().sessions.get(sessionId); events = getApp().events.list(sessionId); }
-  catch { session = storeGetSession(sessionId); events = storeGetEvents(sessionId) as Event[]; }
+  const session = getApp().sessions.get(sessionId);
+  const events = getApp().events.list(sessionId) as Event[];
   if (!session) return null;
 
   return {
@@ -63,12 +61,10 @@ export function importSessionFromFile(filePath: string): { ok: boolean; sessionI
       config: data.session.config,
       group_name: data.session.group_name,
     };
-    try { session = getApp().sessions.create(createOpts); }
-    catch { session = storeCreateSession(createOpts); }
+    session = getApp().sessions.create(createOpts);
 
     if (data.session.agent) {
-      try { getApp().sessions.update(session.id, { agent: data.session.agent }); }
-      catch { storeUpdateSession(session.id, { agent: data.session.agent }); }
+      getApp().sessions.update(session.id, { agent: data.session.agent });
     }
 
     return { ok: true, sessionId: session.id, message: `Imported as ${session.id}` };

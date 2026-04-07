@@ -2,39 +2,56 @@
  * Ark Core - public API.
  */
 
-// Store (createSession is also exported directly for use in tests/recipes; session.ts wraps it with richer logic)
-export {
-  ARK_DIR, DB_PATH, TRACKS_DIR, WORKTREES_DIR,
-  createSession,
-  getDb, getSession, listSessions, updateSession, deleteSession,
-  softDeleteSession, undeleteSession, listDeletedSessions, purgeExpiredDeletes,
-  logEvent, getEvents, getChildren, getGroups, createGroup, deleteGroup, claimSession,
-  createCompute, getCompute, listCompute, updateCompute, mergeComputeConfig, mergeSessionConfig, deleteCompute,
-  safeParseConfig,
-  sessionChannelPort, isChannelPortAvailable,
-  addMessage, getMessages, getUnreadCount, markMessagesRead,
-  type Message,
-  createTestContext, setContext, resetContext, closeDb,
-  rowToSession, type SessionRow,
-  type Session, type Event, type Compute, type TestContext,
-} from "./store.js";
-
-// Context (DI)
-export { getContext, type StoreContext } from "./context.js";
-
-// App context
-export { AppContext, getApp, setApp, clearApp } from "./app.js";
+// Convenience re-exports (delegate to AppContext repos)
+export { getApp, setApp, clearApp, AppContext } from "./app.js";
+export { ARK_DIR, DB_PATH, TRACKS_DIR, WORKTREES_DIR } from "./paths.js";
+export { safeParseConfig } from "./util.js";
 export { loadConfig, type ArkConfig, type OtlpSettings, type RollbackSettings, type TelemetrySettings } from "./config.js";
+
+// Domain types (previously from store.ts, now from types/)
+export type { Session, Event, Compute, Message } from "../types/index.js";
+
+// ── Convenience wrappers (delegate to AppContext repos/services) ────────────
+import { getApp as _getApp } from "./app.js";
+import type { CreateSessionOpts, SessionListFilters } from "../types/index.js";
+
+// Session CRUD
+export function createSession(opts: CreateSessionOpts) { return _getApp().sessions.create(opts); }
+export function getSession(id: string) { return _getApp().sessions.get(id); }
+export function listSessions(filters?: SessionListFilters) { return _getApp().sessions.list(filters); }
+export function updateSession(id: string, fields: Record<string, unknown>) { return _getApp().sessions.update(id, fields as any); }
+export function softDeleteSession(id: string) { return _getApp().sessions.softDelete(id); }
+export function undeleteSession(id: string) { return _getApp().sessions.undelete(id); }
+export function deleteSession(id: string): boolean { return _getApp().sessions.delete(id); }
+
+// Groups
+export function createGroup(name: string) { return _getApp().sessions.createGroup(name); }
+export function deleteGroup(name: string) { return _getApp().sessions.deleteGroup(name); }
+export function getGroups() { return _getApp().sessions.getGroups().map(g => g.name); }
+
+// Event CRUD
+export function getEvents(sessionId: string, filters?: { type?: string }) { return _getApp().events.list(sessionId, filters); }
+export function logEvent(sessionId: string, type: string, data?: Record<string, unknown>) { return _getApp().events.log(sessionId, type, data); }
+
+// Compute CRUD
+export function createCompute(opts: { name: string; provider: string; [k: string]: unknown }) { return _getApp().computes.create(opts as any); }
+export function getCompute(name: string) { return _getApp().computes.get(name); }
+export function listCompute() { return _getApp().computes.list(); }
+export function updateCompute(name: string, fields: Record<string, unknown>) { return _getApp().computes.update(name, fields as any); }
+export function mergeComputeConfig(name: string, config: Record<string, unknown>) { return _getApp().computes.mergeConfig(name, config); }
+export function deleteCompute(name: string) { return _getApp().computes.delete(name); }
 
 // Session lifecycle (the main API)
 export {
-  startSession, dispatch, advance, stop, resume, complete, pause,
+  startSession, dispatch, advance, stop, resume, complete, pause, interrupt,
+  archive, restore,
   forkSession, cloneSession, handoff, fork, joinFork, getOutput, send,
   deleteSessionAsync, undeleteSessionAsync, waitForCompletion, approveReviewGate,
   applyHookStatus, applyReport, cleanupOnTerminal,
-  retryWithContext, fanOut, finishWorktree, detectStatus,
+  retryWithContext, fanOut, worktreeDiff, finishWorktree, createWorktreePR, detectStatus,
   spawnSubagent, spawnParallelSubagents,
   findOrphanedWorktrees, cleanupWorktrees,
+  runVerification,
   type HookStatusResult, type ReportResult, type SessionOpResult,
 } from "./services/session-orchestration.js";
 
@@ -251,7 +268,7 @@ export type { AgentDefinition as AgentDefinitionDomain } from "../types/index.js
 export type { GateType } from "../types/index.js";
 
 // Repositories
-export { SessionRepository, ComputeRepository, EventRepository, MessageRepository } from "./repositories/index.js";
+export { SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
 
 // Services
 export { SessionService, ComputeService, HistoryService } from "./services/index.js";

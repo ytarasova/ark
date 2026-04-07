@@ -1,6 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import { scoreOutput, summarizeResults, listEvalSuites } from "../evals.js";
 import type { EvalResult } from "../evals.js";
+import { withTestContext } from "./test-helpers.js";
+
+withTestContext();
 
 describe("evals", () => {
   it("scoreOutput matches expected keywords", () => {

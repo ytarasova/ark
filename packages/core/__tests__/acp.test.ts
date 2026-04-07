@@ -5,7 +5,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { handleAcpRequest, type AcpRequest } from "../acp.js";
-import { createSession, getSession } from "../store.js";
+import { getApp } from "../app.js";
 
 withTestContext();
 
@@ -30,14 +30,14 @@ describe("handleAcpRequest", () => {
     expect(result.status).toBe("ready");
 
     // Verify it actually exists in the store
-    const session = getSession(result.sessionId);
+    const session = getApp().sessions.get(result.sessionId);
     expect(session).toBeTruthy();
     expect(session!.summary).toBe("ACP test session");
   });
 
   it("session/list returns sessions", async () => {
-    createSession({ summary: "list test 1", repo: "." });
-    createSession({ summary: "list test 2", repo: "." });
+    getApp().sessions.create({ summary: "list test 1", repo: "." });
+    getApp().sessions.create({ summary: "list test 2", repo: "." });
 
     const resp = await handleAcpRequest(req("session/list", { limit: 10 }));
 
@@ -47,7 +47,7 @@ describe("handleAcpRequest", () => {
   });
 
   it("session/get returns a specific session", async () => {
-    const session = createSession({ summary: "get test", repo: "." });
+    const session = getApp().sessions.create({ summary: "get test", repo: "." });
 
     const resp = await handleAcpRequest(req("session/get", { sessionId: session.id }));
 
@@ -74,7 +74,7 @@ describe("handleAcpRequest", () => {
   });
 
   it("session/delete removes a session", async () => {
-    const session = createSession({ summary: "delete test", repo: "." });
+    const session = getApp().sessions.create({ summary: "delete test", repo: "." });
 
     const resp = await handleAcpRequest(req("session/delete", { sessionId: session.id }));
 

@@ -15,9 +15,9 @@ import YAML from "yaml";
 let execFileResult: { stdout: string; stderr: string } = { stdout: "{}", stderr: "" };
 let execFileShouldThrow = false;
 
-import { ARK_DIR } from "../store.js";
-import * as store from "../store.js";
-import { createSession } from "../store.js";
+import { ARK_DIR } from "../paths.js";
+
+import { getApp } from "../app.js";
 import { pollPRReviews, checkSessionPR, fetchPRReviews, processReviewFeedback, setGhExec } from "../pr-poller.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -44,17 +44,17 @@ function makeGhOutput(overrides: Record<string, any> = {}): string {
 }
 
 function createReviewSession(opts: { pr_url?: string; status?: string; flow?: string; stage?: string; config?: Record<string, any> } = {}): store.Session {
-  const session = createSession({
+  const session = getApp().sessions.create({
     summary: "test pr poller",
     flow: opts.flow ?? "review-flow",
   });
-  store.updateSession(session.id, {
+  getApp().sessions.update(session.id, {
     pr_url: opts.pr_url ?? "https://github.com/org/repo/pull/42",
     status: opts.status ?? "running",
     stage: opts.stage ?? "review",
     config: opts.config ?? {},
   });
-  return store.getSession(session.id)!;
+  return getApp().sessions.get(session.id)!;
 }
 
 beforeEach(() => {
@@ -86,21 +86,21 @@ beforeEach(() => {
 
 describe("pollPRReviews", () => {
   it("skips sessions without pr_url", async () => {
-    const session = createSession({ summary: "no pr", flow: "review-flow" });
-    store.updateSession(session.id, { status: "running", stage: "review" });
+    const session = getApp().sessions.create({ summary: "no pr", flow: "review-flow" });
+    getApp().sessions.update(session.id, { status: "running", stage: "review" });
     // No pr_url set
 
     await pollPRReviews();
 
     // Should not have created any pr_ events
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const prEvents = events.filter(e => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
   it("skips sessions not in review-gated stage", async () => {
-    const session = createSession({ summary: "wrong stage", flow: "review-flow" });
-    store.updateSession(session.id, {
+    const session = getApp().sessions.create({ summary: "wrong stage", flow: "review-flow" });
+    getApp().sessions.update(session.id, {
       pr_url: "https://github.com/org/repo/pull/99",
       status: "running",
       stage: "implement", // auto gate, not review
@@ -108,7 +108,7 @@ describe("pollPRReviews", () => {
 
     await pollPRReviews();
 
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const prEvents = events.filter(e => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
@@ -127,7 +127,7 @@ describe("pollPRReviews", () => {
     await pollPRReviews();
 
     // Should have been skipped due to cooldown - no pr_approved event
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const approvals = events.filter(e => e.type === "pr_approved");
     expect(approvals).toHaveLength(0);
   });
@@ -147,7 +147,7 @@ describe("checkSessionPR", () => {
 
     await checkSessionPR(session);
 
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const approvals = events.filter(e => e.type === "pr_approved");
     expect(approvals).toHaveLength(1);
 
@@ -167,12 +167,12 @@ describe("checkSessionPR", () => {
     await checkSessionPR(session);
 
     // Should have logged pr_review_feedback event
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const feedback = events.filter(e => e.type === "pr_review_feedback");
     expect(feedback).toHaveLength(1);
 
     // Should have stored a message
-    const messages = store.getMessages(session.id);
+    const messages = getApp().messages.list(session.id);
     const systemMsgs = messages.filter(m => m.role === "system");
     expect(systemMsgs.length).toBeGreaterThanOrEqual(1);
     expect(systemMsgs[systemMsgs.length - 1].content).toContain("Fix the error handling");
@@ -186,7 +186,7 @@ describe("checkSessionPR", () => {
     await checkSessionPR(session);
 
     // No events should have been created
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const prEvents = events.filter(e => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
@@ -198,7 +198,7 @@ describe("checkSessionPR", () => {
     await checkSessionPR(session);
 
     // Only timestamp update, no review events
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const prEvents = events.filter(e => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
@@ -209,7 +209,7 @@ describe("checkSessionPR", () => {
 
     await checkSessionPR(session);
 
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const statusEvents = events.filter(e => e.type === "pr_status");
     expect(statusEvents).toHaveLength(1);
 
@@ -235,7 +235,7 @@ describe("checkSessionPR", () => {
     await checkSessionPR(session);
 
     // Should not create pr_approved because review_count hasn't increased
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const approvals = events.filter(e => e.type === "pr_approved");
     expect(approvals).toHaveLength(0);
   });
@@ -290,7 +290,7 @@ describe("processReviewFeedback", () => {
 
     await processReviewFeedback(session, data, config);
 
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const prEvents = events.filter(e => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
@@ -305,7 +305,7 @@ describe("processReviewFeedback", () => {
 
     await processReviewFeedback(session, data, config);
 
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const approvals = events.filter(e => e.type === "pr_approved");
     expect(approvals).toHaveLength(1);
   });
@@ -320,12 +320,12 @@ describe("processReviewFeedback", () => {
 
     await processReviewFeedback(session, data, config);
 
-    const events = store.getEvents(session.id);
+    const events = getApp().events.list(session.id);
     const feedback = events.filter(e => e.type === "pr_review_feedback");
     expect(feedback).toHaveLength(1);
 
     // Should have stored a message
-    const messages = store.getMessages(session.id);
+    const messages = getApp().messages.list(session.id);
     const systemMsgs = messages.filter(m => m.role === "system");
     expect(systemMsgs.length).toBeGreaterThanOrEqual(1);
   });
@@ -340,7 +340,7 @@ describe("processReviewFeedback", () => {
 
     await processReviewFeedback(session, data, config);
 
-    const updated = store.getSession(session.id)!;
+    const updated = getApp().sessions.get(session.id)!;
     const updatedConfig = updated.config as Record<string, any>;
     expect(updatedConfig.review_count).toBe(1);
   });

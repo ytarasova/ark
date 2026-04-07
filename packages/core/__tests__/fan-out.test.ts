@@ -1,13 +1,13 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
-import * as store from "../store.js";
+import { getApp } from "../app.js";
 import * as session from "../services/session-orchestration.js";
 
 const { getCtx } = withTestContext();
 
 describe("sub-agent fan-out", () => {
   it("creates correct number of children", () => {
-    const parent = store.createSession({ summary: "build feature", flow: "bare" });
+    const parent = getApp().sessions.create({ summary: "build feature", flow: "bare" });
 
     const result = session.fanOut(parent.id, {
       tasks: [
@@ -22,7 +22,7 @@ describe("sub-agent fan-out", () => {
   });
 
   it("children linked to parent", () => {
-    const parent = store.createSession({ summary: "build feature", flow: "bare" });
+    const parent = getApp().sessions.create({ summary: "build feature", flow: "bare" });
 
     const result = session.fanOut(parent.id, {
       tasks: [
@@ -32,14 +32,14 @@ describe("sub-agent fan-out", () => {
     });
 
     for (const childId of result.childIds!) {
-      const child = store.getSession(childId)!;
+      const child = getApp().sessions.get(childId)!;
       expect(child.parent_id).toBe(parent.id);
       expect(child.status).toBe("ready");
     }
   });
 
   it("children share fork_group", () => {
-    const parent = store.createSession({ summary: "test", flow: "bare" });
+    const parent = getApp().sessions.create({ summary: "test", flow: "bare" });
     const result = session.fanOut(parent.id, {
       tasks: [
         { summary: "task 1" },
@@ -47,24 +47,24 @@ describe("sub-agent fan-out", () => {
       ],
     });
 
-    const child1 = store.getSession(result.childIds![0])!;
-    const child2 = store.getSession(result.childIds![1])!;
+    const child1 = getApp().sessions.get(result.childIds![0])!;
+    const child2 = getApp().sessions.get(result.childIds![1])!;
     expect(child1.fork_group).toBeDefined();
     expect(child1.fork_group).toBe(child2.fork_group);
   });
 
   it("parent in waiting state", () => {
-    const parent = store.createSession({ summary: "test", flow: "bare" });
+    const parent = getApp().sessions.create({ summary: "test", flow: "bare" });
     session.fanOut(parent.id, {
       tasks: [{ summary: "task 1" }],
     });
 
-    const updated = store.getSession(parent.id)!;
+    const updated = getApp().sessions.get(parent.id)!;
     expect(updated.status).toBe("waiting");
   });
 
   it("empty task list rejected", () => {
-    const parent = store.createSession({ summary: "test", flow: "bare" });
+    const parent = getApp().sessions.create({ summary: "test", flow: "bare" });
     const result = session.fanOut(parent.id, { tasks: [] });
 
     expect(result.ok).toBe(false);

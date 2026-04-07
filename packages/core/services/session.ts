@@ -206,6 +206,33 @@ export class SessionService {
   }
 
   /**
+   * Interrupt a running agent (Ctrl+C) without killing the tmux session.
+   * Delegates to session-orchestration.ts interrupt().
+   */
+  async interrupt(id: string): Promise<SessionOpResult> {
+    const { interrupt: legacyInterrupt } = await import("./session-orchestration.js");
+    return legacyInterrupt(id);
+  }
+
+  /**
+   * Archive a session for later reference.
+   * Delegates to session-orchestration.ts archive().
+   */
+  async archive(id: string): Promise<SessionOpResult> {
+    const { archive: legacyArchive } = await import("./session-orchestration.js");
+    return legacyArchive(id);
+  }
+
+  /**
+   * Restore an archived session back to stopped.
+   * Delegates to session-orchestration.ts restore().
+   */
+  async restore(id: string): Promise<SessionOpResult> {
+    const { restore: legacyRestore } = await import("./session-orchestration.js");
+    return legacyRestore(id);
+  }
+
+  /**
    * Soft-delete a session (90s undo window).
    * Port of session.ts deleteSessionAsync() — simplified: no tmux/provider
    * cleanup (caller handles), just state transition.
@@ -506,15 +533,32 @@ export class SessionService {
   }
 
   /**
+   * Get a diff summary for a session's worktree branch vs its base branch.
+   */
+  async worktreeDiff(id: string, opts?: { base?: string }): Promise<any> {
+    const { worktreeDiff: legacyDiff } = await import("./session-orchestration.js");
+    return legacyDiff(id, opts);
+  }
+
+  /**
    * Finish a worktree: merge back and clean up.
    */
   async finishWorktree(id: string, opts?: {
     into?: string;
     noMerge?: boolean;
     keepBranch?: boolean;
+    createPR?: boolean;
   }): Promise<SessionOpResult> {
     const { finishWorktree: legacyFinish } = await import("./session-orchestration.js");
     return legacyFinish(id, opts);
+  }
+
+  /**
+   * Create a GitHub PR from a session's worktree branch.
+   */
+  async createWorktreePR(id: string, opts?: { title?: string; body?: string; base?: string; draft?: boolean }): Promise<SessionOpResult & { pr_url?: string }> {
+    const { createWorktreePR: legacyCreatePR } = await import("./session-orchestration.js");
+    return legacyCreatePR(id, opts);
   }
 
   /**

@@ -8,8 +8,8 @@ import { AppContext, setApp, clearApp } from "../../core/app.js";
 let app: AppContext;
 beforeAll(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 afterAll(async () => {
   await app?.shutdown();
@@ -41,49 +41,61 @@ async function renderWithClient(element: React.ReactElement) {
 describe("ToolsTab", () => {
   it("renders all category groups", async () => {
     const { ToolsTab } = await import("../tabs/ToolsTab.js");
-    const { lastFrame } = await renderWithClient(<ToolsTab pane="left" />);
+    const { lastFrame, unmount } = await renderWithClient(<ToolsTab pane="left" />);
     const frame = lastFrame();
     expect(frame).toContain("MCP Servers");
     expect(frame).toContain("Commands");
     expect(frame).toContain("Skills");
     expect(frame).toContain("Recipes");
     expect(frame).toContain("Context");
+    await new Promise(r => setTimeout(r, 50));
+    unmount();
   });
 
   it("renders Skills group (includes ark skills)", async () => {
     const { ToolsTab } = await import("../tabs/ToolsTab.js");
-    const { lastFrame } = await renderWithClient(<ToolsTab pane="left" />);
+    const { lastFrame, unmount } = await renderWithClient(<ToolsTab pane="left" />);
     const frame = lastFrame();
     expect(frame).toContain("Skills");
+    await new Promise(r => setTimeout(r, 50));
+    unmount();
   });
 
   it("renders Recipes group", async () => {
     const { ToolsTab } = await import("../tabs/ToolsTab.js");
-    const { lastFrame } = await renderWithClient(<ToolsTab pane="left" />);
+    const { lastFrame, unmount } = await renderWithClient(<ToolsTab pane="left" />);
     const frame = lastFrame();
     expect(frame).toContain("Recipes");
+    await new Promise(r => setTimeout(r, 50));
+    unmount();
   });
 
   it("shows detail pane when right is focused", async () => {
     const { ToolsTab } = await import("../tabs/ToolsTab.js");
-    const { lastFrame } = await renderWithClient(<ToolsTab pane="right" />);
+    const { lastFrame, unmount } = await renderWithClient(<ToolsTab pane="right" />);
     const frame = lastFrame();
     expect(frame).toBeDefined();
     expect(frame).toContain("Details");
+    await new Promise(r => setTimeout(r, 50));
+    unmount();
   });
 
   it("shows empty group placeholders for MCP Servers and Commands", async () => {
     const { ToolsTab } = await import("../tabs/ToolsTab.js");
-    const { lastFrame } = await renderWithClient(<ToolsTab pane="left" />);
+    const { lastFrame, unmount } = await renderWithClient(<ToolsTab pane="left" />);
     const frame = lastFrame();
     expect(frame).toContain("MCP Servers");
     expect(frame).toContain("Commands");
+    await new Promise(r => setTimeout(r, 50));
+    unmount();
   });
 
   it("renders Tools as left panel title", async () => {
     const { ToolsTab } = await import("../tabs/ToolsTab.js");
-    const { lastFrame } = await renderWithClient(<ToolsTab pane="left" />);
+    const { lastFrame, unmount } = await renderWithClient(<ToolsTab pane="left" />);
     const frame = lastFrame();
     expect(frame).toContain("Tools");
+    await new Promise(r => setTimeout(r, 50));
+    unmount();
   });
 });

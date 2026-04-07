@@ -5,10 +5,7 @@
 
 import { createHmac } from "crypto";
 import { describe, it, expect } from "bun:test";
-import {
-  updateSession,
-} from "../index.js";
-import { createSession } from "../store.js";
+import { getApp } from "../app.js";
 import {
   validateSignature,
   extractComments,
@@ -141,8 +138,8 @@ describe("formatReviewPrompt", () => {
 
 describe("findSessionByPR", () => {
   it("returns session matching pr_url", () => {
-    const session = createSession({ summary: "test session" });
-    updateSession(session.id, { pr_url: "https://github.com/org/repo/pull/42" });
+    const session = getApp().sessions.create({ summary: "test session" });
+    getApp().sessions.update(session.id, { pr_url: "https://github.com/org/repo/pull/42" });
 
     const found = findSessionByPR("https://github.com/org/repo/pull/42");
     expect(found).not.toBeNull();
@@ -158,12 +155,12 @@ describe("findSessionByPR", () => {
   it("returns most recent session for same PR", () => {
     const prUrl = "https://github.com/org/repo/pull/77";
 
-    const older = createSession({ summary: "older" });
-    updateSession(older.id, { pr_url: prUrl });
+    const older = getApp().sessions.create({ summary: "older" });
+    getApp().sessions.update(older.id, { pr_url: prUrl });
 
     // Small delay to ensure different created_at
-    const newer = createSession({ summary: "newer" });
-    updateSession(newer.id, { pr_url: prUrl });
+    const newer = getApp().sessions.create({ summary: "newer" });
+    getApp().sessions.update(newer.id, { pr_url: prUrl });
 
     const found = findSessionByPR(prUrl);
     expect(found).not.toBeNull();
@@ -188,8 +185,8 @@ describe("handleGitHubWebhook", () => {
 
   it("returns approve for approved reviews with matching session", () => {
     const prUrl = "https://github.com/org/repo/pull/10";
-    const session = createSession({ summary: "webhook test" });
-    updateSession(session.id, { pr_url: prUrl, status: "running" });
+    const session = getApp().sessions.create({ summary: "webhook test" });
+    getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
 
     const result = handleGitHubWebhook("pull_request_review", makePRPayload(prUrl, {
       review: {
@@ -205,8 +202,8 @@ describe("handleGitHubWebhook", () => {
 
   it("returns steer for changes_requested with comments", () => {
     const prUrl = "https://github.com/org/repo/pull/20";
-    const session = createSession({ summary: "steer test" });
-    updateSession(session.id, { pr_url: prUrl, status: "stopped" });
+    const session = getApp().sessions.create({ summary: "steer test" });
+    getApp().sessions.update(session.id, { pr_url: prUrl, status: "stopped" });
 
     const result = handleGitHubWebhook("pull_request_review", makePRPayload(prUrl, {
       review: {
@@ -223,8 +220,8 @@ describe("handleGitHubWebhook", () => {
 
   it("returns steer for pull_request_review_comment", () => {
     const prUrl = "https://github.com/org/repo/pull/30";
-    const session = createSession({ summary: "comment test" });
-    updateSession(session.id, { pr_url: prUrl, status: "running" });
+    const session = getApp().sessions.create({ summary: "comment test" });
+    getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
 
     const result = handleGitHubWebhook("pull_request_review_comment", makePRPayload(prUrl, {
       comment: {

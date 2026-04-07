@@ -10,7 +10,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import type { Session } from "../types/index.js";
 import { getApp } from "./app.js";
-import { listSessions as storeListSessions, logEvent as storeLogEvent } from "./store.js";
+
 import { safeAsync } from "./safe.js";
 
 const execFileAsync = promisify(execFile);
@@ -76,7 +76,7 @@ export async function fetchLabeledIssues(
 export function issueAlreadyTracked(ticket: string): boolean {
   let sessions;
   try { sessions = getApp().sessions.list({ limit: 500 }); }
-  catch { sessions = storeListSessions({ limit: 500 }); }
+  catch { sessions = []; }
   return sessions.some(s => s.ticket === ticket);
 }
 
@@ -114,7 +114,7 @@ export async function createSessionFromIssue(
     },
   };
   try { getApp().events.log(session.id, "issue_imported", evOpts); }
-  catch { storeLogEvent(session.id, "issue_imported", evOpts); }
+  catch { /* app not booted */ }
 
   if (opts?.autoDispatch) {
     await safeAsync(`issue-poller: dispatch ${session.id}`, async () => {

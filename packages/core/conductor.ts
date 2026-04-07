@@ -20,7 +20,6 @@ declare const Bun: {
   }): { stop(): void };
 };
 
-import { sessionChannelPort, mergeSessionConfig, getSession as storeGetSession, listSessions as storeListSessions, getEvents as storeGetEvents, logEvent as storeLogEvent, updateSession as storeUpdateSession, getCompute as storeGetCompute, addMessage as storeAddMessage } from "./store.js";
 import type { Session } from "../types/index.js";
 import { getApp } from "./app.js";
 import * as session from "./services/session-orchestration.js";
@@ -63,9 +62,9 @@ async function handleAgentRelay(req: Request): Promise<Response> {
     target: string;
     message: string;
   };
-  const targetSession = storeGetSession(target);
+  const targetSession = getApp().sessions.get(target);
   if (targetSession) {
-    const channelPort = sessionChannelPort(target);
+    const channelPort = getApp().sessions.channelPort(target);
     const payload = { type: "steer", message, from, sessionId: target };
     await deliverToChannel(targetSession as Session, channelPort, payload);
   }
@@ -76,7 +75,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   const sessionId = url.searchParams.get("session");
   if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
 
-  const s = storeGetSession(sessionId);
+  const s = getApp().sessions.get(sessionId);
   if (!s) return Response.json({ error: "session not found" }, { status: 404 });
 
   const payload = await req.json() as Record<string, unknown>;
@@ -90,12 +89,12 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
     const evalResult = evaluateToolCall(toolName, toolInput);
 
     if (evalResult.action === "block") {
-      storeLogEvent(sessionId, "guardrail_blocked", {
+      getApp().events.log(sessionId, "guardrail_blocked", {
         actor: "system",
         data: { tool: toolName, pattern: evalResult.rule?.pattern, input: toolInput },
       });
     } else if (evalResult.action === "warn") {
-      storeLogEvent(sessionId, "guardrail_warning", {
+      getApp().events.log(sessionId, "guardrail_warning", {
         actor: "system",
         data: { tool: toolName, pattern: evalResult.rule?.pattern },
       });
@@ -109,12 +108,12 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
   // Apply events
   for (const evt of result.events ?? []) {
-    storeLogEvent(sessionId, evt.type, evt.opts);
+    getApp().events.log(sessionId, evt.type, evt.opts);
   }
 
   // Apply store updates
   if (result.updates) {
-    storeUpdateSession(sessionId, result.updates);
+    getApp().sessions.update(sessionId, result.updates);
   }
 
   // Emit to event bus
@@ -135,7 +134,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
   // Apply usage data
   if (result.usage) {
-    mergeSessionConfig(sessionId, { usage: result.usage });
+    getApp().sessions.mergeConfig(sessionId, { usage: result.usage });
   }
 
   // Index transcript
@@ -155,11 +154,11 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
 function handleRestApi(path: string): Response {
   if (path === "/api/sessions")
-    return Response.json(storeListSessions());
+    return Response.json(getApp().sessions.list());
   if (path.startsWith("/api/sessions/")) {
     const id = extractPathSegment(path, 3);
     if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-    const s = storeGetSession(id);
+    const s = getApp().sessions.get(id);
     return s
       ? Response.json(s)
       : Response.json({ error: "not found" }, { status: 404 });
@@ -167,12 +166,12 @@ function handleRestApi(path: string): Response {
   if (path.startsWith("/api/events/")) {
     const id = extractPathSegment(path, 3);
     if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-    return Response.json(storeGetEvents(id));
+    return Response.json(getApp().events.list(id));
   }
   if (path === "/health") {
     return Response.json({
       status: "ok",
-      sessions: storeListSessions().length,
+      sessions: getApp().sessions.list().length,
     });
   }
   return new Response("Not found", { status: 404 });
@@ -188,7 +187,7 @@ async function handlePRMergeWebhook(req: Request): Promise<Response> {
   const repo = payload.repository;
 
   // Find Ark session by branch or PR URL
-  const sessions = storeListSessions();
+  const sessions = getApp().sessions.list();
   const matchedSession = sessions.find(s => {
     const cfg = s.config as any;
     return cfg?.pr_url === pr.html_url || cfg?.branch === pr.head?.ref;
@@ -304,7 +303,7 @@ export function startConductor(port = DEFAULT_PORT, opts?: {
         });
         await session.dispatch(s.id);
         updateScheduleLastRun(sched.id);
-        storeLogEvent(s.id, "scheduled_dispatch", {
+        getApp().events.log(s.id, "scheduled_dispatch", {
           actor: "scheduler",
           data: { schedule_id: sched.id, cron: sched.cron },
         });
@@ -349,7 +348,7 @@ export async function deliverToChannel(
 ): Promise<void> {
   // Try arkd delivery first (works for both local and remote)
   const computeName = targetSession.compute_name || "local";
-  const compute = storeGetCompute(computeName);
+  const compute = getApp().computes.get(computeName);
   const provider = compute ? getProvider(compute.provider) : null;
   if (provider && typeof (provider as any).getArkdUrl === "function") {
     try {
@@ -376,12 +375,12 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
   // Log events
   for (const evt of result.logEvents ?? []) {
-    storeLogEvent(sessionId, evt.type, evt.opts);
+    getApp().events.log(sessionId, evt.type, evt.opts);
   }
 
   // Store message for TUI chat view
   if (result.message) {
-    storeAddMessage({ session_id: sessionId, role: result.message.role, content: result.message.content, type: result.message.type });
+    getApp().messages.send(sessionId, result.message.role as any, result.message.content, result.message.type as any);
   }
 
   // Emit bus events
@@ -391,13 +390,13 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
   // Apply store updates
   if (Object.keys(result.updates).length > 0) {
-    storeUpdateSession(sessionId, result.updates);
+    getApp().sessions.update(sessionId, result.updates);
   }
 
   // Handle advance + auto-dispatch for completed reports
   if (result.shouldAdvance) {
     const advResult = await session.advance(sessionId);
-    const updated = (result.shouldAutoDispatch && advResult.ok) ? storeGetSession(sessionId) : null;
+    const updated = (result.shouldAutoDispatch && advResult.ok) ? getApp().sessions.get(sessionId) : null;
     if (updated?.status === "ready" && updated.stage) {
       const nextAction = flow.getStageAction(updated.flow, updated.stage);
       if (nextAction.type === "agent" || nextAction.type === "fork") {
@@ -408,12 +407,34 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
     }
   }
 
-  // PR URL detection
+  // PR URL detection (agent-provided)
   if (result.prUrl) {
-    storeUpdateSession(sessionId, { pr_url: result.prUrl });
-    storeLogEvent(sessionId, "pr_detected", {
+    getApp().sessions.update(sessionId, { pr_url: result.prUrl });
+    getApp().events.log(sessionId, "pr_detected", {
       actor: "agent",
       data: { pr_url: result.prUrl },
     });
+  }
+
+  // Auto-create PR on completion (when session has a git remote and no PR yet)
+  if (report.type === "completed" && !result.prUrl) {
+    const s = getApp().sessions.get(sessionId);
+    if (s && !s.pr_url && s.config?.github_url && s.branch) {
+      // Check repo config for auto_pr override (defaults to true)
+      const { loadRepoConfig } = await import("./repo-config.js");
+      const repoConfig = s.workdir ? loadRepoConfig(s.workdir) : {};
+      const autoPR = (repoConfig as any).auto_pr !== false;
+
+      if (autoPR) {
+        safeAsync(`auto-pr: ${sessionId}`, async () => {
+          const prResult = await session.createWorktreePR(sessionId, {
+            title: s.summary ?? undefined,
+          });
+          if (prResult.ok && prResult.pr_url) {
+            logInfo("conductor", `auto-PR created for ${sessionId}: ${prResult.pr_url}`);
+          }
+        });
+      }
+    }
   }
 }

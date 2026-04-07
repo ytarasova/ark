@@ -11,8 +11,8 @@ import { ArkClientProvider } from "./context/ArkClientProvider.js";
 
 // ── Boot application ────────────────────────────────────────────────────────
 const app = new AppContext(loadConfig());
-await app.boot();
 setApp(app);
+await app.boot();
 
 // ── Logging ─────────────────────────────────────────────────────────────────
 const LOG_FILE = join(app.config.logDir, "tui.log");

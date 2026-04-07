@@ -8,6 +8,8 @@ export interface RepoConfig {
   group?: string;
   agent?: string;
   env?: Record<string, string>;
+  verify?: string[];  // Default verification scripts for all stages
+  auto_pr?: boolean;  // Auto-create PR on agent completion (default: true for repos with remotes)
 }
 
 export function loadRepoConfig(dir: string): RepoConfig {

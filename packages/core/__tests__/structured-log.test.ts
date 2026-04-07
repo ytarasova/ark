@@ -14,7 +14,7 @@ describe("structured logging", () => {
 
   it("writes JSONL entries", () => {
     logInfo("session", "test message", { key: "value" });
-    const { ARK_DIR } = require("../store.js");
+    const { ARK_DIR } = require("../paths.js");
     const logFile = join(ARK_DIR(), "ark.jsonl");
     expect(existsSync(logFile)).toBe(true);
     const content = readFileSync(logFile, "utf-8").trim();
@@ -29,7 +29,7 @@ describe("structured logging", () => {
     setLogLevel("error");
     logInfo("general", "should not appear");
     logError("general", "should appear");
-    const { ARK_DIR } = require("../store.js");
+    const { ARK_DIR } = require("../paths.js");
     const logFile = join(ARK_DIR(), "ark.jsonl");
     if (existsSync(logFile)) {
       const lines = readFileSync(logFile, "utf-8").trim().split("\n").filter(Boolean);
@@ -42,7 +42,7 @@ describe("structured logging", () => {
     setLogComponents(["mcp"]);
     logInfo("session", "filtered out");
     logInfo("mcp", "allowed");
-    const { ARK_DIR } = require("../store.js");
+    const { ARK_DIR } = require("../paths.js");
     const logFile = join(ARK_DIR(), "ark.jsonl");
     if (existsSync(logFile)) {
       const lines = readFileSync(logFile, "utf-8").trim().split("\n").filter(Boolean);
@@ -53,7 +53,7 @@ describe("structured logging", () => {
 
   it("entries have timestamps", () => {
     logInfo("general", "timed");
-    const { ARK_DIR } = require("../store.js");
+    const { ARK_DIR } = require("../paths.js");
     const logFile = join(ARK_DIR(), "ark.jsonl");
     const content = readFileSync(logFile, "utf-8").trim();
     const entry = JSON.parse(content.split("\n").pop()!);

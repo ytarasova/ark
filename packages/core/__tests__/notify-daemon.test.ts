@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "bun:test";
 import { NotifyDaemon } from "../notify-daemon.js";
 import { Bridge } from "../bridge.js";
 import { withTestContext } from "./test-helpers.js";
-import { createSession, updateSession } from "../store.js";
+import { getApp } from "../app.js";
 
 withTestContext();
 
@@ -59,10 +59,10 @@ describe("NotifyDaemon", () => {
     });
 
     // Create sessions in various states
-    const s1 = createSession({ summary: "running-test" });
-    updateSession(s1.id, { status: "running" });
-    const s2 = createSession({ summary: "waiting-test" });
-    updateSession(s2.id, { status: "waiting" });
+    const s1 = getApp().sessions.create({ summary: "running-test" });
+    getApp().sessions.update(s1.id, { status: "running" });
+    const s2 = getApp().sessions.create({ summary: "waiting-test" });
+    getApp().sessions.update(s2.id, { status: "waiting" });
 
     daemon.start();
     // Let it poll once
@@ -82,15 +82,15 @@ describe("NotifyDaemon", () => {
       idleIntervalMs: 30,
     });
 
-    const s = createSession({ summary: "transition-test" });
-    updateSession(s.id, { status: "running" });
+    const s = getApp().sessions.create({ summary: "transition-test" });
+    getApp().sessions.update(s.id, { status: "running" });
 
     daemon.start();
     // First poll establishes baseline
     await new Promise(r => setTimeout(r, 60));
 
     // Now transition to waiting — next poll should notify
-    updateSession(s.id, { status: "waiting" });
+    getApp().sessions.update(s.id, { status: "waiting" });
     await new Promise(r => setTimeout(r, 60));
 
     daemon.stop();
@@ -110,7 +110,7 @@ describe("NotifyDaemon", () => {
       idleIntervalMs: 30,
     });
 
-    createSession({ summary: "no-initial-notify" });
+    getApp().sessions.create({ summary: "no-initial-notify" });
 
     daemon.start();
     await new Promise(r => setTimeout(r, 60));

@@ -3,6 +3,9 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { SessionReplay } from "../tabs/SessionReplay.js";
 import type { Session } from "../../core/index.js";
+import { withTestContext } from "../../core/__tests__/test-helpers.js";
+
+withTestContext();
 
 // Mock core module - buildReplay returns test data
 const mockSteps = [

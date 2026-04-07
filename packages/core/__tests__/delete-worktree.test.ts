@@ -6,20 +6,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
-import { getSession, WORKTREES_DIR } from "../index.js";
-import { createSession } from "../store.js";
+import { WORKTREES_DIR } from "../paths.js";
 import { deleteSessionAsync } from "../services/session-orchestration.js";
-import { AppContext, setApp, clearApp } from "../app.js";
-import { withTestContext } from "./test-helpers.js";
-
-withTestContext();
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 
 afterEach(async () => {
@@ -29,7 +25,7 @@ afterEach(async () => {
 
 describe("deleteSessionAsync worktree cleanup", () => {
   it("removes worktree directory when session is deleted", async () => {
-    const session = createSession({ summary: "wt-cleanup-test", repo: "/tmp/fake-repo" });
+    const session = getApp().sessions.create({ summary: "wt-cleanup-test", repo: "/tmp/fake-repo" });
     const wtPath = join(WORKTREES_DIR(), session.id);
 
     // Simulate a worktree directory existing
@@ -41,13 +37,13 @@ describe("deleteSessionAsync worktree cleanup", () => {
 
     expect(existsSync(wtPath)).toBe(false);
     // Soft-delete: session still exists in DB with status "deleting"
-    const after = getSession(session.id);
+    const after = getApp().sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
   });
 
   it("succeeds when no worktree directory exists", async () => {
-    const session = createSession({ summary: "no-wt-test", repo: "/tmp/fake-repo" });
+    const session = getApp().sessions.create({ summary: "no-wt-test", repo: "/tmp/fake-repo" });
     const wtPath = join(WORKTREES_DIR(), session.id);
 
     expect(existsSync(wtPath)).toBe(false);
@@ -55,13 +51,13 @@ describe("deleteSessionAsync worktree cleanup", () => {
     const result = await deleteSessionAsync(session.id);
     expect(result.ok).toBe(true);
     // Soft-delete: session still exists in DB with status "deleting"
-    const after = getSession(session.id);
+    const after = getApp().sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
   });
 
   it("deletes session even if worktree cleanup fails gracefully", async () => {
-    const session = createSession({ summary: "wt-no-repo-test" });
+    const session = getApp().sessions.create({ summary: "wt-no-repo-test" });
     const wtPath = join(WORKTREES_DIR(), session.id);
 
     // Create a worktree dir but session has no repo — should still delete
@@ -70,7 +66,7 @@ describe("deleteSessionAsync worktree cleanup", () => {
     const result = await deleteSessionAsync(session.id);
     expect(result.ok).toBe(true);
     // Soft-delete: session still exists in DB with status "deleting"
-    const after = getSession(session.id);
+    const after = getApp().sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
     // Without a repo, falls back to rmSync — directory should be cleaned up

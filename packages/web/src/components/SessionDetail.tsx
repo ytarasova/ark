@@ -10,24 +10,81 @@ interface SessionDetailProps {
   readOnly: boolean;
 }
 
-function SessionActions({ session, onAction }: { session: any; onAction: (action: string) => void }) {
+function SessionActions({ session, onAction, onSend }: { session: any; onAction: (action: string) => void; onSend: (msg: string) => void }) {
   const s = session.status;
+  const [sendMsg, setSendMsg] = useState("");
+  const [showSend, setShowSend] = useState(false);
   return (
-    <div className="btn-group">
-      {(s === "ready" || s === "pending") && (
-        <button className="btn btn-primary btn-sm" onClick={() => onAction("dispatch")}>Dispatch</button>
-      )}
-      {(s === "running" || s === "waiting") && (
-        <button className="btn btn-warning btn-sm" onClick={() => onAction("stop")}>Stop</button>
-      )}
-      {(s === "stopped" || s === "failed") && (
-        <button className="btn btn-success btn-sm" onClick={() => onAction("restart")}>Restart</button>
-      )}
-      {s !== "deleting" && (
-        <button className="btn btn-danger btn-sm" onClick={() => onAction("delete")}>Delete</button>
-      )}
-      {s === "deleting" && (
-        <button className="btn btn-sm" onClick={() => onAction("undelete")}>Undelete</button>
+    <div>
+      <div className="btn-group">
+        {(s === "ready" || s === "pending") && (
+          <button className="btn btn-primary btn-sm" onClick={() => onAction("dispatch")}>Dispatch</button>
+        )}
+        {(s === "running" || s === "waiting") && (
+          <button className="btn btn-warning btn-sm" onClick={() => onAction("stop")}>Stop</button>
+        )}
+        {(s === "running" || s === "waiting") && (
+          <button className="btn btn-sm" onClick={() => onAction("pause")}>Pause</button>
+        )}
+        {(s === "running" || s === "waiting") && (
+          <button className="btn btn-sm" onClick={() => onAction("interrupt")}>Interrupt</button>
+        )}
+        {(s === "running" || s === "waiting" || s === "blocked") && (
+          <button className="btn btn-primary btn-sm" onClick={() => onAction("advance")}>Advance</button>
+        )}
+        {(s === "running" || s === "waiting" || s === "blocked") && (
+          <button className="btn btn-success btn-sm" onClick={() => onAction("complete")}>Complete</button>
+        )}
+        {(s === "stopped" || s === "failed") && (
+          <button className="btn btn-success btn-sm" onClick={() => onAction("restart")}>Restart</button>
+        )}
+        {s !== "deleting" && (
+          <button className="btn btn-sm" onClick={() => onAction("fork")}>Fork</button>
+        )}
+        {(s === "running" || s === "waiting") && (
+          <button className="btn btn-sm" onClick={() => setShowSend(!showSend)}>Send</button>
+        )}
+        {(s === "completed" || s === "stopped" || s === "failed") && (
+          <button className="btn btn-sm" onClick={() => onAction("archive")}>Archive</button>
+        )}
+        {s === "archived" && (
+          <button className="btn btn-sm" onClick={() => onAction("restore")}>Restore</button>
+        )}
+        {s !== "deleting" && (
+          <button className="btn btn-danger btn-sm" onClick={() => onAction("delete")}>Delete</button>
+        )}
+        {s === "deleting" && (
+          <button className="btn btn-sm" onClick={() => onAction("undelete")}>Undelete</button>
+        )}
+      </div>
+      {showSend && (
+        <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+          <input
+            className="input input-sm"
+            style={{ flex: 1 }}
+            placeholder="Message to agent..."
+            value={sendMsg}
+            onChange={(e) => setSendMsg(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && sendMsg.trim()) {
+                onSend(sendMsg.trim());
+                setSendMsg("");
+                setShowSend(false);
+              }
+            }}
+          />
+          <button
+            className="btn btn-primary btn-sm"
+            disabled={!sendMsg.trim()}
+            onClick={() => {
+              if (sendMsg.trim()) {
+                onSend(sendMsg.trim());
+                setSendMsg("");
+                setShowSend(false);
+              }
+            }}
+          >Send</button>
+        </div>
       )}
     </div>
   );
@@ -37,6 +94,21 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
   const [detail, setDetail] = useState<any>(null);
   const [output, setOutput] = useState("");
   const outputRef = useRef<HTMLDivElement>(null);
+  const [diffData, setDiffData] = useState<any>(null);
+  const [showDiff, setShowDiff] = useState(false);
+  const [showPRForm, setShowPRForm] = useState(false);
+  const [prTitle, setPrTitle] = useState("");
+  const [prDraft, setPrDraft] = useState(false);
+  const [prUrl, setPrUrl] = useState<string | null>(null);
+  const [todos, setTodos] = useState<any[]>([]);
+  const [newTodo, setNewTodo] = useState("");
+  const [verifyResult, setVerifyResult] = useState<any>(null);
+
+  // Load todos
+  useEffect(() => {
+    if (!sessionId) return;
+    api.getTodos(sessionId).then((data) => setTodos(Array.isArray(data) ? data : [])).catch(() => {});
+  }, [sessionId]);
 
   // Load detail
   useEffect(() => {
@@ -73,6 +145,13 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
       case "restart": res = await api.restart(sessionId); break;
       case "delete": res = await api.deleteSession(sessionId); break;
       case "undelete": res = await api.undelete(sessionId); break;
+      case "pause": res = await api.pause(sessionId); break;
+      case "interrupt": res = await api.interrupt(sessionId); break;
+      case "advance": res = await api.advance(sessionId); break;
+      case "complete": res = await api.complete(sessionId); break;
+      case "fork": res = await api.fork(sessionId); break;
+      case "archive": res = await api.archive(sessionId); break;
+      case "restore": res = await api.restore(sessionId); break;
       default: return;
     }
     if (res.ok !== false) {
@@ -81,6 +160,72 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
       setDetail(d);
     } else {
       onToast(res.message || "Action failed", "error");
+    }
+  }
+
+  async function handlePreviewDiff() {
+    const data = await api.worktreeDiff(sessionId);
+    setDiffData(data);
+    setShowDiff(true);
+  }
+
+  async function handleCreatePR() {
+    const res = await api.worktreeCreatePR(sessionId, {
+      title: prTitle || undefined,
+      draft: prDraft || undefined,
+    });
+    if (res.ok !== false) {
+      onToast("PR created", "success");
+      if (res.pr_url) setPrUrl(res.pr_url);
+      setShowPRForm(false);
+      const d = await api.getSession(sessionId);
+      setDetail(d);
+    } else {
+      onToast(res.message || "PR creation failed", "error");
+    }
+  }
+
+  async function handleAddTodo() {
+    if (!newTodo.trim()) return;
+    const res = await api.addTodo(sessionId, newTodo.trim());
+    if (res.ok !== false && res.todo) {
+      setTodos([...todos, res.todo]);
+      setNewTodo("");
+    } else {
+      onToast("Failed to add todo", "error");
+    }
+  }
+
+  async function handleToggleTodo(id: number) {
+    const res = await api.toggleTodo(id);
+    if (res.ok !== false && res.todo) {
+      setTodos(todos.map(t => t.id === id ? res.todo : t));
+    }
+  }
+
+  async function handleDeleteTodo(id: number) {
+    const res = await api.deleteTodo(id);
+    if (res.ok !== false) {
+      setTodos(todos.filter(t => t.id !== id));
+    }
+  }
+
+  async function handleRunVerification() {
+    const result = await api.runVerification(sessionId);
+    setVerifyResult(result);
+    if (result.ok) {
+      onToast("Verification passed", "success");
+    } else {
+      onToast("Verification failed", "error");
+    }
+  }
+
+  async function handleSend(message: string) {
+    const res = await api.send(sessionId, message);
+    if (res.ok !== false) {
+      onToast("Message sent", "success");
+    } else {
+      onToast(res.message || "Send failed", "error");
     }
   }
 
@@ -111,7 +256,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {/* Actions */}
         {!readOnly && (
           <div className="detail-section">
-            <SessionActions session={s} onAction={handleAction} />
+            <SessionActions session={s} onAction={handleAction} onSend={handleSend} />
           </div>
         )}
 
@@ -139,6 +284,131 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
             <span className="detail-value">{relTime(s.updated_at)}</span>
           </div>
         </div>
+
+        {/* Preview Changes / Create PR */}
+        {s.workdir && s.status !== "deleting" && (
+          <div className="detail-section">
+            <div className="btn-group">
+              <button className="btn btn-sm" onClick={handlePreviewDiff}>Preview Changes</button>
+              {!readOnly && (
+                <button className="btn btn-sm" onClick={() => { setPrTitle(s.summary || ""); setShowPRForm(!showPRForm); }}>Create PR</button>
+              )}
+            </div>
+            {prUrl && (
+              <div style={{ marginTop: 6, fontSize: 13 }}>
+                PR: <a href={prUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#58a6ff" }}>{prUrl}</a>
+              </div>
+            )}
+            {s.pr_url && !prUrl && (
+              <div style={{ marginTop: 6, fontSize: 13 }}>
+                PR: <a href={s.pr_url} target="_blank" rel="noopener noreferrer" style={{ color: "#58a6ff" }}>{s.pr_url}</a>
+              </div>
+            )}
+            {showPRForm && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                <input
+                  className="input input-sm"
+                  placeholder="PR title"
+                  value={prTitle}
+                  onChange={(e) => setPrTitle(e.target.value)}
+                />
+                <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="checkbox" checked={prDraft} onChange={(e) => setPrDraft(e.target.checked)} />
+                  Draft PR
+                </label>
+                <div className="btn-group">
+                  <button className="btn btn-primary btn-sm" onClick={handleCreatePR}>Submit PR</button>
+                  <button className="btn btn-sm" onClick={() => setShowPRForm(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Diff Preview */}
+        {showDiff && diffData && (
+          <div className="detail-section">
+            <div className="detail-section-title">
+              Changes: {diffData.branch} vs {diffData.baseBranch}
+              <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => setShowDiff(false)}>Close</button>
+            </div>
+            <div style={{ fontSize: 13, color: "#787fa0", marginBottom: 8 }}>
+              {diffData.filesChanged} files changed, +{diffData.insertions} -{diffData.deletions}
+            </div>
+            {diffData.modifiedSinceReview?.length > 0 && (
+              <div style={{ color: "#e0af68", fontSize: 12, marginBottom: 8 }}>
+                Modified since last review: {diffData.modifiedSinceReview.join(", ")}
+              </div>
+            )}
+            <pre className="output-box" style={{ maxHeight: 400, overflow: "auto", whiteSpace: "pre-wrap", fontSize: 12 }}>
+              {diffData.stat || diffData.message || "No changes"}
+            </pre>
+          </div>
+        )}
+
+        {/* Todos */}
+        <div className="detail-section">
+          <div className="detail-section-title">
+            Todos
+            {!readOnly && (
+              <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={handleRunVerification}>Run Verification</button>
+            )}
+          </div>
+          {todos.length === 0 && <div style={{ fontSize: 13, color: "#787fa0" }}>No todos</div>}
+          {todos.map((t: any) => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              {!readOnly && (
+                <input
+                  type="checkbox"
+                  checked={t.done}
+                  onChange={() => handleToggleTodo(t.id)}
+                />
+              )}
+              <span style={{ textDecoration: t.done ? "line-through" : "none", flex: 1, fontSize: 13 }}>
+                {t.content}
+              </span>
+              {!readOnly && (
+                <button className="btn btn-sm btn-danger" style={{ padding: "0 4px", fontSize: 11 }} onClick={() => handleDeleteTodo(t.id)}>x</button>
+              )}
+            </div>
+          ))}
+          {!readOnly && (
+            <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+              <input
+                className="input input-sm"
+                style={{ flex: 1 }}
+                placeholder="Add a todo..."
+                value={newTodo}
+                onChange={(e) => setNewTodo(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleAddTodo(); }}
+              />
+              <button className="btn btn-sm" disabled={!newTodo.trim()} onClick={handleAddTodo}>Add</button>
+            </div>
+          )}
+        </div>
+
+        {/* Verification Result */}
+        {verifyResult && (
+          <div className="detail-section">
+            <div className="detail-section-title">
+              Verification: {verifyResult.ok ? <span style={{ color: "#3fb950" }}>PASSED</span> : <span style={{ color: "#f85149" }}>FAILED</span>}
+            </div>
+            {!verifyResult.todosResolved && (
+              <div style={{ fontSize: 13, color: "#f85149", marginBottom: 4 }}>
+                Pending todos: {verifyResult.pendingTodos?.join(", ")}
+              </div>
+            )}
+            {verifyResult.scriptResults?.map((r: any, i: number) => (
+              <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+                <span style={{ color: r.passed ? "#3fb950" : "#f85149" }}>{r.passed ? "[PASS]" : "[FAIL]"}</span>{" "}
+                <code>{r.script}</code>
+                {!r.passed && r.output && (
+                  <pre style={{ fontSize: 11, color: "#787fa0", marginTop: 2, whiteSpace: "pre-wrap" }}>{r.output.slice(0, 500)}</pre>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Output */}
         {output && (

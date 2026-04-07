@@ -23,7 +23,7 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
       flow: "bare",
     });
     if (claudeSessionId) {
-      core.updateSession(session.id, { claude_session_id: claudeSessionId });
+      core.getApp().sessions.update(session.id, { claude_session_id: claudeSessionId });
     }
     return { session };
   });
@@ -42,8 +42,8 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("history/rebuild-fts", async () => {
-    const { getDb } = await import("../../core/store.js");
-    const db = getDb();
+    const { getApp } = await import("../../core/app.js");
+    const db = getApp().db;
     db.run("DELETE FROM claude_sessions_cache");
     db.run("DELETE FROM transcript_index");
     const sessionCount = await core.refreshClaudeSessionsCache({});

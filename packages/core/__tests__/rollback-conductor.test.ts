@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { watchMergedPR, type RollbackConfig, type CheckSuiteResult } from "../rollback.js";
-import { createSession } from "../store.js";
+import { getApp } from "../app.js";
 
 withTestContext();
 
@@ -11,7 +11,7 @@ const config: RollbackConfig = {
 
 describe("watchMergedPR integration", () => {
   it("returns none when all checks pass", async () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     let callCount = 0;
     const fetcher = async () => {
       callCount++;
@@ -27,7 +27,7 @@ describe("watchMergedPR integration", () => {
   });
 
   it("triggers rollback on CI failure", async () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     let reverted = false;
     const fetcher = async () => ({
       check_suites: [{ id: 1, conclusion: "failure", status: "completed" }] as CheckSuiteResult[],
@@ -42,7 +42,7 @@ describe("watchMergedPR integration", () => {
   });
 
   it("on_timeout=ignore returns none after timeout", async () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     const fetcher = async () => ({
       check_suites: [{ id: 1, conclusion: null, status: "in_progress" }] as CheckSuiteResult[],
     });
@@ -56,7 +56,7 @@ describe("watchMergedPR integration", () => {
   });
 
   it("triggers rollback on timeout when on_timeout=rollback", async () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     let reverted = false;
     const fetcher = async () => ({
       check_suites: [{ id: 1, conclusion: null, status: "in_progress" }] as CheckSuiteResult[],
@@ -72,7 +72,7 @@ describe("watchMergedPR integration", () => {
   });
 
   it("triggers rollback when health check fails", async () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     let reverted = false;
     const fetcher = async () => ({
       check_suites: [{ id: 1, conclusion: "success", status: "completed" }] as CheckSuiteResult[],

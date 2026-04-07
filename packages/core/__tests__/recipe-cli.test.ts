@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext, type TestContext } from "../context.js";
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { saveRecipe, deleteRecipe, loadRecipe, listRecipes, sessionToRecipe } from "../recipe.js";
-import { createSession } from "../store.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+let app: AppContext;
+beforeEach(async () => { if (app) { await app.shutdown(); clearApp(); } app = AppContext.forTest(); setApp(app); await app.boot(); });
+afterEach(async () => { if (app) { await app.shutdown(); clearApp(); } });
 
 describe("recipe create/delete via core", () => {
   it("saveRecipe creates a global recipe and loadRecipe finds it", () => {
@@ -29,7 +28,7 @@ describe("recipe create/delete via core", () => {
   });
 
   it("sessionToRecipe creates recipe from session", () => {
-    const session = createSession({ summary: "Fix auth bug", flow: "default" });
+    const session = getApp().sessions.create({ summary: "Fix auth bug", flow: "default" });
     const recipe = sessionToRecipe(session, "from-session");
     expect(recipe.name).toBe("from-session");
     expect(recipe.flow).toBe("default");

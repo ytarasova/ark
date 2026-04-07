@@ -10,7 +10,7 @@ import { join, basename } from "path";
 import { homedir } from "os";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { getDb } from "./store.js";
+import { getApp } from "./app.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -165,7 +165,7 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
  * Call refreshClaudeSessionsCache() to populate/update the cache.
  */
 export function listClaudeSessions(opts?: ListOpts): ClaudeSession[] {
-  const db = getDb();
+  const db = getApp().db;
   const limit = opts?.limit ?? 100;
 
   let sql = "SELECT * FROM claude_sessions_cache WHERE 1=1";
@@ -204,7 +204,7 @@ export function listClaudeSessions(opts?: ListOpts): ClaudeSession[] {
  * Find a specific Claude session by ID (prefix match supported).
  */
 export function getClaudeSession(sessionId: string, opts?: ListOpts): ClaudeSession | null {
-  const db = getDb();
+  const db = getApp().db;
   try {
     const row = db.prepare(
       "SELECT * FROM claude_sessions_cache WHERE session_id = ? OR session_id LIKE ?"
@@ -231,7 +231,7 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
   const baseDir = opts?.baseDir ?? join(homedir(), ".claude", "projects");
   if (!existsSync(baseDir)) return 0;
 
-  const db = getDb();
+  const db = getApp().db;
 
   const insert = db.prepare(
     `INSERT OR REPLACE INTO claude_sessions_cache
@@ -290,7 +290,8 @@ export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onPr
       fileCount++;
 
       // Incremental: skip files not modified since last cache
-      if (lastCachedTime > 0 && fileStat.mtimeMs <= lastCachedTime) {
+      // Use Math.floor to handle sub-millisecond mtime precision on APFS/ext4
+      if (lastCachedTime > 0 && Math.floor(fileStat.mtimeMs) <= lastCachedTime) {
         skipped++;
         opts?.onProgress?.(fileCount, totalFiles);
         continue;

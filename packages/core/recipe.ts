@@ -8,7 +8,7 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "fs";
 import { join, basename } from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { ARK_DIR } from "./store.js";
+import { ARK_DIR } from "./paths.js";
 import type { Session } from "../types/index.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────

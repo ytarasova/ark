@@ -6,10 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import {
-  getEvents, listSessions,
-} from "../index.js";
-import { createSession, updateSession, getSession } from "../store.js";
+import { getApp } from "../app.js";
 import { startConductor } from "../conductor.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -37,33 +34,33 @@ async function postHook(sessionId: string, payload: Record<string, unknown>): Pr
 
 describe("Conductor /hooks/status endpoint", () => {
   it("UserPromptSubmit maps to status running", async () => {
-    const session = createSession({ summary: "hook test" });
-    updateSession(session.id, { status: "ready" });
+    const session = getApp().sessions.create({ summary: "hook test" });
+    getApp().sessions.update(session.id, { status: "ready" });
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
     const body = await resp.json() as any;
     expect(body.mapped).toBe("running");
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("running");
   });
 
   it("Stop does not change status (agent idle between turns)", async () => {
-    const session = createSession({ summary: "hook test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "hook test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     const resp = await postHook(session.id, { hook_event_name: "Stop" });
     expect(resp.status).toBe(200);
 
     // Stop no longer maps to a status change — session stays running
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("running");
   });
 
   it("StopFailure maps to status failed with error field", async () => {
-    const session = createSession({ summary: "hook test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "hook test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     const resp = await postHook(session.id, {
       hook_event_name: "StopFailure",
@@ -73,27 +70,27 @@ describe("Conductor /hooks/status endpoint", () => {
     const body = await resp.json() as any;
     expect(body.mapped).toBe("failed");
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("failed");
     expect(updated?.error).toBe("agent crashed");
   });
 
   it("SessionEnd maps to status completed", async () => {
-    const session = createSession({ summary: "hook test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "hook test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
     const body = await resp.json() as any;
     expect(body.mapped).toBe("completed");
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("completed");
   });
 
   it("Notification with permission_prompt maps to status waiting", async () => {
-    const session = createSession({ summary: "hook test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "hook test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     const resp = await postHook(session.id, {
       hook_event_name: "Notification",
@@ -103,19 +100,19 @@ describe("Conductor /hooks/status endpoint", () => {
     const body = await resp.json() as any;
     expect(body.mapped).toBe("waiting");
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("waiting");
   });
 
   it("SessionStart maps to status running", async () => {
-    const session = createSession({ summary: "hook test" });
+    const session = getApp().sessions.create({ summary: "hook test" });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionStart" });
     expect(resp.status).toBe(200);
     const body = await resp.json() as any;
     expect(body.mapped).toBe("running");
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("running");
   });
 
@@ -127,24 +124,24 @@ describe("Conductor /hooks/status endpoint", () => {
   });
 
   it("unknown event returns 200 with no-op, status unchanged", async () => {
-    const session = createSession({ summary: "hook test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "hook test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     const resp = await postHook(session.id, { hook_event_name: "SomeUnknownEvent" });
     expect(resp.status).toBe(200);
     const body = await resp.json() as any;
     expect(body.mapped).toBe("no-op");
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("running");
   });
 
   it("logs hook event to event audit trail", async () => {
-    const session = createSession({ summary: "hook test" });
+    const session = getApp().sessions.create({ summary: "hook test" });
 
     await postHook(session.id, { hook_event_name: "SessionStart", extra: "data" });
 
-    const events = getEvents(session.id, { type: "hook_status" });
+    const events = getApp().events.list(session.id, { type: "hook_status" });
     expect(events.length).toBeGreaterThanOrEqual(1);
     const hookEvent = events.find(e => e.type === "hook_status");
     expect(hookEvent).toBeTruthy();
@@ -153,20 +150,20 @@ describe("Conductor /hooks/status endpoint", () => {
   });
 
   it("PreCompact is logged but does not change status", async () => {
-    const session = createSession({ summary: "test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     const resp = await postHook(session.id, {
       hook_event_name: "PreCompact",
       trigger: "auto",
     });
     expect(resp.status).toBe(200);
-    expect(getSession(session.id)!.status).toBe("running");
+    expect(getApp().sessions.get(session.id)!.status).toBe("running");
   });
 
   it("PostCompact is logged with compact_summary in event data", async () => {
-    const session = createSession({ summary: "test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     await postHook(session.id, {
       hook_event_name: "PostCompact",
@@ -174,12 +171,12 @@ describe("Conductor /hooks/status endpoint", () => {
       compact_summary: "Conversation summarized: working on auth module...",
     });
 
-    expect(getSession(session.id)!.status).toBe("running");
+    expect(getApp().sessions.get(session.id)!.status).toBe("running");
   });
 
   it("StopFailure with max_output_tokens sets failed with specific error", async () => {
-    const session = createSession({ summary: "test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     await postHook(session.id, {
       hook_event_name: "StopFailure",
@@ -187,14 +184,14 @@ describe("Conductor /hooks/status endpoint", () => {
       error_details: "Output token limit exceeded",
     });
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated!.status).toBe("failed");
     expect(updated!.error).toContain("max_output_tokens");
   });
 
   it("Stop with transcript_path stores token usage on session config", async () => {
-    const session = createSession({ summary: "test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     // Write a fake transcript
     const { writeFileSync: wf } = await import("fs");
@@ -210,7 +207,7 @@ describe("Conductor /hooks/status endpoint", () => {
       transcript_path: transcriptPath,
     });
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     const config = typeof updated!.config === "string" ? JSON.parse(updated!.config) : updated!.config;
     expect(config.usage).toBeDefined();
     expect(config.usage.input_tokens).toBe(3000);
@@ -219,8 +216,8 @@ describe("Conductor /hooks/status endpoint", () => {
   });
 
   it("SessionEnd with transcript_path stores final token usage", async () => {
-    const session = createSession({ summary: "test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     const { writeFileSync: wf } = await import("fs");
     const { join: j } = await import("path");
@@ -233,67 +230,67 @@ describe("Conductor /hooks/status endpoint", () => {
       reason: "prompt_input_exit",
     });
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     const config = typeof updated!.config === "string" ? JSON.parse(updated!.config) : updated!.config;
     expect(config.usage).toBeDefined();
     expect(config.usage.input_tokens).toBe(500);
   });
 
   it("hook without transcript_path skips usage tracking", async () => {
-    const session = createSession({ summary: "test" });
-    updateSession(session.id, { status: "running" });
+    const session = getApp().sessions.create({ summary: "test" });
+    getApp().sessions.update(session.id, { status: "running" });
 
     await postHook(session.id, { hook_event_name: "Stop" });
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     const config = typeof updated!.config === "string" ? JSON.parse(updated!.config) : updated!.config;
     expect(config.usage).toBeUndefined();
   });
 
   it("UserPromptSubmit does not override completed status", async () => {
-    const session = createSession({ summary: "hook test" });
-    updateSession(session.id, { status: "completed" });
+    const session = getApp().sessions.create({ summary: "hook test" });
+    getApp().sessions.update(session.id, { status: "completed" });
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
     const body = await resp.json() as any;
     expect(body.mapped).toBe("no-op");
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("completed");
   });
 
   it("UserPromptSubmit does not override failed status back to running", async () => {
-    const session = createSession({ summary: "hook test" });
-    updateSession(session.id, { status: "failed", error: "agent crashed" });
+    const session = getApp().sessions.create({ summary: "hook test" });
+    getApp().sessions.update(session.id, { status: "failed", error: "agent crashed" });
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
     const body = await resp.json() as any;
     expect(body.mapped).toBe("no-op");
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("failed");
     expect(updated?.error).toBe("agent crashed");
   });
 
   it("SessionEnd can still set completed on auto-gate session", async () => {
     // Use default flow with implement stage (gate: auto)
-    const session = createSession({ summary: "hook test", flow: "default" });
-    updateSession(session.id, { status: "running", stage: "implement" });
+    const session = getApp().sessions.create({ summary: "hook test", flow: "default" });
+    getApp().sessions.update(session.id, { status: "running", stage: "implement" });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
     const body = await resp.json() as any;
     expect(body.mapped).toBe("completed");
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("completed");
   });
 
   it("Stop hook does not index transcript when claude session ID does not match", async () => {
-    const session = createSession({ summary: "hook test" });
-    updateSession(session.id, { status: "running", claude_session_id: "real-claude-session-abc" });
+    const session = getApp().sessions.create({ summary: "hook test" });
+    getApp().sessions.update(session.id, { status: "running", claude_session_id: "real-claude-session-abc" });
 
     // Write a fake transcript file named after a DIFFERENT claude session
     const { writeFileSync: wf } = await import("fs");
@@ -311,8 +308,7 @@ describe("Conductor /hooks/status endpoint", () => {
     // The transcript should NOT have been indexed because the hook's session_id
     // ("different-claude-session-xyz") does not match the ark session's claude_session_id
     // ("real-claude-session-abc"). We verify by checking the FTS5 index table directly.
-    const { getDb } = await import("../store.js");
-    const db = getDb();
+    const db = getApp().db;
     let count = 0;
     try {
       const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index WHERE session_id = ?").get(session.id) as any;
@@ -324,9 +320,9 @@ describe("Conductor /hooks/status endpoint", () => {
   // ── Manual gate (bare flow) tests ──────────────────────────────────────
 
   it("StopFailure keeps manual-gate session running", async () => {
-    const session = createSession({ summary: "bare test" });
-    updateSession(session.id, { flow: "bare" });
-    updateSession(session.id, { status: "running", stage: "work" });
+    const session = getApp().sessions.create({ summary: "bare test" });
+    getApp().sessions.update(session.id, { flow: "bare" });
+    getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
     const resp = await postHook(session.id, {
       hook_event_name: "StopFailure",
@@ -334,57 +330,57 @@ describe("Conductor /hooks/status endpoint", () => {
     });
     expect(resp.status).toBe(200);
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("running");
 
     // Error should be logged as agent_error event
-    const events = getEvents(session.id, { type: "agent_error" });
+    const events = getApp().events.list(session.id, { type: "agent_error" });
     expect(events.length).toBeGreaterThanOrEqual(1);
     expect(events[0].data?.error).toContain("authentication_failed");
   });
 
   it("SessionEnd keeps manual-gate session running", async () => {
-    const session = createSession({ summary: "bare test" });
-    updateSession(session.id, { flow: "bare" });
-    updateSession(session.id, { status: "running", stage: "work" });
+    const session = getApp().sessions.create({ summary: "bare test" });
+    getApp().sessions.update(session.id, { flow: "bare" });
+    getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("running");
   });
 
   it("StopFailure still fails auto-gate sessions", async () => {
-    const session = createSession({ summary: "auto test", flow: "default" });
-    updateSession(session.id, { status: "running", stage: "implement" });
+    const session = getApp().sessions.create({ summary: "auto test", flow: "default" });
+    getApp().sessions.update(session.id, { status: "running", stage: "implement" });
 
     await postHook(session.id, {
       hook_event_name: "StopFailure",
       error: "some error",
     });
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("failed");
   });
 
   it("SessionEnd still completes auto-gate sessions", async () => {
-    const session = createSession({ summary: "auto test", flow: "default" });
-    updateSession(session.id, { status: "running", stage: "implement" });
+    const session = getApp().sessions.create({ summary: "auto test", flow: "default" });
+    getApp().sessions.update(session.id, { status: "running", stage: "implement" });
 
     await postHook(session.id, { hook_event_name: "SessionEnd" });
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("completed");
   });
 
   it("UserPromptSubmit clears breakpoint_reason when resuming from waiting", async () => {
-    const session = createSession({ summary: "breakpoint clear test" });
-    updateSession(session.id, { status: "waiting", breakpoint_reason: "Need a PAT token" });
+    const session = getApp().sessions.create({ summary: "breakpoint clear test" });
+    getApp().sessions.update(session.id, { status: "waiting", breakpoint_reason: "Need a PAT token" });
 
     await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("running");
     expect(updated?.breakpoint_reason).toBeNull();
   });

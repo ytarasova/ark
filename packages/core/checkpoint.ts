@@ -8,7 +8,6 @@
 
 import type { Session, Event } from "../types/index.js";
 import { getApp } from "./app.js";
-import * as store from "./store.js";
 import * as tmux from "./tmux.js";
 import { safeAsync } from "./safe.js";
 
@@ -40,7 +39,7 @@ export interface Checkpoint {
 
 /** Save a checkpoint for a session. Stores full state snapshot as a checkpoint event. */
 export function saveCheckpoint(sessionId: string): void {
-  const session = getSessions()?.get(sessionId) ?? store.getSession(sessionId);
+  const session = getSessions()?.get(sessionId);
   if (!session) return;
 
   const data: Record<string, unknown> = {
@@ -59,12 +58,12 @@ export function saveCheckpoint(sessionId: string): void {
 
   const ev = getEvents();
   if (ev) ev.log(sessionId, "checkpoint", { stage: session.stage ?? undefined, actor: "system", data });
-  else store.logEvent(sessionId, "checkpoint", { stage: session.stage ?? undefined, actor: "system", data });
+  else getApp().events.log(sessionId, "checkpoint", { stage: session.stage ?? undefined, actor: "system", data });
 }
 
 /** Get the latest checkpoint for a session. */
 export function getCheckpoint(sessionId: string): Checkpoint | null {
-  const events = getEvents()?.list(sessionId, { type: "checkpoint" }) ?? store.getEvents(sessionId, { type: "checkpoint" });
+  const events = getEvents()?.list(sessionId, { type: "checkpoint" }) ?? [];
   if (events.length === 0) return null;
 
   const latest = events[events.length - 1];
@@ -73,7 +72,7 @@ export function getCheckpoint(sessionId: string): Checkpoint | null {
 
 /** List all checkpoints for a session, oldest first. */
 export function listCheckpoints(sessionId: string): Checkpoint[] {
-  const events = getEvents()?.list(sessionId, { type: "checkpoint" }) ?? store.getEvents(sessionId, { type: "checkpoint" });
+  const events = getEvents()?.list(sessionId, { type: "checkpoint" }) ?? [];
   return events.map((e) => eventToCheckpoint(sessionId, e));
 }
 
@@ -86,8 +85,8 @@ export function listCheckpoints(sessionId: string): Checkpoint[] {
  */
 export function findOrphanedSessions(): Session[] {
   const repo = getSessions();
-  const running = repo ? repo.list({ status: "running" } as any) : store.listSessions({ status: "running" }) as Session[];
-  const waiting = repo ? repo.list({ status: "waiting" } as any) : store.listSessions({ status: "waiting" }) as Session[];
+  const running = repo ? repo.list({ status: "running" } as any) : [];
+  const waiting = repo ? repo.list({ status: "waiting" } as any) : [];
   const candidates = [...running, ...waiting];
 
   return candidates.filter((session) => {
@@ -112,7 +111,7 @@ export function findOrphanedSessions(): Session[] {
  * 4. Log recovery event
  */
 export function recoverSession(sessionId: string): { ok: boolean; message: string } {
-  const session = getSessions()?.get(sessionId) ?? store.getSession(sessionId);
+  const session = getSessions()?.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const checkpoint = getCheckpoint(sessionId);
@@ -137,7 +136,7 @@ export function recoverSession(sessionId: string): { ok: boolean; message: strin
 
   const repo = getSessions();
   if (repo) repo.update(sessionId, updates);
-  else store.updateSession(sessionId, updates);
+  else getApp().sessions.update(sessionId, updates);
 
   const ev = getEvents();
   const evOpts = {
@@ -150,7 +149,7 @@ export function recoverSession(sessionId: string): { ok: boolean; message: strin
     },
   };
   if (ev) ev.log(sessionId, "session_recovered", evOpts);
-  else store.logEvent(sessionId, "session_recovered", evOpts);
+  else getApp().events.log(sessionId, "session_recovered", evOpts);
 
   return { ok: true, message: checkpoint
     ? `Recovered from checkpoint (stage: ${checkpoint.stage})`

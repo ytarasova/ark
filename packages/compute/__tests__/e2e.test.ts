@@ -11,13 +11,7 @@ import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-import {
-  createCompute,
-  getCompute,
-  updateCompute,
-  deleteCompute,
-  listCompute,
-} from "../../core/store.js";
+import { getApp } from "../../core/app.js";
 
 import {
   getProvider,
@@ -30,8 +24,8 @@ import { AppContext, setApp, clearApp } from "../../core/app.js";
 let app: AppContext;
 beforeAll(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 afterAll(async () => {
   await app?.shutdown();
@@ -73,7 +67,7 @@ const tmuxSessions: string[] = [];
 
 function cleanupComputes() {
   for (const name of computeNames) {
-    try { deleteCompute(name); } catch { /* already gone */ }
+    try { getApp().computes.delete(name); } catch { /* already gone */ }
   }
   computeNames.length = 0;
 }
@@ -99,7 +93,7 @@ describe("E2E: Full compute lifecycle", () => {
 
   it("uses the auto-created local compute, provisions, updates, and collects metrics", async () => {
     // The "local" compute is auto-created by ensureLocalCompute() in getDb()
-    const compute = getCompute("local");
+    const compute = getApp().computes.get("local");
     expect(compute).not.toBeNull();
     expect(compute!.name).toBe("local");
     expect(compute!.provider).toBe("local");
@@ -144,7 +138,7 @@ describe("E2E: Launch and probe a session", () => {
 
   it("launches a tmux session, probes ports with a live server", async () => {
     // Use the auto-created "local" compute
-    const compute = getCompute("local")!;
+    const compute = getApp().computes.get("local")!;
     expect(compute).not.toBeNull();
 
     const provider = getProvider("local")!;
@@ -262,7 +256,7 @@ describe("E2E: arc.json port resolution and probing", () => {
     expect(devDecl!.source).toBe("devcontainer.json");
 
     // Probe those ports via provider -- both should be not listening
-    const compute = getCompute("local")!;
+    const compute = getApp().computes.get("local")!;
     expect(compute).not.toBeNull();
 
     const provider = getProvider("local")!;
@@ -283,9 +277,9 @@ describe("E2E: Compute to provider resolution flow", () => {
 
   it("resolves providers for computes with different provider types", () => {
     // Use the auto-created "local" compute and create an ec2 compute
-    const localCompute = getCompute("local")!;
+    const localCompute = getApp().computes.get("local")!;
     expect(localCompute).not.toBeNull();
-    const ec2Compute = createCompute({ name: "my-ec2", provider: "ec2" });
+    const ec2Compute = getApp().computes.create({ name: "my-ec2", provider: "ec2" });
     computeNames.push("my-ec2");
 
     expect(localCompute.provider).toBe("local");
@@ -307,16 +301,16 @@ describe("E2E: Compute to provider resolution flow", () => {
     expect(providerNames).toContain("ec2");
 
     // Verify computes can be listed
-    const computes = listCompute();
+    const computes = getApp().computes.list();
     const testComputes = computes.filter((h) =>
       h.name === "local" || h.name === "my-ec2"
     );
     expect(testComputes.length).toBe(2);
 
     // Clean up ec2 compute only (local is a singleton)
-    deleteCompute("my-ec2");
+    getApp().computes.delete("my-ec2");
     computeNames.length = 0;
 
-    expect(getCompute("my-ec2")).toBeNull();
+    expect(getApp().computes.get("my-ec2")).toBeNull();
   });
 });

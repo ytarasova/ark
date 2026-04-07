@@ -6,24 +6,20 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";
-import {
-  createTestContext, setContext, resetContext,
-  getMessages, getUnreadCount, listSessions,
-} from "../index.js";
-import { createSession, updateSession, getSession } from "../store.js";
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { startConductor } from "../conductor.js";
-import type { TestContext } from "../context.js";
 
 // Use a non-default port to avoid conflicts with a running conductor
 const TEST_PORT = 19199;
 
-let ctx: TestContext;
+let app: AppContext;
 let server: { stop(): void };
 
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
+beforeEach(async () => {
+  if (app) { await app.shutdown(); clearApp(); }
+  app = AppContext.forTest();
+  setApp(app);
+  await app.boot();
   server = startConductor(TEST_PORT, { quiet: true });
 });
 
@@ -31,9 +27,8 @@ afterEach(() => {
   try { server.stop(); } catch {}
 });
 
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
+afterAll(async () => {
+  if (app) { await app.shutdown(); clearApp(); }
 });
 
 async function postReport(sessionId: string, report: Record<string, unknown>): Promise<Response> {
@@ -46,7 +41,7 @@ async function postReport(sessionId: string, report: Record<string, unknown>): P
 
 describe("Conductor E2E — report pipeline", () => {
   it("progress report creates an agent message in the DB", async () => {
-    const session = createSession({ summary: "test session" });
+    const session = getApp().sessions.create({ summary: "test session" });
 
     const resp = await postReport(session.id, {
       type: "progress",
@@ -56,7 +51,7 @@ describe("Conductor E2E — report pipeline", () => {
     });
     expect(resp.status).toBe(200);
 
-    const msgs = getMessages(session.id);
+    const msgs = getApp().messages.list(session.id);
     expect(msgs.length).toBe(1);
     expect(msgs[0].role).toBe("agent");
     expect(msgs[0].type).toBe("progress");
@@ -64,7 +59,7 @@ describe("Conductor E2E — report pipeline", () => {
   });
 
   it("completed report creates a message and updates session status", async () => {
-    const session = createSession({ summary: "complete me" });
+    const session = getApp().sessions.create({ summary: "complete me" });
 
     const resp = await postReport(session.id, {
       type: "completed",
@@ -76,7 +71,7 @@ describe("Conductor E2E — report pipeline", () => {
     });
     expect(resp.status).toBe(200);
 
-    const msgs = getMessages(session.id);
+    const msgs = getApp().messages.list(session.id);
     expect(msgs.length).toBe(1);
     expect(msgs[0].role).toBe("agent");
     expect(msgs[0].type).toBe("completed");
@@ -84,7 +79,7 @@ describe("Conductor E2E — report pipeline", () => {
   });
 
   it("question report creates a message and sets session to waiting", async () => {
-    const session = createSession({ summary: "question session" });
+    const session = getApp().sessions.create({ summary: "question session" });
 
     const resp = await postReport(session.id, {
       type: "question",
@@ -94,20 +89,20 @@ describe("Conductor E2E — report pipeline", () => {
     });
     expect(resp.status).toBe(200);
 
-    const msgs = getMessages(session.id);
+    const msgs = getApp().messages.list(session.id);
     expect(msgs.length).toBe(1);
     expect(msgs[0].role).toBe("agent");
     expect(msgs[0].type).toBe("question");
     expect(msgs[0].content).toBe("Should I proceed?");
 
     // Session should be in waiting status
-    const sessions = listSessions();
+    const sessions = getApp().sessions.list();
     const updated = sessions.find(s => s.id === session.id);
     expect(updated?.status).toBe("waiting");
   });
 
   it("error report creates a message and sets session to failed", async () => {
-    const session = createSession({ summary: "error session" });
+    const session = getApp().sessions.create({ summary: "error session" });
 
     const resp = await postReport(session.id, {
       type: "error",
@@ -117,19 +112,19 @@ describe("Conductor E2E — report pipeline", () => {
     });
     expect(resp.status).toBe(200);
 
-    const msgs = getMessages(session.id);
+    const msgs = getApp().messages.list(session.id);
     expect(msgs.length).toBe(1);
     expect(msgs[0].role).toBe("agent");
     expect(msgs[0].type).toBe("error");
     expect(msgs[0].content).toBe("Something went wrong");
 
-    const sessions = listSessions();
+    const sessions = getApp().sessions.list();
     const updated = sessions.find(s => s.id === session.id);
     expect(updated?.status).toBe("failed");
   });
 
   it("multiple reports from same session accumulate messages", async () => {
-    const session = createSession({ summary: "multi-report" });
+    const session = getApp().sessions.create({ summary: "multi-report" });
 
     await postReport(session.id, {
       type: "progress", sessionId: session.id, stage: "work",
@@ -144,7 +139,7 @@ describe("Conductor E2E — report pipeline", () => {
       message: "Almost there...",
     });
 
-    const msgs = getMessages(session.id);
+    const msgs = getApp().messages.list(session.id);
     expect(msgs.length).toBe(3);
     expect(msgs[0].content).toBe("Starting...");
     expect(msgs[1].content).toBe("Halfway done...");
@@ -152,7 +147,7 @@ describe("Conductor E2E — report pipeline", () => {
   });
 
   it("agent messages increment unread count", async () => {
-    const session = createSession({ summary: "unread test" });
+    const session = getApp().sessions.create({ summary: "unread test" });
 
     await postReport(session.id, {
       type: "progress", sessionId: session.id, stage: "work",
@@ -163,12 +158,12 @@ describe("Conductor E2E — report pipeline", () => {
       message: "Update 2",
     });
 
-    expect(getUnreadCount(session.id)).toBe(2);
+    expect(getApp().messages.unreadCount(session.id)).toBe(2);
   });
 
   it("reports to different sessions are isolated", async () => {
-    const s1 = createSession({ summary: "session 1" });
-    const s2 = createSession({ summary: "session 2" });
+    const s1 = getApp().sessions.create({ summary: "session 1" });
+    const s2 = getApp().sessions.create({ summary: "session 2" });
 
     await postReport(s1.id, {
       type: "progress", sessionId: s1.id, stage: "work",
@@ -179,8 +174,8 @@ describe("Conductor E2E — report pipeline", () => {
       message: "For session 2",
     });
 
-    const msgs1 = getMessages(s1.id);
-    const msgs2 = getMessages(s2.id);
+    const msgs1 = getApp().messages.list(s1.id);
+    const msgs2 = getApp().messages.list(s2.id);
     expect(msgs1.length).toBe(1);
     expect(msgs2.length).toBe(1);
     expect(msgs1[0].content).toBe("For session 1");
@@ -188,66 +183,66 @@ describe("Conductor E2E — report pipeline", () => {
   });
 
   it("progress report resets waiting status to running and clears breakpoint", async () => {
-    const session = createSession({ summary: "waiting → running" });
+    const session = getApp().sessions.create({ summary: "waiting → running" });
     // Simulate: question report set waiting + breakpoint_reason
-    updateSession(session.id, { status: "waiting", breakpoint_reason: "Should I proceed?" });
+    getApp().sessions.update(session.id, { status: "waiting", breakpoint_reason: "Should I proceed?" });
 
     await postReport(session.id, {
       type: "progress", sessionId: session.id, stage: "work",
       message: "I am online and ready for work",
     });
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("running");
     expect(updated?.breakpoint_reason).toBeNull();
 
     // Message should still be stored
-    const msgs = getMessages(session.id);
+    const msgs = getApp().messages.list(session.id);
     expect(msgs.length).toBe(1);
     expect(msgs[0].content).toBe("I am online and ready for work");
   });
 
   it("progress report does not override non-waiting statuses", async () => {
     // stopped — agent may send a stale report before being killed
-    const s1 = createSession({ summary: "stopped session" });
-    updateSession(s1.id, { status: "stopped" });
+    const s1 = getApp().sessions.create({ summary: "stopped session" });
+    getApp().sessions.update(s1.id, { status: "stopped" });
 
     await postReport(s1.id, {
       type: "progress", sessionId: s1.id, stage: "work",
       message: "still alive",
     });
-    expect(getSession(s1.id)?.status).toBe("stopped");
+    expect(getApp().sessions.get(s1.id)?.status).toBe("stopped");
 
     // running — should stay running (no-op)
-    const s2 = createSession({ summary: "running session" });
-    updateSession(s2.id, { status: "running" });
+    const s2 = getApp().sessions.create({ summary: "running session" });
+    getApp().sessions.update(s2.id, { status: "running" });
 
     await postReport(s2.id, {
       type: "progress", sessionId: s2.id, stage: "work",
       message: "update",
     });
-    expect(getSession(s2.id)?.status).toBe("running");
+    expect(getApp().sessions.get(s2.id)?.status).toBe("running");
 
     // completed — should stay completed
-    const s3 = createSession({ summary: "completed session" });
-    updateSession(s3.id, { status: "completed" });
+    const s3 = getApp().sessions.create({ summary: "completed session" });
+    getApp().sessions.update(s3.id, { status: "completed" });
 
     await postReport(s3.id, {
       type: "progress", sessionId: s3.id, stage: "work",
       message: "ghost report",
     });
-    expect(getSession(s3.id)?.status).toBe("completed");
+    expect(getApp().sessions.get(s3.id)?.status).toBe("completed");
   });
 
   it("progress report without message falls back to JSON", async () => {
-    const session = createSession({ summary: "no message" });
+    const session = getApp().sessions.create({ summary: "no message" });
 
     await postReport(session.id, {
       type: "progress", sessionId: session.id, stage: "work",
       filesChanged: [],
     });
 
-    const msgs = getMessages(session.id);
+    const msgs = getApp().messages.list(session.id);
     expect(msgs.length).toBe(1);
     expect(msgs[0].content).toContain("progress");
   });

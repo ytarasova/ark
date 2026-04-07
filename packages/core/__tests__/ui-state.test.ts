@@ -33,7 +33,7 @@ describe("UI state persistence", () => {
   it("loadUiState handles corrupt file gracefully", () => {
     const { writeFileSync } = require("fs");
     const { join } = require("path");
-    const { ARK_DIR } = require("../store.js");
+    const { ARK_DIR } = require("../paths.js");
     writeFileSync(join(ARK_DIR(), "ui-state.json"), "not json{{{");
     const state = loadUiState();
     expect(state.activeTab).toBe(0); // defaults

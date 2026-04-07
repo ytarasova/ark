@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { exportSession, exportSessionToFile, importSessionFromFile } from "../session-share.js";
-import { createSession, getSession } from "../store.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 import { writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
@@ -10,7 +10,7 @@ withTestContext();
 
 describe("session sharing", () => {
   it("exportSession returns session data", () => {
-    const s = createSession({ summary: "export-test", repo: "/tmp/repo" });
+    const s = getApp().sessions.create({ summary: "export-test", repo: "/tmp/repo" });
     const exported = exportSession(s.id);
     expect(exported).not.toBeNull();
     expect(exported!.version).toBe(1);
@@ -22,7 +22,7 @@ describe("session sharing", () => {
   });
 
   it("importSessionFromFile creates a new session", () => {
-    const s = createSession({ summary: "to-share", repo: "/tmp/repo" });
+    const s = getApp().sessions.create({ summary: "to-share", repo: "/tmp/repo" });
     const exported = exportSession(s.id);
 
     const dir = mkdtempSync(join(tmpdir(), "ark-share-"));
@@ -33,7 +33,7 @@ describe("session sharing", () => {
     expect(result.ok).toBe(true);
     expect(result.sessionId).toBeDefined();
 
-    const imported = getSession(result.sessionId!);
+    const imported = getApp().sessions.get(result.sessionId!);
     expect(imported).not.toBeNull();
     expect(imported!.summary).toContain("[imported]");
     expect(imported!.summary).toContain("to-share");
@@ -48,7 +48,7 @@ describe("session sharing", () => {
   });
 
   it("exportSessionToFile writes to disk and is re-importable", () => {
-    const s = createSession({ summary: "roundtrip test", repo: "/tmp/repo" });
+    const s = getApp().sessions.create({ summary: "roundtrip test", repo: "/tmp/repo" });
     const dir = mkdtempSync(join(tmpdir(), "ark-export-"));
     const filePath = join(dir, "export.json");
 

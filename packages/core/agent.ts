@@ -10,7 +10,7 @@
 import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import { ARK_DIR } from "./store.js";
+import { ARK_DIR } from "./paths.js";
 import { substituteVars, buildSessionVars } from "./template.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────

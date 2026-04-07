@@ -95,5 +95,23 @@ export function useSessionActions(asyncState: AsyncState) {
         if (sessions.length > 0) lastDeletedRef.current = sessions[sessions.length - 1].id;
       });
     },
+
+    interrupt: (id: string) => {
+      run(`Interrupting ${id}`, async () => { await ark.sessionInterrupt(id); });
+    },
+
+    archive: (id: string) => {
+      run(`Archiving ${id}`, async () => { await ark.sessionArchive(id); });
+    },
+
+    restore: (id: string) => {
+      run(`Restoring ${id}`, async () => { await ark.sessionRestore(id); });
+    },
+
+    createPR: (id: string, title?: string) => {
+      run(`Creating PR for ${id}`, async () => {
+        await ark.worktreeCreatePR(id, { title });
+      });
+    },
   };
 }

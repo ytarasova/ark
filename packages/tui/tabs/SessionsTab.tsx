@@ -30,7 +30,7 @@ import type { StoreData } from "../hooks/useArkStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { matchesHotkey } from "../../core/hotkeys.js";
 
-type Overlay = "move" | "group" | "talk" | "inbox" | "fork" | "search" | "replay" | "mcp" | "skills" | "settings" | "find" | "memory" | null;
+type Overlay = "move" | "group" | "talk" | "inbox" | "fork" | "search" | "replay" | "mcp" | "skills" | "settings" | "find" | "memory" | "worktreeFinish" | null;
 
 interface SessionsTabProps extends StoreData {
   asyncState: AsyncState;
@@ -80,7 +80,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   // Push/pop focus when overlay opens/closes
   useEffect(() => {
     if (overlay) focus.push(overlay);
-    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("fork"), focus.pop("search"), focus.pop("replay"), focus.pop("mcp"), focus.pop("skills"), focus.pop("settings"), focus.pop("find"), focus.pop("memory");
+    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("fork"), focus.pop("search"), focus.pop("replay"), focus.pop("mcp"), focus.pop("skills"), focus.pop("settings"), focus.pop("find"), focus.pop("memory"), focus.pop("worktreeFinish");
   }, [overlay]);
 
   const selected = filteredTopLevel[sel] ?? null;
@@ -288,11 +288,29 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
       }
     } else if (matchesHotkey("worktreeFinish", input, key)) {
       if (selected && selected.workdir) {
-        asyncState.run("Finishing worktree...", async () => {
-          const result = await ark.worktreeFinish(selected.id, { noMerge: false });
-          status.show(result.ok ? result.message : `Worktree: ${result.message}`);
+        setOverlay("worktreeFinish");
+      }
+    } else if (matchesHotkey("interrupt", input, key)) {
+      if (selected && (selected.status === "running" || selected.status === "waiting")) {
+        actions.interrupt(selected.id);
+      }
+    } else if (matchesHotkey("verify", input, key)) {
+      if (selected) {
+        asyncState.run("Verifying...", async () => {
+          const result = await ark.verifyRun(selected.id);
+          if (result.ok) {
+            status.show("Verification passed");
+          } else {
+            status.show(`Verification failed: ${result.message?.slice(0, 80)}`);
+          }
           refresh();
         });
+      }
+    } else if (matchesHotkey("archive", input, key)) {
+      if (selected && ["completed", "stopped", "failed"].includes(selected.status)) {
+        actions.archive(selected.id);
+      } else if (selected?.status === "archived") {
+        actions.restore(selected.id);
       }
     } else if (input === "S") {
       if (selectedGroup && groupSessions.length > 0) {
@@ -307,6 +325,23 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
         actions.deleteGroup(groupSessions);
         setSel(0);
       }
+    }
+  });
+
+  // Worktree finish overlay: M = merge locally, P = create PR, Esc = cancel
+  useInput((input, key) => {
+    if (overlay !== "worktreeFinish" || !selected) return;
+    if (key.escape) { setOverlay(null); return; }
+    if (input === "m" || input === "M") {
+      setOverlay(null);
+      asyncState.run("Finishing worktree...", async () => {
+        const result = await ark.worktreeFinish(selected.id, { noMerge: false });
+        status.show(result.ok ? result.message : `Worktree: ${result.message}`);
+        refresh();
+      });
+    } else if (input === "p" || input === "P") {
+      setOverlay(null);
+      actions.createPR(selected.id, selected.summary ?? undefined);
     }
   });
 
@@ -454,6 +489,16 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
               }}
               onClose={() => setOverlay(null)}
             />
+          )
+          : overlay === "worktreeFinish" ? (
+            <Box flexDirection="column" padding={1}>
+              <Text bold>Finish Worktree</Text>
+              <Text> </Text>
+              <Text>  <Text color="cyan" bold>M</Text> Merge locally</Text>
+              <Text>  <Text color="cyan" bold>P</Text> Create PR on GitHub</Text>
+              <Text> </Text>
+              <Text dimColor>  Esc to cancel</Text>
+            </Box>
           )
           : <SessionDetail
               session={selected}

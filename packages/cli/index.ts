@@ -23,8 +23,8 @@ import { loadConfig } from "../core/config.js";
 import { getArkClient, closeArkClient } from "./client.js";
 
 const app = new AppContext(loadConfig(), { skipConductor: true, skipMetrics: true });
-await app.boot();
 setApp(app);
+await app.boot();
 
 const program = new Command()
   .name("ark")
@@ -146,20 +146,24 @@ session.command("list")
   .option("-s, --status <status>", "Filter by status")
   .option("-r, --repo <repo>", "Filter by repo")
   .option("-g, --group <group>", "Filter by group")
+  .option("--archived", "Include archived sessions")
   .action(async (opts) => {
     const ark = await getArkClient();
-    const sessions = await ark.sessionList({ ...opts, groupPrefix: core.profileGroupPrefix() || undefined });
+    const filters: Record<string, unknown> = { ...opts, groupPrefix: core.profileGroupPrefix() || undefined };
+    if (opts.archived) filters.status = "archived";
+    delete filters.archived;
+    const sessions = await ark.sessionList(filters as any);
     if (!sessions.length) {
       console.log(chalk.dim("No sessions. Start one: ark session start --repo . --summary 'task'"));
       return;
     }
     const icons: Record<string, string> = {
       running: "●", waiting: "⏸", pending: "○", ready: "◎",
-      completed: "✓", failed: "✕", blocked: "■",
+      completed: "✓", failed: "✕", blocked: "■", archived: "▪",
     };
     const colors: Record<string, (s: string) => string> = {
       running: chalk.blue, waiting: chalk.yellow, completed: chalk.green,
-      failed: chalk.red, blocked: chalk.yellow,
+      failed: chalk.red, blocked: chalk.yellow, archived: chalk.dim,
     };
     for (const s of sessions) {
       const icon = icons[s.status] ?? "?";
@@ -232,7 +236,19 @@ session.command("advance")
 session.command("complete")
   .description("Mark current stage done and advance")
   .argument("<id>")
-  .action(async (id) => {
+  .option("--force", "Skip verification checks")
+  .action(async (id, opts) => {
+    if (!opts.force) {
+      // Run verification first
+      const result = await core.runVerification(id);
+      if (!result.ok) {
+        console.log(chalk.red("Verification failed:"));
+        console.log(chalk.red(result.message));
+        console.log(chalk.dim("Use --force to skip verification"));
+        return;
+      }
+      console.log(chalk.green("Verification passed"));
+    }
     const ark = await getArkClient();
     try {
       await ark.sessionComplete(id);
@@ -250,6 +266,33 @@ session.command("pause")
     const ark = await getArkClient();
     const r = await ark.sessionPause(id, opts.reason);
     console.log(r.ok ? chalk.yellow("Paused") : chalk.red(r.message));
+  });
+
+session.command("interrupt")
+  .description("Interrupt a running agent (Ctrl+C) without killing the session")
+  .argument("<id>", "Session ID")
+  .action(async (id) => {
+    const ark = await getArkClient();
+    const result = await ark.sessionInterrupt(id);
+    console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
+  });
+
+session.command("archive")
+  .description("Archive a session for later reference")
+  .argument("<id>", "Session ID")
+  .action(async (id) => {
+    const ark = await getArkClient();
+    const result = await ark.sessionArchive(id);
+    console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
+  });
+
+session.command("restore")
+  .description("Restore an archived session")
+  .argument("<id>", "Session ID")
+  .action(async (id) => {
+    const ark = await getArkClient();
+    const result = await ark.sessionRestore(id);
+    console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
   });
 
 session.command("attach")
@@ -339,6 +382,77 @@ session.command("clone")
       if (opts.dispatch) await ark.sessionDispatch(cloned.id);
     } catch (e: any) {
       console.log(chalk.red(e.message));
+    }
+  });
+
+session.command("todo")
+  .description("Manage session verification todos")
+  .argument("<action>", "add|list|done|delete")
+  .argument("<session-id>", "Session ID")
+  .argument("[text]", "Todo content (for add) or todo ID (for done/delete)")
+  .action(async (action, id, text) => {
+    switch (action) {
+      case "list": {
+        const todos = core.getApp().todos.list(id);
+        if (todos.length === 0) {
+          console.log(chalk.dim("No todos"));
+        } else {
+          for (const t of todos) {
+            const mark = t.done ? chalk.green("[x]") : chalk.red("[ ]");
+            console.log(`${mark} #${t.id} ${t.content}`);
+          }
+        }
+        break;
+      }
+      case "add": {
+        if (!text) { console.log(chalk.red("Usage: ark session todo add <session-id> <content>")); return; }
+        const todo = core.getApp().todos.add(id, text);
+        console.log(chalk.green(`Added todo #${todo.id}: ${todo.content}`));
+        break;
+      }
+      case "done": {
+        if (!text) { console.log(chalk.red("Usage: ark session todo done <session-id> <todo-id>")); return; }
+        const todo = core.getApp().todos.toggle(parseInt(text, 10));
+        if (todo) {
+          console.log(chalk.green(`Todo #${todo.id} ${todo.done ? "done" : "undone"}`));
+        } else {
+          console.log(chalk.red("Todo not found"));
+        }
+        break;
+      }
+      case "delete": {
+        if (!text) { console.log(chalk.red("Usage: ark session todo delete <session-id> <todo-id>")); return; }
+        const ok = core.getApp().todos.delete(parseInt(text, 10));
+        console.log(ok ? chalk.green("Deleted") : chalk.red("Not found"));
+        break;
+      }
+      default:
+        console.log(chalk.red(`Unknown action: ${action}. Use add|list|done|delete`));
+    }
+  });
+
+session.command("verify")
+  .description("Run verification scripts for a session")
+  .argument("<id>", "Session ID")
+  .action(async (id) => {
+    console.log(chalk.dim("Running verification..."));
+    const result = await core.runVerification(id);
+    if (result.ok) {
+      console.log(chalk.green("Verification passed"));
+    } else {
+      console.log(chalk.red("Verification failed:"));
+      if (!result.todosResolved) {
+        console.log(chalk.red(`  ${result.pendingTodos.length} unresolved todo(s):`));
+        for (const t of result.pendingTodos) {
+          console.log(chalk.red(`    - ${t}`));
+        }
+      }
+      for (const r of result.scriptResults) {
+        if (!r.passed) {
+          console.log(chalk.red(`  Script failed: ${r.script}`));
+          if (r.output) console.log(chalk.dim(r.output.slice(0, 500)));
+        }
+      }
     }
   });
 
@@ -1321,6 +1435,30 @@ computeCmd.command("ssh")
 
 const worktree = program.command("worktree").description("Git worktree operations");
 
+worktree.command("diff")
+  .description("Preview changes in a session worktree")
+  .argument("<session-id>", "Session ID")
+  .option("--base <branch>", "Base branch to compare against", "main")
+  .action(async (id: string, opts: any) => {
+    const ark = await getArkClient();
+    const result = await ark.worktreeDiff(id, { base: opts.base });
+    if (!result.ok) {
+      console.log(chalk.red(result.message || "Failed to get diff"));
+      return;
+    }
+    console.log(chalk.bold(`${result.branch} vs ${result.baseBranch}`));
+    console.log(chalk.green(`+${result.insertions}`) + " " + chalk.red(`-${result.deletions}`) + ` (${result.filesChanged} files)`);
+    if (result.modifiedSinceReview?.length > 0) {
+      console.log();
+      console.log(chalk.yellow(`Modified since last review:`));
+      for (const f of result.modifiedSinceReview) {
+        console.log(chalk.yellow(`  ! ${f}`));
+      }
+    }
+    console.log();
+    console.log(result.stat);
+  });
+
 worktree.command("finish")
   .description("Merge worktree branch, remove worktree, delete session")
   .argument("<session-id>")
@@ -1331,6 +1469,27 @@ worktree.command("finish")
     const ark = await getArkClient();
     const result = await ark.worktreeFinish(sessionId, { noMerge: opts.noMerge });
     console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
+  });
+
+worktree.command("pr")
+  .description("Create a GitHub PR from a session worktree")
+  .argument("<session-id>", "Session ID")
+  .option("--title <title>", "PR title")
+  .option("--base <branch>", "Base branch", "main")
+  .option("--draft", "Create as draft PR")
+  .action(async (id: string, opts: any) => {
+    const ark = await getArkClient();
+    const result = await ark.worktreeCreatePR(id, {
+      title: opts.title,
+      base: opts.base,
+      draft: opts.draft,
+    });
+    if (result.ok) {
+      console.log(chalk.green(result.message));
+      if (result.pr_url) console.log(chalk.cyan(result.pr_url));
+    } else {
+      console.log(chalk.red(result.message));
+    }
   });
 
 worktree.command("list")
@@ -1488,7 +1647,7 @@ conductorCmd.command("bridge")
       if (text === "/status" || text === "status") {
         await bridge.notifyStatusSummary();
       } else if (text === "/sessions" || text === "sessions") {
-        const sessions = core.listSessions({ limit: 20 });
+        const sessions = core.getApp().sessions.list({ limit: 20 });
         const lines = sessions.map(s => `\u2022 ${s.summary ?? s.id} (${s.status})`);
         await bridge.notify(lines.join("\n") || "No sessions");
       } else {

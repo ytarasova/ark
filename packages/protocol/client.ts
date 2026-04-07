@@ -216,6 +216,18 @@ export class ArkClient {
     return this.rpc<SessionOpResult>("worktree/finish", { sessionId, ...opts });
   }
 
+  async worktreeCreatePR(sessionId: string, opts?: { title?: string; body?: string; base?: string; draft?: boolean }): Promise<SessionOpResult & { pr_url?: string }> {
+    return this.rpc("worktree/create-pr", { sessionId, ...opts });
+  }
+
+  async worktreeDiff(sessionId: string, opts?: { base?: string }): Promise<{
+    ok: boolean; stat: string; diff: string; branch: string; baseBranch: string;
+    filesChanged: number; insertions: number; deletions: number;
+    modifiedSinceReview: string[]; message?: string;
+  }> {
+    return this.rpc("worktree/diff", { sessionId, ...opts });
+  }
+
   // ── Messaging ───────────────────────────────────────────────────────────────
 
   async messageSend(sessionId: string, content: string): Promise<void> {
@@ -464,6 +476,18 @@ export class ArkClient {
     return this.rpc<SessionOpResult>("session/pause", { sessionId, reason });
   }
 
+  async sessionInterrupt(sessionId: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/interrupt", { sessionId });
+  }
+
+  async sessionArchive(sessionId: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/archive", { sessionId });
+  }
+
+  async sessionRestore(sessionId: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/restore", { sessionId });
+  }
+
   // ── Memory ─────────────────────────────────────────────────────────────────
 
   async memoryList(scope?: string): Promise<MemoryEntry[]> {
@@ -533,13 +557,33 @@ export class ArkClient {
     return this.rpc<IndexStatsResult>("history/index-stats");
   }
 
+  // ── Todos & Verification ───────────────────────────────────────────────────
+
+  async todoList(sessionId: string): Promise<{ todos: any[] }> {
+    return this.rpc("todo/list", { sessionId });
+  }
+
+  async todoAdd(sessionId: string, content: string): Promise<{ todo: any }> {
+    return this.rpc("todo/add", { sessionId, content });
+  }
+
+  async todoToggle(id: number): Promise<{ todo: any }> {
+    return this.rpc("todo/toggle", { id });
+  }
+
+  async todoDelete(id: number): Promise<{ ok: boolean }> {
+    return this.rpc("todo/delete", { id });
+  }
+
+  async verifyRun(sessionId: string): Promise<any> {
+    return this.rpc("verify/run", { sessionId });
+  }
+
   // ── Teardown ────────────────────────────────────────────────────────────────
 
   close(): void {
-    // Reject all pending requests
-    for (const [id, p] of this.pending) {
-      p.reject(new Error("Client closed"));
-    }
+    // Clear pending requests without rejecting to avoid unhandled rejections
+    // during teardown (callers are likely already unmounted/destroyed)
     this.pending.clear();
     this.listeners.clear();
     this.transport.close();

@@ -10,9 +10,8 @@ import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
 import { join } from "path";
 import * as core from "../index.js";
-import { createSession, updateSession, getSession } from "../store.js";
 import { waitForCompletion } from "../services/session-orchestration.js";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
 const CLI = join(ROOT, "packages", "cli", "index.ts");
@@ -21,8 +20,8 @@ let app: AppContext;
 
 beforeAll(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 
 afterAll(async () => {
@@ -44,9 +43,9 @@ afterEach(() => {
 
 describe("waitForCompletion", () => {
   it("returns immediately for completed session", async () => {
-    const session = createSession({ summary: "wfc-completed" });
+    const session = getApp().sessions.create({ summary: "wfc-completed" });
     sessionIds.push(session.id);
-    updateSession(session.id, { status: "completed", stage: "work" });
+    getApp().sessions.update(session.id, { status: "completed", stage: "work" });
 
     const { session: final, timedOut } = await waitForCompletion(session.id, { pollMs: 50 });
     expect(timedOut).toBe(false);
@@ -54,9 +53,9 @@ describe("waitForCompletion", () => {
   });
 
   it("returns immediately for failed session", async () => {
-    const session = createSession({ summary: "wfc-failed" });
+    const session = getApp().sessions.create({ summary: "wfc-failed" });
     sessionIds.push(session.id);
-    updateSession(session.id, { status: "failed", stage: "work", error: "boom" });
+    getApp().sessions.update(session.id, { status: "failed", stage: "work", error: "boom" });
 
     const { session: final, timedOut } = await waitForCompletion(session.id, { pollMs: 50 });
     expect(timedOut).toBe(false);
@@ -65,9 +64,9 @@ describe("waitForCompletion", () => {
   });
 
   it("returns immediately for stopped session", async () => {
-    const session = createSession({ summary: "wfc-stopped" });
+    const session = getApp().sessions.create({ summary: "wfc-stopped" });
     sessionIds.push(session.id);
-    updateSession(session.id, { status: "stopped", stage: "work" });
+    getApp().sessions.update(session.id, { status: "stopped", stage: "work" });
 
     const { session: final, timedOut } = await waitForCompletion(session.id, { pollMs: 50 });
     expect(timedOut).toBe(false);
@@ -75,9 +74,9 @@ describe("waitForCompletion", () => {
   });
 
   it("times out when session stays running", async () => {
-    const session = createSession({ summary: "wfc-timeout" });
+    const session = getApp().sessions.create({ summary: "wfc-timeout" });
     sessionIds.push(session.id);
-    updateSession(session.id, { status: "running", stage: "work" });
+    getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
     const { session: final, timedOut } = await waitForCompletion(session.id, {
       timeoutMs: 150,
@@ -88,15 +87,15 @@ describe("waitForCompletion", () => {
   });
 
   it("calls onStatus during polling", async () => {
-    const session = createSession({ summary: "wfc-status-cb" });
+    const session = getApp().sessions.create({ summary: "wfc-status-cb" });
     sessionIds.push(session.id);
-    updateSession(session.id, { status: "running", stage: "work" });
+    getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
     const statuses: string[] = [];
 
     // Transition to completed after a short delay
     setTimeout(() => {
-      updateSession(session.id, { status: "completed" });
+      getApp().sessions.update(session.id, { status: "completed" });
     }, 120);
 
     const { session: final, timedOut } = await waitForCompletion(session.id, {

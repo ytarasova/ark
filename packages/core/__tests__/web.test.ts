@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "bun:test";
 import { startWebServer } from "../web.js";
 import { withTestContext } from "./test-helpers.js";
-import { createSession } from "../store.js";
+import { getApp } from "../app.js";
 import { remember } from "../memory.js";
 
 withTestContext();
@@ -19,7 +19,7 @@ describe("web server", () => {
   });
 
   it("serves session list API", async () => {
-    createSession({ summary: "web-test" });
+    getApp().sessions.create({ summary: "web-test" });
     server = startWebServer({ port: 18421 });
     const resp = await fetch("http://localhost:18421/api/sessions");
     expect(resp.status).toBe(200);
@@ -52,7 +52,7 @@ describe("web server", () => {
   });
 
   it("returns session detail with events", async () => {
-    const s = createSession({ summary: "detail-test" });
+    const s = getApp().sessions.create({ summary: "detail-test" });
     server = startWebServer({ port: 18425 });
     const resp = await fetch(`http://localhost:18425/api/sessions/${s.id}`);
     expect(resp.status).toBe(200);
@@ -82,8 +82,8 @@ describe("web server", () => {
   });
 
   it("returns system status", async () => {
-    createSession({ summary: "status-test-1" });
-    createSession({ summary: "status-test-2" });
+    getApp().sessions.create({ summary: "status-test-1" });
+    getApp().sessions.create({ summary: "status-test-2" });
     server = startWebServer({ port: 18431 });
     const resp = await fetch("http://localhost:18431/api/status");
     expect(resp.status).toBe(200);
@@ -124,7 +124,7 @@ describe("web server", () => {
   // --- New endpoint tests ---
 
   it("POST /api/sessions/:id/fork clones a session", async () => {
-    const s = createSession({ summary: "fork-me" });
+    const s = getApp().sessions.create({ summary: "fork-me" });
     server = startWebServer({ port: 18535 });
     const resp = await fetch(`http://localhost:18535/api/sessions/${s.id}/fork`, {
       method: "POST",
@@ -187,7 +187,7 @@ describe("web server", () => {
   });
 
   it("GET /api/sessions/:id/events returns events standalone", async () => {
-    const s = createSession({ summary: "events-test" });
+    const s = getApp().sessions.create({ summary: "events-test" });
     server = startWebServer({ port: 18543 });
     const resp = await fetch(`http://localhost:18543/api/sessions/${s.id}/events`);
     expect(resp.status).toBe(200);

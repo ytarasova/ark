@@ -14,7 +14,7 @@ import {
   startSession, logEvent,
   AppContext, setApp, clearApp,
 } from "../../core/index.js";
-import { listSessions, getEvents } from "../../core/store.js";
+import { getApp } from "../../core/app.js";
 import { useEventLog, type EventLogEntry } from "../hooks/useEventLog.js";
 import { createMockArkClient, MockArkClientProvider } from "./test-helpers.js";
 import { withTestContext, waitFor } from "../../core/__tests__/test-helpers.js";
@@ -27,10 +27,10 @@ let capturedEvents: EventLogEntry[] = [];
 function createDbBackedClient() {
   return createMockArkClient({
     sessionList: async (filters?: any) => {
-      return listSessions({ limit: filters?.limit ?? 50 });
+      return getApp().sessions.list({ limit: filters?.limit ?? 50 });
     },
     sessionEvents: async (sessionId: string, limit?: number) => {
-      return getEvents(sessionId, { limit: limit ?? 50 });
+      return getApp().events.list(sessionId, { limit: limit ?? 50 });
     },
   });
 }
@@ -59,8 +59,8 @@ let app: AppContext;
 beforeEach(async () => {
   capturedEvents = [];
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 
 afterAll(async () => {

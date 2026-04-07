@@ -5,12 +5,12 @@
 
 import type { Session } from "../types/index.js";
 import { getApp } from "./app.js";
-import { listSessions as storeListSessions } from "./store.js";
+
 
 /** Safe session list — uses AppContext if available, falls back to store. */
 function safeListSessions(opts?: { limit?: number }): any[] {
   try { return safeListSessions(opts); }
-  catch { return storeListSessions(opts); }
+  catch { return []; }
 }
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ export class Bridge {
 
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./store.js";
+import { ARK_DIR } from "./paths.js";
 
 /** Load bridge config from ~/.ark/bridge.json */
 export function loadBridgeConfig(): BridgeConfig | null {

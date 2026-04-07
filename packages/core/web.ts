@@ -8,7 +8,7 @@
 
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { listSessions, getSession, getEvents, getGroups, createSession, updateSession, listCompute, getCompute } from "./store.js";
+import { getApp } from "./app.js";
 import { getAllSessionCosts, formatCost } from "./costs.js";
 import { handleIssueWebhook, type IssueWebhookConfig, type IssueWebhookPayload } from "./github-webhook.js";
 import {
@@ -25,7 +25,9 @@ import {
   advance,
   complete,
   spawnSubagent,
+  worktreeDiff,
   finishWorktree,
+  createWorktreePR,
   cleanupWorktrees,
 } from "./services/session-orchestration.js";
 import { exportSession, type SessionExport } from "./session-share.js";
@@ -41,6 +43,7 @@ import { getLearnings, recordLearning } from "./learnings.js";
 import { listMemories, recall, remember, forget } from "./memory.js";
 import { ingestFile, ingestDirectory } from "./knowledge.js";
 import { generateRepoMap } from "./repo-map.js";
+import { createSchedule, listSchedules, deleteSchedule, enableSchedule } from "./schedule.js";
 import { getHotkeys } from "./hotkeys.js";
 import { getThemeMode } from "./theme.js";
 
@@ -87,7 +90,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
   // Periodic broadcast of session status
   const statusInterval = setInterval(() => {
-    const sessions = listSessions({ limit: 200 });
+    const sessions = getApp().sessions.list({ limit: 200 });
     broadcast("sessions", sessions.map(s => ({
       id: s.id, summary: s.summary, status: s.status,
       agent: s.agent, repo: s.repo, group: s.group_name,
@@ -143,7 +146,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // GET /api/status
       if (url.pathname === "/api/status" && req.method === "GET") {
-        const sessions = listSessions({ limit: 500 });
+        const sessions = getApp().sessions.list({ limit: 500 });
         const byStatus: Record<string, number> = {};
         for (const s of sessions) {
           byStatus[s.status] = (byStatus[s.status] || 0) + 1;
@@ -153,13 +156,13 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // GET /api/groups
       if (url.pathname === "/api/groups" && req.method === "GET") {
-        return jsonResponse(getGroups());
+        return jsonResponse(getApp().sessions.getGroupNames());
       }
 
       // GET /api/costs/export
       if (url.pathname === "/api/costs/export" && req.method === "GET") {
         const format = url.searchParams.get("format") ?? "json";
-        const sessions = listSessions({ limit: 500 });
+        const sessions = getApp().sessions.list({ limit: 500 });
         if (format === "csv") {
           const { exportCostsCsv } = await import("./costs.js");
           const csv = exportCostsCsv(sessions);
@@ -171,7 +174,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // GET /api/costs
       if (url.pathname === "/api/costs") {
-        const sessions = listSessions({ limit: 500 });
+        const sessions = getApp().sessions.list({ limit: 500 });
         const costs = getAllSessionCosts(sessions);
         return jsonResponse(costs);
       }
@@ -196,7 +199,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // GET /api/sessions
       if (url.pathname === "/api/sessions" && req.method === "GET") {
-        const sessions = listSessions({ limit: 200 });
+        const sessions = getApp().sessions.list({ limit: 200 });
         return jsonResponse(sessions);
       }
 
@@ -224,7 +227,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         try {
           const body = await req.json() as SessionExport;
           if (body.version !== 1) return jsonResponse({ ok: false, message: "Unsupported export version" }, 400);
-          const session = createSession({
+          const session = getApp().sessions.create({
             ticket: body.session.ticket,
             summary: body.session.summary ? `[imported] ${body.session.summary}` : "[imported session]",
             repo: body.session.repo,
@@ -232,7 +235,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
             config: body.session.config,
             group_name: body.session.group_name,
           });
-          if (body.session.agent) updateSession(session.id, { agent: body.session.agent });
+          if (body.session.agent) getApp().sessions.update(session.id, { agent: body.session.agent });
           return jsonResponse({ ok: true, sessionId: session.id, message: `Imported as ${session.id}` });
         } catch (err) {
           return errorResponse(err);
@@ -256,7 +259,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
         if (action === "events" && req.method === "GET") {
           try {
-            return jsonResponse(getEvents(id));
+            return jsonResponse(getApp().events.list(id));
           } catch (err) {
             return errorResponse(err);
           }
@@ -267,6 +270,14 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
             const data = exportSession(id);
             if (!data) return jsonResponse({ error: "Not found" }, 404);
             return jsonResponse(data);
+          } catch (err) {
+            return errorResponse(err);
+          }
+        }
+
+        if (action === "todos" && req.method === "GET") {
+          try {
+            return jsonResponse(getApp().todos.list(id));
           } catch (err) {
             return errorResponse(err);
           }
@@ -322,11 +333,37 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
                 const result = await complete(id);
                 return jsonResponse(result);
               }
+              case "interrupt": {
+                const { interrupt: interruptSession } = await import("./services/session-orchestration.js");
+                const result = await interruptSession(id);
+                return jsonResponse(result);
+              }
+              case "archive": {
+                const { archive: archiveSession } = await import("./services/session-orchestration.js");
+                const result = archiveSession(id);
+                return jsonResponse(result);
+              }
+              case "restore": {
+                const { restore: restoreSession } = await import("./services/session-orchestration.js");
+                const result = restoreSession(id);
+                return jsonResponse(result);
+              }
               case "spawn-subagent": {
                 const rawBody = await req.json() as { task?: string; agent?: string; model?: string; group_name?: string; extensions?: string[] };
                 if (!rawBody?.task) return jsonResponse({ ok: false, message: "task is required" }, 400);
                 const body = rawBody as { task: string; agent?: string; model?: string; group_name?: string; extensions?: string[] };
                 const result = spawnSubagent(id, body);
+                return jsonResponse(result);
+              }
+              case "todos": {
+                const body = await req.json() as { content?: string };
+                if (!body?.content) return jsonResponse({ ok: false, message: "content is required" }, 400);
+                const todo = getApp().todos.add(id, body.content);
+                return jsonResponse({ ok: true, todo });
+              }
+              case "verify": {
+                const { runVerification } = await import("./services/session-orchestration.js");
+                const result = await runVerification(id);
                 return jsonResponse(result);
               }
               default:
@@ -338,12 +375,31 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         }
       }
 
+      // Todo routes: /api/todos/:id/toggle, /api/todos/:id/delete
+      const todoMatch = url.pathname.match(/^\/api\/todos\/(\d+)\/(toggle|delete)$/);
+      if (todoMatch && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        const [, todoIdStr, todoAction] = todoMatch;
+        const todoId = parseInt(todoIdStr, 10);
+        try {
+          if (todoAction === "toggle") {
+            const todo = getApp().todos.toggle(todoId);
+            return jsonResponse({ ok: true, todo });
+          } else {
+            const ok = getApp().todos.delete(todoId);
+            return jsonResponse({ ok });
+          }
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
       // GET /api/sessions/:id (detail)
       if (url.pathname.startsWith("/api/sessions/") && url.pathname.split("/").length === 4) {
         const id = url.pathname.split("/")[3];
-        const session = getSession(id);
+        const session = getApp().sessions.get(id);
         if (!session) return jsonResponse({ error: "Not found" }, 404);
-        const events = getEvents(id);
+        const events = getApp().events.list(id);
         return jsonResponse({ session, events });
       }
 
@@ -492,9 +548,21 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       // GET /api/worktrees
       if (url.pathname === "/api/worktrees" && req.method === "GET") {
         try {
-          const sessions = listSessions({ limit: 500 });
+          const sessions = getApp().sessions.list({ limit: 500 });
           const withWorktrees = sessions.filter(s => s.workdir && s.branch);
           return jsonResponse(withWorktrees);
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // GET /api/worktrees/:id/diff
+      if (url.pathname.match(/^\/api\/worktrees\/([^/]+)\/diff$/) && req.method === "GET") {
+        try {
+          const id = url.pathname.split("/")[3];
+          const base = url.searchParams.get("base") ?? undefined;
+          const result = await worktreeDiff(id, { base });
+          return jsonResponse(result);
         } catch (err) {
           return errorResponse(err);
         }
@@ -507,6 +575,19 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         try {
           const body = await req.json() as { into?: string; noMerge?: boolean; keepBranch?: boolean };
           const result = await finishWorktree(wtFinishMatch[1], body);
+          return jsonResponse(result);
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // POST /api/worktrees/:id/create-pr
+      const wtCreatePRMatch = url.pathname.match(/^\/api\/worktrees\/([^/]+)\/create-pr$/);
+      if (wtCreatePRMatch && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const body = await req.json() as { title?: string; body?: string; base?: string; draft?: boolean };
+          const result = await createWorktreePR(wtCreatePRMatch[1], body);
           return jsonResponse(result);
         } catch (err) {
           return errorResponse(err);
@@ -622,7 +703,52 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       // GET /api/compute
       if (url.pathname === "/api/compute" && req.method === "GET") {
         try {
-          return jsonResponse(listCompute());
+          return jsonResponse(getApp().computes.list());
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // POST /api/compute/:name/:action
+      const computeActionMatch = url.pathname.match(/^\/api\/compute\/([^/]+)\/(provision|start|stop|destroy|delete)$/);
+      if (computeActionMatch && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        const [, computeName, computeAction] = computeActionMatch;
+        try {
+          const app = getApp();
+          if (computeAction === "delete") {
+            app.computes.delete(computeName);
+            return jsonResponse({ ok: true });
+          }
+          const compute = app.computes.get(computeName);
+          if (!compute) return jsonResponse({ error: "Compute not found" }, 404);
+          const { getProvider } = await import("../../compute/index.js");
+          const provider = getProvider(compute.provider);
+          if (!provider) return jsonResponse({ ok: false, message: `Provider '${compute.provider}' not found` }, 400);
+          switch (computeAction) {
+            case "provision": {
+              app.computes.update(compute.name, { status: "provisioning" });
+              await provider.provision(compute);
+              app.computes.update(compute.name, { status: "running" });
+              break;
+            }
+            case "start": {
+              await provider.start(compute);
+              app.computes.update(compute.name, { status: "running" });
+              break;
+            }
+            case "stop": {
+              await provider.stop(compute);
+              app.computes.update(compute.name, { status: "stopped" });
+              break;
+            }
+            case "destroy": {
+              await provider.destroy(compute);
+              app.computes.update(compute.name, { status: "destroyed" });
+              break;
+            }
+          }
+          return jsonResponse({ ok: true });
         } catch (err) {
           return errorResponse(err);
         }
@@ -632,9 +758,69 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname.startsWith("/api/compute/") && req.method === "GET") {
         try {
           const name = url.pathname.split("/")[3];
-          const compute = getCompute(name);
+          const compute = getApp().computes.get(name);
           if (!compute) return jsonResponse({ error: "Not found" }, 404);
           return jsonResponse(compute);
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // --- Schedules ---
+
+      // GET /api/schedules
+      if (url.pathname === "/api/schedules" && req.method === "GET") {
+        try {
+          return jsonResponse(listSchedules());
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // POST /api/schedules
+      if (url.pathname === "/api/schedules" && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const body = await req.json() as { cron?: string; flow?: string; repo?: string; workdir?: string; summary?: string; compute_name?: string; group_name?: string };
+          if (!body?.cron) return jsonResponse({ ok: false, message: "cron is required" }, 400);
+          const schedule = createSchedule(body as { cron: string; flow?: string; repo?: string; workdir?: string; summary?: string; compute_name?: string; group_name?: string });
+          return jsonResponse({ ok: true, schedule });
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // POST /api/schedules/:id/delete
+      const schedDeleteMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/delete$/);
+      if (schedDeleteMatch && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const ok = deleteSchedule(schedDeleteMatch[1]);
+          return jsonResponse({ ok, message: ok ? "Deleted" : "Not found" });
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // POST /api/schedules/:id/enable
+      const schedEnableMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/enable$/);
+      if (schedEnableMatch && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          enableSchedule(schedEnableMatch[1], true);
+          return jsonResponse({ ok: true });
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // POST /api/schedules/:id/disable
+      const schedDisableMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/disable$/);
+      if (schedDisableMatch && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          enableSchedule(schedDisableMatch[1], false);
+          return jsonResponse({ ok: true });
         } catch (err) {
           return errorResponse(err);
         }

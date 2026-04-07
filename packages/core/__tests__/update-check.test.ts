@@ -3,7 +3,7 @@ import { getCurrentVersion, checkForUpdate } from "../update-check.js";
 import { withTestContext } from "./test-helpers.js";
 import { writeFileSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "../store.js";
+import { ARK_DIR } from "../paths.js";
 
 withTestContext();
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { buildReplay } from "../replay.js";
-import { createSession, logEvent } from "../store.js";
+import { getApp } from "../app.js";
+import { startSession } from "../services/session-orchestration.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -13,9 +14,9 @@ describe("buildReplay", () => {
   });
 
   it("returns steps in chronological order", () => {
-    const session = createSession({ summary: "test replay", flow: "default" });
-    logEvent(session.id, "stage_ready", { stage: "plan", data: { stage: "plan" } });
-    logEvent(session.id, "stage_started", { stage: "plan", actor: "planner", data: { stage: "plan", agent: "planner" } });
+    const session = startSession({ summary: "test replay", flow: "default" });
+    getApp().events.log(session.id, "stage_ready", { stage: "plan", data: { stage: "plan" } });
+    getApp().events.log(session.id, "stage_started", { stage: "plan", actor: "planner", data: { stage: "plan", agent: "planner" } });
 
     const steps = buildReplay(session.id);
     expect(steps.length).toBeGreaterThanOrEqual(3);
@@ -27,9 +28,9 @@ describe("buildReplay", () => {
   });
 
   it("steps have correct index values", () => {
-    const session = createSession({ summary: "test indexing" });
-    logEvent(session.id, "stage_ready", { data: { stage: "plan" } });
-    logEvent(session.id, "stage_started", { data: { stage: "plan", agent: "planner" } });
+    const session = getApp().sessions.create({ summary: "test indexing" });
+    getApp().events.log(session.id, "stage_ready", { data: { stage: "plan" } });
+    getApp().events.log(session.id, "stage_started", { data: { stage: "plan", agent: "planner" } });
 
     const steps = buildReplay(session.id);
     steps.forEach((step, i) => {
@@ -38,7 +39,7 @@ describe("buildReplay", () => {
   });
 
   it("steps have elapsed time formatted as HH:MM:SS", () => {
-    const session = createSession({ summary: "elapsed test" });
+    const session = startSession({ summary: "elapsed test" });
     const steps = buildReplay(session.id);
     expect(steps.length).toBeGreaterThan(0);
     // First step should be near 00:00:00
@@ -46,7 +47,10 @@ describe("buildReplay", () => {
   });
 
   it("session_created event has meaningful summary", () => {
-    const session = createSession({ summary: "My important task", flow: "quick" });
+    const session = getApp().sessions.create({ summary: "My important task", flow: "quick" });
+    getApp().events.log(session.id, "session_created", {
+      data: { flow: "quick", summary: "My important task" },
+    });
     const steps = buildReplay(session.id);
     const created = steps.find((s) => s.type === "session_created");
     expect(created).toBeDefined();
@@ -55,8 +59,8 @@ describe("buildReplay", () => {
   });
 
   it("stage_started event includes agent name", () => {
-    const session = createSession({ summary: "agent test" });
-    logEvent(session.id, "stage_started", {
+    const session = getApp().sessions.create({ summary: "agent test" });
+    getApp().events.log(session.id, "stage_started", {
       stage: "implement",
       actor: "implementer",
       data: { stage: "implement", agent: "implementer" },
@@ -70,8 +74,8 @@ describe("buildReplay", () => {
   });
 
   it("agent_error event shows error preview", () => {
-    const session = createSession({ summary: "error test" });
-    logEvent(session.id, "agent_error", {
+    const session = getApp().sessions.create({ summary: "error test" });
+    getApp().events.log(session.id, "agent_error", {
       data: { error: "TypeError: Cannot read properties of null" },
     });
 
@@ -82,8 +86,8 @@ describe("buildReplay", () => {
   });
 
   it("hook_status event formats correctly", () => {
-    const session = createSession({ summary: "hook test" });
-    logEvent(session.id, "hook_status", {
+    const session = getApp().sessions.create({ summary: "hook test" });
+    getApp().events.log(session.id, "hook_status", {
       data: { status: "busy", hook_event: "tool_use" },
     });
 
@@ -95,8 +99,8 @@ describe("buildReplay", () => {
   });
 
   it("retry_with_context event shows attempt number", () => {
-    const session = createSession({ summary: "retry test" });
-    logEvent(session.id, "retry_with_context", {
+    const session = getApp().sessions.create({ summary: "retry test" });
+    getApp().events.log(session.id, "retry_with_context", {
       data: { attempt: 2, error: "tests failed" },
     });
 
@@ -108,8 +112,8 @@ describe("buildReplay", () => {
   });
 
   it("steps include detail when data is present", () => {
-    const session = createSession({ summary: "detail test" });
-    logEvent(session.id, "agent_completed", {
+    const session = getApp().sessions.create({ summary: "detail test" });
+    getApp().events.log(session.id, "agent_completed", {
       data: { summary: "Done", files_changed: 5, commits: 2 },
     });
 
@@ -121,8 +125,8 @@ describe("buildReplay", () => {
   });
 
   it("preserves stage and actor from events", () => {
-    const session = createSession({ summary: "stage test" });
-    logEvent(session.id, "stage_started", {
+    const session = getApp().sessions.create({ summary: "stage test" });
+    getApp().events.log(session.id, "stage_started", {
       stage: "review",
       actor: "reviewer",
       data: { stage: "review", agent: "reviewer" },

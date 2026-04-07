@@ -12,7 +12,7 @@ import { execFile, execFileSync, spawn } from "child_process";
 import { promisify } from "util";
 import { existsSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
-import { TRACKS_DIR, ARK_DIR } from "./store.js";
+import { TRACKS_DIR, ARK_DIR } from "./paths.js";
 
 const execFileAsync = promisify(execFile);
 

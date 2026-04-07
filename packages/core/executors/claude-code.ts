@@ -11,7 +11,7 @@ import { join } from "path";
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as claude from "../claude.js";
 import * as tmux from "../tmux.js";
-import { TRACKS_DIR, sessionChannelPort } from "../store.js";
+import { TRACKS_DIR } from "../paths.js";
 import { getApp } from "../app.js";
 import { parseArcJson } from "../../compute/arc-json.js";
 import { getProvider } from "../../compute/index.js";
@@ -40,12 +40,13 @@ export const claudeCodeExecutor: Executor = {
     // Determine conductor URL based on compute type
     const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
     const usesDevcontainer = arcJson?.devcontainer ?? false;
+    const { DEFAULT_CONDUCTOR_URL, DOCKER_CONDUCTOR_URL } = await import("../constants.js");
     const conductorUrl = usesDevcontainer
-      ? "http://host.docker.internal:19100"
-      : "http://localhost:19100";
+      ? DOCKER_CONDUCTOR_URL
+      : DEFAULT_CONDUCTOR_URL;
 
     // Channel config + launcher
-    const channelPort = sessionChannelPort(session.id);
+    const channelPort = getApp().sessions.channelPort(session.id);
     const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
     const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig });
 

@@ -4,34 +4,73 @@
  *
  * Usage:
  *   import { withTestContext } from "./test-helpers.js";
- *   const { getCtx } = withTestContext();
+ *   withTestContext();
  *
  *   import { waitFor } from "./test-helpers.js";
  *   await waitFor(() => someCondition());
  */
 
 import { beforeEach, afterAll } from "bun:test";
-import { createTestContext, setContext, resetContext, type TestContext } from "../context.js";
+import { execFileSync } from "child_process";
+import { AppContext, setApp, clearApp } from "../app.js";
+
+/**
+ * Snapshot current ark-* tmux sessions. Call before tests start, then pass
+ * the result to killNewArkTmuxSessions() in afterAll to clean up only
+ * sessions created during the test run (avoids destroying real sessions).
+ */
+export function snapshotArkTmuxSessions(): Set<string> {
+  try {
+    const result = execFileSync("tmux", ["list-sessions", "-F", "#{session_name}"], {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return new Set(result.split("\n").filter((s) => s.startsWith("ark-s-")));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Kill ark-* tmux sessions that were NOT in the pre-test snapshot.
+ * Safe to call in afterAll - won't destroy the user's real sessions.
+ */
+export function killNewArkTmuxSessions(preExisting: Set<string>): void {
+  try {
+    const result = execFileSync("tmux", ["list-sessions", "-F", "#{session_name}"], {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const current = result.split("\n").filter((s) => s.startsWith("ark-s-"));
+    for (const name of current) {
+      if (!preExisting.has(name)) {
+        try { execFileSync("tmux", ["kill-session", "-t", name], { stdio: "pipe" }); } catch { /* already gone */ }
+      }
+    }
+  } catch {
+    // No tmux server or no sessions - fine
+  }
+}
 
 /**
  * Sets up beforeEach/afterAll hooks for test context isolation.
- * Returns a getter for the current context (since it's recreated each test).
+ * Each test gets a fresh AppContext.forTest() with an isolated temp DB.
  */
-export function withTestContext(): { getCtx: () => TestContext } {
-  let ctx: TestContext;
+export function withTestContext(): { getCtx: () => AppContext } {
+  let app: AppContext;
 
-  beforeEach(() => {
-    if (ctx) ctx.cleanup();
-    ctx = createTestContext();
-    setContext(ctx);
+  beforeEach(async () => {
+    if (app) { await app.shutdown(); clearApp(); }
+    app = AppContext.forTest();
+    setApp(app);
+    await app.boot();
   });
 
-  afterAll(() => {
-    if (ctx) ctx.cleanup();
-    resetContext();
+  afterAll(async () => {
+    if (app) { await app.shutdown(); clearApp(); }
   });
 
-  return { getCtx: () => ctx };
+  return { getCtx: () => app };
 }
 
 /** Poll a condition until it's true or timeout. Better than arbitrary setTimeout. */

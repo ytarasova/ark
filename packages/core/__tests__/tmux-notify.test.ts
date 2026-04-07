@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
-import { createSession, updateSession } from "../store.js";
+import { getApp } from "../app.js";
 
 withTestContext();
 
@@ -25,12 +25,12 @@ describe("tmux-notify", () => {
   it("updateTmuxStatusBar handles waiting sessions without crashing", async () => {
     const { updateTmuxStatusBar } = await import("../tmux-notify.js");
     // Create some sessions in various states to exercise the filter logic
-    const s1 = createSession({ summary: "waiting-session" });
-    updateSession(s1.id, { status: "waiting" });
-    const s2 = createSession({ summary: "blocked-session" });
-    updateSession(s2.id, { status: "blocked" });
-    const s3 = createSession({ summary: "running-session" });
-    updateSession(s3.id, { status: "running" });
+    const s1 = getApp().sessions.create({ summary: "waiting-session" });
+    getApp().sessions.update(s1.id, { status: "waiting" });
+    const s2 = getApp().sessions.create({ summary: "blocked-session" });
+    getApp().sessions.update(s2.id, { status: "blocked" });
+    const s3 = getApp().sessions.create({ summary: "running-session" });
+    getApp().sessions.update(s3.id, { status: "running" });
 
     // Even with waiting sessions, should not throw (tmux just won't be available)
     expect(() => updateTmuxStatusBar()).not.toThrow();

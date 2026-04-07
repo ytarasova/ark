@@ -229,7 +229,7 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
     },
   });
 
-  if (!opts?.quiet) console.log(`arkd listening on localhost:${port}`);
+  if (!opts?.quiet) process.stderr.write(`[arkd] listening on localhost:${port}\n`);
 
   return {
     stop() { server.stop(); },

@@ -1,6 +1,6 @@
 export type SessionStatus =
   | "pending" | "ready" | "running" | "waiting"
-  | "stopped" | "blocked" | "completed" | "failed" | "deleting";
+  | "stopped" | "blocked" | "completed" | "failed" | "deleting" | "archived";
 
 export interface SessionUsage {
   input_tokens?: number;
@@ -22,7 +22,7 @@ export interface SessionConfig {
   ports?: Array<{ port: number; name?: string; source?: string }>;
   // Compute/infra
   remoteWorkdir?: string;
-  worktree?: string;
+  worktree?: string | boolean;
   // Lifecycle
   _pre_delete_status?: string;
   _deleted_at?: string;
@@ -76,6 +76,7 @@ export interface SessionListFilters {
   status?: SessionStatus;
   repo?: string;
   group_name?: string;
+  groupPrefix?: string;
   parent_id?: string;
   flow?: string;
   limit?: number;

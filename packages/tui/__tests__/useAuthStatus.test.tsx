@@ -88,8 +88,8 @@ let app: AppContext;
 beforeEach(async () => {
   capturedStatus = null;
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
   for (const key of authEnvVars) {
     savedEnv[key] = process.env[key];
     delete process.env[key];

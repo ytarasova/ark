@@ -75,7 +75,7 @@ interface EC2HostConfig {
 /** Try to read oauth token from ~/.ark/claude-oauth-token. Returns null on failure. */
 function readOauthTokenFromDisk(): string | null {
   try {
-    const { ARK_DIR } = require("../../../core/store.js");
+    const { ARK_DIR } = require("../../../core/paths.js");
     const p = join(ARK_DIR(), "claude-oauth-token");
     if (existsSync(p)) return readFileSync(p, "utf-8").trim();
   } catch {}
@@ -521,8 +521,8 @@ export class EC2Provider implements ComputeProvider {
     await setupSessionTunnels(key, ip, session, opts);
 
     // 7. Store remote workdir in session config for display
-    const { updateSession } = await import("../../../core/store.js");
-    updateSession(session.id, {
+    const { getApp } = await import("../../../core/app.js");
+    getApp().sessions.update(session.id, {
       config: { ...(session.config ?? {}), remoteWorkdir },
     });
 
@@ -708,7 +708,7 @@ export class EC2Provider implements ComputeProvider {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
         ARK_CHANNEL_PORT: String(channelPort),
-        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? process.env.ARK_CONDUCTOR_URL ?? "http://localhost:19100",
       },
     };
   }

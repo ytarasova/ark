@@ -6,7 +6,7 @@ import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { loadRecipe, instantiateRecipe } from "../recipe.js";
 import { startSession } from "../services/session-orchestration.js";
-import * as store from "../store.js";
+import { getApp } from "../app.js";
 
 const { getCtx } = withTestContext();
 
@@ -74,7 +74,7 @@ describe("recipe use", () => {
     });
 
     // Agent should be set from the recipe (or null if recipe has no agent)
-    const fetched = store.getSession(session.id)!;
+    const fetched = getApp().sessions.get(session.id)!;
     if (recipe.agent) {
       expect(fetched.agent).toBe(recipe.agent);
     } else {
@@ -90,7 +90,7 @@ describe("recipe use", () => {
       agent: "worker",
     });
 
-    const fetched = store.getSession(session.id)!;
+    const fetched = getApp().sessions.get(session.id)!;
     expect(fetched.agent).toBe("worker");
   });
 
@@ -101,7 +101,7 @@ describe("recipe use", () => {
       flow: "bare",
     });
 
-    const fetched = store.getSession(session.id)!;
+    const fetched = getApp().sessions.get(session.id)!;
     expect(fetched.agent).toBeNull();
   });
 });

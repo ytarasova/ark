@@ -3,14 +3,14 @@
  * Uses a heartbeat table to detect and coordinate concurrent instances.
  */
 
-import { getDb } from "./store.js";
+import { getApp } from "./app.js";
 
 const HEARTBEAT_INTERVAL_MS = 2000;
 const STALE_THRESHOLD_MS = 10000;
 
 /** Register this instance and start heartbeat. Returns cleanup function. */
 export function registerInstance(instanceId: string): { stop: () => void; isPrimary: () => boolean } {
-  const db = getDb();
+  const db = getApp().db;
 
   // Create heartbeat table if needed
   db.exec(`
@@ -62,7 +62,7 @@ export function registerInstance(instanceId: string): { stop: () => void; isPrim
 /** Remove instances that haven't sent a heartbeat recently. */
 function cleanStaleInstances(): void {
   try {
-    const db = getDb();
+    const db = getApp().db;
     const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
     db.prepare("DELETE FROM instance_heartbeat WHERE last_heartbeat < ?").run(cutoff);
   } catch { /* ignore */ }
@@ -71,7 +71,7 @@ function cleanStaleInstances(): void {
 /** Get count of active instances. */
 export function activeInstanceCount(): number {
   try {
-    const db = getDb();
+    const db = getApp().db;
     // Ensure table exists
     db.exec(`CREATE TABLE IF NOT EXISTS instance_heartbeat (
       id TEXT PRIMARY KEY, pid INTEGER NOT NULL,

@@ -33,10 +33,16 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
   const ark = useArkClient();
   const [events, setEvents] = useState<Event[]>([]);
   const [conversation, setConversation] = useState<{ role: string; content: string; timestamp: string }[]>([]);
+  const [todos, setTodos] = useState<any[]>([]);
 
   useEffect(() => {
     if (!s) { setEvents([]); return; }
     ark.sessionEvents(s.id, 50).then(setEvents).catch(() => setEvents([]));
+  }, [s?.id, s?.status]);
+
+  useEffect(() => {
+    if (!s) { setTodos([]); return; }
+    ark.todoList(s.id).then(r => setTodos(r.todos ?? [])).catch(() => setTodos([]));
   }, [s?.id, s?.status]);
 
   // Load conversation history from Claude transcript (local sessions only)
@@ -156,6 +162,20 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
       )}
       {costInfo && costInfo.cost > 0 && (
         <KeyValue label="Cost">{formatCost(costInfo.cost)}</KeyValue>
+      )}
+
+      {/* Todos */}
+      {todos.length > 0 && (
+        <>
+          <Text> </Text>
+          <SectionHeader title={`Todos (${todos.filter((t: any) => t.done).length}/${todos.length})`} />
+          {todos.map((t: any) => (
+            <Text key={t.id} wrap="wrap">
+              {"  "}<Text color={t.done ? "green" : "yellow"}>{t.done ? "+" : "o"}</Text>
+              <Text dimColor={t.done}>{` ${t.content}`}</Text>
+            </Text>
+          ))}
+        </>
       )}
 
       {/* Files changed - as a collapsible list */}

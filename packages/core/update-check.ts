@@ -7,7 +7,7 @@ const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./store.js";
+import { ARK_DIR } from "./paths.js";
 
 interface UpdateState {
   lastCheck: string;

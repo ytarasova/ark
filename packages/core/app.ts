@@ -16,10 +16,10 @@ import { configureOtlp } from "./otlp.js";
 import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
-import { setAppStore, clearAppStore, safeParseConfig, purgeExpiredDeletes } from "./store.js";
+import { safeParseConfig } from "./util.js";
 import { initSchema as initRepoSchema, seedLocalCompute } from "./repositories/schema.js";
 import type { Compute, Session } from "../types/index.js";
-import { setProviderResolver, clearProviderResolver } from "./services/session-orchestration.js";
+import { setProviderResolver, clearProviderResolver } from "./provider-registry.js";
 import { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
 import { startNotifyDaemon } from "./notify-daemon.js";
 import { track, configureTelemetry } from "./telemetry.js";
@@ -27,7 +27,7 @@ import { logError, logWarn, logInfo } from "./structured-log.js";
 import { registerExecutor } from "./executor.js";
 import { claudeCodeExecutor } from "./executors/claude-code.js";
 import { subprocessExecutor } from "./executors/subprocess.js";
-import { SessionRepository, ComputeRepository, EventRepository, MessageRepository } from "./repositories/index.js";
+import { SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -61,6 +61,7 @@ export class AppContext {
   private _computes: ComputeRepository | null = null;
   private _events: EventRepository | null = null;
   private _messages: MessageRepository | null = null;
+  private _todos: TodoRepository | null = null;
 
   // Services
   private _sessionService: SessionService | null = null;
@@ -88,6 +89,9 @@ export class AppContext {
   }
 
   // ── Accessors ──────────────────────────────────────────────────────────
+
+  /** Convenience shortcut for config.arkDir (used heavily in tests). */
+  get arkDir(): string { return this.config.arkDir; }
 
   get db(): Database {
     if (!this._db) throw new Error("AppContext not booted — db not available");
@@ -117,6 +121,11 @@ export class AppContext {
   get messages(): MessageRepository {
     if (!this._messages) throw new Error("AppContext not booted — messages not available");
     return this._messages;
+  }
+
+  get todos(): TodoRepository {
+    if (!this._todos) this._todos = new TodoRepository(this.db);
+    return this._todos;
   }
 
   get sessionService(): SessionService {
@@ -168,6 +177,9 @@ export class AppContext {
     }
     this.phase = "booting";
 
+    // Auto-register as global singleton so paths.ts / getApp() work during boot
+    if (!_app) _app = this;
+
     // 1. Ensure directories
     for (const dir of [
       this.config.arkDir,
@@ -183,10 +195,9 @@ export class AppContext {
     this._db.run("PRAGMA journal_mode = WAL");
     this._db.run("PRAGMA busy_timeout = 5000");
 
-    // 3. Initialize schema (new column names: ticket, summary, flow) + wire store paths
+    // 3. Initialize schema (new column names: ticket, summary, flow)
     initRepoSchema(this._db);
     seedLocalCompute(this._db);
-    setAppStore(this._db, this.config);
 
     // 3b. Create repositories and services
     this._sessions = new SessionRepository(this._db);
@@ -264,7 +275,14 @@ export class AppContext {
 
     // 11. Purge expired soft-deletes every 30s
     this._purgeInterval = setInterval(() => {
-      purgeExpiredDeletes(90);
+      const deleted = this._sessions?.listDeleted() ?? [];
+      const cutoff = Date.now() - 90 * 1000;
+      for (const s of deleted) {
+        const deletedAt = (s.config as any)?._deleted_at as string | undefined;
+        if (deletedAt && new Date(deletedAt).getTime() < cutoff) {
+          this._sessions?.delete(s.id);
+        }
+      }
     }, 30_000);
 
     // 12. Update tmux status bar every 5s
@@ -350,14 +368,14 @@ export class AppContext {
       resetOtlp();
     } catch { /* best-effort */ }
 
-    // 9. Clear provider resolver + app store bindings + close database
+    // 9. Clear provider resolver + close database
     clearProviderResolver();
-    clearAppStore();
 
     // Null out services and repositories before closing DB
     this._historyService = null;
     this._computeService = null;
     this._sessionService = null;
+    this._todos = null;
     this._messages = null;
     this._events = null;
     this._computes = null;

@@ -9,6 +9,7 @@ import { AgentsView } from "./components/AgentsView.js";
 import { ToolsView } from "./components/ToolsView.js";
 import { FlowsView } from "./components/FlowsView.js";
 import { ComputeView } from "./components/ComputeView.js";
+import { ScheduleView } from "./components/ScheduleView.js";
 import { HistoryView } from "./components/HistoryView.js";
 import { MemoryView } from "./components/MemoryView.js";
 import { NewSessionModal } from "./components/NewSessionModal.js";
@@ -78,7 +79,7 @@ function App() {
   const viewTitles: Record<string, string> = {
     sessions: "Sessions", agents: "Agents", tools: "Tools",
     flows: "Flows", history: "History", compute: "Compute",
-    memory: "Memory", costs: "Costs", status: "System",
+    schedules: "Schedules", memory: "Memory", costs: "Costs", status: "System",
   };
 
   return (
@@ -104,6 +105,7 @@ function App() {
           {view === "flows" && <FlowsView />}
           {view === "history" && <HistoryView />}
           {view === "compute" && <ComputeView />}
+          {view === "schedules" && <ScheduleView />}
           {view === "memory" && <MemoryView />}
           {view === "costs" && <CostsView />}
           {view === "status" && <StatusView sessions={sessions} />}

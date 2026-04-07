@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { getDb } from "./store.js";
+import { getApp } from "./app.js";
 
 export interface Schedule {
   id: string;
@@ -27,7 +27,7 @@ export function createSchedule(opts: {
   compute_name?: string;
   group_name?: string;
 }): Schedule {
-  const db = getDb();
+  const db = getApp().db;
   const id = genId();
   const ts = now();
   db.prepare(
@@ -39,29 +39,29 @@ export function createSchedule(opts: {
 }
 
 export function listSchedules(): Schedule[] {
-  const db = getDb();
+  const db = getApp().db;
   return (db.prepare("SELECT * FROM schedules ORDER BY created_at DESC").all() as any[]).map(mapRow);
 }
 
 export function getSchedule(id: string): Schedule | null {
-  const db = getDb();
+  const db = getApp().db;
   const row = db.prepare("SELECT * FROM schedules WHERE id = ?").get(id) as any;
   return row ? mapRow(row) : null;
 }
 
 export function deleteSchedule(id: string): boolean {
-  const db = getDb();
+  const db = getApp().db;
   const result = db.prepare("DELETE FROM schedules WHERE id = ?").run(id);
   return result.changes > 0;
 }
 
 export function updateScheduleLastRun(id: string): void {
-  const db = getDb();
+  const db = getApp().db;
   db.prepare("UPDATE schedules SET last_run = ? WHERE id = ?").run(now(), id);
 }
 
 export function enableSchedule(id: string, enabled: boolean): void {
-  const db = getDb();
+  const db = getApp().db;
   db.prepare("UPDATE schedules SET enabled = ? WHERE id = ?").run(enabled ? 1 : 0, id);
 }
 

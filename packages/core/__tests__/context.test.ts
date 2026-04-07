@@ -1,58 +1,51 @@
 /**
- * Tests for store context DI — verifies test isolation works.
+ * Tests for store context DI — verifies test isolation works via AppContext.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
-import {
-  createTestContext, setContext, resetContext, closeDb,
-  getDb, listSessions, getSession, deleteSession,
-  createCompute, listCompute, getCompute, deleteCompute,
-  startSession,
-} from "../index.js";
-import { createSession } from "../store.js";
-import type { TestContext } from "../store.js";
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
 
-let ctx: TestContext;
+let app: AppContext;
 
-beforeEach(() => {
-  // Each test gets a fresh context
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
+beforeEach(async () => {
+  if (app) { await app.shutdown(); clearApp(); }
+  app = AppContext.forTest();
+  setApp(app);
+  await app.boot();
 });
 
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
+afterAll(async () => {
+  if (app) { await app.shutdown(); clearApp(); }
 });
 
 describe("Store context isolation", () => {
   it("creates database in temp directory", () => {
-    const db = getDb();
+    const db = getApp().db;
     expect(db).toBeDefined();
-    expect(ctx.dbPath).toContain("ark-test-");
+    expect(app.config.dbPath).toContain("ark-test-");
   });
 
-  it("sessions are isolated between contexts", () => {
-    createSession({ summary: "ctx1-session" });
-    const sessions1 = listSessions();
+  it("sessions are isolated between contexts", async () => {
+    getApp().sessions.create({ summary: "ctx1-session" });
+    const sessions1 = getApp().sessions.list();
     expect(sessions1.length).toBe(1);
     expect(sessions1[0].summary).toBe("ctx1-session");
 
     // Switch to new context
-    const ctx2 = createTestContext();
-    setContext(ctx2);
+    const app2 = AppContext.forTest();
+    await app2.boot();
+    setApp(app2);
 
-    const sessions2 = listSessions();
+    const sessions2 = getApp().sessions.list();
     expect(sessions2.length).toBe(0);
 
-    ctx2.cleanup();
-    setContext(ctx);
+    await app2.shutdown();
+    setApp(app);
   });
 
   it("computes are isolated between contexts", () => {
     // Default local compute is auto-created
-    const computes = listCompute();
+    const computes = getApp().computes.list();
     const localCompute = computes.find(h => h.name === "local");
     expect(localCompute).toBeDefined();
     expect(localCompute!.provider).toBe("local");
@@ -60,45 +53,42 @@ describe("Store context isolation", () => {
 
   it("CRUD works in isolated context", () => {
     // Create
-    const session = createSession({ summary: "test-crud", repo: "/tmp/test" });
+    const session = getApp().sessions.create({ summary: "test-crud", repo: "/tmp/test" });
     expect(session.id).toBeTruthy();
 
     // Read
-    const fetched = getSession(session.id);
+    const fetched = getApp().sessions.get(session.id);
     expect(fetched).not.toBeNull();
     expect(fetched!.summary).toBe("test-crud");
 
     // List
-    expect(listSessions().length).toBe(1);
+    expect(getApp().sessions.list().length).toBe(1);
 
     // Delete
-    deleteSession(session.id);
-    expect(listSessions().length).toBe(0);
+    getApp().sessions.delete(session.id);
+    expect(getApp().sessions.list().length).toBe(0);
   });
 
   it("compute CRUD works in isolated context", () => {
-    createCompute({ name: "test-ec2", provider: "ec2", config: { size: "m" } });
-    const compute = getCompute("test-ec2");
+    getApp().computes.create({ name: "test-ec2", provider: "ec2", config: { size: "m" } });
+    const compute = getApp().computes.get("test-ec2");
     expect(compute).not.toBeNull();
     expect(compute!.provider).toBe("ec2");
 
     // local + test-ec2
-    expect(listCompute().length).toBe(2);
+    expect(getApp().computes.list().length).toBe(2);
 
-    deleteCompute("test-ec2");
-    expect(listCompute().length).toBe(1);
+    getApp().computes.delete("test-ec2");
+    expect(getApp().computes.list().length).toBe(1);
   });
 
-  it("cleanup removes temp directory", () => {
-    const tempCtx = createTestContext();
-    const dir = tempCtx.arkDir;
-    setContext(tempCtx);
-    getDb(); // initialize
-    tempCtx.cleanup();
+  it("cleanup removes temp directory", async () => {
+    const tempApp = AppContext.forTest();
+    await tempApp.boot();
+    const dir = tempApp.config.arkDir;
+    await tempApp.shutdown();
 
     const { existsSync } = require("fs");
     expect(existsSync(dir)).toBe(false);
-
-    setContext(ctx); // restore
   });
 });

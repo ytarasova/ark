@@ -97,8 +97,8 @@ let app: AppContext;
 beforeEach(async () => {
   captured = null;
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
   clearProviders();
 });
 

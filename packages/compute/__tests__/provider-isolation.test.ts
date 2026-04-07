@@ -7,18 +7,18 @@
  * - DockerProvider: container only
  */
 
-import { describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 
-afterAll(async () => {
+afterEach(async () => {
   await app?.shutdown();
   clearApp();
 });

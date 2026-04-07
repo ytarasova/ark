@@ -8,16 +8,13 @@ import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import {
-  createTestContext, setContext, resetContext,
-  type TestContext,
-} from "../context.js";
-import { ARK_DIR } from "../store.js";
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { ARK_DIR } from "../paths.js";
 import { resolveFlow } from "../flow.js";
 import { resolveAgent } from "../agent.js";
 import { substituteVars, buildSessionVars } from "../template.js";
 
-let ctx: TestContext;
+let app: AppContext;
 
 const flowDir = () => join(ARK_DIR(), "flows");
 const agentDir = () => join(ARK_DIR(), "agents");
@@ -34,17 +31,17 @@ function writeAgentYaml(name: string, data: Record<string, unknown>): void {
   writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(data));
 }
 
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
+beforeEach(async () => {
+  if (app) { await app.shutdown(); clearApp(); }
+  app = AppContext.forTest();
+  setApp(app);
+  await app.boot();
   rmSync(flowDir(), { recursive: true, force: true });
   rmSync(agentDir(), { recursive: true, force: true });
 });
 
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
+afterAll(async () => {
+  if (app) { await app.shutdown(); clearApp(); }
 });
 
 // ── Flow templating E2E ─────────────────────────────────────────────────────

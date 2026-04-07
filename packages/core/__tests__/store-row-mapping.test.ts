@@ -7,14 +7,23 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import {
-  rowToSession,
-  createSession, getSession, updateSession,
-  logEvent, getEvents,
-  addMessage, getMessages,
-  createCompute, getCompute, updateCompute,
-  type SessionRow,
-} from "../store.js";
+import { getApp } from "../app.js";
+import { safeParseConfig } from "../util.js";
+import type { SessionStatus } from "../../types/index.js";
+
+interface SessionRow {
+  id: string; ticket: string | null; summary: string | null; repo: string | null;
+  branch: string | null; compute_name: string | null; session_id: string | null;
+  claude_session_id: string | null; stage: string | null; status: string; flow: string;
+  agent: string | null; workdir: string | null; pr_url: string | null; pr_id: string | null;
+  error: string | null; parent_id: string | null; fork_group: string | null;
+  group_name: string | null; breakpoint_reason: string | null; attached_by: string | null;
+  config: string; created_at: string; updated_at: string;
+}
+
+function rowToSession(row: SessionRow) {
+  return { ...row, status: row.status as SessionStatus, config: safeParseConfig(row.config) };
+}
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -111,7 +120,7 @@ describe("rowToSession", () => {
 
 describe("rowToSession round-trip via DB", () => {
   it("createSession stores and retrieves with correct field mapping", () => {
-    const session = createSession({
+    const session = getApp().sessions.create({
       ticket: "TICKET-1",
       summary: "My task",
       flow: "quick",
@@ -125,13 +134,13 @@ describe("rowToSession round-trip via DB", () => {
   });
 
   it("getSession returns properly mapped fields", () => {
-    const created = createSession({
+    const created = getApp().sessions.create({
       ticket: "TICKET-2",
       summary: "Another task",
       flow: "bare",
     });
 
-    const fetched = getSession(created.id);
+    const fetched = getApp().sessions.get(created.id);
     expect(fetched).not.toBeNull();
     expect(fetched!.ticket).toBe("TICKET-2");
     expect(fetched!.summary).toBe("Another task");
@@ -139,10 +148,10 @@ describe("rowToSession round-trip via DB", () => {
   });
 
   it("updateSession with config merges and parses JSON", () => {
-    const session = createSession({ summary: "cfg test" });
-    updateSession(session.id, { config: { foo: "bar", count: 42 } });
+    const session = getApp().sessions.create({ summary: "cfg test" });
+    getApp().sessions.update(session.id, { config: { foo: "bar", count: 42 } });
 
-    const updated = getSession(session.id);
+    const updated = getApp().sessions.get(session.id);
     expect(updated!.config).toEqual({ foo: "bar", count: 42 });
   });
 });
@@ -151,29 +160,29 @@ describe("rowToSession round-trip via DB", () => {
 
 describe("rowToCompute via DB", () => {
   it("parses config JSON on getCompute", () => {
-    const compute = createCompute({
+    const compute = getApp().computes.create({
       name: "test-compute-1",
       provider: "local",
       config: { instanceType: "t3.large", region: "us-east-1" },
     });
 
-    const fetched = getCompute("test-compute-1");
+    const fetched = getApp().computes.get("test-compute-1");
     expect(fetched).not.toBeNull();
     expect(fetched!.config).toEqual({ instanceType: "t3.large", region: "us-east-1" });
     expect(typeof fetched!.config).toBe("object");
   });
 
   it("returns empty object for empty config", () => {
-    const compute = createCompute({ name: "test-compute-2" });
-    const fetched = getCompute("test-compute-2");
+    const compute = getApp().computes.create({ name: "test-compute-2" });
+    const fetched = getApp().computes.get("test-compute-2");
     expect(fetched!.config).toEqual({});
   });
 
   it("updateCompute preserves config as parsed object", () => {
-    createCompute({ name: "test-compute-3", config: { a: 1 } });
-    updateCompute("test-compute-3", { config: { a: 1, b: 2 } });
+    getApp().computes.create({ name: "test-compute-3", config: { a: 1 } });
+    getApp().computes.update("test-compute-3", { config: { a: 1, b: 2 } });
 
-    const fetched = getCompute("test-compute-3");
+    const fetched = getApp().computes.get("test-compute-3");
     expect(fetched!.config).toEqual({ a: 1, b: 2 });
   });
 });
@@ -182,14 +191,14 @@ describe("rowToCompute via DB", () => {
 
 describe("rowToEvent via DB", () => {
   it("parses data JSON on getEvents", () => {
-    const session = createSession({ summary: "event test" });
-    logEvent(session.id, "test_event", {
+    const session = getApp().sessions.create({ summary: "event test" });
+    getApp().events.log(session.id, "test_event", {
       stage: "plan",
       actor: "agent",
       data: { result: "success", items: [1, 2, 3] },
     });
 
-    const events = getEvents(session.id, { type: "test_event" });
+    const events = getApp().events.list(session.id, { type: "test_event" });
     expect(events.length).toBeGreaterThanOrEqual(1);
     const ev = events[events.length - 1];
     expect(ev.data).toEqual({ result: "success", items: [1, 2, 3] });
@@ -197,19 +206,19 @@ describe("rowToEvent via DB", () => {
   });
 
   it("returns null data when event has no data", () => {
-    const session = createSession({ summary: "event no data" });
-    logEvent(session.id, "bare_event");
+    const session = getApp().sessions.create({ summary: "event no data" });
+    getApp().events.log(session.id, "bare_event");
 
-    const events = getEvents(session.id, { type: "bare_event" });
+    const events = getApp().events.list(session.id, { type: "bare_event" });
     expect(events.length).toBe(1);
     expect(events[0].data).toBeNull();
   });
 
   it("preserves event metadata fields", () => {
-    const session = createSession({ summary: "event meta" });
-    logEvent(session.id, "meta_event", { stage: "review", actor: "reviewer" });
+    const session = getApp().sessions.create({ summary: "event meta" });
+    getApp().events.log(session.id, "meta_event", { stage: "review", actor: "reviewer" });
 
-    const events = getEvents(session.id, { type: "meta_event" });
+    const events = getApp().events.list(session.id, { type: "meta_event" });
     expect(events[0].stage).toBe("review");
     expect(events[0].actor).toBe("reviewer");
     expect(events[0].track_id).toBe(session.id);
@@ -222,8 +231,8 @@ describe("rowToEvent via DB", () => {
 
 describe("rowToMessage via DB", () => {
   it("converts read from 0/1 integer to boolean", () => {
-    const session = createSession({ summary: "msg test" });
-    const msg = addMessage({ session_id: session.id, role: "agent", content: "hello" });
+    const session = getApp().sessions.create({ summary: "msg test" });
+    const msg = getApp().messages.send(session.id, "agent" as any, "hello");
 
     // Freshly created message should have read = false (stored as 0)
     expect(msg.read).toBe(false);
@@ -231,25 +240,19 @@ describe("rowToMessage via DB", () => {
   });
 
   it("read is true after marking messages read", () => {
-    const { markMessagesRead } = require("../store.js");
-    const session = createSession({ summary: "read test" });
-    addMessage({ session_id: session.id, role: "agent", content: "unread" });
+    const session = getApp().sessions.create({ summary: "read test" });
+    getApp().messages.send(session.id, "agent" as any, "unread");
 
-    markMessagesRead(session.id);
+    getApp().messages.markRead(session.id);
 
-    const msgs = getMessages(session.id);
+    const msgs = getApp().messages.list(session.id);
     expect(msgs[0].read).toBe(true);
     expect(typeof msgs[0].read).toBe("boolean");
   });
 
   it("preserves message fields", () => {
-    const session = createSession({ summary: "field test" });
-    const msg = addMessage({
-      session_id: session.id,
-      role: "user",
-      content: "test content",
-      type: "progress",
-    });
+    const session = getApp().sessions.create({ summary: "field test" });
+    const msg = getApp().messages.send(session.id, "user" as any, "test content", "progress" as any);
 
     expect(msg.session_id).toBe(session.id);
     expect(msg.role).toBe("user");

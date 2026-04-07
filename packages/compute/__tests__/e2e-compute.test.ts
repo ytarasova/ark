@@ -11,15 +11,7 @@ import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-import {
-  createCompute,
-  getCompute,
-  updateCompute,
-  deleteCompute,
-  mergeComputeConfig,
-  sessionChannelPort,
-  getDb,
-} from "../../core/store.js";
+import { getApp } from "../../core/app.js";
 
 import {
   getProvider,
@@ -37,8 +29,8 @@ let app: AppContext;
 
 beforeAll(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 
 afterAll(async () => {
@@ -58,7 +50,7 @@ const computeNames: string[] = [];
 
 function cleanupComputes() {
   for (const name of computeNames) {
-    try { deleteCompute(name); } catch { /* already gone */ }
+    try { getApp().computes.delete(name); } catch { /* already gone */ }
   }
   computeNames.length = 0;
 }
@@ -71,7 +63,7 @@ describe("E2E Compute: EC2 compute provider resolution", () => {
 
   it("creates an EC2 compute and resolves its provider", () => {
     const name = `test-ec2-resolve-${Date.now()}`;
-    const compute = createCompute({
+    const compute = getApp().computes.create({
       name,
       provider: "ec2",
       config: { size: "m", region: "us-east-1" },
@@ -100,7 +92,7 @@ describe("E2E Compute: Docker compute provider resolution", () => {
 
   it("creates a Docker compute and resolves its provider", () => {
     const name = `test-docker-resolve-${Date.now()}`;
-    const compute = createCompute({
+    const compute = getApp().computes.create({
       name,
       provider: "docker",
       config: { image: "ubuntu:22.04", memory: "4g" },
@@ -225,7 +217,7 @@ describe("E2E Compute: Local provider getMetrics", () => {
 
   it("returns a valid metrics snapshot", async () => {
     const name = `test-metrics-local-${Date.now()}`;
-    const compute = createCompute({ name, provider: "local" });
+    const compute = getApp().computes.create({ name, provider: "local" });
     computeNames.push(name);
 
     const provider = getProvider("local")!;
@@ -269,7 +261,7 @@ describe("E2E Compute: Local provider probePorts", () => {
 
   it("detects a listening port and a closed port", async () => {
     const name = `test-probe-local-${Date.now()}`;
-    const compute = createCompute({ name, provider: "local" });
+    const compute = getApp().computes.create({ name, provider: "local" });
     computeNames.push(name);
 
     const provider = getProvider("local")!;
@@ -318,28 +310,28 @@ describe("E2E Compute: mergeComputeConfig", () => {
 
   it("merges config keys without overwriting existing ones", () => {
     const name = `test-merge-cfg-${Date.now()}`;
-    createCompute({
+    getApp().computes.create({
       name,
       provider: "local",
       config: { existing: "value", count: 42 },
     });
     computeNames.push(name);
 
-    const updated = mergeComputeConfig(name, { newKey: "hello", count: 99 });
+    const updated = getApp().computes.mergeConfig(name, { newKey: "hello", count: 99 });
     expect(updated).not.toBeNull();
     expect((updated!.config as any).existing).toBe("value"); // preserved
     expect((updated!.config as any).newKey).toBe("hello");   // added
     expect((updated!.config as any).count).toBe(99);         // overwritten
 
     // Verify via re-read
-    const compute = getCompute(name);
+    const compute = getApp().computes.get(name);
     expect((compute!.config as any).existing).toBe("value");
     expect((compute!.config as any).newKey).toBe("hello");
     expect((compute!.config as any).count).toBe(99);
   });
 
   it("returns null for non-existent compute", () => {
-    const result = mergeComputeConfig("nonexistent-compute", { key: "val" });
+    const result = getApp().computes.mergeConfig("nonexistent-compute", { key: "val" });
     expect(result).toBeNull();
   });
 });
@@ -348,14 +340,14 @@ describe("E2E Compute: mergeComputeConfig", () => {
 
 describe("E2E Compute: sessionChannelPort", () => {
   it("returns consistent port for same session ID", () => {
-    const port1 = sessionChannelPort("s-abc123");
-    const port2 = sessionChannelPort("s-abc123");
+    const port1 = getApp().sessions.channelPort("s-abc123");
+    const port2 = getApp().sessions.channelPort("s-abc123");
     expect(port1).toBe(port2);
   });
 
   it("returns different ports for different session IDs", () => {
-    const port1 = sessionChannelPort("s-aaa111");
-    const port2 = sessionChannelPort("s-bbb222");
+    const port1 = getApp().sessions.channelPort("s-aaa111");
+    const port2 = getApp().sessions.channelPort("s-bbb222");
     // Different IDs should (almost certainly) produce different ports
     // There's a small chance of collision in the mod 10000 space, but
     // these specific hex values should differ
@@ -370,7 +362,7 @@ describe("E2E Compute: sessionChannelPort", () => {
   it("port is within expected range 19200-29199", () => {
     const testIds = ["s-000000", "s-ffffff", "s-123abc", "s-deadbe"];
     for (const id of testIds) {
-      const port = sessionChannelPort(id);
+      const port = getApp().sessions.channelPort(id);
       expect(port).toBeGreaterThanOrEqual(19200);
       expect(port).toBeLessThan(29200);
     }

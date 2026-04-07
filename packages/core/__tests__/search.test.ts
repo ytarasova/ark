@@ -6,7 +6,7 @@
 import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import { createSession, logEvent, addMessage } from "../store.js";
+import { getApp } from "../app.js";
 import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation } from "../search.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -16,7 +16,7 @@ const { getCtx } = withTestContext();
 
 describe("searchSessions", () => {
   it("finds session by summary", () => {
-    createSession({ summary: "Fix login redirect bug" });
+    getApp().sessions.create({ summary: "Fix login redirect bug" });
     const results = searchSessions("login redirect");
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results.some(r => r.source === "metadata")).toBe(true);
@@ -24,7 +24,7 @@ describe("searchSessions", () => {
   });
 
   it("finds session by ticket (jira_key)", () => {
-    createSession({ ticket: "PROJ-1234", summary: "some task" });
+    getApp().sessions.create({ ticket: "PROJ-1234", summary: "some task" });
     const results = searchSessions("PROJ-1234");
     expect(results.length).toBeGreaterThanOrEqual(1);
     const meta = results.find(r => r.source === "metadata");
@@ -32,7 +32,7 @@ describe("searchSessions", () => {
   });
 
   it("finds session by repo", () => {
-    createSession({ repo: "acme/widget-service", summary: "work" });
+    getApp().sessions.create({ repo: "acme/widget-service", summary: "work" });
     const results = searchSessions("widget-service");
     expect(results.length).toBeGreaterThanOrEqual(1);
     const meta = results.find(r => r.source === "metadata");
@@ -40,8 +40,8 @@ describe("searchSessions", () => {
   });
 
   it("finds matches in event data", () => {
-    const session = createSession({ summary: "unrelated" });
-    logEvent(session.id, "deploy", { data: { message: "deployed to staging-east" } });
+    const session = getApp().sessions.create({ summary: "unrelated" });
+    getApp().events.log(session.id, "deploy", { data: { message: "deployed to staging-east" } });
     const results = searchSessions("staging-east");
     const ev = results.find(r => r.source === "event");
     expect(ev).toBeDefined();
@@ -49,8 +49,8 @@ describe("searchSessions", () => {
   });
 
   it("finds matches in messages", () => {
-    const session = createSession({ summary: "unrelated" });
-    addMessage({ session_id: session.id, role: "agent", content: "Refactored the payment module" });
+    const session = getApp().sessions.create({ summary: "unrelated" });
+    getApp().messages.send(session.id, "agent" as any, "Refactored the payment module");
     const results = searchSessions("payment module");
     const msg = results.find(r => r.source === "message");
     expect(msg).toBeDefined();
@@ -58,7 +58,7 @@ describe("searchSessions", () => {
   });
 
   it("is case insensitive", () => {
-    createSession({ summary: "Upgrade PostgreSQL driver" });
+    getApp().sessions.create({ summary: "Upgrade PostgreSQL driver" });
     const upper = searchSessions("POSTGRESQL");
     const lower = searchSessions("postgresql");
     expect(upper.length).toBeGreaterThanOrEqual(1);
@@ -67,7 +67,7 @@ describe("searchSessions", () => {
 
   it("limits results", () => {
     for (let i = 0; i < 10; i++) {
-      createSession({ summary: `batch task ${i}` });
+      getApp().sessions.create({ summary: `batch task ${i}` });
     }
     const results = searchSessions("batch task", { limit: 3 });
     expect(results.length).toBeLessThanOrEqual(3);
@@ -75,7 +75,7 @@ describe("searchSessions", () => {
 
   it("deduplicates by sessionId + source", () => {
     // A session whose summary AND ticket both match
-    createSession({ ticket: "DUP-99", summary: "DUP-99 duplicate test" });
+    getApp().sessions.create({ ticket: "DUP-99", summary: "DUP-99 duplicate test" });
     const results = searchSessions("DUP-99");
     const metaResults = results.filter(r => r.source === "metadata");
     // Should appear at most once for metadata even though both jira_key and jira_summary match
@@ -83,13 +83,13 @@ describe("searchSessions", () => {
   });
 
   it("returns empty array when nothing matches", () => {
-    createSession({ summary: "something else" });
+    getApp().sessions.create({ summary: "something else" });
     const results = searchSessions("zzz_nonexistent_zzz");
     expect(results).toEqual([]);
   });
 
   it("returns results with timestamps", () => {
-    createSession({ summary: "timestamped session" });
+    getApp().sessions.create({ summary: "timestamped session" });
     const results = searchSessions("timestamped");
     expect(results.length).toBeGreaterThanOrEqual(1);
     for (const r of results) {
@@ -98,9 +98,9 @@ describe("searchSessions", () => {
   });
 
   it("returns results from multiple sources", () => {
-    const session = createSession({ summary: "multi-source alpha" });
-    addMessage({ session_id: session.id, role: "agent", content: "working on alpha feature" });
-    logEvent(session.id, "note", { data: { note: "alpha checkpoint" } });
+    const session = getApp().sessions.create({ summary: "multi-source alpha" });
+    getApp().messages.send(session.id, "agent" as any, "working on alpha feature");
+    getApp().events.log(session.id, "note", { data: { note: "alpha checkpoint" } });
 
     const results = searchSessions("alpha");
     const sources = new Set(results.map(r => r.source));

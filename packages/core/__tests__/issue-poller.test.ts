@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach } from "bun:test";
 
-import * as store from "../store.js";
+import { getApp } from "../app.js";
 import {
   fetchLabeledIssues,
   issueAlreadyTracked,
@@ -87,12 +87,12 @@ describe("issueAlreadyTracked", () => {
   });
 
   it("returns true when session with same ticket exists", () => {
-    store.createSession({ ticket: "#42", summary: "existing" });
+    getApp().sessions.create({ ticket: "#42", summary: "existing" });
     expect(issueAlreadyTracked("#42")).toBe(true);
   });
 
   it("does not match different ticket numbers", () => {
-    store.createSession({ ticket: "#99", summary: "other issue" });
+    getApp().sessions.create({ ticket: "#99", summary: "other issue" });
     expect(issueAlreadyTracked("#42")).toBe(false);
   });
 });
@@ -123,7 +123,7 @@ describe("createSessionFromIssue", () => {
     const issue = makeIssue();
     const session = await createSessionFromIssue(issue);
 
-    const events = store.getEvents(session!.id);
+    const events = getApp().events.list(session!.id);
     const imported = events.filter(e => e.type === "issue_imported");
     expect(imported).toHaveLength(1);
 
@@ -133,7 +133,7 @@ describe("createSessionFromIssue", () => {
   });
 
   it("skips duplicate issues (session with same ticket exists)", async () => {
-    store.createSession({ ticket: "#42", summary: "already tracked" });
+    getApp().sessions.create({ ticket: "#42", summary: "already tracked" });
 
     const issue = makeIssue();
     const session = await createSessionFromIssue(issue);
@@ -152,14 +152,14 @@ describe("pollIssues", () => {
 
     await pollIssues({ label: "ark" });
 
-    const sessions = store.listSessions();
+    const sessions = getApp().sessions.list();
     const tickets = sessions.map(s => s.ticket);
     expect(tickets).toContain("#10");
     expect(tickets).toContain("#11");
   });
 
   it("skips issues that already have sessions", async () => {
-    store.createSession({ ticket: "#10", summary: "existing" });
+    getApp().sessions.create({ ticket: "#10", summary: "existing" });
 
     ghOutput = makeGhOutput([
       makeIssue({ number: 10, title: "Bug A" }),
@@ -168,7 +168,7 @@ describe("pollIssues", () => {
 
     await pollIssues({ label: "ark" });
 
-    const sessions = store.listSessions();
+    const sessions = getApp().sessions.list();
     const ticket11 = sessions.filter(s => s.ticket === "#11");
     const ticket10 = sessions.filter(s => s.ticket === "#10");
     expect(ticket11).toHaveLength(1);
@@ -182,7 +182,7 @@ describe("pollIssues", () => {
     // Should not throw
     await pollIssues({ label: "ark" });
 
-    const sessions = store.listSessions();
+    const sessions = getApp().sessions.list();
     expect(sessions).toHaveLength(0);
   });
 

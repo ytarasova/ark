@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { withTestContext, waitFor } from "./test-helpers.js";
-import { getContext } from "../context.js";
+import { getApp } from "../app.js";
 
 // ── withTestContext ─────────────────────────────────────────────────────────
 
@@ -12,33 +12,32 @@ describe("withTestContext", () => {
   const { getCtx } = withTestContext();
 
   it("creates isolated test context with unique paths", () => {
-    const ctx = getCtx();
-    expect(ctx.arkDir).toContain("ark-test-");
-    expect(ctx.dbPath).toContain("ark-test-");
-    expect(ctx.tracksDir).toContain("tracks");
-    expect(ctx.worktreesDir).toContain("worktrees");
+    const app = getCtx();
+    expect(app.config.arkDir).toContain("ark-test-");
+    expect(app.config.dbPath).toContain("ark-test-");
+    expect(app.config.tracksDir).toContain("tracks");
+    expect(app.config.worktreesDir).toContain("worktrees");
   });
 
   it("sets context as the active global context", () => {
-    const ctx = getCtx();
-    const active = getContext();
-    expect(active.arkDir).toBe(ctx.arkDir);
-    expect(active.dbPath).toBe(ctx.dbPath);
+    const app = getCtx();
+    const active = getApp();
+    expect(active.config.arkDir).toBe(app.config.arkDir);
+    expect(active.config.dbPath).toBe(app.config.dbPath);
   });
 
   it("getCtx() returns the current context", () => {
-    const ctx = getCtx();
-    expect(ctx).toBeDefined();
-    expect(typeof ctx.cleanup).toBe("function");
+    const app = getCtx();
+    expect(app).toBeDefined();
+    expect(app.phase).toBe("ready");
   });
 
   it("each test gets a fresh context with different paths", () => {
     // Store the path from this test - other tests in this describe
     // will get different paths due to beforeEach recreation.
     // We verify the context is valid and unique per-run.
-    const ctx = getCtx();
-    expect(ctx.arkDir).toBeTruthy();
-    expect(ctx.db).toBeNull(); // DB not opened yet (lazy)
+    const app = getCtx();
+    expect(app.config.arkDir).toBeTruthy();
   });
 });
 

@@ -7,7 +7,7 @@ import { withTestContext } from "./test-helpers.js";
 import { evaluateRecipeSetup } from "../recipe-eval.js";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "../store.js";
+import { ARK_DIR } from "../paths.js";
 import { stringify as stringifyYaml } from "yaml";
 
 withTestContext();

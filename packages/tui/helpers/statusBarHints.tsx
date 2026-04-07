@@ -135,6 +135,10 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
       case "completed":
         hints.push(<KeyHint key="enter" k="Enter" label="restart" />);
         hints.push(<KeyHint key="r" k="r" label="replay" />);
+        hints.push(<KeyHint key="Z" k="Z" label="archive" />);
+        break;
+      case "archived":
+        hints.push(<KeyHint key="Z" k="Z" label="restore" />);
         break;
       case "waiting":
         hints.push(<KeyHint key="a" k="a" label="attach" />);

@@ -38,7 +38,10 @@ const DEFAULTS: HotkeyMap = {
   settings: "P",
   advance: "A",
   worktreeFinish: "W",
+  interrupt: "I",
   memory: "Y",
+  verify: "V",
+  archive: "Z",
 };
 
 let _hotkeys: HotkeyMap | null = null;

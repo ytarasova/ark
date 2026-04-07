@@ -10,20 +10,16 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
 import * as core from "../index.js";
-import * as store from "../store.js";
+import { getApp } from "../app.js";
 import { deleteSessionAsync } from "../services/session-orchestration.js";
 import { writeHooksConfig } from "../claude.js";
 import { AppContext, setApp, clearApp } from "../app.js";
-import { withTestContext } from "./test-helpers.js";
-
-const { getCtx } = withTestContext();
-
 let app: AppContext;
 
 beforeEach(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 
 afterEach(async () => {
@@ -84,12 +80,12 @@ describe("deleteSessionAsync", () => {
 
   it("cleans up worktree directory if it exists (no repo — rmSync path)", async () => {
     // Create session with no repo/workdir so cleanup uses direct rmSync
-    const session = store.createSession({
+    const session = getApp().sessions.create({
       summary: "delete-worktree-test",
     });
 
     // Create a fake worktree directory under WORKTREES_DIR
-    const wtPath = join(store.WORKTREES_DIR(), session.id);
+    const wtPath = join(core.WORKTREES_DIR(), session.id);
     mkdirSync(wtPath, { recursive: true });
     writeFileSync(join(wtPath, "dummy.txt"), "test content");
     expect(existsSync(wtPath)).toBe(true);
@@ -118,7 +114,7 @@ describe("deleteSessionAsync", () => {
     });
 
     // No worktree dir exists under WORKTREES_DIR
-    const wtPath = join(store.WORKTREES_DIR(), session.id);
+    const wtPath = join(core.WORKTREES_DIR(), session.id);
     expect(existsSync(wtPath)).toBe(false);
 
     await deleteSessionAsync(session.id);

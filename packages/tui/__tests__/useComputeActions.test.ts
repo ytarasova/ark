@@ -76,8 +76,8 @@ let app: AppContext;
 
 beforeEach(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
   clearProviders();
 });
 

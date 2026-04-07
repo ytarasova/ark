@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "bun:test";
 import { handleIssueWebhook, type IssueWebhookPayload, type IssueWebhookConfig } from "../github-webhook.js";
-import { getSession, getEvents } from "../store.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -43,7 +43,7 @@ describe("handleIssueWebhook", () => {
     expect(result.message).toContain("issue #42");
 
     // Verify session was created with correct fields
-    const session = getSession(result.sessionId!);
+    const session = getApp().sessions.get(result.sessionId!);
     expect(session).not.toBeNull();
     expect(session!.ticket).toBe("#42");
     expect(session!.summary).toBe("Fix authentication bug");
@@ -58,7 +58,7 @@ describe("handleIssueWebhook", () => {
     const payload = makePayload();
     const result = await handleIssueWebhook(payload, defaultConfig);
 
-    const events = getEvents(result.sessionId!);
+    const events = getApp().events.list(result.sessionId!);
     const webhookEvents = events.filter(e => e.type === "issue_webhook_triggered");
     expect(webhookEvents.length).toBe(1);
     expect(webhookEvents[0].actor).toBe("github");
@@ -93,7 +93,7 @@ describe("handleIssueWebhook", () => {
     const payload = makePayload();
     const result = await handleIssueWebhook(payload, config);
 
-    const session = getSession(result.sessionId!);
+    const session = getApp().sessions.get(result.sessionId!);
     expect(session!.flow).toBe("parallel");
     expect(session!.group_name).toBe("custom-group");
   });

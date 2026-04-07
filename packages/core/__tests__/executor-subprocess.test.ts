@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext, type TestContext } from "../context.js";
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { subprocessExecutor } from "../executors/subprocess.js";
 
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
+let app: AppContext;
+beforeEach(async () => { if (app) { await app.shutdown(); clearApp(); } app = AppContext.forTest(); setApp(app); await app.boot(); });
+afterEach(async () => { if (app) { await app.shutdown(); clearApp(); } });
 
 describe("subprocess executor", () => {
   it("has correct name", () => {

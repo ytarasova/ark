@@ -168,4 +168,4 @@ export interface ScheduleIdParams { id: string }
 
 // ── Worktree ────────────────────────────────────────────────────────────────
 
-export interface WorktreeFinishParams { sessionId: string; noMerge?: boolean }
+export interface WorktreeFinishParams { sessionId: string; noMerge?: boolean; createPR?: boolean }

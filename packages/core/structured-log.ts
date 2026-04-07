@@ -4,7 +4,7 @@
 
 import { appendFileSync, existsSync, statSync, renameSync, mkdirSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./store.js";
+import { ARK_DIR } from "./paths.js";
 
 export type LogComponent = "session" | "conductor" | "mcp" | "status" | "web" | "bridge" | "pool" | "compute" | "general";
 export type LogLevel = "debug" | "info" | "warn" | "error";

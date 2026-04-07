@@ -15,7 +15,7 @@ import {
   sessionExists,
   listArkSessionsAsync,
 } from "../tmux.js";
-import { TRACKS_DIR } from "../store.js";
+import { TRACKS_DIR } from "../paths.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();

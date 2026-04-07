@@ -7,7 +7,8 @@
 
 import { describe, test, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
-import * as store from "../store.js";
+import { getApp } from "../app.js";
+import { safeParseConfig } from "../util.js";
 import { applyReport } from "../services/session-orchestration.js";
 import type { OutboundMessage } from "../channel-types.js";
 
@@ -25,8 +26,8 @@ describe("applyReport", () => {
   });
 
   test("still works correctly for existing session", () => {
-    const session = store.createSession({ summary: "test session" });
-    store.updateSession(session.id, { status: "running", stage: "plan" });
+    const session = getApp().sessions.create({ summary: "test session" });
+    getApp().sessions.update(session.id, { status: "running", stage: "plan" });
     const report = { type: "progress", stage: "plan", message: "working..." } as unknown as OutboundMessage;
     const result = applyReport(session.id, report);
     // Should have log events and bus events
@@ -39,32 +40,32 @@ describe("applyReport", () => {
 
 describe("mergeSessionConfig", () => {
   test("merges without clobbering existing keys", () => {
-    const session = store.createSession({
+    const session = getApp().sessions.create({
       summary: "test",
       config: { existing: "value", count: 1 },
     });
 
-    store.mergeSessionConfig(session.id, { newKey: "added" });
-    const updated = store.getSession(session.id)!;
+    getApp().sessions.mergeConfig(session.id, { newKey: "added" });
+    const updated = getApp().sessions.get(session.id)!;
     expect(updated.config.existing).toBe("value");
     expect(updated.config.count).toBe(1);
     expect(updated.config.newKey).toBe("added");
   });
 
   test("two sequential patches both survive", () => {
-    const session = store.createSession({ summary: "test", config: {} });
+    const session = getApp().sessions.create({ summary: "test", config: {} });
 
-    store.mergeSessionConfig(session.id, { a: 1 });
-    store.mergeSessionConfig(session.id, { b: 2 });
+    getApp().sessions.mergeConfig(session.id, { a: 1 });
+    getApp().sessions.mergeConfig(session.id, { b: 2 });
 
-    const updated = store.getSession(session.id)!;
+    const updated = getApp().sessions.get(session.id)!;
     expect(updated.config.a).toBe(1);
     expect(updated.config.b).toBe(2);
   });
 
   test("no-ops for nonexistent session", () => {
     // Should not throw
-    store.mergeSessionConfig("s-nonexistent", { key: "val" });
+    getApp().sessions.mergeConfig("s-nonexistent", { key: "val" });
   });
 });
 
@@ -72,33 +73,33 @@ describe("mergeSessionConfig", () => {
 
 describe("safeParseConfig", () => {
   test("parses valid JSON string", () => {
-    const result = store.safeParseConfig('{"key":"value"}');
+    const result = safeParseConfig('{"key":"value"}');
     expect(result).toEqual({ key: "value" });
   });
 
   test("returns object as-is", () => {
     const obj = { foo: "bar" };
-    const result = store.safeParseConfig(obj);
+    const result = safeParseConfig(obj);
     expect(result).toEqual({ foo: "bar" });
   });
 
   test("returns empty object for corrupted JSON", () => {
-    const result = store.safeParseConfig("{broken json!!!");
+    const result = safeParseConfig("{broken json!!!");
     expect(result).toEqual({});
   });
 
   test("returns empty object for null", () => {
-    const result = store.safeParseConfig(null);
+    const result = safeParseConfig(null);
     expect(result).toEqual({});
   });
 
   test("returns empty object for undefined", () => {
-    const result = store.safeParseConfig(undefined);
+    const result = safeParseConfig(undefined);
     expect(result).toEqual({});
   });
 
   test("returns empty object for empty string", () => {
-    const result = store.safeParseConfig("");
+    const result = safeParseConfig("");
     expect(result).toEqual({});
   });
 });

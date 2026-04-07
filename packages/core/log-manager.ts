@@ -4,13 +4,13 @@
 
 import { readdirSync, statSync, readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
-import { ARK_DIR, listSessions as storeListSessions } from "./store.js";
+import { ARK_DIR } from "./paths.js";
 import { getApp } from "./app.js";
 
 /** Safe session list — uses AppContext if available, falls back to store (needed during boot). */
 function safeListSessions(opts?: { limit?: number }): any[] {
   try { return getApp().sessions.list(opts); }
-  catch { return storeListSessions(opts); }
+  catch { return []; }
 }
 
 export interface LogManagerOptions {

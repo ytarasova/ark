@@ -5,7 +5,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { listRecipes, loadRecipe, instantiateRecipe, saveRecipe, deleteRecipe, sessionToRecipe } from "../recipe.js";
-import * as store from "../store.js";
+import { getApp } from "../app.js";
 
 const { getCtx } = withTestContext();
 
@@ -80,13 +80,13 @@ describe("recipe CRUD", () => {
   });
 
   it("sessionToRecipe captures session config", () => {
-    const s = store.createSession({
+    const s = getApp().sessions.create({
       summary: "Fix auth bug",
       repo: "/projects/myapp",
       flow: "default",
     });
-    store.updateSession(s.id, { agent: "implementer", compute_name: "local", group_name: "bugs" });
-    const updated = store.getSession(s.id)!;
+    getApp().sessions.update(s.id, { agent: "implementer", compute_name: "local", group_name: "bugs" });
+    const updated = getApp().sessions.get(s.id)!;
 
     const recipe = sessionToRecipe(updated, "fix-auth");
     expect(recipe.name).toBe("fix-auth");

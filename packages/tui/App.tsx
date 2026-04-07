@@ -58,7 +58,7 @@ function AppInner() {
   const [sessionPrefill, setSessionPrefill] = useState<SessionPrefill | undefined>();
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<import("../core/store.js").Session | null>(null);
+  const [selectedSession, setSelectedSession] = useState<import("../types/index.js").Session | null>(null);
   const [pane, setPane] = useState<Pane>("left");
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;

@@ -8,7 +8,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext, setApp, clearApp } from "../app.js";
-import { startSession, getSession } from "../index.js";
+import { startSession } from "../index.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 /** Same sanitization regex as in NewSessionForm.tsx submit */
@@ -25,8 +26,8 @@ let app: AppContext;
 
 beforeEach(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 
 afterEach(async () => {
@@ -84,7 +85,7 @@ describe("session name in core (E2E)", () => {
       flow: "bare",
     });
 
-    const stored = getSession(session.id)!;
+    const stored = getApp().sessions.get(session.id)!;
     expect(stored.summary).toBe("my test session");
   });
 
@@ -94,14 +95,14 @@ describe("session name in core (E2E)", () => {
       flow: "bare",
     });
 
-    const stored = getSession(session.id)!;
+    const stored = getApp().sessions.get(session.id)!;
     expect(stored.summary).toBe("fix: auth module (v2)");
   });
 
   it("stores empty summary as null", () => {
     const session = startSession({ flow: "bare" });
 
-    const stored = getSession(session.id)!;
+    const stored = getApp().sessions.get(session.id)!;
     expect(stored.summary).toBeNull();
   });
 
@@ -112,7 +113,7 @@ describe("session name in core (E2E)", () => {
       flow: "bare",
     });
 
-    const stored = getSession(session.id)!;
+    const stored = getApp().sessions.get(session.id)!;
     expect(stored.summary).toBe(longName);
     expect(stored.summary!.length).toBe(200);
   });

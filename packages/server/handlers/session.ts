@@ -236,9 +236,75 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return result;
   });
 
-  router.handle("worktree/finish", async (params, _notify) => {
-    const { sessionId, noMerge } = extract<WorktreeFinishParams>(params, ["sessionId"]);
-    const result = await app.sessionService.finishWorktree(sessionId, { noMerge: noMerge ?? false });
+  router.handle("session/interrupt", async (params, notify) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const result = await app.sessionService.interrupt(sessionId);
+    const session = app.sessions.get(sessionId);
+    if (session) notify("session/updated", { session });
     return result;
+  });
+
+  router.handle("session/archive", async (params, notify) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const result = await app.sessionService.archive(sessionId);
+    if (result.ok) notify("session/updated", { session: app.sessions.get(sessionId) });
+    return result;
+  });
+
+  router.handle("session/restore", async (params, notify) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const result = await app.sessionService.restore(sessionId);
+    if (result.ok) notify("session/updated", { session: app.sessions.get(sessionId) });
+    return result;
+  });
+
+  router.handle("worktree/diff", async (params) => {
+    const { sessionId, base } = extract<{ sessionId: string; base?: string }>(params, ["sessionId"]);
+    return app.sessionService.worktreeDiff(sessionId, { base });
+  });
+
+  router.handle("worktree/create-pr", async (params, notify) => {
+    const { sessionId, title, body, base, draft } = extract<{ sessionId: string; title?: string; body?: string; base?: string; draft?: boolean }>(params, ["sessionId"]);
+    const result = await app.sessionService.createWorktreePR(sessionId, { title, body, base, draft });
+    const session = app.sessions.get(sessionId);
+    if (session) notify("session/updated", { session });
+    return result;
+  });
+
+  router.handle("worktree/finish", async (params, _notify) => {
+    const { sessionId, noMerge, createPR } = extract<WorktreeFinishParams>(params, ["sessionId"]);
+    const result = await app.sessionService.finishWorktree(sessionId, { noMerge: noMerge ?? false, createPR: createPR ?? false });
+    return result;
+  });
+
+  // ── Todos ────────────────────────────────────────────────────────────────
+
+  router.handle("todo/list", async (params) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    return { todos: app.todos.list(sessionId) };
+  });
+
+  router.handle("todo/add", async (params) => {
+    const { sessionId, content } = extract<{ sessionId: string; content: string }>(params, ["sessionId", "content"]);
+    return { todo: app.todos.add(sessionId, content) };
+  });
+
+  router.handle("todo/toggle", async (params) => {
+    const { id } = extract<{ id: number }>(params, ["id"]);
+    const todo = app.todos.toggle(id);
+    return { todo };
+  });
+
+  router.handle("todo/delete", async (params) => {
+    const { id } = extract<{ id: number }>(params, ["id"]);
+    return { ok: app.todos.delete(id) };
+  });
+
+  // ── Verification ─────────────────────────────────────────────────────────
+
+  router.handle("verify/run", async (params) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const { runVerification } = await import("../../core/services/session-orchestration.js");
+    return runVerification(sessionId);
   });
 }

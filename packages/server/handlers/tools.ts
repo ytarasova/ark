@@ -61,7 +61,7 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
 
   router.handle("mcp/attach", async (p) => {
     const { sessionId, server } = extract<McpAttachParams>(p, ["sessionId", "server"]);
-    const session = core.getSession(sessionId);
+    const session = core.getApp().sessions.get(sessionId);
     if (!session) throw new Error("Session not found");
     core.addMcpServer(session.workdir ?? session.repo, server.name as string, server);
     return { ok: true };
@@ -69,7 +69,7 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
 
   router.handle("mcp/detach", async (p) => {
     const { sessionId, serverName } = extract<McpDetachParams>(p, ["sessionId", "serverName"]);
-    const session = core.getSession(sessionId);
+    const session = core.getApp().sessions.get(sessionId);
     if (!session) throw new Error("Session not found");
     core.removeMcpServer(session.workdir ?? session.repo, serverName);
     return { ok: true };

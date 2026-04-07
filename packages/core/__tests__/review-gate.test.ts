@@ -8,8 +8,8 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 
-import { ARK_DIR } from "../store.js";
-import * as store from "../store.js";
+import { ARK_DIR } from "../paths.js";
+import { getApp } from "../app.js";
 import { startSession, advance, approveReviewGate } from "../services/session-orchestration.js";
 import { loadFlow, evaluateGate } from "../flow.js";
 import { withTestContext } from "./test-helpers.js";
@@ -47,7 +47,7 @@ describe("approveReviewGate", () => {
     expect(adv.ok).toBe(true);
     expect(adv.message).toContain("wait-review");
 
-    const atReview = store.getSession(session.id)!;
+    const atReview = getApp().sessions.get(session.id)!;
     expect(atReview.stage).toBe("wait-review");
 
     // Normal advance should be blocked by review gate
@@ -60,7 +60,7 @@ describe("approveReviewGate", () => {
     expect(result.ok).toBe(true);
     expect(result.message).toContain("deploy");
 
-    const after = store.getSession(session.id)!;
+    const after = getApp().sessions.get(session.id)!;
     expect(after.stage).toBe("deploy");
   });
 
@@ -82,7 +82,7 @@ describe("approveReviewGate", () => {
     const session = startSession({ flow: "rev-evt", summary: "event test" });
     await approveReviewGate(session.id);
 
-    const events = store.getEvents(session.id, { type: "review_approved" });
+    const events = getApp().events.list(session.id, { type: "review_approved" });
     expect(events.length).toBe(1);
     expect(events[0].actor).toBe("github");
     expect(events[0].stage).toBe("wait");
@@ -116,7 +116,7 @@ describe("review gate blocking", () => {
     const approved = await approveReviewGate(session.id);
     expect(approved.ok).toBe(true);
 
-    const final = store.getSession(session.id)!;
+    const final = getApp().sessions.get(session.id)!;
     expect(final.stage).toBe("final");
   });
 });

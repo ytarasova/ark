@@ -3,17 +3,27 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import {
-  getDb, addMessage, getMessages, getUnreadCount, markMessagesRead,
-} from "../index.js";
-import { createSession } from "../store.js";
+import { getApp } from "../app.js";
+
+function addMessage(opts: { session_id: string; role: string; content: string; type?: string }) {
+  return getApp().messages.send(opts.session_id, opts.role as any, opts.content, opts.type as any);
+}
+function getMessages(sessionId: string, opts?: { limit?: number }) {
+  return getApp().messages.list(sessionId, opts);
+}
+function getUnreadCount(sessionId: string) {
+  return getApp().messages.unreadCount(sessionId);
+}
+function markMessagesRead(sessionId: string) {
+  return getApp().messages.markRead(sessionId);
+}
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
 
 describe("Messages", () => {
   it("addMessage stores a message", () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     const msg = addMessage({ session_id: session.id, role: "user", content: "hello" });
     expect(typeof msg.id).toBe("number");
     expect(msg.role).toBe("user");
@@ -23,14 +33,14 @@ describe("Messages", () => {
   });
 
   it("addMessage with custom type", () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     const msg = addMessage({ session_id: session.id, role: "agent", content: "done", type: "completed" });
     expect(msg.type).toBe("completed");
     expect(msg.role).toBe("agent");
   });
 
   it("getMessages returns messages in chronological order", () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     addMessage({ session_id: session.id, role: "user", content: "first" });
     addMessage({ session_id: session.id, role: "agent", content: "second" });
     addMessage({ session_id: session.id, role: "user", content: "third" });
@@ -43,7 +53,7 @@ describe("Messages", () => {
   });
 
   it("getMessages respects limit", () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     for (let i = 0; i < 10; i++) {
       addMessage({ session_id: session.id, role: "user", content: `msg-${i}` });
     }
@@ -52,8 +62,8 @@ describe("Messages", () => {
   });
 
   it("getMessages isolates by session", () => {
-    const s1 = createSession({ summary: "s1" });
-    const s2 = createSession({ summary: "s2" });
+    const s1 = getApp().sessions.create({ summary: "s1" });
+    const s2 = getApp().sessions.create({ summary: "s2" });
     addMessage({ session_id: s1.id, role: "user", content: "for s1" });
     addMessage({ session_id: s2.id, role: "user", content: "for s2" });
 
@@ -63,7 +73,7 @@ describe("Messages", () => {
   });
 
   it("getUnreadCount counts only unread agent messages", () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     addMessage({ session_id: session.id, role: "user", content: "hello" });
     addMessage({ session_id: session.id, role: "agent", content: "reply" });
     addMessage({ session_id: session.id, role: "agent", content: "another" });
@@ -72,7 +82,7 @@ describe("Messages", () => {
   });
 
   it("getUnreadCount ignores user messages", () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     addMessage({ session_id: session.id, role: "user", content: "hello" });
     addMessage({ session_id: session.id, role: "user", content: "hello again" });
 
@@ -80,7 +90,7 @@ describe("Messages", () => {
   });
 
   it("markMessagesRead marks all as read", () => {
-    const session = createSession({ summary: "test" });
+    const session = getApp().sessions.create({ summary: "test" });
     addMessage({ session_id: session.id, role: "agent", content: "msg1" });
     addMessage({ session_id: session.id, role: "agent", content: "msg2" });
 
@@ -90,8 +100,8 @@ describe("Messages", () => {
   });
 
   it("markMessagesRead only affects specified session", () => {
-    const s1 = createSession({ summary: "s1" });
-    const s2 = createSession({ summary: "s2" });
+    const s1 = getApp().sessions.create({ summary: "s1" });
+    const s2 = getApp().sessions.create({ summary: "s2" });
     addMessage({ session_id: s1.id, role: "agent", content: "for s1" });
     addMessage({ session_id: s2.id, role: "agent", content: "for s2" });
 

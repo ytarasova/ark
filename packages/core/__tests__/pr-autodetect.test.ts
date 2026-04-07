@@ -1,27 +1,27 @@
 import { describe, it, expect } from "bun:test";
-import { createSession, getSession, updateSession } from "../store.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
 
 describe("PR URL on sessions", () => {
   it("pr_url can be stored and retrieved", () => {
-    const session = createSession({ summary: "pr-test" });
-    updateSession(session.id, { pr_url: "https://github.com/owner/repo/pull/1" });
-    const updated = getSession(session.id);
+    const session = getApp().sessions.create({ summary: "pr-test" });
+    getApp().sessions.update(session.id, { pr_url: "https://github.com/owner/repo/pull/1" });
+    const updated = getApp().sessions.get(session.id);
     expect(updated?.pr_url).toBe("https://github.com/owner/repo/pull/1");
   });
 
   it("pr_url is null by default", () => {
-    const session = createSession({ summary: "no-pr" });
-    expect(getSession(session.id)?.pr_url).toBeFalsy();
+    const session = getApp().sessions.create({ summary: "no-pr" });
+    expect(getApp().sessions.get(session.id)?.pr_url).toBeFalsy();
   });
 
   it("pr_url persists across reads", () => {
-    const session = createSession({ summary: "persist" });
-    updateSession(session.id, { pr_url: "https://github.com/a/b/pull/99" });
+    const session = getApp().sessions.create({ summary: "persist" });
+    getApp().sessions.update(session.id, { pr_url: "https://github.com/a/b/pull/99" });
     // Read twice
-    expect(getSession(session.id)?.pr_url).toBe("https://github.com/a/b/pull/99");
-    expect(getSession(session.id)?.pr_url).toBe("https://github.com/a/b/pull/99");
+    expect(getApp().sessions.get(session.id)?.pr_url).toBe("https://github.com/a/b/pull/99");
+    expect(getApp().sessions.get(session.id)?.pr_url).toBe("https://github.com/a/b/pull/99");
   });
 });

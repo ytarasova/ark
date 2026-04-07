@@ -8,17 +8,15 @@
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
-import { getSession, updateSession } from "../index.js";
-import { createSession } from "../store.js";
 import { stop } from "../services/session-orchestration.js";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 
 afterAll(async () => {
@@ -28,19 +26,19 @@ afterAll(async () => {
 
 describe("session stop preserves claude_session_id", () => {
   it("stop() sets status to stopped", async () => {
-    const session = createSession({ summary: "stop-status-test" });
-    updateSession(session.id, { status: "running", stage: "work" });
+    const session = getApp().sessions.create({ summary: "stop-status-test" });
+    getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
     const result = await stop(session.id);
     expect(result.ok).toBe(true);
 
-    const updated = getSession(session.id)!;
+    const updated = getApp().sessions.get(session.id)!;
     expect(updated.status).toBe("stopped");
   });
 
   it("stop() preserves claude_session_id (does NOT null it out)", async () => {
-    const session = createSession({ summary: "stop-preserve-id" });
-    updateSession(session.id, {
+    const session = getApp().sessions.create({ summary: "stop-preserve-id" });
+    getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       claude_session_id: "claude-uuid-12345",
@@ -49,7 +47,7 @@ describe("session stop preserves claude_session_id", () => {
 
     await stop(session.id);
 
-    const updated = getSession(session.id)!;
+    const updated = getApp().sessions.get(session.id)!;
     expect(updated.status).toBe("stopped");
     expect(updated.claude_session_id).toBe("claude-uuid-12345");
     // session_id (tmux name) should be cleared
@@ -58,8 +56,8 @@ describe("session stop preserves claude_session_id", () => {
 
   it("after stop + updateSession to ready, claude_session_id is still intact", async () => {
     const claudeId = "uuid-for-resume-test";
-    const session = createSession({ summary: "stop-resume-cycle" });
-    updateSession(session.id, {
+    const session = getApp().sessions.create({ summary: "stop-resume-cycle" });
+    getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       claude_session_id: claudeId,
@@ -68,12 +66,12 @@ describe("session stop preserves claude_session_id", () => {
 
     // Stop the session
     await stop(session.id);
-    const stopped = getSession(session.id)!;
+    const stopped = getApp().sessions.get(session.id)!;
     expect(stopped.status).toBe("stopped");
     expect(stopped.claude_session_id).toBe(claudeId);
 
     // Simulate resume preparation (what resume() does before dispatch)
-    updateSession(session.id, {
+    getApp().sessions.update(session.id, {
       status: "ready",
       error: null,
       breakpoint_reason: null,
@@ -82,15 +80,15 @@ describe("session stop preserves claude_session_id", () => {
     });
 
     // claude_session_id should still be preserved after the ready transition
-    const ready = getSession(session.id)!;
+    const ready = getApp().sessions.get(session.id)!;
     expect(ready.status).toBe("ready");
     expect(ready.claude_session_id).toBe(claudeId);
   });
 
   it("multiple stop cycles preserve the same claude_session_id", async () => {
     const claudeId = "persistent-uuid";
-    const session = createSession({ summary: "multi-stop-test" });
-    updateSession(session.id, {
+    const session = getApp().sessions.create({ summary: "multi-stop-test" });
+    getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       claude_session_id: claudeId,
@@ -98,24 +96,24 @@ describe("session stop preserves claude_session_id", () => {
 
     // First stop
     await stop(session.id);
-    expect(getSession(session.id)!.claude_session_id).toBe(claudeId);
+    expect(getApp().sessions.get(session.id)!.claude_session_id).toBe(claudeId);
 
     // Simulate restart
-    updateSession(session.id, { status: "running", session_id: "ark-tmux-2" });
+    getApp().sessions.update(session.id, { status: "running", session_id: "ark-tmux-2" });
 
     // Second stop
     await stop(session.id);
-    expect(getSession(session.id)!.claude_session_id).toBe(claudeId);
+    expect(getApp().sessions.get(session.id)!.claude_session_id).toBe(claudeId);
 
     // Third cycle
-    updateSession(session.id, { status: "running", session_id: "ark-tmux-3" });
+    getApp().sessions.update(session.id, { status: "running", session_id: "ark-tmux-3" });
     await stop(session.id);
-    expect(getSession(session.id)!.claude_session_id).toBe(claudeId);
+    expect(getApp().sessions.get(session.id)!.claude_session_id).toBe(claudeId);
   });
 
   it("stop() nulls error field", async () => {
-    const session = createSession({ summary: "stop-clears-error" });
-    updateSession(session.id, {
+    const session = getApp().sessions.create({ summary: "stop-clears-error" });
+    getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       error: "some transient error",
@@ -123,13 +121,13 @@ describe("session stop preserves claude_session_id", () => {
 
     await stop(session.id);
 
-    const updated = getSession(session.id)!;
+    const updated = getApp().sessions.get(session.id)!;
     expect(updated.error).toBeNull();
   });
 
   it("stop() preserves stage and agent fields", async () => {
-    const session = createSession({ summary: "stop-preserves-agent" });
-    updateSession(session.id, {
+    const session = getApp().sessions.create({ summary: "stop-preserves-agent" });
+    getApp().sessions.update(session.id, {
       status: "running",
       stage: "review",
       agent: "reviewer",
@@ -138,7 +136,7 @@ describe("session stop preserves claude_session_id", () => {
 
     await stop(session.id);
 
-    const updated = getSession(session.id)!;
+    const updated = getApp().sessions.get(session.id)!;
     expect(updated.stage).toBe("review");
     expect(updated.agent).toBe("reviewer");
     expect(updated.workdir).toBe("/tmp/work");

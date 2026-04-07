@@ -11,14 +11,18 @@
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import * as core from "../index.js";
 import { AppContext, setApp, clearApp } from "../app.js";
+import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "./test-helpers.js";
 
 let app: AppContext;
+let tmuxSnapshot: Set<string>;
 beforeAll(async () => {
+  tmuxSnapshot = snapshotArkTmuxSessions();
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 afterAll(async () => {
+  killNewArkTmuxSessions(tmuxSnapshot);
   await app?.shutdown();
   clearApp();
 });
@@ -61,7 +65,7 @@ describe("core lifecycle: startSession", () => {
     expect(session.created_at).toBeTruthy();
   });
 
-  it("logs session_created event", () => {
+  it("logs stage_ready event on creation", () => {
     const session = core.startSession({
       repo: process.cwd(),
       summary: "lifecycle-event-test",
@@ -71,10 +75,10 @@ describe("core lifecycle: startSession", () => {
 
     const events = core.getEvents(session.id);
     expect(events.length).toBeGreaterThanOrEqual(1);
-    const created = events.find((e) => e.type === "session_created");
-    expect(created).toBeTruthy();
-    expect(created!.data).toBeTruthy();
-    expect(created!.data!.flow).toBe("bare");
+    const ready = events.find((e) => e.type === "stage_ready");
+    expect(ready).toBeTruthy();
+    expect(ready!.data).toBeTruthy();
+    expect(ready!.data!.stage).toBe("work");
   });
 });
 

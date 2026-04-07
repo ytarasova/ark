@@ -173,7 +173,7 @@ describe("e2e: session detail", () => {
 
     const events = core.getEvents(session.id);
     expect(events.length).toBeGreaterThanOrEqual(1);
-    expect(events.map(e => e.type)).toContain("session_created");
+    expect(events.map(e => e.type)).toContain("stage_ready");
   });
 });
 

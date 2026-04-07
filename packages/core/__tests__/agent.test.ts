@@ -11,7 +11,7 @@ import {
   resolveAgent, buildClaudeArgs, findProjectRoot,
   type AgentDefinition,
 } from "../agent.js";
-import { ARK_DIR } from "../store.js";
+import { ARK_DIR } from "../paths.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();

@@ -11,22 +11,20 @@ import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test"
 import { writeFileSync, mkdirSync, appendFileSync } from "fs";
 import { join } from "path";
 import {
-  createTestContext, setContext, resetContext,
   getSession, updateSession,
-  type TestContext,
 } from "../index.js";
-import { createSession } from "../store.js";
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { startConductor } from "../conductor.js";
 import { getSessionConversation, searchSessionConversation, searchTranscripts } from "../search.js";
 
 const TEST_PORT = 19197;
-let ctx: TestContext;
+let app: AppContext;
 let server: { stop(): void };
 
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
+beforeEach(async () => {
+  if (app) { await app.shutdown(); clearApp(); }
+  app = AppContext.forTest(); setApp(app); await app.boot();
+
   server = startConductor(TEST_PORT, { quiet: true });
 });
 
@@ -34,9 +32,8 @@ afterEach(() => {
   try { server.stop(); } catch {}
 });
 
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
+afterAll(async () => {
+  if (app) { await app.shutdown(); clearApp(); }
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -99,10 +96,10 @@ function toolResultTurn(ts: string) {
 
 describe("E2E: Hook -> Index -> Query flow", () => {
   it("Stop hook with transcript_path indexes and getSessionConversation returns turns", async () => {
-    const session = createSession({ summary: "e2e-conv-basic" });
+    const session = getApp().sessions.create({ summary: "e2e-conv-basic" });
     updateSession(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
-    const transcriptPath = writeTranscript(ctx.arkDir, "conv-basic.jsonl", [
+    const transcriptPath = writeTranscript(app.config.arkDir, "conv-basic.jsonl", [
       userTurn("fix the auth bug in the login module", "2026-01-01T00:01:00Z"),
       assistantTurn("I will fix the authentication issue in the login module now", "2026-01-01T00:02:00Z"),
       userTurn("also check the session timeout logic please", "2026-01-01T00:03:00Z"),
@@ -128,10 +125,10 @@ describe("E2E: Hook -> Index -> Query flow", () => {
 
 describe("E2E: Incremental indexing", () => {
   it("second Stop hook adds new messages without duplicates", async () => {
-    const session = createSession({ summary: "e2e-incremental" });
+    const session = getApp().sessions.create({ summary: "e2e-incremental" });
     updateSession(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
-    const transcriptPath = writeTranscript(ctx.arkDir, "conv-incr.jsonl", [
+    const transcriptPath = writeTranscript(app.config.arkDir, "conv-incr.jsonl", [
       userTurn("implement the caching layer for redis", "2026-01-01T00:01:00Z"),
       assistantTurn("I will implement the Redis caching layer now", "2026-01-01T00:02:00Z"),
     ]);
@@ -169,18 +166,18 @@ describe("E2E: Incremental indexing", () => {
 describe("E2E: Per-session search", () => {
   it("searchSessionConversation is scoped to one session", async () => {
     // Session A — talks about authentication
-    const sessionA = createSession({ summary: "e2e-search-A" });
+    const sessionA = getApp().sessions.create({ summary: "e2e-search-A" });
     updateSession(sessionA.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
-    const pathA = writeTranscript(ctx.arkDir, "conv-a.jsonl", [
+    const pathA = writeTranscript(app.config.arkDir, "conv-a.jsonl", [
       userTurn("fix the authentication middleware vulnerability", "2026-01-01T00:01:00Z"),
       assistantTurn("I have patched the authentication middleware to prevent bypass", "2026-01-01T00:02:00Z"),
     ]);
     await postHookStatus(sessionA.id, { hook_event_name: "Stop", transcript_path: pathA });
 
     // Session B — talks about database
-    const sessionB = createSession({ summary: "e2e-search-B" });
+    const sessionB = getApp().sessions.create({ summary: "e2e-search-B" });
     updateSession(sessionB.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
-    const pathB = writeTranscript(ctx.arkDir, "conv-b.jsonl", [
+    const pathB = writeTranscript(app.config.arkDir, "conv-b.jsonl", [
       userTurn("optimize the database connection pooling", "2026-01-01T00:01:00Z"),
       assistantTurn("I have optimized the database connection pool settings", "2026-01-01T00:02:00Z"),
     ]);
@@ -209,17 +206,17 @@ describe("E2E: Per-session search", () => {
 describe("E2E: Cross-session search", () => {
   it("searchTranscripts finds matches across both sessions via FTS5", async () => {
     // Session C — mentions "deployment pipeline"
-    const sessionC = createSession({ summary: "e2e-cross-C" });
+    const sessionC = getApp().sessions.create({ summary: "e2e-cross-C" });
     updateSession(sessionC.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
-    const pathC = writeTranscript(ctx.arkDir, "conv-c.jsonl", [
+    const pathC = writeTranscript(app.config.arkDir, "conv-c.jsonl", [
       assistantTurn("I have configured the deployment pipeline for staging", "2026-01-01T00:01:00Z"),
     ]);
     await postHookStatus(sessionC.id, { hook_event_name: "Stop", transcript_path: pathC });
 
     // Session D — also mentions "deployment"
-    const sessionD = createSession({ summary: "e2e-cross-D" });
+    const sessionD = getApp().sessions.create({ summary: "e2e-cross-D" });
     updateSession(sessionD.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
-    const pathD = writeTranscript(ctx.arkDir, "conv-d.jsonl", [
+    const pathD = writeTranscript(app.config.arkDir, "conv-d.jsonl", [
       assistantTurn("Fixed the deployment rollback mechanism for production", "2026-01-01T00:01:00Z"),
     ]);
     await postHookStatus(sessionD.id, { hook_event_name: "Stop", transcript_path: pathD });
@@ -240,10 +237,10 @@ describe("E2E: Cross-session search", () => {
 
 describe("E2E: Token usage stored on hook", () => {
   it("Stop hook with transcript_path stores aggregated token usage", async () => {
-    const session = createSession({ summary: "e2e-usage" });
+    const session = getApp().sessions.create({ summary: "e2e-usage" });
     updateSession(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
-    const transcriptPath = writeTranscript(ctx.arkDir, "conv-usage.jsonl", [
+    const transcriptPath = writeTranscript(app.config.arkDir, "conv-usage.jsonl", [
       userTurn("analyze the performance bottleneck in the query", "2026-01-01T00:01:00Z"),
       assistantTurn("I will analyze the performance issue", "2026-01-01T00:02:00Z", {
         input_tokens: 1000, output_tokens: 500,
@@ -276,10 +273,10 @@ describe("E2E: Token usage stored on hook", () => {
 
 describe("E2E: Noise filtering", () => {
   it("tool_use and tool_result entries are not in getSessionConversation", async () => {
-    const session = createSession({ summary: "e2e-noise" });
+    const session = getApp().sessions.create({ summary: "e2e-noise" });
     updateSession(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
-    const transcriptPath = writeTranscript(ctx.arkDir, "conv-noise.jsonl", [
+    const transcriptPath = writeTranscript(app.config.arkDir, "conv-noise.jsonl", [
       userTurn("please read the config file and explain it", "2026-01-01T00:01:00Z"),
       toolUseTurn("2026-01-01T00:02:00Z"),
       toolResultTurn("2026-01-01T00:03:00Z"),

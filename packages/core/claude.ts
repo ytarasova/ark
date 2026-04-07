@@ -14,7 +14,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 
 import * as tmux from "./tmux.js";
-import { TRACKS_DIR } from "./store.js";
+import { TRACKS_DIR } from "./paths.js";
 // TRACKS_DIR is now a function — call it at usage sites, not module level
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -111,7 +111,7 @@ export function channelMcpConfig(
       ARK_SESSION_ID: sessionId,
       ARK_STAGE: stage,
       ARK_CHANNEL_PORT: String(channelPort),
-      ARK_CONDUCTOR_URL: opts?.conductorUrl ?? "http://localhost:19100",
+      ARK_CONDUCTOR_URL: opts?.conductorUrl ?? (process.env.ARK_CONDUCTOR_URL || "http://localhost:19100"),
     },
   };
 }

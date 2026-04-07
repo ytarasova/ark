@@ -18,7 +18,7 @@ import {
   type ClaudeArgsOpts,
   type LauncherOpts,
 } from "../claude.js";
-import { TRACKS_DIR } from "../store.js";
+import { TRACKS_DIR } from "../paths.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();

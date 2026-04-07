@@ -5,13 +5,13 @@
 
 import type { Session } from "../types/index.js";
 import { getApp } from "./app.js";
-import { listSessions as storeListSessions } from "./store.js";
+
 import { Bridge, loadBridgeConfig } from "./bridge.js";
 
 /** Safe session list — uses AppContext if available, falls back to store. */
 function safeListSessions(opts?: { limit?: number }): any[] {
   try { return getApp().sessions.list(opts); }
-  catch { return storeListSessions(opts); }
+  catch { return []; }
 }
 
 export interface NotifyDaemonOptions {

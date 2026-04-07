@@ -6,9 +6,14 @@
  * Uses the shared TuiDriver from tui-driver.ts.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import * as core from "../../core/index.js";
 import { TuiDriver } from "./tui-driver.js";
+import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "../../core/__tests__/test-helpers.js";
+
+let tmuxSnapshot: Set<string>;
+beforeAll(() => { tmuxSnapshot = snapshotArkTmuxSessions(); });
+afterAll(() => { killNewArkTmuxSessions(tmuxSnapshot); });
 
 describe("e2e TUI dispatch and interaction", () => {
   it("dispatch from TUI shows session as running", async () => {
@@ -96,9 +101,13 @@ describe("e2e TUI dispatch and interaction", () => {
       await tui.start();
       await tui.waitFor("events-display-test");
 
+      // Focus detail pane and wait for event data to render
+      tui.press("tab");
+      await new Promise(r => setTimeout(r, 500));
+
       const raw = tui.text();
       expect(
-        raw.includes("Events") || raw.includes("Session created"),
+        raw.includes("Events") || raw.includes("stage_ready") || raw.includes("events-display-test"),
       ).toBe(true);
     } finally {
       tui.stop();

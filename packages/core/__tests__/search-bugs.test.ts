@@ -7,7 +7,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { indexTranscripts, ftsTableExists, getIndexStats } from "../search.js";
 import { refreshClaudeSessionsCache, listClaudeSessions } from "../claude-sessions.js";
-import { getDb } from "../store.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
@@ -45,7 +45,7 @@ describe("indexTranscripts transaction safety", () => {
     await indexTranscripts({ transcriptsDir });
 
     // Data should be committed and queryable
-    const db = getDb();
+    const db = getApp().db;
     const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as any;
     expect(row.c).toBeGreaterThan(0);
   });
@@ -61,7 +61,7 @@ describe("ftsTableExists", () => {
 
   it("returns false when table does not exist", () => {
     // Drop the table and check
-    const db = getDb();
+    const db = getApp().db;
     db.exec("DROP TABLE IF EXISTS transcript_index");
     expect(ftsTableExists()).toBe(false);
   });

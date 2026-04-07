@@ -19,7 +19,6 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { execFileSync } from "child_process";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
-import { setContext, resetContext } from "../../core/context.js";
 import * as tmux from "../../core/tmux.js";
 
 export interface E2EEnv {
@@ -41,19 +40,10 @@ export interface E2EEnv {
 export async function setupE2E(): Promise<E2EEnv> {
   // 1. Create AppContext with isolated temp dir
   const app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 
-  // 2. Wire context system to same temp dir (store.ts reads from context)
-  setContext({
-    arkDir: app.config.arkDir,
-    dbPath: app.config.dbPath,
-    tracksDir: app.config.tracksDir,
-    worktreesDir: app.config.worktreesDir,
-    db: null,  // will be opened by getDb()
-  });
-
-  // 3. Create isolated workdir with a git repo (some tests need .git)
+  // 2. Create isolated workdir with a git repo (some tests need .git)
   const workdir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-"));
   try {
     execFileSync("git", ["init", workdir], { stdio: "pipe" });
@@ -79,7 +69,6 @@ export async function setupE2E(): Promise<E2EEnv> {
       // Shutdown AppContext (closes DB, removes temp dir)
       await app.shutdown();
       clearApp();
-      resetContext();
 
       // Clean up workdir
       try {

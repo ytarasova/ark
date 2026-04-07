@@ -4,7 +4,7 @@
  */
 
 import { getApp } from "./app.js";
-import { createSession as storeCreateSession, logEvent as storeLogEvent } from "./store.js";
+
 import { dispatch } from "./services/session-orchestration.js";
 
 export interface IssueWebhookPayload {
@@ -63,12 +63,11 @@ export async function handleIssueWebhook(
     },
   };
   let session;
-  try { session = getApp().sessions.create(createOpts); }
-  catch { session = storeCreateSession(createOpts); }
+  session = getApp().sessions.create(createOpts);
 
   const evOpts = { actor: "github", data: { issue_number: issue.number, label: config.triggerLabel, repo: repo.full_name } };
   try { getApp().events.log(session.id, "issue_webhook_triggered", evOpts); }
-  catch { storeLogEvent(session.id, "issue_webhook_triggered", evOpts); }
+  catch { /* app not booted */ }
 
   // Auto-dispatch if configured
   if (config.autoDispatch) {

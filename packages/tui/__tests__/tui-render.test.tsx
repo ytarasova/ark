@@ -15,8 +15,8 @@ import { AppContext, setApp, clearApp } from "../../core/app.js";
 let app: AppContext;
 beforeAll(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 afterAll(async () => {
   await app?.shutdown();
@@ -66,6 +66,8 @@ describe("TUI App rendering", () => {
     const { lastFrame, unmount } = await renderApp();
     const frame = lastFrame()!;
     expect(frame.length).toBeGreaterThan(0);
+    // Allow pending React effects to flush before unmount
+    await new Promise(r => setTimeout(r, 50));
     unmount();
   });
 

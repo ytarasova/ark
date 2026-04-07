@@ -5,7 +5,8 @@
  */
 
 import { createHmac } from "crypto";
-import { getDb, safeParseConfig, sessionChannelPort, logEvent as storeLogEvent, addMessage as storeAddMessage } from "./store.js";
+import { getApp } from "./app.js";
+import { safeParseConfig } from "./util.js";
 import type { Session } from "../types/index.js";
 import { safeAsync } from "./safe.js";
 
@@ -98,7 +99,7 @@ export function formatReviewPrompt(
 // ── Session lookup ──────────────────────────────────────────────────────────
 
 export function findSessionByPR(prUrl: string): Session | null {
-  const db = getDb();
+  const db = getApp().db;
   const row = db.prepare(
     "SELECT * FROM sessions WHERE pr_url = ? ORDER BY rowid DESC LIMIT 1"
   ).get(prUrl) as any;
@@ -135,7 +136,7 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
 
   // Handle approved reviews
   if (event === "pull_request_review" && payload.review?.state === "approved") {
-    storeLogEvent(session.id, "webhook_review_approved", {
+    getApp().events.log(session.id, "webhook_review_approved", {
       actor: "github",
       data: { pr_url: prUrl, reviewer: payload.review?.user?.login },
     });
@@ -147,9 +148,9 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
     const prompt = formatReviewPrompt(prTitle, prNumber, comments, payload.review?.state);
 
     // Store as a message so TUI shows it
-    storeAddMessage({ session_id: session.id, role: "system", content: prompt, type: "text" });
+    getApp().messages.send(session.id, "system" as any, prompt, "text" as any);
 
-    storeLogEvent(session.id, "webhook_review_steer", {
+    getApp().events.log(session.id, "webhook_review_steer", {
       actor: "github",
       data: {
         pr_url: prUrl,
@@ -161,7 +162,7 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
 
     // Steer via channel if session is running (fire-and-forget)
     if (session.status === "running") {
-      const channelPort = sessionChannelPort(session.id);
+      const channelPort = getApp().sessions.channelPort(session.id);
       const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
       safeAsync(`[github-pr] deliverToChannel for ${session.id}`, async () => {
         const { deliverToChannel } = await import("./conductor.js");

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget } from "../costs.js";
 import type { TranscriptUsage } from "../claude.js";
-import { createSession, getSession, updateSession } from "../store.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -61,8 +61,8 @@ describe("formatCost", () => {
 
 describe("getSessionCost", () => {
   it("returns cost from session config usage", () => {
-    const s = createSession({ summary: "test" });
-    updateSession(s.id, {
+    const s = getApp().sessions.create({ summary: "test" });
+    getApp().sessions.update(s.id, {
       agent: "sonnet",
       config: {
         usage: {
@@ -71,13 +71,13 @@ describe("getSessionCost", () => {
         },
       },
     });
-    const refreshed = getSession(s.id)!;
+    const refreshed = getApp().sessions.get(s.id)!;
     const sc = getSessionCost(refreshed);
     expect(sc.cost).toBeCloseTo(3.00, 2);
   });
 
   it("returns 0 cost for session without usage", () => {
-    const s = createSession({ summary: "no-usage" });
+    const s = getApp().sessions.create({ summary: "no-usage" });
     const sc = getSessionCost(s);
     expect(sc.cost).toBe(0);
   });
@@ -85,17 +85,17 @@ describe("getSessionCost", () => {
 
 describe("getAllSessionCosts", () => {
   it("returns sorted costs and total", () => {
-    const s1 = createSession({ summary: "cheap" });
-    const s2 = createSession({ summary: "expensive" });
-    updateSession(s1.id, {
+    const s1 = getApp().sessions.create({ summary: "cheap" });
+    const s2 = getApp().sessions.create({ summary: "expensive" });
+    getApp().sessions.update(s1.id, {
       agent: "haiku",
       config: { usage: { input_tokens: 100_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 100_000 } },
     });
-    updateSession(s2.id, {
+    getApp().sessions.update(s2.id, {
       agent: "opus",
       config: { usage: { input_tokens: 100_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 100_000 } },
     });
-    const sessions = [getSession(s1.id)!, getSession(s2.id)!];
+    const sessions = [getApp().sessions.get(s1.id)!, getApp().sessions.get(s2.id)!];
     const result = getAllSessionCosts(sessions);
     expect(result.sessions.length).toBe(2);
     expect(result.sessions[0].sessionId).toBe(s2.id); // opus is more expensive
@@ -103,13 +103,13 @@ describe("getAllSessionCosts", () => {
   });
 
   it("filters out zero-cost sessions", () => {
-    const s1 = createSession({ summary: "has-cost" });
-    const s2 = createSession({ summary: "no-cost" });
-    updateSession(s1.id, {
+    const s1 = getApp().sessions.create({ summary: "has-cost" });
+    const s2 = getApp().sessions.create({ summary: "no-cost" });
+    getApp().sessions.update(s1.id, {
       agent: "sonnet",
       config: { usage: { input_tokens: 100_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 100_000 } },
     });
-    const sessions = [getSession(s1.id)!, s2];
+    const sessions = [getApp().sessions.get(s1.id)!, s2];
     const result = getAllSessionCosts(sessions);
     expect(result.sessions.length).toBe(1);
     expect(result.sessions[0].sessionId).toBe(s1.id);
@@ -160,15 +160,15 @@ describe("getAllSessionCosts edge cases", () => {
   });
 
   it("skips sessions with zero cost", () => {
-    const s = createSession({ summary: "no-tokens" });
-    const store = require("../store.js");
-    const result = getAllSessionCosts([store.getSession(s.id)]);
+    const s = getApp().sessions.create({ summary: "no-tokens" });
+
+    const result = getAllSessionCosts([getApp().sessions.get(s.id)]);
     expect(result.sessions).toHaveLength(0);
   });
 
   it("uses config.model over agent field for cost calculation", () => {
-    const s = createSession({ summary: "model-priority" });
-    updateSession(s.id, {
+    const s = getApp().sessions.create({ summary: "model-priority" });
+    getApp().sessions.update(s.id, {
       agent: "worker",  // not a model name
       config: {
         model: "opus",
@@ -178,20 +178,20 @@ describe("getAllSessionCosts edge cases", () => {
         },
       },
     });
-    const store = require("../store.js");
-    const result = getSessionCost(store.getSession(s.id));
+
+    const result = getSessionCost(getApp().sessions.get(s.id));
     // opus input: 1M * 15/1M = 15.00
     expect(result.cost).toBeCloseTo(15.00, 2);
   });
 
   it("handles multiple sessions with different models", () => {
-    const s1 = createSession({ summary: "opus-session" });
-    const s2 = createSession({ summary: "haiku-session" });
+    const s1 = getApp().sessions.create({ summary: "opus-session" });
+    const s2 = getApp().sessions.create({ summary: "haiku-session" });
     const usage = { input_tokens: 100_000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 100_000 };
-    updateSession(s1.id, { agent: "opus", config: { usage } });
-    updateSession(s2.id, { agent: "haiku", config: { usage } });
-    const store = require("../store.js");
-    const result = getAllSessionCosts([store.getSession(s1.id), store.getSession(s2.id)]);
+    getApp().sessions.update(s1.id, { agent: "opus", config: { usage } });
+    getApp().sessions.update(s2.id, { agent: "haiku", config: { usage } });
+
+    const result = getAllSessionCosts([getApp().sessions.get(s1.id), getApp().sessions.get(s2.id)]);
     expect(result.sessions).toHaveLength(2);
     expect(result.sessions[0].cost).toBeGreaterThan(result.sessions[1].cost); // opus > haiku
     expect(result.total).toBeGreaterThan(0);
@@ -200,26 +200,26 @@ describe("getAllSessionCosts edge cases", () => {
 
 describe("checkBudget", () => {
   it("detects daily limit exceeded", () => {
-    const s = createSession({ summary: "budget-test" });
-    updateSession(s.id, {
+    const s = getApp().sessions.create({ summary: "budget-test" });
+    getApp().sessions.update(s.id, {
       agent: "opus",
       config: { usage: { input_tokens: 10_000_000, output_tokens: 1_000_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 11_000_000 } },
     });
-    const store = require("../store.js");
-    const sessions = [store.getSession(s.id)];
+
+    const sessions = [getApp().sessions.get(s.id)];
     const status = checkBudget(sessions, { dailyLimit: 10 });
     expect(status.daily.exceeded).toBe(true);
     expect(status.daily.warning).toBe(true);
   });
 
   it("no warning when under budget", () => {
-    const s = createSession({ summary: "cheap" });
-    updateSession(s.id, {
+    const s = getApp().sessions.create({ summary: "cheap" });
+    getApp().sessions.update(s.id, {
       agent: "haiku",
       config: { usage: { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, total_tokens: 1100 } },
     });
-    const store = require("../store.js");
-    const sessions = [store.getSession(s.id)];
+
+    const sessions = [getApp().sessions.get(s.id)];
     const status = checkBudget(sessions, { dailyLimit: 100 });
     expect(status.daily.exceeded).toBe(false);
     expect(status.daily.warning).toBe(false);

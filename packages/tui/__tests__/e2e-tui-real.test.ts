@@ -9,10 +9,29 @@
  * screen region parsing, and automatic cleanup.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
 import * as core from "../../core/index.js";
 import { TuiDriver } from "./tui-driver.js";
+import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "../../core/__tests__/test-helpers.js";
+
+// Tests that don't use TuiDriver (like the orphan cleanup test) need
+// a global AppContext so core.getSession() works. TuiDriver tests
+// create their own isolated AppContext internally.
+let app: AppContext;
+let tmuxSnapshot: Set<string>;
+beforeAll(async () => {
+  tmuxSnapshot = snapshotArkTmuxSessions();
+  app = AppContext.forTest();
+  setApp(app);
+  await app.boot();
+});
+afterAll(async () => {
+  killNewArkTmuxSessions(tmuxSnapshot);
+  await app?.shutdown();
+  clearApp();
+});
 
 describe("e2e TUI (real tmux)", () => {
 
@@ -96,80 +115,13 @@ describe("e2e TUI (real tmux)", () => {
     }
   }, 30_000);
 
-  // Test 6: Quit with q key
-  // SKIP: Ink exit() doesn't reliably kill the parent tmux session.
-  // Re-enable when Ink provides a reliable process.exit hook or when we
-  // switch to a signal-based tmux session teardown.
-  it.skip("quits with q key", async () => {
-    const tui = new TuiDriver();
-    try {
-      await tui.start();
-      expect(tui.alive()).toBe(true);
-
-      tui.press("q");
-      // Wait for the tmux session to die after TUI exits
-      const start = Date.now();
-      while (tui.alive() && Date.now() - start < 8000) {
-        await new Promise((r) => setTimeout(r, 300));
-      }
-      expect(tui.alive()).toBe(false);
-    } finally {
-      tui.stop();
-    }
-  }, 30_000);
-
-  // Test 7: Create session via new form (n key)
-  // SKIP: Form overlay not rendering in tmux capture-pane output.
-  // Re-enable once Ink overlay rendering is verified in headless tmux
-  // (may need alternate-screen or larger capture window).
-  it.skip("opens new session form with n key", async () => {
-    const tui = new TuiDriver();
-    try {
-      await tui.start();
-      tui.press("n");
-      const formVisible = await tui.waitFor("New Session", 3000);
-      expect(formVisible).toBe(true);
-
-      // Esc should close the form
-      tui.press("escape");
-      const formGone = await tui.waitForGone("New Session", 3000);
-      expect(formGone).toBe(true);
-    } finally {
-      tui.stop();
-    }
-  }, 30_000);
-
-  // Test 8: Delete session (x key)
-  // SKIP: x key not triggering delete — likely because no session is focused
-  // in the list pane after start. Re-enable after adding explicit j/k
-  // navigation to select a session before pressing x.
-  it.skip("deletes session with x key", async () => {
-    const tui = new TuiDriver();
-    try {
-      const session = tui.createSession({
-        repo: process.cwd(),
-        summary: "e2e-tui-delete-me",
-        flow: "bare",
-      });
-
-      await tui.start();
-      const visible = await tui.waitFor("e2e-tui-delete-me");
-      expect(visible).toBe(true);
-
-      tui.press("x");
-      const gone = await tui.waitForGone("e2e-tui-delete-me");
-      expect(gone).toBe(true);
-
-      // Verify via core API
-      expect(core.getSession(session.id)).toBeNull();
-      tui.untrack(session.id);
-    } finally {
-      tui.stop();
-    }
-  }, 30_000);
-
-  // Test 9: Orphan tmux session cleanup
+  // Test 6: Orphan tmux session cleanup
   it("cleans orphan tmux sessions that have no DB record", async () => {
+    // Re-establish AppContext since TuiDriver tests overwrite the global app
+    const freshApp = AppContext.forTest();
+    setApp(freshApp);
+    await freshApp.boot();
+
     const { listArkSessionsAsync, killSession } = await import("../../core/tmux.js");
     const orphanName = `ark-s-orphan-test-${Date.now()}`;
 
@@ -202,6 +154,7 @@ describe("e2e TUI (real tmux)", () => {
       expect(found).toBe(false);
     } finally {
       try { execFileSync("tmux", ["kill-session", "-t", orphanName], { stdio: "pipe" }); } catch { /* already gone */ }
+      await freshApp.shutdown();
     }
   }, 30_000);
 

@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
-import { createTestContext, setContext, type TestContext } from "../../core/context.js";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
 import { registerSessionHandlers } from "../handlers/session.js";
 import { Router } from "../router.js";
@@ -8,24 +7,20 @@ import { createRequest } from "../../protocol/types.js";
 let app: AppContext;
 beforeAll(async () => {
   app = AppContext.forTest();
-  await app.boot();
   setApp(app);
+  await app.boot();
 });
 afterAll(async () => {
   await app?.shutdown();
   clearApp();
 });
 
-let ctx: TestContext;
 let router: Router;
 
 beforeEach(() => {
-  ctx = createTestContext();
-  setContext(ctx);
   router = new Router();
   registerSessionHandlers(router, app);
 });
-afterEach(() => { ctx.cleanup(); });
 
 describe("session handlers", () => {
   it("session/start creates a session", async () => {

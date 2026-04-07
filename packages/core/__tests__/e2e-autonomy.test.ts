@@ -10,17 +10,14 @@ import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { writeFileSync, mkdirSync, readFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import {
-  createTestContext, setContext, resetContext,
-  type TestContext,
-} from "../context.js";
-import { ARK_DIR } from "../store.js";
+import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { ARK_DIR } from "../paths.js";
 import { buildArgs, writeHooksConfig, removeHooksConfig } from "../claude.js";
 import { loadFlow, resolveFlow } from "../flow.js";
 import { buildClaudeArgs } from "../agent.js";
 import { buildSessionVars } from "../template.js";
 
-let ctx: TestContext;
+let app: AppContext;
 
 const flowDir = () => join(ARK_DIR(), "flows");
 
@@ -30,16 +27,16 @@ function writeUserFlow(name: string, def: Record<string, unknown>): void {
   writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(def));
 }
 
-beforeEach(() => {
-  if (ctx) ctx.cleanup();
-  ctx = createTestContext();
-  setContext(ctx);
+beforeEach(async () => {
+  if (app) { await app.shutdown(); clearApp(); }
+  app = AppContext.forTest();
+  setApp(app);
+  await app.boot();
   rmSync(flowDir(), { recursive: true, force: true });
 });
 
-afterAll(() => {
-  if (ctx) ctx.cleanup();
-  resetContext();
+afterAll(async () => {
+  if (app) { await app.shutdown(); clearApp(); }
 });
 
 // -- Flow YAML -> resolveFlow -> autonomy preserved ---------------------------
@@ -142,9 +139,9 @@ describe("E2E: buildArgs permission gating by autonomy", () => {
 
 describe("E2E: writeHooksConfig writes permission deny rules", () => {
   it("read-only writes deny: ['Bash', 'Write', 'Edit'] to settings.local.json", () => {
-    writeHooksConfig("s-e2e", "http://localhost:19100", ctx.arkDir, { autonomy: "read-only" });
+    writeHooksConfig("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "read-only" });
 
-    const settingsPath = join(ctx.arkDir, ".claude", "settings.local.json");
+    const settingsPath = join(app.config.arkDir, ".claude", "settings.local.json");
     expect(existsSync(settingsPath)).toBe(true);
 
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
@@ -155,50 +152,50 @@ describe("E2E: writeHooksConfig writes permission deny rules", () => {
   });
 
   it("edit writes deny: ['Bash'] to settings.local.json", () => {
-    writeHooksConfig("s-e2e", "http://localhost:19100", ctx.arkDir, { autonomy: "edit" });
+    writeHooksConfig("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "edit" });
 
     const settings = JSON.parse(
-      readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"),
+      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
     expect(settings.permissions.deny).toEqual(["Bash"]);
   });
 
   it("full does NOT add permissions.deny", () => {
-    writeHooksConfig("s-e2e", "http://localhost:19100", ctx.arkDir, { autonomy: "full" });
+    writeHooksConfig("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "full" });
 
     const settings = JSON.parse(
-      readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"),
+      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
     expect(settings.permissions).toBeUndefined();
   });
 
   it("execute does NOT add permissions.deny", () => {
-    writeHooksConfig("s-e2e", "http://localhost:19100", ctx.arkDir, { autonomy: "execute" });
+    writeHooksConfig("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "execute" });
 
     const settings = JSON.parse(
-      readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"),
+      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
     expect(settings.permissions).toBeUndefined();
   });
 
   it("no autonomy does NOT add permissions.deny", () => {
-    writeHooksConfig("s-e2e", "http://localhost:19100", ctx.arkDir);
+    writeHooksConfig("s-e2e", "http://localhost:19100", app.config.arkDir);
 
     const settings = JSON.parse(
-      readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"),
+      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
     expect(settings.permissions).toBeUndefined();
   });
 
   it("edit preserves existing allow rules alongside new deny rules", () => {
     // Pre-populate settings with existing allow rules
-    const claudeDir = join(ctx.arkDir, ".claude");
+    const claudeDir = join(app.config.arkDir, ".claude");
     mkdirSync(claudeDir, { recursive: true });
     writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
       permissions: { allow: ["Read", "Glob"] },
     }));
 
-    writeHooksConfig("s-e2e", "http://localhost:19100", ctx.arkDir, { autonomy: "edit" });
+    writeHooksConfig("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "edit" });
 
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
     expect(settings.permissions.allow).toEqual(["Read", "Glob"]);
@@ -207,12 +204,12 @@ describe("E2E: writeHooksConfig writes permission deny rules", () => {
   });
 
   it("removeHooksConfig cleans up hooks but does not crash", () => {
-    writeHooksConfig("s-e2e", "http://localhost:19100", ctx.arkDir, { autonomy: "read-only" });
+    writeHooksConfig("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "read-only" });
     // removeHooksConfig should not throw
-    removeHooksConfig(ctx.arkDir);
+    removeHooksConfig(app.config.arkDir);
     // After removal, hooks should be gone
     const settings = JSON.parse(
-      readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"),
+      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
     expect(settings.hooks).toBeUndefined();
   });
@@ -297,14 +294,14 @@ describe("E2E: full autonomy pipeline", () => {
     const args0 = buildArgs({ autonomy: s0.autonomy });
     expect(args0).not.toContain("--dangerously-skip-permissions");
 
-    writeHooksConfig("s-pipe-0", "http://localhost:19100", ctx.arkDir, { autonomy: s0.autonomy });
+    writeHooksConfig("s-pipe-0", "http://localhost:19100", app.config.arkDir, { autonomy: s0.autonomy });
     const settings0 = JSON.parse(
-      readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"),
+      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
     expect(settings0.permissions.deny).toEqual(["Bash", "Write", "Edit"]);
 
     // Clean up for stage 1
-    rmSync(join(ctx.arkDir, ".claude"), { recursive: true, force: true });
+    rmSync(join(app.config.arkDir, ".claude"), { recursive: true, force: true });
 
     // Stage 1: full
     const s1 = flow!.stages[1];
@@ -314,9 +311,9 @@ describe("E2E: full autonomy pipeline", () => {
     const args1 = buildArgs({ autonomy: s1.autonomy });
     expect(args1).toContain("--dangerously-skip-permissions");
 
-    writeHooksConfig("s-pipe-1", "http://localhost:19100", ctx.arkDir, { autonomy: s1.autonomy });
+    writeHooksConfig("s-pipe-1", "http://localhost:19100", app.config.arkDir, { autonomy: s1.autonomy });
     const settings1 = JSON.parse(
-      readFileSync(join(ctx.arkDir, ".claude", "settings.local.json"), "utf-8"),
+      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
     expect(settings1.permissions).toBeUndefined();
   });

@@ -308,7 +308,7 @@ export async function destroyStack(
 
   const instanceId = opts?.instance_id;
   if (instanceId) {
-    console.log(`Terminating instance ${instanceId}...`);
+    process.stderr.write(`[ec2] Terminating instance ${instanceId}...\n`);
     try {
       await client.send(new TerminateInstancesCommand({ InstanceIds: [instanceId] }));
     } catch (e: any) {

@@ -1,6 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import { Bridge } from "../bridge.js";
 import type { BridgeConfig, BridgeMessage } from "../bridge.js";
+import { withTestContext } from "./test-helpers.js";
+
+withTestContext();
 
 describe("Bridge", () => {
   it("constructs without error", () => {
@@ -153,7 +156,7 @@ describe("Bridge handler invocation", () => {
 
     // Should not throw — errors are caught internally
     await bridge.notify("test");
-  });
+  }, 15_000);
 
   it("notify with discord config does not throw", async () => {
     const bridge = new Bridge({

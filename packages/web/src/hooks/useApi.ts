@@ -50,9 +50,19 @@ export const api = {
   fork: (id: string, name?: string) => apiPost<any>(`/api/sessions/${id}/fork`, { name }),
   send: (id: string, message: string) => apiPost<any>(`/api/sessions/${id}/send`, { message }),
   pause: (id: string, reason?: string) => apiPost<any>(`/api/sessions/${id}/pause`, { reason }),
+  interrupt: (id: string) => apiPost<any>(`/api/sessions/${id}/interrupt`),
+  archive: (id: string) => apiPost<any>(`/api/sessions/${id}/archive`),
+  restore: (id: string) => apiPost<any>(`/api/sessions/${id}/restore`),
   advance: (id: string) => apiPost<any>(`/api/sessions/${id}/advance`),
   complete: (id: string) => apiPost<any>(`/api/sessions/${id}/complete`),
   spawnSubagent: (id: string, data: any) => apiPost<any>(`/api/sessions/${id}/spawn-subagent`, data),
+
+  // Todos & Verification
+  getTodos: (id: string) => fetchApi<any>(`/api/sessions/${id}/todos`),
+  addTodo: (id: string, content: string) => apiPost<any>(`/api/sessions/${id}/todos`, { content }),
+  toggleTodo: (id: number) => apiPost<any>(`/api/todos/${id}/toggle`),
+  deleteTodo: (id: number) => apiPost<any>(`/api/todos/${id}/delete`),
+  runVerification: (id: string) => apiPost<any>(`/api/sessions/${id}/verify`),
 
   // Costs
   getCosts: () => fetchApi<any>("/api/costs"),
@@ -87,7 +97,9 @@ export const api = {
 
   // Worktrees
   getWorktrees: () => fetchApi<any[]>("/api/worktrees"),
+  worktreeDiff: (id: string) => fetchApi<any>(`/api/worktrees/${id}/diff`),
   finishWorktree: (id: string, opts?: any) => apiPost<any>(`/api/worktrees/${id}/finish`, opts),
+  worktreeCreatePR: (id: string, opts?: any) => apiPost<any>(`/api/worktrees/${id}/create-pr`, opts),
   cleanupWorktrees: () => apiPost<any>("/api/worktrees/cleanup"),
 
   // Conductor
@@ -103,9 +115,21 @@ export const api = {
   // Knowledge
   ingestKnowledge: (path: string, opts?: any) => apiPost<any>("/api/knowledge/ingest", { path, ...opts }),
 
+  // Schedules
+  getSchedules: () => fetchApi<any[]>("/api/schedules"),
+  createSchedule: (data: any) => apiPost<any>("/api/schedules", data),
+  deleteSchedule: (id: string) => apiPost<any>(`/api/schedules/${id}/delete`),
+  enableSchedule: (id: string) => apiPost<any>(`/api/schedules/${id}/enable`),
+  disableSchedule: (id: string) => apiPost<any>(`/api/schedules/${id}/disable`),
+
   // Compute
   getCompute: () => fetchApi<any[]>("/api/compute"),
   getComputeDetail: (name: string) => fetchApi<any>(`/api/compute/${name}`),
+  provisionCompute: (name: string) => apiPost<any>(`/api/compute/${name}/provision`),
+  startCompute: (name: string) => apiPost<any>(`/api/compute/${name}/start`),
+  stopCompute: (name: string) => apiPost<any>(`/api/compute/${name}/stop`),
+  destroyCompute: (name: string) => apiPost<any>(`/api/compute/${name}/destroy`),
+  deleteCompute: (name: string) => apiPost<any>(`/api/compute/${name}/delete`),
 
   // Repo Map
   getRepoMap: (dir?: string) => fetchApi<any>(`/api/repo-map${dir ? `?dir=${encodeURIComponent(dir)}` : ""}`),

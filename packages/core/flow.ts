@@ -9,7 +9,7 @@
 import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import { ARK_DIR } from "./store.js";
+import { ARK_DIR } from "./paths.js";
 import { substituteVars } from "./template.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -25,6 +25,7 @@ export interface StageDefinition {
   on_failure?: string;
   optional?: boolean;
   model?: string;  // override model for this stage (e.g., "opus" for planning, "haiku" for docs)
+  verify?: string[];  // Scripts that must pass before stage completion
   // Fork-specific
   strategy?: string;
   max_parallel?: number;
@@ -87,6 +88,11 @@ export function getStages(flowName: string): StageDefinition[] {
 
 export function getStage(flowName: string, stageName: string): StageDefinition | null {
   return getStages(flowName).find((s) => s.name === stageName) ?? null;
+}
+
+/** Alias for getStage - retrieve a single stage definition by flow and stage name. */
+export function getStageDefinition(flowName: string, stageName: string): StageDefinition | null {
+  return getStage(flowName, stageName);
 }
 
 export function getFirstStage(flowName: string): string | null {

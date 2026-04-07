@@ -5,7 +5,7 @@
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./store.js";
+import { ARK_DIR } from "./paths.js";
 
 export interface EvalScenario {
   name: string;

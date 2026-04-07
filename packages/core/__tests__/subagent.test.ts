@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { createSession, getSession, updateSession } from "../store.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -9,14 +9,14 @@ const session = await import("../services/session-orchestration.js");
 
 describe("spawnSubagent", () => {
   it("creates a child session with parent reference", () => {
-    const parent = createSession({ summary: "parent", repo: "/tmp/repo" });
-    updateSession(parent.id, { agent: "implementer", workdir: "/tmp/repo" });
+    const parent = getApp().sessions.create({ summary: "parent", repo: "/tmp/repo" });
+    getApp().sessions.update(parent.id, { agent: "implementer", workdir: "/tmp/repo" });
 
     const result = session.spawnSubagent(parent.id, { task: "subtask" });
     expect(result.ok).toBe(true);
     expect(result.sessionId).toBeDefined();
 
-    const child = getSession(result.sessionId!);
+    const child = getApp().sessions.get(result.sessionId!);
     expect(child).not.toBeNull();
     expect(child!.summary).toBe("subtask");
     expect(child!.parent_id).toBe(parent.id);
@@ -24,27 +24,27 @@ describe("spawnSubagent", () => {
   });
 
   it("allows model override", () => {
-    const parent = createSession({ summary: "parent", repo: "/tmp/repo" });
-    updateSession(parent.id, { agent: "worker", workdir: "/tmp/repo" });
+    const parent = getApp().sessions.create({ summary: "parent", repo: "/tmp/repo" });
+    getApp().sessions.update(parent.id, { agent: "worker", workdir: "/tmp/repo" });
 
     const result = session.spawnSubagent(parent.id, {
       task: "cheap task",
       model: "haiku",
     });
     expect(result.ok).toBe(true);
-    const child = getSession(result.sessionId!);
+    const child = getApp().sessions.get(result.sessionId!);
     expect((child!.config as any).model_override).toBe("haiku");
   });
 
   it("allows agent override", () => {
-    const parent = createSession({ summary: "parent", repo: "/tmp/repo" });
-    updateSession(parent.id, { agent: "implementer", workdir: "/tmp/repo" });
+    const parent = getApp().sessions.create({ summary: "parent", repo: "/tmp/repo" });
+    getApp().sessions.update(parent.id, { agent: "implementer", workdir: "/tmp/repo" });
 
     const result = session.spawnSubagent(parent.id, {
       task: "review task",
       agent: "reviewer",
     });
-    const child = getSession(result.sessionId!);
+    const child = getApp().sessions.get(result.sessionId!);
     expect(child!.agent).toBe("reviewer");
   });
 
@@ -54,21 +54,21 @@ describe("spawnSubagent", () => {
   });
 
   it("sets subagent config flag", () => {
-    const parent = createSession({ summary: "parent", repo: "/tmp/repo" });
-    updateSession(parent.id, { agent: "worker", workdir: "/tmp/repo" });
+    const parent = getApp().sessions.create({ summary: "parent", repo: "/tmp/repo" });
+    getApp().sessions.update(parent.id, { agent: "worker", workdir: "/tmp/repo" });
 
     const result = session.spawnSubagent(parent.id, { task: "sub" });
-    const child = getSession(result.sessionId!);
+    const child = getApp().sessions.get(result.sessionId!);
     expect((child!.config as any).subagent).toBe(true);
     expect((child!.config as any).parent_id).toBe(parent.id);
   });
 
   it("uses quick flow for subagents", () => {
-    const parent = createSession({ summary: "parent", repo: "/tmp/repo" });
-    updateSession(parent.id, { agent: "worker", workdir: "/tmp/repo" });
+    const parent = getApp().sessions.create({ summary: "parent", repo: "/tmp/repo" });
+    getApp().sessions.update(parent.id, { agent: "worker", workdir: "/tmp/repo" });
 
     const result = session.spawnSubagent(parent.id, { task: "sub" });
-    const child = getSession(result.sessionId!);
+    const child = getApp().sessions.get(result.sessionId!);
     expect(child!.flow).toBe("quick");
   });
 });

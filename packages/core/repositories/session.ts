@@ -101,9 +101,15 @@ export class SessionRepository {
     let sql = "SELECT * FROM sessions WHERE status != 'deleting'";
     const params: any[] = [];
 
+    // Exclude archived sessions unless explicitly filtering for them
+    if (!filters?.status || filters.status !== "archived") {
+      sql += " AND status != 'archived'";
+    }
+
     if (filters?.status) { sql += " AND status = ?"; params.push(filters.status); }
     if (filters?.repo) { sql += " AND repo = ?"; params.push(filters.repo); }
     if (filters?.group_name) { sql += " AND group_name = ?"; params.push(filters.group_name); }
+    if (filters?.groupPrefix) { sql += " AND group_name LIKE ?"; params.push(filters.groupPrefix + "%"); }
     if (filters?.parent_id) { sql += " AND parent_id = ?"; params.push(filters.parent_id); }
     if (filters?.flow) { sql += " AND flow = ?"; params.push(filters.flow); }
 

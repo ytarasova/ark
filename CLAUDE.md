@@ -6,7 +6,8 @@ Autonomous agent ecosystem. Orchestrates Claude agents through multi-stage SDLC 
 
 ```bash
 make install          # bun install + symlink ark to /usr/local/bin
-make test             # bun test --concurrency 1 (NOT vitest - tests use bun:test, NEVER parallel)
+make test             # run all tests sequentially (NEVER parallel -- ports collide)
+make test-file F=path # run a single test file
 make dev              # tsc --watch
 make tui              # ark tui
 ./ark <command>       # run CLI directly via bun
@@ -81,18 +82,17 @@ import { foo } from "./bar";     // breaks at runtime
 
 **No ESLint config file.** The `lint` script exists but no `.eslintrc` or `eslint.config.*` - runs with ESLint defaults.
 
-**Bun-only testing.** Tests use `bun:test`. Run with `bun test` or `make test`.
+**Bun-only testing.** Tests use `bun:test`. Always run via `make test` -- never call `bun test` directly.
 
 ## Testing
 
-Tests use `bun:test`, not vitest. Run with `bun test` or `make test`.
+Tests use `bun:test`, not vitest. **Always use make targets** -- never call `bun test` directly (concurrency flags can be misinterpreted and tests MUST run sequentially).
 
-**NEVER run tests in parallel.** Tests share ports (19100, 19200, 19300), globalThis state, and SQLite databases. Bun runs test files concurrently by default which causes cross-test contamination — port collisions, leaked state, phantom failures. Always run tests sequentially with `--concurrency 1`:
+**NEVER run tests in parallel.** Tests share ports (19100, 19200, 19300), globalThis state, and SQLite databases. Bun runs test files concurrently by default which causes cross-test contamination -- port collisions, leaked state, phantom failures.
 
 ```bash
-bun test --concurrency 1                        # all tests (sequential)
-bun test --concurrency 1 packages/core          # core only
-bun test packages/core/__tests__/session.test.ts # single file is always safe
+make test                                                      # all tests (sequential, builds deps first)
+make test-file F=packages/core/__tests__/session.test.ts       # single file
 ```
 
 If you see tests that pass individually but fail in the full suite, it's a parallelism issue, not a code bug.
@@ -198,7 +198,12 @@ stages:
   - name: implement
     agent: implementer
     gate: auto
+    verify:           # scripts that must pass before stage completion
+      - "npm test"
+      - "npm run lint"
 ```
+
+The `verify` field defines scripts that are run before a stage can be completed. If any script fails, completion is blocked and the agent is steered to fix the issue. Verify scripts can also be set in repo config (`.ark.yaml`) as a default for all stages.
 
 ## Skills
 
@@ -219,6 +224,11 @@ CLI: `ark recipe list`, `ark recipe show <name>`.
 
 ## Intelligence Features
 
+- **Verification gates**: `verify` field on flow stages defines scripts (e.g. `npm test`) that must pass before an agent can complete. Todos (user-added checklist items) also block completion. Enforced automatically when agent reports completed. `--force` flag to override. CLI: `ark session verify <id>`, `ark session todo add <id> "text"`.
+- **Auto-PR creation**: when an agent completes and the repo has a git remote, Ark auto-pushes the branch and creates a GitHub PR via `gh pr create`. Disable per-repo with `auto_pr: false` in `.ark.yaml`. Manual: `ark worktree pr <id>`.
+- **Agent interrupt**: sends Ctrl+C to a running agent without killing the tmux session (`ark session interrupt <id>`, TUI: `I`). Agent pauses and can be re-engaged.
+- **Diff preview**: view git diff stat before merging or creating a PR (`ark worktree diff <id>`, TUI: `W` overlay, Web: "Preview Changes" button). Tracks which files you've reviewed and flags modifications since last review.
+- **Session archive/restore**: archive completed sessions for later reference without deleting them (`ark session archive <id>`, TUI: `Z`). Archived sessions are hidden from the default list but preserved indefinitely.
 - **Fail-loopback**: retry failed stages with error context injected (max 3 retries). Configured via `on_failure: "retry(3)"` in flow stage YAML.
 - **Sub-agent fan-out**: decompose tasks into N parallel child sessions. Parent waits for all children. Use `ark session fork` / `ark session join`.
 - **Skill extraction**: analyze conversations for reusable procedures, save as skills.
@@ -236,8 +246,10 @@ At dispatch to remote compute, Ark syncs `.claude/commands/`, `.claude/skills/`,
 |-----|--------|-----|--------|
 | `j/k` | Navigate sessions | `n` | New session |
 | `Enter` | Dispatch/restart | `s` | Stop session |
-| `a` | Attach to tmux | `t` | Talk (send message) |
+| `I` | Interrupt agent (Ctrl+C) | `t` | Talk (send message) |
+| `a` | Attach to tmux | `V` | Run verification |
 | `x` | Delete session | `d` | Mark done (press twice) |
+| `W` | Worktree finish (Merge/PR) | `Z` | Archive/restore |
 | `c` | Clone session | `m` | Move to group |
 | `i` | Inbox/threads | `g` | Group manager |
 | `Tab` | Focus detail pane | `e` | Expand events |
@@ -326,11 +338,11 @@ Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/h
 ## Architecture Boundaries
 
 - **`packages/types/`** - All domain interfaces. Single source of truth. No logic, no dependencies. Imported by every other package.
-- **`repositories/`** - SQL CRUD behind typed classes. Column whitelists prevent injection. `SessionRepository`, `ComputeRepository`, `EventRepository`, `MessageRepository`. Access via `app.sessions`, `app.computes`, etc.
-- **`services/`** - Business logic. `SessionService` owns lifecycle (start, stop, resume, complete, delete, applyHookStatus, applyReport). `ComputeService` owns compute CRUD. Access via `app.sessionService`, `app.computeService`.
+- **`repositories/`** - SQL CRUD behind typed classes. Column whitelists prevent injection. `SessionRepository`, `ComputeRepository`, `EventRepository`, `MessageRepository`, `TodoRepository`. Access via `app.sessions`, `app.computes`, `app.todos`, etc.
+- **`services/`** - Business logic. `SessionService` owns lifecycle (start, stop, resume, complete, interrupt, archive, delete, applyHookStatus, applyReport). `ComputeService` owns compute CRUD. Access via `app.sessionService`, `app.computeService`.
+- **`provider-registry.ts`** - Provider resolver plumbing between `app.ts` and `session-orchestration.ts`. Breaks what was a circular import.
 - **`packages/server/validate.ts`** - `extract<T>()` validates RPC params at the boundary. All handlers use it.
-- **`store.ts`** (legacy) - Original SQL CRUD. Being replaced by repositories. Still used by some code paths.
-- **`session.ts`** (legacy) - Original orchestration. Complex functions (dispatch, advance, fork) not yet ported to SessionService.
+- **`constants.ts`** - Shared URL/port defaults (`DEFAULT_CONDUCTOR_URL`, `DEFAULT_ARKD_URL`, `DOCKER_CONDUCTOR_URL`). All providers and executors use these.
 - **`claude.ts`** - ALL Claude Code knowledge (model mapping, args, hooks config, launcher, trust, transcript parsing).
 - **`conductor.ts`** - HTTP server (:19100). Channel reports + hook status. Delegates to SessionService for applyHookStatus/applyReport.
 - **`arkd/`** - Stateless HTTP daemon (:19300) on every compute target. Agent lifecycle, file ops, metrics, channel relay.

@@ -5,7 +5,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./store.js";
+import { ARK_DIR } from "./paths.js";
 
 export interface FlowState {
   sessionId: string;

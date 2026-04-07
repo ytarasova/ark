@@ -7,7 +7,7 @@ import type { TranscriptUsage } from "./claude.js";
 import { parseTranscriptUsage } from "./claude.js";
 import type { Session } from "../types/index.js";
 import { getApp } from "./app.js";
-import { listSessions as storeListSessions, updateSession as storeUpdateSession } from "./store.js";
+
 import { readdirSync, statSync, existsSync } from "fs";
 import { join } from "path";
 
@@ -114,7 +114,7 @@ export function checkBudget(sessions: Session[], budgets: BudgetConfig): BudgetS
 export function syncCosts(): { synced: number; skipped: number } {
   let sessions;
   try { sessions = getApp().sessions.list({ limit: 1000 }); }
-  catch { sessions = storeListSessions({ limit: 1000 }) as Session[]; }
+  catch { sessions = []; }
   let synced = 0;
   let skipped = 0;
 
@@ -141,7 +141,7 @@ export function syncCosts(): { synced: number; skipped: number } {
               const usage = parseTranscriptUsage(transcriptPath);
               if (usage.total_tokens > 0) {
                 try { getApp().sessions.update(session.id, { config: { ...session.config, usage } }); }
-                catch { storeUpdateSession(session.id, { config: { ...session.config, usage } }); }
+                catch { /* app not booted */ }
                 synced++;
               }
               break;
