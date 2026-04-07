@@ -229,6 +229,16 @@ export function getCostsHints(): React.ReactNode[] {
   ];
 }
 
+export function getSchedulesHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS, sep(0),
+    <KeyHint key="e" k="e" label="enable/disable" />,
+    <KeyHint key="x" k="x" label="delete" />,
+    <KeyHint key="r" k="r" label="refresh" />, sep(1),
+    <KeyHint key="q" k="q" label="quit" />,
+  ];
+}
+
 export function getGenericHints(): React.ReactNode[] {
   return [
     <KeyHint key="q" k="q" label="quit" />,

@@ -566,6 +566,19 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         }
       }
 
+      // GET /api/flows/:name (flow detail with stages)
+      const flowDetailMatch = url.pathname.match(/^\/api\/flows\/([^/]+)$/);
+      if (flowDetailMatch && req.method === "GET") {
+        try {
+          const name = decodeURIComponent(flowDetailMatch[1]);
+          const { getStages } = await import("./flow.js");
+          const stages = getStages(name);
+          return jsonResponse({ name, stages: stages.map(st => ({ name: st.name, gate: st.gate, agent: st.agent, type: st.type })) });
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
       // --- Worktrees ---
 
       // GET /api/worktrees

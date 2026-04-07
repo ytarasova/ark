@@ -103,6 +103,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
   const [todos, setTodos] = useState<any[]>([]);
   const [newTodo, setNewTodo] = useState("");
   const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [flowStages, setFlowStages] = useState<any[]>([]);
 
   // Load todos
   useEffect(() => {
@@ -115,6 +116,14 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
     if (!sessionId) return;
     api.getSession(sessionId).then(setDetail);
   }, [sessionId]);
+
+  // Load flow stages for pipeline visualization
+  useEffect(() => {
+    if (!detail?.session?.flow) { setFlowStages([]); return; }
+    api.getFlowDetail(detail.session.flow)
+      .then((d: any) => setFlowStages(d.stages || []))
+      .catch(() => setFlowStages([]));
+  }, [detail?.session?.flow]);
 
   // Poll output for running sessions
   useEffect(() => {
@@ -243,6 +252,24 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
   const s = detail.session;
   const events = detail.events || [];
 
+  // Channel port: deterministic from session ID
+  const channelPort = 19200 + (parseInt(s.id.replace("s-", ""), 16) % 10000);
+
+  // Token formatting helper
+  function humanTokens(n: number): string {
+    if (!n) return "0";
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+    return String(n);
+  }
+
+  // Cost formatting helper
+  function formatCost(cost: number): string {
+    if (cost === 0) return "$0.00";
+    if (cost < 0.01) return "<$0.01";
+    return `$${cost.toFixed(2)}`;
+  }
+
   return (
     <div className="detail-panel open">
       <div className="detail-header">
@@ -284,6 +311,78 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
             <span className="detail-value">{relTime(s.updated_at)}</span>
           </div>
         </div>
+
+        {/* Flow Pipeline */}
+        {flowStages.length > 1 && s.stage && (
+          <div className="detail-section">
+            <div className="detail-section-title">Flow Pipeline</div>
+            <div style={{ display: "flex", gap: 0, flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
+              {flowStages.map((st: any, i: number) => {
+                const isCurrent = st.name === s.stage;
+                const currentIdx = flowStages.findIndex((x: any) => x.name === s.stage);
+                const isPast = currentIdx > i;
+                return (
+                  <span key={st.name} style={{ display: "inline-flex", alignItems: "center" }}>
+                    {i > 0 && <span style={{ color: "#64748b", margin: "0 4px" }}>&gt;</span>}
+                    <span style={{
+                      color: isCurrent ? "#818cf8" : isPast ? "#22c55e" : "#64748b",
+                      fontWeight: isCurrent ? 700 : 400,
+                    }}>
+                      {isCurrent ? `[${st.name}]` : st.name}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Completion Summary */}
+        {s.config?.completion_summary && (
+          <div className="detail-section">
+            <div className="detail-section-title">Completion Summary</div>
+            <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.6 }}>{s.config.completion_summary}</div>
+          </div>
+        )}
+
+        {/* Token Usage & Cost */}
+        {s.config?.usage && (
+          <div className="detail-section">
+            <div className="detail-section-title">Usage</div>
+            <div className="detail-grid">
+              {s.config.usage.input_tokens != null && (
+                <>
+                  <span className="detail-label">Input tokens</span>
+                  <span className="detail-value">{humanTokens(s.config.usage.input_tokens)}</span>
+                </>
+              )}
+              {s.config.usage.output_tokens != null && (
+                <>
+                  <span className="detail-label">Output tokens</span>
+                  <span className="detail-value">{humanTokens(s.config.usage.output_tokens)}</span>
+                </>
+              )}
+              {s.config.usage.cache_read_input_tokens != null && (
+                <>
+                  <span className="detail-label">Cache read</span>
+                  <span className="detail-value">{humanTokens(s.config.usage.cache_read_input_tokens)}</span>
+                </>
+              )}
+              {s.config.usage.total_tokens != null && (
+                <>
+                  <span className="detail-label">Total tokens</span>
+                  <span className="detail-value">{humanTokens(s.config.usage.total_tokens)}</span>
+                </>
+              )}
+              {s.config.usage.total_cost != null && s.config.usage.total_cost > 0 && (
+                <>
+                  <span className="detail-label">Cost</span>
+                  <span className="detail-value" style={{ color: "#e0af68" }}>{formatCost(s.config.usage.total_cost)}</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Preview Changes / Create PR */}
         {s.workdir && s.status !== "deleting" && (
@@ -407,6 +506,46 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Files Changed */}
+        {s.config?.filesChanged?.length > 0 && (
+          <div className="detail-section">
+            <div className="detail-section-title">Files Changed ({s.config.filesChanged.length})</div>
+            <div style={{ maxHeight: 200, overflowY: "auto" }}>
+              {s.config.filesChanged.map((f: string) => (
+                <div key={f} style={{ fontSize: 12, color: "#94a3b8", padding: "2px 0", fontFamily: "monospace" }}>{f}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Commits */}
+        {s.config?.commits?.length > 0 && (
+          <div className="detail-section">
+            <div className="detail-section-title">Commits ({s.config.commits.length})</div>
+            {s.config.commits.map((c: string) => {
+              const shortSha = c.slice(0, 7);
+              const ghBase = s.config?.github_url;
+              const commitUrl = ghBase ? `${ghBase}/commit/${c}` : null;
+              return (
+                <div key={c} style={{ fontSize: 12, color: "#94a3b8", fontFamily: "monospace", padding: "1px 0" }}>
+                  {commitUrl ? (
+                    <a href={commitUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#58a6ff" }}>{shortSha}</a>
+                  ) : shortSha}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Channel Port */}
+        {(s.status === "running" || s.status === "waiting") && s.session_id && (
+          <div className="detail-section">
+            <div style={{ fontSize: 12, color: "#22c55e" }}>
+              Channel: port {channelPort}
+            </div>
           </div>
         )}
 

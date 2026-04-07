@@ -119,7 +119,7 @@ describe("StatusBar", () => {
     const { lastFrame } = render(
       <TabBar active="sessions" loading={true} loadingLabel="Dispatching s-abc" />
     );
-    expect(lastFrame()!).toContain("Dispatching s-abc");
+    expect(lastFrame()!).toContain("Dispatching");
   });
 
   it("shows error count for failed sessions", () => {

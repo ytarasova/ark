@@ -34,7 +34,7 @@ const GROUPS: ShortcutGroup[] = [
       ["Tab", "Toggle panes"],
       ["/", "Search sessions"],
       ["?", "This help"],
-      ["1-7", "Switch tabs"],
+      ["1-8", "Switch tabs"],
       ["q", "Quit"],
     ],
   },

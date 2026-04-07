@@ -17,6 +17,7 @@ import { FlowsTab } from "./tabs/FlowsTab.js";
 import { HistoryTab } from "./tabs/HistoryTab.js";
 import { ToolsTab } from "./tabs/ToolsTab.js";
 import { CostsTab } from "./tabs/CostsTab.js";
+import { SchedulesTab } from "./tabs/SchedulesTab.js";
 import { loadUiState, saveUiState } from "../core/ui-state.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
@@ -141,6 +142,8 @@ function AppInner() {
       switchTab("compute");
     } else if (input === "7") {
       switchTab("costs");
+    } else if (input === "8") {
+      switchTab("schedules");
     }
   });
 
@@ -232,6 +235,8 @@ function AppInner() {
         />
       ) : tab === "costs" ? (
         <CostsTab pane={pane} />
+      ) : tab === "schedules" ? (
+        <SchedulesTab pane={pane} />
       ) : null}
       </Box>
 

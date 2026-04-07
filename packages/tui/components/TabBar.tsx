@@ -2,9 +2,9 @@ import React from "react";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 
-export type Tab = "sessions" | "agents" | "tools" | "flows" | "history" | "compute" | "costs";
+export type Tab = "sessions" | "agents" | "tools" | "flows" | "history" | "compute" | "costs" | "schedules";
 
-export const TABS: Tab[] = ["sessions", "agents", "tools", "flows", "history", "compute", "costs"];
+export const TABS: Tab[] = ["sessions", "agents", "tools", "flows", "history", "compute", "costs", "schedules"];
 
 const TAB_KEYS: Record<Tab, string> = {
   sessions: "1",
@@ -14,6 +14,7 @@ const TAB_KEYS: Record<Tab, string> = {
   history: "5",
   compute: "6",
   costs: "7",
+  schedules: "8",
 };
 
 interface TabBarProps {

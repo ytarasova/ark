@@ -94,6 +94,7 @@ export const api = {
   // Agents & Flows
   getAgents: () => fetchApi<any[]>("/api/agents"),
   getFlows: () => fetchApi<any[]>("/api/flows"),
+  getFlowDetail: (name: string) => fetchApi<any>(`/api/flows/${encodeURIComponent(name)}`),
 
   // Worktrees
   getWorktrees: () => fetchApi<any[]>("/api/worktrees"),
