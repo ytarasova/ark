@@ -27,6 +27,7 @@ import { logError, logWarn, logInfo } from "./structured-log.js";
 import { registerExecutor } from "./executor.js";
 import { claudeCodeExecutor } from "./executors/claude-code.js";
 import { subprocessExecutor } from "./executors/subprocess.js";
+import { cliAgentExecutor } from "./executors/cli-agent.js";
 import { SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
 
@@ -233,6 +234,7 @@ export class AppContext {
     // 5b. Register executors
     registerExecutor(claudeCodeExecutor);
     registerExecutor(subprocessExecutor);
+    registerExecutor(cliAgentExecutor);
 
     // 6. Set up event bus
     this._eventBus = eventBus;
@@ -356,6 +358,12 @@ export class AppContext {
 
     // 1. Remove signal handlers
     this._removeSignalHandlers();
+
+    // 1b. Stop status pollers for non-Claude executors
+    try {
+      const { stopAllPollers } = await import("./executors/status-poller.js");
+      stopAllPollers();
+    } catch { /* ignore */ }
 
     // 2. Close SSH connection pools
     await safeAsync("shutdown: destroy SSH pools", async () => {

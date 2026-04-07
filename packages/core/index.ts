@@ -75,6 +75,8 @@ export type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "./execu
 export { registerExecutor, getExecutor, listExecutors, resetExecutors } from "./executor.js";
 export { claudeCodeExecutor } from "./executors/claude-code.js";
 export { subprocessExecutor } from "./executors/subprocess.js";
+export { cliAgentExecutor } from "./executors/cli-agent.js";
+export { startStatusPoller, stopStatusPoller, stopAllPollers } from "./executors/status-poller.js";
 
 // Claude integration
 export * as claude from "./claude.js";

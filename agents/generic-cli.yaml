@@ -1,0 +1,11 @@
+name: generic-cli
+description: Generic CLI agent - customize the command field for a project or global agent YAML
+runtime: cli-agent
+command: ["echo", "Override this command in a project or global agent YAML"]
+task_delivery: stdin
+model: custom
+max_turns: 200
+system_prompt: ""
+tools: []
+permission_mode: bypassPermissions
+env: {}

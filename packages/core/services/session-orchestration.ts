@@ -240,8 +240,8 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   const executor = getExecutor(runtime);
   if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
 
-  // Build claude args (only relevant for claude-code executor)
-  const claudeArgs = agentRegistry.buildClaudeArgs(agent, { autonomy, projectRoot });
+  // Build claude args (only for claude-code executor)
+  const claudeArgs = runtime === "claude-code" ? agentRegistry.buildClaudeArgs(agent, { autonomy, projectRoot }) : [];
 
   // Launch via executor
   log(`Launching via ${runtime}...`);
@@ -277,6 +277,14 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
 
   // Checkpoint after successful dispatch
   saveCheckpoint(sessionId);
+
+  // Start status poller for non-Claude runtimes (Claude uses hook-based status)
+  if (runtime !== "claude-code") {
+    try {
+      const { startStatusPoller } = await import("../executors/status-poller.js");
+      startStatusPoller(sessionId, tmuxName, runtime);
+    } catch { /* ignore */ }
+  }
 
   // Observability + telemetry
   recordEvent({ type: "session_start", sessionId, data: { agent: session.agent ?? agentName, flow: session.flow } });
@@ -393,6 +401,12 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
 
   // Checkpoint before stopping (preserve state for potential recovery)
   saveCheckpoint(sessionId);
+
+  // Stop status poller if active (non-Claude executors)
+  try {
+    const { stopStatusPoller } = await import("../executors/status-poller.js");
+    stopStatusPoller(sessionId);
+  } catch { /* ignore */ }
 
   // Kill agent + clean up provider resources
   const stopped = await withProvider(session, `stop ${sessionId}`, async (p, c) => {

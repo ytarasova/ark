@@ -1,0 +1,11 @@
+name: aider-worker
+description: Aider AI pair programming agent
+runtime: cli-agent
+command: ["aider", "--yes-always", "--no-git"]
+task_delivery: arg
+model: aider
+max_turns: 200
+system_prompt: ""
+tools: []
+permission_mode: bypassPermissions
+env: {}

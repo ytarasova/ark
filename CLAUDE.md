@@ -165,13 +165,31 @@ env:
 
 Template variables: `{ticket}`, `{summary}`, `{workdir}`, `{repo}`, `{branch}` - substituted at dispatch.
 
+**Adding a cli-agent (non-Claude CLI tool):**
+```yaml
+name: codex-worker
+description: OpenAI Codex CLI coding agent
+runtime: cli-agent
+command: ["codex", "--approval-mode", "full-auto"]
+task_delivery: arg    # stdin | file | arg (default: stdin)
+model: o4-mini
+max_turns: 200
+system_prompt: ""
+tools: []
+permission_mode: bypassPermissions
+env: {}
+```
+
+The `task_delivery` field controls how the task is sent to the CLI tool: `stdin` pipes via cat, `file` passes a file path, `arg` appends the task as the last CLI argument.
+
 ## Executor System
 
 Agents dispatch through pluggable executors. The `runtime` field in agent YAML selects which executor launches the agent.
 
 **Built-in executors:**
-- `claude-code` (default) — launches Claude Code in tmux with hooks + MCP channel
-- `subprocess` — spawns any command as a child process
+- `claude-code` (default) -- launches Claude Code in tmux with hooks + MCP channel
+- `subprocess` -- spawns any command as a child process
+- `cli-agent` -- runs any CLI tool (codex, gemini, aider, etc.) in tmux with worktree isolation
 
 **Executor interface:** 5 methods — `launch`, `kill`, `status`, `send`, `capture`. Defined in `packages/core/executor.ts`.
 

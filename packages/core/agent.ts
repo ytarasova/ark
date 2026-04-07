@@ -30,6 +30,7 @@ export interface AgentDefinition {
   env: Record<string, string>;
   runtime?: string;
   command?: string[];
+  task_delivery?: "stdin" | "file" | "arg";
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }
@@ -48,6 +49,7 @@ const DEFAULTS: Omit<AgentDefinition, "name"> = {
   env: {},
   runtime: undefined,
   command: undefined,
+  task_delivery: undefined,
 };
 
 // ── Paths ───────────────────────────────────────────────────────────────────

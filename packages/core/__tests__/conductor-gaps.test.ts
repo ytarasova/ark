@@ -397,3 +397,39 @@ describe("archive() and restore()", () => {
     expect(foundArchived!.status).toBe("archived");
   });
 });
+
+// ── cli-agent executor ──────────────────────────────────────────────────────
+
+import { cliAgentExecutor } from "../executors/cli-agent.js";
+
+describe("cli-agent executor", () => {
+  it("is exported and registered", () => {
+    expect(typeof cliAgentExecutor).toBe("object");
+    expect(cliAgentExecutor.name).toBe("cli-agent");
+  });
+
+  it("launch fails without command", async () => {
+    const result = await cliAgentExecutor.launch({
+      sessionId: "s-test", workdir: "/tmp", task: "test",
+      agent: { name: "test", model: "test", max_turns: 1, system_prompt: "", tools: [], skills: [], mcp_servers: [], permission_mode: "bypassPermissions", env: {} },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("no command");
+  });
+
+  it("status returns completed for unknown handle", async () => {
+    const status = await cliAgentExecutor.status("nonexistent-handle");
+    expect(status.state).toBe("completed"); // tmux session doesn't exist = completed
+  });
+});
+
+// ── status poller ───────────────────────────────────────────────────────────
+
+describe("status poller", () => {
+  it("exports startStatusPoller and stopStatusPoller", async () => {
+    const mod = await import("../executors/status-poller.js");
+    expect(typeof mod.startStatusPoller).toBe("function");
+    expect(typeof mod.stopStatusPoller).toBe("function");
+    expect(typeof mod.stopAllPollers).toBe("function");
+  });
+});
