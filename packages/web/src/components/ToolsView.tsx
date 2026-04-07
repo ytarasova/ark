@@ -53,7 +53,7 @@ export function ToolsView() {
         </button>
       </div>
 
-      <Card className="grid grid-cols-[260px_1fr] overflow-hidden h-[calc(100vh-160px)]">
+      <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
         {/* Left: list panel */}
         <div className="bg-card border-r border-border overflow-y-auto">
           {items.length === 0 && (
@@ -134,7 +134,7 @@ export function ToolsView() {
             </div>
           )}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

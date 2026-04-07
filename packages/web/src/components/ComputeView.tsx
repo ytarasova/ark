@@ -97,7 +97,7 @@ export function ComputeView() {
   }
 
   return (
-    <Card className="grid grid-cols-[260px_1fr] overflow-hidden h-[calc(100vh-112px)]">
+    <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
       {/* Left: list panel */}
       <div className="bg-card border-r border-border overflow-y-auto">
         {computes.map((c: any) => (
@@ -175,6 +175,6 @@ export function ComputeView() {
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }

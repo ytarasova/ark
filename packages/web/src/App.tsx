@@ -126,7 +126,10 @@ function App() {
             )}
           </div>
         </div>
-        <div className="flex-1 p-5 px-6 overflow-y-auto flex flex-col">
+        <div className={cn(
+          "flex-1 overflow-y-auto flex flex-col",
+          ["agents","tools","flows","compute","schedules"].includes(view) ? "" : "p-5 px-6"
+        )}>
           {view === "sessions" && (
             <SessionList
               sessions={sessions} selectedId={selectedId} onSelect={setSelectedId}
