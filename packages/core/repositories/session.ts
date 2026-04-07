@@ -70,15 +70,6 @@ const SESSION_COLUMNS = new Set([
 export class SessionRepository {
   constructor(private db: Database) {}
 
-  /** Generate a unique session ID (s-<6 hex chars>). */
-  private generateId(): string {
-    while (true) {
-      const id = `s-${randomBytes(3).toString("hex")}`;
-      const row = this.db.prepare("SELECT 1 FROM sessions WHERE id = ?").get(id);
-      if (!row) return id;
-    }
-  }
-
   create(opts: CreateSessionOpts): Session {
     const id = this.generateId();
     const ts = now();
@@ -245,6 +236,17 @@ export class SessionRepository {
     `).all() as Array<{ name: string; created_at: string }>;
   }
 
+  /** Return all group names — union of groups table + distinct session group_names, sorted. */
+  getGroupNames(): string[] {
+    const rows = this.db.prepare(`
+      SELECT name FROM groups
+      UNION
+      SELECT DISTINCT group_name FROM sessions WHERE group_name IS NOT NULL
+      ORDER BY 1
+    `).all() as { name: string }[];
+    return rows.map((r) => r.name);
+  }
+
   createGroup(name: string): void {
     this.db.prepare("INSERT OR IGNORE INTO groups (name, created_at) VALUES (?, ?)").run(name, now());
   }
@@ -252,5 +254,29 @@ export class SessionRepository {
   deleteGroup(name: string): void {
     this.db.prepare("DELETE FROM groups WHERE name = ?").run(name);
     this.db.prepare("UPDATE sessions SET group_name = NULL WHERE group_name = ?").run(name);
+  }
+
+  /** List sessions in 'deleting' status (soft-deleted). */
+  listDeleted(): Session[] {
+    return (this.db.prepare(
+      "SELECT * FROM sessions WHERE status = 'deleting' ORDER BY updated_at DESC"
+    ).all() as SessionRow[]).map(rowToSession);
+  }
+
+  /** Generate a unique session ID (s-<6 hex chars>). Public for backward compat. */
+  generateId(): string {
+    while (true) {
+      const id = `s-${randomBytes(3).toString("hex")}`;
+      const row = this.db.prepare("SELECT 1 FROM sessions WHERE id = ?").get(id);
+      if (!row) return id;
+    }
+  }
+
+  /** Check whether a channel port is in use by any running/waiting session. */
+  isChannelPortAvailable(port: number, excludeSessionId?: string): boolean {
+    const sessions = this.db.prepare(
+      "SELECT id FROM sessions WHERE status IN ('running', 'waiting') AND id != ?"
+    ).all(excludeSessionId ?? "") as { id: string }[];
+    return !sessions.some(s => this.channelPort(s.id) === port);
   }
 }

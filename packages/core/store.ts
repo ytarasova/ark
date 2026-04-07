@@ -1,19 +1,21 @@
 /**
- * store.ts — backward-compatible shim.
+ * store.ts — backward-compatible delegation shim.
  *
- * All real logic lives in:
- *   - repositories/ (SessionRepository, ComputeRepository, EventRepository, MessageRepository)
- *   - repositories/schema.ts (initSchema, seedLocalCompute)
- *   - context.ts (test context helpers)
- *   - ../types/index.ts (domain types)
+ * Zero SQL in this file. Every data operation delegates to a repository
+ * accessed via lazy per-Database repo instances.
  *
- * This file re-exports everything under the original API surface so that
- * existing callers (tests, CLI commands, session.ts, conductor.ts, etc.)
- * continue to work unchanged.
+ * Repositories:
+ *   - repositories/session.ts  (SessionRepository)
+ *   - repositories/compute.ts  (ComputeRepository)
+ *   - repositories/event.ts    (EventRepository)
+ *   - repositories/message.ts  (MessageRepository)
+ *   - repositories/schema.ts   (initSchema, seedLocalCompute)
+ *
+ * Context:
+ *   - context.ts  (test context helpers, getDb for legacy callers)
  */
 
 import { Database } from "bun:sqlite";
-import { randomBytes } from "crypto";
 
 import {
   getContext, getDb as getDbFromContext, closeDb,
@@ -22,6 +24,10 @@ import {
 } from "./context.js";
 
 import { initSchema as repoInitSchema, seedLocalCompute } from "./repositories/schema.js";
+import { SessionRepository } from "./repositories/session.js";
+import { ComputeRepository } from "./repositories/compute.js";
+import { EventRepository } from "./repositories/event.js";
+import { MessageRepository } from "./repositories/message.js";
 
 import type {
   SessionStatus, SessionConfig,
@@ -136,7 +142,7 @@ export function rowToSession(row: SessionRow): Session {
 }
 
 // ── App-level overrides ────────────────────────────────────────────────────
-// setAppStore/clearAppStore are still called by AppContext.boot()/shutdown().
+// setAppStore/clearAppStore are called by AppContext.boot()/shutdown().
 // They wire the DB and paths so getDb() / ARK_DIR() etc. work without
 // requiring a circular import of app.ts at call time.
 
@@ -170,12 +176,9 @@ export function WORKTREES_DIR(): string {
 
 // ── Database ───────────────────────────────────────────────────────────────
 
-function now(): string {
-  return new Date().toISOString();
-}
-
 const _initialized = new WeakSet<Database>();
 
+/** Return the current Database handle. Initializes schema on first use. */
 export function getDb(): Database {
   if (_appDb) return _appDb;
 
@@ -183,13 +186,7 @@ export function getDb(): Database {
   if (!_initialized.has(db)) {
     _initialized.add(db);
     initSchema(db);
-    const row = db.prepare("SELECT name FROM compute WHERE name = 'local'").get();
-    if (!row) {
-      const ts = now();
-      db.prepare(
-        "INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at) VALUES ('local', 'local', 'running', '{}', ?, ?)"
-      ).run(ts, ts);
-    }
+    seedLocalCompute(db);
   }
   return db;
 }
@@ -198,15 +195,35 @@ export function initSchema(db: Database): void {
   repoInitSchema(db);
 }
 
+// ── Lazy repository accessors ──────────────────────────────────────────────
+// Each test gets a fresh DB via context.ts, so we cache per-Database instance.
+
+const _repoCache = new WeakMap<Database, {
+  sessions: SessionRepository;
+  computes: ComputeRepository;
+  events: EventRepository;
+  messages: MessageRepository;
+}>();
+
+function repos() {
+  const db = getDb();
+  let cached = _repoCache.get(db);
+  if (!cached) {
+    cached = {
+      sessions: new SessionRepository(db),
+      computes: new ComputeRepository(db),
+      events: new EventRepository(db),
+      messages: new MessageRepository(db),
+    };
+    _repoCache.set(db, cached);
+  }
+  return cached;
+}
+
 // ── Session CRUD ───────────────────────────────────────────────────────────
 
 export function generateId(): string {
-  const db = getDb();
-  while (true) {
-    const id = `s-${randomBytes(3).toString("hex")}`;
-    const row = db.prepare("SELECT 1 FROM sessions WHERE id = ?").get(id);
-    if (!row) return id;
-  }
+  return repos().sessions.generateId();
 }
 
 export function createSession(opts: {
@@ -219,41 +236,23 @@ export function createSession(opts: {
   group_name?: string | null;
   config?: Record<string, unknown>;
 }): Session {
-  const db = getDb();
-  const id = generateId();
-  const ts = now();
-  const branch = opts.ticket
-    ? `feat/${opts.ticket}-${(opts.summary ?? "work").toLowerCase().replace(/\s+/g, "-").slice(0, 30)}`
-    : null;
+  const session = repos().sessions.create(opts as any) as Session;
 
-  db.prepare(`
-    INSERT INTO sessions (id, ticket, summary, repo, branch, compute_name,
-      workdir, stage, status, flow, group_name, config, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?)
-  `).run(
-    id, opts.ticket ?? null, opts.summary ?? null, opts.repo ?? null,
-    branch, opts.compute_name ?? null, opts.workdir ?? null,
-    opts.flow ?? "default", opts.group_name ?? null,
-    JSON.stringify(opts.config ?? {}), ts, ts,
-  );
-
-  logEvent(id, "session_created", {
+  // Log session_created event (the repo does not do this — store.ts always did)
+  logEvent(session.id, "session_created", {
     actor: "user",
     data: {
       ticket: opts.ticket, summary: opts.summary,
       repo: opts.repo, flow: opts.flow ?? "default",
-      branch, workdir: opts.workdir, group_name: opts.group_name,
+      branch: session.branch, workdir: opts.workdir, group_name: opts.group_name,
     },
   });
 
-  return getSession(id)!;
+  return session;
 }
 
 export function getSession(id: string): Session | null {
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as SessionRow | undefined;
-  if (!row) return null;
-  return rowToSession(row);
+  return repos().sessions.get(id) as Session | null;
 }
 
 export function listSessions(opts?: {
@@ -264,82 +263,38 @@ export function listSessions(opts?: {
   groupPrefix?: string;
   limit?: number;
 }): Session[] {
-  const db = getDb();
-  let sql = "SELECT * FROM sessions WHERE status != 'deleting'";
-  const params: any[] = [];
-
-  if (opts?.status) { sql += " AND status = ?"; params.push(opts.status); }
-  if (opts?.repo) { sql += " AND repo = ?"; params.push(opts.repo); }
-  if (opts?.group_name) { sql += " AND group_name = ?"; params.push(opts.group_name); }
-  if (opts?.parent_id) { sql += " AND parent_id = ?"; params.push(opts.parent_id); }
-  if (opts?.groupPrefix) { sql += " AND group_name LIKE ?"; params.push(opts.groupPrefix + "%"); }
-
-  sql += ` ORDER BY created_at DESC LIMIT ?`;
-  params.push(opts?.limit ?? 100);
-
-  return (db.prepare(sql).all(...params) as SessionRow[]).map(rowToSession);
+  // The repo supports most filters natively. groupPrefix is not supported,
+  // so fetch a broader set and filter in memory when needed.
+  if (opts?.groupPrefix) {
+    const all = repos().sessions.list({
+      status: opts.status,
+      repo: opts.repo,
+      parent_id: opts.parent_id,
+      limit: opts.limit,
+    } as any) as Session[];
+    return all.filter(s => s.group_name && s.group_name.startsWith(opts.groupPrefix!));
+  }
+  return repos().sessions.list(opts as any) as Session[];
 }
 
-const SESSION_COLUMNS = new Set([
-  "ticket", "summary", "repo", "branch", "compute_name", "session_id",
-  "claude_session_id", "stage", "status", "flow", "agent", "workdir",
-  "pr_url", "pr_id", "error", "parent_id", "fork_group", "group_name",
-  "breakpoint_reason", "attached_by", "config", "updated_at",
-]);
-
-const COMPUTE_COLUMNS = new Set([
-  "provider", "status", "config", "updated_at",
-]);
-
 export function updateSession(id: string, fields: Partial<Session>): Session | null {
-  const db = getDb();
-  const updates: string[] = ["updated_at = ?"];
-  const values: any[] = [now()];
-
-  for (const [key, value] of Object.entries(fields)) {
-    if (key === "id" || key === "created_at") continue;
-    if (!SESSION_COLUMNS.has(key)) continue;
-    if (key === "config" && typeof value === "object") {
-      updates.push("config = ?");
-      values.push(JSON.stringify(value));
-    } else {
-      updates.push(`${key} = ?`);
-      values.push(value ?? null);
-    }
-  }
-  values.push(id);
-
-  db.prepare(`UPDATE sessions SET ${updates.join(", ")} WHERE id = ?`).run(...values);
-  return getSession(id);
+  return repos().sessions.update(id, fields as any) as Session | null;
 }
 
 export function deleteSession(id: string): boolean {
-  const db = getDb();
-  db.prepare("DELETE FROM events WHERE track_id = ?").run(id);
-  const result = db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
-  return result.changes > 0;
+  return repos().sessions.delete(id);
 }
 
 export function softDeleteSession(id: string): boolean {
-  const session = getSession(id);
-  if (!session) return false;
-  const config = { ...session.config, _pre_delete_status: session.status, _deleted_at: new Date().toISOString() };
-  updateSession(id, { status: "deleting", config });
-  return true;
+  return repos().sessions.softDelete(id);
 }
 
 export function undeleteSession(id: string): Session | null {
-  const session = getSession(id);
-  if (!session || session.status !== "deleting") return null;
-  const prevStatus = (session.config._pre_delete_status as SessionStatus) || "pending";
-  const { _pre_delete_status, _deleted_at, ...cleanConfig } = session.config;
-  updateSession(id, { status: prevStatus, config: cleanConfig });
-  return getSession(id);
+  return repos().sessions.undelete(id) as Session | null;
 }
 
 export function listDeletedSessions(): Session[] {
-  const db = getDb();
-  return (db.prepare("SELECT * FROM sessions WHERE status = 'deleting' ORDER BY updated_at DESC").all() as SessionRow[]).map(rowToSession);
+  return repos().sessions.listDeleted() as Session[];
 }
 
 export function purgeExpiredDeletes(ttlSeconds: number = 90): string[] {
@@ -350,7 +305,7 @@ export function purgeExpiredDeletes(ttlSeconds: number = 90): string[] {
   for (const s of deleted) {
     const deletedAt = s.config._deleted_at as string | undefined;
     if (deletedAt && new Date(deletedAt).getTime() < cutoff) {
-      deleteSession(s.id);
+      repos().sessions.delete(s.id);
       purged.push(s.id);
     }
   }
@@ -363,23 +318,7 @@ export function claimSession(
   id: string, expectedStatus: string, newStatus: string,
   extraFields?: Partial<Session>,
 ): boolean {
-  const db = getDb();
-  const updates: string[] = ["status = ?", "updated_at = ?"];
-  const values: any[] = [newStatus, now()];
-
-  if (extraFields) {
-    for (const [key, value] of Object.entries(extraFields)) {
-      if (!SESSION_COLUMNS.has(key)) continue;
-      updates.push(`${key} = ?`);
-      values.push(key === "config" ? JSON.stringify(value) : value ?? null);
-    }
-  }
-  values.push(id, expectedStatus);
-
-  const result = db.prepare(
-    `UPDATE sessions SET ${updates.join(", ")} WHERE id = ? AND status = ?`
-  ).run(...values);
-  return result.changes > 0;
+  return repos().sessions.claim(id, expectedStatus as any, newStatus as any, extraFields as any);
 }
 
 // ── Events ─────────────────────────────────────────────────────────────────
@@ -388,44 +327,22 @@ export function logEvent(
   trackId: string, type: string,
   opts?: { stage?: string; actor?: string; data?: Record<string, unknown> },
 ): void {
-  const db = getDb();
-  db.prepare(`
-    INSERT INTO events (track_id, type, stage, actor, data, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(
-    trackId, type, opts?.stage ?? null, opts?.actor ?? null,
-    opts?.data ? JSON.stringify(opts.data) : null, now(),
-  );
+  repos().events.log(trackId, type, opts);
 }
 
 export function getEvents(
   trackId: string, opts?: { type?: string; limit?: number },
 ): Event[] {
-  const db = getDb();
-  let sql = "SELECT * FROM events WHERE track_id = ?";
-  const params: any[] = [trackId];
-  if (opts?.type) { sql += " AND type = ?"; params.push(opts.type); }
-  sql += " ORDER BY id ASC LIMIT ?";
-  params.push(opts?.limit ?? 200);
-
-  return (db.prepare(sql).all(...params) as any[]).map((row: any) => ({
-    ...row,
-    data: row.data ? JSON.parse(row.data) : null,
-  }));
+  return repos().events.list(trackId, opts) as Event[];
 }
 
 // ── Compute CRUD ───────────────────────────────────────────────────────────
 
 export function ensureLocalCompute(): Compute {
-  const existing = getCompute("local");
-  if (existing) return existing;
-  const db = getDb();
-  const ts = now();
-  db.prepare(`
-    INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at)
-    VALUES ('local', 'local', 'running', '{}', ?, ?)
-  `).run(ts, ts);
-  return getCompute("local")!;
+  const existing = repos().computes.get("local");
+  if (existing) return existing as Compute;
+  seedLocalCompute(getDb());
+  return repos().computes.get("local")! as Compute;
 }
 
 export function createCompute(opts: {
@@ -433,41 +350,11 @@ export function createCompute(opts: {
   provider?: string;
   config?: Record<string, unknown>;
 }): Compute {
-  const db = getDb();
-  const ts = now();
-
-  const provider = opts.provider ?? "local";
-  let providerInstance: any = null;
-  try {
-    const { getProvider } = require("../compute/index.js");
-    providerInstance = getProvider(opts.provider ?? "local");
-  } catch {}
-  const status = providerInstance?.initialStatus ?? (provider === "local" ? "running" : "stopped");
-
-  db.prepare(`
-    INSERT INTO compute (name, provider, status, config, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(
-    opts.name,
-    provider,
-    status,
-    JSON.stringify(opts.config ?? {}),
-    ts, ts,
-  );
-
-  return getCompute(opts.name)!;
+  return repos().computes.create(opts as any) as Compute;
 }
 
 export function getCompute(name: string): Compute | null {
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM compute WHERE name = ?").get(name) as any | undefined;
-  if (!row) return null;
-  return {
-    ...row,
-    provider: row.provider as ComputeProviderName,
-    status: row.status as ComputeStatus,
-    config: safeParseConfig(row.config),
-  };
+  return repos().computes.get(name) as Compute | null;
 }
 
 export function listCompute(opts?: {
@@ -476,116 +363,49 @@ export function listCompute(opts?: {
   limit?: number;
 }): Compute[] {
   ensureLocalCompute();
-  const db = getDb();
-  let sql = "SELECT * FROM compute WHERE 1=1";
-  const params: any[] = [];
-
-  if (opts?.provider) { sql += " AND provider = ?"; params.push(opts.provider); }
-  if (opts?.status) { sql += " AND status = ?"; params.push(opts.status); }
-
-  sql += " ORDER BY created_at DESC LIMIT ?";
-  params.push(opts?.limit ?? 100);
-
-  return (db.prepare(sql).all(...params) as any[]).map((row: any) => ({
-    ...row,
-    provider: row.provider as ComputeProviderName,
-    status: row.status as ComputeStatus,
-    config: safeParseConfig(row.config),
-  }));
+  return repos().computes.list(opts as any) as Compute[];
 }
 
 export function updateCompute(name: string, fields: Partial<Compute>): Compute | null {
-  const db = getDb();
-  const updates: string[] = ["updated_at = ?"];
-  const values: any[] = [now()];
-
-  for (const [key, value] of Object.entries(fields)) {
-    if (key === "name" || key === "created_at") continue;
-    if (!COMPUTE_COLUMNS.has(key)) continue;
-    if (key === "config" && typeof value === "object") {
-      updates.push("config = ?");
-      values.push(JSON.stringify(value));
-    } else {
-      updates.push(`${key} = ?`);
-      values.push(value ?? null);
-    }
-  }
-  values.push(name);
-
-  db.prepare(`UPDATE compute SET ${updates.join(", ")} WHERE name = ?`).run(...values);
-  return getCompute(name);
+  return repos().computes.update(name, fields as any) as Compute | null;
 }
 
 export function mergeComputeConfig(name: string, patch: Record<string, unknown>): Compute | null {
-  const db = getDb();
-  db.transaction(() => {
-    const row = db.prepare("SELECT config FROM compute WHERE name = ?").get(name) as { config: string } | undefined;
-    if (!row) return;
-    const existing = safeParseConfig(row.config);
-    const merged = { ...existing, ...patch };
-    db.prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ?")
-      .run(JSON.stringify(merged), new Date().toISOString(), name);
-  })();
-  return getCompute(name);
+  return repos().computes.mergeConfig(name, patch as any) as Compute | null;
 }
 
 export function mergeSessionConfig(sessionId: string, patch: Record<string, unknown>): void {
-  const db = getDb();
-  db.transaction(() => {
-    const row = db.prepare("SELECT config FROM sessions WHERE id = ?").get(sessionId) as { config: string } | undefined;
-    if (!row) return;
-    const existing = safeParseConfig(row.config);
-    const merged = { ...existing, ...patch };
-    db.prepare("UPDATE sessions SET config = ?, updated_at = ? WHERE id = ?")
-      .run(JSON.stringify(merged), new Date().toISOString(), sessionId);
-  })();
+  repos().sessions.mergeConfig(sessionId, patch as any);
 }
 
 export function deleteCompute(name: string): boolean {
-  if (name === "local") return false;
-  const db = getDb();
-  const result = db.prepare("DELETE FROM compute WHERE name = ?").run(name);
-  return result.changes > 0;
+  return repos().computes.delete(name);
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 export function getChildren(parentId: string): Session[] {
-  return listSessions({ parent_id: parentId });
+  return repos().sessions.getChildren(parentId) as Session[];
 }
 
 export function getGroups(): string[] {
-  const db = getDb();
-  const rows = db.prepare(`
-    SELECT name FROM groups
-    UNION
-    SELECT DISTINCT group_name FROM sessions WHERE group_name IS NOT NULL
-    ORDER BY 1
-  `).all() as { name: string }[];
-  return rows.map((r) => r.name);
+  return repos().sessions.getGroupNames();
 }
 
 export function createGroup(name: string): void {
-  const db = getDb();
-  db.prepare("INSERT OR IGNORE INTO groups (name, created_at) VALUES (?, ?)").run(name, now());
+  repos().sessions.createGroup(name);
 }
 
 export function deleteGroup(name: string): void {
-  const db = getDb();
-  db.prepare("DELETE FROM groups WHERE name = ?").run(name);
-  db.prepare("UPDATE sessions SET group_name = NULL WHERE group_name = ?").run(name);
+  repos().sessions.deleteGroup(name);
 }
 
 export function sessionChannelPort(sessionId: string): number {
-  return 19200 + parseInt(sessionId.replace("s-", ""), 16) % 10000;
+  return repos().sessions.channelPort(sessionId);
 }
 
 export function isChannelPortAvailable(port: number, excludeSessionId?: string): boolean {
-  const db = getDb();
-  const sessions = db.prepare(
-    "SELECT id FROM sessions WHERE status IN ('running', 'waiting') AND id != ?"
-  ).all(excludeSessionId ?? "") as any[];
-  return !sessions.some(s => sessionChannelPort(s.id) === port);
+  return repos().sessions.isChannelPortAvailable(port, excludeSessionId);
 }
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -596,42 +416,17 @@ export function addMessage(opts: {
   content: string;
   type?: string;
 }): Message {
-  const db = getDb();
-  const ts = now();
-  db.prepare(
-    "INSERT INTO messages (session_id, role, content, type, read, created_at) VALUES (?, ?, ?, ?, 0, ?)"
-  ).run(opts.session_id, opts.role, opts.content, opts.type ?? "text", ts);
-  const row = db.prepare("SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT 1").get(opts.session_id) as any;
-  return {
-    ...row,
-    role: row.role as MessageRole,
-    type: row.type as MessageType,
-    read: !!row.read,
-  };
+  return repos().messages.send(opts.session_id, opts.role as any, opts.content, opts.type as any) as Message;
 }
 
 export function getMessages(sessionId: string, opts?: { limit?: number }): Message[] {
-  const db = getDb();
-  const rows = db.prepare(
-    "SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT ?"
-  ).all(sessionId, opts?.limit ?? 50) as any[];
-  return rows.reverse().map((row: any) => ({
-    ...row,
-    role: row.role as MessageRole,
-    type: row.type as MessageType,
-    read: !!row.read,
-  }));
+  return repos().messages.list(sessionId, opts) as Message[];
 }
 
 export function getUnreadCount(sessionId: string): number {
-  const db = getDb();
-  const row = db.prepare(
-    "SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND role = 'agent' AND read = 0"
-  ).get(sessionId) as { count: number } | undefined;
-  return row?.count ?? 0;
+  return repos().messages.unreadCount(sessionId);
 }
 
 export function markMessagesRead(sessionId: string): void {
-  const db = getDb();
-  db.prepare("UPDATE messages SET read = 1 WHERE session_id = ? AND read = 0").run(sessionId);
+  repos().messages.markRead(sessionId);
 }
