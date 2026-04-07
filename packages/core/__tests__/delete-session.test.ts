@@ -11,7 +11,7 @@ import { join } from "path";
 
 import * as core from "../index.js";
 import * as store from "../store.js";
-import { deleteSessionAsync } from "../session.js";
+import { deleteSessionAsync } from "../services/session-orchestration.js";
 import { writeHooksConfig } from "../claude.js";
 import { AppContext, setApp, clearApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";

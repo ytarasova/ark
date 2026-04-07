@@ -8,7 +8,7 @@
 import { describe, test, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import * as store from "../store.js";
-import { applyReport } from "../session.js";
+import { applyReport } from "../services/session-orchestration.js";
 import type { OutboundMessage } from "../channel-types.js";
 
 withTestContext();

@@ -10,7 +10,7 @@ import YAML from "yaml";
 
 import { ARK_DIR } from "../store.js";
 import * as store from "../store.js";
-import { startSession, advance, approveReviewGate } from "../session.js";
+import { startSession, advance, approveReviewGate } from "../services/session-orchestration.js";
 import { loadFlow, evaluateGate } from "../flow.js";
 import { withTestContext } from "./test-helpers.js";
 

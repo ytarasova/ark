@@ -11,7 +11,7 @@ withTestContext();
 
 describe("finishWorktree preconditions", () => {
   it("rejects non-existent session", async () => {
-    const { finishWorktree } = await import("../session.js");
+    const { finishWorktree } = await import("../services/session-orchestration.js");
     const result = await finishWorktree("nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
@@ -19,7 +19,7 @@ describe("finishWorktree preconditions", () => {
 
   it("rejects session without workdir", async () => {
     const s = createSession({ summary: "no-workdir" });
-    const { finishWorktree } = await import("../session.js");
+    const { finishWorktree } = await import("../services/session-orchestration.js");
     const result = await finishWorktree(s.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("workdir");
@@ -28,7 +28,7 @@ describe("finishWorktree preconditions", () => {
   it("rejects session without branch", async () => {
     const s = createSession({ summary: "no-branch", repo: "/tmp/fake-repo" });
     updateSession(s.id, { workdir: "/tmp/fake-workdir" });
-    const { finishWorktree } = await import("../session.js");
+    const { finishWorktree } = await import("../services/session-orchestration.js");
     const result = await finishWorktree(s.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("branch");
@@ -40,7 +40,7 @@ describe("finishWorktree with options", () => {
     const s = createSession({ summary: "no-merge-test", repo: "/tmp/fake-repo" });
     updateSession(s.id, { workdir: "/tmp/fake-workdir", branch: "feature-x" });
 
-    const { finishWorktree } = await import("../session.js");
+    const { finishWorktree } = await import("../services/session-orchestration.js");
     // This will fail at the git merge step, but with noMerge it skips merge
     // The git worktree remove will also fail (no real worktree) but that's caught
     // The session should still be soft-deleted
@@ -59,7 +59,7 @@ describe("finishWorktree with options", () => {
     const s = createSession({ summary: "running-finish", repo: "/tmp/fake-repo" });
     updateSession(s.id, { workdir: "/tmp/fake-workdir", branch: "feature-y", status: "running" });
 
-    const { finishWorktree } = await import("../session.js");
+    const { finishWorktree } = await import("../services/session-orchestration.js");
     // stop() will be called first, then merge (which fails), which aborts
     const result = await finishWorktree(s.id, { noMerge: true });
     // After finishing, session should be processed (stopped then deleted)
@@ -74,7 +74,7 @@ describe("finishWorktree with options", () => {
     const s = createSession({ summary: "msg-test", repo: "/tmp/fake-repo" });
     updateSession(s.id, { workdir: "/tmp/fake-workdir", branch: "my-branch" });
 
-    const { finishWorktree } = await import("../session.js");
+    const { finishWorktree } = await import("../services/session-orchestration.js");
     const result = await finishWorktree(s.id, { noMerge: true });
     if (result.ok) {
       expect(result.message).toContain("skipped merge");
@@ -85,7 +85,7 @@ describe("finishWorktree with options", () => {
     const s = createSession({ summary: "into-test", repo: "/tmp/fake-repo" });
     updateSession(s.id, { workdir: "/tmp/fake-workdir", branch: "feature-z" });
 
-    const { finishWorktree } = await import("../session.js");
+    const { finishWorktree } = await import("../services/session-orchestration.js");
     // With noMerge, the into option doesn't matter but should still work
     const result = await finishWorktree(s.id, { noMerge: true, into: "develop" });
     expect(result.ok).toBe(true);

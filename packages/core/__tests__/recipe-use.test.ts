@@ -5,7 +5,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { loadRecipe, instantiateRecipe } from "../recipe.js";
-import { startSession } from "../session.js";
+import { startSession } from "../services/session-orchestration.js";
 import * as store from "../store.js";
 
 const { getCtx } = withTestContext();

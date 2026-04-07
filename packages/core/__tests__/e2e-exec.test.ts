@@ -11,7 +11,7 @@ import { execFileSync } from "child_process";
 import { join } from "path";
 import * as core from "../index.js";
 import { createSession, updateSession, getSession } from "../store.js";
-import { waitForCompletion } from "../session.js";
+import { waitForCompletion } from "../services/session-orchestration.js";
 import { AppContext, setApp, clearApp } from "../app.js";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");

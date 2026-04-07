@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { getSession, updateSession } from "../index.js";
 import { createSession } from "../store.js";
-import { stop } from "../session.js";
+import { stop } from "../services/session-orchestration.js";
 import { AppContext, setApp, clearApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -161,19 +161,19 @@ describe("session resume", () => {
   // so we test the status changes and guard clauses rather than full dispatch.
 
   it("resume() is exported as a function", async () => {
-    const { resume } = await import("../session.js");
+    const { resume } = await import("../services/session-orchestration.js");
     expect(typeof resume).toBe("function");
   });
 
   it("resume returns ok: false for nonexistent session", async () => {
-    const { resume } = await import("../session.js");
+    const { resume } = await import("../services/session-orchestration.js");
     const result = await resume("s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
 
   it("resume allows completed sessions to restart", async () => {
-    const { resume } = await import("../session.js");
+    const { resume } = await import("../services/session-orchestration.js");
     const session = createSession({ summary: "completed-test" });
     updateSession(session.id, { status: "completed", stage: "work" });
 

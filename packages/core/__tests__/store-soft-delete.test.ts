@@ -69,7 +69,7 @@ describe("soft delete", () => {
   });
 });
 
-import { deleteSessionAsync, undeleteSessionAsync } from "../session.js";
+import { deleteSessionAsync, undeleteSessionAsync } from "../services/session-orchestration.js";
 
 describe("deleteSessionAsync with soft delete", () => {
   it("soft-deletes instead of hard-deleting", async () => {

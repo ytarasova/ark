@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { getSession, updateSession } from "../index.js";
 import { createSession } from "../store.js";
-import { stop } from "../session.js";
+import { stop } from "../services/session-orchestration.js";
 import { AppContext, setApp, clearApp } from "../app.js";
 
 let app: AppContext;

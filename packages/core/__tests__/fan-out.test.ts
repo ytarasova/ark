@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import * as store from "../store.js";
-import * as session from "../session.js";
+import * as session from "../services/session-orchestration.js";
 
 const { getCtx } = withTestContext();
 

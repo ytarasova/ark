@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "bun:test";
 import { createSession, getSession, updateSession } from "../store.js";
-import { forkSession, cloneSession } from "../session.js";
+import { forkSession, cloneSession } from "../services/session-orchestration.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();

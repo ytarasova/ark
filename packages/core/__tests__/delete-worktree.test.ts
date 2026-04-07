@@ -8,7 +8,7 @@ import { mkdirSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
 import { getSession, WORKTREES_DIR } from "../index.js";
 import { createSession } from "../store.js";
-import { deleteSessionAsync } from "../session.js";
+import { deleteSessionAsync } from "../services/session-orchestration.js";
 import { AppContext, setApp, clearApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
