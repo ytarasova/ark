@@ -62,8 +62,8 @@ export { createTestContext, setContext, resetContext, closeDb, type TestContext 
 
 export interface Session {
   id: string;
-  ticket: string | null;      // DB column: jira_key — external ticket reference (Jira, GitHub issue, etc.)
-  summary: string | null;     // DB column: jira_summary — task description
+  ticket: string | null;      // external ticket reference (Jira, GitHub issue, etc.)
+  summary: string | null;     // task description
   repo: string | null;
   branch: string | null;
   compute_name: string | null;
@@ -71,7 +71,7 @@ export interface Session {
   claude_session_id: string | null; // Claude UUID for --resume
   stage: string | null;
   status: SessionStatus;
-  flow: string;           // DB column: pipeline — flow definition name
+  flow: string;           // flow definition name
   agent: string | null;
   workdir: string | null;
   pr_url: string | null;
@@ -110,8 +110,8 @@ export interface Compute {
 
 export interface SessionRow {
   id: string;
-  jira_key: string | null;
-  jira_summary: string | null;
+  ticket: string | null;
+  summary: string | null;
   repo: string | null;
   branch: string | null;
   compute_name: string | null;
@@ -119,7 +119,7 @@ export interface SessionRow {
   claude_session_id: string | null;
   stage: string | null;
   status: string;
-  pipeline: string;
+  flow: string;
   agent: string | null;
   workdir: string | null;
   pr_url: string | null;
@@ -176,9 +176,6 @@ export function safeParseConfig(raw: unknown): Record<string, unknown> {
 export function rowToSession(row: SessionRow): Session {
   return {
     ...row,
-    ticket: row.jira_key,
-    summary: row.jira_summary,
-    flow: row.pipeline,
     status: row.status as SessionStatus,
     config: safeParseConfig(row.config),
   };
@@ -240,8 +237,8 @@ export function initSchema(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
-      jira_key TEXT,
-      jira_summary TEXT,
+      ticket TEXT,
+      summary TEXT,
       repo TEXT,
       branch TEXT,
       compute_name TEXT,
@@ -249,7 +246,7 @@ export function initSchema(db: Database): void {
       claude_session_id TEXT,
       stage TEXT,
       status TEXT NOT NULL DEFAULT 'pending',
-      pipeline TEXT NOT NULL DEFAULT 'default',
+      flow TEXT NOT NULL DEFAULT 'default',
       agent TEXT,
       workdir TEXT,
       pr_url TEXT,
@@ -379,8 +376,8 @@ export function createSession(opts: {
     : null;
 
   db.prepare(`
-    INSERT INTO sessions (id, jira_key, jira_summary, repo, branch, compute_name,
-      workdir, stage, status, pipeline, group_name, config, created_at, updated_at)
+    INSERT INTO sessions (id, ticket, summary, repo, branch, compute_name,
+      workdir, stage, status, flow, group_name, config, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?)
   `).run(
     id, opts.ticket ?? null, opts.summary ?? null, opts.repo ?? null,
@@ -434,8 +431,8 @@ export function listSessions(opts?: {
 
 // Valid session columns (from schema). Used to whitelist dynamic SQL column names.
 const SESSION_COLUMNS = new Set([
-  "jira_key", "jira_summary", "repo", "branch", "compute_name", "session_id",
-  "claude_session_id", "stage", "status", "pipeline", "agent", "workdir",
+  "ticket", "summary", "repo", "branch", "compute_name", "session_id",
+  "claude_session_id", "stage", "status", "flow", "agent", "workdir",
   "pr_url", "pr_id", "error", "parent_id", "fork_group", "group_name",
   "breakpoint_reason", "attached_by", "config", "updated_at",
 ]);
@@ -450,18 +447,14 @@ export function updateSession(id: string, fields: Partial<Session>): Session | n
   const updates: string[] = ["updated_at = ?"];
   const values: any[] = [now()];
 
-  // Maps TypeScript field names to legacy SQLite column names (from original Jira integration)
-  const fieldMap: Record<string, string> = { ticket: "jira_key", summary: "jira_summary", flow: "pipeline" };
-
   for (const [key, value] of Object.entries(fields)) {
     if (key === "id" || key === "created_at") continue;
-    const col = fieldMap[key] ?? key;
-    if (!SESSION_COLUMNS.has(col)) continue; // skip unknown columns
-    if (col === "config" && typeof value === "object") {
+    if (!SESSION_COLUMNS.has(key)) continue; // skip unknown columns
+    if (key === "config" && typeof value === "object") {
       updates.push("config = ?");
       values.push(JSON.stringify(value));
     } else {
-      updates.push(`${col} = ?`);
+      updates.push(`${key} = ?`);
       values.push(value ?? null);
     }
   }
@@ -534,12 +527,10 @@ export function claimSession(
   const values: any[] = [newStatus, now()];
 
   if (extraFields) {
-    const fieldMap: Record<string, string> = { ticket: "jira_key", summary: "jira_summary", flow: "pipeline" };
     for (const [key, value] of Object.entries(extraFields)) {
-      const col = fieldMap[key] ?? key;
-      if (!SESSION_COLUMNS.has(col)) continue; // skip unknown columns
-      updates.push(`${col} = ?`);
-      values.push(col === "config" ? JSON.stringify(value) : value ?? null);
+      if (!SESSION_COLUMNS.has(key)) continue; // skip unknown columns
+      updates.push(`${key} = ?`);
+      values.push(key === "config" ? JSON.stringify(value) : value ?? null);
     }
   }
   values.push(id, expectedStatus);

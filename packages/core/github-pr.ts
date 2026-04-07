@@ -105,9 +105,6 @@ export function findSessionByPR(prUrl: string): Session | null {
   if (!row) return null;
   return {
     ...row,
-    ticket: row.jira_key,
-    summary: row.jira_summary,
-    flow: row.pipeline,
     config: safeParseConfig(row.config),
   };
 }

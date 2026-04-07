@@ -1,12 +1,23 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-12811b' > /dev/null 2>&1 || true # ark-status",
+            "async": false
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "startup|resume",
         "hooks": [
           {
             "type": "command",
-            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-9a31e7' > /dev/null 2>&1 || true # ark-status",
+            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-12811b' > /dev/null 2>&1 || true # ark-status",
             "async": true
           }
         ]
@@ -17,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-9a31e7' > /dev/null 2>&1 || true # ark-status",
+            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-12811b' > /dev/null 2>&1 || true # ark-status",
             "async": true
           }
         ]
@@ -28,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-9a31e7' > /dev/null 2>&1 || true # ark-status",
+            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-12811b' > /dev/null 2>&1 || true # ark-status",
             "async": true
           }
         ]
@@ -39,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-9a31e7' > /dev/null 2>&1 || true # ark-status",
+            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-12811b' > /dev/null 2>&1 || true # ark-status",
             "async": true
           }
         ]
@@ -50,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-9a31e7' > /dev/null 2>&1 || true # ark-status",
+            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-12811b' > /dev/null 2>&1 || true # ark-status",
             "async": true
           }
         ]
@@ -62,7 +73,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-9a31e7' > /dev/null 2>&1 || true # ark-status",
+            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-12811b' > /dev/null 2>&1 || true # ark-status",
             "async": true
           }
         ]
@@ -73,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-9a31e7' > /dev/null 2>&1 || true # ark-status",
+            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-12811b' > /dev/null 2>&1 || true # ark-status",
             "async": true
           }
         ]
@@ -84,7 +95,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-9a31e7' > /dev/null 2>&1 || true # ark-status",
+            "command": "curl -sf -X POST -H 'Content-Type: application/json' -d @- 'http://localhost:19100/hooks/status?session=s-12811b' > /dev/null 2>&1 || true # ark-status",
             "async": true
           }
         ]

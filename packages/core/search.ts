@@ -48,15 +48,15 @@ export function searchSessions(query: string, opts?: SearchOpts): SearchResult[]
 
   // 1. Session metadata
   const metaRows = db.prepare(
-    `SELECT id, jira_key, jira_summary, repo, created_at FROM sessions
-     WHERE jira_summary LIKE ? COLLATE NOCASE
-        OR jira_key LIKE ? COLLATE NOCASE
+    `SELECT id, ticket, summary, repo, created_at FROM sessions
+     WHERE summary LIKE ? COLLATE NOCASE
+        OR ticket LIKE ? COLLATE NOCASE
         OR repo LIKE ? COLLATE NOCASE
      ORDER BY created_at DESC LIMIT ?`
   ).all(pattern, pattern, pattern, limit) as any[];
 
   for (const row of metaRows) {
-    add({ sessionId: row.id, source: "metadata", match: row.jira_summary ?? row.jira_key ?? row.repo ?? "", timestamp: row.created_at });
+    add({ sessionId: row.id, source: "metadata", match: row.summary ?? row.ticket ?? row.repo ?? "", timestamp: row.created_at });
   }
 
   // 2. Events

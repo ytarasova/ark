@@ -22,11 +22,11 @@ withTestContext();
 // ── rowToSession (exported, direct tests) ───────────────────────────────────
 
 describe("rowToSession", () => {
-  it("maps jira_key -> ticket", () => {
+  it("reads ticket, summary, flow from row", () => {
     const row: SessionRow = {
       id: "s-abc123",
-      jira_key: "PROJ-42",
-      jira_summary: "Fix the widget",
+      ticket: "PROJ-42",
+      summary: "Fix the widget",
       repo: null,
       branch: null,
       compute_name: null,
@@ -34,7 +34,7 @@ describe("rowToSession", () => {
       claude_session_id: null,
       stage: null,
       status: "pending",
-      pipeline: "default",
+      flow: "default",
       agent: null,
       workdir: null,
       pr_url: null,
@@ -56,14 +56,14 @@ describe("rowToSession", () => {
     expect(session.flow).toBe("default");
   });
 
-  it("maps jira_summary -> summary", () => {
-    const row = makeRow({ jira_summary: "Build the thing" });
+  it("reads summary from row", () => {
+    const row = makeRow({ summary: "Build the thing" });
     const session = rowToSession(row);
     expect(session.summary).toBe("Build the thing");
   });
 
-  it("maps pipeline -> flow", () => {
-    const row = makeRow({ pipeline: "quick" });
+  it("reads flow from row", () => {
+    const row = makeRow({ flow: "quick" });
     const session = rowToSession(row);
     expect(session.flow).toBe("quick");
   });
@@ -265,8 +265,8 @@ describe("rowToMessage via DB", () => {
 function makeRow(overrides: Partial<SessionRow> = {}): SessionRow {
   return {
     id: "s-000000",
-    jira_key: null,
-    jira_summary: null,
+    ticket: null,
+    summary: null,
     repo: null,
     branch: null,
     compute_name: null,
@@ -274,7 +274,7 @@ function makeRow(overrides: Partial<SessionRow> = {}): SessionRow {
     claude_session_id: null,
     stage: null,
     status: "pending",
-    pipeline: "default",
+    flow: "default",
     agent: null,
     workdir: null,
     pr_url: null,

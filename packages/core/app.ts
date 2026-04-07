@@ -16,7 +16,8 @@ import { configureOtlp } from "./otlp.js";
 import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
-import { initSchema as initStoreSchema, setAppStore, clearAppStore, safeParseConfig, purgeExpiredDeletes } from "./store.js";
+import { setAppStore, clearAppStore, safeParseConfig, purgeExpiredDeletes } from "./store.js";
+import { initSchema as initRepoSchema, seedLocalCompute } from "./repositories/schema.js";
 import type { Compute, Session } from "../types/index.js";
 import { setProviderResolver, clearProviderResolver } from "./session.js";
 import { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
@@ -182,17 +183,10 @@ export class AppContext {
     this._db.run("PRAGMA journal_mode = WAL");
     this._db.run("PRAGMA busy_timeout = 5000");
 
-    // 3. Initialize schema + wire store paths
-    initStoreSchema(this._db);
+    // 3. Initialize schema (new column names: ticket, summary, flow) + wire store paths
+    initRepoSchema(this._db);
+    seedLocalCompute(this._db);
     setAppStore(this._db, this.config);
-    // Seed directly on this._db since _app singleton isn't set yet during boot
-    const row = this._db.prepare("SELECT name FROM compute WHERE name = 'local'").get();
-    if (!row) {
-      const ts = new Date().toISOString();
-      this._db.prepare(
-        "INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at) VALUES ('local', 'local', 'running', '{}', ?, ?)"
-      ).run(ts, ts);
-    }
 
     // 3b. Create repositories and services
     this._sessions = new SessionRepository(this._db);

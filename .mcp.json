@@ -1,14 +1,14 @@
 {
   "mcpServers": {
     "ark-channel": {
-      "command": "/Users/yana/.bun/bin/bun",
+      "command": "/Users/paytmlabs/.bun/bin/bun",
       "args": [
-        "/Users/yana/Projects/ark/packages/core/channel.ts"
+        "/Users/paytmlabs/Projects/ark/packages/core/channel.ts"
       ],
       "env": {
-        "ARK_SESSION_ID": "s-9a31e7",
+        "ARK_SESSION_ID": "s-12811b",
         "ARK_STAGE": "work",
-        "ARK_CHANNEL_PORT": "24519",
+        "ARK_CHANNEL_PORT": "21899",
         "ARK_CONDUCTOR_URL": "http://localhost:19100"
       }
     }
