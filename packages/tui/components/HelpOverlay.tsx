@@ -5,35 +5,62 @@ interface HelpOverlayProps {
   onClose: () => void;
 }
 
-const SHORTCUTS: [string, string][] = [
-  ["j/k", "Navigate up/down"],
-  ["f/b", "Page up/down"],
-  ["g/G", "Top/bottom"],
-  ["Enter", "Dispatch/restart"],
-  ["s", "Stop session"],
-  ["r", "Session replay"],
-  ["f", "Fork session"],
-  ["a", "Attach to tmux"],
-  ["t", "Talk (send message)"],
-  ["x", "Delete (press twice)"],
-  ["d", "Mark done (press twice)"],
-  ["u", "Mark as waiting"],
-  ["m", "Move to group"],
-  ["M", "MCP Manager"],
-  ["K", "Skills Manager"],
-  ["P", "Settings"],
-  ["i", "Import hint"],
-  ["Ctrl+Z", "Undo delete"],
-  ["/", "Search sessions"],
-  ["!/@/#/$", "Filter by status"],
-  ["0", "Clear filter"],
-  ["n", "New session"],
-  ["o", "Group manager"],
-  ["e", "Expand events"],
-  ["Tab", "Toggle pane"],
-  ["1-7", "Switch tabs"],
-  ["?", "This help"],
-  ["q", "Quit"],
+interface ShortcutGroup {
+  title: string;
+  items: [string, string][];
+}
+
+const GROUPS: ShortcutGroup[] = [
+  {
+    title: "Session Actions",
+    items: [
+      ["Enter", "Dispatch/restart"],
+      ["s", "Stop"],
+      ["I", "Interrupt agent"],
+      ["d", "Complete (press twice)"],
+      ["t", "Send message"],
+      ["f", "Fork session"],
+      ["a", "Attach to tmux"],
+      ["W", "Worktree finish/PR"],
+      ["V", "Run verification"],
+      ["Z", "Archive/restore"],
+      ["x", "Delete (Ctrl+Z undo)"],
+    ],
+  },
+  {
+    title: "Navigation",
+    items: [
+      ["j/k", "Move up/down"],
+      ["Tab", "Toggle panes"],
+      ["/", "Search sessions"],
+      ["?", "This help"],
+      ["1-7", "Switch tabs"],
+      ["q", "Quit"],
+    ],
+  },
+  {
+    title: "Tools",
+    items: [
+      ["n", "New session"],
+      ["m", "Move to group"],
+      ["o", "Group manager"],
+      ["r", "Session replay"],
+      ["M", "MCP Manager"],
+      ["K", "Skills Manager"],
+      ["P", "Settings"],
+      ["e", "Expand events"],
+    ],
+  },
+  {
+    title: "Filters",
+    items: [
+      ["!", "Running"],
+      ["@", "Waiting"],
+      ["#", "Stopped"],
+      ["$", "Failed"],
+      ["0", "Clear filter"],
+    ],
+  },
 ];
 
 export function HelpOverlay({ onClose }: HelpOverlayProps) {
@@ -44,10 +71,15 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1}>
       <Box marginBottom={1}><Text bold>Keyboard Shortcuts</Text></Box>
-      {SHORTCUTS.map(([shortcut, desc]) => (
-        <Box key={shortcut}>
-          <Text color="cyan" bold>{shortcut.padEnd(12)}</Text>
-          <Text>{desc}</Text>
+      {GROUPS.map((group, gi) => (
+        <Box key={group.title} flexDirection="column" marginBottom={gi < GROUPS.length - 1 ? 1 : 0}>
+          <Text bold color="cyan">{group.title}</Text>
+          {group.items.map(([shortcut, desc]) => (
+            <Box key={shortcut}>
+              <Text color="cyan" bold>{"  "}{shortcut.padEnd(10)}</Text>
+              <Text>{desc}</Text>
+            </Box>
+          ))}
         </Box>
       ))}
       <Box marginTop={1}><Text color="gray">Press ? or Esc to close</Text></Box>

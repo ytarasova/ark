@@ -7,8 +7,10 @@
  */
 
 import { readFileSync, existsSync } from "fs";
+import { execFileSync } from "child_process";
 import { join } from "path";
 import { getApp } from "./app.js";
+import { eventBus } from "./hooks.js";
 import { getAllSessionCosts, formatCost } from "./costs.js";
 import { handleIssueWebhook, type IssueWebhookConfig, type IssueWebhookPayload } from "./github-webhook.js";
 import {
@@ -76,6 +78,16 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
   const readOnly = opts?.readOnly ?? false;
   const token = opts?.token;
 
+  // Auto-build web frontend if dist doesn't exist
+  if (!existsSync(WEB_DIST)) {
+    try {
+      const buildScript = join(import.meta.dir, "../../packages/web/build.ts");
+      if (existsSync(buildScript)) {
+        execFileSync("bun", ["run", buildScript], { stdio: "pipe", timeout: 30_000 });
+      }
+    } catch { /* build failed - will serve 404s */ }
+  }
+
   // SSE clients
   const sseClients = new Set<ReadableStreamDefaultController>();
 
@@ -88,15 +100,26 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
     }
   }
 
-  // Periodic broadcast of session status
-  const statusInterval = setInterval(() => {
+  // Broadcast current session state to all SSE clients
+  function broadcastSessions() {
     const sessions = getApp().sessions.list({ limit: 200 });
     broadcast("sessions", sessions.map(s => ({
       id: s.id, summary: s.summary, status: s.status,
       agent: s.agent, repo: s.repo, group: s.group_name,
       updated: s.updated_at,
     })));
-  }, 3000);
+  }
+
+  // Periodic broadcast of session status
+  const statusInterval = setInterval(broadcastSessions, 3000);
+
+  // Event-driven SSE push (in addition to periodic broadcast)
+  const unsubEventBus = eventBus.onAll((event) => {
+    // Push on any hook_status or session-related event
+    if (event.type === "hook_status" || event.type.startsWith("session")) {
+      broadcastSessions();
+    }
+  });
 
   const server = Bun.serve({
     port,
@@ -894,6 +917,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
     url: serverUrl,
     stop: () => {
       clearInterval(statusInterval);
+      unsubEventBus();
       for (const client of sseClients) {
         try { client.close(); } catch { /* ignore */ }
       }

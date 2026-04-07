@@ -66,6 +66,22 @@ export function detectStatusFromContent(content: string): DetectedStatus {
   return "unknown";
 }
 
+/** Extract a structured progress label from tmux output. */
+export function parseAgentProgress(output: string): string | null {
+  const lines = output.split("\n").filter(Boolean);
+  const last = lines[lines.length - 1] ?? "";
+
+  // Claude Code patterns
+  if (last.includes("esc to interrupt") || last.includes("ctrl+c to interrupt")) return "Working...";
+  if (last.includes("Reading")) return "Reading files";
+  if (last.includes("Writing") || last.includes("Editing")) return "Writing code";
+  if (last.includes("Running")) return "Running command";
+  if (last.includes("Searching")) return "Searching";
+  if (last.includes("Thinking")) return "Thinking...";
+
+  return null;
+}
+
 /** Detect status for a tmux session by capturing pane content. */
 export async function detectSessionStatus(tmuxSessionName: string): Promise<DetectedStatus> {
   try {

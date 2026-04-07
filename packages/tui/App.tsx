@@ -58,6 +58,7 @@ function AppInner() {
   const [sessionPrefill, setSessionPrefill] = useState<SessionPrefill | undefined>();
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
   const [selectedSession, setSelectedSession] = useState<import("../types/index.js").Session | null>(null);
   const [pane, setPane] = useState<Pane>("left");
   const { stdout } = useStdout();
@@ -102,6 +103,11 @@ function AppInner() {
     else focus.pop("help");
   }, [showHelp]);
 
+  // Dismiss welcome overlay on any keypress
+  useInput(() => {
+    if (showWelcome && store.sessions.length === 0) setShowWelcome(false);
+  });
+
   // App-level shortcuts only fire when no child owns focus
   useInput((input, key) => {
     if (!focus.appActive) return;
@@ -143,7 +149,20 @@ function AppInner() {
       <TabBar active={tab} loading={asyncState.loading || store.initialLoading} loadingLabel={store.initialLoading ? "Loading..." : asyncState.label} />
 
       <Box flexDirection="column" flexGrow={1}>
-      {tab === "sessions" ? (
+      {showWelcome && store.sessions.length === 0 && !store.initialLoading ? (
+        <Box flexDirection="column" alignItems="center" justifyContent="center" flexGrow={1}>
+          <Text bold color="cyan">Welcome to Ark</Text>
+          <Text> </Text>
+          <Text>  <Text bold>n</Text>     Create your first session</Text>
+          <Text>  <Text bold>?</Text>     See all keyboard shortcuts</Text>
+          <Text>  <Text bold>q</Text>     Quit</Text>
+          <Text> </Text>
+          <Text dimColor>  Or from the terminal:</Text>
+          <Text dimColor>  ark session start --repo . --summary "Fix a bug" --dispatch</Text>
+          <Text> </Text>
+          <Text dimColor>Press any key to dismiss</Text>
+        </Box>
+      ) : tab === "sessions" ? (
         <SessionsTab
           {...store}
           pane={pane}

@@ -7,7 +7,7 @@
  */
 
 import { Database } from "bun:sqlite";
-import { mkdirSync, rmSync, existsSync, mkdtempSync } from "fs";
+import { mkdirSync, rmSync, existsSync, mkdtempSync, readFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -301,7 +301,46 @@ export class AppContext {
       cleanupLogs();
     });
 
-    // 15. Telemetry: track app boot
+    // 15. Clean up stale hook configs in cwd
+    await safeAsync("boot: cleanup stale hooks", async () => {
+      const cwd = process.cwd();
+      const settingsPath = join(cwd, ".claude", "settings.local.json");
+      if (existsSync(settingsPath)) {
+        try {
+          const content = JSON.parse(readFileSync(settingsPath, "utf-8"));
+          const cmd = content?.hooks?.Stop?.[0]?.hooks?.[0]?.command ?? "";
+          if (cmd.includes("ark-status")) {
+            const match = cmd.match(/session=([^'&\s]+)/);
+            const sid = match?.[1];
+            if (sid && this._sessions) {
+              const session = this._sessions.get(sid);
+              if (!session || !["running", "waiting"].includes(session.status)) {
+                const { removeHooksConfig } = await import("./claude.js");
+                removeHooksConfig(cwd);
+              }
+            }
+          }
+        } catch { /* ignore parse errors */ }
+      }
+    });
+
+    // 16. Detect stale running sessions (tmux died while TUI was closed)
+    await safeAsync("boot: detect stale sessions", async () => {
+      const { sessionExistsAsync } = await import("./tmux.js");
+      const running = this._sessions?.list({ status: "running" }) ?? [];
+      for (const s of running) {
+        if (s.session_id && !(await sessionExistsAsync(s.session_id))) {
+          this._sessions?.update(s.id, {
+            status: "failed",
+            error: "Agent process exited while Ark was not running",
+            session_id: null,
+          });
+          this._events?.log(s.id, "session_stale_detected", { actor: "system" });
+        }
+      }
+    });
+
+    // 17. Telemetry: track app boot
     track("app_boot");
 
     this.phase = "ready";

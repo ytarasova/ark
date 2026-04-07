@@ -34,7 +34,8 @@ import { pollIssues } from "./issue-poller.js";
 import { ArkdClient } from "../arkd/client.js";
 import { safeAsync } from "./safe.js";
 import { addEntry } from "./ledger.js";
-import { logError, logInfo } from "./structured-log.js";
+import { logError, logInfo, logWarn } from "./structured-log.js";
+import { sendOSNotification } from "./notify.js";
 import { watchMergedPR, type RollbackConfig } from "./rollback.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "./otlp.js";
 
@@ -129,6 +130,14 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
       emitStageSpanEnd(sessionId, { status: result.newStatus });
       emitSessionSpanEnd(sessionId, { status: result.newStatus });
       flushSpans();
+
+      // OS notification on terminal hook status
+      const hookSession = getApp().sessions.get(sessionId);
+      if (hookSession) {
+        const hookTitle = result.newStatus === "completed" ? "Stage completed" : "Session failed";
+        const hookBody = `${hookSession.summary ?? sessionId} - ${hookSession.stage ?? ""}`;
+        sendOSNotification(`Ark: ${hookTitle}`, hookBody);
+      }
     }
   }
 
@@ -419,10 +428,33 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
       const nextAction = flow.getStageAction(updated.flow, updated.stage);
       if (nextAction.type === "agent" || nextAction.type === "fork") {
         session.dispatch(sessionId).catch(err => {
-          console.error(`[conductor] auto-dispatch failed for ${sessionId}:`, err?.message ?? err);
+          logError("conductor", `auto-dispatch failed for ${sessionId}: ${err?.message ?? err}`);
+        });
+      } else if (nextAction.type === "action") {
+        // Auto-execute action stages with verification enforcement
+        safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
+          const verify = await session.runVerification(sessionId);
+          if (!verify.ok) {
+            logWarn("conductor", `action stage blocked by verification for ${sessionId}: ${verify.message}`);
+            getApp().sessions.update(sessionId, {
+              status: "blocked",
+              breakpoint_reason: `Verification failed: ${verify.message.slice(0, 200)}`,
+            });
+            sendOSNotification("Ark: Verification failed", `${updated.summary ?? sessionId} - ${verify.message.slice(0, 100)}`);
+            return;
+          }
+          await session.executeAction(sessionId, nextAction.action ?? "");
         });
       }
     }
+  }
+
+  // OS notification on stage completion or failure
+  const finalSession = getApp().sessions.get(sessionId);
+  if (finalSession && (report.type === "completed" || report.type === "error")) {
+    const notifyTitle = report.type === "completed" ? "Stage completed" : "Session failed";
+    const notifyBody = `${finalSession.summary ?? sessionId} - ${finalSession.stage ?? ""}`;
+    sendOSNotification(`Ark: ${notifyTitle}`, notifyBody);
   }
 
   // PR URL detection (agent-provided)

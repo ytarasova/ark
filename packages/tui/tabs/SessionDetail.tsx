@@ -8,6 +8,7 @@ import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter } from "../helpers/sessionFormatting.js";
 import { getSessionCost, formatCost } from "../../core/costs.js";
+import * as flow from "../../core/flow.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { Link } from "../components/Link.js";
@@ -150,6 +151,30 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
       {s.stage && <KeyValue label="Stage">{s.stage}</KeyValue>}
       {s.agent && <KeyValue label="Agent">{s.agent}</KeyValue>}
       {s.group_name && <KeyValue label="Group">{s.group_name}</KeyValue>}
+
+      {/* Flow pipeline */}
+      {s.flow && s.stage && (() => {
+        const stages = flow.getStages(s.flow);
+        if (stages.length <= 1) return null;
+        return (
+          <Box>
+            <Text dimColor>{"  "}</Text>
+            {stages.map((st, idx) => {
+              const isCurrent = st.name === s.stage;
+              const isPast = stages.findIndex(x => x.name === s.stage) > idx;
+              return (
+                <React.Fragment key={st.name}>
+                  {idx > 0 && <Text dimColor>{" > "}</Text>}
+                  <Text color={isCurrent ? "cyan" : isPast ? "green" : undefined} bold={isCurrent} dimColor={!isCurrent && !isPast}>
+                    {isCurrent ? `[${st.name}]` : st.name}
+                  </Text>
+                </React.Fragment>
+              );
+            })}
+          </Box>
+        );
+      })()}
+
       {s.pr_url && (
         <KeyValue label="PR">
           <Link url={s.pr_url} color="cyan">{s.pr_url.replace("https://github.com/", "")}</Link>
@@ -165,7 +190,7 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
       )}
 
       {/* Todos */}
-      {todos.length > 0 && (
+      {todos.length > 0 ? (
         <>
           <Text> </Text>
           <SectionHeader title={`Todos (${todos.filter((t: any) => t.done).length}/${todos.length})`} />
@@ -175,6 +200,12 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
               <Text dimColor={t.done}>{` ${t.content}`}</Text>
             </Text>
           ))}
+        </>
+      ) : (
+        <>
+          <Text> </Text>
+          <SectionHeader title="Todos" />
+          <Text dimColor>{"  No todos. Add with ark session todo add <id> \"text\""}</Text>
         </>
       )}
 
@@ -254,6 +285,12 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
             );
           })}
         </>
+      ) : (s.status === "running") ? (
+        <>
+          <Text> </Text>
+          <SectionHeader title="Conversation" />
+          <Text dimColor>{"  Waiting for agent output..."}</Text>
+        </>
       ) : null}
 
       {/* Agent output (live tmux capture) */}
@@ -265,14 +302,20 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
             <Text key={`out-${idx}`} wrap="truncate">{`  ${line}`}</Text>
           ))}
         </>
+      ) : (s.status === "running") ? (
+        <>
+          <Text> </Text>
+          <SectionHeader title="Live Output" />
+          <Text dimColor>{"  Agent starting up..."}</Text>
+        </>
       ) : null}
 
       {/* Events - visual separator */}
-      {events.length > 0 && (
-        <>
-          <Text> </Text>
-          <SectionHeader title="Events" />
-          {events.slice(-10).map((ev) => {
+      <>
+        <Text> </Text>
+        <SectionHeader title="Events" />
+        {events.length > 0 ? (
+          events.slice(-10).map((ev) => {
             const ts = hms(ev.created_at).slice(0, 5); // HH:MM
             const msg = formatEvent(ev.type, ev.data ?? undefined);
             return (
@@ -281,9 +324,11 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
                 {msg}
               </Text>
             );
-          })}
-        </>
-      )}
+          })
+        ) : (
+          <Text dimColor>{"  No events yet"}</Text>
+        )}
+      </>
     </DetailPanel>
   );
 }

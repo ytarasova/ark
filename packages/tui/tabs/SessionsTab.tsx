@@ -104,7 +104,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   const [groups, setGroups] = useState<any[]>([]);
   useEffect(() => { ark.groupList().then(setGroups); }, [sessions]);
 
-  const actions = useSessionActions(asyncState);
+  const actions = useSessionActions(asyncState, status.show);
   const groupActions = useGroupActions(asyncState);
 
   // Auth status for selected session's compute target
@@ -357,8 +357,11 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
             groupBy={s => s.group_name ?? ""}
             emptyGroups={groups}
             renderRow={(s) => {
+              const cols = process.stdout.columns ?? 120;
+              const summaryWidth = cols > 140 ? 45 : cols > 100 ? 30 : 20;
               const icon = ICON[s.status] ?? "?";
-              const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
+              const raw = s.summary ?? s.ticket ?? s.repo ?? "---";
+              const summary = raw.length > summaryWidth ? raw.slice(0, summaryWidth - 1) + "\u2026" : raw.padEnd(summaryWidth);
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
               const unread = unreadCounts.get(s.id) ?? 0;
@@ -366,9 +369,12 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
               return `${icon} ${summary} ${stage} ${age}${badge}`;
             }}
             renderColoredRow={(s) => {
+              const cols = process.stdout.columns ?? 120;
+              const summaryWidth = cols > 140 ? 45 : cols > 100 ? 30 : 20;
               const icon = ICON[s.status] ?? "?";
               const color = getStatusColor(s.status);
-              const summary = (s.summary ?? s.ticket ?? s.repo ?? "---").slice(0, 22).padEnd(22);
+              const raw = s.summary ?? s.ticket ?? s.repo ?? "---";
+              const summary = raw.length > summaryWidth ? raw.slice(0, summaryWidth - 1) + "\u2026" : raw.padEnd(summaryWidth);
               const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
               const age = ago(s.created_at).padStart(4);
               const unread = unreadCounts.get(s.id) ?? 0;

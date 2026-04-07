@@ -158,11 +158,11 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
     return { ok: true, message: `Already running (${session.session_id})` };
   }
   if (session.status !== "ready" && session.status !== "blocked") {
-    return { ok: false, message: `Not ready (status: ${session.status})` };
+    return { ok: false, message: `Not ready (status: ${session.status}). Stop it first, or wait for it to finish.` };
   }
 
   const stage = session.stage;
-  if (!stage) return { ok: false, message: "No current stage" };
+  if (!stage) return { ok: false, message: "No current stage. The session may have completed its flow." };
 
   // Validate compute exists if specified
   if (session.compute_name && !getApp().computes.get(session.compute_name)) {
@@ -290,7 +290,7 @@ export async function advance(sessionId: string, force = false): Promise<{ ok: b
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const { flow: flowName, stage } = session;
-  if (!stage) return { ok: false, message: "No current stage" };
+  if (!stage) return { ok: false, message: "No current stage. The session may have completed its flow." };
 
   if (!force) {
     const { canProceed, reason } = flow.evaluateGate(flowName, stage, session);
@@ -508,6 +508,44 @@ export async function runVerification(sessionId: string): Promise<{
     scriptResults,
     message: ok ? "Verification passed" : parts.join("\n"),
   };
+}
+
+/**
+ * Execute an action stage (create_pr, merge, close, etc.).
+ * Called by the conductor when auto-advancing into an action stage.
+ */
+export async function executeAction(sessionId: string, action: string): Promise<{ ok: boolean; message: string }> {
+  const s = getApp().sessions.get(sessionId);
+  if (!s) return { ok: false, message: "Session not found" };
+
+  switch (action) {
+    case "create_pr": {
+      const result = await createWorktreePR(sessionId, { title: s.summary ?? undefined });
+      if (result.ok) {
+        getApp().events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: result.pr_url } });
+        // Auto-advance past this action stage
+        return await advance(sessionId, true);
+      }
+      return result;
+    }
+    case "merge_pr":
+    case "merge": {
+      const result = await finishWorktree(sessionId, { force: true });
+      if (result.ok) {
+        getApp().events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action } });
+      }
+      return result;
+    }
+    case "close_ticket":
+    case "close": {
+      getApp().events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action } });
+      return await advance(sessionId, true);
+    }
+    default: {
+      getApp().events.log(sessionId, "action_skipped", { stage: s.stage ?? undefined, actor: "system", data: { action, reason: "unknown action type" } });
+      return await advance(sessionId, true);
+    }
+  }
 }
 
 export async function complete(sessionId: string, opts?: { force?: boolean }): Promise<{ ok: boolean; message: string }> {
@@ -1363,7 +1401,7 @@ export async function finishWorktree(sessionId: string, opts?: {
 
   const workdir = session.workdir;
   const repo = session.repo;
-  if (!workdir || !repo) return { ok: false, message: "Session has no workdir or repo" };
+  if (!workdir || !repo) return { ok: false, message: "Session has no workdir or repo. Create a new session with --repo to enable worktree features." };
 
   // Verify before finishing (unless force)
   if (!opts?.force) {

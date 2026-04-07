@@ -48,7 +48,7 @@ export {
   forkSession, cloneSession, handoff, fork, joinFork, getOutput, send,
   deleteSessionAsync, undeleteSessionAsync, waitForCompletion, approveReviewGate,
   applyHookStatus, applyReport, cleanupOnTerminal,
-  retryWithContext, fanOut, worktreeDiff, finishWorktree, createWorktreePR, detectStatus,
+  retryWithContext, fanOut, worktreeDiff, finishWorktree, createWorktreePR, detectStatus, executeAction,
   spawnSubagent, spawnParallelSubagents,
   findOrphanedWorktrees, cleanupWorktrees,
   runVerification,
@@ -124,6 +124,12 @@ export { saveCheckpoint, getCheckpoint, listCheckpoints, findOrphanedSessions, r
 // Safe async helper
 export { safeAsync } from "./safe.js";
 
+// Prerequisite checker
+export { checkPrereqs, formatPrereqCheck, hasRequiredPrereqs, type PrereqResult } from "./prereqs.js";
+
+// OS notifications
+export { sendOSNotification } from "./notify.js";
+
 // Unified tool discovery
 export { discoverTools, removeMcpServer, removeCommand, getCommand, addMcpServer, addCommand, type ToolEntry } from "./tools.js";
 
@@ -174,7 +180,7 @@ export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./not
 export { searchAllConversations, type GlobalSearchResult } from "./global-search.js";
 
 // Tmux content-based status detection
-export { detectStatusFromContent, detectSessionStatus, stripAnsi, type DetectedStatus } from "./status-detect.js";
+export { detectStatusFromContent, detectSessionStatus, stripAnsi, parseAgentProgress, type DetectedStatus } from "./status-detect.js";
 
 // Multi-instance coordination
 export { registerInstance, activeInstanceCount } from "./instance-lock.js";
