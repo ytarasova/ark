@@ -60,6 +60,7 @@ ark session list [options]
 | `-s, --status <status>` | Filter by status (running/stopped/completed/failed/waiting/ready) |
 | `-r, --repo <repo>` | Filter by repo |
 | `-g, --group <group>` | Filter by group |
+| `--archived` | Show archived sessions |
 
 ```bash
 ark session list
@@ -134,14 +135,19 @@ ark session advance s-a1b2c3 --force
 
 ### ark session complete
 
-Mark the current stage as done and advance.
+Mark the current stage as done and advance. Blocked if verification scripts or todos are incomplete.
 
 ```
-ark session complete <id>
+ark session complete <id> [options]
 ```
+
+| Option | Description |
+|--------|-------------|
+| `-f, --force` | Override verification and complete regardless |
 
 ```bash
 ark session complete s-a1b2c3
+ark session complete s-a1b2c3 --force
 ```
 
 ### ark session pause
@@ -277,6 +283,74 @@ ark session join s-parent
 ark session join s-parent --force
 ```
 
+### ark session interrupt
+
+Interrupt a running agent (sends Ctrl+C). The agent pauses and can be re-engaged with `ark session send`.
+
+```
+ark session interrupt <id>
+```
+
+```bash
+ark session interrupt s-a1b2c3
+```
+
+### ark session archive
+
+Archive a completed session. Archived sessions are hidden from the default list.
+
+```
+ark session archive <id>
+```
+
+```bash
+ark session archive s-a1b2c3
+```
+
+### ark session restore
+
+Restore an archived session to stopped status.
+
+```
+ark session restore <id>
+```
+
+```bash
+ark session restore s-a1b2c3
+```
+
+### ark session verify
+
+Run verification scripts for the current stage. Shows pass/fail for each script.
+
+```
+ark session verify <id>
+```
+
+```bash
+ark session verify s-a1b2c3
+```
+
+### ark session todo
+
+Manage verification todos (checklists that block stage completion).
+
+```
+ark session todo <action> <id> [text]
+```
+
+| Action | Description |
+|--------|-------------|
+| `add` | Add a todo item (requires text) |
+| `list` | List all todos for the session |
+| `done` | Toggle a todo by number |
+
+```bash
+ark session todo add s-a1b2c3 "Write migration docs"
+ark session todo list s-a1b2c3
+ark session todo done s-a1b2c3 1
+```
+
 ### ark session events
 
 Show event history for a session.
@@ -380,12 +454,51 @@ ark worktree finish <session-id> [options]
 | `--into <branch>` | Target branch to merge into | `main` |
 | `--no-merge` | Skip merge, just remove worktree and delete session | -- |
 | `--keep-branch` | Do not delete the branch after merge | -- |
+| `--pr` | Push branch and create a GitHub PR instead of merging locally | -- |
 
 ```bash
 ark worktree finish s-a1b2c3
 ark worktree finish s-a1b2c3 --into develop
 ark worktree finish s-a1b2c3 --no-merge
 ark worktree finish s-a1b2c3 --keep-branch
+ark worktree finish s-a1b2c3 --pr
+```
+
+### ark worktree diff
+
+Preview changes in a session's worktree branch.
+
+```
+ark worktree diff <session-id> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--base <branch>` | Branch to compare against | `main` |
+
+```bash
+ark worktree diff s-a1b2c3
+ark worktree diff s-a1b2c3 --base develop
+```
+
+### ark worktree pr
+
+Push the worktree branch and create a GitHub PR.
+
+```
+ark worktree pr <session-id> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--title <text>` | PR title | session summary |
+| `--base <branch>` | Base branch for the PR | `main` |
+| `--draft` | Create as a draft PR | -- |
+
+```bash
+ark worktree pr s-a1b2c3
+ark worktree pr s-a1b2c3 --title "Add OAuth2 support"
+ark worktree pr s-a1b2c3 --base develop --draft
 ```
 
 ---

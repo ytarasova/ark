@@ -95,6 +95,17 @@ ark session resume s-a1b2c3    # Resume a stopped session
 ark session pause s-a1b2c3 --reason "Waiting for review"
 ```
 
+### Interrupting Agents
+
+Interrupt a running agent without killing its tmux session. The agent pauses (receives Ctrl+C) and can be re-engaged:
+
+```bash
+ark session interrupt s-a1b2c3    # Pause the agent
+ark session send s-a1b2c3 "Continue with the API layer"  # Re-engage
+```
+
+In the TUI, press `I` to interrupt the selected session.
+
 ### Forking (Conversation Branching)
 
 Fork creates a copy of a session with its own identity, useful for exploring alternative approaches:
@@ -123,6 +134,18 @@ ark session undelete s-a1b2c3    # Restore within 90s
 ```
 
 In the TUI, press `x` to delete, then `Ctrl+Z` to undo.
+
+### Archiving Sessions
+
+Archive completed sessions for long-term reference without deleting them:
+
+```bash
+ark session archive s-a1b2c3     # Archive (hidden from default list)
+ark session restore s-a1b2c3     # Restore to stopped status
+ark session list --archived       # Show archived sessions
+```
+
+In the TUI, press `Z` to archive/restore.
 
 ### Session Output
 
@@ -182,6 +205,15 @@ Launch with `ark tui`. The dashboard has 7 tabs, switched with number keys `1`-`
 | `f/b` | Page forward/back |
 | `Tab` | Toggle between list and detail pane |
 
+### Session Actions
+
+| Key | Action |
+|-----|--------|
+| `I` | Interrupt running agent |
+| `V` | Run verification |
+| `Z` | Archive/restore session |
+| `W` | Worktree finish overlay (with diff preview) |
+
 ### Status Filters
 
 Quickly filter the session list by status:
@@ -227,7 +259,12 @@ ark web --token my-secret-token      # Require Bearer token auth
 
 ### Features
 
-- **Session management**: create, dispatch, stop, restart, delete sessions
+- **Session management**: create, dispatch, stop, restart, interrupt, pause, advance, complete, fork, send, archive sessions
+- **Compute lifecycle**: provision, start, stop, destroy compute resources
+- **Scheduling**: create, enable/disable, delete scheduled sessions
+- **Verification**: run verification, manage todos
+- **Diff preview**: view changes before merging or creating PRs
+- **PR creation**: create GitHub PRs from session worktrees
 - **Cost tracking**: per-session and aggregate cost display
 - **Memory view**: add, search, and delete cross-session memories from the sidebar
 - **System status**: conductor health, active sessions count
@@ -364,6 +401,37 @@ stages:
     gate: auto
 ```
 
+### Verification Gates
+
+Flow stages can require verification scripts to pass before completion:
+
+```yaml
+stages:
+  - name: implement
+    agent: implementer
+    gate: auto
+    verify:
+      - "npm test"
+      - "npm run lint"
+```
+
+The agent cannot complete the stage until all verify scripts pass. Failed verification steers the agent to fix the issue.
+
+### Todos
+
+Add checklists that block stage completion:
+
+```bash
+ark session todo add s-a1b2c3 "Write migration docs"
+ark session todo list s-a1b2c3
+ark session todo done s-a1b2c3 1          # Toggle todo #1
+ark session verify s-a1b2c3               # Run verification manually
+ark session complete s-a1b2c3             # Blocked if todos/scripts fail
+ark session complete s-a1b2c3 --force     # Override verification
+```
+
+Todos are shown in the TUI detail panel. Press `V` to run verification.
+
 ### Builtin Flows
 
 | Flow | Stages | Use Case |
@@ -473,6 +541,30 @@ ark worktree finish s-a1b2c3 --keep-branch    # Keep branch after merge
 ```
 
 Worktrees are stored at `~/.ark/worktrees/<sessionId>/`.
+
+### Diff Preview
+
+Preview changes before merging:
+
+```bash
+ark worktree diff s-a1b2c3                    # Show diff stat
+ark worktree diff s-a1b2c3 --base develop     # Compare against specific branch
+```
+
+In the TUI, press `W` to see the worktree finish overlay with diff preview.
+
+### Creating Pull Requests
+
+Create a GitHub PR from a session's worktree branch:
+
+```bash
+ark worktree pr s-a1b2c3                      # Push branch + create PR
+ark worktree pr s-a1b2c3 --title "My PR"      # Custom title
+ark worktree pr s-a1b2c3 --draft              # Create as draft
+ark worktree finish s-a1b2c3 --pr             # Finish worktree and create PR
+```
+
+**Auto-PR**: When an agent completes and the repo has a git remote, Ark automatically pushes the branch and creates a PR. Disable per-repo with `auto_pr: false` in `.ark.yaml`.
 
 ---
 

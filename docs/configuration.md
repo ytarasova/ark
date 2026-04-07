@@ -49,6 +49,9 @@ hotkeys:
   settings: P
   advance: A
   worktreeFinish: W
+  interrupt: I
+  verify: V
+  archive: Z
 
 # ── Budgets ─────────────────────────────────────────────────────────
 # Spending limits in USD. Ark warns when approaching/exceeding limits.
@@ -126,6 +129,9 @@ Available actions and their defaults:
 | `settings` | `P` | Open settings |
 | `advance` | `A` | Advance session to next flow stage |
 | `worktreeFinish` | `W` | Finish worktree (merge branch and clean up) |
+| `interrupt` | `I` | Interrupt running agent |
+| `verify` | `V` | Run verification |
+| `archive` | `Z` | Archive/restore session |
 
 To disable a shortcut, set it to `null`:
 
@@ -370,6 +376,14 @@ agent: implementer
 env:
   CUSTOM_VAR: "value"
   DB_HOST: "localhost"
+
+# Verification scripts for all stages (overridden by flow-level verify)
+verify:
+  - "npm test"
+  - "npm run lint"
+
+# Auto-create PR on agent completion (default: true for repos with remotes)
+auto_pr: true
 ```
 
 | Field | Type | Description |
@@ -379,6 +393,8 @@ env:
 | `compute` | string | Default compute resource |
 | `agent` | string | Default agent name |
 | `env` | object | Environment variables for agents |
+| `verify` | string[] | Verification scripts run before stage completion |
+| `auto_pr` | boolean | Auto-create PR on agent completion (default: true for repos with remotes) |
 
 CLI flags always override `.ark.yaml` defaults. For example:
 

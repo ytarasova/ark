@@ -7,3 +7,6 @@ dist/
 !shims/**/*.js
 .env
 .worktrees/
+
+# Ark session hook config (written at dispatch, cleaned on stop)
+.claude/settings.local.json
