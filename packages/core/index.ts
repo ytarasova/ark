@@ -36,7 +36,7 @@ export {
   spawnSubagent, spawnParallelSubagents,
   findOrphanedWorktrees, cleanupWorktrees,
   type HookStatusResult, type ReportResult, type SessionOpResult,
-} from "./session.js";
+} from "./services/session-orchestration.js";
 
 // Flow
 export * from "./flow.js";

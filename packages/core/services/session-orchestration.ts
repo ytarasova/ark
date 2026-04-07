@@ -14,39 +14,39 @@ import { homedir } from "os";
 
 const execFileAsync = promisify(execFile);
 
-import * as store from "./store.js";
-import { getCompute } from "./store.js";
-import * as tmux from "./tmux.js";
-import * as flow from "./flow.js";
-import * as agentRegistry from "./agent.js";
-import * as claude from "./claude.js";
-import { parseTranscriptUsage } from "./claude.js";
-import { getProvider } from "../compute/index.js";
+import * as store from "../store.js";
+import { getCompute } from "../store.js";
+import * as tmux from "../tmux.js";
+import * as flow from "../flow.js";
+import * as agentRegistry from "../agent.js";
+import * as claude from "../claude.js";
+import { parseTranscriptUsage } from "../claude.js";
+import { getProvider } from "../../compute/index.js";
 
 export type SessionOpResult = { ok: true; sessionId: string } | { ok: false; message: string };
-import { resolvePortDecls, parseArcJson } from "../compute/arc-json.js";
-import { buildSessionVars } from "./template.js";
-import { resolveFlow } from "./flow.js";
-import { loadRepoConfig } from "./repo-config.js";
-import { eventBus } from "./hooks.js";
-import { indexSession } from "./search.js";
-import type { OutboundMessage } from "./channel-types.js";
-import { safeAsync } from "./safe.js";
-import { saveCheckpoint } from "./checkpoint.js";
-import { profileGroupPrefix } from "./profiles.js";
-import { parseGraphFlow, getSuccessors } from "./graph-flow.js";
-import { evaluateTermination, parseTermination, type TerminationContext } from "./termination.js";
-import { markStageCompleted, setCurrentStage } from "./flow-state.js";
-import { recall, formatMemoriesForPrompt } from "./memory.js";
-import { detectHandoff } from "./handoff.js";
-import { filterMessages, parseMessageFilter } from "./message-filter.js";
-import { logError, logInfo, logWarn } from "./structured-log.js";
-import { recordEvent } from "./observability.js";
-import { track } from "./telemetry.js";
-import { emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "./otlp.js";
-import { detectInjection } from "./prompt-guard.js";
-import { generateRepoMap, formatRepoMap } from "./repo-map.js";
-import { getExecutor } from "./executor.js";
+import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
+import { buildSessionVars } from "../template.js";
+import { resolveFlow } from "../flow.js";
+import { loadRepoConfig } from "../repo-config.js";
+import { eventBus } from "../hooks.js";
+import { indexSession } from "../search.js";
+import type { OutboundMessage } from "../channel-types.js";
+import { safeAsync } from "../safe.js";
+import { saveCheckpoint } from "../checkpoint.js";
+import { profileGroupPrefix } from "../profiles.js";
+import { parseGraphFlow, getSuccessors } from "../graph-flow.js";
+import { evaluateTermination, parseTermination, type TerminationContext } from "../termination.js";
+import { markStageCompleted, setCurrentStage } from "../flow-state.js";
+import { recall, formatMemoriesForPrompt } from "../memory.js";
+import { detectHandoff } from "../handoff.js";
+import { filterMessages, parseMessageFilter } from "../message-filter.js";
+import { logError, logInfo, logWarn } from "../structured-log.js";
+import { recordEvent } from "../observability.js";
+import { track } from "../telemetry.js";
+import { emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../otlp.js";
+import { detectInjection } from "../prompt-guard.js";
+import { generateRepoMap, formatRepoMap } from "../repo-map.js";
+import { getExecutor } from "../executor.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 function sessionAsVars(session: store.Session): Record<string, unknown> {
@@ -347,8 +347,8 @@ export async function advance(sessionId: string, force = false): Promise<{ ok: b
 
     // Extract skills from completed session transcript
     try {
-      const { extractAndSaveSkills } = await import("./skill-extractor.js");
-      const { getSessionConversation } = await import("./search.js");
+      const { extractAndSaveSkills } = await import("../skill-extractor.js");
+      const { getSessionConversation } = await import("../search.js");
       const conv = getSessionConversation(sessionId);
       if (conv.length > 0) {
         const turns = conv.map((c: any) => ({ role: c.source === "message" ? "user" : "assistant", content: c.match ?? c.content }));
@@ -678,7 +678,7 @@ export async function undeleteSessionAsync(sessionId: string): Promise<{ ok: boo
 
 // ── Provider resolution ──────────────────────────────────────────────────────
 
-import type { ComputeProvider } from "../compute/types.js";
+import type { ComputeProvider } from "../../compute/types.js";
 
 // App-level provider resolver — set by AppContext.boot() via setProviderResolver()
 type ProviderResolver = (session: store.Session) => { provider: ComputeProvider | null; compute: store.Compute | null };
@@ -771,7 +771,7 @@ async function applyContainerSetup(
   const arcJson = parseArcJson(effectiveWorkdir);
   if (arcJson?.compose === true && compute.config?.ip) {
     onLog("Starting Docker Compose services...");
-    const { sshExec, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
+    const { sshExec, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
     sshExec(sshKeyPath(compute.name), compute.config.ip as string,
       `cd ${effectiveWorkdir} && docker compose up -d`);
   }
@@ -779,7 +779,7 @@ async function applyContainerSetup(
   // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }
   if (arcJson?.devcontainer === true) {
     onLog("Building devcontainer...");
-    const { buildLaunchCommand } = await import("../compute/providers/docker/devcontainer.js");
+    const { buildLaunchCommand } = await import("../../compute/providers/docker/devcontainer.js");
     return buildLaunchCommand(effectiveWorkdir, launchContent);
   }
 
@@ -806,7 +806,7 @@ export async function prepareRemoteEnvironment(
   const ip = (compute.config as any)?.ip;
   if (ip) {
     log("Checking host connectivity...");
-    const { sshExecAsync, sshKeyPath } = await import("../compute/providers/ec2/ssh.js");
+    const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
     const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), ip, "echo ok", { timeout: 15_000 });
     if (exitCode !== 0) {
       throw new Error(`Cannot reach compute '${compute.name}' at ${ip}`);
@@ -1223,7 +1223,7 @@ export async function send(sessionId: string, message: string): Promise<{ ok: bo
     }
   } catch { /* skip prompt guard on error */ }
 
-  const { sendReliable } = await import("./send-reliable.js");
+  const { sendReliable } = await import("../send-reliable.js");
   const result = await sendReliable(session.session_id, message, { waitForReady: false, maxRetries: 3 });
   return { ok: result.ok, message: result.message };
 }
@@ -1232,7 +1232,7 @@ export async function send(sessionId: string, message: string): Promise<{ ok: bo
 export async function detectStatus(sessionId: string): Promise<string | null> {
   const session = store.getSession(sessionId);
   if (!session?.session_id) return null;
-  const { detectSessionStatus } = await import("./status-detect.js");
+  const { detectSessionStatus } = await import("../status-detect.js");
   const detected = await detectSessionStatus(session.session_id);
   return detected === "unknown" ? null : detected;
 }

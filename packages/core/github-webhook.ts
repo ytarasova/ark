@@ -5,7 +5,7 @@
 
 import { getApp } from "./app.js";
 import { createSession as storeCreateSession, logEvent as storeLogEvent } from "./store.js";
-import { dispatch } from "./session.js";
+import { dispatch } from "./services/session-orchestration.js";
 
 export interface IssueWebhookPayload {
   action: string;  // "labeled", "opened", "edited"

@@ -23,7 +23,7 @@ declare const Bun: {
 import { sessionChannelPort, mergeSessionConfig, getSession as storeGetSession, listSessions as storeListSessions, getEvents as storeGetEvents, logEvent as storeLogEvent, updateSession as storeUpdateSession, getCompute as storeGetCompute, addMessage as storeAddMessage } from "./store.js";
 import type { Session } from "../types/index.js";
 import { getApp } from "./app.js";
-import * as session from "./session.js";
+import * as session from "./services/session-orchestration.js";
 import * as flow from "./flow.js";
 import { eventBus } from "./hooks.js";
 import type { OutboundMessage } from "./channel-types.js";

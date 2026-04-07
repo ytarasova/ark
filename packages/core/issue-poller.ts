@@ -93,7 +93,7 @@ export async function createSessionFromIssue(
   if (issueAlreadyTracked(ticket)) return null;
 
   // Lazy import to avoid circular deps (same pattern as pr-poller.ts)
-  const { startSession, dispatch } = await import("./session.js");
+  const { startSession, dispatch } = await import("./services/session-orchestration.js");
 
   const session = startSession({
     ticket,

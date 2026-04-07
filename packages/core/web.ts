@@ -27,7 +27,7 @@ import {
   spawnSubagent,
   finishWorktree,
   cleanupWorktrees,
-} from "./session.js";
+} from "./services/session-orchestration.js";
 import { exportSession, type SessionExport } from "./session-share.js";
 import { searchSessions, searchTranscripts } from "./search.js";
 import { searchAllConversations } from "./global-search.js";

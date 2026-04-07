@@ -3,7 +3,7 @@
  */
 
 import { loadRecipe, instantiateRecipe } from "./recipe.js";
-import { startSession } from "./session.js";
+import { startSession } from "./services/session-orchestration.js";
 import type { Session } from "../types/index.js";
 import { getSessionCost } from "./costs.js";
 

@@ -3,7 +3,7 @@
  * Enables CI/CD integration and programmatic agent control.
  */
 
-import { startSession, dispatch, stop, resume, deleteSessionAsync, getOutput, send } from "./session.js";
+import { startSession, dispatch, stop, resume, deleteSessionAsync, getOutput, send } from "./services/session-orchestration.js";
 import { getApp } from "./app.js";
 import { getSession as storeGetSession, listSessions as storeListSessions } from "./store.js";
 

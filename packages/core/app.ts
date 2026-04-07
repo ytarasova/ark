@@ -19,7 +19,7 @@ import type { ComputeProvider } from "../compute/types.js";
 import { setAppStore, clearAppStore, safeParseConfig, purgeExpiredDeletes } from "./store.js";
 import { initSchema as initRepoSchema, seedLocalCompute } from "./repositories/schema.js";
 import type { Compute, Session } from "../types/index.js";
-import { setProviderResolver, clearProviderResolver } from "./session.js";
+import { setProviderResolver, clearProviderResolver } from "./services/session-orchestration.js";
 import { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
 import { startNotifyDaemon } from "./notify-daemon.js";
 import { track, configureTelemetry } from "./telemetry.js";

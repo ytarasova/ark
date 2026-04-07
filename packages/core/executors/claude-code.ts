@@ -34,7 +34,7 @@ export const claudeCodeExecutor: Executor = {
     const provider = getProvider(compute?.provider ?? "local");
 
     // Setup worktree + trust (dynamic import to avoid circular dependency)
-    const { setupSessionWorktree } = await import("../session.js");
+    const { setupSessionWorktree } = await import("../services/session-orchestration.js");
     const effectiveWorkdir = await setupSessionWorktree(session, compute, provider, log);
 
     // Determine conductor URL based on compute type
@@ -74,7 +74,7 @@ export const claudeCodeExecutor: Executor = {
 
     // Remote compute (providers that don't support local worktrees)
     if (compute && provider && !provider.supportsWorktree) {
-      const { prepareRemoteEnvironment } = await import("../session.js");
+      const { prepareRemoteEnvironment } = await import("../services/session-orchestration.js");
       const { finalLaunchContent, ports } = await prepareRemoteEnvironment(
         session, compute, provider, effectiveWorkdir,
         { launchContent, onLog: log },
