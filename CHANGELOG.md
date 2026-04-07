@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.10.0 (2026-04-07)
+
+### New Features
+- **Generic CLI agent executor**: run ANY CLI coding tool (Codex, Gemini, Aider, Cursor Agent, OpenCode, Pi, Amp, etc.) in tmux with worktree isolation. Agent YAML: `runtime: cli-agent`, `command: ["tool", "args"]`, `task_delivery: stdin|file|arg`
+- **Electron desktop app**: native macOS/Windows/Linux app wrapping the Web UI. `make desktop` to launch, `make desktop-build` to package for distribution
+- **Status poller**: non-Claude executors get automatic session status detection via 3-second tmux polling
+- **Builtin agent definitions**: codex-worker, gemini-worker, aider-worker, generic-cli
+
+### Usage
+```bash
+ark session start --repo . --summary "Fix bug" --agent codex-worker --dispatch
+ark session start --repo . --summary "Refactor" --agent aider-worker --dispatch
+make desktop   # Launch Electron app
+```
+
 ## v0.9.1 (2026-04-07)
 
 ### Product Excellence

@@ -1,4 +1,4 @@
-.PHONY: install dev tui web test test-watch lint clean uninstall build-web help
+.PHONY: install dev tui web test test-watch lint clean uninstall build-web desktop desktop-install help
 
 BUN := bun
 ARK_BIN := /usr/local/bin/ark
@@ -37,8 +37,17 @@ web: ## Launch the web dashboard
 build-web: ## Build the web frontend
 	$(BUN) run packages/web/build.ts
 
+desktop-install: ## Install Electron dependencies for desktop app
+	cd packages/desktop && npm install
+
+desktop: build-web desktop-install ## Build and launch the Electron desktop app
+	cd packages/desktop && npx electron .
+
+desktop-build: build-web desktop-install ## Package the Electron app for distribution
+	cd packages/desktop && npx electron-builder
+
 clean: ## Remove build artifacts
-	rm -rf dist packages/web/dist node_modules/.cache
+	rm -rf dist packages/web/dist packages/desktop/out node_modules/.cache
 
 uninstall: ## Remove the ark symlink
 	rm -f $(ARK_BIN)

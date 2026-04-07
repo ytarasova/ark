@@ -37,6 +37,7 @@ The `default` flow runs: plan > implement > PR > review > merge. Each stage uses
 ```bash
 ark tui    # Terminal dashboard (7 tabs, keyboard-driven)
 ark web    # Web dashboard (browser-based, SSE live updates)
+make desktop  # Desktop app (Electron, native window)
 ```
 
 ### Use a recipe template
@@ -243,6 +244,45 @@ Press `f` on any session to fork it. Enter a task description for the forked ses
 Press `r` on a completed/stopped/failed session to open the replay view. Step through the session timeline event by event with `j/k`.
 
 See the [TUI Reference](tui-reference.md) for the complete keyboard shortcut table.
+
+---
+
+## Desktop App
+
+Ark ships as an Electron desktop app that wraps the Web UI in a native window.
+
+### Running
+
+```bash
+make desktop                         # Build web + launch Electron app
+```
+
+### Building for Distribution
+
+```bash
+make desktop-build                   # Package for macOS/Windows/Linux
+```
+
+This produces distributable binaries in `packages/desktop/out/`:
+- macOS: `.dmg` and `.zip`
+- Windows: `.exe` (NSIS installer) and `.zip`
+- Linux: `.AppImage` and `.deb`
+
+### How it works
+
+The desktop app boots the Ark web server (`ark web`) as a child process on a free port, then opens a BrowserWindow. All features work identically to the browser-based dashboard. The native window provides:
+- macOS traffic light controls with hidden title bar
+- Native menu bar (Edit, View, Window)
+- External links open in the system browser
+- Dark background matches the Ark theme
+
+### Prerequisites
+
+```bash
+make desktop-install                 # Install Electron + electron-builder
+```
+
+Requires: Bun, Git, `ark` on PATH (`make install`).
 
 ---
 

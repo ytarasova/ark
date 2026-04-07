@@ -10,3 +10,7 @@ dist/
 
 # Ark session hook config (written at dispatch, cleaned on stop)
 .claude/settings.local.json
+
+# Electron desktop app build output
+packages/desktop/out/
+packages/desktop/node_modules/

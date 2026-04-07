@@ -1,0 +1,49 @@
+{
+  "name": "ark-desktop",
+  "version": "0.10.0",
+  "description": "Ark Desktop - AI Agent Orchestration",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac --win --linux",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.ark.desktop",
+    "productName": "Ark",
+    "directories": {
+      "output": "out"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../../packages/web/dist",
+        "to": "web-dist"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": ["dmg", "zip"],
+      "icon": "icon.png"
+    },
+    "win": {
+      "target": ["nsis", "zip"],
+      "icon": "icon.png"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Development",
+      "icon": "icon.png"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

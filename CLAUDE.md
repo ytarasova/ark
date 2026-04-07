@@ -10,6 +10,8 @@ make test             # run all tests sequentially (NEVER parallel -- ports coll
 make test-file F=path # run a single test file
 make dev              # tsc --watch
 make tui              # ark tui
+make desktop          # launch Electron desktop app
+make desktop-build    # package Electron app for distribution
 ./ark <command>       # run CLI directly via bun
 ark skill list        # list available skills
 ark recipe list       # list available recipes
