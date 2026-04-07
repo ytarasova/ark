@@ -1169,7 +1169,7 @@ computeCmd.command("update")
     try {
       const compute = await ark.computeRead(name);
 
-      const config = { ...compute.config } as any;
+      const config: Record<string, unknown> = { ...compute.config };
       if (opts.size) config.size = opts.size;
       if (opts.arch) config.arch = opts.arch;
       if (opts.region) config.region = opts.region;
@@ -1205,7 +1205,7 @@ computeCmd.command("list")
     }
     console.log(`  ${"NAME".padEnd(20)} ${"PROVIDER".padEnd(10)} ${"STATUS".padEnd(14)} IP`);
     for (const h of computes) {
-      const ip = (h.config as any).ip ?? "-";
+      const ip = (h.config as { ip?: string }).ip ?? "-";
       console.log(`  ${h.name.padEnd(20)} ${h.provider.padEnd(10)} ${h.status.padEnd(14)} ${ip}`);
     }
   });
@@ -1302,9 +1302,10 @@ computeCmd.command("ssh")
     const ark = await getArkClient();
     let compute: any;
     try { compute = await ark.computeRead(name); } catch { console.log(chalk.red(`Compute '${name}' not found`)); return; }
-    const ip = (compute.config as any).ip;
-    const keyPath = (compute.config as any).key_path;
-    const user = (compute.config as any).ssh_user ?? "ubuntu";
+    const sshCfg = compute.config as { ip?: string; key_path?: string; ssh_user?: string };
+    const ip = sshCfg.ip;
+    const keyPath = sshCfg.key_path;
+    const user = sshCfg.ssh_user ?? "ubuntu";
     if (!ip) { console.log(chalk.red(`Compute '${name}' has no IP address`)); return; }
     const sshArgs = [`${user}@${ip}`];
     if (keyPath) sshArgs.unshift("-i", keyPath);
@@ -1548,7 +1549,7 @@ program.command("auth")
       const ark = await getArkClient();
       let compute: any;
       try { compute = await ark.computeRead(opts.host); } catch { console.error(`Compute '${opts.host}' not found`); process.exit(1); }
-      const cfg = compute.config as any;
+      const cfg = compute.config as { ip?: string };
       if (!cfg.ip) { console.error(`No IP for '${opts.host}'`); process.exit(1); }
       const key = `${process.env.HOME}/.ssh/ark-${compute.name}`;
       console.log(`Running setup-token on ${compute.name} (${cfg.ip})...`);

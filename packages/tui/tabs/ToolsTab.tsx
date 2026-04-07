@@ -244,23 +244,30 @@ function ToolDetail({ item, pane, statusMessage }: {
       {/* MCP Server details */}
       {item.kind === "mcp-server" && item.config && (
         <>
-          <Text> </Text>
-          <SectionHeader title="Server Config" />
-          {(item.config as any).command && (
-            <Text>{`  Command: ${(item.config as any).command}`}</Text>
-          )}
-          {(item.config as any).args?.length > 0 && (
-            <Text>{`  Args:    ${(item.config as any).args.join(" ")}`}</Text>
-          )}
-          {(item.config as any).env && Object.keys((item.config as any).env).length > 0 && (
-            <>
-              <Text> </Text>
-              <SectionHeader title="Environment" />
-              {Object.entries((item.config as any).env).map(([k, v]) => (
-                <Text key={k}>{`  ${k}=${String(v)}`}</Text>
-              ))}
-            </>
-          )}
+          {(() => {
+            const mcpCfg = item.config as { command?: string; args?: string[]; env?: Record<string, string> };
+            return (
+              <>
+                <Text> </Text>
+                <SectionHeader title="Server Config" />
+                {mcpCfg.command && (
+                  <Text>{`  Command: ${mcpCfg.command}`}</Text>
+                )}
+                {mcpCfg.args && mcpCfg.args.length > 0 && (
+                  <Text>{`  Args:    ${mcpCfg.args.join(" ")}`}</Text>
+                )}
+                {mcpCfg.env && Object.keys(mcpCfg.env).length > 0 && (
+                  <>
+                    <Text> </Text>
+                    <SectionHeader title="Environment" />
+                    {Object.entries(mcpCfg.env).map(([k, v]) => (
+                      <Text key={k}>{`  ${k}=${String(v)}`}</Text>
+                    ))}
+                  </>
+                )}
+              </>
+            );
+          })()}
         </>
       )}
 

@@ -370,11 +370,12 @@ export class SessionService {
     // Handle by type
     switch (report.type) {
       case "completed": {
+        const rr = report as unknown as Record<string, unknown>;
         const cfg: SessionConfig = {
-          ...(session.config as any),
-          completion_summary: (report as any).summary,
-          filesChanged: (report as any).filesChanged,
-          commits: (report as any).commits,
+          ...session.config,
+          completion_summary: rr.summary as string | undefined,
+          filesChanged: rr.filesChanged as string[] | undefined,
+          commits: rr.commits as string[] | undefined,
         };
         result.updates.config = cfg;
 
@@ -386,15 +387,19 @@ export class SessionService {
         result.shouldAutoDispatch = true;
         break;
       }
-      case "question":
+      case "question": {
+        const qr = report as unknown as Record<string, unknown>;
         result.updates.status = "waiting" as SessionStatus;
         result.updates.breakpoint_reason =
-          (report as any).question ?? (report as any).message;
+          (qr.question ?? qr.message) as string | null;
         break;
-      case "error":
+      }
+      case "error": {
+        const er = report as unknown as Record<string, unknown>;
         result.updates.status = "failed" as SessionStatus;
-        result.updates.error = (report as any).error ?? (report as any).message;
+        result.updates.error = (er.error ?? er.message) as string | null;
         break;
+      }
       case "progress": {
         // Agent is actively reporting — ensure status reflects that.
         if (session.status === "waiting") {
@@ -406,7 +411,7 @@ export class SessionService {
     }
 
     // PR URL from agent report
-    const prUrl = (report as any).pr_url as string | undefined;
+    const prUrl = (report as unknown as Record<string, unknown>).pr_url as string | undefined;
     if (prUrl && !session.pr_url) {
       result.prUrl = prUrl;
     }

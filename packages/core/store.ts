@@ -236,7 +236,7 @@ export function createSession(opts: {
   group_name?: string | null;
   config?: Record<string, unknown>;
 }): Session {
-  const session = repos().sessions.create(opts as any) as Session;
+  const session = repos().sessions.create(opts) as Session;
 
   // Log session_created event (the repo does not do this — store.ts always did)
   logEvent(session.id, "session_created", {
@@ -267,18 +267,21 @@ export function listSessions(opts?: {
   // so fetch a broader set and filter in memory when needed.
   if (opts?.groupPrefix) {
     const all = repos().sessions.list({
-      status: opts.status,
+      status: opts.status as SessionStatus | undefined,
       repo: opts.repo,
       parent_id: opts.parent_id,
       limit: opts.limit,
-    } as any) as Session[];
+    }) as Session[];
     return all.filter(s => s.group_name && s.group_name.startsWith(opts.groupPrefix!));
   }
-  return repos().sessions.list(opts as any) as Session[];
+  return repos().sessions.list({
+    ...opts,
+    status: opts?.status as SessionStatus | undefined,
+  }) as Session[];
 }
 
 export function updateSession(id: string, fields: Partial<Session>): Session | null {
-  return repos().sessions.update(id, fields as any) as Session | null;
+  return repos().sessions.update(id, fields) as Session | null;
 }
 
 export function deleteSession(id: string): boolean {
@@ -318,7 +321,7 @@ export function claimSession(
   id: string, expectedStatus: string, newStatus: string,
   extraFields?: Partial<Session>,
 ): boolean {
-  return repos().sessions.claim(id, expectedStatus as any, newStatus as any, extraFields as any);
+  return repos().sessions.claim(id, expectedStatus as SessionStatus, newStatus as SessionStatus, extraFields);
 }
 
 // ── Events ─────────────────────────────────────────────────────────────────
@@ -350,7 +353,7 @@ export function createCompute(opts: {
   provider?: string;
   config?: Record<string, unknown>;
 }): Compute {
-  return repos().computes.create(opts as any) as Compute;
+  return repos().computes.create({ ...opts, provider: opts.provider as ComputeProviderName | undefined }) as Compute;
 }
 
 export function getCompute(name: string): Compute | null {
@@ -363,19 +366,19 @@ export function listCompute(opts?: {
   limit?: number;
 }): Compute[] {
   ensureLocalCompute();
-  return repos().computes.list(opts as any) as Compute[];
+  return repos().computes.list(opts as { status?: ComputeStatus; provider?: ComputeProviderName; limit?: number } | undefined) as Compute[];
 }
 
 export function updateCompute(name: string, fields: Partial<Compute>): Compute | null {
-  return repos().computes.update(name, fields as any) as Compute | null;
+  return repos().computes.update(name, fields) as Compute | null;
 }
 
 export function mergeComputeConfig(name: string, patch: Record<string, unknown>): Compute | null {
-  return repos().computes.mergeConfig(name, patch as any) as Compute | null;
+  return repos().computes.mergeConfig(name, patch) as Compute | null;
 }
 
 export function mergeSessionConfig(sessionId: string, patch: Record<string, unknown>): void {
-  repos().sessions.mergeConfig(sessionId, patch as any);
+  repos().sessions.mergeConfig(sessionId, patch);
 }
 
 export function deleteCompute(name: string): boolean {
@@ -416,7 +419,7 @@ export function addMessage(opts: {
   content: string;
   type?: string;
 }): Message {
-  return repos().messages.send(opts.session_id, opts.role as any, opts.content, opts.type as any) as Message;
+  return repos().messages.send(opts.session_id, opts.role as MessageRole, opts.content, opts.type as MessageType | undefined) as Message;
 }
 
 export function getMessages(sessionId: string, opts?: { limit?: number }): Message[] {

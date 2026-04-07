@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { listSessions, getSession, getEvents, getGroups, createSession, updateSession, listCompute, getCompute } from "./store.js";
 import { getAllSessionCosts, formatCost } from "./costs.js";
-import { handleIssueWebhook, type IssueWebhookConfig } from "./github-webhook.js";
+import { handleIssueWebhook, type IssueWebhookConfig, type IssueWebhookPayload } from "./github-webhook.js";
 import {
   startSession,
   dispatch,
@@ -162,17 +162,17 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         const sessions = listSessions({ limit: 500 });
         if (format === "csv") {
           const { exportCostsCsv } = await import("./costs.js");
-          const csv = exportCostsCsv(sessions as any);
+          const csv = exportCostsCsv(sessions);
           return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=ark-costs.csv", ...CORS } });
         }
-        const costs = getAllSessionCosts(sessions as any);
+        const costs = getAllSessionCosts(sessions);
         return jsonResponse(costs);
       }
 
       // GET /api/costs
       if (url.pathname === "/api/costs") {
         const sessions = listSessions({ limit: 500 });
-        const costs = getAllSessionCosts(sessions as any);
+        const costs = getAllSessionCosts(sessions);
         return jsonResponse(costs);
       }
 
@@ -180,7 +180,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/sessions" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json() as any;
+          const body = await req.json() as { summary?: string; repo?: string; flow?: string; group_name?: string; workdir?: string };
           const session = startSession({
             summary: body.summary,
             repo: body.repo,
@@ -204,7 +204,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/webhooks/github/issues" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const payload = await req.json() as any;
+          const payload = await req.json() as IssueWebhookPayload;
           const config: IssueWebhookConfig = {
             triggerLabel: url.searchParams.get("label") ?? "ark",
             autoDispatch: url.searchParams.get("dispatch") === "true",
@@ -299,18 +299,18 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
                 return jsonResponse(result);
               }
               case "fork": {
-                const body = await req.json() as any;
+                const body = await req.json() as { name?: string };
                 const result = cloneSession(id, body?.name);
                 return jsonResponse(result);
               }
               case "send": {
-                const body = await req.json() as any;
+                const body = await req.json() as { message?: string };
                 if (!body?.message) return jsonResponse({ ok: false, message: "message is required" }, 400);
                 const result = await send(id, body.message);
                 return jsonResponse(result);
               }
               case "pause": {
-                const body = await req.json() as any;
+                const body = await req.json() as { reason?: string };
                 const result = pause(id, body?.reason);
                 return jsonResponse(result);
               }
@@ -323,8 +323,9 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
                 return jsonResponse(result);
               }
               case "spawn-subagent": {
-                const body = await req.json() as any;
-                if (!body?.task) return jsonResponse({ ok: false, message: "task is required" }, 400);
+                const rawBody = await req.json() as { task?: string; agent?: string; model?: string; group_name?: string; extensions?: string[] };
+                if (!rawBody?.task) return jsonResponse({ ok: false, message: "task is required" }, 400);
+                const body = rawBody as { task: string; agent?: string; model?: string; group_name?: string; extensions?: string[] };
                 const result = spawnSubagent(id, body);
                 return jsonResponse(result);
               }
@@ -385,7 +386,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/profiles" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json() as any;
+          const body = await req.json() as { name?: string; description?: string };
           if (!body?.name) return jsonResponse({ ok: false, message: "name is required" }, 400);
           const profile = createProfile(body.name, body.description);
           return jsonResponse({ ok: true, profile });
@@ -422,7 +423,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/mcp/attach" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json() as any;
+          const body = await req.json() as { dir?: string; name?: string; config?: Record<string, unknown> };
           if (!body?.dir || !body?.name || !body?.config) return jsonResponse({ ok: false, message: "dir, name, config are required" }, 400);
           addMcpServer(body.dir, body.name, body.config);
           return jsonResponse({ ok: true });
@@ -435,7 +436,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/mcp/detach" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json() as any;
+          const body = await req.json() as { dir?: string; name?: string };
           if (!body?.dir || !body?.name) return jsonResponse({ ok: false, message: "dir, name are required" }, 400);
           removeMcpServer(body.dir, body.name);
           return jsonResponse({ ok: true });
@@ -504,7 +505,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (wtFinishMatch && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json() as any;
+          const body = await req.json() as { into?: string; noMerge?: boolean; keepBranch?: boolean };
           const result = await finishWorktree(wtFinishMatch[1], body);
           return jsonResponse(result);
         } catch (err) {
@@ -539,7 +540,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/conductor/learn" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json() as any;
+          const body = await req.json() as { title?: string; description?: string; dir?: string };
           if (!body?.title || !body?.description) return jsonResponse({ ok: false, message: "title and description are required" }, 400);
           const dir = body.dir ?? ".";
           const result = recordLearning(dir, body.title, body.description);
@@ -576,7 +577,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/memory" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json() as any;
+          const body = await req.json() as { content?: string; scope?: string; tags?: string[] };
           if (!body?.content) return jsonResponse({ ok: false, message: "content is required" }, 400);
           const entry = remember(body.content, body);
           return jsonResponse({ ok: true, entry });
@@ -603,13 +604,13 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/knowledge/ingest" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json() as any;
+          const body = await req.json() as { path?: string; directory?: boolean; scope?: string; tags?: string[]; recursive?: boolean };
           if (!body?.path) return jsonResponse({ ok: false, message: "path is required" }, 400);
           if (body.directory) {
-            const result = ingestDirectory(body.path, body);
+            const result = ingestDirectory(body.path, { scope: body.scope, tags: body.tags, recursive: body.recursive });
             return jsonResponse({ ok: true, ...result });
           }
-          const chunks = ingestFile(body.path, body);
+          const chunks = ingestFile(body.path, { scope: body.scope, tags: body.tags });
           return jsonResponse({ ok: true, chunks });
         } catch (err) {
           return errorResponse(err);

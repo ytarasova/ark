@@ -53,7 +53,7 @@ export function searchSessions(query: string, opts?: SearchOpts): SearchResult[]
         OR ticket LIKE ? COLLATE NOCASE
         OR repo LIKE ? COLLATE NOCASE
      ORDER BY created_at DESC LIMIT ?`
-  ).all(pattern, pattern, pattern, limit) as any[];
+  ).all(pattern, pattern, pattern, limit) as { id: string; ticket: string | null; summary: string | null; repo: string | null; created_at: string }[];
 
   for (const row of metaRows) {
     add({ sessionId: row.id, source: "metadata", match: row.summary ?? row.ticket ?? row.repo ?? "", timestamp: row.created_at });
@@ -64,7 +64,7 @@ export function searchSessions(query: string, opts?: SearchOpts): SearchResult[]
     `SELECT track_id, data, created_at FROM events
      WHERE data LIKE ? COLLATE NOCASE
      ORDER BY created_at DESC LIMIT ?`
-  ).all(pattern, limit) as any[];
+  ).all(pattern, limit) as { track_id: string; data: string | null; created_at: string }[];
 
   for (const row of eventRows) {
     add({ sessionId: row.track_id, source: "event", match: row.data ?? "", timestamp: row.created_at });
@@ -75,7 +75,7 @@ export function searchSessions(query: string, opts?: SearchOpts): SearchResult[]
     `SELECT session_id, content, created_at FROM messages
      WHERE content LIKE ? COLLATE NOCASE
      ORDER BY created_at DESC LIMIT ?`
-  ).all(pattern, limit) as any[];
+  ).all(pattern, limit) as { session_id: string; content: string | null; created_at: string }[];
 
   for (const row of msgRows) {
     add({ sessionId: row.session_id, source: "message", match: row.content ?? "", timestamp: row.created_at });
@@ -121,7 +121,7 @@ function searchTranscriptsFTS(query: string, limit: number): SearchResult[] {
      WHERE transcript_index MATCH ?
      ORDER BY rank
      LIMIT ?`
-  ).all(ftsQuery, limit) as any[];
+  ).all(ftsQuery, limit) as { session_id: string; role: string; content: string | null; timestamp: string | null; snippet: string | null }[];
 
   return rows.map(r => ({
     sessionId: r.session_id,
@@ -181,10 +181,10 @@ export function getSessionConversation(sessionId: string, opts?: { limit?: numbe
   const db = getDb();
   const limit = opts?.limit ?? 100;
   try {
-    return db.prepare(
+    return (db.prepare(
       `SELECT role, content, timestamp FROM transcript_index
        WHERE session_id = ? ORDER BY rowid DESC LIMIT ?`
-    ).all(sessionId, limit).reverse() as any[];
+    ).all(sessionId, limit) as { role: string; content: string; timestamp: string }[]).reverse();
   } catch { return []; }
 }
 
@@ -201,7 +201,7 @@ export function searchSessionConversation(sessionId: string, query: string, opts
        FROM transcript_index
        WHERE session_id = ? AND transcript_index MATCH ?
        ORDER BY rank LIMIT ?`
-    ).all(sessionId, ftsQuery, limit) as any[];
+    ).all(sessionId, ftsQuery, limit) as { role: string; content: string | null; timestamp: string | null; snippet: string | null }[];
     return rows.map(r => ({
       sessionId,
       source: "transcript" as const,
@@ -264,8 +264,8 @@ export async function indexTranscripts(opts?: { transcriptsDir?: string; onProgr
           // Skip tool_result (user) and tool_use-only (assistant) entries
           const content = entry.message?.content;
           if (Array.isArray(content)) {
-            if (content.some((c: any) => c.type === "tool_result")) continue;
-            if (content.every((c: any) => c.type === "tool_use")) continue;
+            if (content.some((c: { type?: string }) => c.type === "tool_result")) continue;
+            if (content.every((c: { type?: string }) => c.type === "tool_use")) continue;
           }
           const text = extractText(entry);
           if (!text.trim() || text.length < 10) continue;
@@ -295,7 +295,7 @@ export function indexSession(transcriptPath: string, sessionId: string, project?
   try {
     const row = db.prepare(
       "SELECT MAX(timestamp) as ts FROM transcript_index WHERE session_id = ?"
-    ).get(sessionId) as any;
+    ).get(sessionId) as { ts: string | null } | undefined;
     maxTs = row?.ts ?? null;
   } catch {}
 
@@ -333,8 +333,8 @@ export function indexSession(transcriptPath: string, sessionId: string, project?
       // Skip tool_result (user) and tool_use-only (assistant) entries
       const msgContent = entry.message?.content;
       if (Array.isArray(msgContent)) {
-        if (msgContent.some((c: any) => c.type === "tool_result")) continue;
-        if (msgContent.every((c: any) => c.type === "tool_use")) continue;
+        if (msgContent.some((c: { type?: string }) => c.type === "tool_result")) continue;
+        if (msgContent.every((c: { type?: string }) => c.type === "tool_use")) continue;
       }
 
       const text = extractText(entry);
@@ -351,8 +351,8 @@ export function indexSession(transcriptPath: string, sessionId: string, project?
 export function getIndexStats(): { entries: number; sessions: number } {
   const db = getDb();
   try {
-    const entries = (db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as any)?.c ?? 0;
-    const sessions = (db.prepare("SELECT COUNT(DISTINCT session_id) as c FROM transcript_index").get() as any)?.c ?? 0;
+    const entries = (db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as { c: number } | undefined)?.c ?? 0;
+    const sessions = (db.prepare("SELECT COUNT(DISTINCT session_id) as c FROM transcript_index").get() as { c: number } | undefined)?.c ?? 0;
     return { entries, sessions };
   } catch {
     return { entries: 0, sessions: 0 };
@@ -366,13 +366,13 @@ function escapeFtsQuery(query: string): string {
   return query.replace(/['"*()]/g, "").split(/\s+/).map(w => `"${w}"`).join(" ");
 }
 
-function extractText(entry: any): string {
+function extractText(entry: { message?: { content?: string | Array<{ type?: string; text?: string }> } }): string {
   const msg = entry.message;
   if (!msg) return "";
   const content = msg.content;
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
-    return content.filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ");
+    return content.filter((c) => c.type === "text").map((c) => c.text ?? "").join(" ");
   }
   return "";
 }

@@ -18,6 +18,7 @@ import * as store from "../store.js";
 import { getCompute } from "../store.js";
 import * as tmux from "../tmux.js";
 import * as flow from "../flow.js";
+import type { FlowDefinition } from "../flow.js";
 import * as agentRegistry from "../agent.js";
 import * as claude from "../claude.js";
 import { parseTranscriptUsage } from "../claude.js";
@@ -203,7 +204,7 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   const autonomy = stageDef?.autonomy ?? "full";
 
   // Check for stage-level or session-level model override
-  const modelOverride = stageDef?.model ?? (session.config as any)?.model_override;
+  const modelOverride = stageDef?.model ?? (session.config?.model_override as string | undefined);
   if (modelOverride) {
     agent.model = modelOverride;
   }
@@ -253,7 +254,7 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
     onLog: log,
     prevClaudeSessionId: session.claude_session_id,
     sessionName: session.summary ?? session.id,
-    compute: session.compute_name ? (store.getCompute(session.compute_name) as any) ?? undefined : undefined,
+    compute: session.compute_name ? (store.getCompute(session.compute_name) as unknown as { name: string; provider: string; [k: string]: unknown } | null) ?? undefined : undefined,
   });
 
   if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
@@ -303,7 +304,7 @@ export async function advance(sessionId: string, force = false): Promise<{ ok: b
   // Graph flow routing: if flow definition has edges, use DAG successor resolution
   try {
     const flowDef = flow.loadFlow(flowName);
-    if (flowDef && (flowDef as any).edges?.length > 0) {
+    if (flowDef && (flowDef as FlowDefinition & { edges?: unknown[] }).edges?.length > 0) {
       const graphFlow = parseGraphFlow(flowDef);
       const successors = getSuccessors(graphFlow, stage, session.config);
       if (successors.length > 0) {
@@ -337,11 +338,11 @@ export async function advance(sessionId: string, force = false): Promise<{ ok: b
 
     emitStageSpanEnd(sessionId, { status: "completed" });
     const s = store.getSession(sessionId);
-    const usage = (s?.config as any)?.usage;
+    const usage = s?.config?.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; total_cost?: number } | undefined;
     emitSessionSpanEnd(sessionId, {
       status: "completed",
-      tokens_in: usage?.input, tokens_out: usage?.output, tokens_cache: usage?.cache,
-      cost_usd: usage?.cost, turns: (s?.config as any)?.turns,
+      tokens_in: usage?.input_tokens, tokens_out: usage?.output_tokens, tokens_cache: usage?.cache_read_input_tokens,
+      cost_usd: usage?.total_cost, turns: s?.config?.turns as number | undefined,
     });
     flushSpans();
 
@@ -351,7 +352,7 @@ export async function advance(sessionId: string, force = false): Promise<{ ok: b
       const { getSessionConversation } = await import("../search.js");
       const conv = getSessionConversation(sessionId);
       if (conv.length > 0) {
-        const turns = conv.map((c: any) => ({ role: c.source === "message" ? "user" : "assistant", content: c.match ?? c.content }));
+        const turns = conv.map((c) => ({ role: c.role === "message" ? "user" : "assistant", content: c.content }));
         extractAndSaveSkills(sessionId, turns);
       }
     } catch { /* skill extraction is best-effort */ }
@@ -803,7 +804,7 @@ export async function prepareRemoteEnvironment(
   }
 
   // Verify host is reachable before starting expensive sync/clone chain
-  const ip = (compute.config as any)?.ip;
+  const ip = (compute.config as { ip?: string }).ip;
   if (ip) {
     log("Checking host connectivity...");
     const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
@@ -872,7 +873,7 @@ async function launchAgentTmux(
   claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts?.autonomy });
 
   // Build launch env from agent config + provider-specific env (e.g. auth tokens for remote)
-  const launchEnv = { ...(agent.env ?? {}), ...(provider?.buildLaunchEnv(session as any) ?? {}) };
+  const launchEnv = { ...(agent.env ?? {}), ...(provider?.buildLaunchEnv(session) ?? {}) };
 
   const { content: launchContent, claudeSessionId } = claude.buildLauncher({
     workdir: effectiveWorkdir,
@@ -1008,7 +1009,7 @@ async function buildTaskWithHandoff(session: store.Session, stage: string, agent
       const mFilter = parseMessageFilter(agent);
       if (mFilter) {
         const messages = store.getMessages(session.id).map(m => ({
-          role: m.role, content: m.content, agent: (m as any).agent, timestamp: m.created_at,
+          role: m.role, content: m.content, timestamp: m.created_at,
         }));
         const filtered = filterMessages(messages, mFilter);
         if (filtered.length > 0) {
@@ -1314,7 +1315,7 @@ export function applyHookStatus(
   }
 
   if (newStatus) {
-    const updates: Partial<store.Session> = { status: newStatus as any };
+    const updates: Partial<store.Session> = { status: newStatus as store.Session["status"] };
     if (newStatus === "failed") {
       updates.error = String(payload.error ?? payload.error_details ?? "unknown error");
     }
@@ -1329,15 +1330,15 @@ export function applyHookStatus(
   // Check termination conditions from flow stage config
   try {
     const flowDef = flow.loadFlow(session.flow);
-    const termStageDef = flowDef?.stages?.find((s: any) => s.name === session.stage);
-    const termConfig = (termStageDef as any)?.termination;
+    const termStageDef = flowDef?.stages?.find((s) => s.name === session.stage);
+    const termConfig = (termStageDef as { termination?: unknown })?.termination;
     if (termConfig) {
       const condition = parseTermination(termConfig);
       if (condition) {
         const ctx: TerminationContext = {
           session,
-          turnCount: (session.config as any)?.turns ?? 0,
-          tokenCount: (session.config as any)?.usage?.total_tokens ?? 0,
+          turnCount: (session.config?.turns as number | undefined) ?? 0,
+          tokenCount: ((session.config?.usage as { total_tokens?: number } | undefined)?.total_tokens) ?? 0,
           elapsedMs: Date.now() - new Date(session.updated_at).getTime(),
           lastOutput: "",
         };
@@ -1460,13 +1461,13 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
   switch (report.type) {
     case "completed": {
       // Save completion data to session config for display in detail pane
-      const cfg = {
-        ...(session.config as any),
-        completion_summary: (report as any).summary,
-        filesChanged: (report as any).filesChanged,
-        commits: (report as any).commits,
+      const rr = report as unknown as Record<string, unknown>;
+      result.updates.config = {
+        ...session.config,
+        completion_summary: rr.summary as string | undefined,
+        filesChanged: rr.filesChanged as string[] | undefined,
+        commits: rr.commits as string[] | undefined,
       };
-      result.updates.config = cfg;
 
       // Check gate type — manual gates keep session running (user decides when done)
       const stageDef = flow.getStage(session.flow, session.stage ?? "");
@@ -1479,7 +1480,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
           opts: {
             stage: session.stage ?? undefined,
             actor: "agent",
-            data: { summary: (report as any).summary },
+            data: { summary: (report as unknown as Record<string, unknown>).summary },
           },
         });
         // Don't change status — session stays running, agent stays alive
@@ -1492,15 +1493,19 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
       }
       break;
     }
-    case "question":
+    case "question": {
+      const qr = report as unknown as Record<string, unknown>;
       result.updates.status = "waiting";
       result.updates.breakpoint_reason =
-        (report as any).question ?? (report as any).message;
+        (qr.question ?? qr.message) as string | null;
       break;
-    case "error":
+    }
+    case "error": {
+      const er = report as unknown as Record<string, unknown>;
       result.updates.status = "failed";
-      result.updates.error = (report as any).error ?? (report as any).message;
+      result.updates.error = (er.error ?? er.message) as string | null;
       break;
+    }
     case "progress": {
       // Agent is actively reporting — ensure status reflects that.
       if (session.status === "waiting") {
@@ -1512,7 +1517,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
   }
 
   // PR URL from agent report
-  const prUrl = (report as any).pr_url as string | undefined;
+  const prUrl = (report as unknown as Record<string, unknown>).pr_url as string | undefined;
   if (prUrl && !session.pr_url) {
     result.prUrl = prUrl;
   }
