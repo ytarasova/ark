@@ -3,6 +3,10 @@ import { StatusBadge } from "./StatusDot.js";
 import { api } from "../hooks/useApi.js";
 import { relTime } from "../util.js";
 import { cn } from "../lib/utils.js";
+import { Button } from "./ui/button.js";
+import { Input } from "./ui/input.js";
+import { Separator } from "./ui/separator.js";
+import { Badge } from "./ui/badge.js";
 import { X } from "lucide-react";
 
 interface SessionDetailProps {
@@ -12,13 +16,6 @@ interface SessionDetailProps {
   readOnly: boolean;
 }
 
-const btnClass = "px-3 py-1 text-xs font-medium rounded-md border border-white/[0.06] text-white/50 hover:text-white/80 hover:bg-white/[0.03] transition-colors";
-const btnPrimary = "px-3 py-1 text-xs font-medium rounded-md bg-indigo-500 border border-indigo-500/50 text-white hover:bg-indigo-400 transition-colors";
-const btnDanger = "px-3 py-1 text-xs font-medium rounded-md border border-red-500/20 text-red-400/70 hover:text-red-400 hover:border-red-500/30 transition-colors";
-const btnSuccess = "px-3 py-1 text-xs font-medium rounded-md border border-emerald-500/20 text-emerald-400/70 hover:text-emerald-400 hover:border-emerald-500/30 transition-colors";
-const btnWarning = "px-3 py-1 text-xs font-medium rounded-md border border-amber-500/20 text-amber-400/70 hover:text-amber-400 hover:border-amber-500/30 transition-colors";
-const inputClass = "bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-1.5 text-xs text-white/90 placeholder:text-white/25 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all";
-
 function SessionActions({ session, onAction, onSend }: { session: any; onAction: (action: string) => void; onSend: (msg: string) => void }) {
   const s = session.status;
   const [sendMsg, setSendMsg] = useState("");
@@ -27,49 +24,49 @@ function SessionActions({ session, onAction, onSend }: { session: any; onAction:
     <div>
       <div className="flex gap-1.5 flex-wrap">
         {(s === "ready" || s === "pending") && (
-          <button className={btnPrimary} onClick={() => onAction("dispatch")}>Dispatch</button>
+          <Button size="xs" onClick={() => onAction("dispatch")}>Dispatch</Button>
         )}
         {(s === "running" || s === "waiting") && (
-          <button className={btnWarning} onClick={() => onAction("stop")}>Stop</button>
+          <Button variant="warning" size="xs" onClick={() => onAction("stop")}>Stop</Button>
         )}
         {(s === "running" || s === "waiting") && (
-          <button className={btnClass} onClick={() => onAction("pause")}>Pause</button>
+          <Button variant="outline" size="xs" onClick={() => onAction("pause")}>Pause</Button>
         )}
         {(s === "running" || s === "waiting") && (
-          <button className={btnClass} onClick={() => onAction("interrupt")}>Interrupt</button>
+          <Button variant="outline" size="xs" onClick={() => onAction("interrupt")}>Interrupt</Button>
         )}
         {(s === "running" || s === "waiting" || s === "blocked") && (
-          <button className={btnPrimary} onClick={() => onAction("advance")}>Advance</button>
+          <Button size="xs" onClick={() => onAction("advance")}>Advance</Button>
         )}
         {(s === "running" || s === "waiting" || s === "blocked") && (
-          <button className={btnSuccess} onClick={() => onAction("complete")}>Complete</button>
+          <Button variant="success" size="xs" onClick={() => onAction("complete")}>Complete</Button>
         )}
         {(s === "stopped" || s === "failed") && (
-          <button className={btnSuccess} onClick={() => onAction("restart")}>Restart</button>
+          <Button variant="success" size="xs" onClick={() => onAction("restart")}>Restart</Button>
         )}
         {s !== "deleting" && (
-          <button className={btnClass} onClick={() => onAction("fork")}>Fork</button>
+          <Button variant="outline" size="xs" onClick={() => onAction("fork")}>Fork</Button>
         )}
         {(s === "running" || s === "waiting") && (
-          <button className={btnClass} onClick={() => setShowSend(!showSend)}>Send</button>
+          <Button variant="outline" size="xs" onClick={() => setShowSend(!showSend)}>Send</Button>
         )}
         {(s === "completed" || s === "stopped" || s === "failed") && (
-          <button className={btnClass} onClick={() => onAction("archive")}>Archive</button>
+          <Button variant="outline" size="xs" onClick={() => onAction("archive")}>Archive</Button>
         )}
         {s === "archived" && (
-          <button className={btnClass} onClick={() => onAction("restore")}>Restore</button>
+          <Button variant="outline" size="xs" onClick={() => onAction("restore")}>Restore</Button>
         )}
         {s !== "deleting" && (
-          <button className={btnDanger} onClick={() => onAction("delete")}>Delete</button>
+          <Button variant="destructive" size="xs" onClick={() => onAction("delete")}>Delete</Button>
         )}
         {s === "deleting" && (
-          <button className={btnClass} onClick={() => onAction("undelete")}>Undelete</button>
+          <Button variant="outline" size="xs" onClick={() => onAction("undelete")}>Undelete</Button>
         )}
       </div>
       {showSend && (
         <div className="flex gap-1 mt-1.5">
-          <input
-            className={cn(inputClass, "flex-1")}
+          <Input
+            className="flex-1 h-7 text-xs"
             placeholder="Message to agent..."
             value={sendMsg}
             onChange={(e) => setSendMsg(e.target.value)}
@@ -81,8 +78,8 @@ function SessionActions({ session, onAction, onSend }: { session: any; onAction:
               }
             }}
           />
-          <button
-            className={btnPrimary}
+          <Button
+            size="xs"
             disabled={!sendMsg.trim()}
             onClick={() => {
               if (sendMsg.trim()) {
@@ -91,7 +88,7 @@ function SessionActions({ session, onAction, onSend }: { session: any; onAction:
                 setShowSend(false);
               }
             }}
-          >Send</button>
+          >Send</Button>
         </div>
       )}
     </div>
@@ -248,12 +245,12 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
   if (!detail || !detail.session) {
     return (
-      <div className="fixed top-0 right-0 w-[560px] h-screen bg-[#0f0f14] border-l border-white/[0.06] shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
-        <div className="h-[52px] px-5 border-b border-white/[0.06] flex justify-between items-center shrink-0">
-          <span className="text-xs text-white/35">Loading...</span>
-          <button className="w-7 h-7 flex items-center justify-center rounded-md text-white/35 cursor-pointer hover:text-white/80 hover:bg-white/[0.06] transition-colors" onClick={onClose}>
+      <div className="fixed top-0 right-0 w-[560px] h-screen bg-tertiary border-l border-border shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
+        <div className="h-[52px] px-5 border-b border-border flex justify-between items-center shrink-0">
+          <span className="text-xs text-muted-foreground">Loading...</span>
+          <Button variant="ghost" size="icon-xs" onClick={onClose}>
             <X size={14} />
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -281,16 +278,16 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
   }
 
   return (
-    <div className="fixed top-0 right-0 w-[560px] h-screen bg-[#0f0f14] border-l border-white/[0.06] shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
+    <div className="fixed top-0 right-0 w-[560px] h-screen bg-tertiary border-l border-border shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
       {/* Header */}
-      <div className="h-[52px] px-5 border-b border-white/[0.06] flex justify-between items-center shrink-0">
+      <div className="h-[52px] px-5 border-b border-border flex justify-between items-center shrink-0">
         <div className="flex items-center gap-2">
           <StatusBadge status={s.status} />
-          <span className="font-semibold text-[13px] text-white/90">{s.id}</span>
+          <span className="font-semibold text-[13px] text-foreground">{s.id}</span>
         </div>
-        <button className="w-7 h-7 flex items-center justify-center rounded-md text-white/35 cursor-pointer hover:text-white/80 hover:bg-white/[0.06] transition-colors" onClick={onClose}>
+        <Button variant="ghost" size="icon-xs" onClick={onClose}>
           <X size={14} />
-        </button>
+        </Button>
       </div>
 
       {/* Content */}
@@ -304,33 +301,35 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
         {/* Metadata */}
         <div className="mb-5">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06]">Details</h3>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Details</h3>
+          <Separator className="mb-2" />
           <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1.5 text-[13px]">
-            <span className="text-white/35">Summary</span>
-            <span className="text-white/75 break-all">{s.summary || "-"}</span>
-            <span className="text-white/35">Agent</span>
-            <span className="text-white/75 break-all">{s.agent || "-"}</span>
-            <span className="text-white/35">Flow</span>
-            <span className="text-white/75 break-all">{s.pipeline || s.flow || "-"}</span>
-            <span className="text-white/35">Stage</span>
-            <span className="text-white/75 break-all">{s.stage || "-"}</span>
-            <span className="text-white/35">Repo</span>
-            <span className="text-white/75 break-all">{s.repo || "-"}</span>
-            <span className="text-white/35">Branch</span>
-            <span className="text-white/75 break-all">{s.branch || "-"}</span>
-            <span className="text-white/35">Group</span>
-            <span className="text-white/75 break-all">{s.group_name || "-"}</span>
-            <span className="text-white/35">Created</span>
-            <span className="text-white/75 break-all">{relTime(s.created_at)}</span>
-            <span className="text-white/35">Updated</span>
-            <span className="text-white/75 break-all">{relTime(s.updated_at)}</span>
+            <span className="text-muted-foreground">Summary</span>
+            <span className="text-card-foreground break-all">{s.summary || "-"}</span>
+            <span className="text-muted-foreground">Agent</span>
+            <span className="text-card-foreground break-all">{s.agent || "-"}</span>
+            <span className="text-muted-foreground">Flow</span>
+            <span className="text-card-foreground break-all">{s.pipeline || s.flow || "-"}</span>
+            <span className="text-muted-foreground">Stage</span>
+            <span className="text-card-foreground break-all">{s.stage || "-"}</span>
+            <span className="text-muted-foreground">Repo</span>
+            <span className="text-card-foreground break-all">{s.repo || "-"}</span>
+            <span className="text-muted-foreground">Branch</span>
+            <span className="text-card-foreground break-all">{s.branch || "-"}</span>
+            <span className="text-muted-foreground">Group</span>
+            <span className="text-card-foreground break-all">{s.group_name || "-"}</span>
+            <span className="text-muted-foreground">Created</span>
+            <span className="text-card-foreground break-all">{relTime(s.created_at)}</span>
+            <span className="text-muted-foreground">Updated</span>
+            <span className="text-card-foreground break-all">{relTime(s.updated_at)}</span>
           </div>
         </div>
 
         {/* Flow Pipeline */}
         {flowStages.length > 1 && s.stage && (
           <div className="mb-5">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06]">Flow Pipeline</h3>
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Flow Pipeline</h3>
+            <Separator className="mb-2" />
             <div className="flex gap-0 flex-wrap items-center text-xs">
               {flowStages.map((st: any, i: number) => {
                 const isCurrent = st.name === s.stage;
@@ -338,12 +337,12 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
                 const isPast = currentIdx > i;
                 return (
                   <span key={st.name} className="inline-flex items-center">
-                    {i > 0 && <span className="text-white/20 mx-1">&gt;</span>}
+                    {i > 0 && <span className="text-muted-foreground mx-1">&gt;</span>}
                     <span className={cn(
                       "font-mono text-[11px]",
-                      isCurrent && "text-indigo-400 font-bold",
+                      isCurrent && "text-primary font-bold",
                       isPast && "text-emerald-400",
-                      !isCurrent && !isPast && "text-white/25"
+                      !isCurrent && !isPast && "text-muted-foreground"
                     )}>
                       {isCurrent ? `[${st.name}]` : st.name}
                     </span>
@@ -357,43 +356,45 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {/* Completion Summary */}
         {s.config?.completion_summary && (
           <div className="mb-5">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06]">Completion Summary</h3>
-            <div className="text-xs text-white/60 leading-relaxed">{s.config.completion_summary}</div>
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Completion Summary</h3>
+            <Separator className="mb-2" />
+            <div className="text-xs text-muted-foreground leading-relaxed">{s.config.completion_summary}</div>
           </div>
         )}
 
         {/* Token Usage & Cost */}
         {s.config?.usage && (
           <div className="mb-5">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06]">Usage</h3>
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Usage</h3>
+            <Separator className="mb-2" />
             <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1.5 text-[13px]">
               {s.config.usage.input_tokens != null && (
                 <>
-                  <span className="text-white/35">Input tokens</span>
-                  <span className="text-white/75 font-mono">{humanTokens(s.config.usage.input_tokens)}</span>
+                  <span className="text-muted-foreground">Input tokens</span>
+                  <span className="text-card-foreground font-mono">{humanTokens(s.config.usage.input_tokens)}</span>
                 </>
               )}
               {s.config.usage.output_tokens != null && (
                 <>
-                  <span className="text-white/35">Output tokens</span>
-                  <span className="text-white/75 font-mono">{humanTokens(s.config.usage.output_tokens)}</span>
+                  <span className="text-muted-foreground">Output tokens</span>
+                  <span className="text-card-foreground font-mono">{humanTokens(s.config.usage.output_tokens)}</span>
                 </>
               )}
               {s.config.usage.cache_read_input_tokens != null && (
                 <>
-                  <span className="text-white/35">Cache read</span>
-                  <span className="text-white/75 font-mono">{humanTokens(s.config.usage.cache_read_input_tokens)}</span>
+                  <span className="text-muted-foreground">Cache read</span>
+                  <span className="text-card-foreground font-mono">{humanTokens(s.config.usage.cache_read_input_tokens)}</span>
                 </>
               )}
               {s.config.usage.total_tokens != null && (
                 <>
-                  <span className="text-white/35">Total tokens</span>
-                  <span className="text-white/75 font-mono">{humanTokens(s.config.usage.total_tokens)}</span>
+                  <span className="text-muted-foreground">Total tokens</span>
+                  <span className="text-card-foreground font-mono">{humanTokens(s.config.usage.total_tokens)}</span>
                 </>
               )}
               {s.config.usage.total_cost != null && s.config.usage.total_cost > 0 && (
                 <>
-                  <span className="text-white/35">Cost</span>
+                  <span className="text-muted-foreground">Cost</span>
                   <span className="text-amber-400 font-mono">{formatCost(s.config.usage.total_cost)}</span>
                 </>
               )}
@@ -405,9 +406,9 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {s.workdir && s.status !== "deleting" && (
           <div className="mb-5">
             <div className="flex gap-1.5 flex-wrap">
-              <button className={btnClass} onClick={handlePreviewDiff}>Preview Changes</button>
+              <Button variant="outline" size="xs" onClick={handlePreviewDiff}>Preview Changes</Button>
               {!readOnly && (
-                <button className={btnClass} onClick={() => { setPrTitle(s.summary || ""); setShowPRForm(!showPRForm); }}>Create PR</button>
+                <Button variant="outline" size="xs" onClick={() => { setPrTitle(s.summary || ""); setShowPRForm(!showPRForm); }}>Create PR</Button>
               )}
             </div>
             {prUrl && (
@@ -422,19 +423,19 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
             )}
             {showPRForm && (
               <div className="mt-2 flex flex-col gap-1.5">
-                <input
-                  className={inputClass}
+                <Input
+                  className="h-7 text-xs"
                   placeholder="PR title"
                   value={prTitle}
                   onChange={(e) => setPrTitle(e.target.value)}
                 />
-                <label className="text-[11px] flex items-center gap-1 text-white/50">
+                <label className="text-[11px] flex items-center gap-1 text-muted-foreground">
                   <input type="checkbox" checked={prDraft} onChange={(e) => setPrDraft(e.target.checked)} />
                   Draft PR
                 </label>
                 <div className="flex gap-1.5 flex-wrap">
-                  <button className={btnPrimary} onClick={handleCreatePR}>Submit PR</button>
-                  <button className={btnClass} onClick={() => setShowPRForm(false)}>Cancel</button>
+                  <Button size="xs" onClick={handleCreatePR}>Submit PR</Button>
+                  <Button variant="outline" size="xs" onClick={() => setShowPRForm(false)}>Cancel</Button>
                 </div>
               </div>
             )}
@@ -444,11 +445,12 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {/* Diff Preview */}
         {showDiff && diffData && (
           <div className="mb-5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06] flex items-center gap-2">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2 flex items-center gap-2">
               Changes: {diffData.branch} vs {diffData.baseBranch}
-              <button className={cn(btnClass, "ml-2")} onClick={() => setShowDiff(false)}>Close</button>
+              <Button variant="outline" size="xs" className="ml-2" onClick={() => setShowDiff(false)}>Close</Button>
             </div>
-            <div className="text-[11px] text-white/35 mb-1.5 font-mono">
+            <Separator className="mb-2" />
+            <div className="text-[11px] text-muted-foreground mb-1.5 font-mono">
               {diffData.filesChanged} files changed, +{diffData.insertions} -{diffData.deletions}
             </div>
             {diffData.modifiedSinceReview?.length > 0 && (
@@ -456,7 +458,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
                 Modified since last review: {diffData.modifiedSinceReview.join(", ")}
               </div>
             )}
-            <pre className="bg-black/40 border border-white/[0.06] rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[400px] overflow-auto whitespace-pre-wrap break-all text-white/50">
+            <pre className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[400px] overflow-auto whitespace-pre-wrap break-all text-muted-foreground">
               {diffData.stat || diffData.message || "No changes"}
             </pre>
           </div>
@@ -464,13 +466,14 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
         {/* Todos */}
         <div className="mb-5">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06] flex items-center gap-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2 flex items-center gap-2">
             Todos
             {!readOnly && (
-              <button className={cn(btnClass, "ml-2")} onClick={handleRunVerification}>Run Verification</button>
+              <Button variant="outline" size="xs" className="ml-2" onClick={handleRunVerification}>Run Verification</Button>
             )}
           </div>
-          {todos.length === 0 && <div className="text-xs text-white/35">No todos</div>}
+          <Separator className="mb-2" />
+          {todos.length === 0 && <div className="text-xs text-muted-foreground">No todos</div>}
           {todos.map((t: any) => (
             <div key={t.id} className="flex items-center gap-1.5 mb-1">
               {!readOnly && (
@@ -480,24 +483,24 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
                   onChange={() => handleToggleTodo(t.id)}
                 />
               )}
-              <span className={cn("flex-1 text-xs", t.done ? "line-through text-white/35" : "text-white/80")}>
+              <span className={cn("flex-1 text-xs", t.done ? "line-through text-muted-foreground" : "text-foreground")}>
                 {t.content}
               </span>
               {!readOnly && (
-                <button className="px-1 py-0 text-[10px] font-medium rounded border border-red-500/20 text-red-400/70 hover:text-red-400 hover:border-red-500/30 transition-colors" onClick={() => handleDeleteTodo(t.id)}>x</button>
+                <Button variant="destructive" size="xs" className="h-5 px-1 text-[10px]" onClick={() => handleDeleteTodo(t.id)}>x</Button>
               )}
             </div>
           ))}
           {!readOnly && (
             <div className="flex gap-1 mt-1.5">
-              <input
-                className={cn(inputClass, "flex-1")}
+              <Input
+                className="flex-1 h-7 text-xs"
                 placeholder="Add a todo..."
                 value={newTodo}
                 onChange={(e) => setNewTodo(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleAddTodo(); }}
               />
-              <button className={btnClass} disabled={!newTodo.trim()} onClick={handleAddTodo}>Add</button>
+              <Button variant="outline" size="xs" disabled={!newTodo.trim()} onClick={handleAddTodo}>Add</Button>
             </div>
           )}
         </div>
@@ -505,9 +508,10 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {/* Verification Result */}
         {verifyResult && (
           <div className="mb-5">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06]">
-              Verification: {verifyResult.ok ? <span className="text-emerald-400">PASSED</span> : <span className="text-red-400">FAILED</span>}
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+              Verification: {verifyResult.ok ? <Badge variant="success">PASSED</Badge> : <Badge variant="destructive">FAILED</Badge>}
             </h3>
+            <Separator className="mb-2" />
             {!verifyResult.todosResolved && (
               <div className="text-xs text-red-400 mb-1">
                 Pending todos: {verifyResult.pendingTodos?.join(", ")}
@@ -515,10 +519,10 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
             )}
             {verifyResult.scriptResults?.map((r: any, i: number) => (
               <div key={i} className="text-xs mb-1">
-                <span className={cn("font-mono text-[10px]", r.passed ? "text-emerald-400" : "text-red-400")}>{r.passed ? "[PASS]" : "[FAIL]"}</span>{" "}
-                <code className="font-mono text-[11px] text-white/60">{r.script}</code>
+                <Badge variant={r.passed ? "success" : "destructive"} className="text-[10px]">{r.passed ? "PASS" : "FAIL"}</Badge>{" "}
+                <code className="font-mono text-[11px] text-muted-foreground">{r.script}</code>
                 {!r.passed && r.output && (
-                  <pre className="text-[10px] text-white/35 mt-0.5 whitespace-pre-wrap font-mono">{r.output.slice(0, 500)}</pre>
+                  <pre className="text-[10px] text-muted-foreground mt-0.5 whitespace-pre-wrap font-mono">{r.output.slice(0, 500)}</pre>
                 )}
               </div>
             ))}
@@ -528,10 +532,11 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {/* Files Changed */}
         {s.config?.filesChanged?.length > 0 && (
           <div className="mb-5">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06]">Files Changed ({s.config.filesChanged.length})</h3>
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Files Changed ({s.config.filesChanged.length})</h3>
+            <Separator className="mb-2" />
             <div className="max-h-[200px] overflow-y-auto">
               {s.config.filesChanged.map((f: string) => (
-                <div key={f} className="text-[11px] text-white/50 py-px font-mono">{f}</div>
+                <div key={f} className="text-[11px] text-muted-foreground py-px font-mono">{f}</div>
               ))}
             </div>
           </div>
@@ -540,13 +545,14 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {/* Commits */}
         {s.config?.commits?.length > 0 && (
           <div className="mb-5">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06]">Commits ({s.config.commits.length})</h3>
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Commits ({s.config.commits.length})</h3>
+            <Separator className="mb-2" />
             {s.config.commits.map((c: string) => {
               const shortSha = c.slice(0, 7);
               const ghBase = s.config?.github_url;
               const commitUrl = ghBase ? `${ghBase}/commit/${c}` : null;
               return (
-                <div key={c} className="text-[11px] text-white/50 font-mono py-px">
+                <div key={c} className="text-[11px] text-muted-foreground font-mono py-px">
                   {commitUrl ? (
                     <a href={commitUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">{shortSha}</a>
                   ) : shortSha}
@@ -568,21 +574,23 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {/* Output */}
         {output && (
           <div className="mb-5">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06]">Live Output</h3>
-            <div ref={outputRef} className="bg-black/40 border border-white/[0.06] rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-white/50">{output}</div>
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Live Output</h3>
+            <Separator className="mb-2" />
+            <div ref={outputRef} className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">{output}</div>
           </div>
         )}
 
         {/* Events */}
         {events.length > 0 && (
           <div className="mb-5">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2 pb-2 border-b border-white/[0.06]">Events ({events.length})</h3>
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Events ({events.length})</h3>
+            <Separator className="mb-2" />
             <div className="flex flex-col gap-0 relative">
               {events.slice(-50).reverse().map((ev: any, i: number) => (
-                <div key={i} className="flex gap-3 py-1.5 text-[11px] border-l border-white/[0.06] ml-1 pl-3.5 relative rounded-r-lg hover:bg-white/[0.02] transition-colors duration-200 before:content-[''] before:absolute before:left-[-3px] before:top-[10px] before:w-[5px] before:h-[5px] before:rounded-full before:bg-white/20 before:z-[1] first:before:bg-indigo-400">
-                  <span className="text-white/20 whitespace-nowrap shrink-0 w-[60px] font-mono text-[10px]">{relTime(ev.created_at)}</span>
-                  <span className="text-white/50 text-[11px]">
-                    <b className="text-white/75 font-medium">{ev.type}</b>
+                <div key={i} className="flex gap-3 py-1.5 text-[11px] border-l border-border ml-1 pl-3.5 relative rounded-r-lg hover:bg-accent transition-colors duration-200 before:content-[''] before:absolute before:left-[-3px] before:top-[10px] before:w-[5px] before:h-[5px] before:rounded-full before:bg-muted-foreground before:z-[1] first:before:bg-primary">
+                  <span className="text-muted-foreground whitespace-nowrap shrink-0 w-[60px] font-mono text-[10px]">{relTime(ev.created_at)}</span>
+                  <span className="text-muted-foreground text-[11px]">
+                    <b className="text-foreground font-medium">{ev.type}</b>
                     {ev.data ? " " + (typeof ev.data === "string" ? ev.data : JSON.stringify(ev.data)).slice(0, 120) : ""}
                   </span>
                 </div>

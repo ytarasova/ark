@@ -1,18 +1,17 @@
 import { useState, useEffect } from "react";
 import { api } from "../hooks/useApi.js";
 import { cn } from "../lib/utils.js";
+import { Button } from "./ui/button.js";
+import { Card } from "./ui/card.js";
+import { Badge } from "./ui/badge.js";
 import { Server } from "lucide-react";
-
-const btnClass = "px-3 py-1 text-xs font-medium rounded-md border border-white/[0.06] text-white/50 hover:text-white/80 hover:border-white/[0.1] transition-colors";
-const btnDanger = "px-3 py-1 text-xs font-medium rounded-md border border-red-500/20 text-red-400/70 hover:text-red-400 hover:border-red-500/30 transition-colors";
-const btnPrimary = "px-3 py-1 text-xs font-medium rounded-md bg-indigo-500 border border-indigo-500/50 text-white hover:bg-indigo-400 transition-colors";
 
 function statusDotColor(status: string): string {
   switch (status) {
     case "running": return "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]";
     case "stopped": return "bg-red-400";
     case "pending": case "provisioning": return "bg-amber-400";
-    default: return "bg-white/20";
+    default: return "bg-muted-foreground/30";
   }
 }
 
@@ -21,19 +20,19 @@ function ComputeActions({ compute, onAction }: { compute: any; onAction: (action
   return (
     <div className="flex gap-1.5 flex-wrap">
       {(s === "stopped" || s === "created" || s === "destroyed") && (
-        <button className={btnPrimary} onClick={() => onAction("provision")}>Provision</button>
+        <Button size="xs" onClick={() => onAction("provision")}>Provision</Button>
       )}
       {(s === "stopped" || s === "created") && (
-        <button className={btnClass} onClick={() => onAction("start")}>Start</button>
+        <Button variant="outline" size="xs" onClick={() => onAction("start")}>Start</Button>
       )}
       {s === "running" && (
-        <button className={btnDanger} onClick={() => onAction("stop")}>Stop</button>
+        <Button variant="destructive" size="xs" onClick={() => onAction("stop")}>Stop</Button>
       )}
       {s === "running" && (
-        <button className={btnDanger} onClick={() => onAction("destroy")}>Destroy</button>
+        <Button variant="destructive" size="xs" onClick={() => onAction("destroy")}>Destroy</Button>
       )}
       {s !== "provisioning" && (
-        <button className={btnDanger} onClick={() => onAction("delete")}>Delete</button>
+        <Button variant="destructive" size="xs" onClick={() => onAction("delete")}>Delete</Button>
       )}
     </div>
   );
@@ -90,40 +89,40 @@ export function ComputeView() {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-180px)]">
         <div className="text-center">
-          <Server size={28} className="text-white/15 mx-auto mb-3" />
-          <p className="text-sm text-white/35">No compute targets</p>
+          <Server size={28} className="text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">No compute targets</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-[260px_1fr] rounded-lg border border-white/[0.06] overflow-hidden h-[calc(100vh-112px)]">
+    <Card className="grid grid-cols-[260px_1fr] overflow-hidden h-[calc(100vh-112px)]">
       {/* Left: list panel */}
-      <div className="bg-white/[0.02] border-r border-white/[0.06] overflow-y-auto">
+      <div className="bg-card border-r border-border overflow-y-auto">
         {computes.map((c: any) => (
           <div
             key={c.name || c.id}
             className={cn(
-              "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-white/[0.03] transition-colors text-[13px]",
-              "hover:bg-white/[0.03]",
-              selected === c && "bg-white/[0.05] border-l-2 border-l-indigo-400 font-semibold"
+              "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
+              "hover:bg-accent",
+              selected === c && "bg-accent border-l-2 border-l-primary font-semibold"
             )}
             onClick={() => setSelected(c)}
           >
             <div className="flex items-center gap-2 min-w-0">
               <span className={cn("inline-block w-2 h-2 rounded-full shrink-0", statusDotColor(c.status || "unknown"))} />
-              <span className="text-white/80 truncate">{c.name || c.id}</span>
+              <span className="text-foreground truncate">{c.name || c.id}</span>
             </div>
-            <span className="text-[10px] font-mono uppercase text-white/25 tracking-wider shrink-0 ml-2">{c.provider || c.type || "local"}</span>
+            <Badge variant="secondary" className="text-[10px] shrink-0 ml-2">{c.provider || c.type || "local"}</Badge>
           </div>
         ))}
       </div>
       {/* Right: detail panel */}
-      <div className="p-5 overflow-y-auto bg-[#0d0d11]">
+      <div className="p-5 overflow-y-auto bg-background">
         {selected ? (
           <>
-            <h2 className="text-lg font-semibold text-white/90 mb-1">{selected.name || selected.id}</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-1">{selected.name || selected.id}</h2>
             {/* Actions */}
             <div className="mb-5">
               <ComputeActions compute={selected} onAction={handleAction} />
@@ -134,48 +133,48 @@ export function ComputeView() {
               )}
             </div>
             <div className="mb-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">Details</h3>
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Details</h3>
               <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
-                <span className="text-white/35">Provider</span>
-                <span className="text-white/75 font-mono">{selected.provider || selected.type || "-"}</span>
-                <span className="text-white/35">Status</span>
-                <span className="text-white/75 flex items-center gap-2">
+                <span className="text-muted-foreground">Provider</span>
+                <span className="text-card-foreground font-mono">{selected.provider || selected.type || "-"}</span>
+                <span className="text-muted-foreground">Status</span>
+                <span className="text-card-foreground flex items-center gap-2">
                   <span className={cn("inline-block w-2 h-2 rounded-full", statusDotColor(selected.status || "unknown"))} />
                   {selected.status || "unknown"}
                 </span>
                 {selected.ip && (
                   <>
-                    <span className="text-white/35">IP</span>
-                    <span className="text-white/75 font-mono">{selected.ip}</span>
+                    <span className="text-muted-foreground">IP</span>
+                    <span className="text-card-foreground font-mono">{selected.ip}</span>
                   </>
                 )}
                 {selected.instanceType && (
                   <>
-                    <span className="text-white/35">Instance</span>
-                    <span className="text-white/75">{selected.instanceType}</span>
+                    <span className="text-muted-foreground">Instance</span>
+                    <span className="text-card-foreground">{selected.instanceType}</span>
                   </>
                 )}
                 {selected.region && (
                   <>
-                    <span className="text-white/35">Region</span>
-                    <span className="text-white/75">{selected.region}</span>
+                    <span className="text-muted-foreground">Region</span>
+                    <span className="text-card-foreground">{selected.region}</span>
                   </>
                 )}
                 {selected.created_at && (
                   <>
-                    <span className="text-white/35">Created</span>
-                    <span className="text-white/75">{new Date(selected.created_at).toLocaleString()}</span>
+                    <span className="text-muted-foreground">Created</span>
+                    <span className="text-card-foreground">{new Date(selected.created_at).toLocaleString()}</span>
                   </>
                 )}
               </div>
             </div>
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-sm text-white/25">
+          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
             Select a compute target
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

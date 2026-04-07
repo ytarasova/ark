@@ -1,101 +1,117 @@
 @import "tailwindcss";
-@plugin "liquidglass-tailwind";
 
-/* ---- Liquid Glass Theme ---- */
-@theme {
-  --color-glass: rgba(255, 255, 255, 0.05);
-  --color-glass-hover: rgba(255, 255, 255, 0.08);
-  --color-glass-active: rgba(255, 255, 255, 0.12);
-  --color-glass-border: rgba(255, 255, 255, 0.08);
-  --color-glass-highlight: rgba(255, 255, 255, 0.1);
+@source "./**/*.{ts,tsx}";
 
-  --color-surface-0: rgba(25, 25, 32, 0.6);
-  --color-surface-1: rgba(35, 35, 42, 0.6);
-  --color-surface-2: rgba(45, 45, 52, 0.7);
+:root {
+  --background: #101014;
+  --foreground: #e8e8ec;
+  --card: #1a1a20;
+  --card-foreground: #e8e8ec;
+  --popover: #1a1a20;
+  --popover-foreground: #e8e8ec;
+  --primary: #7c6aef;
+  --primary-foreground: #ffffff;
+  --secondary: #252530;
+  --secondary-foreground: #e8e8ec;
+  --muted: #252530;
+  --muted-foreground: #8888a0;
+  --accent: #252530;
+  --accent-foreground: #e8e8ec;
+  --tertiary: #161620;
+  --tertiary-active: #202030;
+  --destructive: #cc4444;
+  --destructive-foreground: #ffcccc;
+  --border: #2a2a35;
+  --input: #2a2a35;
+  --ring: #7c6aef;
+  --radius: 0.5rem;
+  --sidebar: #141418;
+  --sidebar-foreground: #e8e8ec;
+  --sidebar-primary: #7c6aef;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #202028;
+  --sidebar-accent-foreground: #e8e8ec;
+  --sidebar-border: #2a2a35;
+  --sidebar-ring: #3a3a45;
+}
 
-  --color-label: rgba(255, 255, 255, 0.92);
-  --color-label-secondary: rgba(255, 255, 255, 0.55);
-  --color-label-tertiary: rgba(255, 255, 255, 0.3);
-  --color-label-quaternary: rgba(255, 255, 255, 0.16);
-
-  --color-tint: #7c6aef;
-  --color-tint-dim: rgba(124, 106, 239, 0.18);
-  --color-success: #32d583;
-  --color-success-dim: rgba(50, 213, 131, 0.15);
-  --color-warning: #f5c542;
-  --color-warning-dim: rgba(245, 197, 66, 0.15);
-  --color-danger: #f45555;
-  --color-danger-dim: rgba(244, 85, 85, 0.15);
-  --color-info: #5a9cf5;
-  --color-info-dim: rgba(90, 156, 245, 0.15);
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-active: var(--tertiary-active);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
 }
 
-/* ---- Ambient background gradient ---- */
-body {
-  background: #0d0d11;
-  background-image:
-    radial-gradient(ellipse at 15% 50%, rgba(100, 60, 200, 0.18) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 15%, rgba(50, 100, 180, 0.12) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 95%, rgba(80, 40, 140, 0.10) 0%, transparent 55%);
+@layer base {
+  * {
+    @apply border-border antialiased;
+  }
+  button, [role="button"] {
+    cursor: pointer;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html, body {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
 }
-
-/* ---- Glass utility classes ---- */
-/* Removed: glass, glass-thick, glass-highlight, glass-glow */
-/* Now provided by liquidglass-tailwind plugin: */
-/* glass-surface, glass-surface-xl, glass-shine-subtle, shadow-glass, etc. */
 
 /* ---- Scrollbar ---- */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ring); }
+::selection { background: var(--primary); color: white; }
 
-/* ---- Status dot glow ---- */
+/* ---- Animations ---- */
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(50,213,131,0.5), 0 0 2px rgba(50,213,131,0.8); }
-  50% { box-shadow: 0 0 12px rgba(50,213,131,0.3), 0 0 2px rgba(50,213,131,0.5); }
+  0%, 100% { box-shadow: 0 0 8px rgba(52,211,153,0.5); }
+  50% { box-shadow: 0 0 12px rgba(52,211,153,0.3); }
 }
-
-@keyframes delete-fade {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.15; }
+@keyframes slide-up {
+  from { transform: translateY(8px); opacity: 0; }
 }
-
 @keyframes fade-in {
   from { opacity: 0; }
 }
 
-@keyframes modal-slide-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes slide-up {
-  from { transform: translateY(8px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-/* ---- Electron drag region ---- */
+/* ---- Electron ---- */
 .drag-region { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
-
-/* ---- Reset ---- */
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; overflow: hidden; }
-
-::selection { background: var(--color-tint); color: #fff; }
-input, select, textarea, button { font-family: inherit; }
-
-/* ---- Focus rings ---- */
-:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--color-tint-dim), 0 0 0 1px var(--color-tint);
-  border-radius: 8px;
-}
-
-/* ---- Link styling ---- */
-a { color: var(--color-info); text-decoration: none; }
-a:hover { text-decoration: underline; }

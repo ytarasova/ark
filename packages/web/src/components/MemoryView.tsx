@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../hooks/useApi.js";
 import { cn } from "../lib/utils.js";
+import { Button } from "./ui/button.js";
+import { Input } from "./ui/input.js";
+import { Card } from "./ui/card.js";
+import { Badge } from "./ui/badge.js";
 import { BookOpen, Search } from "lucide-react";
-
-const btnClass = "px-3 py-1 text-xs font-medium rounded-md border border-white/[0.06] text-white/50 hover:text-white/80 hover:border-white/[0.1] transition-colors";
-const btnDanger = "px-3 py-1 text-xs font-medium rounded-md border border-red-500/20 text-red-400/70 hover:text-red-400 hover:border-red-500/30 transition-colors";
-const btnPrimary = "px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-500 border border-indigo-500/50 text-white hover:bg-indigo-400 transition-colors";
-const btnSuccess = "px-3 py-1.5 text-xs font-medium rounded-md border border-emerald-500/20 text-emerald-400/70 hover:text-emerald-400 hover:border-emerald-500/30 transition-colors";
-const inputClass = "bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-[13px] text-white/90 placeholder:text-white/25 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all";
 
 export function MemoryView() {
   const [memories, setMemories] = useState<any[]>([]);
@@ -62,36 +60,36 @@ export function MemoryView() {
       {/* Header with search and add */}
       <div className="flex gap-2 items-center mb-4 flex-wrap">
         <div className="relative flex-1 max-w-[480px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
-          <input
-            className="w-full h-8 pl-9 pr-3 text-[13px] bg-white/[0.03] border border-white/[0.06] rounded-lg text-white/90 placeholder:text-white/25 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all"
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="w-full h-8 pl-9 pr-3 text-[13px] bg-secondary"
             placeholder="Search memories..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleSearch()}
           />
         </div>
-        <button className={cn(btnPrimary, loading && "opacity-60 cursor-wait")} onClick={handleSearch} disabled={loading}>
+        <Button size="sm" className={cn(loading && "opacity-60 cursor-wait")} onClick={handleSearch} disabled={loading}>
           {loading ? "Searching..." : "Search"}
-        </button>
+        </Button>
         {searchResults && (
-          <button className={btnClass} onClick={() => { setSearchResults(null); setSearch(""); }}>
+          <Button variant="outline" size="sm" onClick={() => { setSearchResults(null); setSearch(""); }}>
             Clear
-          </button>
+          </Button>
         )}
         <div className="flex-1" />
-        <button className={btnSuccess} onClick={() => setShowAdd(!showAdd)}>
+        <Button variant="success" size="sm" onClick={() => setShowAdd(!showAdd)}>
           {showAdd ? "Cancel" : "+ Add Memory"}
-        </button>
+        </Button>
       </div>
 
       {/* Add form */}
       {showAdd && (
-        <div className="mb-4 p-4 bg-white/[0.02] border border-white/[0.06] rounded-lg">
+        <Card className="mb-4 p-4">
           <div className="mb-3.5">
-            <label className="block text-[11px] font-semibold text-white/50 mb-1.5 uppercase tracking-[0.04em]">Content</label>
+            <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Content</label>
             <textarea
-              className={cn(inputClass, "w-full resize-y")}
+              className="w-full resize-y bg-transparent border border-input rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={newContent}
               onChange={e => setNewContent(e.target.value)}
               placeholder="What should Ark remember?"
@@ -100,18 +98,17 @@ export function MemoryView() {
           </div>
           <div className="flex gap-2">
             <div className="flex-1 mb-3.5">
-              <label className="block text-[11px] font-semibold text-white/50 mb-1.5 uppercase tracking-[0.04em]">Tags (comma-separated)</label>
-              <input
-                className={cn(inputClass, "w-full")}
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Tags (comma-separated)</label>
+              <Input
                 value={newTags}
                 onChange={e => setNewTags(e.target.value)}
                 placeholder="e.g. aws, deploy, config"
               />
             </div>
             <div className="w-[120px] mb-3.5">
-              <label className="block text-[11px] font-semibold text-white/50 mb-1.5 uppercase tracking-[0.04em]">Scope</label>
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Scope</label>
               <select
-                className={cn(inputClass, "w-full")}
+                className="w-full h-9 bg-transparent border border-input rounded-md px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={newScope}
                 onChange={e => setNewScope(e.target.value)}
               >
@@ -121,15 +118,15 @@ export function MemoryView() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button className={btnPrimary} onClick={handleAdd}>Save Memory</button>
-            <button className={btnClass} onClick={() => setShowAdd(false)}>Cancel</button>
+            <Button size="sm" onClick={handleAdd}>Save Memory</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAdd(false)}>Cancel</Button>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Result count */}
       {displayList.length > 0 && (
-        <div className="text-white/25 text-[11px] mb-2 font-mono">
+        <div className="text-muted-foreground text-[11px] mb-2 font-mono">
           {searchResults ? `${displayList.length} result${displayList.length !== 1 ? "s" : ""}` : `${memories.length} memor${memories.length !== 1 ? "ies" : "y"}`}
         </div>
       )}
@@ -138,8 +135,8 @@ export function MemoryView() {
       {displayList.length === 0 && (
         <div className="flex items-center justify-center h-[calc(100vh-180px)]">
           <div className="text-center">
-            <BookOpen size={28} className="text-white/15 mx-auto mb-3" />
-            <p className="text-sm text-white/35">
+            <BookOpen size={28} className="text-muted-foreground/40 mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">
               {searchResults ? `No memories matching "${search}"` : "No memories yet. Add one above."}
             </p>
           </div>
@@ -150,16 +147,16 @@ export function MemoryView() {
       {displayList.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {displayList.map((m: any) => (
-            <div key={m.id} className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3.5 cursor-default">
+            <Card key={m.id} className="p-3.5 cursor-default">
               <div className="flex justify-between items-start gap-3">
                 <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  <div className="text-xs text-white/80 leading-relaxed">{m.content}</div>
-                  <div className="flex gap-3 text-white/35 text-[11px] items-center flex-wrap">
-                    <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-white/25">{m.scope || "global"}</span>
+                  <div className="text-xs text-foreground leading-relaxed">{m.content}</div>
+                  <div className="flex gap-3 text-muted-foreground text-[11px] items-center flex-wrap">
+                    <Badge variant="secondary" className="text-[10px]">{m.scope || "global"}</Badge>
                     {m.tags?.length > 0 && (
                       <span className="flex gap-1">
                         {m.tags.map((t: string) => (
-                          <span key={t} className="inline-block px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">{t}</span>
+                          <Badge key={t} variant="default" className="text-[11px]">{t}</Badge>
                         ))}
                       </span>
                     )}
@@ -167,14 +164,15 @@ export function MemoryView() {
                     {m.created_at && !m.createdAt && <span className="font-mono">{m.created_at.slice(0, 10)}</span>}
                   </div>
                 </div>
-                <button
-                  className={btnDanger}
+                <Button
+                  variant="destructive"
+                  size="xs"
                   onClick={() => handleForget(m.id)}
                 >
                   Forget
-                </button>
+                </Button>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}

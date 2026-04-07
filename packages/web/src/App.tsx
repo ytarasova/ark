@@ -25,7 +25,7 @@ function Toast({ message, type, onDone }: { message: string; type: string; onDon
   }, []);
   return (
     <div className={cn(
-      "fixed bottom-5 right-5 px-[18px] py-2.5 bg-[#1a1a22] border border-white/[0.1] rounded-xl text-white/90 text-[13px] font-medium z-[300] shadow-[0_4px_20px_rgba(0,0,0,0.4)] animate-[slide-up_300ms_cubic-bezier(0.32,0.72,0,1)] flex items-center gap-2",
+      "fixed bottom-5 right-5 px-[18px] py-2.5 bg-card border border-border rounded-xl text-foreground text-[13px] font-medium z-[300] shadow-[0_4px_20px_rgba(0,0,0,0.4)] animate-[slide-up_300ms_cubic-bezier(0.32,0.72,0,1)] flex items-center gap-2",
       type === "success" && "border-l-[3px] border-l-emerald-400",
       type === "error" && "border-l-[3px] border-l-red-400",
     )}>
@@ -102,10 +102,10 @@ function App() {
   return (
     <div className="grid grid-cols-[200px_1fr] h-screen bg-transparent max-md:grid-cols-[48px_1fr]">
       <Sidebar activeView={view} onNavigate={setView} readOnly={readOnly} />
-      <div className="overflow-y-auto flex flex-col bg-[#0d0d11]">
-        <div className="h-12 px-5 border-b border-white/[0.06] flex items-center justify-between bg-[#0d0d11]/80 backdrop-blur-xl sticky top-0 z-10 shrink-0">
+      <div className="overflow-y-auto flex flex-col bg-background">
+        <div className="h-12 px-5 border-b border-border flex items-center justify-between bg-background/80 backdrop-blur-xl sticky top-0 z-10 shrink-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-[15px] font-semibold text-white/90">{viewTitles[view] || "Dashboard"}</h1>
+            <h1 className="text-[15px] font-semibold text-foreground">{viewTitles[view] || "Dashboard"}</h1>
             {view === "sessions" && (
               <div className="flex gap-2 text-xs font-mono">
                 {runningCount > 0 && <span className="text-emerald-400">{runningCount}</span>}
@@ -115,10 +115,10 @@ function App() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-white/25">{sessions.length}</span>
+            <span className="text-xs font-mono text-muted-foreground">{sessions.length}</span>
             {view === "sessions" && !readOnly && (
               <button
-                className="px-3.5 py-1.5 rounded-lg text-[12px] font-medium bg-indigo-500 text-white hover:bg-indigo-400 active:scale-[0.97] transition-all duration-150"
+                className="px-3.5 py-1.5 rounded-lg text-[12px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.97] transition-all duration-150"
                 onClick={() => setShowNew(true)}
               >
                 + New Session
