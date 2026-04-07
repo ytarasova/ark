@@ -8,7 +8,9 @@
     "build": "electron-builder --mac --win --linux",
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux"
+    "build:linux": "electron-builder --linux",
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed"
   },
   "build": {
     "appId": "com.ark.desktop",
@@ -29,20 +31,30 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "icon.png"
     },
     "win": {
-      "target": ["nsis", "zip"],
+      "target": [
+        "nsis",
+        "zip"
+      ],
       "icon": "icon.png"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Development",
       "icon": "icon.png"
     }
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0"
   }

@@ -100,8 +100,61 @@ jobs:
             echo "TUI smoke test passed"
           fi
 
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            build-flag: "--mac"
+            name: mac
+          - os: ubuntu-latest
+            build-flag: "--linux"
+            name: linux
+          - os: windows-latest
+            build-flag: "--win"
+            name: win
+
+    runs-on: ${{ matrix.os }}
+    name: desktop (${{ matrix.name }})
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build web frontend
+        run: bun run packages/web/build.ts
+
+      - name: Install Electron dependencies
+        run: cd packages/desktop && npm install
+
+      - name: Build Electron app
+        run: cd packages/desktop && npx electron-builder ${{ matrix.build-flag }}
+
+      - name: Upload desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-desktop-${{ matrix.name }}
+          path: |
+            packages/desktop/out/*.dmg
+            packages/desktop/out/*.zip
+            packages/desktop/out/*.exe
+            packages/desktop/out/*.AppImage
+            packages/desktop/out/*.deb
+
   release:
-    needs: [build, smoke-test]
+    needs: [build, smoke-test, desktop]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -115,9 +168,12 @@ jobs:
         run: |
           mkdir -p dist
           for d in artifacts/ark-*/; do
-            cp "$d"* dist/
+            cp "$d"* dist/ 2>/dev/null || true
           done
-          chmod +x dist/ark-*
+          for d in artifacts/ark-desktop-*/; do
+            cp "$d"* dist/ 2>/dev/null || true
+          done
+          chmod +x dist/ark-* 2>/dev/null || true
           ls -lh dist/
 
       - name: Determine release type

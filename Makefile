@@ -1,4 +1,4 @@
-.PHONY: install dev tui web test test-watch lint clean uninstall build-web desktop desktop-install help
+.PHONY: install dev tui web test test-watch lint clean uninstall build-web desktop desktop-install desktop-test help
 
 BUN := bun
 ARK_BIN := /usr/local/bin/ark
@@ -20,7 +20,7 @@ tui: ## Launch the terminal UI
 	./ark tui
 
 test: build-web ## Run all tests sequentially (never parallel — ports collide)
-	$(BUN) test packages/ --concurrency 1
+	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/tui packages/arkd --concurrency 1
 
 test-file: ## Run a single test file: make test-file F=packages/core/__tests__/session.test.ts
 	$(BUN) test $(F)
@@ -42,6 +42,9 @@ desktop-install: ## Install Electron dependencies for desktop app
 
 desktop: build-web desktop-install ## Build and launch the Electron desktop app
 	cd packages/desktop && npx electron .
+
+desktop-test: build-web desktop-install ## Run Electron E2E tests via Playwright
+	cd packages/desktop && npx playwright test
 
 desktop-build: build-web desktop-install ## Package the Electron app for distribution
 	cd packages/desktop && npx electron-builder
