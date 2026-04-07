@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.9.1 (2026-04-07)
+
+### Product Excellence
+- **OS notifications**: stage completion/failure triggers terminal-notifier or terminal bell
+- **Auto-execute action stages**: flow action stages (create_pr, merge, close) now execute automatically with verification enforcement
+- **Prerequisite checker**: `ark doctor` command; guards on `session start` and `tui` for missing tmux/git/claude
+- **Flow pipeline visualization**: TUI SessionDetail shows `plan > [implement] > pr > review` with current stage highlighted
+- **First-run welcome**: TUI shows getting-started hints when no sessions exist
+- **Success toasts**: inline status bar confirmation for all async operations
+- **Stale session detection**: orphaned running sessions detected and marked failed on boot
+- **Stale hooks cleanup**: removes orphaned `.claude/settings.local.json` on boot
+- **Structured error messages**: recovery hints on common error paths
+- **Empty state guidance**: helpful placeholders in SessionDetail sections
+- **Responsive layout**: session list adapts to terminal width
+- **`ark init` wizard**: prerequisite check + auth check + .ark.yaml stub creation
+- **Web auto-build**: `ark web` auto-builds frontend if dist/ is missing
+- **Agent progress parsing**: structured labels from tmux output (Working/Reading/Writing)
+- **Web SSE push**: event-driven broadcast on state changes (replaces 3s polling)
+- **Help overlay grouped**: reorganized into Session Actions / Navigation / Tools / Filters sections
+
+### Fixes
+- **Config YAML loading**: `~/.ark/config.yaml` now actually loaded (hotkeys, budgets, theme, otlp, rollback, telemetry, default_compute)
+- **Notifications**: uses terminal-notifier (no Script Editor permission dialog) with bell fallback
+
 ## v0.9.0 (2026-04-07)
 
 ### New Features

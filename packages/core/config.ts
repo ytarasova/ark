@@ -1,5 +1,6 @@
 import { join } from "path";
 import { homedir } from "os";
+import { existsSync, readFileSync } from "fs";
 
 export interface OtlpSettings {
   enabled: boolean;
@@ -33,12 +34,32 @@ export interface ArkConfig {
   rollback: RollbackSettings;
   telemetry: TelemetrySettings;
   default_compute: string | null;
+  hotkeys?: Record<string, string | null>;
+  budgets?: { dailyLimit?: number; weeklyLimit?: number; monthlyLimit?: number };
+  theme?: string;
+  notifications?: boolean;
+}
+
+/** Load ~/.ark/config.yaml if it exists. Returns empty object on failure. */
+function loadYamlConfig(arkDir: string): Record<string, unknown> {
+  const configPath = join(arkDir, "config.yaml");
+  if (!existsSync(configPath)) return {};
+  try {
+    // Lazy import YAML to avoid loading it when not needed (test mode)
+    const YAML = require("yaml");
+    return (YAML.parse(readFileSync(configPath, "utf-8")) ?? {}) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
 export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
   const arkDir = overrides?.arkDir ?? process.env.ARK_TEST_DIR ?? join(homedir(), ".ark");
   const conductorPort = overrides?.conductorPort
     ?? parseInt(process.env.ARK_CONDUCTOR_PORT ?? "19100", 10);
+
+  // Load user config from ~/.ark/config.yaml
+  const yaml = overrides?.env === "test" ? {} : loadYamlConfig(arkDir);
 
   const base: ArkConfig = {
     arkDir,
@@ -49,10 +70,27 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
     conductorPort,
     conductorUrl: process.env.ARK_CONDUCTOR_URL ?? `http://localhost:${conductorPort}`,
     env: process.env.ARK_TEST_DIR !== undefined ? "test" : "production",
-    otlp: { enabled: false },
-    rollback: { enabled: false, timeout: 600, on_timeout: "ignore", auto_merge: false, health_url: null },
-    telemetry: { enabled: process.env.ARK_TELEMETRY === "1" },
-    default_compute: process.env.ARK_DEFAULT_COMPUTE ?? null,
+    otlp: {
+      enabled: (yaml.otlp as Record<string, unknown>)?.enabled === true,
+      endpoint: (yaml.otlp as Record<string, unknown>)?.endpoint as string | undefined,
+      headers: (yaml.otlp as Record<string, unknown>)?.headers as Record<string, string> | undefined,
+    },
+    rollback: {
+      enabled: (yaml.rollback as Record<string, unknown>)?.enabled === true,
+      timeout: ((yaml.rollback as Record<string, unknown>)?.timeout as number) ?? 600,
+      on_timeout: ((yaml.rollback as Record<string, unknown>)?.on_timeout as "rollback" | "ignore") ?? "ignore",
+      auto_merge: (yaml.rollback as Record<string, unknown>)?.auto_merge === true,
+      health_url: ((yaml.rollback as Record<string, unknown>)?.health_url as string) ?? null,
+    },
+    telemetry: {
+      enabled: process.env.ARK_TELEMETRY === "1" || (yaml.telemetry as Record<string, unknown>)?.enabled === true,
+      endpoint: (yaml.telemetry as Record<string, unknown>)?.endpoint as string | undefined,
+    },
+    default_compute: process.env.ARK_DEFAULT_COMPUTE ?? (yaml.default_compute as string) ?? null,
+    hotkeys: yaml.hotkeys as Record<string, string | null> | undefined,
+    budgets: yaml.budgets as ArkConfig["budgets"],
+    theme: yaml.theme as string | undefined,
+    notifications: yaml.notifications as boolean | undefined,
   };
 
   if (overrides) {
