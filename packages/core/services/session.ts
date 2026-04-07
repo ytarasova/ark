@@ -414,6 +414,120 @@ export class SessionService {
     return result;
   }
 
+  // ── Delegating methods (complex orchestration — call through to session.ts) ──
+
+  /**
+   * Dispatch a session: resolve agent, build task, launch executor.
+   * Delegates to session.ts dispatch() which owns tmux/executor/flow logic.
+   */
+  async dispatch(id: string, opts?: { onLog?: (msg: string) => void }): Promise<SessionOpResult> {
+    const { dispatch: legacyDispatch } = await import("../session.js");
+    return legacyDispatch(id, opts);
+  }
+
+  /**
+   * Advance a session to the next flow stage.
+   * Delegates to session.ts advance() which owns gate evaluation and flow progression.
+   */
+  async advance(id: string, force?: boolean): Promise<SessionOpResult> {
+    const { advance: legacyAdvance } = await import("../session.js");
+    return legacyAdvance(id, force);
+  }
+
+  /**
+   * Get captured output from a running session's tmux pane.
+   */
+  async getOutput(id: string, opts?: { lines?: number; ansi?: boolean }): Promise<string> {
+    const { getOutput: legacyGetOutput } = await import("../session.js");
+    return legacyGetOutput(id, opts);
+  }
+
+  /**
+   * Send a message to a running session's tmux pane.
+   */
+  async send(id: string, message: string): Promise<SessionOpResult> {
+    const { send: legacySend } = await import("../session.js");
+    return legacySend(id, message);
+  }
+
+  /**
+   * Poll until session reaches a terminal state (completed/failed/stopped).
+   */
+  async waitForCompletion(
+    id: string,
+    opts?: { timeoutMs?: number; pollMs?: number; onStatus?: (status: string) => void },
+  ): Promise<{ session: Session | null; timedOut: boolean }> {
+    const { waitForCompletion: legacyWait } = await import("../session.js");
+    return legacyWait(id, opts);
+  }
+
+  /**
+   * Fork a session: create a new session from the same point in the flow.
+   */
+  async fork(id: string, name?: string): Promise<SessionOpResult> {
+    const { forkSession } = await import("../session.js");
+    // session.ts has a narrower local SessionOpResult (no `message` on success)
+    return forkSession(id, name) as unknown as SessionOpResult;
+  }
+
+  /**
+   * Clone a session: deep copy including claude_session_id for --resume.
+   */
+  async clone(id: string, name?: string): Promise<SessionOpResult> {
+    const { cloneSession } = await import("../session.js");
+    return cloneSession(id, name) as unknown as SessionOpResult;
+  }
+
+  /**
+   * Spawn a subagent session under a parent.
+   */
+  async spawn(parentId: string, opts: {
+    task: string;
+    agent?: string;
+    model?: string;
+    group_name?: string;
+    extensions?: string[];
+  }): Promise<SessionOpResult> {
+    const { spawnSubagent } = await import("../session.js");
+    return spawnSubagent(parentId, opts);
+  }
+
+  /**
+   * Handoff: clone session to a different agent and dispatch.
+   */
+  async handoff(id: string, agent: string, instructions?: string): Promise<SessionOpResult> {
+    const { handoff: legacyHandoff } = await import("../session.js");
+    return legacyHandoff(id, agent, instructions);
+  }
+
+  /**
+   * Finish a worktree: merge back and clean up.
+   */
+  async finishWorktree(id: string, opts?: {
+    into?: string;
+    noMerge?: boolean;
+    keepBranch?: boolean;
+  }): Promise<SessionOpResult> {
+    const { finishWorktree: legacyFinish } = await import("../session.js");
+    return legacyFinish(id, opts);
+  }
+
+  /**
+   * Join forked children back into parent session.
+   */
+  async join(parentId: string, force?: boolean): Promise<SessionOpResult> {
+    const { joinFork } = await import("../session.js");
+    return joinFork(parentId, force);
+  }
+
+  /**
+   * Approve a review gate and force-advance past it.
+   */
+  async approveReviewGate(id: string): Promise<SessionOpResult> {
+    const { approveReviewGate: legacyApprove } = await import("../session.js");
+    return legacyApprove(id);
+  }
+
   // ── Query helpers ─────────────────────────────────────────────────────────
 
   get(id: string): Session | null {

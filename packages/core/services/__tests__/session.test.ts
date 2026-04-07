@@ -525,4 +525,56 @@ describe("SessionService", () => {
       expect(svc.list().length).toBe(2);
     });
   });
+
+  // ── delegating methods (existence checks) ─────────────────────────────────
+
+  describe("delegating methods", () => {
+    it("dispatch is a function", () => {
+      expect(typeof svc.dispatch).toBe("function");
+    });
+
+    it("advance is a function", () => {
+      expect(typeof svc.advance).toBe("function");
+    });
+
+    it("getOutput is a function", () => {
+      expect(typeof svc.getOutput).toBe("function");
+    });
+
+    it("send is a function", () => {
+      expect(typeof svc.send).toBe("function");
+    });
+
+    it("waitForCompletion is a function", () => {
+      expect(typeof svc.waitForCompletion).toBe("function");
+    });
+
+    it("fork is a function", () => {
+      expect(typeof svc.fork).toBe("function");
+    });
+
+    it("clone is a function", () => {
+      expect(typeof svc.clone).toBe("function");
+    });
+
+    it("spawn is a function", () => {
+      expect(typeof svc.spawn).toBe("function");
+    });
+
+    it("handoff is a function", () => {
+      expect(typeof svc.handoff).toBe("function");
+    });
+
+    it("finishWorktree is a function", () => {
+      expect(typeof svc.finishWorktree).toBe("function");
+    });
+
+    it("join is a function", () => {
+      expect(typeof svc.join).toBe("function");
+    });
+
+    it("approveReviewGate is a function", () => {
+      expect(typeof svc.approveReviewGate).toBe("function");
+    });
+  });
 });
