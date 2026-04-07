@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../hooks/useApi.js";
 import { cn } from "../lib/utils.js";
+import { Search } from "lucide-react";
 
 export function HistoryView() {
   const [query, setQuery] = useState("");
@@ -26,18 +27,21 @@ export function HistoryView() {
 
   return (
     <div>
+      {/* Search bar */}
       <div className="flex gap-2 items-center mb-4 flex-wrap">
-        <input
-          className="glass-input rounded-lg px-3.5 py-[7px] pl-8 text-[13px] flex-1 max-w-[480px] text-label placeholder:text-label-quaternary focus:border-tint focus:shadow-[0_0_0_3px_var(--color-tint-dim)] outline-none transition-all duration-200 bg-[length:13px] bg-[10px_center] bg-no-repeat"
-          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E")` }}
-          placeholder="Search sessions, events, transcripts..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
+        <div className="relative flex-1 max-w-[480px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
+          <input
+            className="w-full h-8 pl-9 pr-3 text-[13px] bg-white/[0.03] border border-white/[0.06] rounded-lg text-white/90 placeholder:text-white/25 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all"
+            placeholder="Search sessions, events, transcripts..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
         <button
           className={cn(
-            "inline-flex items-center justify-center gap-1.5 px-3.5 py-[7px] rounded-lg text-[13px] font-semibold cursor-pointer bg-tint border-none text-white shadow-[0_2px_12px_rgba(124,106,239,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] hover:brightness-110 active:scale-[0.97] transition-all duration-200",
+            "px-3.5 py-1.5 text-xs font-medium rounded-md bg-indigo-500 border border-indigo-500/50 text-white hover:bg-indigo-400 transition-colors",
             loading && "opacity-60 cursor-wait"
           )}
           onClick={handleSearch}
@@ -47,36 +51,42 @@ export function HistoryView() {
         </button>
       </div>
 
+      {/* Initial empty state */}
       {!searched && (
-        <div className="text-center py-16 px-6 text-label-tertiary">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="opacity-15 mb-4 mx-auto">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <div className="text-[13px]">Enter a search query to find sessions, events, and transcript content</div>
+        <div className="flex items-center justify-center h-[calc(100vh-180px)]">
+          <div className="text-center">
+            <Search size={28} className="text-white/15 mx-auto mb-3" />
+            <p className="text-sm text-white/35">Enter a search query to find sessions, events, and transcript content</p>
+          </div>
         </div>
       )}
 
+      {/* No results */}
       {searched && results.length === 0 && (
-        <div className="text-center py-16 px-6 text-label-tertiary">
-          <div className="text-[13px]">No results for "{query}"</div>
+        <div className="flex items-center justify-center h-[calc(100vh-220px)]">
+          <div className="text-center">
+            <Search size={28} className="text-white/15 mx-auto mb-3" />
+            <p className="text-sm text-white/35">No results for "{query}"</p>
+          </div>
         </div>
       )}
 
+      {/* Results */}
       {results.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <div className="text-label-quaternary text-[11px] mb-2 font-mono">
+          <div className="text-white/25 text-[11px] mb-2 font-mono">
             {results.length} result{results.length !== 1 ? "s" : ""}
           </div>
           {results.map((r: any, i: number) => (
-            <div key={i} className="glass-card glass-shine-subtle rounded-xl p-3.5 transition-all duration-200 hover:bg-surface-1 hover:border-white/15">
+            <div key={i} className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3.5 transition-colors hover:bg-white/[0.04] hover:border-white/[0.1]">
               <div className="flex gap-2 items-center mb-1.5">
-                <span className="text-[10px] font-medium uppercase tracking-[0.03em] px-2 py-0.5 rounded-full bg-tint-dim text-tint font-mono backdrop-blur-[4px]">{r.type || "session"}</span>
-                <span className="text-[10px] text-label-quaternary font-mono">{r.sessionId || r.id || ""}</span>
+                <span className="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">{r.type || "session"}</span>
+                <span className="text-[10px] text-white/25 font-mono">{r.sessionId || r.id || ""}</span>
               </div>
-              {r.summary && <div className="text-[13px] font-semibold text-label mb-1">{r.summary}</div>}
-              {r.snippet && <div className="text-xs text-label-secondary leading-relaxed max-h-12 overflow-hidden text-ellipsis">{r.snippet}</div>}
+              {r.summary && <div className="text-[13px] font-semibold text-white/80 mb-1">{r.summary}</div>}
+              {r.snippet && <div className="text-xs text-white/50 leading-relaxed max-h-12 overflow-hidden text-ellipsis">{r.snippet}</div>}
               {r.content && !r.snippet && (
-                <div className="text-xs text-label-secondary leading-relaxed max-h-12 overflow-hidden text-ellipsis">{String(r.content).slice(0, 200)}</div>
+                <div className="text-xs text-white/50 leading-relaxed max-h-12 overflow-hidden text-ellipsis">{String(r.content).slice(0, 200)}</div>
               )}
             </div>
           ))}

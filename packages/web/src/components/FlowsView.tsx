@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { api } from "../hooks/useApi.js";
 import { cn } from "../lib/utils.js";
+import { GitBranch } from "lucide-react";
 
-const GATE_CLASSES: Record<string, string> = {
-  auto: "bg-success-dim text-success",
-  manual: "bg-warning-dim text-warning",
-  condition: "bg-tint-dim text-tint",
+const GATE_COLORS: Record<string, string> = {
+  auto: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  manual: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  condition: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  review: "bg-purple-500/10 text-purple-400 border-purple-500/20",
 };
 
 export function FlowsView() {
@@ -21,64 +23,67 @@ export function FlowsView() {
 
   if (!flows.length) {
     return (
-      <div className="text-center py-16 px-6 text-label-tertiary">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="opacity-15 mb-4 mx-auto">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-        </svg>
-        <div className="text-[13px] text-label-tertiary">No flows found</div>
+      <div className="flex items-center justify-center h-[calc(100vh-180px)]">
+        <div className="text-center">
+          <GitBranch size={28} className="text-white/15 mx-auto mb-3" />
+          <p className="text-sm text-white/35">No flows found</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-[260px_1fr] rounded-xl glass-card glass-shine-subtle overflow-hidden h-[calc(100vh-112px)] max-md:grid-cols-1">
-      <div className="glass-surface bg-glass-dark border-r border-white/8 overflow-y-auto h-full">
+    <div className="grid grid-cols-[260px_1fr] rounded-lg border border-white/[0.06] overflow-hidden h-[calc(100vh-112px)]">
+      {/* Left: list panel */}
+      <div className="bg-white/[0.02] border-r border-white/[0.06] overflow-y-auto">
         {flows.map((f: any) => {
           const stageCount = f.stages?.length ?? 0;
           return (
             <div
               key={f.name}
               className={cn(
-                "flex justify-between items-center px-3.5 py-2.5 cursor-pointer border-b border-white/4 hover:bg-white/5 transition-colors text-xs",
-                selected?.name === f.name && "bg-white/12 border-l-3 border-l-tint font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-white/[0.03] transition-colors text-[13px]",
+                "hover:bg-white/[0.03]",
+                selected?.name === f.name && "bg-white/[0.05] border-l-2 border-l-indigo-400 font-semibold"
               )}
               onClick={() => setSelected(f)}
             >
-              <div className="font-medium text-[13px] text-label">{f.name}</div>
-              <span className="text-[10px] font-medium uppercase tracking-[0.03em] px-2 py-0.5 rounded-full bg-white/6 text-label-tertiary whitespace-nowrap font-mono backdrop-blur-[4px]">{stageCount} stage{stageCount !== 1 ? "s" : ""}</span>
+              <span className="text-white/80 truncate">{f.name}</span>
+              <span className="text-[10px] font-mono uppercase text-white/25 tracking-wider">{stageCount} stage{stageCount !== 1 ? "s" : ""}</span>
             </div>
           );
         })}
       </div>
-      <div className="p-5 overflow-y-auto h-full bg-surface-0 bg-black/20 backdrop-blur-[20px] saturate-150">
+      {/* Right: detail panel */}
+      <div className="p-5 overflow-y-auto bg-[#0d0d11]">
         {selected ? (
           <>
-            <h2 className="text-[15px] font-semibold text-label mb-1.5 tracking-[-0.01em]">{selected.name}</h2>
+            <h2 className="text-lg font-semibold text-white/90 mb-1">{selected.name}</h2>
             {selected.description && (
-              <p className="text-label-secondary text-[13px] mb-4 leading-relaxed">{selected.description}</p>
+              <p className="text-sm text-white/40 mb-5">{selected.description}</p>
             )}
             {selected.stages && selected.stages.length > 0 && (
-              <div className="mb-5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Stages</div>
+              <div className="mb-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">Stages</h3>
                 <table className="w-full border-collapse">
                   <thead>
                     <tr>
-                      <th className="text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-label-quaternary p-2 px-3.5 border-b border-white/8 bg-surface-0 backdrop-blur-[10px]">#</th>
-                      <th className="text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-label-quaternary p-2 px-3.5 border-b border-white/8 bg-surface-0 backdrop-blur-[10px]">Name</th>
-                      <th className="text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-label-quaternary p-2 px-3.5 border-b border-white/8 bg-surface-0 backdrop-blur-[10px]">Agent</th>
-                      <th className="text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-label-quaternary p-2 px-3.5 border-b border-white/8 bg-surface-0 backdrop-blur-[10px]">Gate</th>
+                      <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 p-2 px-3 border-b border-white/[0.06]">#</th>
+                      <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 p-2 px-3 border-b border-white/[0.06]">Name</th>
+                      <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 p-2 px-3 border-b border-white/[0.06]">Agent</th>
+                      <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 p-2 px-3 border-b border-white/[0.06]">Gate</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selected.stages.map((s: any, i: number) => (
-                      <tr key={i} className="hover:bg-white/3 transition-colors">
-                        <td className="p-2.5 px-3.5 text-xs border-b border-white/4 text-label-quaternary font-mono text-[11px]">{i + 1}</td>
-                        <td className="p-2.5 px-3.5 text-xs border-b border-white/4 text-label-secondary font-semibold">{s.name}</td>
-                        <td className="p-2.5 px-3.5 text-xs border-b border-white/4 text-label-secondary">{s.agent || "-"}</td>
-                        <td className="p-2.5 px-3.5 text-xs border-b border-white/4">
+                      <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="p-2.5 px-3 text-[13px] border-b border-white/[0.03] text-white/25 font-mono text-[11px]">{i + 1}</td>
+                        <td className="p-2.5 px-3 text-[13px] border-b border-white/[0.03] text-white/70 font-semibold">{s.name}</td>
+                        <td className="p-2.5 px-3 text-[13px] border-b border-white/[0.03] text-white/60">{s.agent || "-"}</td>
+                        <td className="p-2.5 px-3 text-[13px] border-b border-white/[0.03]">
                           <span className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-[0.03em] font-mono backdrop-blur-[4px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
-                            GATE_CLASSES[s.gate || "auto"] || GATE_CLASSES.auto
+                            "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase tracking-wider border",
+                            GATE_COLORS[s.gate || "auto"] || GATE_COLORS.auto
                           )}>
                             {s.gate || "auto"}
                           </span>
@@ -91,7 +96,9 @@ export function FlowsView() {
             )}
           </>
         ) : (
-          <div className="text-center py-16 px-6 text-label-tertiary"><div className="text-[13px]">Select a flow</div></div>
+          <div className="flex items-center justify-center h-full text-sm text-white/25">
+            Select a flow
+          </div>
         )}
       </div>
     </div>

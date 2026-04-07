@@ -1,44 +1,42 @@
 import { useState, useEffect } from "react";
 import { api } from "../hooks/useApi.js";
 import { cn } from "../lib/utils.js";
+import { Server } from "lucide-react";
 
-const btnBase = "glass-btn inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-medium cursor-pointer text-label active:scale-[0.97] transition-all duration-200 whitespace-nowrap";
-const btnSm = "px-2.5 py-1";
-const btnPrimary = "bg-tint border-none text-white font-semibold shadow-[0_2px_12px_rgba(124,106,239,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] hover:brightness-110";
-const btnDanger = "text-danger border-danger/20 bg-transparent hover:bg-danger-dim hover:border-danger/30";
-const btnSuccess = "text-success border-success/20 bg-transparent hover:bg-success-dim hover:border-success/30";
-const btnWarning = "text-warning border-warning/20 bg-transparent hover:bg-warning-dim hover:border-warning/30";
+const btnClass = "px-3 py-1 text-xs font-medium rounded-md border border-white/[0.06] text-white/50 hover:text-white/80 hover:border-white/[0.1] transition-colors";
+const btnDanger = "px-3 py-1 text-xs font-medium rounded-md border border-red-500/20 text-red-400/70 hover:text-red-400 hover:border-red-500/30 transition-colors";
+const btnPrimary = "px-3 py-1 text-xs font-medium rounded-md bg-indigo-500 border border-indigo-500/50 text-white hover:bg-indigo-400 transition-colors";
+
+function statusDotColor(status: string): string {
+  switch (status) {
+    case "running": return "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]";
+    case "stopped": return "bg-red-400";
+    case "pending": case "provisioning": return "bg-amber-400";
+    default: return "bg-white/20";
+  }
+}
 
 function ComputeActions({ compute, onAction }: { compute: any; onAction: (action: string) => void }) {
   const s = compute.status || "unknown";
   return (
     <div className="flex gap-1.5 flex-wrap">
       {(s === "stopped" || s === "created" || s === "destroyed") && (
-        <button className={cn(btnBase, btnSm, btnPrimary)} onClick={() => onAction("provision")}>Provision</button>
+        <button className={btnPrimary} onClick={() => onAction("provision")}>Provision</button>
       )}
       {(s === "stopped" || s === "created") && (
-        <button className={cn(btnBase, btnSm, btnSuccess)} onClick={() => onAction("start")}>Start</button>
+        <button className={btnClass} onClick={() => onAction("start")}>Start</button>
       )}
       {s === "running" && (
-        <button className={cn(btnBase, btnSm, btnWarning)} onClick={() => onAction("stop")}>Stop</button>
+        <button className={btnDanger} onClick={() => onAction("stop")}>Stop</button>
       )}
       {s === "running" && (
-        <button className={cn(btnBase, btnSm, btnDanger)} onClick={() => onAction("destroy")}>Destroy</button>
+        <button className={btnDanger} onClick={() => onAction("destroy")}>Destroy</button>
       )}
       {s !== "provisioning" && (
-        <button className={cn(btnBase, btnSm, btnDanger)} onClick={() => onAction("delete")}>Delete</button>
+        <button className={btnDanger} onClick={() => onAction("delete")}>Delete</button>
       )}
     </div>
   );
-}
-
-function statusColor(status: string): string {
-  switch (status) {
-    case "running": return "bg-success";
-    case "stopped": return "bg-danger";
-    case "pending": case "provisioning": return "bg-warning";
-    default: return "bg-label-quaternary";
-  }
 }
 
 export function ComputeView() {
@@ -90,87 +88,92 @@ export function ComputeView() {
 
   if (!computes.length) {
     return (
-      <div className="text-center py-16 px-6 text-label-tertiary">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="opacity-15 mb-4 mx-auto">
-          <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/>
-        </svg>
-        <div className="text-[13px] text-label-tertiary">No compute targets</div>
+      <div className="flex items-center justify-center h-[calc(100vh-180px)]">
+        <div className="text-center">
+          <Server size={28} className="text-white/15 mx-auto mb-3" />
+          <p className="text-sm text-white/35">No compute targets</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-[260px_1fr] rounded-xl glass-card glass-shine-subtle overflow-hidden h-[calc(100vh-112px)] max-md:grid-cols-1">
-      <div className="glass-surface bg-glass-dark border-r border-white/8 overflow-y-auto h-full">
+    <div className="grid grid-cols-[260px_1fr] rounded-lg border border-white/[0.06] overflow-hidden h-[calc(100vh-112px)]">
+      {/* Left: list panel */}
+      <div className="bg-white/[0.02] border-r border-white/[0.06] overflow-y-auto">
         {computes.map((c: any) => (
           <div
             key={c.name || c.id}
             className={cn(
-              "flex justify-between items-center px-3.5 py-2.5 cursor-pointer border-b border-white/4 hover:bg-white/5 transition-colors text-xs",
-              selected === c && "bg-white/12 border-l-3 border-l-tint font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+              "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-white/[0.03] transition-colors text-[13px]",
+              "hover:bg-white/[0.03]",
+              selected === c && "bg-white/[0.05] border-l-2 border-l-indigo-400 font-semibold"
             )}
             onClick={() => setSelected(c)}
           >
-            <div className="flex items-center gap-2">
-              <span className={cn("inline-block w-2 h-2 rounded-full", statusColor(c.status || "unknown"))} />
-              <div className="font-medium text-[13px] text-label">{c.name || c.id}</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className={cn("inline-block w-2 h-2 rounded-full shrink-0", statusDotColor(c.status || "unknown"))} />
+              <span className="text-white/80 truncate">{c.name || c.id}</span>
             </div>
-            <span className="text-[10px] font-medium uppercase tracking-[0.03em] px-2 py-0.5 rounded-full bg-white/6 text-label-tertiary whitespace-nowrap font-mono backdrop-blur-[4px]">{c.provider || c.type || "local"}</span>
+            <span className="text-[10px] font-mono uppercase text-white/25 tracking-wider shrink-0 ml-2">{c.provider || c.type || "local"}</span>
           </div>
         ))}
       </div>
-      <div className="p-5 overflow-y-auto h-full bg-surface-0 bg-black/20 backdrop-blur-[20px] saturate-150">
+      {/* Right: detail panel */}
+      <div className="p-5 overflow-y-auto bg-[#0d0d11]">
         {selected ? (
           <>
-            <h2 className="text-[15px] font-semibold text-label mb-1.5 tracking-[-0.01em]">{selected.name || selected.id}</h2>
+            <h2 className="text-lg font-semibold text-white/90 mb-1">{selected.name || selected.id}</h2>
             {/* Actions */}
             <div className="mb-5">
               <ComputeActions compute={selected} onAction={handleAction} />
               {actionMsg && (
-                <div className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-danger" : "text-success")}>
+                <div className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-red-400" : "text-emerald-400")}>
                   {actionMsg.text}
                 </div>
               )}
             </div>
-            <div className="mb-5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Details</div>
-              <div className="grid grid-cols-[100px_1fr] gap-x-3.5 gap-y-1.5 text-xs">
-                <div className="text-label-tertiary font-medium">Provider</div>
-                <div className="text-label">{selected.provider || selected.type || "-"}</div>
-                <div className="text-label-tertiary font-medium">Status</div>
-                <div className="text-label flex items-center gap-2">
-                  <span className={cn("inline-block w-2 h-2 rounded-full", statusColor(selected.status || "unknown"))} />
+            <div className="mb-4">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">Details</h3>
+              <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
+                <span className="text-white/35">Provider</span>
+                <span className="text-white/75 font-mono">{selected.provider || selected.type || "-"}</span>
+                <span className="text-white/35">Status</span>
+                <span className="text-white/75 flex items-center gap-2">
+                  <span className={cn("inline-block w-2 h-2 rounded-full", statusDotColor(selected.status || "unknown"))} />
                   {selected.status || "unknown"}
-                </div>
+                </span>
                 {selected.ip && (
                   <>
-                    <div className="text-label-tertiary font-medium">IP</div>
-                    <div className="text-label font-mono">{selected.ip}</div>
+                    <span className="text-white/35">IP</span>
+                    <span className="text-white/75 font-mono">{selected.ip}</span>
                   </>
                 )}
                 {selected.instanceType && (
                   <>
-                    <div className="text-label-tertiary font-medium">Instance</div>
-                    <div className="text-label">{selected.instanceType}</div>
+                    <span className="text-white/35">Instance</span>
+                    <span className="text-white/75">{selected.instanceType}</span>
                   </>
                 )}
                 {selected.region && (
                   <>
-                    <div className="text-label-tertiary font-medium">Region</div>
-                    <div className="text-label">{selected.region}</div>
+                    <span className="text-white/35">Region</span>
+                    <span className="text-white/75">{selected.region}</span>
                   </>
                 )}
                 {selected.created_at && (
                   <>
-                    <div className="text-label-tertiary font-medium">Created</div>
-                    <div className="text-label">{new Date(selected.created_at).toLocaleString()}</div>
+                    <span className="text-white/35">Created</span>
+                    <span className="text-white/75">{new Date(selected.created_at).toLocaleString()}</span>
                   </>
                 )}
               </div>
             </div>
           </>
         ) : (
-          <div className="text-center py-16 px-6 text-label-tertiary"><div className="text-[13px]">Select a compute target</div></div>
+          <div className="flex items-center justify-center h-full text-sm text-white/25">
+            Select a compute target
+          </div>
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../hooks/useApi.js";
 import { cn } from "../lib/utils.js";
+import { Wrench } from "lucide-react";
 
 type Tab = "skills" | "recipes";
 
@@ -28,11 +29,12 @@ export function ToolsView() {
 
   return (
     <div>
-      <div className="flex gap-0 mb-4 border-b border-white/8">
+      {/* Tabs */}
+      <div className="flex gap-0 mb-4 border-b border-white/[0.06]">
         <button
           className={cn(
-            "px-4 py-2.5 text-[13px] font-medium cursor-pointer bg-transparent border-none border-b-2 border-b-transparent transition-all duration-200",
-            tab === "skills" ? "text-label border-b-tint" : "text-label-tertiary hover:text-label"
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            tab === "skills" ? "border-indigo-400 text-white/90" : "border-transparent text-white/40 hover:text-white/60"
           )}
           onClick={() => handleTab("skills")}
         >
@@ -40,85 +42,94 @@ export function ToolsView() {
         </button>
         <button
           className={cn(
-            "px-4 py-2.5 text-[13px] font-medium cursor-pointer bg-transparent border-none border-b-2 border-b-transparent transition-all duration-200",
-            tab === "recipes" ? "text-label border-b-tint" : "text-label-tertiary hover:text-label"
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            tab === "recipes" ? "border-indigo-400 text-white/90" : "border-transparent text-white/40 hover:text-white/60"
           )}
           onClick={() => handleTab("recipes")}
         >
           Recipes
         </button>
       </div>
-      <div className="grid grid-cols-[260px_1fr] rounded-xl glass-card glass-shine-subtle overflow-hidden h-[calc(100vh-112px)] max-md:grid-cols-1">
-        <div className="glass-surface bg-glass-dark border-r border-white/8 overflow-y-auto h-full">
+
+      <div className="grid grid-cols-[260px_1fr] rounded-lg border border-white/[0.06] overflow-hidden h-[calc(100vh-160px)]">
+        {/* Left: list panel */}
+        <div className="bg-white/[0.02] border-r border-white/[0.06] overflow-y-auto">
           {items.length === 0 && (
-            <div className="text-center py-8 px-4 text-label-tertiary">
-              <div className="text-[13px]">No {tab} found</div>
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center py-8">
+                <Wrench size={24} className="text-white/15 mx-auto mb-3" />
+                <p className="text-sm text-white/35">No {tab} found</p>
+              </div>
             </div>
           )}
           {items.map((item: any) => (
             <div
               key={item.name}
               className={cn(
-                "flex justify-between items-center px-3.5 py-2.5 cursor-pointer border-b border-white/4 hover:bg-white/5 transition-colors text-xs",
-                selected?.name === item.name && "bg-white/12 border-l-3 border-l-tint font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-white/[0.03] transition-colors text-[13px]",
+                "hover:bg-white/[0.03]",
+                selected?.name === item.name && "bg-white/[0.05] border-l-2 border-l-indigo-400 font-semibold"
               )}
               onClick={() => handleSelect(item)}
             >
-              <div className="font-medium text-[13px] text-label">{item.name}</div>
-              <span className="text-[10px] font-medium uppercase tracking-[0.03em] px-2 py-0.5 rounded-full bg-white/6 text-label-tertiary whitespace-nowrap font-mono backdrop-blur-[4px]">{item.source || "builtin"}</span>
+              <span className="text-white/80 truncate">{item.name}</span>
+              <span className="text-[10px] font-mono uppercase text-white/25 tracking-wider">{item.source || "builtin"}</span>
             </div>
           ))}
         </div>
-        <div className="p-5 overflow-y-auto h-full bg-surface-0 bg-black/20 backdrop-blur-[20px] saturate-150">
+        {/* Right: detail panel */}
+        <div className="p-5 overflow-y-auto bg-[#0d0d11]">
           {selected ? (
             <>
-              <h2 className="text-[15px] font-semibold text-label mb-1.5 tracking-[-0.01em]">{selected.name}</h2>
+              <h2 className="text-lg font-semibold text-white/90 mb-1">{selected.name}</h2>
               {selected.description && (
-                <p className="text-label-secondary text-[13px] mb-4 leading-relaxed">{selected.description}</p>
+                <p className="text-sm text-white/40 mb-5">{selected.description}</p>
               )}
               {tab === "skills" && (
-                <div className="mb-5">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Content</div>
-                  <div className="bg-[rgba(8,8,12,0.8)] border border-white/8 rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-label-secondary shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">{selected.content || selected.prompt || "(no content)"}</div>
+                <div className="mb-4">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">Content</h3>
+                  <div className="bg-black/40 border border-white/[0.06] rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-white/50">{selected.content || selected.prompt || "(no content)"}</div>
                 </div>
               )}
               {tab === "recipes" && (
                 <>
-                  <div className="mb-5">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Configuration</div>
-                    <div className="grid grid-cols-[100px_1fr] gap-x-3.5 gap-y-1.5 text-xs">
-                      <div className="text-label-tertiary font-medium">Flow</div>
-                      <div className="text-label">{selected.flow || "-"}</div>
-                      <div className="text-label-tertiary font-medium">Agent</div>
-                      <div className="text-label">{selected.agent || "-"}</div>
-                      <div className="text-label-tertiary font-medium">Repo</div>
-                      <div className="text-label">{selected.repo || "-"}</div>
+                  <div className="mb-4">
+                    <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">Configuration</h3>
+                    <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
+                      <span className="text-white/35">Flow</span>
+                      <span className="text-white/75 font-mono">{selected.flow || "-"}</span>
+                      <span className="text-white/35">Agent</span>
+                      <span className="text-white/75 font-mono">{selected.agent || "-"}</span>
+                      <span className="text-white/35">Repo</span>
+                      <span className="text-white/75 font-mono">{selected.repo || "-"}</span>
                     </div>
                   </div>
                   {selected.variables && Object.keys(selected.variables).length > 0 && (
-                    <div className="mb-5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Variables</div>
-                      <div className="grid grid-cols-[100px_1fr] gap-x-3.5 gap-y-1.5 text-xs">
+                    <div className="mb-4">
+                      <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">Variables</h3>
+                      <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
                         {Object.entries(selected.variables).map(([k, v]) => (
                           <div key={k} className="contents">
-                            <div className="text-label-tertiary font-medium">{k}</div>
-                            <div className="text-label">{String(v)}</div>
+                            <span className="text-white/35">{k}</span>
+                            <span className="text-white/75 font-mono">{String(v)}</span>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
                   {selected.summary && (
-                    <div className="mb-5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Summary</div>
-                      <div className="bg-[rgba(8,8,12,0.8)] border border-white/8 rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-label-secondary shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">{selected.summary}</div>
+                    <div className="mb-4">
+                      <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">Summary</h3>
+                      <div className="bg-black/40 border border-white/[0.06] rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-white/50">{selected.summary}</div>
                     </div>
                   )}
                 </>
               )}
             </>
           ) : (
-            <div className="text-center py-16 px-6 text-label-tertiary"><div className="text-[13px]">Select a {tab === "skills" ? "skill" : "recipe"}</div></div>
+            <div className="flex items-center justify-center h-full text-sm text-white/25">
+              Select a {tab === "skills" ? "skill" : "recipe"}
+            </div>
           )}
         </div>
       </div>

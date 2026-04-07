@@ -25,12 +25,12 @@ function Toast({ message, type, onDone }: { message: string; type: string; onDon
   }, []);
   return (
     <div className={cn(
-      "fixed bottom-5 right-5 px-[18px] py-2.5 glass-surface-xl bg-glass-dark border border-white/15 rounded-xl text-label text-[13px] font-medium z-[300] shadow-[0_4px_20px_rgba(0,0,0,0.25)] glass-shine-subtle animate-[slide-up_300ms_cubic-bezier(0.32,0.72,0,1)] flex items-center gap-2",
-      type === "success" && "border-l-[3px] border-l-success",
-      type === "error" && "border-l-[3px] border-l-danger",
+      "fixed bottom-5 right-5 px-[18px] py-2.5 bg-[#1a1a22] border border-white/[0.1] rounded-xl text-white/90 text-[13px] font-medium z-[300] shadow-[0_4px_20px_rgba(0,0,0,0.4)] animate-[slide-up_300ms_cubic-bezier(0.32,0.72,0,1)] flex items-center gap-2",
+      type === "success" && "border-l-[3px] border-l-emerald-400",
+      type === "error" && "border-l-[3px] border-l-red-400",
     )}>
-      {type === "success" && <span className="text-success font-bold">{"\u2713"}</span>}
-      {type === "error" && <span className="text-danger font-bold">{"\u2717"}</span>}
+      {type === "success" && <span className="text-emerald-400 font-bold">{"\u2713"}</span>}
+      {type === "error" && <span className="text-red-400 font-bold">{"\u2717"}</span>}
       {message}
     </div>
   );
@@ -102,25 +102,23 @@ function App() {
   return (
     <div className="grid grid-cols-[200px_1fr] h-screen bg-transparent max-md:grid-cols-[48px_1fr]">
       <Sidebar activeView={view} onNavigate={setView} readOnly={readOnly} />
-      <div className="overflow-y-auto flex flex-col bg-transparent">
-        <div className="h-[52px] px-6 border-b border-glass-border flex justify-between items-center glass-surface bg-glass-dark sticky top-0 z-10 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="text-lg font-semibold text-label tracking-[-0.01em]">{viewTitles[view] || "Dashboard"}</div>
+      <div className="overflow-y-auto flex flex-col bg-[#0d0d11]">
+        <div className="h-12 px-5 border-b border-white/[0.06] flex items-center justify-between bg-[#0d0d11]/80 backdrop-blur-xl sticky top-0 z-10 shrink-0">
+          <div className="flex items-center gap-3">
+            <h1 className="text-[15px] font-semibold text-white/90">{viewTitles[view] || "Dashboard"}</h1>
             {view === "sessions" && (
-              <div className="flex gap-2 text-sm font-mono">
-                {runningCount > 0 && <span className="text-success">{runningCount}</span>}
-                {waitingCount > 0 && <span className="text-warning">{waitingCount}</span>}
-                {failedCount > 0 && <span className="text-danger">{failedCount}</span>}
+              <div className="flex gap-2 text-xs font-mono">
+                {runningCount > 0 && <span className="text-emerald-400">{runningCount}</span>}
+                {waitingCount > 0 && <span className="text-amber-400">{waitingCount}</span>}
+                {failedCount > 0 && <span className="text-red-400">{failedCount}</span>}
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2.5">
-            <span className="text-sm font-mono text-label-quaternary">
-              {sessions.length}
-            </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono text-white/25">{sessions.length}</span>
             {view === "sessions" && !readOnly && (
               <button
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-[7px] rounded-lg text-[11px] font-semibold cursor-pointer bg-tint border-none text-white shadow-[0_2px_12px_rgba(124,106,239,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] hover:brightness-110 active:scale-[0.97] transition-all duration-200"
+                className="px-3.5 py-1.5 rounded-lg text-[12px] font-medium bg-indigo-500 text-white hover:bg-indigo-400 active:scale-[0.97] transition-all duration-150"
                 onClick={() => setShowNew(true)}
               >
                 + New Session

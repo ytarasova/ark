@@ -1,34 +1,34 @@
 import { cn } from "../lib/utils.js";
 
-const STATUS_DOT_CLASSES: Record<string, string> = {
-  running: "bg-success shadow-[0_0_8px_rgba(50,213,131,0.5)] animate-[glow-pulse_2.5s_ease-in-out_infinite]",
-  waiting: "bg-warning shadow-[0_0_4px_rgba(245,197,66,0.3)]",
-  completed: "bg-info",
-  failed: "bg-danger shadow-[0_0_6px_rgba(244,85,85,0.3)]",
-  stopped: "bg-white/16",
-  pending: "bg-white/16",
-  ready: "bg-white/16",
-  archived: "bg-white/10",
-  deleting: "bg-white/16 opacity-40 animate-[delete-fade_1.2s_ease-in-out_infinite]",
+const DOT: Record<string, string> = {
+  running: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)] animate-[glow-pulse_2.5s_ease-in-out_infinite]",
+  waiting: "bg-amber-400",
+  completed: "bg-blue-400",
+  failed: "bg-red-400 shadow-[0_0_4px_rgba(248,113,113,0.4)]",
+  stopped: "bg-white/20",
+  pending: "bg-white/20",
+  ready: "bg-white/20",
+  archived: "bg-white/15",
+  deleting: "bg-white/10 animate-pulse",
 };
 
-const STATUS_BADGE_CLASSES: Record<string, string> = {
-  running: "bg-success-dim text-success",
-  waiting: "bg-warning-dim text-warning",
-  completed: "bg-info-dim text-info",
-  failed: "bg-danger-dim text-danger",
-  stopped: "bg-white/6 text-white/30",
-  pending: "bg-white/6 text-white/30",
-  ready: "bg-white/6 text-white/30",
-  deleting: "bg-white/4 text-white/16",
-  archived: "bg-white/4 text-white/16",
+const BADGE: Record<string, string> = {
+  running: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
+  waiting: "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  completed: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  failed: "bg-red-500/15 text-red-400 border-red-500/20",
+  stopped: "bg-white/5 text-white/30 border-white/[0.06]",
+  pending: "bg-white/5 text-white/30 border-white/[0.06]",
+  ready: "bg-white/5 text-white/30 border-white/[0.06]",
+  archived: "bg-white/5 text-white/25 border-white/[0.06]",
+  deleting: "bg-white/5 text-white/20 border-white/[0.06]",
 };
 
 export function StatusDot({ status }: { status?: string }) {
   return (
     <span className={cn(
       "inline-block w-2 h-2 rounded-full shrink-0",
-      STATUS_DOT_CLASSES[status || "pending"] || "bg-white/16"
+      DOT[status || "pending"] || "bg-white/20"
     )} />
   );
 }
@@ -36,8 +36,8 @@ export function StatusDot({ status }: { status?: string }) {
 export function StatusBadge({ status }: { status?: string }) {
   return (
     <span className={cn(
-      "inline-flex items-center px-2.5 py-[3px] rounded-full text-[10px] font-semibold uppercase tracking-[0.04em] font-mono backdrop-blur-[10px] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
-      STATUS_BADGE_CLASSES[status || "pending"] || "bg-white/6 text-white/30"
+      "inline-block px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase tracking-wider border",
+      BADGE[status || "pending"] || "bg-white/5 text-white/30 border-white/[0.06]"
     )}>
       {status || "unknown"}
     </span>

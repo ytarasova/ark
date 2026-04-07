@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../hooks/useApi.js";
 import { cn } from "../lib/utils.js";
+import { Settings } from "lucide-react";
 
 export function AgentsView() {
   const [agents, setAgents] = useState<any[]>([]);
@@ -15,79 +16,96 @@ export function AgentsView() {
 
   if (!agents.length) {
     return (
-      <div className="text-center py-16 px-6 text-label-tertiary">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="opacity-15 mb-4 mx-auto">
-          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-        <div className="text-[13px] text-label-tertiary">No agents found</div>
+      <div className="flex items-center justify-center h-[calc(100vh-180px)]">
+        <div className="text-center">
+          <Settings size={28} className="text-white/15 mx-auto mb-3" />
+          <p className="text-sm text-white/35">No agents found</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-[260px_1fr] rounded-xl glass-card glass-shine-subtle overflow-hidden h-[calc(100vh-112px)] max-md:grid-cols-1">
-      <div className="glass-surface bg-glass-dark border-r border-white/8 overflow-y-auto h-full">
+    <div className="grid grid-cols-[260px_1fr] rounded-lg border border-white/[0.06] overflow-hidden h-[calc(100vh-112px)]">
+      {/* Left: list panel */}
+      <div className="bg-white/[0.02] border-r border-white/[0.06] overflow-y-auto">
         {agents.map((a: any) => (
           <div
             key={a.name}
             className={cn(
-              "flex justify-between items-center px-3.5 py-2.5 cursor-pointer border-b border-white/4 hover:bg-white/5 transition-colors text-xs",
-              selected?.name === a.name && "bg-white/12 border-l-3 border-l-tint font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+              "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-white/[0.03] transition-colors text-[13px]",
+              "hover:bg-white/[0.03]",
+              selected?.name === a.name && "bg-white/[0.05] border-l-2 border-l-indigo-400 font-semibold"
             )}
             onClick={() => setSelected(a)}
           >
-            <div className="font-medium text-[13px] text-label">{a.name}</div>
-            <span className="text-[10px] font-medium uppercase tracking-[0.03em] px-2 py-0.5 rounded-full bg-white/6 text-label-tertiary whitespace-nowrap font-mono backdrop-blur-[4px]">{a.source || "builtin"}</span>
+            <span className="text-white/80 truncate">{a.name}</span>
+            <span className="text-[10px] font-mono uppercase text-white/25 tracking-wider">{a.source || "builtin"}</span>
           </div>
         ))}
       </div>
-      <div className="p-5 overflow-y-auto h-full bg-surface-0 bg-black/20 backdrop-blur-[20px] saturate-150">
+      {/* Right: detail panel */}
+      <div className="p-5 overflow-y-auto bg-[#0d0d11]">
         {selected ? (
           <>
-            <h2 className="text-[15px] font-semibold text-label mb-1.5 tracking-[-0.01em]">{selected.name}</h2>
+            <h2 className="text-lg font-semibold text-white/90 mb-1">{selected.name}</h2>
             {selected.description && (
-              <p className="text-label-secondary text-[13px] mb-4 leading-relaxed">{selected.description}</p>
+              <p className="text-sm text-white/40 mb-5">{selected.description}</p>
             )}
-            <div className="mb-5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Configuration</div>
-              <div className="grid grid-cols-[100px_1fr] gap-x-3.5 gap-y-1.5 text-xs">
-                <div className="text-label-tertiary font-medium">Model</div>
-                <div className="text-label">{selected.model || "-"}</div>
-                <div className="text-label-tertiary font-medium">Max Turns</div>
-                <div className="text-label">{selected.max_turns ?? "-"}</div>
-                <div className="text-label-tertiary font-medium">Permission</div>
-                <div className="text-label">{selected.permission_mode || "-"}</div>
+            <div className="mb-4">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">Configuration</h3>
+              <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
+                <span className="text-white/35">Model</span>
+                <span className="text-white/75 font-mono">{selected.model || "-"}</span>
+                <span className="text-white/35">Max Turns</span>
+                <span className="text-white/75 font-mono">{selected.max_turns ?? "-"}</span>
+                <span className="text-white/35">Permission</span>
+                <span className="text-white/75 font-mono">{selected.permission_mode || "-"}</span>
+                <span className="text-white/35">Runtime</span>
+                <span className="text-white/75 font-mono">{selected.runtime || "claude-code"}</span>
               </div>
             </div>
-            {selected.tools && selected.tools.length > 0 && (
-              <div className="mb-5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Tools</div>
+            {selected.skills && selected.skills.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">Skills</h3>
                 <div className="flex flex-wrap gap-1.5">
-                  {selected.tools.map((t: string) => (
-                    <span key={t} className="inline-block px-2 py-[3px] rounded-lg text-[11px] font-mono glass-surface text-label shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] hover:border-white/15 transition-all">{t}</span>
+                  {selected.skills.map((s: string) => (
+                    <span key={s} className="inline-block px-2 py-0.5 rounded text-[11px] font-mono bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">{s}</span>
                   ))}
                 </div>
               </div>
             )}
-            {selected.skills && selected.skills.length > 0 && (
-              <div className="mb-5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Skills</div>
+            {selected.tools && selected.tools.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">Tools</h3>
                 <div className="flex flex-wrap gap-1.5">
-                  {selected.skills.map((s: string) => (
-                    <span key={s} className="inline-block px-2 py-[3px] rounded-lg text-[11px] font-mono bg-tint-dim border border-tint/20 text-tint">{s}</span>
+                  {selected.tools.map((t: string) => (
+                    <span key={t} className="inline-block px-2 py-0.5 rounded text-[11px] font-mono bg-white/[0.04] border border-white/[0.06] text-white/60">{t}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selected.mcp_servers && selected.mcp_servers.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">MCP Servers</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {selected.mcp_servers.map((m: string) => (
+                    <span key={m} className="inline-block px-2 py-0.5 rounded text-[11px] font-mono bg-white/[0.04] border border-white/[0.06] text-white/60">{m}</span>
                   ))}
                 </div>
               </div>
             )}
             {selected.system_prompt && (
-              <div className="mb-5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">System Prompt</div>
-                <div className="bg-[rgba(8,8,12,0.8)] border border-white/8 rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-label-secondary shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">{selected.system_prompt}</div>
+              <div className="mb-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/25 mb-2">System Prompt</h3>
+                <div className="bg-black/40 border border-white/[0.06] rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-white/50">{selected.system_prompt}</div>
               </div>
             )}
           </>
         ) : (
-          <div className="text-center py-16 px-6 text-label-tertiary"><div className="text-[13px]">Select an agent</div></div>
+          <div className="flex items-center justify-center h-full text-sm text-white/25">
+            Select an agent
+          </div>
         )}
       </div>
     </div>
