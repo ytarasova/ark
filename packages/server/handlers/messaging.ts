@@ -1,7 +1,6 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { markMessagesRead } from "../../core/store.js";
 import type { MessageSendParams, SessionIdParams } from "../../types/index.js";
 
 export function registerMessagingHandlers(router: Router, app: AppContext): void {
@@ -19,7 +18,7 @@ export function registerMessagingHandlers(router: Router, app: AppContext): void
 
   router.handle("message/markRead", async (p) => {
     const { sessionId } = extract<SessionIdParams>(p, ["sessionId"]);
-    markMessagesRead(sessionId);
+    app.messages.markRead(sessionId);
     return { ok: true };
   });
 }

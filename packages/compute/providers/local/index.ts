@@ -13,7 +13,7 @@ import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
   ComputeSnapshot, PortDecl, PortStatus, Compute, Session,
 } from "../../types.js";
-import { WORKTREES_DIR } from "../../../core/store.js";
+import { getApp } from "../../../core/app.js";
 import * as tmux from "../../../core/tmux.js";
 import { collectLocalMetrics } from "./metrics.js";
 import { safeAsync } from "../../../core/safe.js";
@@ -77,7 +77,7 @@ export class LocalProvider implements ComputeProvider {
   }
 
   async cleanupSession(_compute: Compute, session: Session): Promise<void> {
-    const wtPath = join(WORKTREES_DIR(), session.id);
+    const wtPath = join(getApp().config.worktreesDir, session.id);
     if (!existsSync(wtPath)) return;
 
     const repo = session.workdir ?? session.repo;
