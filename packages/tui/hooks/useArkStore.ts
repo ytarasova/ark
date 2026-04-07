@@ -13,8 +13,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useArkClient } from "./useArkClient.js";
-import type { ComputeSnapshot } from "../../compute/types.js";
-import type { Session, Compute, AgentDefinition, FlowDefinition } from "../../types/index.js";
+import type { Session, Compute, AgentDefinition, FlowDefinition, ComputeSnapshot } from "../../types/index.js";
 
 export interface StoreData {
   sessions: Session[];

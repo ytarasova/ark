@@ -15,20 +15,28 @@ import {
 import type {
   Session, Compute, Event, Message, AgentDefinition, FlowDefinition,
   SessionOpResult, ComputeSnapshot,
+  Profile, ClaudeSession, ToolEntry, MemoryEntry, Schedule, SessionCost,
+  ConversationTurn, SearchResult,
   SessionStartParams, SessionStartResult, SessionListParams, SessionListResult,
   SessionReadParams, SessionReadResult, SessionUpdateParams, SessionUpdateResult,
   SessionIdParams, SessionEventsResult, SessionMessagesResult, SessionSearchResult,
+  SessionConversationResult, SessionSearchConversationResult,
   SessionOutputResult, SessionForkResult, SessionCloneResult,
   ComputeCreateParams, ComputeCreateResult, ComputeListResult, ComputeReadResult,
   ComputeUpdateParams, ComputePingResult, ComputeCleanZombiesResult,
   AgentListResult, AgentReadResult, FlowListResult, FlowReadResult,
+  SkillListResult, SkillReadResult,
+  RecipeListResult, RecipeReadResult, RecipeUseResult,
+  SkillDefinition, RecipeDefinition,
   HistoryListResult, HistoryRefreshResult, HistoryIndexResult, HistorySearchResult,
   HistoryRebuildFtsResult, HistoryImportResult,
   MetricsSnapshotResult, CostsReadResult,
   MemoryListResult, MemoryRecallResult, MemoryForgetResult, MemoryAddResult, MemoryClearResult,
   ScheduleListResult, ScheduleCreateResult, ScheduleDeleteResult,
   ProfileListResult, ProfileCreateResult,
+  ToolsListResult,
   GroupListResult, GroupCreateResult,
+  ConfigReadResult,
   IndexStatsResult,
 } from "../types/index.js";
 
@@ -189,23 +197,23 @@ export class ArkClient {
     return messages;
   }
 
-  async sessionSearch(query: string): Promise<any[]> {
-    const { results } = await this.rpc<any>("session/search", { query });
+  async sessionSearch(query: string): Promise<SearchResult[]> {
+    const { results } = await this.rpc<SessionSearchResult>("session/search", { query });
     return results;
   }
 
-  async sessionConversation(sessionId: string, limit?: number): Promise<any[]> {
-    const { turns } = await this.rpc<any>("session/conversation", { sessionId, limit });
+  async sessionConversation(sessionId: string, limit?: number): Promise<ConversationTurn[]> {
+    const { turns } = await this.rpc<SessionConversationResult>("session/conversation", { sessionId, limit });
     return turns;
   }
 
-  async sessionSearchConversation(sessionId: string, query: string): Promise<any[]> {
-    const { results } = await this.rpc<any>("session/search-conversation", { sessionId, query });
+  async sessionSearchConversation(sessionId: string, query: string): Promise<SearchResult[]> {
+    const { results } = await this.rpc<SessionSearchConversationResult>("session/search-conversation", { sessionId, query });
     return results;
   }
 
-  async worktreeFinish(sessionId: string, opts?: { noMerge?: boolean }): Promise<any> {
-    return this.rpc("worktree/finish", { sessionId, ...opts });
+  async worktreeFinish(sessionId: string, opts?: { noMerge?: boolean }): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("worktree/finish", { sessionId, ...opts });
   }
 
   // ── Messaging ───────────────────────────────────────────────────────────────
@@ -244,28 +252,28 @@ export class ArkClient {
     return flow;
   }
 
-  async skillList(): Promise<any[]> {
-    const { skills } = await this.rpc<any>("skill/list");
+  async skillList(): Promise<SkillDefinition[]> {
+    const { skills } = await this.rpc<SkillListResult>("skill/list");
     return skills;
   }
 
-  async skillRead(name: string): Promise<any> {
-    const { skill } = await this.rpc<any>("skill/read", { name });
+  async skillRead(name: string): Promise<SkillDefinition> {
+    const { skill } = await this.rpc<SkillReadResult>("skill/read", { name });
     return skill;
   }
 
-  async recipeList(): Promise<any[]> {
-    const { recipes } = await this.rpc<any>("recipe/list");
+  async recipeList(): Promise<RecipeDefinition[]> {
+    const { recipes } = await this.rpc<RecipeListResult>("recipe/list");
     return recipes;
   }
 
-  async recipeRead(name: string): Promise<any> {
-    const { recipe } = await this.rpc<any>("recipe/read", { name });
+  async recipeRead(name: string): Promise<RecipeDefinition> {
+    const { recipe } = await this.rpc<RecipeReadResult>("recipe/read", { name });
     return recipe;
   }
 
-  async recipeUse(name: string, variables?: Record<string, string>): Promise<any> {
-    const { session } = await this.rpc<any>("recipe/use", { name, variables });
+  async recipeUse(name: string, variables?: Record<string, string>): Promise<Session> {
+    const { session } = await this.rpc<RecipeUseResult>("recipe/use", { name, variables });
     return session;
   }
 
@@ -324,12 +332,12 @@ export class ArkClient {
     return this.rpc<ComputeCleanZombiesResult>("compute/clean-zombies");
   }
 
-  async groupList(): Promise<any[]> {
+  async groupList(): Promise<Array<{ name: string; created_at: string }>> {
     const { groups } = await this.rpc<GroupListResult>("group/list");
     return groups;
   }
 
-  async groupCreate(name: string): Promise<any> {
+  async groupCreate(name: string): Promise<{ name: string; created_at: string }> {
     const { group } = await this.rpc<GroupCreateResult>("group/create", { name });
     return group;
   }
@@ -340,13 +348,13 @@ export class ArkClient {
 
   // ── Config ──────────────────────────────────────────────────────────────────
 
-  async configRead(): Promise<any> {
-    const { config } = await this.rpc<any>("config/read");
+  async configRead(): Promise<Record<string, unknown>> {
+    const { config } = await this.rpc<ConfigReadResult>("config/read");
     return config;
   }
 
-  async configWrite(config: Record<string, unknown>): Promise<any> {
-    const { config: updated } = await this.rpc<any>("config/write", config);
+  async configWrite(config: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const { config: updated } = await this.rpc<ConfigReadResult>("config/write", config);
     return updated;
   }
 
@@ -360,7 +368,7 @@ export class ArkClient {
 
   // ── History ─────────────────────────────────────────────────────────────────
 
-  async historyList(limit?: number): Promise<any[]> {
+  async historyList(limit?: number): Promise<ClaudeSession[]> {
     const { items } = await this.rpc<HistoryListResult>("history/list", { limit });
     return items;
   }
@@ -386,15 +394,15 @@ export class ArkClient {
     return this.rpc<HistoryRebuildFtsResult>("history/refresh-and-index");
   }
 
-  async historySearch(query: string, limit?: number): Promise<any[]> {
+  async historySearch(query: string, limit?: number): Promise<SearchResult[]> {
     const { results } = await this.rpc<HistorySearchResult>("history/search", { query, limit });
     return results;
   }
 
   // ── Tools ───────────────────────────────────────────────────────────────────
 
-  async toolsList(projectRoot?: string): Promise<any[]> {
-    const { tools } = await this.rpc<any>("tools/list", { projectRoot });
+  async toolsList(projectRoot?: string): Promise<ToolEntry[]> {
+    const { tools } = await this.rpc<ToolsListResult>("tools/list", { projectRoot });
     return tools;
   }
 
@@ -420,7 +428,7 @@ export class ArkClient {
 
   // ── Metrics ─────────────────────────────────────────────────────────────────
 
-  async metricsSnapshot(computeName?: string): Promise<any> {
+  async metricsSnapshot(computeName?: string): Promise<ComputeSnapshot | null> {
     const { snapshot } = await this.rpc<MetricsSnapshotResult>("metrics/snapshot", { computeName });
     return snapshot;
   }
@@ -458,12 +466,12 @@ export class ArkClient {
 
   // ── Memory ─────────────────────────────────────────────────────────────────
 
-  async memoryList(scope?: string): Promise<any[]> {
+  async memoryList(scope?: string): Promise<MemoryEntry[]> {
     const { memories } = await this.rpc<MemoryListResult>("memory/list", { scope });
     return memories;
   }
 
-  async memoryRecall(query: string, opts?: { scope?: string; limit?: number }): Promise<any[]> {
+  async memoryRecall(query: string, opts?: { scope?: string; limit?: number }): Promise<MemoryEntry[]> {
     const { results } = await this.rpc<MemoryRecallResult>("memory/recall", { query, ...opts });
     return results;
   }
@@ -473,7 +481,7 @@ export class ArkClient {
     return ok;
   }
 
-  async memoryAdd(content: string, opts?: { tags?: string[]; scope?: string; importance?: number }): Promise<any> {
+  async memoryAdd(content: string, opts?: { tags?: string[]; scope?: string; importance?: number }): Promise<MemoryEntry> {
     const { memory } = await this.rpc<MemoryAddResult>("memory/add", { content, ...opts });
     return memory;
   }
@@ -485,7 +493,7 @@ export class ArkClient {
 
   // ── Profile extended ───────────────────────────────────────────────────────
 
-  async profileCreate(name: string, description?: string): Promise<any> {
+  async profileCreate(name: string, description?: string): Promise<Profile> {
     const { profile } = await this.rpc<ProfileCreateResult>("profile/create", { name, description });
     return profile;
   }
@@ -496,12 +504,12 @@ export class ArkClient {
 
   // ── Schedule ───────────────────────────────────────────────────────────────
 
-  async scheduleList(): Promise<any[]> {
+  async scheduleList(): Promise<Schedule[]> {
     const { schedules } = await this.rpc<ScheduleListResult>("schedule/list");
     return schedules;
   }
 
-  async scheduleCreate(opts: Record<string, unknown>): Promise<any> {
+  async scheduleCreate(opts: Record<string, unknown>): Promise<Schedule> {
     const { schedule } = await this.rpc<ScheduleCreateResult>("schedule/create", opts);
     return schedule;
   }

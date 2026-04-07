@@ -1,3 +1,11 @@
+export interface SkillDefinition {
+  name: string;
+  description: string;
+  prompt: string;
+  tags?: string[];
+  _source?: "builtin" | "project" | "global";
+}
+
 export interface AgentDefinition {
   name: string;
   description: string;

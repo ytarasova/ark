@@ -1,3 +1,97 @@
+// ── Profile ──────────────────────────────────────────────────────────────────
+
+export interface Profile {
+  name: string;
+  description?: string;
+  config?: Record<string, unknown>;
+  createdAt: string;
+}
+
+// ── Claude session history ────────────────────────────────────────────────────
+
+export interface ClaudeSession {
+  sessionId: string;
+  project: string;
+  projectDir: string;
+  transcriptPath: string;
+  summary: string;
+  messageCount: number;
+  timestamp: string;
+  lastActivity: string;
+}
+
+// ── Tool entry ────────────────────────────────────────────────────────────────
+
+export interface ToolEntry {
+  kind: "mcp-server" | "command" | "claude-skill" | "ark-skill" | "ark-recipe" | "context";
+  name: string;
+  description: string;
+  source: string;
+  config?: Record<string, unknown>;
+}
+
+// ── Memory ────────────────────────────────────────────────────────────────────
+
+export interface MemoryEntry {
+  id: string;
+  content: string;
+  tags: string[];
+  scope: string;
+  importance: number;
+  createdAt: string;
+  accessedAt: string;
+  accessCount: number;
+}
+
+// ── Schedule ──────────────────────────────────────────────────────────────────
+
+export interface Schedule {
+  id: string;
+  cron: string;
+  flow: string;
+  repo?: string;
+  workdir?: string;
+  summary?: string;
+  compute_name?: string;
+  group_name?: string;
+  enabled: boolean;
+  last_run?: string;
+  created_at: string;
+}
+
+// ── Costs ─────────────────────────────────────────────────────────────────────
+
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  total_tokens: number;
+}
+
+export interface SessionCost {
+  sessionId: string;
+  summary: string | null;
+  model: string | null;
+  usage: TokenUsage | null;
+  cost: number;
+}
+
+// ── Conversation ──────────────────────────────────────────────────────────────
+
+export interface ConversationTurn {
+  role: string;
+  content: string;
+  timestamp: string;
+}
+
+export interface SearchResult {
+  sessionId: string;
+  source: "metadata" | "event" | "message" | "transcript";
+  match: string;
+  timestamp?: string;
+}
+
 export interface SessionOpResult {
   ok: boolean;
   message: string;
@@ -20,14 +114,44 @@ export interface ComputeMetrics {
   memUsedGb: number;
   memPct: number;
   diskPct: number;
+  netRxMb: number;
+  netTxMb: number;
   uptime: string;
+  idleTicks: number;
+}
+
+export interface ComputeSessionInfo {
+  name: string;
+  status: string;
+  mode?: string;
+  projectPath?: string;
+  cpu?: number;
+  mem?: number;
+}
+
+export interface ComputeProcessInfo {
+  pid: string | number;
+  cpu: string | number;
+  mem: string | number;
+  command?: string;
+  name?: string;
+  workingDir?: string;
+}
+
+export interface DockerContainerInfo {
+  name: string;
+  status?: string;
+  image?: string;
+  cpu?: string;
+  memory?: string;
+  project?: string;
 }
 
 export interface ComputeSnapshot {
   metrics: ComputeMetrics;
-  sessions: Array<{ name: string; status: string }>;
-  processes: Array<{ pid: number; name: string; cpu: number; mem: number }>;
-  docker: Array<{ name: string; status: string; image: string }>;
+  sessions: ComputeSessionInfo[];
+  processes: ComputeProcessInfo[];
+  docker: DockerContainerInfo[];
 }
 
 export interface HookPayload {

@@ -97,7 +97,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
     ark.groupList().then((groups) => {
       setGroupChoices([
         { label: "(none)", value: "" },
-        ...groups.map((g: string) => ({ label: g, value: g })),
+        ...groups.map((g) => ({ label: g.name, value: g.name })),
       ]);
     }).catch(() => { /* keep default */ });
   }, [ark]);

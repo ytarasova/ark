@@ -6,7 +6,7 @@ import { homedir } from "os";
 import type { Session, Compute } from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
 import { getComputeStatusColor } from "../helpers/colors.js";
-import type { ComputeSnapshot } from "../../compute/types.js";
+import type { ComputeSnapshot } from "../../types/index.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { MetricBar } from "../components/MetricBar.js";
