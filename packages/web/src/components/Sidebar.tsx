@@ -1,3 +1,5 @@
+import { cn } from "../lib/utils.js";
+
 interface SidebarProps {
   activeView: string;
   onNavigate: (view: string) => void;
@@ -8,7 +10,7 @@ interface SidebarProps {
 // These are static constants, not user input -- safe for innerHTML
 function Icon({ svg }: { svg: string }) {
   // eslint-disable-next-line react/no-danger
-  return <span className="nav-icon" dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <span className="w-[18px] h-[18px] flex items-center justify-center shrink-0 opacity-55" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 const SVG: Record<string, string> = {
@@ -39,25 +41,30 @@ const NAV_ITEMS = [
 
 export function Sidebar({ activeView, onNavigate, readOnly }: SidebarProps) {
   return (
-    <div className="sidebar">
-      <div className="sidebar-header">
-        <span className="sidebar-logo">ark</span>
-        <span className="sidebar-live" />
+    <div className="glass-surface-xl bg-glass-dark border-r border-white/8 flex flex-col h-full overflow-y-auto relative z-2">
+      <div className="h-[52px] px-4 pt-2 flex items-center gap-2 drag-region shrink-0">
+        <span className="text-base font-bold text-label tracking-[-0.03em]">ark</span>
+        <span className="w-[7px] h-[7px] rounded-full bg-success shadow-[0_0_8px_rgba(50,213,131,0.5),0_0_2px_rgba(50,213,131,0.8)] animate-[glow-pulse_2.5s_ease-in-out_infinite] shrink-0 no-drag" />
       </div>
-      <nav className="sidebar-nav">
+      <nav className="flex-1 py-2 no-drag">
         {NAV_ITEMS.map((it) => (
           <div
             key={it.id}
-            className={`nav-item${activeView === it.id ? " active" : ""}`}
+            className={cn(
+              "flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm font-medium cursor-pointer select-none transition-all duration-200 no-drag",
+              activeView === it.id
+                ? "bg-white/12 text-white/92 glass-shine-subtle [&_.icon-wrap]:opacity-85"
+                : "text-white/55 hover:text-white/80 hover:bg-white/8 [&_.icon-wrap]:opacity-55"
+            )}
             onClick={() => onNavigate(it.id)}
           >
-            <Icon svg={SVG[it.id] || ""} />
-            <span className="sidebar-label">{it.label}</span>
+            <span className={cn("icon-wrap w-[18px] h-[18px] flex items-center justify-center shrink-0", activeView === it.id ? "opacity-85" : "opacity-55")} dangerouslySetInnerHTML={{ __html: SVG[it.id] || "" }} />
+            <span className="max-md:hidden tracking-[-0.01em]">{it.label}</span>
           </div>
         ))}
       </nav>
-      <div className="sidebar-footer">
-        <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--green)", boxShadow: "0 0 8px rgba(50,213,131,0.5), 0 0 2px rgba(50,213,131,0.8)", marginRight: 6 }} />
+      <div className="h-10 flex items-center justify-center border-t border-white/8 text-[11px] text-label-quaternary font-mono shrink-0 no-drag">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_8px_rgba(50,213,131,0.5),0_0_2px_rgba(50,213,131,0.8)] mr-1.5" />
         {readOnly ? "read-only" : "connected"}
       </div>
     </div>

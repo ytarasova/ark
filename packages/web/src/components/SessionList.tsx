@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { StatusDot, StatusBadge } from "./StatusDot.js";
 import { relTime } from "../util.js";
+import { cn } from "../lib/utils.js";
 
 interface SessionListProps {
   sessions: any[];
@@ -41,9 +42,10 @@ export function SessionList({
 
   return (
     <div>
-      <div className="filter-bar">
+      <div className="flex gap-2 items-center mb-4 flex-wrap">
         <input
-          className="search-input"
+          className="glass-input rounded-lg px-3.5 py-[7px] pl-8 text-[13px] w-60 text-label placeholder:text-label-quaternary focus:border-tint focus:shadow-[0_0_0_3px_var(--color-tint-dim)] outline-none transition-all duration-200 bg-[length:13px] bg-[10px_center] bg-no-repeat"
+          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E")` }}
           placeholder="Search sessions..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -51,7 +53,12 @@ export function SessionList({
         {FILTERS.map((f) => (
           <button
             key={f}
-            className={`filter-chip${filter === f ? " active" : ""}`}
+            className={cn(
+              "px-4 py-1.5 rounded-full text-[13px] font-medium glass-surface border border-white/12 cursor-pointer transition-all duration-200 select-none shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+              filter === f
+                ? "bg-tint-dim border-tint/30 text-tint shadow-[0_0_12px_rgba(124,106,239,0.15),inset_0_1px_0_rgba(255,255,255,0.06)]"
+                : "text-white/55 hover:text-white/80 hover:bg-white/8"
+            )}
             onClick={() => onFilterChange(f)}
           >
             {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -59,8 +66,7 @@ export function SessionList({
         ))}
         {groups && groups.length > 0 && (
           <select
-            className="form-input"
-            style={{ width: 120, padding: "4px 8px", fontSize: 11 }}
+            className="glass-input rounded-lg px-2 py-1 text-[11px] text-label outline-none focus:border-tint focus:shadow-[0_0_0_3px_var(--color-tint-dim)] transition-all duration-200 w-[120px]"
             value={groupFilter}
             onChange={(e) => onGroupFilter(e.target.value)}
           >
@@ -72,43 +78,47 @@ export function SessionList({
         )}
       </div>
       {filtered.length === 0 ? (
-        <div className="empty">
+        <div className="text-center py-24 px-6 text-label-tertiary">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor"
             strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-            style={{ opacity: 0.15, marginBottom: 16 }}>
+            className="opacity-15 mb-4 mx-auto">
             <polygon points="5 3 19 12 5 21 5 3"/>
           </svg>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--label-secondary)", marginBottom: 6 }}>
+          <div className="text-base font-medium text-label-secondary mb-1.5">
             No sessions yet
           </div>
-          <div style={{ fontSize: 12, color: "var(--label-tertiary)", maxWidth: 280, margin: "0 auto" }}>
+          <div className="text-sm text-label-tertiary max-w-[320px] mx-auto mb-4">
             Create your first session to start orchestrating AI agents
           </div>
+          <code className="inline-block px-4 py-2 rounded-lg text-sm font-mono bg-white/5 border border-white/8 text-label-secondary">ark session start --recipe quick-fix</code>
         </div>
       ) : (
-        <div className="session-list">
+        <div className="flex flex-col gap-1.5">
           {filtered.map((s) => (
             <div
               key={s.id}
-              className={`session-card${selectedId === s.id ? " selected" : ""}`}
+              className={cn(
+                "glass-card glass-shine-subtle rounded-xl p-3.5 cursor-pointer transition-all duration-200 hover:bg-white/6 hover:border-white/12",
+                selectedId === s.id && "!border-tint ring-1 ring-tint shadow-[0_0_0_1px_var(--color-tint),inset_0_1px_0_rgba(255,255,255,0.06),0_2px_8px_rgba(0,0,0,0.2)]"
+              )}
               onClick={() => onSelect(s.id)}
             >
-              <div className="session-row">
-                <div className="session-left">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <StatusDot status={s.status} />
-                  <div style={{ minWidth: 0 }}>
-                    <div className="session-name">{s.summary || s.id}</div>
-                    <div className="session-meta">
-                      <span>{s.id}</span>
-                      {s.agent && <span>{s.agent}</span>}
-                      {s.stage && <span style={{ color: "var(--tint)" }}>{s.stage}</span>}
-                      <span>{relTime(s.updated_at)}</span>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-label text-[13px] whitespace-nowrap overflow-hidden text-ellipsis">{s.summary || s.id}</div>
+                    <div className="flex gap-3 text-label-tertiary text-[11px] mt-1">
+                      <span className="whitespace-nowrap font-mono">{s.id}</span>
+                      {s.agent && <span className="whitespace-nowrap font-mono">{s.agent}</span>}
+                      {s.stage && <span className="whitespace-nowrap font-mono text-tint">{s.stage}</span>}
+                      <span className="whitespace-nowrap font-mono">{relTime(s.updated_at)}</span>
                     </div>
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="flex items-center gap-2">
                   {s.flow && s.flow !== "bare" && (
-                    <span style={{ fontSize: 10, color: "var(--label-quaternary)", fontFamily: "var(--mono)" }}>{s.flow}</span>
+                    <span className="text-[10px] text-label-quaternary font-mono">{s.flow}</span>
                   )}
                   <StatusBadge status={s.status} />
                 </div>

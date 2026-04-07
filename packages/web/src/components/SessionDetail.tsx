@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { StatusBadge } from "./StatusDot.js";
 import { api } from "../hooks/useApi.js";
 import { relTime } from "../util.js";
+import { cn } from "../lib/utils.js";
 
 interface SessionDetailProps {
   sessionId: string;
@@ -10,58 +11,67 @@ interface SessionDetailProps {
   readOnly: boolean;
 }
 
+// Shared button styles
+const btnBase = "glass-btn inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-medium cursor-pointer text-label active:scale-[0.97] transition-all duration-200 whitespace-nowrap";
+const btnSm = "px-2.5 py-1";
+const btnPrimary = "bg-tint border-none text-white font-semibold shadow-[0_2px_12px_rgba(124,106,239,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] hover:brightness-110";
+const btnDanger = "text-danger border-danger/20 bg-transparent hover:bg-danger-dim hover:border-danger/30";
+const btnSuccess = "text-success border-success/20 bg-transparent hover:bg-success-dim hover:border-success/30";
+const btnWarning = "text-warning border-warning/20 bg-transparent hover:bg-warning-dim hover:border-warning/30";
+const inputBase = "glass-input rounded-lg px-3 py-[7px] text-[13px] text-label placeholder:text-label-quaternary outline-none focus:border-tint focus:shadow-[0_0_0_3px_var(--color-tint-dim)] transition-all duration-200";
+const inputSm = "px-2.5 py-1 text-xs";
+
 function SessionActions({ session, onAction, onSend }: { session: any; onAction: (action: string) => void; onSend: (msg: string) => void }) {
   const s = session.status;
   const [sendMsg, setSendMsg] = useState("");
   const [showSend, setShowSend] = useState(false);
   return (
     <div>
-      <div className="btn-group">
+      <div className="flex gap-1.5 flex-wrap">
         {(s === "ready" || s === "pending") && (
-          <button className="btn btn-primary btn-sm" onClick={() => onAction("dispatch")}>Dispatch</button>
+          <button className={cn(btnBase, btnSm, btnPrimary)} onClick={() => onAction("dispatch")}>Dispatch</button>
         )}
         {(s === "running" || s === "waiting") && (
-          <button className="btn btn-warning btn-sm" onClick={() => onAction("stop")}>Stop</button>
+          <button className={cn(btnBase, btnSm, btnWarning)} onClick={() => onAction("stop")}>Stop</button>
         )}
         {(s === "running" || s === "waiting") && (
-          <button className="btn btn-sm" onClick={() => onAction("pause")}>Pause</button>
+          <button className={cn(btnBase, btnSm)} onClick={() => onAction("pause")}>Pause</button>
         )}
         {(s === "running" || s === "waiting") && (
-          <button className="btn btn-sm" onClick={() => onAction("interrupt")}>Interrupt</button>
+          <button className={cn(btnBase, btnSm)} onClick={() => onAction("interrupt")}>Interrupt</button>
         )}
         {(s === "running" || s === "waiting" || s === "blocked") && (
-          <button className="btn btn-primary btn-sm" onClick={() => onAction("advance")}>Advance</button>
+          <button className={cn(btnBase, btnSm, btnPrimary)} onClick={() => onAction("advance")}>Advance</button>
         )}
         {(s === "running" || s === "waiting" || s === "blocked") && (
-          <button className="btn btn-success btn-sm" onClick={() => onAction("complete")}>Complete</button>
+          <button className={cn(btnBase, btnSm, btnSuccess)} onClick={() => onAction("complete")}>Complete</button>
         )}
         {(s === "stopped" || s === "failed") && (
-          <button className="btn btn-success btn-sm" onClick={() => onAction("restart")}>Restart</button>
+          <button className={cn(btnBase, btnSm, btnSuccess)} onClick={() => onAction("restart")}>Restart</button>
         )}
         {s !== "deleting" && (
-          <button className="btn btn-sm" onClick={() => onAction("fork")}>Fork</button>
+          <button className={cn(btnBase, btnSm)} onClick={() => onAction("fork")}>Fork</button>
         )}
         {(s === "running" || s === "waiting") && (
-          <button className="btn btn-sm" onClick={() => setShowSend(!showSend)}>Send</button>
+          <button className={cn(btnBase, btnSm)} onClick={() => setShowSend(!showSend)}>Send</button>
         )}
         {(s === "completed" || s === "stopped" || s === "failed") && (
-          <button className="btn btn-sm" onClick={() => onAction("archive")}>Archive</button>
+          <button className={cn(btnBase, btnSm)} onClick={() => onAction("archive")}>Archive</button>
         )}
         {s === "archived" && (
-          <button className="btn btn-sm" onClick={() => onAction("restore")}>Restore</button>
+          <button className={cn(btnBase, btnSm)} onClick={() => onAction("restore")}>Restore</button>
         )}
         {s !== "deleting" && (
-          <button className="btn btn-danger btn-sm" onClick={() => onAction("delete")}>Delete</button>
+          <button className={cn(btnBase, btnSm, btnDanger)} onClick={() => onAction("delete")}>Delete</button>
         )}
         {s === "deleting" && (
-          <button className="btn btn-sm" onClick={() => onAction("undelete")}>Undelete</button>
+          <button className={cn(btnBase, btnSm)} onClick={() => onAction("undelete")}>Undelete</button>
         )}
       </div>
       {showSend && (
-        <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+        <div className="flex gap-1 mt-1.5">
           <input
-            className="input input-sm"
-            style={{ flex: 1 }}
+            className={cn(inputBase, inputSm, "flex-1")}
             placeholder="Message to agent..."
             value={sendMsg}
             onChange={(e) => setSendMsg(e.target.value)}
@@ -74,7 +84,7 @@ function SessionActions({ session, onAction, onSend }: { session: any; onAction:
             }}
           />
           <button
-            className="btn btn-primary btn-sm"
+            className={cn(btnBase, btnSm, btnPrimary)}
             disabled={!sendMsg.trim()}
             onClick={() => {
               if (sendMsg.trim()) {
@@ -240,10 +250,10 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
   if (!detail || !detail.session) {
     return (
-      <div className="detail-panel open">
-        <div className="detail-header">
-          <span style={{ fontSize: 12, color: "var(--label-tertiary)" }}>Loading...</span>
-          <button className="detail-close" onClick={onClose}>{"\u2715"}</button>
+      <div className="fixed top-0 right-0 w-[560px] h-screen glass-surface-xl bg-glass-dark border-l border-white/8 flex flex-col z-[100] shadow-glass-elevated translate-x-0 transition-transform duration-300">
+        <div className="h-[52px] px-5 border-b border-white/8 flex justify-between items-center shrink-0">
+          <span className="text-xs text-label-tertiary">Loading...</span>
+          <button className="glass-btn w-7 h-7 flex items-center justify-center rounded-lg text-sm text-label-tertiary cursor-pointer hover:text-label hover:bg-white/8 transition-all duration-200" onClick={onClose}>{"\u2715"}</button>
         </div>
       </div>
     );
@@ -271,65 +281,65 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
   }
 
   return (
-    <div className="detail-panel open">
-      <div className="detail-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <div className="fixed top-0 right-0 w-[560px] h-screen glass-surface-xl bg-glass-dark border-l border-white/8 flex flex-col z-[100] shadow-glass-elevated translate-x-0 transition-transform duration-300">
+      <div className="h-[52px] px-5 border-b border-white/8 flex justify-between items-center shrink-0">
+        <div className="flex items-center gap-2">
           <StatusBadge status={s.status} />
-          <span style={{ fontWeight: 600, fontSize: 13 }}>{s.id}</span>
+          <span className="font-semibold text-[13px]">{s.id}</span>
         </div>
-        <button className="detail-close" onClick={onClose}>{"\u2715"}</button>
+        <button className="glass-btn w-7 h-7 flex items-center justify-center rounded-lg text-sm text-label-tertiary cursor-pointer hover:text-label hover:bg-white/8 transition-all duration-200" onClick={onClose}>{"\u2715"}</button>
       </div>
-      <div className="detail-body">
+      <div className="flex-1 overflow-y-auto p-5">
         {/* Actions */}
         {!readOnly && (
-          <div className="detail-section">
+          <div className="mb-5">
             <SessionActions session={s} onAction={handleAction} onSend={handleSend} />
           </div>
         )}
 
         {/* Metadata */}
-        <div className="detail-section">
-          <div className="detail-section-title">Details</div>
-          <div className="detail-grid">
-            <span className="detail-label">Summary</span>
-            <span className="detail-value">{s.summary || "-"}</span>
-            <span className="detail-label">Agent</span>
-            <span className="detail-value">{s.agent || "-"}</span>
-            <span className="detail-label">Flow</span>
-            <span className="detail-value">{s.pipeline || s.flow || "-"}</span>
-            <span className="detail-label">Stage</span>
-            <span className="detail-value">{s.stage || "-"}</span>
-            <span className="detail-label">Repo</span>
-            <span className="detail-value">{s.repo || "-"}</span>
-            <span className="detail-label">Branch</span>
-            <span className="detail-value">{s.branch || "-"}</span>
-            <span className="detail-label">Group</span>
-            <span className="detail-value">{s.group_name || "-"}</span>
-            <span className="detail-label">Created</span>
-            <span className="detail-value">{relTime(s.created_at)}</span>
-            <span className="detail-label">Updated</span>
-            <span className="detail-value">{relTime(s.updated_at)}</span>
+        <div className="mb-5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Details</div>
+          <div className="grid grid-cols-[100px_1fr] gap-x-3.5 gap-y-1.5 text-xs">
+            <span className="text-label-tertiary font-medium">Summary</span>
+            <span className="text-label break-all">{s.summary || "-"}</span>
+            <span className="text-label-tertiary font-medium">Agent</span>
+            <span className="text-label break-all">{s.agent || "-"}</span>
+            <span className="text-label-tertiary font-medium">Flow</span>
+            <span className="text-label break-all">{s.pipeline || s.flow || "-"}</span>
+            <span className="text-label-tertiary font-medium">Stage</span>
+            <span className="text-label break-all">{s.stage || "-"}</span>
+            <span className="text-label-tertiary font-medium">Repo</span>
+            <span className="text-label break-all">{s.repo || "-"}</span>
+            <span className="text-label-tertiary font-medium">Branch</span>
+            <span className="text-label break-all">{s.branch || "-"}</span>
+            <span className="text-label-tertiary font-medium">Group</span>
+            <span className="text-label break-all">{s.group_name || "-"}</span>
+            <span className="text-label-tertiary font-medium">Created</span>
+            <span className="text-label break-all">{relTime(s.created_at)}</span>
+            <span className="text-label-tertiary font-medium">Updated</span>
+            <span className="text-label break-all">{relTime(s.updated_at)}</span>
           </div>
         </div>
 
         {/* Flow Pipeline */}
         {flowStages.length > 1 && s.stage && (
-          <div className="detail-section">
-            <div className="detail-section-title">Flow Pipeline</div>
-            <div style={{ display: "flex", gap: 0, flexWrap: "wrap", alignItems: "center", fontSize: 12 }}>
+          <div className="mb-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Flow Pipeline</div>
+            <div className="flex gap-0 flex-wrap items-center text-xs">
               {flowStages.map((st: any, i: number) => {
                 const isCurrent = st.name === s.stage;
                 const currentIdx = flowStages.findIndex((x: any) => x.name === s.stage);
                 const isPast = currentIdx > i;
                 return (
-                  <span key={st.name} style={{ display: "inline-flex", alignItems: "center" }}>
-                    {i > 0 && <span style={{ color: "var(--label-quaternary)", margin: "0 4px" }}>&gt;</span>}
-                    <span style={{
-                      color: isCurrent ? "var(--tint)" : isPast ? "var(--green)" : "var(--label-quaternary)",
-                      fontWeight: isCurrent ? 700 : 400,
-                      fontFamily: "var(--mono)",
-                      fontSize: 11,
-                    }}>
+                  <span key={st.name} className="inline-flex items-center">
+                    {i > 0 && <span className="text-label-quaternary mx-1">&gt;</span>}
+                    <span className={cn(
+                      "font-mono text-[11px]",
+                      isCurrent && "text-tint font-bold",
+                      isPast && "text-success",
+                      !isCurrent && !isPast && "text-label-quaternary"
+                    )}>
                       {isCurrent ? `[${st.name}]` : st.name}
                     </span>
                   </span>
@@ -341,45 +351,45 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
         {/* Completion Summary */}
         {s.config?.completion_summary && (
-          <div className="detail-section">
-            <div className="detail-section-title">Completion Summary</div>
-            <div style={{ fontSize: 12, color: "var(--label-secondary)", lineHeight: 1.6 }}>{s.config.completion_summary}</div>
+          <div className="mb-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Completion Summary</div>
+            <div className="text-xs text-label-secondary leading-relaxed">{s.config.completion_summary}</div>
           </div>
         )}
 
         {/* Token Usage & Cost */}
         {s.config?.usage && (
-          <div className="detail-section">
-            <div className="detail-section-title">Usage</div>
-            <div className="detail-grid">
+          <div className="mb-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Usage</div>
+            <div className="grid grid-cols-[100px_1fr] gap-x-3.5 gap-y-1.5 text-xs">
               {s.config.usage.input_tokens != null && (
                 <>
-                  <span className="detail-label">Input tokens</span>
-                  <span className="detail-value" style={{ fontFamily: "var(--mono)" }}>{humanTokens(s.config.usage.input_tokens)}</span>
+                  <span className="text-label-tertiary font-medium">Input tokens</span>
+                  <span className="text-label font-mono">{humanTokens(s.config.usage.input_tokens)}</span>
                 </>
               )}
               {s.config.usage.output_tokens != null && (
                 <>
-                  <span className="detail-label">Output tokens</span>
-                  <span className="detail-value" style={{ fontFamily: "var(--mono)" }}>{humanTokens(s.config.usage.output_tokens)}</span>
+                  <span className="text-label-tertiary font-medium">Output tokens</span>
+                  <span className="text-label font-mono">{humanTokens(s.config.usage.output_tokens)}</span>
                 </>
               )}
               {s.config.usage.cache_read_input_tokens != null && (
                 <>
-                  <span className="detail-label">Cache read</span>
-                  <span className="detail-value" style={{ fontFamily: "var(--mono)" }}>{humanTokens(s.config.usage.cache_read_input_tokens)}</span>
+                  <span className="text-label-tertiary font-medium">Cache read</span>
+                  <span className="text-label font-mono">{humanTokens(s.config.usage.cache_read_input_tokens)}</span>
                 </>
               )}
               {s.config.usage.total_tokens != null && (
                 <>
-                  <span className="detail-label">Total tokens</span>
-                  <span className="detail-value" style={{ fontFamily: "var(--mono)" }}>{humanTokens(s.config.usage.total_tokens)}</span>
+                  <span className="text-label-tertiary font-medium">Total tokens</span>
+                  <span className="text-label font-mono">{humanTokens(s.config.usage.total_tokens)}</span>
                 </>
               )}
               {s.config.usage.total_cost != null && s.config.usage.total_cost > 0 && (
                 <>
-                  <span className="detail-label">Cost</span>
-                  <span className="detail-value" style={{ color: "var(--yellow)", fontFamily: "var(--mono)" }}>{formatCost(s.config.usage.total_cost)}</span>
+                  <span className="text-label-tertiary font-medium">Cost</span>
+                  <span className="text-warning font-mono">{formatCost(s.config.usage.total_cost)}</span>
                 </>
               )}
             </div>
@@ -388,38 +398,38 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
         {/* Preview Changes / Create PR */}
         {s.workdir && s.status !== "deleting" && (
-          <div className="detail-section">
-            <div className="btn-group">
-              <button className="btn btn-sm" onClick={handlePreviewDiff}>Preview Changes</button>
+          <div className="mb-5">
+            <div className="flex gap-1.5 flex-wrap">
+              <button className={cn(btnBase, btnSm)} onClick={handlePreviewDiff}>Preview Changes</button>
               {!readOnly && (
-                <button className="btn btn-sm" onClick={() => { setPrTitle(s.summary || ""); setShowPRForm(!showPRForm); }}>Create PR</button>
+                <button className={cn(btnBase, btnSm)} onClick={() => { setPrTitle(s.summary || ""); setShowPRForm(!showPRForm); }}>Create PR</button>
               )}
             </div>
             {prUrl && (
-              <div style={{ marginTop: 6, fontSize: 12 }}>
-                PR: <a href={prUrl} target="_blank" rel="noopener noreferrer">{prUrl}</a>
+              <div className="mt-1.5 text-xs">
+                PR: <a href={prUrl} target="_blank" rel="noopener noreferrer" className="text-info hover:underline">{prUrl}</a>
               </div>
             )}
             {s.pr_url && !prUrl && (
-              <div style={{ marginTop: 6, fontSize: 12 }}>
-                PR: <a href={s.pr_url} target="_blank" rel="noopener noreferrer">{s.pr_url}</a>
+              <div className="mt-1.5 text-xs">
+                PR: <a href={s.pr_url} target="_blank" rel="noopener noreferrer" className="text-info hover:underline">{s.pr_url}</a>
               </div>
             )}
             {showPRForm && (
-              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="mt-2 flex flex-col gap-1.5">
                 <input
-                  className="input input-sm"
+                  className={cn(inputBase, inputSm)}
                   placeholder="PR title"
                   value={prTitle}
                   onChange={(e) => setPrTitle(e.target.value)}
                 />
-                <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 4, color: "var(--label-secondary)" }}>
+                <label className="text-[11px] flex items-center gap-1 text-label-secondary">
                   <input type="checkbox" checked={prDraft} onChange={(e) => setPrDraft(e.target.checked)} />
                   Draft PR
                 </label>
-                <div className="btn-group">
-                  <button className="btn btn-primary btn-sm" onClick={handleCreatePR}>Submit PR</button>
-                  <button className="btn btn-sm" onClick={() => setShowPRForm(false)}>Cancel</button>
+                <div className="flex gap-1.5 flex-wrap">
+                  <button className={cn(btnBase, btnSm, btnPrimary)} onClick={handleCreatePR}>Submit PR</button>
+                  <button className={cn(btnBase, btnSm)} onClick={() => setShowPRForm(false)}>Cancel</button>
                 </div>
               </div>
             )}
@@ -428,36 +438,36 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
         {/* Diff Preview */}
         {showDiff && diffData && (
-          <div className="detail-section">
-            <div className="detail-section-title">
+          <div className="mb-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8 flex items-center gap-2">
               Changes: {diffData.branch} vs {diffData.baseBranch}
-              <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => setShowDiff(false)}>Close</button>
+              <button className={cn(btnBase, btnSm, "ml-2")} onClick={() => setShowDiff(false)}>Close</button>
             </div>
-            <div style={{ fontSize: 11, color: "var(--label-tertiary)", marginBottom: 6, fontFamily: "var(--mono)" }}>
+            <div className="text-[11px] text-label-tertiary mb-1.5 font-mono">
               {diffData.filesChanged} files changed, +{diffData.insertions} -{diffData.deletions}
             </div>
             {diffData.modifiedSinceReview?.length > 0 && (
-              <div style={{ color: "var(--yellow)", fontSize: 11, marginBottom: 6 }}>
+              <div className="text-warning text-[11px] mb-1.5">
                 Modified since last review: {diffData.modifiedSinceReview.join(", ")}
               </div>
             )}
-            <pre className="output-box" style={{ maxHeight: 400, overflow: "auto", whiteSpace: "pre-wrap", fontSize: 11 }}>
+            <pre className="bg-[rgba(8,8,12,0.8)] border border-white/8 rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[400px] overflow-auto whitespace-pre-wrap break-all text-label-secondary shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">
               {diffData.stat || diffData.message || "No changes"}
             </pre>
           </div>
         )}
 
         {/* Todos */}
-        <div className="detail-section">
-          <div className="detail-section-title">
+        <div className="mb-5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8 flex items-center gap-2">
             Todos
             {!readOnly && (
-              <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={handleRunVerification}>Run Verification</button>
+              <button className={cn(btnBase, btnSm, "ml-2")} onClick={handleRunVerification}>Run Verification</button>
             )}
           </div>
-          {todos.length === 0 && <div style={{ fontSize: 12, color: "var(--label-tertiary)" }}>No todos</div>}
+          {todos.length === 0 && <div className="text-xs text-label-tertiary">No todos</div>}
           {todos.map((t: any) => (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <div key={t.id} className="flex items-center gap-1.5 mb-1">
               {!readOnly && (
                 <input
                   type="checkbox"
@@ -465,46 +475,45 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
                   onChange={() => handleToggleTodo(t.id)}
                 />
               )}
-              <span style={{ textDecoration: t.done ? "line-through" : "none", flex: 1, fontSize: 12, color: t.done ? "var(--label-tertiary)" : "var(--label)" }}>
+              <span className={cn("flex-1 text-xs", t.done ? "line-through text-label-tertiary" : "text-label")}>
                 {t.content}
               </span>
               {!readOnly && (
-                <button className="btn btn-sm btn-danger" style={{ padding: "0 4px", fontSize: 10 }} onClick={() => handleDeleteTodo(t.id)}>x</button>
+                <button className={cn(btnBase, "px-1 py-0 text-[10px]", btnDanger)} onClick={() => handleDeleteTodo(t.id)}>x</button>
               )}
             </div>
           ))}
           {!readOnly && (
-            <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+            <div className="flex gap-1 mt-1.5">
               <input
-                className="input input-sm"
-                style={{ flex: 1 }}
+                className={cn(inputBase, inputSm, "flex-1")}
                 placeholder="Add a todo..."
                 value={newTodo}
                 onChange={(e) => setNewTodo(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleAddTodo(); }}
               />
-              <button className="btn btn-sm" disabled={!newTodo.trim()} onClick={handleAddTodo}>Add</button>
+              <button className={cn(btnBase, btnSm)} disabled={!newTodo.trim()} onClick={handleAddTodo}>Add</button>
             </div>
           )}
         </div>
 
         {/* Verification Result */}
         {verifyResult && (
-          <div className="detail-section">
-            <div className="detail-section-title">
-              Verification: {verifyResult.ok ? <span style={{ color: "var(--green)" }}>PASSED</span> : <span style={{ color: "var(--red)" }}>FAILED</span>}
+          <div className="mb-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">
+              Verification: {verifyResult.ok ? <span className="text-success">PASSED</span> : <span className="text-danger">FAILED</span>}
             </div>
             {!verifyResult.todosResolved && (
-              <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 4 }}>
+              <div className="text-xs text-danger mb-1">
                 Pending todos: {verifyResult.pendingTodos?.join(", ")}
               </div>
             )}
             {verifyResult.scriptResults?.map((r: any, i: number) => (
-              <div key={i} style={{ fontSize: 12, marginBottom: 4 }}>
-                <span style={{ color: r.passed ? "var(--green)" : "var(--red)", fontFamily: "var(--mono)", fontSize: 10 }}>{r.passed ? "[PASS]" : "[FAIL]"}</span>{" "}
-                <code style={{ fontFamily: "var(--mono)", fontSize: 11 }}>{r.script}</code>
+              <div key={i} className="text-xs mb-1">
+                <span className={cn("font-mono text-[10px]", r.passed ? "text-success" : "text-danger")}>{r.passed ? "[PASS]" : "[FAIL]"}</span>{" "}
+                <code className="font-mono text-[11px]">{r.script}</code>
                 {!r.passed && r.output && (
-                  <pre style={{ fontSize: 10, color: "var(--label-tertiary)", marginTop: 2, whiteSpace: "pre-wrap", fontFamily: "var(--mono)" }}>{r.output.slice(0, 500)}</pre>
+                  <pre className="text-[10px] text-label-tertiary mt-0.5 whitespace-pre-wrap font-mono">{r.output.slice(0, 500)}</pre>
                 )}
               </div>
             ))}
@@ -513,11 +522,11 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
         {/* Files Changed */}
         {s.config?.filesChanged?.length > 0 && (
-          <div className="detail-section">
-            <div className="detail-section-title">Files Changed ({s.config.filesChanged.length})</div>
-            <div style={{ maxHeight: 200, overflowY: "auto" }}>
+          <div className="mb-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Files Changed ({s.config.filesChanged.length})</div>
+            <div className="max-h-[200px] overflow-y-auto">
               {s.config.filesChanged.map((f: string) => (
-                <div key={f} style={{ fontSize: 11, color: "var(--label-secondary)", padding: "1px 0", fontFamily: "var(--mono)" }}>{f}</div>
+                <div key={f} className="text-[11px] text-label-secondary py-px font-mono">{f}</div>
               ))}
             </div>
           </div>
@@ -525,16 +534,16 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
         {/* Commits */}
         {s.config?.commits?.length > 0 && (
-          <div className="detail-section">
-            <div className="detail-section-title">Commits ({s.config.commits.length})</div>
+          <div className="mb-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Commits ({s.config.commits.length})</div>
             {s.config.commits.map((c: string) => {
               const shortSha = c.slice(0, 7);
               const ghBase = s.config?.github_url;
               const commitUrl = ghBase ? `${ghBase}/commit/${c}` : null;
               return (
-                <div key={c} style={{ fontSize: 11, color: "var(--label-secondary)", fontFamily: "var(--mono)", padding: "1px 0" }}>
+                <div key={c} className="text-[11px] text-label-secondary font-mono py-px">
                   {commitUrl ? (
-                    <a href={commitUrl} target="_blank" rel="noopener noreferrer">{shortSha}</a>
+                    <a href={commitUrl} target="_blank" rel="noopener noreferrer" className="text-info hover:underline">{shortSha}</a>
                   ) : shortSha}
                 </div>
               );
@@ -544,8 +553,8 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
         {/* Channel Port */}
         {(s.status === "running" || s.status === "waiting") && s.session_id && (
-          <div className="detail-section">
-            <div style={{ fontSize: 11, color: "var(--green)", fontFamily: "var(--mono)" }}>
+          <div className="mb-5">
+            <div className="text-[11px] text-success font-mono">
               Channel: port {channelPort}
             </div>
           </div>
@@ -553,22 +562,22 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
         {/* Output */}
         {output && (
-          <div className="detail-section">
-            <div className="detail-section-title">Live Output</div>
-            <div className="output-box" ref={outputRef}>{output}</div>
+          <div className="mb-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Live Output</div>
+            <div ref={outputRef} className="bg-[rgba(8,8,12,0.8)] border border-white/8 rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-label-secondary shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">{output}</div>
           </div>
         )}
 
         {/* Events */}
         {events.length > 0 && (
-          <div className="detail-section">
-            <div className="detail-section-title">Events ({events.length})</div>
-            <div className="timeline">
+          <div className="mb-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-label-tertiary mb-2.5 pb-2 border-b border-white/8">Events ({events.length})</div>
+            <div className="flex flex-col gap-0 relative">
               {events.slice(-50).reverse().map((ev: any, i: number) => (
-                <div key={i} className="timeline-item">
-                  <span className="timeline-time">{relTime(ev.created_at)}</span>
-                  <span className="timeline-event">
-                    <b>{ev.type}</b>
+                <div key={i} className="flex gap-3 py-1.5 text-[11px] border-l border-white/8 ml-1 pl-3.5 relative rounded-r-lg hover:bg-white/3 transition-colors duration-200 before:content-[''] before:absolute before:left-[-3px] before:top-[10px] before:w-[5px] before:h-[5px] before:rounded-full before:bg-label-quaternary before:z-[1] first:before:bg-tint">
+                  <span className="text-label-quaternary whitespace-nowrap shrink-0 w-[60px] font-mono text-[10px]">{relTime(ev.created_at)}</span>
+                  <span className="text-label-secondary text-[11px]">
+                    <b className="text-label font-medium">{ev.type}</b>
                     {ev.data ? " " + (typeof ev.data === "string" ? ev.data : JSON.stringify(ev.data)).slice(0, 120) : ""}
                   </span>
                 </div>

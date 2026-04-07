@@ -1,3 +1,4 @@
+import "./styles.css";
 import { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { Sidebar } from "./components/Sidebar.js";
@@ -15,13 +16,24 @@ import { MemoryView } from "./components/MemoryView.js";
 import { NewSessionModal } from "./components/NewSessionModal.js";
 import { api } from "./hooks/useApi.js";
 import { useSse } from "./hooks/useSse.js";
+import { cn } from "./lib/utils.js";
 
 function Toast({ message, type, onDone }: { message: string; type: string; onDone: () => void }) {
   useEffect(() => {
     const t = setTimeout(onDone, 3000);
     return () => clearTimeout(t);
   }, []);
-  return <div className={`toast toast-${type}`}>{message}</div>;
+  return (
+    <div className={cn(
+      "fixed bottom-5 right-5 px-[18px] py-2.5 glass-surface-xl bg-glass-dark border border-white/15 rounded-xl text-label text-[13px] font-medium z-[300] shadow-[0_4px_20px_rgba(0,0,0,0.25)] glass-shine-subtle animate-[slide-up_300ms_cubic-bezier(0.32,0.72,0,1)] flex items-center gap-2",
+      type === "success" && "border-l-[3px] border-l-success",
+      type === "error" && "border-l-[3px] border-l-danger",
+    )}>
+      {type === "success" && <span className="text-success font-bold">{"\u2713"}</span>}
+      {type === "error" && <span className="text-danger font-bold">{"\u2717"}</span>}
+      {message}
+    </div>
+  );
 }
 
 function App() {
@@ -88,32 +100,35 @@ function App() {
   const failedCount = sessions.filter(s => s.status === "failed").length;
 
   return (
-    <div className="app">
+    <div className="grid grid-cols-[200px_1fr] h-screen bg-transparent max-md:grid-cols-[48px_1fr]">
       <Sidebar activeView={view} onNavigate={setView} readOnly={readOnly} />
-      <div className="main">
-        <div className="main-header">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="main-title">{viewTitles[view] || "Dashboard"}</div>
+      <div className="overflow-y-auto flex flex-col bg-transparent">
+        <div className="h-[52px] px-6 border-b border-glass-border flex justify-between items-center glass-surface bg-glass-dark sticky top-0 z-10 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="text-lg font-semibold text-label tracking-[-0.01em]">{viewTitles[view] || "Dashboard"}</div>
             {view === "sessions" && (
-              <div style={{ display: "flex", gap: 8, fontSize: 11, fontFamily: "var(--mono)" }}>
-                {runningCount > 0 && <span style={{ color: "var(--green)" }}>{runningCount}</span>}
-                {waitingCount > 0 && <span style={{ color: "var(--yellow)" }}>{waitingCount}</span>}
-                {failedCount > 0 && <span style={{ color: "var(--red)" }}>{failedCount}</span>}
+              <div className="flex gap-2 text-sm font-mono">
+                {runningCount > 0 && <span className="text-success">{runningCount}</span>}
+                {waitingCount > 0 && <span className="text-warning">{waitingCount}</span>}
+                {failedCount > 0 && <span className="text-danger">{failedCount}</span>}
               </div>
             )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--label-quaternary)" }}>
+          <div className="flex items-center gap-2.5">
+            <span className="text-sm font-mono text-label-quaternary">
               {sessions.length}
             </span>
             {view === "sessions" && !readOnly && (
-              <button className="btn btn-primary" onClick={() => setShowNew(true)} style={{ fontSize: 11 }}>
+              <button
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-[7px] rounded-lg text-[11px] font-semibold cursor-pointer bg-tint border-none text-white shadow-[0_2px_12px_rgba(124,106,239,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] hover:brightness-110 active:scale-[0.97] transition-all duration-200"
+                onClick={() => setShowNew(true)}
+              >
                 + New Session
               </button>
             )}
           </div>
         </div>
-        <div className="main-body">
+        <div className="flex-1 p-5 px-6 overflow-y-auto flex flex-col">
           {view === "sessions" && (
             <SessionList
               sessions={sessions} selectedId={selectedId} onSelect={setSelectedId}
