@@ -1,17 +1,19 @@
 /**
- * SQLite store for sessions and events.
+ * store.ts — backward-compatible shim.
  *
- * Single-file database at ~/.ark/ark.db. Provides:
- * - Session CRUD with atomic CAS claiming
- * - Event logging (append-only audit trail)
- * - Message storage for agent↔human communication
- * - Auto-migration for schema changes
+ * All real logic lives in:
+ *   - repositories/ (SessionRepository, ComputeRepository, EventRepository, MessageRepository)
+ *   - repositories/schema.ts (initSchema, seedLocalCompute)
+ *   - context.ts (test context helpers)
+ *   - ../types/index.ts (domain types)
+ *
+ * This file re-exports everything under the original API surface so that
+ * existing callers (tests, CLI commands, session.ts, conductor.ts, etc.)
+ * continue to work unchanged.
  */
 
 import { Database } from "bun:sqlite";
 import { randomBytes } from "crypto";
-import { mkdirSync, existsSync, rmSync } from "fs";
-import { join } from "path";
 
 import {
   getContext, getDb as getDbFromContext, closeDb,
@@ -19,59 +21,33 @@ import {
   type StoreContext, type TestContext,
 } from "./context.js";
 
-import type { SessionStatus, ComputeStatus, ComputeProviderName, MessageRole, MessageType } from "../types/index.js";
+import { initSchema as repoInitSchema, seedLocalCompute } from "./repositories/schema.js";
 
-// ── Paths ───────────────────────────────────────────────────────────────────
-// Functions (not constants) so they respect ARK_TEST_DIR and setContext()
-// at call time rather than freezing at import time.
+import type {
+  SessionStatus, SessionConfig,
+  ComputeStatus, ComputeProviderName, ComputeConfig,
+  MessageRole, MessageType,
+} from "../types/index.js";
 
-// App-level overrides — set by AppContext.boot(), cleared on shutdown.
-// Removes the need for a circular require("./app.js") at call time.
-let _appConfig: { arkDir: string; dbPath: string; tracksDir: string; worktreesDir: string } | null = null;
-let _appDb: Database | null = null;
-
-/** Called by AppContext.boot() to wire up the app-level DB and paths. */
-export function setAppStore(db: Database, config: typeof _appConfig): void {
-  _appDb = db;
-  _appConfig = config;
-}
-
-/** Called by AppContext.shutdown() to clear app-level overrides. */
-export function clearAppStore(): void {
-  _appDb = null;
-  _appConfig = null;
-}
-
-export function ARK_DIR(): string {
-  return _appConfig ? _appConfig.arkDir : getContext().arkDir;
-}
-export function DB_PATH(): string {
-  return _appConfig ? _appConfig.dbPath : getContext().dbPath;
-}
-export function TRACKS_DIR(): string {
-  return _appConfig ? _appConfig.tracksDir : getContext().tracksDir;
-}
-export function WORKTREES_DIR(): string {
-  return _appConfig ? _appConfig.worktreesDir : getContext().worktreesDir;
-}
-
-// Re-export context utilities for tests
+// ── Re-export context utilities for tests ──────────────────────────────────
 export { createTestContext, setContext, resetContext, closeDb, type TestContext };
+export type { StoreContext };
 
-// ── Types ───────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────
+// Re-export domain types that callers previously imported from store.ts
 
 export interface Session {
   id: string;
-  ticket: string | null;      // external ticket reference (Jira, GitHub issue, etc.)
-  summary: string | null;     // task description
+  ticket: string | null;
+  summary: string | null;
   repo: string | null;
   branch: string | null;
   compute_name: string | null;
-  session_id: string | null; // tmux session name
-  claude_session_id: string | null; // Claude UUID for --resume
+  session_id: string | null;
+  claude_session_id: string | null;
   stage: string | null;
   status: SessionStatus;
-  flow: string;           // flow definition name
+  flow: string;
   agent: string | null;
   workdir: string | null;
   pr_url: string | null;
@@ -98,15 +74,13 @@ export interface Event {
 }
 
 export interface Compute {
-  name: string;              // unique identifier
+  name: string;
   provider: ComputeProviderName;
   status: ComputeStatus;
   config: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
-
-// ── DB Row Types ────────────────────────────────────────────────────────────
 
 export interface SessionRow {
   id: string;
@@ -135,38 +109,18 @@ export interface SessionRow {
   updated_at: string;
 }
 
-interface ComputeRow {
-  name: string;
-  provider: string;
-  status: string;
-  config: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface EventRow {
-  id: number;
-  track_id: string;
-  type: string;
-  stage: string | null;
-  actor: string | null;
-  data: string | null;
-  created_at: string;
-}
-
-interface MessageRow {
+export interface Message {
   id: number;
   session_id: string;
-  role: string;
+  role: MessageRole;
   content: string;
-  type: string;
-  read: number;
+  type: MessageType;
+  read: boolean;
   created_at: string;
 }
 
-// ── Safe parsing ─────────────────────────────────────────────────────────────
+// ── Safe parsing ────────────────────────────────────────────────────────────
 
-/** Safely parse a config value that may be a JSON string, an object, or corrupted. */
 export function safeParseConfig(raw: unknown): Record<string, unknown> {
   if (typeof raw === "object" && raw !== null) return raw as Record<string, unknown>;
   try { return JSON.parse(String(raw ?? "{}")); }
@@ -181,47 +135,54 @@ export function rowToSession(row: SessionRow): Session {
   };
 }
 
-function rowToCompute(row: ComputeRow): Compute {
-  return {
-    ...row,
-    provider: row.provider as ComputeProviderName,
-    status: row.status as ComputeStatus,
-    config: safeParseConfig(row.config),
-  };
+// ── App-level overrides ────────────────────────────────────────────────────
+// setAppStore/clearAppStore are still called by AppContext.boot()/shutdown().
+// They wire the DB and paths so getDb() / ARK_DIR() etc. work without
+// requiring a circular import of app.ts at call time.
+
+let _appConfig: { arkDir: string; dbPath: string; tracksDir: string; worktreesDir: string } | null = null;
+let _appDb: Database | null = null;
+
+export function setAppStore(db: Database, config: typeof _appConfig): void {
+  _appDb = db;
+  _appConfig = config;
 }
 
-function rowToEvent(row: EventRow): Event {
-  return { ...row, data: row.data ? JSON.parse(row.data) : null };
+export function clearAppStore(): void {
+  _appDb = null;
+  _appConfig = null;
 }
 
-function rowToMessage(row: MessageRow): Message {
-  return {
-    ...row,
-    role: row.role as MessageRole,
-    type: row.type as MessageType,
-    read: !!row.read,
-  };
+// ── Paths ──────────────────────────────────────────────────────────────────
+
+export function ARK_DIR(): string {
+  return _appConfig ? _appConfig.arkDir : getContext().arkDir;
+}
+export function DB_PATH(): string {
+  return _appConfig ? _appConfig.dbPath : getContext().dbPath;
+}
+export function TRACKS_DIR(): string {
+  return _appConfig ? _appConfig.tracksDir : getContext().tracksDir;
+}
+export function WORKTREES_DIR(): string {
+  return _appConfig ? _appConfig.worktreesDir : getContext().worktreesDir;
 }
 
-// ── Database ────────────────────────────────────────────────────────────────
+// ── Database ───────────────────────────────────────────────────────────────
 
 function now(): string {
   return new Date().toISOString();
 }
 
-// Tracks databases that have had schema initialized, preventing re-initialization
 const _initialized = new WeakSet<Database>();
 
 export function getDb(): Database {
-  // Use app-level DB if set by AppContext.boot()
   if (_appDb) return _appDb;
 
-  // Legacy path (CLI without AppContext, or tests using context.ts)
   const db = getDbFromContext();
   if (!_initialized.has(db)) {
-    _initialized.add(db); // mark BEFORE init to prevent recursion
+    _initialized.add(db);
     initSchema(db);
-    // Ensure local compute exists (use db directly, not getDb)
     const row = db.prepare("SELECT name FROM compute WHERE name = 'local'").get();
     if (!row) {
       const ts = now();
@@ -234,120 +195,10 @@ export function getDb(): Database {
 }
 
 export function initSchema(db: Database): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      ticket TEXT,
-      summary TEXT,
-      repo TEXT,
-      branch TEXT,
-      compute_name TEXT,
-      session_id TEXT,
-      claude_session_id TEXT,
-      stage TEXT,
-      status TEXT NOT NULL DEFAULT 'pending',
-      flow TEXT NOT NULL DEFAULT 'default',
-      agent TEXT,
-      workdir TEXT,
-      pr_url TEXT,
-      pr_id TEXT,
-      error TEXT,
-      parent_id TEXT,
-      fork_group TEXT,
-      group_name TEXT,
-      breakpoint_reason TEXT,
-      attached_by TEXT,
-      config TEXT DEFAULT '{}',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      track_id TEXT NOT NULL,
-      type TEXT NOT NULL,
-      stage TEXT,
-      actor TEXT,
-      data TEXT,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_events_track ON events(track_id);
-    CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
-    CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
-    CREATE INDEX IF NOT EXISTS idx_sessions_repo ON sessions(repo);
-    CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_id);
-    CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_name);
-    CREATE INDEX IF NOT EXISTS idx_sessions_pr_url ON sessions(pr_url);
-
-    CREATE TABLE IF NOT EXISTS compute (
-      name TEXT PRIMARY KEY,
-      provider TEXT NOT NULL DEFAULT 'local',
-      status TEXT NOT NULL DEFAULT 'stopped',
-      config TEXT DEFAULT '{}',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider);
-    CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status);
-
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'text',
-      read INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
-
-    CREATE TABLE IF NOT EXISTS groups (
-      name TEXT PRIMARY KEY,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS claude_sessions_cache (
-      session_id TEXT PRIMARY KEY,
-      project TEXT NOT NULL,
-      project_dir TEXT NOT NULL,
-      transcript_path TEXT NOT NULL,
-      summary TEXT DEFAULT '',
-      message_count INTEGER DEFAULT 0,
-      timestamp TEXT DEFAULT '',
-      last_activity TEXT DEFAULT '',
-      cached_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_claude_cache_activity ON claude_sessions_cache(last_activity DESC);
-
-    CREATE VIRTUAL TABLE IF NOT EXISTS transcript_index USING fts5(
-      session_id UNINDEXED,
-      project,
-      role,
-      content,
-      timestamp UNINDEXED
-    );
-
-    CREATE TABLE IF NOT EXISTS schedules (
-      id TEXT PRIMARY KEY,
-      cron TEXT NOT NULL,
-      flow TEXT NOT NULL DEFAULT 'bare',
-      repo TEXT,
-      workdir TEXT,
-      summary TEXT,
-      compute_name TEXT,
-      group_name TEXT,
-      enabled INTEGER NOT NULL DEFAULT 1,
-      last_run TEXT,
-      created_at TEXT NOT NULL
-    );
-  `);
+  repoInitSchema(db);
 }
 
-// ── Session CRUD ────────────────────────────────────────────────────────────
+// ── Session CRUD ───────────────────────────────────────────────────────────
 
 export function generateId(): string {
   const db = getDb();
@@ -429,7 +280,6 @@ export function listSessions(opts?: {
   return (db.prepare(sql).all(...params) as SessionRow[]).map(rowToSession);
 }
 
-// Valid session columns (from schema). Used to whitelist dynamic SQL column names.
 const SESSION_COLUMNS = new Set([
   "ticket", "summary", "repo", "branch", "compute_name", "session_id",
   "claude_session_id", "stage", "status", "flow", "agent", "workdir",
@@ -437,7 +287,6 @@ const SESSION_COLUMNS = new Set([
   "breakpoint_reason", "attached_by", "config", "updated_at",
 ]);
 
-// Valid compute columns (from schema).
 const COMPUTE_COLUMNS = new Set([
   "provider", "status", "config", "updated_at",
 ]);
@@ -449,7 +298,7 @@ export function updateSession(id: string, fields: Partial<Session>): Session | n
 
   for (const [key, value] of Object.entries(fields)) {
     if (key === "id" || key === "created_at") continue;
-    if (!SESSION_COLUMNS.has(key)) continue; // skip unknown columns
+    if (!SESSION_COLUMNS.has(key)) continue;
     if (key === "config" && typeof value === "object") {
       updates.push("config = ?");
       values.push(JSON.stringify(value));
@@ -464,7 +313,6 @@ export function updateSession(id: string, fields: Partial<Session>): Session | n
   return getSession(id);
 }
 
-/** Delete session DB rows only. Use session.deleteSessionAsync() for full cleanup. */
 export function deleteSession(id: string): boolean {
   const db = getDb();
   db.prepare("DELETE FROM events WHERE track_id = ?").run(id);
@@ -472,7 +320,6 @@ export function deleteSession(id: string): boolean {
   return result.changes > 0;
 }
 
-/** Soft-delete: set status to "deleting", store previous status + timestamp in config. */
 export function softDeleteSession(id: string): boolean {
   const session = getSession(id);
   if (!session) return false;
@@ -481,7 +328,6 @@ export function softDeleteSession(id: string): boolean {
   return true;
 }
 
-/** Restore a soft-deleted session to its previous status. */
 export function undeleteSession(id: string): Session | null {
   const session = getSession(id);
   if (!session || session.status !== "deleting") return null;
@@ -491,16 +337,11 @@ export function undeleteSession(id: string): Session | null {
   return getSession(id);
 }
 
-/** List sessions that are soft-deleted (status = "deleting"). */
 export function listDeletedSessions(): Session[] {
   const db = getDb();
   return (db.prepare("SELECT * FROM sessions WHERE status = 'deleting' ORDER BY updated_at DESC").all() as SessionRow[]).map(rowToSession);
 }
 
-/**
- * Hard-delete sessions whose soft-delete timestamp exceeds ttlSeconds.
- * Returns array of purged session IDs.
- */
 export function purgeExpiredDeletes(ttlSeconds: number = 90): string[] {
   const deleted = listDeletedSessions();
   const purged: string[] = [];
@@ -516,7 +357,7 @@ export function purgeExpiredDeletes(ttlSeconds: number = 90): string[] {
   return purged;
 }
 
-// ── Atomic claim (CAS) ─────────────────────────────────────────────────────
+// ── Atomic claim (CAS) ────────────────────────────────────────────────────
 
 export function claimSession(
   id: string, expectedStatus: string, newStatus: string,
@@ -528,7 +369,7 @@ export function claimSession(
 
   if (extraFields) {
     for (const [key, value] of Object.entries(extraFields)) {
-      if (!SESSION_COLUMNS.has(key)) continue; // skip unknown columns
+      if (!SESSION_COLUMNS.has(key)) continue;
       updates.push(`${key} = ?`);
       values.push(key === "config" ? JSON.stringify(value) : value ?? null);
     }
@@ -541,7 +382,7 @@ export function claimSession(
   return result.changes > 0;
 }
 
-// ── Events ──────────────────────────────────────────────────────────────────
+// ── Events ─────────────────────────────────────────────────────────────────
 
 export function logEvent(
   trackId: string, type: string,
@@ -567,14 +408,14 @@ export function getEvents(
   sql += " ORDER BY id ASC LIMIT ?";
   params.push(opts?.limit ?? 200);
 
-  return (db.prepare(sql).all(...params) as EventRow[]).map(rowToEvent);
+  return (db.prepare(sql).all(...params) as any[]).map((row: any) => ({
+    ...row,
+    data: row.data ? JSON.parse(row.data) : null,
+  }));
 }
 
-// ── Compute CRUD ────────────────────────────────────────────────────────────
+// ── Compute CRUD ───────────────────────────────────────────────────────────
 
-/**
- * Ensure the singleton "local" compute exists. Called on DB init.
- */
 export function ensureLocalCompute(): Compute {
   const existing = getCompute("local");
   if (existing) return existing;
@@ -619,9 +460,14 @@ export function createCompute(opts: {
 
 export function getCompute(name: string): Compute | null {
   const db = getDb();
-  const row = db.prepare("SELECT * FROM compute WHERE name = ?").get(name) as ComputeRow | undefined;
+  const row = db.prepare("SELECT * FROM compute WHERE name = ?").get(name) as any | undefined;
   if (!row) return null;
-  return rowToCompute(row);
+  return {
+    ...row,
+    provider: row.provider as ComputeProviderName,
+    status: row.status as ComputeStatus,
+    config: safeParseConfig(row.config),
+  };
 }
 
 export function listCompute(opts?: {
@@ -640,7 +486,12 @@ export function listCompute(opts?: {
   sql += " ORDER BY created_at DESC LIMIT ?";
   params.push(opts?.limit ?? 100);
 
-  return (db.prepare(sql).all(...params) as ComputeRow[]).map(rowToCompute);
+  return (db.prepare(sql).all(...params) as any[]).map((row: any) => ({
+    ...row,
+    provider: row.provider as ComputeProviderName,
+    status: row.status as ComputeStatus,
+    config: safeParseConfig(row.config),
+  }));
 }
 
 export function updateCompute(name: string, fields: Partial<Compute>): Compute | null {
@@ -650,7 +501,7 @@ export function updateCompute(name: string, fields: Partial<Compute>): Compute |
 
   for (const [key, value] of Object.entries(fields)) {
     if (key === "name" || key === "created_at") continue;
-    if (!COMPUTE_COLUMNS.has(key)) continue; // skip unknown columns
+    if (!COMPUTE_COLUMNS.has(key)) continue;
     if (key === "config" && typeof value === "object") {
       updates.push("config = ?");
       values.push(JSON.stringify(value));
@@ -665,10 +516,6 @@ export function updateCompute(name: string, fields: Partial<Compute>): Compute |
   return getCompute(name);
 }
 
-/**
- * Merge keys into a compute's config without replacing the whole object.
- * Uses a transaction to avoid lost updates from concurrent writers.
- */
 export function mergeComputeConfig(name: string, patch: Record<string, unknown>): Compute | null {
   const db = getDb();
   db.transaction(() => {
@@ -682,10 +529,6 @@ export function mergeComputeConfig(name: string, patch: Record<string, unknown>)
   return getCompute(name);
 }
 
-/**
- * Merge keys into a session's config without replacing the whole object.
- * Uses a transaction to avoid lost updates from concurrent writers.
- */
 export function mergeSessionConfig(sessionId: string, patch: Record<string, unknown>): void {
   const db = getDb();
   db.transaction(() => {
@@ -699,19 +542,18 @@ export function mergeSessionConfig(sessionId: string, patch: Record<string, unkn
 }
 
 export function deleteCompute(name: string): boolean {
-  if (name === "local") return false; // local compute cannot be deleted
+  if (name === "local") return false;
   const db = getDb();
   const result = db.prepare("DELETE FROM compute WHERE name = ?").run(name);
   return result.changes > 0;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 export function getChildren(parentId: string): Session[] {
   return listSessions({ parent_id: parentId });
 }
 
-/** List all groups (union of groups table + session group_names). */
 export function getGroups(): string[] {
   const db = getDb();
   const rows = db.prepare(`
@@ -731,12 +573,10 @@ export function createGroup(name: string): void {
 export function deleteGroup(name: string): void {
   const db = getDb();
   db.prepare("DELETE FROM groups WHERE name = ?").run(name);
-  // Also unassign any sessions in this group
   db.prepare("UPDATE sessions SET group_name = NULL WHERE group_name = ?").run(name);
 }
 
 export function sessionChannelPort(sessionId: string): number {
-  // Use 10000-port range (19200-29199) to reduce collision probability
   return 19200 + parseInt(sessionId.replace("s-", ""), 16) % 10000;
 }
 
@@ -748,17 +588,7 @@ export function isChannelPortAvailable(port: number, excludeSessionId?: string):
   return !sessions.some(s => sessionChannelPort(s.id) === port);
 }
 
-// ── Messages ─────────────────────────────────────────────────────────────────
-
-export interface Message {
-  id: number;
-  session_id: string;
-  role: MessageRole;
-  content: string;
-  type: MessageType;
-  read: boolean;
-  created_at: string;
-}
+// ── Messages ───────────────────────────────────────────────────────────────
 
 export function addMessage(opts: {
   session_id: string;
@@ -771,16 +601,26 @@ export function addMessage(opts: {
   db.prepare(
     "INSERT INTO messages (session_id, role, content, type, read, created_at) VALUES (?, ?, ?, ?, 0, ?)"
   ).run(opts.session_id, opts.role, opts.content, opts.type ?? "text", ts);
-  const row = db.prepare("SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT 1").get(opts.session_id) as MessageRow;
-  return rowToMessage(row);
+  const row = db.prepare("SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT 1").get(opts.session_id) as any;
+  return {
+    ...row,
+    role: row.role as MessageRole,
+    type: row.type as MessageType,
+    read: !!row.read,
+  };
 }
 
 export function getMessages(sessionId: string, opts?: { limit?: number }): Message[] {
   const db = getDb();
   const rows = db.prepare(
     "SELECT * FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT ?"
-  ).all(sessionId, opts?.limit ?? 50) as MessageRow[];
-  return rows.reverse().map(rowToMessage);
+  ).all(sessionId, opts?.limit ?? 50) as any[];
+  return rows.reverse().map((row: any) => ({
+    ...row,
+    role: row.role as MessageRole,
+    type: row.type as MessageType,
+    read: !!row.read,
+  }));
 }
 
 export function getUnreadCount(sessionId: string): number {
