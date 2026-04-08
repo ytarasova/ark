@@ -1,7 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
-import { X } from "lucide-react";
 
 interface NewSessionModalProps {
   onClose: () => void;
@@ -55,18 +54,9 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
   }
 
   return (
-    <div className="fixed top-0 right-0 w-[560px] h-screen bg-tertiary border-l border-border shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
-      {/* Header */}
-      <div className="h-[52px] px-5 border-b border-border flex justify-between items-center shrink-0">
-        <h2 className="text-[13px] font-semibold text-foreground">New Session</h2>
-        <Button variant="ghost" size="icon-xs" onClick={onClose}>
-          <X size={14} />
-        </Button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-5">
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+    <div className="flex flex-col h-full p-5 overflow-y-auto">
+      <h2 className="text-base font-semibold text-foreground mb-5">New Session</h2>
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="mb-3.5">
             <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Summary *</label>
             <Input
@@ -180,7 +170,6 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
             </Button>
           </div>
         </form>
-      </div>
     </div>
   );
 }

@@ -245,7 +245,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
   if (!detail || !detail.session) {
     return (
-      <div className="fixed top-0 right-0 w-[560px] h-screen bg-tertiary border-l border-border shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
+      <div className="flex flex-col h-full bg-background">
         <div className="h-[52px] px-5 border-b border-border flex justify-between items-center shrink-0">
           <span className="text-xs text-muted-foreground">Loading...</span>
           <Button variant="ghost" size="icon-xs" onClick={onClose}>
@@ -278,7 +278,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
   }
 
   return (
-    <div className="fixed top-0 right-0 w-[560px] h-screen bg-tertiary border-l border-border shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
+    <div className="flex flex-col h-full bg-background">
       {/* Header */}
       <div className="h-[52px] px-5 border-b border-border flex justify-between items-center shrink-0">
         <div className="flex items-center gap-2">
