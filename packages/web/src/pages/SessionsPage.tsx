@@ -52,16 +52,13 @@ export function SessionsPage({ view, onNavigate, readOnly, onToast }: SessionsPa
       <Layout
         view={view} onNavigate={onNavigate} readOnly={readOnly} title="Sessions"
         headerLeft={
-          <div className="flex gap-2 text-xs font-mono">
-            {runningCount > 0 && <span className="text-emerald-400">{runningCount}</span>}
-            {waitingCount > 0 && <span className="text-amber-400">{waitingCount}</span>}
-            {failedCount > 0 && <span className="text-red-400">{failedCount}</span>}
+          <div className="flex gap-1.5">
+            {runningCount > 0 && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />{runningCount} running</span>}
+            {waitingCount > 0 && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/20"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />{waitingCount} waiting</span>}
+            {failedCount > 0 && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/15 text-red-400 border border-red-500/20"><span className="w-1.5 h-1.5 rounded-full bg-red-400" />{failedCount} failed</span>}
           </div>
         }
-        headerRight={<>
-          <span className="text-xs font-mono text-muted-foreground">{sessions.length}</span>
-          {!readOnly && <Button size="sm" onClick={() => setShowNew(true)}>+ New Session</Button>}
-        </>}
+        headerRight={!readOnly ? <Button size="sm" onClick={() => setShowNew(true)}>+ New Session</Button> : undefined}
       >
         <SessionList
           sessions={sessions} selectedId={selectedId} onSelect={setSelectedId}

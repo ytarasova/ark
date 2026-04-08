@@ -224,7 +224,6 @@ function NewScheduleModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
                 value={form.compute_name}
                 onChange={(e) => update("compute_name", e.target.value)}
               >
-                <option value="">local</option>
                 {computes.map((c) => (
                   <option key={c.name} value={c.name}>{c.name}</option>
                 ))}

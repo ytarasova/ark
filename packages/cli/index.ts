@@ -2180,11 +2180,13 @@ program.command("web")
   .option("--port <port>", "Listen port", "8420")
   .option("--read-only", "Read-only mode")
   .option("--token <token>", "Bearer token for auth")
+  .option("--api-only", "API only, skip static file serving (for dev with Vite)")
   .action(async (opts) => {
     const server = core.startWebServer({
       port: Number(opts.port),
       readOnly: opts.readOnly,
       token: opts.token,
+      apiOnly: opts.apiOnly,
     });
     console.log(chalk.green(`Ark web dashboard: ${server.url}`));
     console.log(chalk.dim("Press Ctrl+C to stop"));

@@ -40,6 +40,8 @@ export interface WebServerOptions {
   port?: number;
   readOnly?: boolean;
   token?: string;
+  /** API-only mode: skip static file serving (used in dev with Vite) */
+  apiOnly?: boolean;
 }
 
 const CORS: Record<string, string> = {
@@ -79,6 +81,7 @@ async function callRpc(
 export function startWebServer(opts?: WebServerOptions): { stop: () => void; url: string } {
   const port = opts?.port ?? 8420;
   const readOnly = opts?.readOnly ?? false;
+  const apiOnly = opts?.apiOnly ?? false;
   const token = opts?.token;
 
   // ── Set up in-process RPC router ─────────────────────────────────────────
@@ -86,8 +89,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
   registerAllHandlers(router, getApp());
   router.markInitialized(); // bypass initialize handshake for in-process use
 
-  // Auto-build web frontend if dist doesn't exist
-  if (!existsSync(WEB_DIST)) {
+  // Auto-build web frontend if dist doesn't exist (skip in API-only mode)
+  if (!apiOnly && !existsSync(WEB_DIST)) {
     try {
       const buildScript = join(import.meta.dir, "../../packages/web/build.ts");
       if (existsSync(buildScript)) {
@@ -986,7 +989,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         }
       }
 
-      // Static file serving for web frontend
+      // Static file serving for web frontend (skip in API-only mode)
+      if (apiOnly) return new Response("Not Found", { status: 404, headers: CORS });
       const staticExts: Record<string, string> = {
         ".js": "application/javascript",
         ".css": "text/css",

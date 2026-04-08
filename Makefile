@@ -54,7 +54,7 @@ dev: ## Hot-reload: ark web (:8420) + Vite dev server (:5173) with HMR
 	@echo "  TUI:  ./ark tui             (runs from source, no build)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
-	  ./ark web --port 8420 2>&1 | sed 's/^/[api] /' & \
+	  ./ark web --port 8420 --api-only 2>&1 | sed 's/^/[api] /' & \
 	  sleep 1 && cd packages/web && npx vite --port 5173 2>&1 | sed 's/^/[web] /' & \
 	  wait
 

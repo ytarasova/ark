@@ -61,7 +61,7 @@ function NewAgentModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (
                 onChange={(e) => update("runtime", e.target.value)}
               >
                 <option value="claude-code">claude-code</option>
-                <option value="subprocess">subprocess</option>
+                <option value="cli-agent">cli-agent</option>
               </select>
             </div>
             <Separator className="mt-5" />
