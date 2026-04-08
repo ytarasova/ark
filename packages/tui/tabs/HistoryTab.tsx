@@ -261,6 +261,8 @@ function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null;
         {s.repo && <KeyValue label="Repo">{s.repo}</KeyValue>}
         {s.claude_session_id && <KeyValue label="Claude ID">{s.claude_session_id}</KeyValue>}
         <KeyValue label="Age">{ago(s.updated_at || s.created_at)}</KeyValue>
+
+        <ConversationView turns={conversation} />
       </DetailPanel>
     );
   }
@@ -281,8 +283,13 @@ function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null;
 }
 
 function ConversationView({ turns }: { turns: any[] }) {
+  if (!turns || turns.length === 0) return null;
+
   const filtered = turns.filter((t: any) => {
-    if (!t || !t.content || t.content.length < 2) return false;
+    if (!t) return false;
+    // Handle old string format
+    if (typeof t === "string") return t.length > 2;
+    if (!t.content || t.content.length < 2) return false;
     if (t.role !== "user" && t.role !== "assistant") return false;
     const c = t.content;
     if (c.startsWith("<channel ") || c.startsWith("You are the ") || c.startsWith("Session ")) return false;
@@ -296,11 +303,13 @@ function ConversationView({ turns }: { turns: any[] }) {
       <Text> </Text>
       <SectionHeader title={`Conversation (${filtered.length})`} />
       {filtered.map((turn: any, idx: number) => {
-        const isUser = turn.role === "user";
-        const raw = (turn.content || "").trim();
+        // Handle both object {role, content, timestamp} and legacy string "Role: content"
+        const isString = typeof turn === "string";
+        const isUser = isString ? turn.startsWith("You:") : turn.role === "user";
+        const raw = isString ? turn.replace(/^(You|Claude): ?/, "") : (turn.content || "").trim();
         const content = raw.slice(0, 200) + (raw.length > 200 ? "..." : "");
         const label = isUser ? " You " : " Agent ";
-        const time = turn.timestamp ? `  ${ago(turn.timestamp)}` : "";
+        const time = !isString && turn.timestamp ? `  ${ago(turn.timestamp)}` : "";
         return (
           <React.Fragment key={idx}>
             <Text color={isUser ? "cyan" : "green"} bold>{label}</Text>
