@@ -27,9 +27,19 @@ export function SessionsPage({ view, onNavigate, readOnly, onToast }: SessionsPa
   const failedCount = sessions.filter(s => s.status === "failed").length;
 
   async function handleNewSession(form: any) {
+    const shouldDispatch = form.dispatch;
     const res = await api.createSession(form);
     if (res.ok) {
-      onToast("Session created", "success");
+      if (shouldDispatch && res.id) {
+        try {
+          await api.dispatch(res.id);
+          onToast("Session created and dispatched", "success");
+        } catch {
+          onToast("Session created but dispatch failed", "error");
+        }
+      } else {
+        onToast("Session created", "success");
+      }
       setShowNew(false);
       refresh();
     } else {
