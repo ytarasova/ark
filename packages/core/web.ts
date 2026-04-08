@@ -674,6 +674,34 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         }
       }
 
+      // POST /api/flows (create)
+      if (url.pathname === "/api/flows" && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const body = await req.json() as any;
+          const { saveFlow } = await import("./flow.js");
+          saveFlow(body);
+          return jsonResponse({ ok: true, name: body.name });
+        } catch (err) { return errorResponse(err); }
+      }
+
+      // DELETE /api/flows/:name
+      if (url.pathname.match(/^\/api\/flows\/[^/]+$/) && req.method === "DELETE") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const name = decodeURIComponent(url.pathname.split("/")[3]);
+          // Prevent deleting builtin flows
+          const { listFlows, deleteFlow } = await import("./flow.js");
+          const all = listFlows();
+          const flow = all.find(f => f.name === name);
+          if (flow && flow.source === "builtin") {
+            return jsonResponse({ ok: false, message: "Cannot delete builtin flows" }, 400);
+          }
+          deleteFlow(name);
+          return jsonResponse({ ok: true });
+        } catch (err) { return errorResponse(err); }
+      }
+
       // GET /api/flows
       if (url.pathname === "/api/flows" && req.method === "GET") {
         try {

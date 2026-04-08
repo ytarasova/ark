@@ -6,7 +6,7 @@
  * Fork stages split into parallel children.
  */
 
-import { readFileSync, existsSync, readdirSync } from "fs";
+import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { ARK_DIR } from "./paths.js";
@@ -79,6 +79,22 @@ export function listFlows(): { name: string; description: string; stages: string
     }
   }
   return [...result.values()];
+}
+
+// ── Save / Delete ──────────────────────────────────────────────────────────
+
+export function saveFlow(flow: FlowDefinition, scope: "global" | "project" = "global", projectRoot?: string): void {
+  const dir = scope === "project" && projectRoot ? join(projectRoot, ".ark", "flows") : USER_DIR();
+  mkdirSync(dir, { recursive: true });
+  const { ...data } = flow;
+  writeFileSync(join(dir, `${flow.name}.yaml`), YAML.stringify(data));
+}
+
+export function deleteFlow(name: string, scope: "global" | "project" = "global", projectRoot?: string): boolean {
+  const dir = scope === "project" && projectRoot ? join(projectRoot, ".ark", "flows") : USER_DIR();
+  const path = join(dir, `${name}.yaml`);
+  if (existsSync(path)) { unlinkSync(path); return true; }
+  return false;
 }
 
 // ── Stage navigation ────────────────────────────────────────────────────────

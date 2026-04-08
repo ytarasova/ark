@@ -28,6 +28,7 @@ function App() {
 
   // Per-view "new item" state
   const [showNewAgent, setShowNewAgent] = useState(false);
+  const [showNewFlow, setShowNewFlow] = useState(false);
   const [showNewCompute, setShowNewCompute] = useState(false);
   const [showNewSchedule, setShowNewSchedule] = useState(false);
   const [showNewMemory, setShowNewMemory] = useState(false);
@@ -55,8 +56,9 @@ function App() {
         <ToolsPage view={view} onNavigate={setView} readOnly={readOnly} />
       )}
       {view === "flows" && (
-        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Flows" padded={false}>
-          <FlowsView />
+        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Flows" padded={false}
+          headerRight={!readOnly ? <Button size="sm" onClick={() => setShowNewFlow(true)}>+ New Flow</Button> : undefined}>
+          <FlowsView showCreate={showNewFlow} onCloseCreate={() => setShowNewFlow(false)} />
         </Layout>
       )}
       {view === "history" && (

@@ -106,6 +106,8 @@ export const api = {
   deleteAgent: (name: string) => fetchApi<any>(`/api/agents/${encodeURIComponent(name)}`, { method: "DELETE" }),
   getFlows: () => fetchApi<any[]>("/api/flows"),
   getFlowDetail: (name: string) => fetchApi<any>(`/api/flows/${encodeURIComponent(name)}`),
+  createFlow: (data: any) => apiPost<any>("/api/flows", data),
+  deleteFlow: (name: string) => fetchApi<any>(`/api/flows/${encodeURIComponent(name)}`, { method: "DELETE" }),
 
   // Worktrees
   getWorktrees: () => fetchApi<any[]>("/api/worktrees"),

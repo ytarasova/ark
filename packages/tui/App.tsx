@@ -40,6 +40,7 @@ function AppInner() {
   const focus = useFocus();
   const sessionsAsync = useAsync(store.refresh);
   const agentsAsync = useAsync(store.refresh);
+  const flowsAsync = useAsync(store.refresh);
   const historyAsync = useAsync(store.refresh);
   const computeAsync = useAsync(store.refresh);
 
@@ -79,7 +80,7 @@ function AppInner() {
   }, [focus.appActive]);
 
   // Active tab's async state
-  const asyncState = tab === "agents" ? agentsAsync : tab === "history" ? historyAsync : tab === "compute" ? computeAsync : sessionsAsync;
+  const asyncState = tab === "agents" ? agentsAsync : tab === "flows" ? flowsAsync : tab === "history" ? historyAsync : tab === "compute" ? computeAsync : sessionsAsync;
 
   const takeSnapshot = useCallback(() => {
     if (!process.env.TMUX) return;
@@ -179,7 +180,7 @@ function AppInner() {
           }}
         />
       ) : tab === "flows" ? (
-        <FlowsTab {...store} pane={pane} />
+        <FlowsTab {...store} pane={pane} asyncState={flowsAsync} refresh={store.refresh} />
       ) : tab === "history" ? (
         <HistoryTab
           {...store}

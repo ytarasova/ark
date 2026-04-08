@@ -1,27 +1,70 @@
-import React, { useMemo, useState, useEffect } from "react";
-import { Box, Text } from "ink";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
+import { Box, Text, useInput } from "ink";
+import { loadFlow, saveFlow, deleteFlow, findProjectRoot } from "../../core/index.js";
+import type { FlowDefinition } from "../../core/index.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
-import { useArkClient } from "../hooks/useArkClient.js";
+import { useStatusMessage } from "../hooks/useStatusMessage.js";
+import { useFocus } from "../hooks/useFocus.js";
+import { FlowForm } from "../forms/FlowForm.js";
 import type { StoreData } from "../hooks/useArkStore.js";
+import type { AsyncState } from "../hooks/useAsync.js";
 
 interface FlowsTabProps extends StoreData {
   pane: "left" | "right";
+  asyncState: AsyncState;
+  refresh: () => void;
 }
 
-export function FlowsTab({ flows, pane }: FlowsTabProps) {
-  const { sel } = useListNavigation(flows.length, { active: pane === "left" });
+export function FlowsTab({ flows, pane, asyncState, refresh }: FlowsTabProps) {
+  const focus = useFocus();
+  const [formMode, setFormMode] = useState<"create" | null>(null);
+  const hasOverlay = formMode !== null;
+  const { sel } = useListNavigation(flows.length, { active: pane === "left" && !hasOverlay });
+  const status = useStatusMessage();
+  const projectRoot = useMemo(() => findProjectRoot(process.cwd()) ?? undefined, []);
 
   const selected = flows[sel] ?? null;
+
+  useEffect(() => {
+    if (formMode) focus.push("form");
+    else focus.pop("form");
+  }, [formMode]);
+
+  const closeForm = useCallback(() => {
+    setFormMode(null);
+    refresh();
+  }, [refresh]);
+
+  useInput((input, _key) => {
+    if (hasOverlay || pane !== "left") return;
+
+    if (input === "n") { setFormMode("create"); return; }
+
+    if (!selected) return;
+
+    if (input === "x") {
+      if (selected.source === "builtin") {
+        status.show("Cannot delete builtin flows");
+        return;
+      }
+      asyncState.run("Deleting flow...", async () => {
+        deleteFlow(selected.name);
+        status.show(`Deleted '${selected.name}'`);
+        refresh();
+      });
+      return;
+    }
+  });
 
   return (
     <SplitPane
       focus={pane}
       leftTitle="Flows"
-      rightTitle="Details"
+      rightTitle={formMode === "create" ? "New Flow" : "Details"}
       left={
         <TreeList
           items={flows}
@@ -33,25 +76,36 @@ export function FlowsTab({ flows, pane }: FlowsTabProps) {
           emptyMessage="  No flows found."
         />
       }
-      right={<FlowDetail flow={selected} pane={pane} />}
+      right={
+        formMode === "create" ? (
+          <FlowForm
+            onDone={closeForm}
+            asyncState={asyncState}
+            projectRoot={projectRoot}
+          />
+        ) : (
+          <FlowDetail flow={selected} pane={pane} statusMessage={status.message} />
+        )
+      }
     />
   );
 }
 
 // ── Detail ──────────────────────────────────────────────────────────────────
 
-interface FlowDetailProps {
+function FlowDetail({ flow, pane, statusMessage }: {
   flow: any | null;
   pane: "left" | "right";
-}
-
-function FlowDetail({ flow, pane }: FlowDetailProps) {
-  const ark = useArkClient();
+  statusMessage: string | null;
+}) {
   const [p, setP] = useState<any>(null);
 
   useEffect(() => {
     if (!flow) { setP(null); return; }
-    ark.flowRead(flow.name).then(setP).catch(() => setP(null));
+    try {
+      const loaded = loadFlow(flow.name);
+      setP(loaded);
+    } catch { setP(null); }
   }, [flow?.name]);
 
   if (!flow) {
@@ -66,6 +120,7 @@ function FlowDetail({ flow, pane }: FlowDetailProps) {
     <DetailPanel active={pane === "right"}>
       <Text bold>{` ${p.name}`}</Text>
       {p.description && <Text dimColor>{` ${p.description}`}</Text>}
+      {statusMessage && <Text color="yellow">{` ${statusMessage}`}</Text>}
 
       <Text> </Text>
       <SectionHeader title="Stages" />
