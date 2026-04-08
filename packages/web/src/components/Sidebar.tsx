@@ -3,7 +3,7 @@ import { Button } from "./ui/button.js";
 import { Separator } from "./ui/separator.js";
 import {
   Play, Settings, Wrench, GitBranch, Clock, Server,
-  Calendar, BookOpen, DollarSign, LayoutGrid,
+  Calendar, BookOpen, DollarSign,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -23,7 +23,6 @@ const NAV: { id: string; icon: LucideIcon; label: string }[] = [
   { id: "schedules", icon: Calendar, label: "Schedules" },
   { id: "memory", icon: BookOpen, label: "Memory" },
   { id: "costs", icon: DollarSign, label: "Costs" },
-  { id: "status", icon: LayoutGrid, label: "System" },
 ];
 
 export function Sidebar({ activeView, onNavigate, readOnly }: SidebarProps) {

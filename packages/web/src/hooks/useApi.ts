@@ -89,10 +89,16 @@ export const api = {
 
   // Skills & Recipes
   getSkills: () => fetchApi<any[]>("/api/skills"),
+  createSkill: (data: any) => apiPost<any>("/api/skills", data),
+  deleteSkill: (name: string, scope?: string) => fetchApi<any>(`/api/skills/${encodeURIComponent(name)}${scope ? `?scope=${scope}` : ""}`, { method: "DELETE" }),
   getRecipes: () => fetchApi<any[]>("/api/recipes"),
+  deleteRecipe: (name: string, scope?: string) => fetchApi<any>(`/api/recipes/${encodeURIComponent(name)}${scope ? `?scope=${scope}` : ""}`, { method: "DELETE" }),
 
   // Agents & Flows
   getAgents: () => fetchApi<any[]>("/api/agents"),
+  createAgent: (data: any) => apiPost<any>("/api/agents", data),
+  updateAgent: (name: string, data: any) => fetchApi<any>(`/api/agents/${encodeURIComponent(name)}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteAgent: (name: string) => fetchApi<any>(`/api/agents/${encodeURIComponent(name)}`, { method: "DELETE" }),
   getFlows: () => fetchApi<any[]>("/api/flows"),
   getFlowDetail: (name: string) => fetchApi<any>(`/api/flows/${encodeURIComponent(name)}`),
 
@@ -125,6 +131,7 @@ export const api = {
 
   // Compute
   getCompute: () => fetchApi<any[]>("/api/compute"),
+  createCompute: (data: any) => apiPost<any>("/api/compute", data),
   getComputeDetail: (name: string) => fetchApi<any>(`/api/compute/${name}`),
   provisionCompute: (name: string) => apiPost<any>(`/api/compute/${name}/provision`),
   startCompute: (name: string) => apiPost<any>(`/api/compute/${name}/start`),

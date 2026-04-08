@@ -1,10 +1,89 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { api } from "../hooks/useApi.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
+import { Input } from "./ui/input.js";
+import { Separator } from "./ui/separator.js";
 import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
 import { Server } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+
+function NewComputeModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
+  const [form, setForm] = useState({ name: "", provider: "local", size: "", region: "" });
+
+  function update(key: string, val: string) {
+    setForm((prev) => ({ ...prev, [key]: val }));
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    onSubmit(form);
+  }
+
+  return (
+    <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] max-w-[90vw] bg-card border border-border rounded-xl p-6 z-[200] shadow-2xl">
+          <form onSubmit={handleSubmit}>
+            <Dialog.Title className="text-base font-semibold text-foreground mb-5">
+              New Compute Target
+            </Dialog.Title>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
+              <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="my-compute" />
+            </div>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Provider</label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={form.provider}
+                onChange={(e) => update("provider", e.target.value)}
+              >
+                <option value="local">local</option>
+                <option value="docker">docker</option>
+                <option value="devcontainer">devcontainer</option>
+                <option value="ec2">ec2</option>
+                <option value="ec2-docker">ec2-docker</option>
+                <option value="ec2-devcontainer">ec2-devcontainer</option>
+              </select>
+            </div>
+            {(form.provider.startsWith("ec2")) && (
+              <>
+                <div className="mb-3.5">
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Size</label>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={form.size}
+                    onChange={(e) => update("size", e.target.value)}
+                  >
+                    <option value="">Default</option>
+                    <option value="xs">XS (2 vCPU, 8 GB)</option>
+                    <option value="s">S (4 vCPU, 16 GB)</option>
+                    <option value="m">M (8 vCPU, 32 GB)</option>
+                    <option value="l">L (16 vCPU, 64 GB)</option>
+                    <option value="xl">XL (32 vCPU, 128 GB)</option>
+                  </select>
+                </div>
+                <div className="mb-3.5">
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Region</label>
+                  <Input value={form.region} onChange={(e) => update("region", e.target.value)} placeholder="us-east-1" />
+                </div>
+              </>
+            )}
+            <Separator className="mt-5" />
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+              <Button type="submit" size="sm">Create Compute</Button>
+            </div>
+          </form>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
 
 function statusDotColor(status: string): string {
   switch (status) {
@@ -42,6 +121,7 @@ export function ComputeView() {
   const [computes, setComputes] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: string } | null>(null);
+  const [showNew, setShowNew] = useState(false);
 
   function refresh() {
     api.getCompute().then((data) => {
@@ -85,21 +165,43 @@ export function ComputeView() {
     setTimeout(() => setActionMsg(null), 3000);
   }
 
-  if (!computes.length) {
+  async function handleCreate(form: any) {
+    try {
+      const config: any = {};
+      if (form.size) config.size = form.size;
+      if (form.region) config.region = form.region;
+      await api.createCompute({ name: form.name, provider: form.provider, config });
+      setShowNew(false);
+      refresh();
+    } catch (err: any) {
+      setActionMsg({ text: err.message || "Failed to create compute", type: "error" });
+      setTimeout(() => setActionMsg(null), 3000);
+    }
+  }
+
+  if (!computes.length && !showNew) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-180px)]">
         <div className="text-center">
           <Server size={28} className="text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No compute targets</p>
+          <p className="text-sm text-muted-foreground mb-4">No compute targets</p>
+          <Button size="sm" onClick={() => setShowNew(true)}>New Compute</Button>
+          {showNew && <NewComputeModal onClose={() => setShowNew(false)} onSubmit={handleCreate} />}
         </div>
       </div>
     );
   }
 
   return (
+    <>
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
       {/* Left: list panel */}
       <div className="bg-card border-r border-border overflow-y-auto">
+        <div className="p-2 px-3">
+          <Button size="sm" className="w-full" onClick={() => setShowNew(true)}>
+            + New Compute
+          </Button>
+        </div>
         {computes.map((c: any) => (
           <div
             key={c.name || c.id}
@@ -216,5 +318,7 @@ export function ComputeView() {
         )}
       </div>
     </div>
+    {showNew && <NewComputeModal onClose={() => setShowNew(false)} onSubmit={handleCreate} />}
+    </>
   );
 }

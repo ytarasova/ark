@@ -10,6 +10,12 @@ import { useFocus } from "../hooks/useFocus.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { KeyValue } from "../components/KeyValue.js";
+import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
+import {
+  FormTextField,
+  FormSelectField,
+  useFormNavigation,
+} from "../components/form/index.js";
 
 interface SchedulesTabProps {
   pane: "left" | "right";
@@ -22,6 +28,7 @@ export function SchedulesTab({ pane }: SchedulesTabProps) {
   const focus = useFocus();
   const status = useStatusMessage();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [showCreate, setShowCreate] = useState(false);
 
   // Load schedules on mount and periodically
   useEffect(() => {
@@ -33,11 +40,16 @@ export function SchedulesTab({ pane }: SchedulesTabProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Push/pop focus when confirmation is pending
+  // Push/pop focus when confirmation is pending or create form is open
   useEffect(() => {
     if (confirmation.pending) focus.push("confirm");
     else focus.pop("confirm");
   }, [confirmation.pending]);
+
+  useEffect(() => {
+    if (showCreate) focus.push("schedule-create");
+    else focus.pop("schedule-create");
+  }, [showCreate]);
 
   const sorted = useMemo(() =>
     [...schedules].sort((a, b) => {
@@ -47,7 +59,7 @@ export function SchedulesTab({ pane }: SchedulesTabProps) {
     }),
   [schedules]);
 
-  const { sel } = useListNavigation(sorted.length, { active: pane === "left" && !confirmation.pending });
+  const { sel } = useListNavigation(sorted.length, { active: pane === "left" && !confirmation.pending && !showCreate });
   const selected = sorted[sel] ?? null;
 
   const refresh = () => {
@@ -56,6 +68,12 @@ export function SchedulesTab({ pane }: SchedulesTabProps) {
 
   useInput((input, key) => {
     if (pane !== "left") return;
+    if (showCreate) return;
+
+    if (input === "n" && !confirmation.pending) {
+      setShowCreate(true);
+      return;
+    }
 
     if (input === "e" && selected) {
       // Toggle enable/disable
@@ -83,6 +101,19 @@ export function SchedulesTab({ pane }: SchedulesTabProps) {
       });
     }
   });
+
+  if (showCreate) {
+    return (
+      <NewScheduleForm
+        ark={ark}
+        asyncState={asyncState}
+        onDone={() => {
+          setShowCreate(false);
+          refresh();
+        }}
+      />
+    );
+  }
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -204,6 +235,96 @@ function ScheduleDetail({ schedule: s, pane }: ScheduleDetailProps) {
         <Text>{s.created_at}</Text>
       </KeyValue>
     </DetailPanel>
+  );
+}
+
+// -- New Schedule Form -------------------------------------------------------
+
+interface NewScheduleFormProps {
+  ark: ReturnType<typeof useArkClient>;
+  asyncState: ReturnType<typeof useAsync>;
+  onDone: () => void;
+}
+
+function NewScheduleForm({ ark, asyncState, onDone }: NewScheduleFormProps) {
+  const [cron, setCron] = useState("*/30 * * * *");
+  const [summary, setSummary] = useState("");
+  const [flow, setFlow] = useState("bare");
+  const [repo, setRepo] = useState(process.cwd());
+
+  const flowChoices = [
+    { label: "bare", value: "bare" },
+    { label: "default", value: "default" },
+    { label: "quick", value: "quick" },
+    { label: "parallel", value: "parallel" },
+  ];
+
+  const submit = () => {
+    if (!cron.trim()) return;
+    onDone();
+    asyncState.run("Creating schedule...", async () => {
+      await ark.scheduleCreate({
+        cron: cron.trim(),
+        summary: summary.trim() || undefined,
+        flow: flow || "bare",
+        repo: repo || process.cwd(),
+      });
+    });
+  };
+
+  const { active, advance, setEditing } = useFormNavigation({
+    fields: [
+      { name: "cron", type: "text" },
+      { name: "summary", type: "text" },
+      { name: "repo", type: "text" },
+      { name: "flow", type: "select" },
+    ],
+    onCancel: onDone,
+    onSubmit: submit,
+  });
+
+  return (
+    <Box flexDirection="column" flexGrow={1}>
+      <Text bold color="cyan">{" New Schedule "}</Text>
+      <Text> </Text>
+
+      <FormTextField
+        label="Cron"
+        value={cron}
+        onChange={setCron}
+        active={active === "cron"}
+        onEditChange={setEditing}
+        placeholder="*/30 * * * *"
+      />
+
+      <FormTextField
+        label="Summary"
+        value={summary}
+        onChange={setSummary}
+        active={active === "summary"}
+        onEditChange={setEditing}
+        placeholder="What should the scheduled agent do?"
+      />
+
+      <FormTextField
+        label="Repo"
+        value={repo}
+        onChange={setRepo}
+        active={active === "repo"}
+        onEditChange={setEditing}
+        placeholder="/path/to/repo"
+      />
+
+      <FormSelectField
+        label="Flow"
+        value={flow}
+        items={flowChoices}
+        onSelect={(v) => { setFlow(v); submit(); }}
+        active={active === "flow"}
+      />
+
+      <Box flexGrow={1} />
+    </Box>
   );
 }
 

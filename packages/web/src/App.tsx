@@ -5,7 +5,6 @@ import { Sidebar } from "./components/Sidebar.js";
 import { SessionList } from "./components/SessionList.js";
 import { SessionDetail } from "./components/SessionDetail.js";
 import { CostsView } from "./components/CostsView.js";
-import { StatusView } from "./components/StatusView.js";
 import { AgentsView } from "./components/AgentsView.js";
 import { ToolsView } from "./components/ToolsView.js";
 import { FlowsView } from "./components/FlowsView.js";
@@ -92,7 +91,7 @@ function App() {
   const viewTitles: Record<string, string> = {
     sessions: "Sessions", agents: "Agents", tools: "Tools",
     flows: "Flows", history: "History", compute: "Compute",
-    schedules: "Schedules", memory: "Memory", costs: "Costs", status: "System",
+    schedules: "Schedules", memory: "Memory", costs: "Costs",
   };
 
   // Inline status counts for sessions view (only non-zero)
@@ -159,7 +158,6 @@ function App() {
           {view === "schedules" && <ScheduleView />}
           {view === "memory" && <MemoryView />}
           {view === "costs" && <CostsView />}
-          {view === "status" && <StatusView sessions={sessions} />}
         </div>
       </div>
       {/* Detail panel */}

@@ -3,6 +3,7 @@ import { api } from "../hooks/useApi.js";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
+import { Button } from "./ui/button.js";
 import { Wrench } from "lucide-react";
 
 type Tab = "skills" | "recipes";
@@ -17,10 +18,15 @@ export function ToolsView({ activeTab = "skills", onTabChange }: ToolsViewProps)
   const [skills, setSkills] = useState<any[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  function refreshItems() {
     api.getSkills().then((d) => setSkills(d || []));
     api.getRecipes().then((d) => setRecipes(d || []));
+  }
+
+  useEffect(() => {
+    refreshItems();
   }, []);
 
   // Reset selection when tab changes
@@ -48,7 +54,7 @@ export function ToolsView({ activeTab = "skills", onTabChange }: ToolsViewProps)
                 "hover:bg-accent",
                 selected?.name === item.name && "bg-accent border-l-2 border-l-primary font-semibold"
               )}
-              onClick={() => handleSelect(item)}
+              onClick={() => setSelected(item)}
             >
               <span className="text-foreground truncate">{item.name}</span>
               <Badge variant="secondary" className="text-[10px]">{item.source || "builtin"}</Badge>
@@ -101,7 +107,38 @@ export function ToolsView({ activeTab = "skills", onTabChange }: ToolsViewProps)
                       <div className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">{selected.summary}</div>
                     </div>
                   )}
+                  <div className="mt-4">
+                    <Button size="sm" onClick={async () => {
+                      try {
+                        await api.createSession({ recipe: selected.name, repo: ".", flow: selected.flow || "bare" });
+                        setActionMsg("Session created from recipe");
+                        setTimeout(() => setActionMsg(null), 3000);
+                      } catch {
+                        setActionMsg("Failed to create session");
+                        setTimeout(() => setActionMsg(null), 3000);
+                      }
+                    }}>
+                      Use Recipe
+                    </Button>
+                  </div>
                 </>
+              )}
+              {selected.source !== "builtin" && (
+                <div className="mt-4">
+                  <Button variant="destructive" size="xs" onClick={async () => {
+                    try {
+                      if (tab === "skills") await api.deleteSkill(selected.name);
+                      else await api.deleteRecipe(selected.name);
+                      setSelected(null);
+                      refreshItems();
+                    } catch {}
+                  }}>
+                    Delete
+                  </Button>
+                </div>
+              )}
+              {actionMsg && (
+                <div className="mt-2 text-xs text-emerald-400">{actionMsg}</div>
               )}
             </>
           ) : (

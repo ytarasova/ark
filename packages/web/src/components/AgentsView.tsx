@@ -1,13 +1,93 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { api } from "../hooks/useApi.js";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
+import { Button } from "./ui/button.js";
+import { Input } from "./ui/input.js";
+import { Separator } from "./ui/separator.js";
 import { Settings } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+
+function NewAgentModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
+  const [form, setForm] = useState({ name: "", description: "", model: "sonnet", runtime: "claude-code" });
+
+  function update(key: string, val: string) {
+    setForm((prev) => ({ ...prev, [key]: val }));
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    onSubmit(form);
+  }
+
+  return (
+    <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] max-w-[90vw] bg-card border border-border rounded-xl p-6 z-[200] shadow-2xl">
+          <form onSubmit={handleSubmit}>
+            <Dialog.Title className="text-base font-semibold text-foreground mb-5">
+              New Agent
+            </Dialog.Title>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
+              <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="my-agent" />
+            </div>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Description</label>
+              <Input value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="What does this agent do?" />
+            </div>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Model</label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={form.model}
+                onChange={(e) => update("model", e.target.value)}
+              >
+                <option value="opus">opus</option>
+                <option value="sonnet">sonnet</option>
+                <option value="haiku">haiku</option>
+              </select>
+            </div>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Runtime</label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={form.runtime}
+                onChange={(e) => update("runtime", e.target.value)}
+              >
+                <option value="claude-code">claude-code</option>
+                <option value="subprocess">subprocess</option>
+              </select>
+            </div>
+            <Separator className="mt-5" />
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+              <Button type="submit" size="sm">Create Agent</Button>
+            </div>
+          </form>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
 
 export function AgentsView() {
   const [agents, setAgents] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
+  const [showCreate, setShowCreate] = useState(false);
+
+  function refresh() {
+    api.getAgents().then((data) => {
+      setAgents(data || []);
+      if (selected) {
+        const updated = (data || []).find((a: any) => a.name === selected.name);
+        setSelected(updated || null);
+      }
+    });
+  }
 
   useEffect(() => {
     api.getAgents().then((data) => {
@@ -16,21 +96,45 @@ export function AgentsView() {
     });
   }, []);
 
-  if (!agents.length) {
+  async function handleCreate(form: any) {
+    try {
+      await api.createAgent(form);
+      setShowCreate(false);
+      refresh();
+    } catch {}
+  }
+
+  async function handleDelete(name: string) {
+    try {
+      await api.deleteAgent(name);
+      setSelected(null);
+      refresh();
+    } catch {}
+  }
+
+  if (!agents.length && !showCreate) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-180px)]">
         <div className="text-center">
           <Settings size={28} className="text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No agents found</p>
+          <p className="text-sm text-muted-foreground mb-4">No agents found</p>
+          <Button size="sm" onClick={() => setShowCreate(true)}>New Agent</Button>
+          {showCreate && <NewAgentModal onClose={() => setShowCreate(false)} onSubmit={handleCreate} />}
         </div>
       </div>
     );
   }
 
   return (
+    <>
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
       {/* Left: list panel */}
       <div className="bg-card border-r border-border overflow-y-auto">
+        <div className="p-2 px-3">
+          <Button size="sm" className="w-full" onClick={() => setShowCreate(true)}>
+            + New Agent
+          </Button>
+        </div>
         {agents.map((a: any) => (
           <div
             key={a.name}
@@ -103,6 +207,13 @@ export function AgentsView() {
                 <div className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">{selected.system_prompt}</div>
               </div>
             )}
+            {selected.source !== "builtin" && (
+              <div className="mt-5">
+                <Button variant="destructive" size="xs" onClick={() => handleDelete(selected.name)}>
+                  Delete Agent
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
@@ -111,5 +222,7 @@ export function AgentsView() {
         )}
       </div>
     </div>
+    {showCreate && <NewAgentModal onClose={() => setShowCreate(false)} onSubmit={handleCreate} />}
+    </>
   );
 }

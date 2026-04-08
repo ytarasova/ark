@@ -60,7 +60,7 @@ export interface WebServerOptions {
 
 const CORS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
@@ -526,6 +526,29 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // --- Skills ---
 
+      // POST /api/skills (create)
+      if (url.pathname === "/api/skills" && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const body = await req.json();
+          const { saveSkill } = await import("./skill.js");
+          saveSkill(body, body.scope);
+          return jsonResponse({ ok: true, name: body.name });
+        } catch (err) { return errorResponse(err); }
+      }
+
+      // DELETE /api/skills/:name
+      if (url.pathname.match(/^\/api\/skills\/(.+)$/) && req.method === "DELETE") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const name = decodeURIComponent(url.pathname.split("/")[3]);
+          const scope = url.searchParams.get("scope") as "project" | "global" | undefined || undefined;
+          const { deleteSkill } = await import("./skill.js");
+          deleteSkill(name, scope);
+          return jsonResponse({ ok: true });
+        } catch (err) { return errorResponse(err); }
+      }
+
       // GET /api/skills
       if (url.pathname === "/api/skills" && req.method === "GET") {
         try {
@@ -537,6 +560,18 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // --- Recipes ---
 
+      // DELETE /api/recipes/:name
+      if (url.pathname.match(/^\/api\/recipes\/(.+)$/) && req.method === "DELETE") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const name = decodeURIComponent(url.pathname.split("/")[3]);
+          const scope = url.searchParams.get("scope") as "project" | "global" || "global";
+          const { deleteRecipe } = await import("./recipe.js");
+          deleteRecipe(name, scope);
+          return jsonResponse({ ok: true });
+        } catch (err) { return errorResponse(err); }
+      }
+
       // GET /api/recipes
       if (url.pathname === "/api/recipes" && req.method === "GET") {
         try {
@@ -547,6 +582,40 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       }
 
       // --- Agents & Flows ---
+
+      // POST /api/agents (create)
+      if (url.pathname === "/api/agents" && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const body = await req.json();
+          const { saveAgent } = await import("./agent.js");
+          saveAgent(body);
+          return jsonResponse({ ok: true, name: body.name });
+        } catch (err) { return errorResponse(err); }
+      }
+
+      // PUT /api/agents/:name (update)
+      if (url.pathname.match(/^\/api\/agents\/(.+)$/) && req.method === "PUT") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const name = decodeURIComponent(url.pathname.split("/")[3]);
+          const body = await req.json();
+          const { saveAgent } = await import("./agent.js");
+          saveAgent({ ...body, name });
+          return jsonResponse({ ok: true, name });
+        } catch (err) { return errorResponse(err); }
+      }
+
+      // DELETE /api/agents/:name
+      if (url.pathname.match(/^\/api\/agents\/(.+)$/) && req.method === "DELETE") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const name = decodeURIComponent(url.pathname.split("/")[3]);
+          const { deleteAgent } = await import("./agent.js");
+          deleteAgent(name);
+          return jsonResponse({ ok: true });
+        } catch (err) { return errorResponse(err); }
+      }
 
       // GET /api/agents
       if (url.pathname === "/api/agents" && req.method === "GET") {
@@ -735,6 +804,17 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       }
 
       // --- Compute ---
+
+      // POST /api/compute (create)
+      if (url.pathname === "/api/compute" && req.method === "POST") {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const body = await req.json();
+          if (!body?.name || !body?.provider) return jsonResponse({ ok: false, message: "name and provider are required" }, 400);
+          const compute = getApp().computes.create(body);
+          return jsonResponse({ ok: true, compute });
+        } catch (err) { return errorResponse(err); }
+      }
 
       // GET /api/compute
       if (url.pathname === "/api/compute" && req.method === "GET") {
