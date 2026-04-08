@@ -180,7 +180,7 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
     <>
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
       {/* Left: list panel */}
-      <div className="bg-card border-r border-border overflow-y-auto">
+      <div className="border-r border-border overflow-y-auto">
         {computes.map((c: any) => (
           <div
             key={c.name || c.id}

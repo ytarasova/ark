@@ -162,7 +162,7 @@ export function FlowsView({ showCreate = false, onCloseCreate }: FlowsViewProps)
   return (
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
       {/* Left: list panel */}
-      <div className="bg-card border-r border-border overflow-y-auto">
+      <div className="border-r border-border overflow-y-auto">
         {flows.map((f: any) => {
           const stageCount = f.stages?.length ?? 0;
           return (

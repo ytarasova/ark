@@ -31,7 +31,7 @@ function App() {
   const [showNewFlow, setShowNewFlow] = useState(false);
   const [showNewCompute, setShowNewCompute] = useState(false);
   const [showNewSchedule, setShowNewSchedule] = useState(false);
-  const [showNewMemory, setShowNewMemory] = useState(false);
+  const [addMemoryCounter, setAddMemoryCounter] = useState(0);
 
   // History view mode
   const [historyMode, setHistoryMode] = useState<"sessions" | "transcripts">("sessions");
@@ -92,9 +92,9 @@ function App() {
         </Layout>
       )}
       {view === "memory" && (
-        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Memory"
-          headerRight={!readOnly ? <Button size="sm" onClick={() => setShowNewMemory(true)}>+ Add Memory</Button> : undefined}>
-          <MemoryView showCreate={showNewMemory} onCloseCreate={() => setShowNewMemory(false)} />
+        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Memory" padded={false}
+          headerRight={!readOnly ? <Button size="sm" onClick={() => setAddMemoryCounter(c => c + 1)}>+ Add Memory</Button> : undefined}>
+          <MemoryView addRequested={addMemoryCounter} />
         </Layout>
       )}
       {view === "costs" && (

@@ -177,7 +177,7 @@ export function AgentsView({ showCreate = false, onCloseCreate }: AgentsViewProp
     <>
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
       {/* Left: list panel */}
-      <div className="bg-card border-r border-border overflow-y-auto">
+      <div className="border-r border-border overflow-y-auto">
         {agents.map((a: any) => (
           <div
             key={a.name}

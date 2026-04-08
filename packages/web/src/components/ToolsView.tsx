@@ -31,7 +31,7 @@ export function ToolsView({ activeTab = "skills", onTabChange }: ToolsViewProps)
   return (
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
         {/* Left: list panel */}
-        <div className="bg-card border-r border-border overflow-y-auto">
+        <div className="border-r border-border overflow-y-auto">
           {items.length === 0 && (
             <div className="flex items-center justify-center h-full">
               <div className="text-center py-8">
