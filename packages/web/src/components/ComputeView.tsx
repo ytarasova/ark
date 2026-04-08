@@ -263,6 +263,24 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
                     <span className="text-card-foreground font-mono">{selected.config.region}</span>
                   </>
                 )}
+                {selected.config?.publicIp && !selected.config?.ip && (
+                  <>
+                    <span className="text-muted-foreground">Public IP</span>
+                    <span className="text-card-foreground font-mono">{selected.config.publicIp}</span>
+                  </>
+                )}
+                {selected.config?.hourlyRate != null && (
+                  <>
+                    <span className="text-muted-foreground">Hourly Rate</span>
+                    <span className="text-card-foreground font-mono">${selected.config.hourlyRate}/hr</span>
+                  </>
+                )}
+                {selected.config?.runningSessions != null && (
+                  <>
+                    <span className="text-muted-foreground">Running Sessions</span>
+                    <span className="text-card-foreground font-mono">{selected.config.runningSessions}</span>
+                  </>
+                )}
                 {selected.created_at && (
                   <>
                     <span className="text-muted-foreground">Created</span>
@@ -276,18 +294,42 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
               <div className="mt-4">
                 <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Metrics</h3>
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-secondary rounded-md p-3">
-                    <div className="text-xs text-muted-foreground mb-1">CPU</div>
-                    <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.cpu}%</div>
-                  </div>
-                  <div className="bg-secondary rounded-md p-3">
-                    <div className="text-xs text-muted-foreground mb-1">Memory</div>
-                    <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.memPct}%</div>
-                  </div>
-                  <div className="bg-secondary rounded-md p-3">
-                    <div className="text-xs text-muted-foreground mb-1">Disk</div>
-                    <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.diskPct}%</div>
-                  </div>
+                  {selected.config.metrics.cpu != null && (
+                    <div className="bg-secondary rounded-md p-3">
+                      <div className="text-xs text-muted-foreground mb-1">CPU</div>
+                      <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.cpu}%</div>
+                    </div>
+                  )}
+                  {selected.config.metrics.memPct != null && (
+                    <div className="bg-secondary rounded-md p-3">
+                      <div className="text-xs text-muted-foreground mb-1">Memory</div>
+                      <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.memPct}%</div>
+                    </div>
+                  )}
+                  {selected.config.metrics.diskPct != null && (
+                    <div className="bg-secondary rounded-md p-3">
+                      <div className="text-xs text-muted-foreground mb-1">Disk</div>
+                      <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.diskPct}%</div>
+                    </div>
+                  )}
+                  {selected.config.metrics.netRx != null && (
+                    <div className="bg-secondary rounded-md p-3">
+                      <div className="text-xs text-muted-foreground mb-1">Network RX</div>
+                      <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.netRx}</div>
+                    </div>
+                  )}
+                  {selected.config.metrics.netTx != null && (
+                    <div className="bg-secondary rounded-md p-3">
+                      <div className="text-xs text-muted-foreground mb-1">Network TX</div>
+                      <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.netTx}</div>
+                    </div>
+                  )}
+                  {selected.config.metrics.uptime != null && (
+                    <div className="bg-secondary rounded-md p-3">
+                      <div className="text-xs text-muted-foreground mb-1">Uptime</div>
+                      <div className="text-lg font-mono font-semibold text-foreground">{selected.config.metrics.uptime}</div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -43,6 +43,7 @@ export const api = {
   getSession: (id: string) => fetchApi<any>(`/api/sessions/${id}`),
   getOutput: (id: string) => fetchApi<any>(`/api/sessions/${id}/output`),
   getEvents: (id: string) => fetchApi<any[]>(`/api/sessions/${id}/events`),
+  getMessages: (id: string) => fetchApi<any>(`/api/sessions/${id}/messages`),
   exportSession: (id: string) => fetchApi<any>(`/api/sessions/${id}/export`),
   createSession: (data: any) => apiPost<any>("/api/sessions", data),
   importSession: (data: any) => apiPost<any>("/api/sessions/import", data),

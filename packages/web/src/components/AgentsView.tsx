@@ -11,27 +11,48 @@ import { Settings } from "lucide-react";
 const selectClassName =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]";
 
-function NewAgentForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
-  const [form, setForm] = useState({ name: "", description: "", model: "sonnet", runtime: "claude-code", system_prompt: "" });
+const TOOL_OPTIONS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch"];
 
-  function update(key: string, val: string) {
+function AgentForm({ onClose, onSubmit, agent, isEdit }: { onClose: () => void; onSubmit: (form: any) => void; agent?: any; isEdit?: boolean }) {
+  const [form, setForm] = useState({
+    name: agent?.name ?? "",
+    description: agent?.description ?? "",
+    model: agent?.model ?? "sonnet",
+    runtime: agent?.runtime ?? "claude-code",
+    max_turns: String(agent?.max_turns ?? 200),
+    tools: agent?.tools ?? ["Bash", "Read", "Write", "Edit", "Glob", "Grep"],
+    permission_mode: agent?.permission_mode ?? "bypassPermissions",
+    scope: "project",
+    system_prompt: agent?.system_prompt ?? "",
+  });
+
+  function update(key: string, val: any) {
     setForm((prev) => ({ ...prev, [key]: val }));
+  }
+
+  function toggleTool(tool: string) {
+    setForm((prev) => ({
+      ...prev,
+      tools: prev.tools.includes(tool) ? prev.tools.filter((t: string) => t !== tool) : [...prev.tools, tool],
+    }));
   }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) return;
-    onSubmit(form);
+    if (!isEdit && !form.name.trim()) return;
+    onSubmit({ ...form, max_turns: parseInt(form.max_turns) || 200 });
   }
 
   return (
     <div className="flex flex-col h-full p-5 overflow-y-auto">
-      <h2 className="text-base font-semibold text-foreground mb-5">New Agent</h2>
+      <h2 className="text-base font-semibold text-foreground mb-5">{isEdit ? `Edit Agent: ${agent?.name}` : "New Agent"}</h2>
       <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-        <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
-          <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="my-agent" />
-        </div>
+        {!isEdit && (
+          <div className="mb-3.5">
+            <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
+            <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="my-agent" />
+          </div>
+        )}
         <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Description</label>
           <Input value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="What does this agent do?" />
@@ -51,6 +72,42 @@ function NewAgentForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (f
             <option value="cli-agent">cli-agent</option>
           </select>
         </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Max Turns</label>
+          <Input value={form.max_turns} onChange={(e) => update("max_turns", e.target.value)} placeholder="200" />
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Tools</label>
+          <div className="flex flex-wrap gap-2">
+            {TOOL_OPTIONS.map((tool) => (
+              <label key={tool} className="flex items-center gap-1.5 text-[13px] text-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.tools.includes(tool)}
+                  onChange={() => toggleTool(tool)}
+                  className="accent-primary"
+                />
+                {tool}
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Permission Mode</label>
+          <select className={selectClassName} value={form.permission_mode} onChange={(e) => update("permission_mode", e.target.value)}>
+            <option value="bypassPermissions">bypassPermissions</option>
+            <option value="default">default</option>
+          </select>
+        </div>
+        {!isEdit && (
+          <div className="mb-3.5">
+            <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Scope</label>
+            <select className={selectClassName} value={form.scope} onChange={(e) => update("scope", e.target.value)}>
+              <option value="project">project</option>
+              <option value="global">global</option>
+            </select>
+          </div>
+        )}
         <div className="mb-3.5 flex flex-col flex-1 min-h-0">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">System Prompt</label>
           <textarea
@@ -62,7 +119,7 @@ function NewAgentForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (f
         </div>
         <div className="flex gap-2 pt-4 border-t border-border mt-auto">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button type="submit" size="sm">Create Agent</Button>
+          <Button type="submit" size="sm">{isEdit ? "Save Agent" : "Create Agent"}</Button>
         </div>
       </form>
     </div>
@@ -78,11 +135,21 @@ export function AgentsView({ showCreate = false, onCloseCreate }: AgentsViewProp
   const queryClient = useQueryClient();
   const { data: agents = [] } = useAgentsQuery();
   const [selected, setSelected] = useState<any>(null);
+  const [editing, setEditing] = useState<any>(null);
 
   async function handleCreate(form: any) {
     try {
       await api.createAgent(form);
       onCloseCreate?.();
+      queryClient.invalidateQueries({ queryKey: ["agents"] });
+    } catch {}
+  }
+
+  async function handleUpdate(form: any) {
+    try {
+      await api.updateAgent(editing.name, form);
+      setEditing(null);
+      setSelected(null);
       queryClient.invalidateQueries({ queryKey: ["agents"] });
     } catch {}
   }
@@ -129,7 +196,9 @@ export function AgentsView({ showCreate = false, onCloseCreate }: AgentsViewProp
       {/* Right: detail panel or create form */}
       <div className="overflow-y-auto bg-background">
         {showCreate ? (
-          <NewAgentForm onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />
+          <AgentForm onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />
+        ) : editing ? (
+          <AgentForm onClose={() => setEditing(null)} onSubmit={handleUpdate} agent={editing} isEdit />
         ) : selected ? (
           <div className="p-5">
             <h2 className="text-lg font-semibold text-foreground mb-1">{selected.name}</h2>
@@ -186,7 +255,10 @@ export function AgentsView({ showCreate = false, onCloseCreate }: AgentsViewProp
               </div>
             )}
             {selected._source !== "builtin" && (
-              <div className="mt-5">
+              <div className="mt-5 flex gap-1.5">
+                <Button variant="outline" size="xs" onClick={() => setEditing(selected)}>
+                  Edit Agent
+                </Button>
                 <Button variant="destructive" size="xs" onClick={() => handleDelete(selected.name)}>
                   Delete Agent
                 </Button>

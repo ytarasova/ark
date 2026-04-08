@@ -70,6 +70,8 @@ export function FlowsView() {
                       <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">Name</th>
                       <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">Agent</th>
                       <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">Gate</th>
+                      <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">Type</th>
+                      <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">Optional</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -78,6 +80,8 @@ export function FlowsView() {
                       const stageName = typeof s === "string" ? s : s.name;
                       const agent = typeof s === "string" ? "-" : (s.agent || "-");
                       const gate = typeof s === "string" ? "auto" : (s.gate || "auto");
+                      const stageType = typeof s === "string" ? "-" : (s.type || "-");
+                      const optional = typeof s === "string" ? false : !!s.optional;
                       return (
                         <tr key={i} className="hover:bg-accent transition-colors">
                           <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-muted-foreground font-mono text-[11px]">{i + 1}</td>
@@ -87,6 +91,10 @@ export function FlowsView() {
                             <Badge variant={GATE_VARIANT[gate] || "success"} className="text-[10px]">
                               {gate}
                             </Badge>
+                          </td>
+                          <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">{stageType}</td>
+                          <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">
+                            {optional && <Badge variant="info" className="text-[10px]">optional</Badge>}
                           </td>
                         </tr>
                       );

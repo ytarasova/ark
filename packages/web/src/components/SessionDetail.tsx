@@ -109,11 +109,20 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
   const [newTodo, setNewTodo] = useState("");
   const [verifyResult, setVerifyResult] = useState<any>(null);
   const [flowStages, setFlowStages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
 
   // Load todos
   useEffect(() => {
     if (!sessionId) return;
     api.getTodos(sessionId).then((data) => setTodos(Array.isArray(data) ? data : [])).catch(() => {});
+  }, [sessionId]);
+
+  // Load conversation messages
+  useEffect(() => {
+    if (!sessionId) return;
+    api.getMessages(sessionId)
+      .then((data) => setMessages(Array.isArray(data?.messages) ? data.messages : Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, [sessionId]);
 
   // Load detail
@@ -567,6 +576,40 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
           <div className="mb-5">
             <div className="text-[11px] text-emerald-400 font-mono">
               Channel: port {channelPort}
+            </div>
+          </div>
+        )}
+
+        {/* Conversation */}
+        {messages.length > 0 && (
+          <div className="mb-5">
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Conversation ({messages.length})</h3>
+            <Separator className="mb-2" />
+            <div className="flex flex-col gap-1.5 max-h-[400px] overflow-y-auto">
+              {messages.map((m: any, i: number) => (
+                <div
+                  key={m.id || i}
+                  className={cn(
+                    "rounded-lg px-3 py-2 text-[12px] leading-relaxed max-w-[85%]",
+                    m.role === "user"
+                      ? "bg-primary/10 border border-primary/20 self-end text-foreground"
+                      : "bg-secondary border border-border self-start text-card-foreground"
+                  )}
+                >
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className={cn("text-[10px] font-semibold uppercase", m.role === "user" ? "text-primary" : "text-muted-foreground")}>
+                      {m.role}
+                    </span>
+                    {m.type && m.type !== "text" && (
+                      <Badge variant="secondary" className="text-[9px] py-0 px-1">{m.type}</Badge>
+                    )}
+                    {m.created_at && (
+                      <span className="text-[10px] text-muted-foreground">{relTime(m.created_at)}</span>
+                    )}
+                  </div>
+                  <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}

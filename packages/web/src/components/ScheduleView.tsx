@@ -12,6 +12,26 @@ interface ScheduleViewProps {
   onCloseCreate?: () => void;
 }
 
+function describeCron(cron: string): string {
+  if (!cron) return "";
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length < 5) return cron;
+  const [minute, hour, dom, month, dow] = parts;
+
+  // Common patterns
+  if (minute === "*" && hour === "*" && dom === "*" && month === "*" && dow === "*") return "Every minute";
+  if (minute.startsWith("*/") && hour === "*" && dom === "*" && month === "*" && dow === "*") return `Every ${minute.slice(2)} minutes`;
+  if (hour.startsWith("*/") && dom === "*" && month === "*" && dow === "*") return `Every ${hour.slice(2)} hours at minute ${minute}`;
+  if (minute !== "*" && hour !== "*" && dom === "*" && month === "*" && dow === "*") return `Daily at ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  if (minute !== "*" && hour !== "*" && dom === "*" && month === "*" && dow !== "*") {
+    const days: Record<string, string> = { "0": "Sun", "1": "Mon", "2": "Tue", "3": "Wed", "4": "Thu", "5": "Fri", "6": "Sat", "7": "Sun" };
+    const dayList = dow.split(",").map(d => days[d] || d).join(", ");
+    return `${dayList} at ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  }
+  if (minute !== "*" && hour !== "*" && dom !== "*" && month === "*" && dow === "*") return `Monthly on day ${dom} at ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  return cron;
+}
+
 export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleViewProps) {
   const queryClient = useQueryClient();
   const { data: schedules = [] } = useSchedulesQuery();
@@ -86,6 +106,12 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
                   <span className="text-card-foreground font-mono">{selected.id}</span>
                   <span className="text-muted-foreground">Cron</span>
                   <span className="text-card-foreground font-mono">{selected.cron}</span>
+                  {selected.cron && describeCron(selected.cron) !== selected.cron && (
+                    <>
+                      <span className="text-muted-foreground">Schedule</span>
+                      <span className="text-card-foreground">{describeCron(selected.cron)}</span>
+                    </>
+                  )}
                   <span className="text-muted-foreground">Status</span>
                   <span className="text-card-foreground flex items-center gap-2">
                     <span className={cn("inline-block w-2 h-2 rounded-full", selected.enabled ? "bg-emerald-400" : "bg-muted-foreground/30")} />

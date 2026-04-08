@@ -326,6 +326,15 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
           }
         }
 
+        if (action === "messages" && req.method === "GET") {
+          try {
+            const result = await callRpc(router, "session/messages", { sessionId: id });
+            return jsonResponse(result);
+          } catch (err) {
+            return errorResponse(err);
+          }
+        }
+
         // POST actions on sessions
         if (req.method === "POST") {
           if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
