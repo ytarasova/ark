@@ -32,7 +32,7 @@ export interface SessionDetailProps {
   onTodoChange?: () => void;
 }
 
-export function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResults, onSearchToggle, onSearchQueryChange, onSearchSubmit, onTodoChange }: SessionDetailProps) {
+export function SessionDetail({ session: s, sessions, pane, searchMode, searchQuery, searchResults, onSearchToggle, onSearchQueryChange, onSearchSubmit, onTodoChange }: SessionDetailProps) {
   const ark = useArkClient();
   const [events, setEvents] = useState<Event[]>([]);
   const [conversation, setConversation] = useState<{ role: string; content: string; timestamp: string }[]>([]);
@@ -161,7 +161,24 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
   );
 
   if (!s) {
-    return <Box flexGrow={1}><Text dimColor>{"  No session selected."}</Text></Box>;
+    return (
+      <Box flexDirection="column" flexGrow={1} paddingX={2} paddingTop={1}>
+        {sessions.length === 0 ? (
+          <>
+            <Text bold color="cyan">Welcome to Ark</Text>
+            <Text> </Text>
+            <Text>  <Text bold color="cyan">n</Text>  Create your first session</Text>
+            <Text>  <Text bold color="cyan">?</Text>  See all keyboard shortcuts</Text>
+            <Text>  <Text bold color="cyan">q</Text>  Quit</Text>
+            <Text> </Text>
+            <Text dimColor>Or from the terminal:</Text>
+            <Text dimColor>  ark session start --repo . --summary "Fix a bug" --dispatch</Text>
+          </>
+        ) : (
+          <Text dimColor>Select a session from the list.</Text>
+        )}
+      </Box>
+    );
   }
 
   return (

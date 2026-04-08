@@ -21,6 +21,13 @@ const NAV_HINTS = [
   <KeyHint key="gG" k="g/G" label="top/end" />,
 ];
 
+/** Global hints that appear on every non-overlay screen */
+const GLOBAL_HINTS = [
+  sep(99),
+  <KeyHint key="?" k="?" label="help" />,
+  <KeyHint key="q" k="q" label="quit" />,
+];
+
 export function getOverlayHints(overlay: string): React.ReactNode[] {
   switch (overlay) {
     case "form":
@@ -108,6 +115,7 @@ export function getRightPaneHints(tab?: Tab): React.ReactNode[] {
     hints.push(<KeyHint key="D" k="D" label="del todo" />);
   }
   hints.push(<KeyHint key="tab" k="Tab" label="back" />);
+  hints.push(...GLOBAL_HINTS);
   return hints;
 }
 
@@ -168,11 +176,7 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
   hints.push(<KeyHint key="/" k="/" label="find" />);
   hints.push(<KeyHint key="filter" k="!/@/#/$" label="filter" />);
   hints.push(<KeyHint key="P" k="P" label="settings" />);
-  hints.push(<KeyHint key="?" k="?" label="help" />);
-  hints.push(sep(1));
-
-  // App
-  hints.push(<KeyHint key="q" k="q" label="quit" />);
+  hints.push(...GLOBAL_HINTS);
   return hints;
 }
 
@@ -185,8 +189,8 @@ export function getComputeHints(): React.ReactNode[] {
     <KeyHint key="t" k="t" label="test" />,
     <KeyHint key="x" k="x" label="delete" />,
     <KeyHint key="c" k="c" label="clean" />,
-    <KeyHint key="n" k="n" label="new" />, sep(1),
-    <KeyHint key="q" k="q" label="quit" />,
+    <KeyHint key="n" k="n" label="new" />,
+    ...GLOBAL_HINTS,
   ];
 }
 
@@ -195,8 +199,8 @@ export function getHistoryHints(): React.ReactNode[] {
     ...NAV_HINTS, sep(0),
     <KeyHint key="enter" k="Enter" label="import Claude" />,
     <KeyHint key="r" k="r/R" label="refresh/rebuild" />,
-    <KeyHint key="s" k="s" label="search" />, sep(1),
-    <KeyHint key="q" k="q" label="quit" />,
+    <KeyHint key="s" k="s" label="search" />,
+    ...GLOBAL_HINTS,
   ];
 }
 
@@ -206,8 +210,8 @@ export function getAgentsHints(): React.ReactNode[] {
     <KeyHint key="n" k="n" label="new" />,
     <KeyHint key="e" k="e" label="edit" />,
     <KeyHint key="c" k="c" label="copy" />,
-    <KeyHint key="x" k="x" label="delete" />, sep(1),
-    <KeyHint key="q" k="q" label="quit" />,
+    <KeyHint key="x" k="x" label="delete" />,
+    ...GLOBAL_HINTS,
   ];
 }
 
@@ -215,22 +219,22 @@ export function getToolsHints(): React.ReactNode[] {
   return [
     ...NAV_HINTS, sep(0),
     <KeyHint key="enter" k="Enter" label="use recipe" />,
-    <KeyHint key="x" k="x" label="delete" />, sep(1),
-    <KeyHint key="q" k="q" label="quit" />,
+    <KeyHint key="x" k="x" label="delete" />,
+    ...GLOBAL_HINTS,
   ];
 }
 
 export function getFlowsHints(): React.ReactNode[] {
   return [
     ...NAV_HINTS,
-    <KeyHint key="tab" k="Tab" label="detail" />, sep(0),
-    <KeyHint key="q" k="q" label="quit" />,
+    <KeyHint key="tab" k="Tab" label="detail" />,
+    ...GLOBAL_HINTS,
   ];
 }
 
 export function getCostsHints(): React.ReactNode[] {
   return [
-    <KeyHint key="q" k="q" label="quit" />,
+    ...GLOBAL_HINTS,
   ];
 }
 
@@ -240,13 +244,13 @@ export function getSchedulesHints(): React.ReactNode[] {
     <KeyHint key="n" k="n" label="new" />,
     <KeyHint key="e" k="e" label="enable/disable" />,
     <KeyHint key="x" k="x" label="delete" />,
-    <KeyHint key="r" k="r" label="refresh" />, sep(1),
-    <KeyHint key="q" k="q" label="quit" />,
+    <KeyHint key="r" k="r" label="refresh" />,
+    ...GLOBAL_HINTS,
   ];
 }
 
 export function getGenericHints(): React.ReactNode[] {
   return [
-    <KeyHint key="q" k="q" label="quit" />,
+    ...GLOBAL_HINTS,
   ];
 }
