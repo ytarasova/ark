@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
 import { useSchedulesQuery } from "../hooks/useQueries.js";
@@ -150,6 +150,9 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
   );
 }
 
+const selectClassName =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]";
+
 function NewScheduleModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
   const [form, setForm] = useState({
     cron: "",
@@ -159,6 +162,16 @@ function NewScheduleModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
     compute_name: "",
     group_name: "",
   });
+
+  const [flows, setFlows] = useState<{ name: string }[]>([]);
+  const [computes, setComputes] = useState<{ name: string }[]>([]);
+  const [groups, setGroups] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/flows").then(r => r.json()).then(setFlows).catch(() => {});
+    fetch("/api/compute").then(r => r.json()).then(setComputes).catch(() => {});
+    fetch("/api/groups").then(r => r.json()).then(setGroups).catch(() => {});
+  }, []);
 
   function update(key: string, val: string) {
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -189,7 +202,16 @@ function NewScheduleModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
             </div>
             <div className="mb-3.5">
               <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Flow</label>
-              <Input value={form.flow} onChange={(e) => update("flow", e.target.value)} placeholder="bare" />
+              <select
+                className={selectClassName}
+                value={form.flow}
+                onChange={(e) => update("flow", e.target.value)}
+              >
+                <option value="">default</option>
+                {flows.map((f) => (
+                  <option key={f.name} value={f.name}>{f.name}</option>
+                ))}
+              </select>
             </div>
             <div className="mb-3.5">
               <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Repository</label>
@@ -197,11 +219,37 @@ function NewScheduleModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
             </div>
             <div className="mb-3.5">
               <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Compute</label>
-              <Input value={form.compute_name} onChange={(e) => update("compute_name", e.target.value)} placeholder="Optional compute target" />
+              <select
+                className={selectClassName}
+                value={form.compute_name}
+                onChange={(e) => update("compute_name", e.target.value)}
+              >
+                <option value="">local</option>
+                {computes.map((c) => (
+                  <option key={c.name} value={c.name}>{c.name}</option>
+                ))}
+              </select>
             </div>
             <div className="mb-3.5">
               <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Group</label>
-              <Input value={form.group_name} onChange={(e) => update("group_name", e.target.value)} placeholder="Optional group name" />
+              {groups.length > 0 && (
+                <select
+                  className={selectClassName}
+                  value={groups.includes(form.group_name) ? form.group_name : ""}
+                  onChange={(e) => update("group_name", e.target.value)}
+                >
+                  <option value="">none</option>
+                  {groups.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              )}
+              <Input
+                className={groups.length > 0 ? "mt-1.5" : ""}
+                value={form.group_name}
+                onChange={(e) => update("group_name", e.target.value)}
+                placeholder="Or type a new group name"
+              />
             </div>
             <Separator className="mt-5" />
             <div className="flex justify-end gap-2 pt-4">
