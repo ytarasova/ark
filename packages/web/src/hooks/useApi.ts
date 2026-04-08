@@ -79,6 +79,7 @@ export const api = {
 
   // History (Claude Code transcripts)
   getClaudeSessions: () => fetchApi<any[]>("/api/history/sessions"),
+  getConversation: (sessionId: string, limit = 50) => fetchApi<any[]>(`/api/history/conversation/${encodeURIComponent(sessionId)}?limit=${limit}`),
   refreshHistory: () => apiPost<any>("/api/history/refresh"),
   rebuildHistory: () => apiPost<any>("/api/history/rebuild"),
 

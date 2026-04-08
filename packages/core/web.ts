@@ -500,6 +500,18 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         }
       }
 
+      // GET /api/history/conversation/:sessionId -- get conversation turns for a Claude session
+      if (url.pathname.match(/^\/api\/history\/conversation\/[^/]+$/) && req.method === "GET") {
+        try {
+          const sessionId = decodeURIComponent(url.pathname.split("/")[4]);
+          const limit = parseInt(url.searchParams.get("limit") || "50", 10);
+          const result = await callRpc(router, "session/conversation", { sessionId, limit });
+          return jsonResponse(result.turns || []);
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
       // POST /api/history/refresh (incremental refresh + index)
       if (url.pathname === "/api/history/refresh" && req.method === "POST") {
         try {
