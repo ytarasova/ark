@@ -28,6 +28,12 @@ export function ScheduleView() {
 
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    const handler = () => setShowNew(true);
+    document.addEventListener("ark:new-item", handler);
+    return () => document.removeEventListener("ark:new-item", handler);
+  }, []);
+
   async function handleToggle(sched: any) {
     if (sched.enabled) {
       await api.disableSchedule(sched.id);
@@ -53,12 +59,8 @@ export function ScheduleView() {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-180px)]">
         <div className="text-center">
-          <Calendar size={28} className="text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground mb-4">No schedules</p>
-          <Button size="sm" onClick={() => setShowNew(true)}>
-            New Schedule
-          </Button>
-          {showNew && <NewScheduleModal onClose={() => setShowNew(false)} onSubmit={handleCreate} />}
+          <Calendar size={28} className="text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">No schedules</p>
         </div>
       </div>
     );
@@ -69,11 +71,6 @@ export function ScheduleView() {
       <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
         {/* Left: list panel */}
         <div className="bg-card border-r border-border overflow-y-auto">
-          <div className="p-2 px-3">
-            <Button size="sm" className="w-full" onClick={() => setShowNew(true)}>
-              + New Schedule
-            </Button>
-          </div>
           {schedules.map((s: any) => (
             <div
               key={s.id}

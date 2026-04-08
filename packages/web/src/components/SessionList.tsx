@@ -86,18 +86,11 @@ export function SessionList({
       {filtered.length === 0 ? (
         <div className="flex items-center justify-center h-[calc(100vh-180px)]">
           <div className="text-center max-w-md">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <Play size={24} className="text-primary" />
-            </div>
-            <h2 className="text-xl font-semibold text-foreground mb-2">Create your first session</h2>
-            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-              Sessions orchestrate AI agents to build, fix, and review code.
-              Each session runs through a flow of stages with verification.
-            </p>
-            <Card className="p-3 mb-6 font-mono text-xs text-muted-foreground text-left">
+            <Play size={28} className="text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground mb-4">No sessions yet</p>
+            <Card className="p-3 font-mono text-xs text-muted-foreground text-left">
               <span className="text-primary">$</span> ark session start --repo . --summary "Fix login bug" --dispatch
             </Card>
-            <Button>+ New Session</Button>
           </div>
         </div>
       ) : (

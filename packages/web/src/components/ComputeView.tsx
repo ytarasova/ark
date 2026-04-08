@@ -140,6 +140,12 @@ export function ComputeView() {
     });
   }, []);
 
+  useEffect(() => {
+    const handler = () => setShowNew(true);
+    document.addEventListener("ark:new-item", handler);
+    return () => document.removeEventListener("ark:new-item", handler);
+  }, []);
+
   async function handleAction(action: string) {
     if (!selected) return;
     const name = selected.name || selected.id;
@@ -183,10 +189,8 @@ export function ComputeView() {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-180px)]">
         <div className="text-center">
-          <Server size={28} className="text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground mb-4">No compute targets</p>
-          <Button size="sm" onClick={() => setShowNew(true)}>New Compute</Button>
-          {showNew && <NewComputeModal onClose={() => setShowNew(false)} onSubmit={handleCreate} />}
+          <Server size={28} className="text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">No compute targets</p>
         </div>
       </div>
     );
@@ -197,11 +201,6 @@ export function ComputeView() {
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
       {/* Left: list panel */}
       <div className="bg-card border-r border-border overflow-y-auto">
-        <div className="p-2 px-3">
-          <Button size="sm" className="w-full" onClick={() => setShowNew(true)}>
-            + New Compute
-          </Button>
-        </div>
         {computes.map((c: any) => (
           <div
             key={c.name || c.id}

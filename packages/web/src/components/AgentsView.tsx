@@ -96,6 +96,12 @@ export function AgentsView() {
     });
   }, []);
 
+  useEffect(() => {
+    const handler = () => setShowCreate(true);
+    document.addEventListener("ark:new-item", handler);
+    return () => document.removeEventListener("ark:new-item", handler);
+  }, []);
+
   async function handleCreate(form: any) {
     try {
       await api.createAgent(form);
@@ -116,10 +122,8 @@ export function AgentsView() {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-180px)]">
         <div className="text-center">
-          <Settings size={28} className="text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground mb-4">No agents found</p>
-          <Button size="sm" onClick={() => setShowCreate(true)}>New Agent</Button>
-          {showCreate && <NewAgentModal onClose={() => setShowCreate(false)} onSubmit={handleCreate} />}
+          <Settings size={28} className="text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">No custom agents. Builtin agents are shown by default.</p>
         </div>
       </div>
     );
@@ -130,11 +134,6 @@ export function AgentsView() {
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
       {/* Left: list panel */}
       <div className="bg-card border-r border-border overflow-y-auto">
-        <div className="p-2 px-3">
-          <Button size="sm" className="w-full" onClick={() => setShowCreate(true)}>
-            + New Agent
-          </Button>
-        </div>
         {agents.map((a: any) => (
           <div
             key={a.name}
