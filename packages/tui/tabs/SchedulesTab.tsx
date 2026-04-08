@@ -251,6 +251,8 @@ function NewScheduleForm({ ark, asyncState, onDone }: NewScheduleFormProps) {
   const [summary, setSummary] = useState("");
   const [flow, setFlow] = useState("bare");
   const [repo, setRepo] = useState(process.cwd());
+  const [computeName, setComputeName] = useState("local");
+  const [groupName, setGroupName] = useState("");
 
   const flowChoices = [
     { label: "bare", value: "bare" },
@@ -258,6 +260,26 @@ function NewScheduleForm({ ark, asyncState, onDone }: NewScheduleFormProps) {
     { label: "quick", value: "quick" },
     { label: "parallel", value: "parallel" },
   ];
+
+  // Load computes and groups for selects
+  const [computeChoices, setComputeChoices] = useState([{ label: "local", value: "local" }]);
+  const [groupChoices, setGroupChoices] = useState([{ label: "(none)", value: "" }]);
+
+  useEffect(() => {
+    ark.computeList().then(computes => {
+      setComputeChoices(computes.map(c => ({
+        label: c.provider === "local" ? "local" : `${c.name} (${c.provider})`,
+        value: c.name,
+      })));
+    }).catch(() => {});
+
+    ark.groupList().then(groups => {
+      setGroupChoices([
+        { label: "(none)", value: "" },
+        ...groups.map(g => ({ label: g.name, value: g.name })),
+      ]);
+    }).catch(() => {});
+  }, []);
 
   const submit = () => {
     if (!cron.trim()) return;
@@ -267,6 +289,8 @@ function NewScheduleForm({ ark, asyncState, onDone }: NewScheduleFormProps) {
         summary: summary.trim() || undefined,
         flow: flow || "bare",
         repo: repo || process.cwd(),
+        compute_name: computeName || undefined,
+        group_name: groupName || undefined,
       });
       onDone();
     });
@@ -278,6 +302,8 @@ function NewScheduleForm({ ark, asyncState, onDone }: NewScheduleFormProps) {
       { name: "summary", type: "text" },
       { name: "repo", type: "text" },
       { name: "flow", type: "select" },
+      { name: "compute", type: "select" },
+      { name: "group", type: "select" },
     ],
     onCancel: onDone,
     onSubmit: submit,
@@ -319,9 +345,33 @@ function NewScheduleForm({ ark, asyncState, onDone }: NewScheduleFormProps) {
         label="Flow"
         value={flow}
         items={flowChoices}
-        onSelect={(v) => { setFlow(v); submit(); }}
+        onSelect={(v) => { setFlow(v); advance(); }}
         active={active === "flow"}
       />
+
+      <FormSelectField
+        label="Compute"
+        value={computeName}
+        items={computeChoices}
+        onSelect={(v) => { setComputeName(v); advance(); }}
+        active={active === "compute"}
+        displayValue={computeName || "local"}
+      />
+
+      <FormSelectField
+        label="Group"
+        value={groupName}
+        items={groupChoices}
+        onSelect={(v) => { setGroupName(v); submit(); }}
+        active={active === "group"}
+        displayValue={groupName || "(none)"}
+      />
+
+      {cron.trim() && (
+        <Box marginTop={1}>
+          <Text dimColor>{`  Schedule: ${describeCron(cron.trim())}`}</Text>
+        </Box>
+      )}
 
       <Box flexGrow={1} />
     </Box>
