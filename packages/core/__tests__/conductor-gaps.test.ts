@@ -417,9 +417,9 @@ describe("cli-agent executor", () => {
     expect(result.message).toContain("no command");
   });
 
-  it("status returns completed for unknown handle", async () => {
+  it("status returns not_found for unknown handle", async () => {
     const status = await cliAgentExecutor.status("nonexistent-handle");
-    expect(status.state).toBe("completed"); // tmux session doesn't exist = completed
+    expect(status.state).toBe("not_found"); // tmux session doesn't exist = not_found
   });
 });
 

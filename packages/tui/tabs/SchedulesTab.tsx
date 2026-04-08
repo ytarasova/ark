@@ -261,7 +261,6 @@ function NewScheduleForm({ ark, asyncState, onDone }: NewScheduleFormProps) {
 
   const submit = () => {
     if (!cron.trim()) return;
-    onDone();
     asyncState.run("Creating schedule...", async () => {
       await ark.scheduleCreate({
         cron: cron.trim(),
@@ -269,6 +268,7 @@ function NewScheduleForm({ ark, asyncState, onDone }: NewScheduleFormProps) {
         flow: flow || "bare",
         repo: repo || process.cwd(),
       });
+      onDone();
     });
   };
 

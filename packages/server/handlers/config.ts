@@ -2,6 +2,7 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
+import { RpcError } from "../../protocol/types.js";
 import type {
   ProfileSetParams,
   ProfileCreateParams,
@@ -11,7 +12,7 @@ import type {
 export function registerConfigHandlers(router: Router, app: AppContext): void {
   router.handle("config/read", async () => ({ config: core.loadConfig() }));
   router.handle("config/write", async () => {
-    throw Object.assign(new Error("config/write not yet implemented — edit ~/.ark/config.yaml directly"), { code: -32601 });
+    throw new RpcError("config/write not yet implemented -- edit ~/.ark/config.yaml directly", -32601);
   });
   router.handle("profile/list", async () => ({
     profiles: core.listProfiles(),

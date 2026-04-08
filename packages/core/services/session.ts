@@ -1,64 +1,23 @@
 /**
- * SessionService — owns session lifecycle orchestration.
+ * SessionService -- owns session lifecycle orchestration.
  *
  * Core lifecycle methods (start, stop, resume, complete, pause, delete, undelete)
- * and state-machine methods (applyHookStatus, applyReport) are fully ported.
+ * are fully ported. State-machine methods (applyHookStatus, applyReport) live
+ * in session-orchestration.ts.
  *
  * Complex methods (dispatch, advance, fork, clone, etc.) delegate to the
- * existing packages/core/session.ts functions for now — will be fully ported
- * in a later pass.
+ * existing session-orchestration.ts functions for now.
  */
 
 import type {
   Session,
   SessionStatus,
-  SessionConfig,
   CreateSessionOpts,
   SessionOpResult,
 } from "../../types/index.js";
 import type { SessionRepository } from "../repositories/session.js";
 import type { EventRepository } from "../repositories/event.js";
 import type { MessageRepository } from "../repositories/message.js";
-
-// ── HookStatusResult ─────────────────────────────────────────────────────────
-
-export interface HookStatusResult {
-  newStatus?: string;
-  shouldIndex?: boolean;
-  claudeSessionId?: string;
-  /** Store updates to apply */
-  updates?: Partial<Session>;
-  /** Events to log */
-  events?: Array<{ type: string; opts: { actor?: string; stage?: string; data?: Record<string, unknown> } }>;
-}
-
-// ── ReportResult ─────────────────────────────────────────────────────────────
-
-export interface ReportResult {
-  /** Store updates to apply to the session */
-  updates: Partial<Session>;
-  /** Whether to call advance() after applying updates */
-  shouldAdvance?: boolean;
-  /** Whether to auto-dispatch next stage after advance */
-  shouldAutoDispatch?: boolean;
-  /** Events to emit on the event bus */
-  busEvents?: Array<{ type: string; sessionId: string; data: Record<string, unknown> }>;
-  /** Events to log to the store */
-  logEvents?: Array<{ type: string; opts: { stage?: string; actor?: string; data?: Record<string, unknown> } }>;
-  /** Message to store for TUI chat view */
-  message?: { role: string; content: string; type: string };
-  /** PR URL detected from report */
-  prUrl?: string;
-}
-
-// ── OutboundMessage (minimal interface for applyReport) ──────────────────────
-
-export interface OutboundMessage {
-  type: "progress" | "completed" | "question" | "error";
-  sessionId: string;
-  stage: string;
-  [key: string]: unknown;
-}
 
 // ── SessionService ───────────────────────────────────────────────────────────
 
@@ -259,191 +218,6 @@ export class SessionService {
     this.events.log(id, "session_undeleted", { actor: "user" });
 
     return { ok: true, message: "OK", sessionId: id };
-  }
-
-  // ── State machine (fully ported) ──────────────────────────────────────────
-
-  /**
-   * Process a hook status event and return the computed state transition.
-   * Pure logic — caller is responsible for applying updates to the store.
-   *
-   * Port of session.ts applyHookStatus() — core guard logic preserved.
-   * Termination-condition checks and transcript parsing are omitted (kept
-   * in the orchestration layer where flow definitions are available).
-   */
-  applyHookStatus(
-    session: Session,
-    hookEvent: string,
-    payload: Record<string, unknown>,
-    opts?: { isManualGate?: boolean },
-  ): HookStatusResult {
-    const result: HookStatusResult = { events: [] };
-    const isManualGate = opts?.isManualGate ?? false;
-
-    const statusMap: Record<string, string> = {
-      SessionStart: "running",
-      UserPromptSubmit: "running",
-      StopFailure: isManualGate ? "running" : "failed",
-      SessionEnd: isManualGate ? "running" : "completed",
-    };
-
-    let newStatus = statusMap[hookEvent];
-
-    // CRITICAL guards: don't override terminal status — late hooks can fire
-    // after session is done or manually stopped
-    if (newStatus && session.status === "completed" && newStatus !== "completed") {
-      newStatus = undefined;
-    }
-    if (newStatus && session.status === "failed" && newStatus === "running") {
-      newStatus = undefined;
-    }
-    if (newStatus && session.status === "stopped" && newStatus !== "stopped") {
-      newStatus = undefined;
-    }
-
-    // Notification hook: permission/idle prompts -> waiting
-    if (hookEvent === "Notification") {
-      const matcher = String(payload.matcher ?? "");
-      if (matcher.includes("permission_prompt") || matcher.includes("idle_prompt")) {
-        newStatus = "waiting";
-      }
-    }
-
-    // Always log the hook event
-    result.events!.push({
-      type: "hook_status",
-      opts: { actor: "hook", data: { event: hookEvent, ...payload } as Record<string, unknown> },
-    });
-
-    // For manual gate: log errors/completions as events but don't change status
-    if (isManualGate && (hookEvent === "StopFailure" || hookEvent === "SessionEnd")) {
-      const errorMsg = payload.error ?? payload.error_details;
-      if (errorMsg) {
-        result.events!.push({
-          type: "agent_error",
-          opts: { actor: "agent", data: { error: String(errorMsg), event: hookEvent } },
-        });
-      }
-    }
-
-    if (newStatus) {
-      const updates: Partial<Session> = { status: newStatus as SessionStatus };
-      if (newStatus === "failed") {
-        updates.error = String(payload.error ?? payload.error_details ?? "unknown error");
-      }
-      // Clear stale breakpoint when resuming from waiting
-      if (newStatus === "running" && session.status === "waiting") {
-        updates.breakpoint_reason = null;
-      }
-      result.updates = updates;
-      result.newStatus = newStatus;
-    }
-
-    return result;
-  }
-
-  /**
-   * Process an agent channel report and return the computed state transition.
-   * Pure logic — caller is responsible for applying updates + dispatching events.
-   *
-   * Port of session.ts applyReport().
-   */
-  applyReport(sessionId: string, report: OutboundMessage): ReportResult {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      return { updates: {}, logEvents: [], busEvents: [] };
-    }
-    const result: ReportResult = { updates: {}, logEvents: [], busEvents: [] };
-
-    // Log event
-    result.logEvents!.push({
-      type: `agent_${report.type}`,
-      opts: {
-        stage: report.stage,
-        actor: "agent",
-        data: report as unknown as Record<string, unknown>,
-      },
-    });
-
-    // Build message content for TUI chat view
-    const r = report as unknown as Record<string, unknown>;
-    const contentByType: Record<string, string | undefined> = {
-      completed: (r.summary || r.message) as string | undefined,
-      question: (r.question || r.message) as string | undefined,
-      error: (r.error || r.message) as string | undefined,
-      progress: (r.message || r.summary) as string | undefined,
-    };
-    let content = contentByType[report.type] || JSON.stringify(report);
-
-    // Enrich with files, commits, PR URL when available
-    const extras: string[] = [];
-    if (r.pr_url) extras.push(`PR: ${r.pr_url}`);
-    if (Array.isArray(r.filesChanged) && r.filesChanged.length > 0) {
-      extras.push(`Files: ${(r.filesChanged as string[]).join(", ")}`);
-    }
-    if (Array.isArray(r.commits) && r.commits.length > 0) {
-      extras.push(`Commits: ${(r.commits as string[]).join(", ")}`);
-    }
-    if (extras.length > 0) content += "\n" + extras.join("\n");
-    result.message = { role: "agent", content, type: report.type };
-
-    // Emit to event bus
-    result.busEvents!.push({
-      type: `agent_${report.type}`,
-      sessionId,
-      data: { stage: report.stage, data: report as unknown as Record<string, unknown> },
-    });
-
-    // Handle by type
-    switch (report.type) {
-      case "completed": {
-        const rr = report as unknown as Record<string, unknown>;
-        const cfg: SessionConfig = {
-          ...session.config,
-          completion_summary: rr.summary as string | undefined,
-          filesChanged: rr.filesChanged as string[] | undefined,
-          commits: rr.commits as string[] | undefined,
-        };
-        result.updates.config = cfg;
-
-        // Without flow definition access we default to auto-gate behavior.
-        // The orchestration layer can override this with manual-gate logic.
-        result.updates.status = "ready" as SessionStatus;
-        result.updates.session_id = null;
-        result.shouldAdvance = true;
-        result.shouldAutoDispatch = true;
-        break;
-      }
-      case "question": {
-        const qr = report as unknown as Record<string, unknown>;
-        result.updates.status = "waiting" as SessionStatus;
-        result.updates.breakpoint_reason =
-          (qr.question ?? qr.message) as string | null;
-        break;
-      }
-      case "error": {
-        const er = report as unknown as Record<string, unknown>;
-        result.updates.status = "failed" as SessionStatus;
-        result.updates.error = (er.error ?? er.message) as string | null;
-        break;
-      }
-      case "progress": {
-        // Agent is actively reporting — ensure status reflects that.
-        if (session.status === "waiting") {
-          result.updates.status = "running" as SessionStatus;
-          result.updates.breakpoint_reason = null;
-        }
-        break;
-      }
-    }
-
-    // PR URL from agent report
-    const prUrl = (report as unknown as Record<string, unknown>).pr_url as string | undefined;
-    if (prUrl && !session.pr_url) {
-      result.prUrl = prUrl;
-    }
-
-    return result;
   }
 
   // ── Delegating methods (complex orchestration — call through to session.ts) ──

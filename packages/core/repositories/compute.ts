@@ -53,16 +53,7 @@ export class ComputeRepository {
     const ts = now();
     const provider = opts.provider ?? "local";
 
-    let initialStatus: ComputeStatus = provider === "local" ? "running" : "stopped";
-    try {
-      const { getProvider } = require("../../../packages/compute/index.js");
-      const providerInstance = getProvider(provider);
-      if (providerInstance?.initialStatus) {
-        initialStatus = providerInstance.initialStatus;
-      }
-    } catch {
-      // Provider registry unavailable; use default
-    }
+    const initialStatus: ComputeStatus = provider === "local" ? "running" : "stopped";
 
     this.db.prepare(`
       INSERT INTO compute (name, provider, status, config, created_at, updated_at)

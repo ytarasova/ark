@@ -5,7 +5,7 @@ export function Toast({ message, type, onDone }: { message: string; type: string
   useEffect(() => {
     const t = setTimeout(onDone, 3000);
     return () => clearTimeout(t);
-  }, []);
+  }, [onDone]);
   return (
     <div className={cn(
       "fixed bottom-5 right-5 px-[18px] py-2.5 bg-card border border-border rounded-xl text-foreground text-[13px] font-medium z-[300] shadow-[0_4px_20px_rgba(0,0,0,0.4)] animate-[slide-up_300ms_cubic-bezier(0.32,0.72,0,1)] flex items-center gap-2",

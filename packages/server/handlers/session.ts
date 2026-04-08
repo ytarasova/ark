@@ -48,11 +48,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("session/stop", async (params, notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const result = await app.sessionService.stop(sessionId);
-    if (result.ok) {
-      const session = app.sessions.get(sessionId);
-      if (session) notify("session/updated", { session });
-    }
-    return { ok: true };
+    if (!result.ok) throw new RpcError(result.message ?? "Stop failed", SESSION_NOT_FOUND);
+    const session = app.sessions.get(sessionId);
+    if (session) notify("session/updated", { session });
+    return result;
   });
 
   router.handle("session/advance", async (params, notify) => {
@@ -65,10 +64,11 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/complete", async (params, notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    app.sessionService.complete(sessionId);
+    const result = app.sessionService.complete(sessionId);
+    if (!result.ok) throw new RpcError(result.message ?? "Complete failed", SESSION_NOT_FOUND);
     const session = app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
-    return { ok: true };
+    return result;
   });
 
   router.handle("session/delete", async (params, notify) => {

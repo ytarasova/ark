@@ -130,14 +130,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
       emitStageSpanEnd(sessionId, { status: result.newStatus });
       emitSessionSpanEnd(sessionId, { status: result.newStatus });
       flushSpans();
-
-      // OS notification on terminal hook status
-      const hookSession = getApp().sessions.get(sessionId);
-      if (hookSession) {
-        const hookTitle = result.newStatus === "completed" ? "Stage completed" : "Session failed";
-        const hookBody = `${hookSession.summary ?? sessionId} - ${hookSession.stage ?? ""}`;
-        sendOSNotification(`Ark: ${hookTitle}`, hookBody);
-      }
+      // OS notification is handled by handleReport to avoid duplicates
     }
   }
 
@@ -213,6 +206,11 @@ async function handlePRMergeWebhook(req: Request): Promise<Response> {
 
   const pr = payload.pull_request;
   const repo = payload.repository;
+
+  // Guard against incomplete webhook payloads
+  if (!repo?.owner?.login || !repo?.name || !pr?.head?.ref || !pr?.base?.ref || !pr?.merge_commit_sha) {
+    return Response.json({ status: "incomplete_payload" }, { status: 400 });
+  }
 
   // Find Ark session by branch or PR URL
   const sessions = getApp().sessions.list();

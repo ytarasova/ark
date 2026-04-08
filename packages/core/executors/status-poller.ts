@@ -45,6 +45,14 @@ export function startStatusPoller(sessionId: string, handle: string, executorNam
 
         logInfo("status-poller" as any, `${sessionId} -> ${newStatus}`);
 
+        // Advance flow for multi-stage pipelines (same as Claude hook path)
+        if (newStatus === "completed") {
+          try {
+            const { advance } = await import("../services/session-orchestration.js");
+            await advance(sessionId);
+          } catch { /* advance may fail if flow is done */ }
+        }
+
         // Send OS notification
         try {
           const { sendOSNotification } = await import("../notify.js");

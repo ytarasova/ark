@@ -20,7 +20,7 @@ tui: ## Launch the terminal UI
 	./ark tui
 
 test: build-web ## Run all tests sequentially (never parallel — ports collide)
-	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/tui packages/arkd --concurrency 1
+	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/tui packages/arkd packages/web --concurrency 1
 
 test-file: ## Run a single test file: make test-file F=packages/core/__tests__/session.test.ts
 	$(BUN) test $(F)

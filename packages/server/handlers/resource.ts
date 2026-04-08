@@ -5,7 +5,7 @@ import { findProjectRoot, loadAgent, listAgents } from "../../core/agent.js";
 import { listFlows, loadFlow } from "../../core/flow.js";
 import { listSkills, loadSkill } from "../../core/skill.js";
 import { listRecipes, loadRecipe, instantiateRecipe } from "../../core/recipe.js";
-import { ErrorCodes } from "../../protocol/types.js";
+import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type {
   AgentReadParams,
   FlowReadParams,
@@ -74,7 +74,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("compute/read", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = app.computes.get(name);
-    if (!compute) throw Object.assign(new Error("Compute not found"), { code: ErrorCodes.SESSION_NOT_FOUND });
+    if (!compute) throw new RpcError("Compute not found", ErrorCodes.SESSION_NOT_FOUND);
     return { compute };
   });
   router.handle("compute/provision", async (p) => {

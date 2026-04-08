@@ -51,28 +51,34 @@ export const cliAgentExecutor: Executor = {
     const taskFile = join(trackDir, "task.txt");
     writeFileSync(taskFile, task);
 
+    // Write env vars to a file and source it (avoids shell injection via env values)
+    const mergedEnv = { ...agent.env, ...(opts.env ?? {}) };
+    const envFile = join(trackDir, "env.sh");
+    const envLines = Object.entries(mergedEnv)
+      .map(([k, v]) => `export ${k}=${JSON.stringify(v)}`)
+      .join("\n");
+    writeFileSync(envFile, envLines);
+    const envPrefix = envLines ? `source ${JSON.stringify(envFile)} && ` : "";
+
     // Build the command line
     let cmdLine: string;
     const cmdStr = command.join(" ");
-    const envExports = Object.entries({ ...agent.env, ...(opts.env ?? {}) })
-      .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`)
-      .join("; ");
-    const envPrefix = envExports ? `${envExports}; ` : "";
 
     switch (taskDelivery) {
       case "file":
         // Pass task as a file path argument
-        cmdLine = `${envPrefix}cd "${effectiveWorkdir}" && ${cmdStr} "${taskFile}"`;
+        cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && ${cmdStr} ${JSON.stringify(taskFile)}`;
         break;
-      case "arg":
+      case "arg": {
         // Pass task as the last CLI argument (truncated to 4000 chars for shell safety)
-        const shortTask = task.slice(0, 4000).replace(/"/g, '\\"').replace(/\n/g, "\\n");
-        cmdLine = `${envPrefix}cd "${effectiveWorkdir}" && ${cmdStr} "${shortTask}"`;
+        const shortTask = task.slice(0, 4000);
+        cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && ${cmdStr} ${JSON.stringify(shortTask)}`;
         break;
+      }
       case "stdin":
       default:
         // Pipe task via stdin using file
-        cmdLine = `${envPrefix}cd "${effectiveWorkdir}" && cat "${taskFile}" | ${cmdStr}`;
+        cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && cat ${JSON.stringify(taskFile)} | ${cmdStr}`;
         break;
     }
 
@@ -90,7 +96,7 @@ export const cliAgentExecutor: Executor = {
   async status(handle: string): Promise<ExecutorStatus> {
     const alive = await tmux.sessionExistsAsync(handle);
     if (alive) return { state: "running" };
-    return { state: "completed", exitCode: 0 };
+    return { state: "not_found" };
   },
 
   async send(handle: string, message: string): Promise<void> {
