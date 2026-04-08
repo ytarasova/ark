@@ -55,7 +55,7 @@ function App() {
       )}
       {view === "history" && (
         <Layout view={view} onNavigate={setView} readOnly={readOnly} title="History">
-          <HistoryView />
+          <HistoryView onSelectSession={() => setView("sessions")} />
         </Layout>
       )}
       {view === "compute" && (
