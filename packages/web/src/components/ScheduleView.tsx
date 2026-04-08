@@ -207,7 +207,6 @@ function NewScheduleModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
                 value={form.flow}
                 onChange={(e) => update("flow", e.target.value)}
               >
-                <option value="">default</option>
                 {flows.map((f) => (
                   <option key={f.name} value={f.name}>{f.name}</option>
                 ))}

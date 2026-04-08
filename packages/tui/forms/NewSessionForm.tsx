@@ -44,6 +44,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
   const [groupName, setGroupName] = useState(prefill?.group || "");
   const [computeName, setComputeName] = useState(prefill?.compute || "local");
   const [flowName, setFlowName] = useState(prefill?.flow || "bare");
+  const [ticket, setTicket] = useState("");
 
   const isGitRepo = useMemo(() => {
     const rp = resolvePath(repoPath);
@@ -128,6 +129,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
         repo,
         flow: flowName,
         agent: prefill?.agent || undefined,
+        ticket: ticket || undefined,
         workdir,
         compute_name: computeName || undefined,
         group_name: groupName || undefined,
@@ -147,6 +149,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
     fields: [
       { name: "name", type: "text" },
       { name: "repo", type: "path" },
+      { name: "ticket", type: "text" },
       { name: "compute", type: "select" },
       { name: "isolation", type: "select", visible: showIsolation },
       { name: "group", type: "select" },
@@ -175,6 +178,15 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
         onChange={setRepoPath}
         active={active === "repo"}
         onEditChange={setEditing}
+      />
+
+      <FormTextField
+        label="Ticket"
+        value={ticket}
+        onChange={setTicket}
+        active={active === "ticket"}
+        onEditChange={setEditing}
+        placeholder="JIRA-123 or github#42"
       />
 
       <FormSelectField

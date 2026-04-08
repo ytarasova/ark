@@ -23,6 +23,11 @@ const MODEL_CHOICES = [
   { label: "haiku", value: "haiku" },
 ];
 
+const RUNTIME_CHOICES = [
+  { label: "claude-code", value: "claude-code" },
+  { label: "cli-agent", value: "cli-agent" },
+];
+
 const PERMISSION_CHOICES = [
   { label: "bypassPermissions", value: "bypassPermissions" },
   { label: "default", value: "default" },
@@ -46,6 +51,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
   const [scope, setScope] = useState<"project" | "global">(
     agent?._source === "global" ? "global" : projectRoot ? "project" : "global",
   );
+  const [runtime, setRuntime] = useState(agent?.runtime ?? "claude-code");
   const [systemPrompt, setSystemPrompt] = useState(agent?.system_prompt ?? "");
 
   // submit is defined as a ref-stable callback below, after useFormNavigation
@@ -57,6 +63,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
       { name: "name", type: "text", visible: !isEdit },
       { name: "description", type: "text" },
       { name: "model", type: "select" },
+      { name: "runtime", type: "select" },
       { name: "max_turns", type: "text" },
       { name: "tools", type: "text" },
       { name: "permission", type: "select" },
@@ -80,6 +87,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
       name: isEdit ? agent!.name : name.trim(),
       description,
       model,
+      runtime,
       max_turns: parseInt(maxTurns) || 200,
       system_prompt: systemPrompt,
       tools,
@@ -127,6 +135,8 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
       <FormTextField label="Desc" value={description} onChange={setDescription} active={active === "description"} onEditChange={setEditing} placeholder="What this agent does" />
 
       <FormSelectField label="Model" value={model} items={MODEL_CHOICES} onSelect={(v) => { setModel(v); advance(); }} active={active === "model"} displayValue={model} />
+
+      <FormSelectField label="Runtime" value={runtime} items={RUNTIME_CHOICES} onSelect={(v) => { setRuntime(v); advance(); }} active={active === "runtime"} displayValue={runtime} />
 
       <FormTextField label="Max turns" value={maxTurns} onChange={setMaxTurns} active={active === "max_turns"} onEditChange={setEditing} />
 

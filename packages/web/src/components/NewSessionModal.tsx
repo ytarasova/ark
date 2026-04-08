@@ -97,7 +97,6 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
                 value={form.flow}
                 onChange={(e) => update("flow", e.target.value)}
               >
-                <option value="">default</option>
                 {flows.map((f) => (
                   <option key={f.name} value={f.name}>{f.name}</option>
                 ))}
@@ -110,7 +109,7 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
                 value={form.agent}
                 onChange={(e) => update("agent", e.target.value)}
               >
-                <option value="">auto</option>
+                <option value="">(auto)</option>
                 {agents.map((a) => (
                   <option key={a.name} value={a.name}>{a.name}</option>
                 ))}
@@ -123,7 +122,6 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
                 value={form.compute_name}
                 onChange={(e) => update("compute_name", e.target.value)}
               >
-                <option value="">local</option>
                 {computes.map((c) => (
                   <option key={c.name} value={c.name}>{c.name}</option>
                 ))}
