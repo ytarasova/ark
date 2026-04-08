@@ -84,6 +84,7 @@ export function getOverlayHints(overlay: string): React.ReactNode[] {
       return [
         <KeyHint key="jk" k="j/k" label="move" />,
         <KeyHint key="n" k="n" label="add" />,
+        <KeyHint key="/" k="/" label="search" />,
         <KeyHint key="x" k="x" label="delete" />,
         <KeyHint key="esc" k="Esc" label="close" />,
       ];
