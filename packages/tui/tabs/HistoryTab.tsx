@@ -91,7 +91,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
   const selectedItem = mode === "recent" ? historyItems[sel] ?? null : null;
 
   // Load conversation preview from FTS5 index (fast SQLite read, no file I/O)
-  const [conversationPreview, setConversationPreview] = useState<string[]>([]);
+  const [conversationPreview, setConversationPreview] = useState<any[]>([]);
   useEffect(() => {
     if (!selectedItem) {
       setConversationPreview([]);
@@ -100,10 +100,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
     // Use claude session ID for Claude sessions, ark session ID for ark sessions
     const convId = selectedItem.claudeSession?.sessionId || selectedItem.arkSession?.claude_session_id || selectedItem.id;
     ark.sessionConversation(convId, 50).then((turns: any[]) => {
-      setConversationPreview(turns.map((t: any) => {
-        const role = t.role === "user" ? "You" : "Claude";
-        return `${role}: ${t.content}`;
-      }));
+      setConversationPreview(turns);
     }).catch(() => setConversationPreview([]));
   }, [selectedItem?.id]);
 
@@ -244,7 +241,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
 
 // -- Detail ------------------------------------------------------------------
 
-function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null; pane: string; conversation: string[] }) {
+function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null; pane: string; conversation: any[] }) {
   if (!item) return <Box flexGrow={1}><Text dimColor>{"  No session selected."}</Text></Box>;
 
   if (item.type === "ark") {
@@ -274,13 +271,23 @@ function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null;
       {conversation.length > 0 && (
         <>
           <Text> </Text>
-          <SectionHeader title="Recent conversation" />
-          {conversation.map((msg, idx) => {
-            const isUser = msg.startsWith("You:");
+          <SectionHeader title={`Recent conversation (${conversation.length})`} />
+          {conversation.map((turn: any, idx: number) => {
+            const isUser = turn.role === "user";
+            const content = (turn.content || "").slice(0, 300) + ((turn.content || "").length > 300 ? "..." : "");
+            const label = isUser ? "You" : "Agent";
+            const ts = turn.timestamp ? ` ${ago(turn.timestamp)}` : "";
             return (
-              <Text key={`conv-${idx}`} wrap="wrap" color={isUser ? "cyan" : undefined} dimColor={!isUser}>
-                {msg}
-              </Text>
+              <Box key={`conv-${idx}`} flexDirection="column" marginBottom={1}
+                paddingLeft={isUser ? 4 : 0}
+              >
+                <Text bold color={isUser ? "cyan" : "green"}>
+                  {isUser ? "  " : ""}{label}<Text dimColor>{ts}</Text>
+                </Text>
+                <Text wrap="wrap" dimColor={!isUser} color={isUser ? "white" : undefined}>
+                  {isUser ? "  " : ""}{content}
+                </Text>
+              </Box>
             );
           })}
         </>
