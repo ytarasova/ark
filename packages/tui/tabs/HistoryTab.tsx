@@ -311,15 +311,15 @@ function ConversationView({ turns }: { turns: any[] }) {
         const label = isUser ? " You " : " Agent ";
         const time = !isString && turn.timestamp ? `  ${ago(turn.timestamp)}` : "";
         return (
-          <React.Fragment key={idx}>
-            <Text color={isUser ? "cyan" : "green"} bold>{label}</Text>
-            {time && <Text dimColor>{time}</Text>}
-            <Box paddingLeft={isUser ? 2 : 0} marginBottom={1}>
-              <Text wrap="wrap" color={isUser ? "white" : undefined} dimColor={!isUser}>
-                {content}
-              </Text>
-            </Box>
-          </React.Fragment>
+          <Box key={idx} flexDirection="column" marginBottom={1} paddingLeft={isUser ? 2 : 0}>
+            <Text>
+              <Text color={isUser ? "cyan" : "green"} bold>{label}</Text>
+              {time ? <Text dimColor>{time}</Text> : null}
+            </Text>
+            <Text wrap="wrap" color={isUser ? "white" : undefined} dimColor={!isUser}>
+              {content}
+            </Text>
+          </Box>
         );
       })}
     </>
