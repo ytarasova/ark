@@ -123,22 +123,9 @@ function AppInner() {
 
     if (input === "e") {
       setEventLogExpanded((v) => !v);
-    } else if (input === "1") {
-      switchTab("sessions");
-    } else if (input === "2") {
-      switchTab("agents");
-    } else if (input === "3") {
-      switchTab("tools");
-    } else if (input === "4") {
-      switchTab("flows");
-    } else if (input === "5") {
-      switchTab("history");
-    } else if (input === "6") {
-      switchTab("compute");
-    } else if (input === "7") {
-      switchTab("costs");
-    } else if (input === "8") {
-      switchTab("schedules");
+    } else if (input >= "1" && input <= "9") {
+      const tab = TABS[parseInt(input) - 1];
+      if (tab) switchTab(tab);
     }
   });
 
