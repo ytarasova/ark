@@ -4,7 +4,6 @@ import { cn } from "../lib/utils.js";
 import { relTime } from "../util.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
-import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
 import { StatusDot, StatusBadge } from "./StatusDot.js";
 import { Search, Clock, FileText, Database } from "lucide-react";
@@ -28,6 +27,8 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingRecent, setLoadingRecent] = useState(true);
+  const [selected, setSelected] = useState<any>(null);
+  const [selectedType, setSelectedType] = useState<"session" | "transcript">("session");
 
   // Load recent sessions on mount
   useEffect(() => {
@@ -90,208 +91,284 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
     setSearched(false);
     setSessionResults([]);
     setTranscriptResults([]);
+    setSelected(null);
   }
 
-  const hasResults = sessionResults.length > 0 || transcriptResults.length > 0;
-  const totalResults = sessionResults.length + transcriptResults.length;
+  // Build the list for the left panel
+  const allResults = searched
+    ? [
+        ...sessionResults.map(r => ({ ...r, _type: "session" as const })),
+        ...transcriptResults.map(r => ({ ...r, _type: "transcript" as const })),
+      ]
+    : recentSessions.map(s => ({ ...s, _type: "recent" as const }));
 
   return (
-    <div>
-      {/* Search bar */}
-      <div className="flex gap-2 items-center mb-4 flex-wrap">
-        <div className="relative flex-1 max-w-[480px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="w-full h-8 pl-9 pr-3 text-[13px] bg-secondary"
-            placeholder={mode === "sessions" ? "Search sessions, events, messages..." : "Search Claude transcripts..."}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
+    <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
+      {/* Left: search + results list */}
+      <div className="border-r border-border overflow-y-auto">
+        {/* Search bar */}
+        <div className="px-3 py-2 border-b border-border/50">
+          <div className="relative flex gap-1.5">
+            <div className="relative flex-1">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="w-full h-7 pl-7 pr-2 text-[12px] bg-secondary"
+                placeholder={mode === "sessions" ? "Search sessions..." : "Search transcripts..."}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+            <button
+              className={cn(
+                "text-[10px] shrink-0 px-1.5 py-1 rounded",
+                loading ? "opacity-60 cursor-wait text-muted-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={doSearch}
+              disabled={loading || !query.trim()}
+            >
+              Go
+            </button>
+          </div>
+          {searched && (
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-muted-foreground text-[10px] font-mono">
+                {allResults.length} result{allResults.length !== 1 ? "s" : ""}
+              </span>
+              <button
+                className="text-[10px] text-muted-foreground hover:text-foreground"
+                onClick={handleClear}
+              >
+                Clear
+              </button>
+            </div>
+          )}
         </div>
-        <Button
-          size="sm"
-          className={cn(loading && "opacity-60 cursor-wait")}
-          onClick={doSearch}
-          disabled={loading || !query.trim()}
-        >
-          {loading ? "Searching..." : "Search"}
-        </Button>
-        {searched && (
-          <Button size="sm" variant="outline" onClick={handleClear}>
-            Clear
-          </Button>
+
+        {/* Loading state */}
+        {!searched && loadingRecent && (
+          <div className="flex items-center justify-center py-12">
+            <span className="text-[11px] text-muted-foreground">Loading...</span>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!searched && !loadingRecent && recentSessions.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <Search size={20} className="text-muted-foreground/30 mb-2" />
+            <p className="text-[11px] text-muted-foreground text-center">No sessions found</p>
+          </div>
+        )}
+
+        {/* Not-searched: recent sessions list */}
+        {!searched && !loadingRecent && recentSessions.length > 0 && (
+          <>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              <Clock size={10} />
+              Recent
+            </div>
+            {recentSessions.map((s: any) => (
+              <div
+                key={s.id}
+                className={cn(
+                  "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
+                  "hover:bg-accent",
+                  selected?.id === s.id && selectedType === "session" && !searched && "bg-accent border-l-2 border-l-primary"
+                )}
+                onClick={() => { setSelected(s); setSelectedType("session"); }}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <StatusDot status={s.status} />
+                  <span className="text-[12px] text-foreground truncate leading-snug">
+                    {s.summary || s.id}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground font-mono">
+                  <span>{s.id}</span>
+                  <span className="flex-1" />
+                  <span className="shrink-0">{relTime(s.updated_at)}</span>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Searched: no results */}
+        {searched && allResults.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <Search size={20} className="text-muted-foreground/30 mb-2" />
+            <p className="text-[11px] text-muted-foreground text-center">No results for "{query}"</p>
+          </div>
+        )}
+
+        {/* Searched: session results */}
+        {searched && sessionResults.length > 0 && (
+          <>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              <Database size={10} />
+              Sessions ({sessionResults.length})
+            </div>
+            {sessionResults.map((r: any, i: number) => (
+              <div
+                key={`s-${i}`}
+                className={cn(
+                  "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
+                  "hover:bg-accent",
+                  selected === r && selectedType === "session" && "bg-accent border-l-2 border-l-primary"
+                )}
+                onClick={() => { setSelected(r); setSelectedType("session"); }}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Badge variant="outline" className="text-[9px] shrink-0">{r.source || "session"}</Badge>
+                  <span className="text-[12px] text-foreground truncate leading-snug">
+                    {r.match ? String(r.match).slice(0, 50) : r.sessionId || ""}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground font-mono">
+                  <span>{r.sessionId || ""}</span>
+                  <span className="flex-1" />
+                  {r.timestamp && <span className="shrink-0">{relTime(r.timestamp)}</span>}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Searched: transcript results */}
+        {searched && transcriptResults.length > 0 && (
+          <>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              <FileText size={10} />
+              Transcripts ({transcriptResults.length})
+            </div>
+            {transcriptResults.map((r: any, i: number) => (
+              <div
+                key={`t-${i}`}
+                className={cn(
+                  "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
+                  "hover:bg-accent",
+                  selected === r && selectedType === "transcript" && "bg-accent border-l-2 border-l-primary"
+                )}
+                onClick={() => { setSelected(r); setSelectedType("transcript"); }}
+              >
+                <span className="text-[12px] text-foreground truncate leading-snug">
+                  {r.projectName || r.fileName || r.sessionId || `Transcript ${i + 1}`}
+                </span>
+                <span className="text-[10px] text-muted-foreground mt-1 truncate">
+                  {(r.matchLine || r.match || r.content || "").slice(0, 60)}
+                </span>
+              </div>
+            ))}
+          </>
         )}
       </div>
 
-      {/* Default state: recent sessions */}
-      {!searched && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Clock size={14} className="text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Recent Sessions</span>
-          </div>
-
-          {loadingRecent && (
-            <div className="flex items-center justify-center py-12">
-              <span className="text-sm text-muted-foreground">Loading...</span>
+      {/* Right: detail panel */}
+      <div className="overflow-y-auto bg-background">
+        {selected && selectedType === "session" && !searched ? (
+          /* Recent session detail */
+          <div className="p-5">
+            <div className="flex items-center gap-2.5 mb-4">
+              <StatusDot status={selected.status} />
+              <h2 className="text-lg font-semibold text-foreground">{selected.summary || selected.id}</h2>
+              <StatusBadge status={selected.status} />
             </div>
-          )}
-
-          {!loadingRecent && recentSessions.length === 0 && (
-            <div className="flex items-center justify-center h-[calc(100vh-260px)]">
-              <div className="text-center">
-                <Search size={28} className="text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">No sessions found. Use the search bar to find sessions and transcripts.</p>
+            <div className="mb-4">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Details</h3>
+              <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
+                <span className="text-muted-foreground">ID</span>
+                <span className="text-card-foreground font-mono">{selected.id}</span>
+                {selected.repo && (
+                  <>
+                    <span className="text-muted-foreground">Repository</span>
+                    <span className="text-card-foreground font-mono">{selected.repo}</span>
+                  </>
+                )}
+                {selected.agent && (
+                  <>
+                    <span className="text-muted-foreground">Agent</span>
+                    <span className="text-card-foreground">{selected.agent}</span>
+                  </>
+                )}
+                {selected.flow && (
+                  <>
+                    <span className="text-muted-foreground">Flow</span>
+                    <span className="text-card-foreground">{selected.flow}</span>
+                  </>
+                )}
+                {selected.updated_at && (
+                  <>
+                    <span className="text-muted-foreground">Updated</span>
+                    <span className="text-card-foreground font-mono">{relTime(selected.updated_at)}</span>
+                  </>
+                )}
               </div>
             </div>
-          )}
-
-          {!loadingRecent && recentSessions.length > 0 && (
-            <div className="space-y-1.5">
-              {recentSessions.map((s: any) => (
-                <Card
-                  key={s.id}
-                  className={cn(
-                    "p-3 transition-all duration-150",
-                    onSelectSession && "cursor-pointer hover:bg-accent hover:border-ring"
-                  )}
-                  onClick={() => onSelectSession?.(s.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <StatusDot status={s.status} />
-                      <span className="text-[13px] font-semibold text-foreground truncate">
-                        {s.summary || s.id}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {s.repo && (
-                        <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[200px]">
-                          {s.repo.split("/").pop()}
-                        </span>
-                      )}
-                      <StatusBadge status={s.status} />
-                    </div>
-                  </div>
-                  <div className="flex gap-3 mt-1.5 text-[11px] font-mono text-muted-foreground">
-                    <span>{s.id}</span>
-                    {s.agent && <span>{s.agent}</span>}
-                    <span>{relTime(s.updated_at)}</span>
-                  </div>
-                </Card>
-              ))}
+            {onSelectSession && (
+              <Button size="sm" variant="outline" onClick={() => onSelectSession(selected.id)}>
+                View in Sessions
+              </Button>
+            )}
+          </div>
+        ) : selected && selectedType === "session" && searched ? (
+          /* Search session result detail */
+          <div className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Badge variant="outline" className="text-[10px]">{selected.source || "session"}</Badge>
+              <span className="text-[12px] text-muted-foreground font-mono">{selected.sessionId || ""}</span>
+              {selected.timestamp && (
+                <span className="text-[11px] text-muted-foreground/60 font-mono">{relTime(selected.timestamp)}</span>
+              )}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* No results */}
-      {searched && !hasResults && (
-        <div className="flex items-center justify-center h-[calc(100vh-260px)]">
-          <div className="text-center">
-            <Search size={28} className="text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">No results for "{query}"</p>
-            <p className="text-xs text-muted-foreground/60 mt-1">
-              {mode === "sessions"
-                ? "Try searching transcripts for deeper results"
-                : "Try searching sessions for metadata matches"}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Search results */}
-      {searched && hasResults && (
-        <div className="flex flex-col gap-1.5">
-          <div className="text-muted-foreground text-[11px] mb-2 font-mono">
-            {totalResults} result{totalResults !== 1 ? "s" : ""}
-          </div>
-
-          {/* Session results */}
-          {sessionResults.length > 0 && (
-            <>
-              <div className="text-xs font-medium text-muted-foreground mb-1 mt-2 flex items-center gap-1.5">
-                <Database size={12} />
-                Sessions ({sessionResults.length})
+            {selected.match && (
+              <div className="mb-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Match</h3>
+                <div className="bg-black/40 border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
+                  {String(selected.match)}
+                </div>
               </div>
-              {sessionResults.map((r: any, i: number) => (
-                <Card
-                  key={`s-${i}`}
-                  className={cn(
-                    "p-3.5 transition-colors hover:bg-accent hover:border-ring",
-                    onSelectSession && r.sessionId && "cursor-pointer"
-                  )}
-                  onClick={() => r.sessionId && onSelectSession?.(r.sessionId)}
-                >
-                  <div className="flex gap-2 items-center mb-1.5">
-                    <Badge variant="outline" className="text-[10px]">{r.source || "session"}</Badge>
-                    <span className="text-[10px] text-muted-foreground font-mono">{r.sessionId || ""}</span>
-                    {r.timestamp && (
-                      <span className="text-[10px] text-muted-foreground/60 font-mono">{relTime(r.timestamp)}</span>
-                    )}
-                  </div>
-                  {r.match && (
-                    <div className="text-xs text-muted-foreground leading-relaxed max-h-12 overflow-hidden text-ellipsis">
-                      {String(r.match).slice(0, 300)}
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </>
-          )}
-
-          {/* Transcript results */}
-          {transcriptResults.length > 0 && (
-            <>
-              <div className="text-xs font-medium text-muted-foreground mb-1 mt-3 flex items-center gap-1.5">
-                <FileText size={12} />
-                Transcripts ({transcriptResults.length})
+            )}
+            {onSelectSession && selected.sessionId && (
+              <Button size="sm" variant="outline" onClick={() => onSelectSession(selected.sessionId)}>
+                View in Sessions
+              </Button>
+            )}
+          </div>
+        ) : selected && selectedType === "transcript" ? (
+          /* Transcript result detail */
+          <div className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Badge variant="outline" className="text-[10px]">transcript</Badge>
+              {selected.projectName && (
+                <span className="text-[12px] text-muted-foreground font-mono">{selected.projectName}</span>
+              )}
+              {selected.fileName && (
+                <span className="text-[12px] text-muted-foreground/60 font-mono">{selected.fileName}</span>
+              )}
+            </div>
+            <div className="mb-4">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Content</h3>
+              <div className="bg-black/40 border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
+                {selected.matchLine || selected.match || String(selected.content || "")}
               </div>
-              {transcriptResults.map((r: any, i: number) => (
-                <Card
-                  key={`t-${i}`}
-                  className="p-3.5 transition-colors hover:bg-accent hover:border-ring"
-                >
-                  <div className="flex gap-2 items-center mb-1.5">
-                    <Badge variant="outline" className="text-[10px]">transcript</Badge>
-                    {/* Global search results have projectName/fileName */}
-                    {r.projectName && (
-                      <span className="text-[10px] text-muted-foreground font-mono">{r.projectName}</span>
-                    )}
-                    {r.fileName && (
-                      <span className="text-[10px] text-muted-foreground/60 font-mono">{r.fileName}</span>
-                    )}
-                    {/* Session search transcript results have sessionId */}
-                    {r.sessionId && (
-                      <span
-                        className={cn(
-                          "text-[10px] text-muted-foreground font-mono",
-                          onSelectSession && "text-primary/80 cursor-pointer hover:text-primary"
-                        )}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          r.sessionId && onSelectSession?.(r.sessionId);
-                        }}
-                      >
-                        {r.sessionId}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground leading-relaxed max-h-12 overflow-hidden text-ellipsis">
-                    {r.matchLine || r.match || String(r.content || "").slice(0, 300)}
-                  </div>
-                  {r.lineNumber && (
-                    <div className="text-[10px] text-muted-foreground/50 font-mono mt-1">
-                      line {r.lineNumber}
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </>
-          )}
-        </div>
-      )}
+            </div>
+            {selected.lineNumber && (
+              <div className="text-[10px] text-muted-foreground/50 font-mono">
+                line {selected.lineNumber}
+              </div>
+            )}
+            {onSelectSession && selected.sessionId && (
+              <Button size="sm" variant="outline" className="mt-3" onClick={() => onSelectSession(selected.sessionId)}>
+                View in Sessions
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+            {searched ? "Select a result" : "Select a session"}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

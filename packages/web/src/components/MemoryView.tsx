@@ -63,19 +63,6 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
 
   const displayList = searchResults ?? memories;
 
-  if (!displayList.length && !showAdd) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-180px)]">
-        <div className="text-center">
-          <BookOpen size={28} className="text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">
-            {searchResults ? `No memories matching "${search}"` : "No memories yet"}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
@@ -109,6 +96,15 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
               </div>
             )}
           </div>
+          {/* Empty state in left panel */}
+          {!displayList.length && !showAdd && (
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+              <BookOpen size={20} className="text-muted-foreground/30 mb-2" />
+              <p className="text-[11px] text-muted-foreground text-center">
+                {searchResults ? `No memories matching "${search}"` : "No memories yet"}
+              </p>
+            </div>
+          )}
           {/* Memory list */}
           {displayList.map((m: any) => (
             <div

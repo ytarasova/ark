@@ -58,22 +58,18 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
     queryClient.invalidateQueries({ queryKey: ["schedules"] });
   }
 
-  if (!schedules.length && !showCreate) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-180px)]">
-        <div className="text-center">
-          <Calendar size={28} className="text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No schedules</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
         {/* Left: list panel */}
         <div className="border-r border-border overflow-y-auto">
+          {/* Empty state in left panel */}
+          {!schedules.length && !showCreate && (
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+              <Calendar size={20} className="text-muted-foreground/30 mb-2" />
+              <p className="text-[11px] text-muted-foreground text-center">No schedules</p>
+            </div>
+          )}
           {schedules.map((s: any) => (
             <div
               key={s.id}

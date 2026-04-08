@@ -62,7 +62,7 @@ function App() {
         </Layout>
       )}
       {view === "history" && (
-        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="History"
+        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="History" padded={false}
           headerLeft={
             <div className="flex gap-1 ml-2">
               {(["sessions", "transcripts"] as const).map(m => (
@@ -98,7 +98,7 @@ function App() {
         </Layout>
       )}
       {view === "costs" && (
-        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Costs">
+        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Costs" padded={false}>
           <CostsView />
         </Layout>
       )}
