@@ -21,34 +21,29 @@ describe("TabBar", () => {
     const frame = lastFrame()!;
     expect(frame).toContain("1:Sessions");
     expect(frame).toContain("2:Agents");
-    expect(frame).toContain("3:Tools");
-    expect(frame).toContain("4:Flows");
+    expect(frame).toContain("3:Flows");
+    expect(frame).toContain("4:Compute");
     expect(frame).toContain("5:History");
-    expect(frame).toContain("6:Compute");
+    expect(frame).toContain("6:Memory");
   });
 
   it("highlights the active tab by including it in output", () => {
-    // ink-testing-library strips ANSI codes, so we verify each tab
-    // label is present and the component renders without error for
-    // every possible active tab
-    const tabs = ["sessions", "agents", "tools", "flows", "history", "compute"] as const;
+    const tabs = ["sessions", "agents", "flows", "compute", "history", "memory", "tools", "schedules", "costs"] as const;
     for (const tab of tabs) {
       const { lastFrame } = render(<TabBar active={tab} />);
       const frame = lastFrame()!;
-      // The active tab's capitalized label must appear
       const label = tab.charAt(0).toUpperCase() + tab.slice(1);
       expect(frame).toContain(label);
     }
   });
 
   it("renders correctly with each tab active", () => {
-    const tabs = ["sessions", "agents", "tools", "flows", "history", "compute"] as const;
+    const tabs = ["sessions", "agents", "flows", "compute", "history", "memory", "tools", "schedules", "costs"] as const;
     for (const tab of tabs) {
       const { lastFrame } = render(<TabBar active={tab} />);
       const frame = lastFrame()!;
-      // Should still contain all tab labels regardless of which is active
       expect(frame).toContain("1:Sessions");
-      expect(frame).toContain("6:Compute");
+      expect(frame).toContain("4:Compute");
     }
   });
 });

@@ -12,7 +12,7 @@ import { Server } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 
 function NewComputeModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
-  const [form, setForm] = useState({ name: "", provider: "local", size: "", region: "" });
+  const [form, setForm] = useState({ name: "", provider: "local", size: "", region: "", aws_profile: "", vpc_id: "", subnet_id: "" });
 
   function update(key: string, val: string) {
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -72,6 +72,18 @@ function NewComputeModal({ onClose, onSubmit }: { onClose: () => void; onSubmit:
                 <div className="mb-3.5">
                   <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Region</label>
                   <Input value={form.region} onChange={(e) => update("region", e.target.value)} placeholder="us-east-1" />
+                </div>
+                <div className="mb-3.5">
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">AWS Profile</label>
+                  <Input value={form.aws_profile} onChange={(e) => update("aws_profile", e.target.value)} placeholder="default" />
+                </div>
+                <div className="mb-3.5">
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">VPC ID</label>
+                  <Input value={form.vpc_id} onChange={(e) => update("vpc_id", e.target.value)} placeholder="vpc-xxxxxxxx (optional)" />
+                </div>
+                <div className="mb-3.5">
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Subnet ID</label>
+                  <Input value={form.subnet_id} onChange={(e) => update("subnet_id", e.target.value)} placeholder="subnet-xxxxxxxx (optional)" />
                 </div>
               </>
             )}

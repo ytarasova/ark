@@ -190,7 +190,7 @@ export function AgentsView({ showCreate = false, onCloseCreate }: AgentsViewProp
                 <div className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">{selected.system_prompt}</div>
               </div>
             )}
-            {selected.source !== "builtin" && (
+            {selected._source !== "builtin" && (
               <div className="mt-5">
                 <Button variant="destructive" size="xs" onClick={() => handleDelete(selected.name)}>
                   Delete Agent
