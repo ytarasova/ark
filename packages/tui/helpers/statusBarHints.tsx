@@ -102,6 +102,9 @@ export function getRightPaneHints(tab?: Tab): React.ReactNode[] {
   ];
   if (tab === "sessions") {
     hints.push(<KeyHint key="/" k="/" label="search" />);
+    hints.push(<KeyHint key="A" k="A" label="add todo" />);
+    hints.push(<KeyHint key="T" k="T" label="toggle" />);
+    hints.push(<KeyHint key="D" k="D" label="del todo" />);
   }
   hints.push(<KeyHint key="tab" k="Tab" label="back" />);
   return hints;

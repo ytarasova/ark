@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Session, Event, SearchResult } from "../../core/index.js";
 import { ICON } from "../constants.js";
@@ -28,13 +28,18 @@ export interface SessionDetailProps {
   onSearchToggle: (on: boolean) => void;
   onSearchQueryChange: (q: string) => void;
   onSearchSubmit: (q: string) => void;
+  /** Called when todos are mutated so parent can refresh if needed */
+  onTodoChange?: () => void;
 }
 
-export function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResults, onSearchToggle, onSearchQueryChange, onSearchSubmit }: SessionDetailProps) {
+export function SessionDetail({ session: s, pane, searchMode, searchQuery, searchResults, onSearchToggle, onSearchQueryChange, onSearchSubmit, onTodoChange }: SessionDetailProps) {
   const ark = useArkClient();
   const [events, setEvents] = useState<Event[]>([]);
   const [conversation, setConversation] = useState<{ role: string; content: string; timestamp: string }[]>([]);
   const [todos, setTodos] = useState<any[]>([]);
+  const [todoSel, setTodoSel] = useState(0);
+  const [todoAddMode, setTodoAddMode] = useState(false);
+  const [todoAddText, setTodoAddText] = useState("");
 
   useEffect(() => {
     if (!s) { setEvents([]); return; }
@@ -45,6 +50,63 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
     if (!s) { setTodos([]); return; }
     ark.todoList(s.id).then(r => setTodos(r.todos ?? [])).catch(() => setTodos([]));
   }, [s?.id, s?.status]);
+
+  // Keep todoSel in bounds when todos change
+  useEffect(() => {
+    if (todoSel >= todos.length) setTodoSel(Math.max(0, todos.length - 1));
+  }, [todos.length]);
+
+  const refreshTodos = useCallback(() => {
+    if (!s) return;
+    ark.todoList(s.id).then(r => setTodos(r.todos ?? [])).catch(() => {});
+    onTodoChange?.();
+  }, [s?.id, onTodoChange]);
+
+  // Todo CRUD input handler (right pane, not in search or todo-add mode)
+  useInput((input, key) => {
+    if (pane !== "right" || searchMode || !s) return;
+
+    // Todo add mode: capture text input
+    if (todoAddMode) return; // handled by TextInputEnhanced
+
+    // 'A' to start adding a todo
+    if (input === "A" && !key.ctrl && !key.meta) {
+      setTodoAddMode(true);
+      setTodoAddText("");
+      return;
+    }
+
+    // Only operate on todos when we have some
+    if (todos.length === 0) return;
+
+    // Navigate todos with [ and ]
+    if (input === "[") {
+      setTodoSel(c => Math.max(0, c - 1));
+      return;
+    }
+    if (input === "]") {
+      setTodoSel(c => Math.min(todos.length - 1, c + 1));
+      return;
+    }
+
+    // 'T' to toggle selected todo
+    if (input === "T" && !key.ctrl && !key.meta) {
+      const todo = todos[todoSel];
+      if (todo) {
+        ark.todoToggle(todo.id).then(() => refreshTodos()).catch(() => {});
+      }
+      return;
+    }
+
+    // 'D' to delete selected todo
+    if (input === "D" && !key.ctrl && !key.meta) {
+      const todo = todos[todoSel];
+      if (todo) {
+        ark.todoDelete(todo.id).then(() => refreshTodos()).catch(() => {});
+      }
+      return;
+    }
+  });
 
   // Load conversation history from Claude transcript (local sessions only)
   // Remote sessions don't have local transcripts — their conversation is in channel messages
@@ -76,8 +138,13 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
   );
 
   // Search mode: / to enter, Esc to exit
+  // Todo add mode: Esc to cancel
   useInput((input, key) => {
     if (pane !== "right") return;
+    if (todoAddMode) {
+      if (key.escape) { setTodoAddMode(false); setTodoAddText(""); }
+      return;
+    }
     if (searchMode) {
       if (key.escape) onSearchToggle(false);
       return;
@@ -194,18 +261,59 @@ export function SessionDetail({ session: s, pane, searchMode, searchQuery, searc
         <>
           <Text> </Text>
           <SectionHeader title={`Todos (${todos.filter((t: any) => t.done).length}/${todos.length})`} />
-          {todos.map((t: any) => (
-            <Text key={t.id} wrap="wrap">
-              {"  "}<Text color={t.done ? "green" : "yellow"}>{t.done ? "+" : "o"}</Text>
-              <Text dimColor={t.done}>{` ${t.content}`}</Text>
-            </Text>
-          ))}
+          {todos.map((t: any, idx: number) => {
+            const isSel = pane === "right" && idx === todoSel;
+            return (
+              <Text key={t.id} wrap="wrap" inverse={isSel}>
+                {"  "}<Text color={t.done ? "green" : "yellow"}>{t.done ? "+" : "o"}</Text>
+                <Text dimColor={t.done}>{` ${t.content}`}</Text>
+              </Text>
+            );
+          })}
+          {todoAddMode && (
+            <Box>
+              <Text color="cyan">{"  + "}</Text>
+              <TextInputEnhanced
+                value={todoAddText}
+                onChange={setTodoAddText}
+                onSubmit={(val: string) => {
+                  setTodoAddMode(false);
+                  if (val.trim() && s) {
+                    ark.todoAdd(s.id, val.trim()).then(() => refreshTodos()).catch(() => {});
+                  }
+                }}
+                focus={todoAddMode}
+                placeholder="New todo..."
+              />
+            </Box>
+          )}
+          {pane === "right" && !todoAddMode && (
+            <Text dimColor>{"  A:add  T:toggle  D:delete  [/]:navigate"}</Text>
+          )}
         </>
       ) : (
         <>
           <Text> </Text>
           <SectionHeader title="Todos" />
-          <Text dimColor>{"  No todos. Add with ark session todo add <id> \"text\""}</Text>
+          {todoAddMode ? (
+            <Box>
+              <Text color="cyan">{"  + "}</Text>
+              <TextInputEnhanced
+                value={todoAddText}
+                onChange={setTodoAddText}
+                onSubmit={(val: string) => {
+                  setTodoAddMode(false);
+                  if (val.trim() && s) {
+                    ark.todoAdd(s.id, val.trim()).then(() => refreshTodos()).catch(() => {});
+                  }
+                }}
+                focus={todoAddMode}
+                placeholder="New todo..."
+              />
+            </Box>
+          ) : (
+            <Text dimColor>{pane === "right" ? "  No todos. Press A to add." : "  No todos."}</Text>
+          )}
         </>
       )}
 
