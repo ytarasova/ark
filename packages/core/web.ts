@@ -1,8 +1,15 @@
 /**
- * Web UI dashboard — browser-based session management.
+ * Web UI dashboard -- browser-based session management.
  * Serves static React SPA from packages/web/dist/ + JSON API + SSE live updates on a single port.
  *
- * All data is read from the local SQLite store (no external/untrusted input).
+ * REST routes delegate to the same RPC handlers used by the TUI and CLI,
+ * eliminating duplication. Routes without an RPC equivalent call core directly.
+ *
+ * Architecture:
+ *   Browser -> REST (web.ts) -> Router.dispatch() -> RPC handlers -> core
+ *   TUI     -> in-process ArkClient -> ArkServer -> RPC handlers -> core
+ *   CLI     -> ArkClient (JSON-RPC)  -> ArkServer -> RPC handlers -> core
+ *
  * Build the frontend with: bun run packages/web/build.ts
  */
 
@@ -11,43 +18,20 @@ import { execFileSync } from "child_process";
 import { join } from "path";
 import { getApp } from "./app.js";
 import { eventBus } from "./hooks.js";
-import { getAllSessionCosts, formatCost } from "./costs.js";
+import { Router } from "../server/router.js";
+import { registerAllHandlers } from "../server/register.js";
 import { handleIssueWebhook, type IssueWebhookConfig, type IssueWebhookPayload } from "./github-webhook.js";
-import {
-  startSession,
-  dispatch,
-  stop,
-  resume,
-  deleteSessionAsync,
-  undeleteSessionAsync,
-  getOutput,
-  cloneSession,
-  send,
-  pause,
-  advance,
-  complete,
-  spawnSubagent,
-  worktreeDiff,
-  finishWorktree,
-  createWorktreePR,
-  cleanupWorktrees,
-} from "./services/session-orchestration.js";
 import { exportSession, type SessionExport } from "./session-share.js";
 import { searchSessions, searchTranscripts } from "./search.js";
 import { searchAllConversations } from "./global-search.js";
-import { listProfiles, createProfile, deleteProfile, getActiveProfile } from "./profiles.js";
-import { discoverTools, addMcpServer, removeMcpServer } from "./tools.js";
-import { listSkills } from "./skill.js";
-import { listRecipes } from "./recipe.js";
-import { listAgents } from "./agent.js";
-import { listFlows } from "./flow.js";
 import { getLearnings, recordLearning } from "./learnings.js";
-import { listMemories, recall, remember, forget } from "./memory.js";
 import { ingestFile, ingestDirectory } from "./knowledge.js";
 import { generateRepoMap } from "./repo-map.js";
-import { createSchedule, listSchedules, deleteSchedule, enableSchedule } from "./schedule.js";
 import { getHotkeys } from "./hotkeys.js";
 import { getThemeMode } from "./theme.js";
+import { getAllSessionCosts } from "./costs.js";
+import { getActiveProfile } from "./profiles.js";
+import { cleanupWorktrees } from "./services/session-orchestration.js";
 
 // Static file serving for the web frontend
 const WEB_DIST = join(import.meta.dir, "../../packages/web/dist");
@@ -73,10 +57,34 @@ function errorResponse(err: unknown, status = 500): Response {
   return jsonResponse({ ok: false, message }, status);
 }
 
+// ── RPC bridge ─────────────────────────────────────────────────────────────────
+
+/**
+ * Call an RPC handler directly via the Router, bypassing transport/serialization.
+ * Throws on RPC errors so callers can use try/catch as before.
+ */
+async function callRpc(
+  router: Router,
+  method: string,
+  params: Record<string, unknown> = {},
+): Promise<any> {
+  const fakeReq = { jsonrpc: "2.0" as const, id: 0, method, params };
+  const resp = await router.dispatch(fakeReq);
+  if ("error" in resp) {
+    throw new Error((resp as any).error.message);
+  }
+  return (resp as any).result;
+}
+
 export function startWebServer(opts?: WebServerOptions): { stop: () => void; url: string } {
   const port = opts?.port ?? 8420;
   const readOnly = opts?.readOnly ?? false;
   const token = opts?.token;
+
+  // ── Set up in-process RPC router ─────────────────────────────────────────
+  const router = new Router();
+  registerAllHandlers(router, getApp());
+  router.markInitialized(); // bypass initialize handshake for in-process use
 
   // Auto-build web frontend if dist doesn't exist
   if (!existsSync(WEB_DIST)) {
@@ -159,7 +167,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         });
       }
 
-      // --- API routes ---
+      // ── API routes ─────────────────────────────────────────────────────────
 
       // GET /api/openapi.json
       if (url.pathname === "/api/openapi.json") {
@@ -179,7 +187,12 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // GET /api/groups
       if (url.pathname === "/api/groups" && req.method === "GET") {
-        return jsonResponse(getApp().sessions.getGroupNames());
+        try {
+          const result = await callRpc(router, "group/list");
+          return jsonResponse(result.groups.map((g: any) => g.name));
+        } catch (err) {
+          return errorResponse(err);
+        }
       }
 
       // GET /api/costs/export
@@ -197,24 +210,22 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // GET /api/costs
       if (url.pathname === "/api/costs") {
-        const sessions = getApp().sessions.list({ limit: 500 });
-        const costs = getAllSessionCosts(sessions);
-        return jsonResponse(costs);
+        try {
+          const result = await callRpc(router, "costs/read");
+          // RPC returns { costs, total }, REST API returns { sessions, total }
+          return jsonResponse({ sessions: result.costs, total: result.total });
+        } catch (err) {
+          return errorResponse(err);
+        }
       }
 
       // POST /api/sessions (create)
       if (url.pathname === "/api/sessions" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json() as { summary?: string; repo?: string; flow?: string; group_name?: string; workdir?: string };
-          const session = startSession({
-            summary: body.summary,
-            repo: body.repo,
-            flow: body.flow,
-            group_name: body.group_name,
-            workdir: body.workdir,
-          });
-          return jsonResponse({ ok: true, session });
+          const body = await req.json() as Record<string, unknown>;
+          const result = await callRpc(router, "session/start", body);
+          return jsonResponse({ ok: true, session: result.session });
         } catch (err) {
           return errorResponse(err);
         }
@@ -222,8 +233,12 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // GET /api/sessions
       if (url.pathname === "/api/sessions" && req.method === "GET") {
-        const sessions = getApp().sessions.list({ limit: 200 });
-        return jsonResponse(sessions);
+        try {
+          const result = await callRpc(router, "session/list", { limit: 200 });
+          return jsonResponse(result.sessions);
+        } catch (err) {
+          return errorResponse(err);
+        }
       }
 
       // POST /api/webhooks/github/issues
@@ -273,8 +288,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         // GET actions on sessions
         if (action === "output" && req.method === "GET") {
           try {
-            const output = await getOutput(id);
-            return jsonResponse({ ok: true, output });
+            const result = await callRpc(router, "session/output", { sessionId: id });
+            return jsonResponse({ ok: true, output: result.output });
           } catch (err) {
             return errorResponse(err);
           }
@@ -282,7 +297,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
         if (action === "events" && req.method === "GET") {
           try {
-            return jsonResponse(getApp().events.list(id));
+            const result = await callRpc(router, "session/events", { sessionId: id });
+            return jsonResponse(result.events);
           } catch (err) {
             return errorResponse(err);
           }
@@ -300,7 +316,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
         if (action === "todos" && req.method === "GET") {
           try {
-            return jsonResponse(getApp().todos.list(id));
+            const result = await callRpc(router, "todo/list", { sessionId: id });
+            return jsonResponse(result.todos);
           } catch (err) {
             return errorResponse(err);
           }
@@ -313,80 +330,83 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
           try {
             switch (action) {
               case "dispatch": {
-                const result = await dispatch(id);
+                const result = await callRpc(router, "session/dispatch", { sessionId: id });
                 return jsonResponse(result);
               }
               case "stop": {
-                const result = await stop(id);
+                const result = await callRpc(router, "session/stop", { sessionId: id });
                 return jsonResponse(result);
               }
               case "restart": {
-                const result = await resume(id);
+                const result = await callRpc(router, "session/resume", { sessionId: id });
                 return jsonResponse(result);
               }
               case "delete": {
-                const result = await deleteSessionAsync(id);
+                const result = await callRpc(router, "session/delete", { sessionId: id });
                 return jsonResponse(result);
               }
               case "undelete": {
-                const result = await undeleteSessionAsync(id);
+                const result = await callRpc(router, "session/undelete", { sessionId: id });
                 return jsonResponse(result);
               }
               case "fork": {
                 const body = await req.json() as { name?: string };
-                const result = cloneSession(id, body?.name);
-                return jsonResponse(result);
+                const result = await callRpc(router, "session/clone", { sessionId: id, name: body?.name });
+                // RPC returns { session }, but REST API returns { ok, sessionId }
+                const session = result.session;
+                return jsonResponse({ ok: true, sessionId: session?.id });
               }
               case "send": {
                 const body = await req.json() as { message?: string };
                 if (!body?.message) return jsonResponse({ ok: false, message: "message is required" }, 400);
-                const result = await send(id, body.message);
+                const result = await callRpc(router, "message/send", { sessionId: id, content: body.message });
                 return jsonResponse(result);
               }
               case "pause": {
                 const body = await req.json() as { reason?: string };
-                const result = pause(id, body?.reason);
+                const result = await callRpc(router, "session/pause", { sessionId: id, reason: body?.reason });
                 return jsonResponse(result);
               }
               case "advance": {
-                const result = await advance(id);
+                const result = await callRpc(router, "session/advance", { sessionId: id });
                 return jsonResponse(result);
               }
               case "complete": {
-                const result = await complete(id);
+                const result = await callRpc(router, "session/complete", { sessionId: id });
                 return jsonResponse(result);
               }
               case "interrupt": {
-                const { interrupt: interruptSession } = await import("./services/session-orchestration.js");
-                const result = await interruptSession(id);
+                const result = await callRpc(router, "session/interrupt", { sessionId: id });
                 return jsonResponse(result);
               }
               case "archive": {
-                const { archive: archiveSession } = await import("./services/session-orchestration.js");
-                const result = archiveSession(id);
+                const result = await callRpc(router, "session/archive", { sessionId: id });
                 return jsonResponse(result);
               }
               case "restore": {
-                const { restore: restoreSession } = await import("./services/session-orchestration.js");
-                const result = restoreSession(id);
+                const result = await callRpc(router, "session/restore", { sessionId: id });
                 return jsonResponse(result);
               }
               case "spawn-subagent": {
                 const rawBody = await req.json() as { task?: string; agent?: string; model?: string; group_name?: string; extensions?: string[] };
                 if (!rawBody?.task) return jsonResponse({ ok: false, message: "task is required" }, 400);
-                const body = rawBody as { task: string; agent?: string; model?: string; group_name?: string; extensions?: string[] };
-                const result = spawnSubagent(id, body);
+                const result = await callRpc(router, "session/spawn", {
+                  sessionId: id,
+                  task: rawBody.task,
+                  agent: rawBody.agent,
+                  model: rawBody.model,
+                  group_name: rawBody.group_name,
+                });
                 return jsonResponse(result);
               }
               case "todos": {
                 const body = await req.json() as { content?: string };
                 if (!body?.content) return jsonResponse({ ok: false, message: "content is required" }, 400);
-                const todo = getApp().todos.add(id, body.content);
-                return jsonResponse({ ok: true, todo });
+                const result = await callRpc(router, "todo/add", { sessionId: id, content: body.content });
+                return jsonResponse({ ok: true, todo: result.todo });
               }
               case "verify": {
-                const { runVerification } = await import("./services/session-orchestration.js");
-                const result = await runVerification(id);
+                const result = await callRpc(router, "verify/run", { sessionId: id });
                 return jsonResponse(result);
               }
               default:
@@ -406,11 +426,11 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         const todoId = parseInt(todoIdStr, 10);
         try {
           if (todoAction === "toggle") {
-            const todo = getApp().todos.toggle(todoId);
-            return jsonResponse({ ok: true, todo });
+            const result = await callRpc(router, "todo/toggle", { id: todoId });
+            return jsonResponse({ ok: true, todo: result.todo });
           } else {
-            const ok = getApp().todos.delete(todoId);
-            return jsonResponse({ ok });
+            const result = await callRpc(router, "todo/delete", { id: todoId });
+            return jsonResponse(result);
           }
         } catch (err) {
           return errorResponse(err);
@@ -420,10 +440,12 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       // GET /api/sessions/:id (detail)
       if (url.pathname.startsWith("/api/sessions/") && url.pathname.split("/").length === 4) {
         const id = url.pathname.split("/")[3];
-        const session = getApp().sessions.get(id);
-        if (!session) return jsonResponse({ error: "Not found" }, 404);
-        const events = getApp().events.list(id);
-        return jsonResponse({ session, events });
+        try {
+          const result = await callRpc(router, "session/read", { sessionId: id, include: ["events"] });
+          return jsonResponse(result);
+        } catch (err) {
+          return errorResponse(err, 404);
+        }
       }
 
       // --- Search ---
@@ -458,7 +480,12 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // GET /api/profiles
       if (url.pathname === "/api/profiles" && req.method === "GET") {
-        return jsonResponse(listProfiles());
+        try {
+          const result = await callRpc(router, "profile/list");
+          return jsonResponse(result.profiles);
+        } catch (err) {
+          return errorResponse(err);
+        }
       }
 
       // POST /api/profiles
@@ -467,8 +494,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         try {
           const body = await req.json() as { name?: string; description?: string };
           if (!body?.name) return jsonResponse({ ok: false, message: "name is required" }, 400);
-          const profile = createProfile(body.name, body.description);
-          return jsonResponse({ ok: true, profile });
+          const result = await callRpc(router, "profile/create", { name: body.name, description: body.description });
+          return jsonResponse({ ok: true, profile: result.profile });
         } catch (err) {
           return errorResponse(err);
         }
@@ -479,10 +506,10 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
           const name = url.pathname.split("/")[3];
-          const ok = deleteProfile(name);
-          return jsonResponse({ ok, message: ok ? "Deleted" : "Not found" });
+          await callRpc(router, "profile/delete", { name });
+          return jsonResponse({ ok: true, message: "Deleted" });
         } catch (err) {
-          return errorResponse(err);
+          return jsonResponse({ ok: false, message: "Not found" });
         }
       }
 
@@ -492,7 +519,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/tools" && req.method === "GET") {
         try {
           const dir = url.searchParams.get("dir") ?? undefined;
-          return jsonResponse(discoverTools(dir));
+          const result = await callRpc(router, "tools/list", { projectRoot: dir });
+          return jsonResponse(result.tools);
         } catch (err) {
           return errorResponse(err);
         }
@@ -504,6 +532,9 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         try {
           const body = await req.json() as { dir?: string; name?: string; config?: Record<string, unknown> };
           if (!body?.dir || !body?.name || !body?.config) return jsonResponse({ ok: false, message: "dir, name, config are required" }, 400);
+          // mcp/attach RPC expects sessionId + server object; the web route uses dir + name + config.
+          // The web route has a different contract, so we call core directly here.
+          const { addMcpServer } = await import("./tools.js");
           addMcpServer(body.dir, body.name, body.config);
           return jsonResponse({ ok: true });
         } catch (err) {
@@ -517,6 +548,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         try {
           const body = await req.json() as { dir?: string; name?: string };
           if (!body?.dir || !body?.name) return jsonResponse({ ok: false, message: "dir, name are required" }, 400);
+          // Same as attach -- web route uses dir+name, RPC uses sessionId+serverName
+          const { removeMcpServer } = await import("./tools.js");
           removeMcpServer(body.dir, body.name);
           return jsonResponse({ ok: true });
         } catch (err) {
@@ -530,7 +563,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/skills" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json();
+          const body = await req.json() as any;
           const { saveSkill } = await import("./skill.js");
           saveSkill(body, body.scope);
           return jsonResponse({ ok: true, name: body.name });
@@ -552,7 +585,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       // GET /api/skills
       if (url.pathname === "/api/skills" && req.method === "GET") {
         try {
-          return jsonResponse(listSkills());
+          const result = await callRpc(router, "skill/list");
+          return jsonResponse(result.skills);
         } catch (err) {
           return errorResponse(err);
         }
@@ -575,7 +609,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       // GET /api/recipes
       if (url.pathname === "/api/recipes" && req.method === "GET") {
         try {
-          return jsonResponse(listRecipes());
+          const result = await callRpc(router, "recipe/list");
+          return jsonResponse(result.recipes);
         } catch (err) {
           return errorResponse(err);
         }
@@ -583,30 +618,30 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
       // --- Agents & Flows ---
 
-      // POST /api/agents (create)
+      // POST /api/agents (create) -- no RPC handler for agent save
       if (url.pathname === "/api/agents" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json();
+          const body = await req.json() as any;
           const { saveAgent } = await import("./agent.js");
           saveAgent(body);
           return jsonResponse({ ok: true, name: body.name });
         } catch (err) { return errorResponse(err); }
       }
 
-      // PUT /api/agents/:name (update)
+      // PUT /api/agents/:name (update) -- no RPC handler for agent save
       if (url.pathname.match(/^\/api\/agents\/(.+)$/) && req.method === "PUT") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
           const name = decodeURIComponent(url.pathname.split("/")[3]);
-          const body = await req.json();
+          const body = await req.json() as any;
           const { saveAgent } = await import("./agent.js");
           saveAgent({ ...body, name });
           return jsonResponse({ ok: true, name });
         } catch (err) { return errorResponse(err); }
       }
 
-      // DELETE /api/agents/:name
+      // DELETE /api/agents/:name -- no RPC handler for agent delete
       if (url.pathname.match(/^\/api\/agents\/(.+)$/) && req.method === "DELETE") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
@@ -620,7 +655,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       // GET /api/agents
       if (url.pathname === "/api/agents" && req.method === "GET") {
         try {
-          return jsonResponse(listAgents());
+          const result = await callRpc(router, "agent/list");
+          return jsonResponse(result.agents);
         } catch (err) {
           return errorResponse(err);
         }
@@ -629,7 +665,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       // GET /api/flows
       if (url.pathname === "/api/flows" && req.method === "GET") {
         try {
-          return jsonResponse(listFlows());
+          const result = await callRpc(router, "flow/list");
+          return jsonResponse(result.flows);
         } catch (err) {
           return errorResponse(err);
         }
@@ -640,9 +677,14 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (flowDetailMatch && req.method === "GET") {
         try {
           const name = decodeURIComponent(flowDetailMatch[1]);
-          const { getStages } = await import("./flow.js");
-          const stages = getStages(name);
-          return jsonResponse({ name, stages: stages.map(st => ({ name: st.name, gate: st.gate, agent: st.agent, type: st.type })) });
+          const result = await callRpc(router, "flow/read", { name });
+          const flow = result.flow;
+          return jsonResponse({
+            name: flow.name,
+            stages: (flow.stages ?? []).map((st: any) => ({
+              name: st.name, gate: st.gate, agent: st.agent, type: st.type,
+            })),
+          });
         } catch (err) {
           return errorResponse(err);
         }
@@ -666,7 +708,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         try {
           const id = url.pathname.split("/")[3];
           const base = url.searchParams.get("base") ?? undefined;
-          const result = await worktreeDiff(id, { base });
+          const result = await callRpc(router, "worktree/diff", { sessionId: id, base });
           return jsonResponse(result);
         } catch (err) {
           return errorResponse(err);
@@ -679,7 +721,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
           const body = await req.json() as { into?: string; noMerge?: boolean; keepBranch?: boolean };
-          const result = await finishWorktree(wtFinishMatch[1], body);
+          const result = await callRpc(router, "worktree/finish", { sessionId: wtFinishMatch[1], noMerge: body?.noMerge });
           return jsonResponse(result);
         } catch (err) {
           return errorResponse(err);
@@ -692,14 +734,14 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
           const body = await req.json() as { title?: string; body?: string; base?: string; draft?: boolean };
-          const result = await createWorktreePR(wtCreatePRMatch[1], body);
+          const result = await callRpc(router, "worktree/create-pr", { sessionId: wtCreatePRMatch[1], ...body });
           return jsonResponse(result);
         } catch (err) {
           return errorResponse(err);
         }
       }
 
-      // POST /api/worktrees/cleanup
+      // POST /api/worktrees/cleanup -- no RPC equivalent
       if (url.pathname === "/api/worktrees/cleanup" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
@@ -710,7 +752,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         }
       }
 
-      // --- Conductor / Learnings ---
+      // --- Conductor / Learnings (no RPC equivalents) ---
 
       // GET /api/conductor/learnings
       if (url.pathname === "/api/conductor/learnings" && req.method === "GET") {
@@ -742,7 +784,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/memory" && req.method === "GET") {
         try {
           const scope = url.searchParams.get("scope") ?? undefined;
-          return jsonResponse(listMemories(scope));
+          const result = await callRpc(router, "memory/list", { scope });
+          return jsonResponse(result.memories);
         } catch (err) {
           return errorResponse(err);
         }
@@ -753,7 +796,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         const q = url.searchParams.get("q") ?? "";
         if (!q) return jsonResponse({ ok: false, message: "q parameter is required" }, 400);
         try {
-          return jsonResponse(recall(q));
+          const result = await callRpc(router, "memory/recall", { query: q });
+          return jsonResponse(result.results);
         } catch (err) {
           return errorResponse(err);
         }
@@ -765,8 +809,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         try {
           const body = await req.json() as { content?: string; scope?: string; tags?: string[] };
           if (!body?.content) return jsonResponse({ ok: false, message: "content is required" }, 400);
-          const entry = remember(body.content, body);
-          return jsonResponse({ ok: true, entry });
+          const result = await callRpc(router, "memory/add", { content: body.content, scope: body.scope, tags: body.tags });
+          return jsonResponse({ ok: true, entry: result.memory });
         } catch (err) {
           return errorResponse(err);
         }
@@ -777,14 +821,14 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
           const id = url.pathname.split("/")[3];
-          const ok = forget(id);
-          return jsonResponse({ ok, message: ok ? "Forgotten" : "Not found" });
+          const result = await callRpc(router, "memory/forget", { id });
+          return jsonResponse({ ok: result.ok, message: result.ok ? "Forgotten" : "Not found" });
         } catch (err) {
           return errorResponse(err);
         }
       }
 
-      // --- Knowledge ---
+      // --- Knowledge (no RPC equivalent) ---
 
       // POST /api/knowledge/ingest
       if (url.pathname === "/api/knowledge/ingest" && req.method === "POST") {
@@ -809,17 +853,18 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname === "/api/compute" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const body = await req.json();
+          const body = await req.json() as any;
           if (!body?.name || !body?.provider) return jsonResponse({ ok: false, message: "name and provider are required" }, 400);
-          const compute = getApp().computes.create(body);
-          return jsonResponse({ ok: true, compute });
+          const result = await callRpc(router, "compute/create", body as Record<string, unknown>);
+          return jsonResponse({ ok: true, compute: result.compute });
         } catch (err) { return errorResponse(err); }
       }
 
       // GET /api/compute
       if (url.pathname === "/api/compute" && req.method === "GET") {
         try {
-          return jsonResponse(getApp().computes.list());
+          const result = await callRpc(router, "compute/list");
+          return jsonResponse(result.targets);
         } catch (err) {
           return errorResponse(err);
         }
@@ -831,40 +876,12 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         const [, computeName, computeAction] = computeActionMatch;
         try {
-          const app = getApp();
-          if (computeAction === "delete") {
-            app.computes.delete(computeName);
-            return jsonResponse({ ok: true });
-          }
-          const compute = app.computes.get(computeName);
-          if (!compute) return jsonResponse({ error: "Compute not found" }, 404);
-          const { getProvider } = await import("../../compute/index.js");
-          const provider = getProvider(compute.provider);
-          if (!provider) return jsonResponse({ ok: false, message: `Provider '${compute.provider}' not found` }, 400);
-          switch (computeAction) {
-            case "provision": {
-              app.computes.update(compute.name, { status: "provisioning" });
-              await provider.provision(compute);
-              app.computes.update(compute.name, { status: "running" });
-              break;
-            }
-            case "start": {
-              await provider.start(compute);
-              app.computes.update(compute.name, { status: "running" });
-              break;
-            }
-            case "stop": {
-              await provider.stop(compute);
-              app.computes.update(compute.name, { status: "stopped" });
-              break;
-            }
-            case "destroy": {
-              await provider.destroy(compute);
-              app.computes.update(compute.name, { status: "destroyed" });
-              break;
-            }
-          }
-          return jsonResponse({ ok: true });
+          const rpcMethod =
+            computeAction === "start" ? "compute/start-instance" :
+            computeAction === "stop" ? "compute/stop-instance" :
+            `compute/${computeAction}`;
+          const result = await callRpc(router, rpcMethod, { name: computeName });
+          return jsonResponse(result);
         } catch (err) {
           return errorResponse(err);
         }
@@ -874,9 +891,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (url.pathname.startsWith("/api/compute/") && req.method === "GET") {
         try {
           const name = url.pathname.split("/")[3];
-          const compute = getApp().computes.get(name);
-          if (!compute) return jsonResponse({ error: "Not found" }, 404);
-          return jsonResponse(compute);
+          const result = await callRpc(router, "compute/read", { name });
+          return jsonResponse(result.compute);
         } catch (err) {
           return errorResponse(err);
         }
@@ -887,7 +903,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       // GET /api/schedules
       if (url.pathname === "/api/schedules" && req.method === "GET") {
         try {
-          return jsonResponse(listSchedules());
+          const result = await callRpc(router, "schedule/list");
+          return jsonResponse(result.schedules);
         } catch (err) {
           return errorResponse(err);
         }
@@ -899,8 +916,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         try {
           const body = await req.json() as { cron?: string; flow?: string; repo?: string; workdir?: string; summary?: string; compute_name?: string; group_name?: string };
           if (!body?.cron) return jsonResponse({ ok: false, message: "cron is required" }, 400);
-          const schedule = createSchedule(body as { cron: string; flow?: string; repo?: string; workdir?: string; summary?: string; compute_name?: string; group_name?: string });
-          return jsonResponse({ ok: true, schedule });
+          const result = await callRpc(router, "schedule/create", body);
+          return jsonResponse({ ok: true, schedule: result.schedule });
         } catch (err) {
           return errorResponse(err);
         }
@@ -911,8 +928,8 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (schedDeleteMatch && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const ok = deleteSchedule(schedDeleteMatch[1]);
-          return jsonResponse({ ok, message: ok ? "Deleted" : "Not found" });
+          const result = await callRpc(router, "schedule/delete", { id: schedDeleteMatch[1] });
+          return jsonResponse({ ok: result.ok, message: result.ok ? "Deleted" : "Not found" });
         } catch (err) {
           return errorResponse(err);
         }
@@ -923,7 +940,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (schedEnableMatch && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          enableSchedule(schedEnableMatch[1], true);
+          await callRpc(router, "schedule/enable", { id: schedEnableMatch[1] });
           return jsonResponse({ ok: true });
         } catch (err) {
           return errorResponse(err);
@@ -935,14 +952,14 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
       if (schedDisableMatch && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          enableSchedule(schedDisableMatch[1], false);
+          await callRpc(router, "schedule/disable", { id: schedDisableMatch[1] });
           return jsonResponse({ ok: true });
         } catch (err) {
           return errorResponse(err);
         }
       }
 
-      // --- Repo Map ---
+      // --- Repo Map (no RPC equivalent) ---
 
       // GET /api/repo-map?dir=<path>
       if (url.pathname === "/api/repo-map" && req.method === "GET") {
@@ -986,7 +1003,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         }
       }
 
-      // Dashboard HTML — serve index.html only for root path
+      // Dashboard HTML -- serve index.html only for root path
       if (url.pathname === "/" || url.pathname === "/index.html") {
         const indexPath = join(WEB_DIST, "index.html");
         if (existsSync(indexPath)) {
@@ -1019,4 +1036,3 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
     },
   };
 }
-
