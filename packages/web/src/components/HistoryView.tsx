@@ -9,15 +9,19 @@ import { Badge } from "./ui/badge.js";
 import { StatusDot, StatusBadge } from "./StatusDot.js";
 import { Search, Clock, FileText, Database } from "lucide-react";
 
-interface HistoryViewProps {
-  onSelectSession?: (id: string) => void;
-}
-
 type SearchMode = "sessions" | "transcripts";
 
-export function HistoryView({ onSelectSession }: HistoryViewProps) {
+interface HistoryViewProps {
+  onSelectSession?: (id: string) => void;
+  mode?: SearchMode;
+  onModeChange?: (mode: SearchMode) => void;
+}
+
+export function HistoryView({ onSelectSession, mode: controlledMode, onModeChange }: HistoryViewProps) {
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<SearchMode>("sessions");
+  const [internalMode, setInternalMode] = useState<SearchMode>("sessions");
+  const mode = controlledMode ?? internalMode;
+  const setMode = onModeChange ?? setInternalMode;
   const [sessionResults, setSessionResults] = useState<any[]>([]);
   const [transcriptResults, setTranscriptResults] = useState<any[]>([]);
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
@@ -74,11 +78,6 @@ export function HistoryView({ onSelectSession }: HistoryViewProps) {
     if (e.key === "Enter") doSearch();
   }
 
-  function handleModeSwitch(newMode: SearchMode) {
-    if (newMode === mode) return;
-    setMode(newMode);
-  }
-
   // Re-search when mode changes and there's an active query
   useEffect(() => {
     if (searched && query.trim()) {
@@ -123,28 +122,6 @@ export function HistoryView({ onSelectSession }: HistoryViewProps) {
             Clear
           </Button>
         )}
-      </div>
-
-      {/* Mode toggle */}
-      <div className="flex gap-1 mb-4">
-        <Button
-          size="xs"
-          variant={mode === "sessions" ? "default" : "outline"}
-          onClick={() => handleModeSwitch("sessions")}
-          className="gap-1.5"
-        >
-          <Database size={12} />
-          Sessions
-        </Button>
-        <Button
-          size="xs"
-          variant={mode === "transcripts" ? "default" : "outline"}
-          onClick={() => handleModeSwitch("transcripts")}
-          className="gap-1.5"
-        >
-          <FileText size={12} />
-          Transcripts
-        </Button>
       </div>
 
       {/* Default state: recent sessions */}

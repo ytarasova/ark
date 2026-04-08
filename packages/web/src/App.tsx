@@ -15,6 +15,8 @@ import { MemoryView } from "./components/MemoryView.js";
 import { CostsView } from "./components/CostsView.js";
 import { SettingsView } from "./components/SettingsView.js";
 import { Button } from "./components/ui/button.js";
+import { cn } from "./lib/utils.js";
+import { Database, FileText } from "lucide-react";
 
 const READ_ONLY = document.getElementById("root")?.dataset.readonly === "true";
 
@@ -29,6 +31,9 @@ function App() {
   const [showNewCompute, setShowNewCompute] = useState(false);
   const [showNewSchedule, setShowNewSchedule] = useState(false);
   const [showNewMemory, setShowNewMemory] = useState(false);
+
+  // History view mode
+  const [historyMode, setHistoryMode] = useState<"sessions" | "transcripts">("sessions");
 
   function showToast(msg: string, type: string) {
     setToast({ msg, type });
@@ -55,8 +60,21 @@ function App() {
         </Layout>
       )}
       {view === "history" && (
-        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="History">
-          <HistoryView onSelectSession={() => setView("sessions")} />
+        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="History"
+          headerLeft={
+            <div className="flex gap-1 ml-2">
+              {(["sessions", "transcripts"] as const).map(m => (
+                <button key={m} onClick={() => setHistoryMode(m)} className={cn(
+                  "px-3 py-1 text-xs font-medium rounded-md transition-colors inline-flex items-center gap-1.5",
+                  historyMode === m ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
+                )}>
+                  {m === "sessions" ? <Database size={12} /> : <FileText size={12} />}
+                  {m.charAt(0).toUpperCase() + m.slice(1)}
+                </button>
+              ))}
+            </div>
+          }>
+          <HistoryView mode={historyMode} onModeChange={setHistoryMode} onSelectSession={() => setView("sessions")} />
         </Layout>
       )}
       {view === "compute" && (
