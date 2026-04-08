@@ -189,22 +189,23 @@ test("export and import session round-trip", async () => {
 
 // -- Detail panel close -------------------------------------------------------
 
-test("detail panel closes with X button", async () => {
-  const id = await createSession("Close test");
+test("selecting another session replaces detail panel", async () => {
+  const id1 = await createSession("Close test A");
+  const id2 = await createSession("Close test B");
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
-  await page.locator("text=Close test").click();
-  await expect(page.locator(`text=${id}`).first()).toBeVisible({ timeout: 5_000 });
 
-  // Click the close button (X icon in header)
-  // The X button is a small ghost variant button with an X/lucide icon
-  // It's inside the detail panel header
-  const closeBtn = page.locator('.fixed button').filter({ has: page.locator('svg') }).first();
-  await closeBtn.click();
+  // Click session A to open its detail
+  await page.locator("text=Close test A").click();
+  await expect(page.locator(`text=${id1}`).first()).toBeVisible({ timeout: 5_000 });
 
-  // The detail panel should disappear -- the session ID should not be visible in a fixed panel
-  await expect(page.locator('.fixed').locator(`text=${id}`)).not.toBeVisible({ timeout: 3_000 });
+  // Click session B -- it should replace session A in the detail panel
+  await page.locator("text=Close test B").click();
+  await expect(page.locator(`text=${id2}`).first()).toBeVisible({ timeout: 5_000 });
+
+  // Session A's ID should no longer be in the detail panel
+  await expect(page.locator(`text=${id1}`)).not.toBeVisible({ timeout: 3_000 });
 });
 
 // -- Events list in detail panel (via API seeding) ----------------------------

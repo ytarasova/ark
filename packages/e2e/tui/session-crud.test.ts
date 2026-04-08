@@ -25,13 +25,17 @@ describe("e2e TUI session CRUD", () => {
       tui.press("n");
       await new Promise(r => setTimeout(r, 500));
 
-      // Type a summary
+      // Type a name
       tui.typeChars("crud-new-session-test");
       tui.press("enter");
       await new Promise(r => setTimeout(r, 300));
 
-      // Press enter through remaining form fields (repo, flow, etc.)
-      // The form has multiple fields -- keep pressing enter to accept defaults
+      // Press enter through remaining form fields:
+      // Repo, Ticket, Compute, Group, Flow, Agent
+      tui.press("enter");
+      await new Promise(r => setTimeout(r, 300));
+      tui.press("enter");
+      await new Promise(r => setTimeout(r, 300));
       tui.press("enter");
       await new Promise(r => setTimeout(r, 300));
       tui.press("enter");

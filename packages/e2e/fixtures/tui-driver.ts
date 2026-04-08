@@ -326,9 +326,9 @@ export class TuiDriver {
 
   // -- Navigation shortcuts --------------------------------------------------
 
-  /** Switch to a tab by number (1-6). */
-  async switchTab(n: 1 | 2 | 3 | 4 | 5 | 6): Promise<void> {
-    const tabNames = ["Sessions", "Agents", "Tools", "Flows", "History", "Compute"];
+  /** Switch to a tab by number (1-9). */
+  async switchTab(n: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9): Promise<void> {
+    const tabNames = ["Sessions", "Agents", "Flows", "Compute", "History", "Memory", "Tools", "Schedules", "Costs"];
     this.press(String(n));
     await this.waitFor(tabNames[n - 1]);
   }

@@ -49,16 +49,19 @@ describe("TUI App rendering", () => {
     unmount();
   });
 
-  it("renders tab bar with all 6 tabs", async () => {
+  it("renders tab bar with all 9 tabs", async () => {
     const { lastFrame, unmount } = await renderApp();
     const frame = lastFrame()!;
 
     expect(frame).toContain("Sessions");
     expect(frame).toContain("Agents");
-    expect(frame).toContain("Tools");
     expect(frame).toContain("Flows");
-    expect(frame).toContain("History");
     expect(frame).toContain("Compute");
+    expect(frame).toContain("History");
+    expect(frame).toContain("Memory");
+    expect(frame).toContain("Tools");
+    expect(frame).toContain("Schedules");
+    expect(frame).toContain("Costs");
     unmount();
   });
 
@@ -74,8 +77,8 @@ describe("TUI App rendering", () => {
   it("tab switching works via key press", async () => {
     const { lastFrame, stdin, unmount } = await renderApp();
 
-    // Press "6" to switch to Compute tab
-    stdin.write("6");
+    // Press "4" to switch to Compute tab
+    stdin.write("4");
 
     // Wait for React to re-render
     for (let i = 0; i < 50; i++) {

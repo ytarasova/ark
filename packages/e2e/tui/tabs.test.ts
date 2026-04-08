@@ -1,7 +1,7 @@
 /**
  * E2E TUI tab navigation and content tests.
  *
- * Verifies all 6 tabs render, switching works with 1-6 keys,
+ * Verifies all 9 tabs render, switching works with 1-9 keys,
  * Agents/Flows tabs show builtin definitions, Compute tab shows
  * local as running, and status bar hints update per tab.
  */
@@ -16,23 +16,26 @@ afterAll(() => { killNewArkTmuxSessions(tmuxSnapshot); });
 
 describe("e2e TUI tabs", () => {
 
-  it("shows all 6 tabs in the tab bar", async () => {
+  it("shows all 9 tabs in the tab bar", async () => {
     const tui = new TuiDriver();
     try {
       await tui.start();
       const raw = tui.text();
       expect(raw).toContain("Sessions");
       expect(raw).toContain("Agents");
-      expect(raw).toContain("Tools");
       expect(raw).toContain("Flows");
-      expect(raw).toContain("History");
       expect(raw).toContain("Compute");
+      expect(raw).toContain("History");
+      expect(raw).toContain("Memory");
+      expect(raw).toContain("Tools");
+      expect(raw).toContain("Schedules");
+      expect(raw).toContain("Costs");
     } finally {
       tui.stop();
     }
   }, 30_000);
 
-  it("switches between all tabs with number keys 1-6", async () => {
+  it("switches between all tabs with number keys 1-9", async () => {
     const tui = new TuiDriver();
     try {
       await tui.start();
@@ -44,16 +47,16 @@ describe("e2e TUI tabs", () => {
       tui.expectRegion("tabBar", "Agents");
 
       await tui.switchTab(3);
-      tui.expectRegion("tabBar", "Tools");
+      tui.expectRegion("tabBar", "Flows");
 
       await tui.switchTab(4);
-      tui.expectRegion("tabBar", "Flows");
+      tui.expectRegion("tabBar", "Compute");
 
       await tui.switchTab(5);
       tui.expectRegion("tabBar", "History");
 
       await tui.switchTab(6);
-      tui.expectRegion("tabBar", "Compute");
+      tui.expectRegion("tabBar", "Memory");
 
       // Return to Sessions
       await tui.switchTab(1);
@@ -87,7 +90,7 @@ describe("e2e TUI tabs", () => {
     const tui = new TuiDriver();
     try {
       await tui.start();
-      await tui.switchTab(4);
+      await tui.switchTab(3);
 
       // Wait for flows to load
       const found = await tui.waitFor("bare", 5000);
@@ -106,7 +109,7 @@ describe("e2e TUI tabs", () => {
     const tui = new TuiDriver();
     try {
       await tui.start();
-      await tui.switchTab(6);
+      await tui.switchTab(4);
       await tui.waitFor("local");
 
       const raw = tui.text();
@@ -127,7 +130,7 @@ describe("e2e TUI tabs", () => {
       tui.expectRegion("statusBar", "quit");
 
       // Compute tab -- should show compute-relevant hints
-      await tui.switchTab(6);
+      await tui.switchTab(4);
       await tui.waitFor("provision", 3000, { region: "statusBar" });
       tui.expectRegion("statusBar", "provision");
       tui.expectRegion("statusBar", "new");

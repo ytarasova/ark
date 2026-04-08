@@ -102,15 +102,15 @@ test("delete compute target via API and verify removal", async () => {
   await expect(page.locator("text=e2e-test-compute")).not.toBeVisible({ timeout: 5_000 });
 });
 
-// -- Create compute via New Compute modal (UI) --------------------------------
+// -- Create compute via New Compute inline form (UI) --------------------------
 
-test("create compute via New Compute modal", async () => {
+test("create compute via New Compute inline form", async () => {
   await goToCompute();
 
   // Click New Compute button
   await page.click('button:has-text("New Compute")');
 
-  // The modal should open with title "New Compute Target"
+  // The inline form should appear in the right panel with title "New Compute Target"
   await expect(page.locator("text=New Compute Target")).toBeVisible({ timeout: 5_000 });
 
   // Fill in name

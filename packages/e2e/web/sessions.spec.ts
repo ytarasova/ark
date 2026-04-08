@@ -1,7 +1,7 @@
 /**
  * Session CRUD E2E tests.
  *
- * Tests session creation via UI modal, filtering by status chips,
+ * Tests session creation via inline form, filtering by status chips,
  * searching by summary, delete/undelete, clone (fork), archive/restore.
  */
 
@@ -52,12 +52,12 @@ test("sessions page shows New Session button", async () => {
   await expect(page.locator('button:has-text("New Session")')).toBeVisible();
 });
 
-// -- Create session via modal -------------------------------------------------
+// -- Create session via inline form -------------------------------------------
 
-test("create session via New Session modal", async () => {
+test("create session via New Session inline form", async () => {
   await goToSessions();
 
-  // Open the modal
+  // Open the inline form in the right panel
   await page.click('button:has-text("New Session")');
   await expect(page.locator("text=New Session").first()).toBeVisible();
 
@@ -73,7 +73,7 @@ test("create session via New Session modal", async () => {
   // Submit the form
   await page.click('button:has-text("Create Session")');
 
-  // Wait for modal to close and session to appear in the list
+  // Wait for session to appear in the list
   await expect(page.locator("text=E2E test session alpha")).toBeVisible({ timeout: 10_000 });
 });
 

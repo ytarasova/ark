@@ -39,8 +39,8 @@ test("sidebar shows ark brand text", async () => {
 
 test("sidebar nav items have correct labels", async () => {
   const expected = [
-    "Sessions", "Agents", "Tools", "Flows", "History",
-    "Compute", "Schedules", "Memory", "Costs",
+    "Sessions", "Agents", "Flows", "Compute", "History",
+    "Memory", "Tools", "Schedules", "Costs",
   ];
   for (const label of expected) {
     await expect(page.locator(`nav button:has-text("${label}")`)).toBeVisible();
