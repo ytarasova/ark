@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import type { ClaudeSession, SearchResult } from "../../core/index.js";
 import { ago } from "../helpers.js";
+import { sanitizeForTerminal } from "../helpers/sessionFormatting.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { SectionHeader } from "../components/SectionHeader.js";
@@ -301,13 +302,14 @@ function ConversationView({ turns }: { turns: any[] }) {
   return (
     <>
       <Text> </Text>
+      <Text dimColor>{"  " + "─".repeat(40)}</Text>
       <SectionHeader title={`Conversation (${filtered.length})`} />
       {filtered.map((turn: any, idx: number) => {
         // Handle both object {role, content, timestamp} and legacy string "Role: content"
         const isString = typeof turn === "string";
         const isUser = isString ? turn.startsWith("You:") : turn.role === "user";
-        const raw = isString ? turn.replace(/^(You|Claude): ?/, "") : (turn.content || "").trim();
-        const content = raw.slice(0, 200) + (raw.length > 200 ? "..." : "");
+        const rawText = isString ? turn.replace(/^(You|Claude): ?/, "") : (turn.content || "").trim();
+        const content = sanitizeForTerminal(rawText, 120);
         const label = isUser ? " You " : " Agent ";
         const time = !isString && turn.timestamp ? `  ${ago(turn.timestamp)}` : "";
         return (

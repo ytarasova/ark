@@ -48,6 +48,17 @@ export function buildCommitLinks(session: SessionLike): CommitLink[] | null {
   }));
 }
 
+/** Sanitize text for safe terminal rendering: strip ANSI, control chars, collapse whitespace, truncate. */
+export function sanitizeForTerminal(text: string, maxLen = 200): string {
+  const clean = text
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")              // strip ANSI
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")   // strip control chars
+    .replace(/\n+/g, " ")                                  // newlines to spaces
+    .replace(/\s{2,}/g, " ")                               // collapse whitespace
+    .trim();
+  return clean.length > maxLen ? clean.slice(0, maxLen) + "..." : clean;
+}
+
 /** Strip ANSI escape codes and control characters, filter blank lines, return last N lines. */
 export function stripAnsiAndFilter(output: string, lastN = 12): string[] {
   return output
