@@ -77,6 +77,11 @@ export const api = {
   search: (q: string) => fetchApi<any>(`/api/search?q=${encodeURIComponent(q)}`),
   searchGlobal: (q: string) => fetchApi<any>(`/api/search/global?q=${encodeURIComponent(q)}`),
 
+  // History (Claude Code transcripts)
+  getClaudeSessions: () => fetchApi<any[]>("/api/history/sessions"),
+  refreshHistory: () => apiPost<any>("/api/history/refresh"),
+  rebuildHistory: () => apiPost<any>("/api/history/rebuild"),
+
   // System
   getStatus: () => fetchApi<any>("/api/status"),
   getGroups: () => fetchApi<string[]>("/api/groups"),

@@ -6,7 +6,7 @@ import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { Badge } from "./ui/badge.js";
 import { StatusDot, StatusBadge } from "./StatusDot.js";
-import { Search, Clock, FileText, Database } from "lucide-react";
+import { Search, Clock, FileText, Database, RefreshCw } from "lucide-react";
 
 type SearchMode = "sessions" | "transcripts";
 
@@ -24,20 +24,22 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
   const [sessionResults, setSessionResults] = useState<any[]>([]);
   const [transcriptResults, setTranscriptResults] = useState<any[]>([]);
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
+  const [claudeSessions, setClaudeSessions] = useState<any[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingRecent, setLoadingRecent] = useState(true);
+  const [loadingClaude, setLoadingClaude] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<any>(null);
   const [selectedType, setSelectedType] = useState<"session" | "transcript">("session");
 
-  // Load recent sessions on mount
+  // Load recent sessions on mount (for Sessions tab)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const sessions = await api.getSessions();
         if (!cancelled) {
-          // Sort by updated_at descending, take 20
           const sorted = (sessions || [])
             .sort((a: any, b: any) => {
               const da = new Date(a.updated_at || 0).getTime();
@@ -48,13 +50,42 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
           setRecentSessions(sorted);
         }
       } catch {
-        // ignore - just show empty
+        // ignore
       } finally {
         if (!cancelled) setLoadingRecent(false);
       }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Load Claude Code sessions (for Transcripts tab)
+  const loadClaudeSessions = useCallback(async () => {
+    setLoadingClaude(true);
+    try {
+      const items = await api.getClaudeSessions();
+      setClaudeSessions(Array.isArray(items) ? items : []);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingClaude(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadClaudeSessions();
+  }, [loadClaudeSessions]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await api.refreshHistory();
+      await loadClaudeSessions();
+    } catch {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadClaudeSessions]);
 
   const doSearch = useCallback(async () => {
     if (!query.trim()) return;
@@ -94,18 +125,18 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
     setSelected(null);
   }
 
-  // Build the list for the left panel
-  const allResults = searched
-    ? [
-        ...sessionResults.map(r => ({ ...r, _type: "session" as const })),
-        ...transcriptResults.map(r => ({ ...r, _type: "transcript" as const })),
-      ]
-    : recentSessions.map(s => ({ ...s, _type: "recent" as const }));
+  // ---- Sessions tab content ----
+  function renderSessionsTab() {
+    // Build the list for the left panel
+    const allResults = searched
+      ? [
+          ...sessionResults.map(r => ({ ...r, _type: "session" as const })),
+          ...transcriptResults.map(r => ({ ...r, _type: "transcript" as const })),
+        ]
+      : recentSessions.map(s => ({ ...s, _type: "recent" as const }));
 
-  return (
-    <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
-      {/* Left: search + results list */}
-      <div className="border-r border-border overflow-y-auto">
+    return (
+      <>
         {/* Search bar */}
         <div className="px-3 py-2 border-b border-border/50">
           <div className="relative flex gap-1.5">
@@ -113,22 +144,12 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
               <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="w-full h-7 pl-7 pr-2 text-[12px] bg-secondary"
-                placeholder={mode === "sessions" ? "Search sessions..." : "Search transcripts..."}
+                placeholder="Search sessions..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
               />
             </div>
-            <button
-              className={cn(
-                "text-[10px] shrink-0 px-1.5 py-1 rounded",
-                loading ? "opacity-60 cursor-wait text-muted-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-              onClick={doSearch}
-              disabled={loading || !query.trim()}
-            >
-              Go
-            </button>
           </div>
           {searched && (
             <div className="flex items-center justify-between mt-1">
@@ -261,12 +282,197 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
             ))}
           </>
         )}
+      </>
+    );
+  }
+
+  // ---- Transcripts tab content ----
+  function renderTranscriptsTab() {
+    return (
+      <>
+        {/* Header with refresh button */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <FileText size={10} />
+            Claude Code Sessions
+          </div>
+          <button
+            className={cn(
+              "flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded",
+              refreshing && "opacity-50 pointer-events-none"
+            )}
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Refresh and re-index transcripts"
+          >
+            <RefreshCw size={10} className={cn(refreshing && "animate-spin")} />
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
+
+        {/* Loading state */}
+        {loadingClaude && (
+          <div className="flex items-center justify-center py-12">
+            <span className="text-[11px] text-muted-foreground">Loading transcripts...</span>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loadingClaude && claudeSessions.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <FileText size={20} className="text-muted-foreground/30 mb-2" />
+            <p className="text-[11px] text-muted-foreground text-center">No Claude Code transcripts found</p>
+            <button
+              className="text-[10px] text-primary hover:underline mt-2"
+              onClick={handleRefresh}
+            >
+              Scan for transcripts
+            </button>
+          </div>
+        )}
+
+        {/* Claude sessions list */}
+        {!loadingClaude && claudeSessions.length > 0 && claudeSessions.map((cs: any, i: number) => (
+          <div
+            key={cs.sessionId || i}
+            className={cn(
+              "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
+              "hover:bg-accent",
+              selected?.sessionId === cs.sessionId && selectedType === "transcript" && "bg-accent border-l-2 border-l-primary"
+            )}
+            onClick={() => { setSelected(cs); setSelectedType("transcript"); }}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText size={10} className="text-muted-foreground shrink-0" />
+              <span className="text-[12px] text-foreground truncate leading-snug">
+                {cs.project || cs.sessionId}
+              </span>
+            </div>
+            {cs.summary && (
+              <span className="text-[11px] text-muted-foreground mt-0.5 truncate pl-[18px]">
+                {cs.summary}
+              </span>
+            )}
+            <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground font-mono pl-[18px]">
+              {cs.messageCount != null && (
+                <span>{cs.messageCount} msg{cs.messageCount !== 1 ? "s" : ""}</span>
+              )}
+              <span className="flex-1" />
+              <span className="shrink-0">{relTime(cs.lastActivity || cs.timestamp)}</span>
+            </div>
+          </div>
+        ))}
+      </>
+    );
+  }
+
+  // ---- Detail panel for transcript (Claude session) ----
+  function renderTranscriptDetail(cs: any) {
+    return (
+      <div className="p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Badge variant="outline" className="text-[10px]">transcript</Badge>
+          {cs.project && (
+            <span className="text-[13px] font-semibold text-foreground">{cs.project}</span>
+          )}
+        </div>
+        {cs.summary && (
+          <div className="mb-4">
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Summary</h3>
+            <p className="text-[13px] text-foreground leading-relaxed">{cs.summary}</p>
+          </div>
+        )}
+        <div className="mb-4">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Details</h3>
+          <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
+            <span className="text-muted-foreground">Session ID</span>
+            <span className="text-card-foreground font-mono text-[12px] break-all">{cs.sessionId}</span>
+            {cs.project && (
+              <>
+                <span className="text-muted-foreground">Project</span>
+                <span className="text-card-foreground font-mono">{cs.project}</span>
+              </>
+            )}
+            {cs.projectDir && (
+              <>
+                <span className="text-muted-foreground">Directory</span>
+                <span className="text-card-foreground font-mono text-[12px] break-all">{cs.projectDir}</span>
+              </>
+            )}
+            {cs.transcriptPath && (
+              <>
+                <span className="text-muted-foreground">Transcript</span>
+                <span className="text-card-foreground font-mono text-[11px] break-all">{cs.transcriptPath}</span>
+              </>
+            )}
+            {cs.messageCount != null && (
+              <>
+                <span className="text-muted-foreground">Messages</span>
+                <span className="text-card-foreground">{cs.messageCount}</span>
+              </>
+            )}
+            {(cs.lastActivity || cs.timestamp) && (
+              <>
+                <span className="text-muted-foreground">Last Activity</span>
+                <span className="text-card-foreground font-mono">{relTime(cs.lastActivity || cs.timestamp)}</span>
+              </>
+            )}
+            {cs.timestamp && (
+              <>
+                <span className="text-muted-foreground">Created</span>
+                <span className="text-card-foreground font-mono">{relTime(cs.timestamp)}</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Detail panel for search transcript result ----
+  function renderSearchTranscriptDetail(r: any) {
+    return (
+      <div className="p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Badge variant="outline" className="text-[10px]">transcript</Badge>
+          {r.projectName && (
+            <span className="text-[12px] text-muted-foreground font-mono">{r.projectName}</span>
+          )}
+          {r.fileName && (
+            <span className="text-[12px] text-muted-foreground/60 font-mono">{r.fileName}</span>
+          )}
+        </div>
+        <div className="mb-4">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Content</h3>
+          <div className="bg-black/40 border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
+            {r.matchLine || r.match || String(r.content || "")}
+          </div>
+        </div>
+        {r.lineNumber && (
+          <div className="text-[10px] text-muted-foreground/50 font-mono">
+            line {r.lineNumber}
+          </div>
+        )}
+        {onSelectSession && r.sessionId && (
+          <Button size="sm" variant="outline" className="mt-3" onClick={() => onSelectSession(r.sessionId)}>
+            View in Sessions
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
+      {/* Left: list panel */}
+      <div className="border-r border-border overflow-y-auto">
+        {mode === "sessions" ? renderSessionsTab() : renderTranscriptsTab()}
       </div>
 
       {/* Right: detail panel */}
       <div className="overflow-y-auto bg-background">
-        {selected && selectedType === "session" && !searched ? (
-          /* Recent session detail */
+        {/* Sessions tab: recent session detail */}
+        {selected && selectedType === "session" && !searched && mode === "sessions" ? (
           <div className="p-5">
             <div className="flex items-center gap-2.5 mb-4">
               <StatusDot status={selected.status} />
@@ -334,38 +540,15 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
               </Button>
             )}
           </div>
-        ) : selected && selectedType === "transcript" ? (
-          /* Transcript result detail */
-          <div className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Badge variant="outline" className="text-[10px]">transcript</Badge>
-              {selected.projectName && (
-                <span className="text-[12px] text-muted-foreground font-mono">{selected.projectName}</span>
-              )}
-              {selected.fileName && (
-                <span className="text-[12px] text-muted-foreground/60 font-mono">{selected.fileName}</span>
-              )}
-            </div>
-            <div className="mb-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Content</h3>
-              <div className="bg-black/40 border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
-                {selected.matchLine || selected.match || String(selected.content || "")}
-              </div>
-            </div>
-            {selected.lineNumber && (
-              <div className="text-[10px] text-muted-foreground/50 font-mono">
-                line {selected.lineNumber}
-              </div>
-            )}
-            {onSelectSession && selected.sessionId && (
-              <Button size="sm" variant="outline" className="mt-3" onClick={() => onSelectSession(selected.sessionId)}>
-                View in Sessions
-              </Button>
-            )}
-          </div>
+        ) : selected && selectedType === "transcript" && searched ? (
+          /* Search transcript result detail */
+          renderSearchTranscriptDetail(selected)
+        ) : selected && selectedType === "transcript" && mode === "transcripts" ? (
+          /* Claude Code session detail (from Transcripts tab) */
+          renderTranscriptDetail(selected)
         ) : (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-            {searched ? "Select a result" : "Select a session"}
+            {mode === "transcripts" ? "Select a transcript" : searched ? "Select a result" : "Select a session"}
           </div>
         )}
       </div>

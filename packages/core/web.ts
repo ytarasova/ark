@@ -488,6 +488,38 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
         }
       }
 
+      // --- History (Claude Code transcripts) ---
+
+      // GET /api/history/sessions
+      if (url.pathname === "/api/history/sessions" && req.method === "GET") {
+        try {
+          const result = await callRpc(router, "history/list", {});
+          return jsonResponse(result.items);
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // POST /api/history/refresh (incremental refresh + index)
+      if (url.pathname === "/api/history/refresh" && req.method === "POST") {
+        try {
+          const result = await callRpc(router, "history/refresh-and-index", {});
+          return jsonResponse(result);
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // POST /api/history/rebuild (full rebuild: clear + refresh + index)
+      if (url.pathname === "/api/history/rebuild" && req.method === "POST") {
+        try {
+          const result = await callRpc(router, "history/rebuild-fts", {});
+          return jsonResponse(result);
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
       // --- Profiles ---
 
       // GET /api/profiles
