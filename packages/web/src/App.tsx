@@ -13,6 +13,7 @@ import { ComputeView } from "./components/ComputeView.js";
 import { ScheduleView } from "./components/ScheduleView.js";
 import { MemoryView } from "./components/MemoryView.js";
 import { CostsView } from "./components/CostsView.js";
+import { SettingsView } from "./components/SettingsView.js";
 import { Button } from "./components/ui/button.js";
 
 const READ_ONLY = document.getElementById("root")?.dataset.readonly === "true";
@@ -79,6 +80,11 @@ function App() {
       {view === "costs" && (
         <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Costs">
           <CostsView />
+        </Layout>
+      )}
+      {view === "settings" && (
+        <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Settings">
+          <SettingsView />
         </Layout>
       )}
       {toast && (

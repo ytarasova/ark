@@ -3,6 +3,39 @@
 @source "./**/*.{ts,tsx}";
 
 :root {
+  --background: #ffffff;
+  --foreground: #1a1a2e;
+  --card: #f8f8fa;
+  --card-foreground: #1a1a2e;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a2e;
+  --primary: #7c6aef;
+  --primary-foreground: #ffffff;
+  --secondary: #f0f0f4;
+  --secondary-foreground: #1a1a2e;
+  --muted: #f0f0f4;
+  --muted-foreground: #6b6b80;
+  --accent: #f0f0f4;
+  --accent-foreground: #1a1a2e;
+  --tertiary: #f5f5f8;
+  --tertiary-active: #e8e8f0;
+  --destructive: #dc3545;
+  --destructive-foreground: #fff0f0;
+  --border: #e0e0e8;
+  --input: #e0e0e8;
+  --ring: #7c6aef;
+  --radius: 0.5rem;
+  --sidebar: #f5f5f8;
+  --sidebar-foreground: #1a1a2e;
+  --sidebar-primary: #7c6aef;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8e8f0;
+  --sidebar-accent-foreground: #1a1a2e;
+  --sidebar-border: #e0e0e8;
+  --sidebar-ring: #c8c8d0;
+}
+
+.dark {
   --background: #101014;
   --foreground: #e8e8ec;
   --card: #1a1a20;
