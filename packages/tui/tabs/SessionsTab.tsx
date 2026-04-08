@@ -536,6 +536,63 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
                 const convId = selected.claude_session_id || selected.id;
                 ark.sessionSearchConversation(convId, q.trim()).then(setSearchResults);
               }}
+              actions={{
+                dispatch: actions.dispatch,
+                stop: actions.stop,
+                restart: actions.restart,
+                complete: actions.complete,
+                interrupt: actions.interrupt,
+                archive: actions.archive,
+                restore: actions.restore,
+              }}
+              onOverlay={(name) => {
+                if (name === "attach" && selected?.session_id) {
+                  // Trigger attach logic via left-pane handler
+                  const sid = selected.session_id;
+                  asyncState.run("Attaching...", async () => {
+                    const compute = selected?.compute_name ? await ark.computeRead(selected.compute_name).catch(() => null) : null;
+                    const attachCompute = compute ?? await ark.computeRead("local");
+                    const { getProvider } = await import("../../compute/index.js");
+                    const provider = getProvider(attachCompute.provider);
+                    if (!provider) { status.show("Provider not found"); return; }
+                    const exists = await provider.checkSession(attachCompute, sid);
+                    if (!exists) { status.show(`Session not found on ${attachCompute.name}`); return; }
+                    const attachCmd = provider.getAttachCommand(attachCompute, selected!);
+                    if (attachCmd.length === 0) { status.show("Cannot attach to this session"); return; }
+                    const origWrite = process.stdout.write.bind(process.stdout);
+                    const origErrWrite = process.stderr.write.bind(process.stderr);
+                    process.stdout.write = (() => true) as typeof process.stdout.write;
+                    process.stderr.write = (() => true) as typeof process.stderr.write;
+                    setTimeout(() => {
+                      process.stdout.write = origWrite;
+                      process.stderr.write = origErrWrite;
+                      try { process.stdin.setRawMode(false); } catch {}
+                      process.stdout.write("\x1b[?1049l");
+                      process.stdout.write("\x1b[?25h");
+                      const result = Bun.spawnSync(attachCmd, {
+                        stdin: "inherit", stdout: "inherit", stderr: "inherit",
+                        env: { ...process.env, TERM: "xterm-256color" },
+                      });
+                      try { process.stdin.setRawMode(true); } catch {}
+                      process.stdout.write("\x1b[?25l");
+                      process.stdout.write("\x1b[2J\x1b[H");
+                      status.show("Detached from session");
+                    }, 100);
+                  });
+                } else if (name === "verify" && selected) {
+                  asyncState.run("Verifying...", async () => {
+                    const result = await ark.verifyRun(selected.id);
+                    if (result.ok) {
+                      status.show("Verification passed");
+                    } else {
+                      status.show(`Verification failed: ${result.message?.slice(0, 80)}`);
+                    }
+                    refresh();
+                  });
+                } else if (name === "talk" || name === "worktreeFinish") {
+                  setOverlay(name as Overlay);
+                }
+              }}
             />
         }
       />

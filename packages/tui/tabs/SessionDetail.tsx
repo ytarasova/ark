@@ -17,6 +17,17 @@ import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useArkClient } from "../hooks/useArkClient.js";
+import { matchesHotkey } from "../../core/hotkeys.js";
+
+export interface SessionActions {
+  dispatch: (id: string) => void;
+  stop: (id: string) => void;
+  restart: (id: string) => void;
+  complete: (id: string) => void;
+  interrupt: (id: string) => void;
+  archive: (id: string) => void;
+  restore: (id: string) => void;
+}
 
 export interface SessionDetailProps {
   session: Session | null;
@@ -30,9 +41,13 @@ export interface SessionDetailProps {
   onSearchSubmit: (q: string) => void;
   /** Called when todos are mutated so parent can refresh if needed */
   onTodoChange?: () => void;
+  /** Session lifecycle actions (dispatch, stop, restart, etc.) for right-pane shortcuts */
+  actions?: SessionActions;
+  /** Callback to open an overlay from the detail pane */
+  onOverlay?: (overlay: string) => void;
 }
 
-export function SessionDetail({ session: s, sessions, pane, searchMode, searchQuery, searchResults, onSearchToggle, onSearchQueryChange, onSearchSubmit, onTodoChange }: SessionDetailProps) {
+export function SessionDetail({ session: s, sessions, pane, searchMode, searchQuery, searchResults, onSearchToggle, onSearchQueryChange, onSearchSubmit, onTodoChange, actions, onOverlay }: SessionDetailProps) {
   const ark = useArkClient();
   const [events, setEvents] = useState<Event[]>([]);
   const [conversation, setConversation] = useState<{ role: string; content: string; timestamp: string }[]>([]);
@@ -105,6 +120,54 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
         ark.todoDelete(todo.id).then(() => refreshTodos()).catch(() => {});
       }
       return;
+    }
+  });
+
+  // Session lifecycle actions in the right pane (dispatch, stop, restart, etc.)
+  useInput((input, key) => {
+    if (pane !== "right" || searchMode || todoAddMode || !s || !actions) return;
+
+    if (key.return) {
+      if (s.status === "ready" || s.status === "blocked") {
+        actions.dispatch(s.id);
+      } else if (["failed", "stopped", "completed"].includes(s.status)) {
+        actions.restart(s.id);
+      }
+    } else if (matchesHotkey("stop", input, key)) {
+      if (!["completed", "failed", "stopped"].includes(s.status)) {
+        actions.stop(s.id);
+      }
+    } else if (matchesHotkey("interrupt", input, key)) {
+      if (s.status === "running" || s.status === "waiting") {
+        actions.interrupt(s.id);
+      }
+    } else if (matchesHotkey("complete", input, key)) {
+      if (s.status === "running") {
+        actions.complete(s.id);
+      }
+    } else if (matchesHotkey("talk", input, key)) {
+      if ((s.status === "running" || s.status === "waiting") && onOverlay) {
+        onOverlay("talk");
+      }
+    } else if (matchesHotkey("attach", input, key)) {
+      // Delegate attach to parent via overlay callback (handled in SessionsTab)
+      if (s.session_id && onOverlay) {
+        onOverlay("attach");
+      }
+    } else if (matchesHotkey("archive", input, key)) {
+      if (["completed", "stopped", "failed"].includes(s.status)) {
+        actions.archive(s.id);
+      } else if (s.status === "archived") {
+        actions.restore(s.id);
+      }
+    } else if (matchesHotkey("worktreeFinish", input, key)) {
+      if (s.workdir && onOverlay) {
+        onOverlay("worktreeFinish");
+      }
+    } else if (matchesHotkey("verify", input, key)) {
+      if (onOverlay) {
+        onOverlay("verify");
+      }
     }
   });
 

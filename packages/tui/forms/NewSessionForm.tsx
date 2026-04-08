@@ -44,6 +44,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
   const [groupName, setGroupName] = useState(prefill?.group || "");
   const [computeName, setComputeName] = useState(prefill?.compute || "local");
   const [flowName, setFlowName] = useState(prefill?.flow || "bare");
+  const [agentName, setAgentName] = useState(prefill?.agent || "");
   const [ticket, setTicket] = useState("");
 
   const isGitRepo = useMemo(() => {
@@ -93,6 +94,11 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
     return fromStore;
   }, [store.flows]);
 
+  const agentChoices = useMemo(() => {
+    const fromStore = store.agents.map(a => ({ label: `${a.name} (${a.model})`, value: a.name }));
+    return [{ label: "(flow default)", value: "" }, ...fromStore];
+  }, [store.agents]);
+
   const [groupChoices, setGroupChoices] = useState([{ label: "(none)", value: "" }]);
   useEffect(() => {
     ark.groupList().then((groups) => {
@@ -128,7 +134,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
         summary: sanitized,
         repo,
         flow: flowName,
-        agent: prefill?.agent || undefined,
+        agent: agentName || prefill?.agent || undefined,
         ticket: ticket || undefined,
         workdir,
         compute_name: computeName || undefined,
@@ -154,6 +160,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
       { name: "isolation", type: "select", visible: showIsolation },
       { name: "group", type: "select" },
       { name: "flow", type: "select" },
+      { name: "agent", type: "select" },
     ],
     onCancel: onDone,
     onSubmit: submit,
@@ -222,8 +229,17 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
         label="Flow"
         value={flowName}
         items={flowChoices}
-        onSelect={(v) => { setFlowName(v); submit(); }}
+        onSelect={(v) => { setFlowName(v); advance(); }}
         active={active === "flow"}
+      />
+
+      <FormSelectField
+        label="Agent"
+        value={agentName}
+        items={agentChoices}
+        onSelect={(v) => { setAgentName(v); submit(); }}
+        active={active === "agent"}
+        displayValue={agentName || "(flow default)"}
       />
 
       {repoPath && !isGitRepo && (
