@@ -48,13 +48,13 @@ install: ## Install deps and symlink `ark` to PATH
 dev: ## Hot-reload: ark web (:8420) + Vite dev server (:5173) with HMR
 	@$(BUN) install --silent
 	@echo "\033[1mArk dev mode\033[0m"
-	@echo "  API:  http://localhost:8420  (ark web -- live from source)"
+	@echo "  API:  http://localhost:8420  (bun --watch, auto-restarts on changes)"
 	@echo "  Web:  http://localhost:5173  (Vite HMR, proxies /api to :8420)"
 	@echo "  CLI:  ./ark <command>        (runs from source, no build)"
 	@echo "  TUI:  ./ark tui             (runs from source, no build)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
-	  ./ark web --port 8420 --api-only 2>&1 | sed 's/^/[api] /' & \
+	  $(BUN) --watch packages/cli/index.ts web --port 8420 --api-only 2>&1 | sed 's/^/[api] /' & \
 	  sleep 1 && cd packages/web && npx vite --port 5173 2>&1 | sed 's/^/[web] /' & \
 	  wait
 
