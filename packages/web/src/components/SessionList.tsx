@@ -2,32 +2,19 @@ import { useMemo } from "react";
 import { StatusDot, StatusBadge } from "./StatusDot.js";
 import { relTime } from "../util.js";
 import { cn } from "../lib/utils.js";
-import { Button } from "./ui/button.js";
-import { Badge } from "./ui/badge.js";
-import { Card } from "./ui/card.js";
-import { Input } from "./ui/input.js";
-import { Search, Play } from "lucide-react";
 
 interface SessionListProps {
   sessions: any[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   filter: string;
-  onFilterChange: (f: string) => void;
   search: string;
-  onSearchChange: (q: string) => void;
-  groups: string[];
   groupFilter: string;
-  onGroupFilter: (g: string) => void;
 }
-
-const FILTERS = ["all", "running", "waiting", "stopped", "failed", "completed"];
 
 export function SessionList({
   sessions, selectedId, onSelect,
-  filter, onFilterChange,
-  search, onSearchChange,
-  groups, groupFilter, onGroupFilter,
+  filter, search, groupFilter,
 }: SessionListProps) {
   const filtered = useMemo(() => {
     let list = sessions || [];
@@ -45,91 +32,39 @@ export function SessionList({
     return list;
   }, [sessions, filter, search, groupFilter]);
 
-  return (
-    <div>
-      {/* Filter bar */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="w-60 h-8 pl-9 pr-3 text-[13px] bg-secondary"
-            placeholder="Search sessions..."
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
-        </div>
-        {FILTERS.map((f) => (
-          <Button
-            key={f}
-            variant={filter === f ? "default" : "outline"}
-            size="xs"
-            onClick={() => onFilterChange(f)}
-          >
-            {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
-          </Button>
-        ))}
-        {groups && groups.length > 0 && (
-          <select
-            className="h-7 px-2 text-[11px] bg-secondary border border-border rounded-lg text-muted-foreground outline-none focus:border-ring transition-all appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]"
-            value={groupFilter}
-            onChange={(e) => onGroupFilter(e.target.value)}
-          >
-            <option value="">All groups</option>
-            {groups.map((g) => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-          </select>
-        )}
+  if (filtered.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+        No sessions found
       </div>
+    );
+  }
 
-      {/* Empty state */}
-      {filtered.length === 0 ? (
-        <div className="flex items-center justify-center h-[calc(100vh-180px)]">
-          <div className="text-center max-w-md">
-            <Play size={28} className="text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground mb-4">No sessions yet</p>
-            <Card className="p-3 font-mono text-xs text-muted-foreground text-left">
-              <span className="text-primary">$</span> ark session start --repo . --summary "Fix login bug" --dispatch
-            </Card>
+  return (
+    <div className="flex flex-col">
+      {filtered.map((s) => (
+        <div
+          key={s.id}
+          onClick={() => onSelect(s.id)}
+          className={cn(
+            "px-3 py-2.5 cursor-pointer border-b border-border transition-colors",
+            "hover:bg-accent",
+            selectedId === s.id && "bg-accent border-l-2 border-l-primary"
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <StatusDot status={s.status} />
+              <span className="text-[13px] text-foreground truncate">{s.summary || s.id}</span>
+            </div>
+            <StatusBadge status={s.status} />
+          </div>
+          <div className="flex gap-2 mt-1 text-[10px] font-mono text-muted-foreground">
+            <span>{s.id}</span>
+            <span>{relTime(s.updated_at)}</span>
           </div>
         </div>
-      ) : (
-        /* Session cards */
-        <div className="space-y-1.5">
-          {filtered.map((s) => (
-            <Card
-              key={s.id}
-              onClick={() => onSelect(s.id)}
-              className={cn(
-                "p-3 cursor-pointer transition-all duration-150",
-                "hover:bg-accent hover:border-ring",
-                selectedId === s.id && "bg-accent border-primary/40 ring-1 ring-primary/20"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <StatusDot status={s.status} />
-                  <span className="text-[13px] font-semibold text-foreground truncate">
-                    {s.summary || s.id}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {s.flow && s.flow !== "bare" && (
-                    <span className="text-[10px] font-mono text-muted-foreground">{s.flow}</span>
-                  )}
-                  <StatusBadge status={s.status} />
-                </div>
-              </div>
-              <div className="flex gap-3 mt-1.5 text-[11px] font-mono text-muted-foreground">
-                <span>{s.id}</span>
-                {s.agent && <span className="text-muted-foreground">{s.agent}</span>}
-                {s.stage && <span className="text-primary/60">{s.stage}</span>}
-                <span>{relTime(s.updated_at)}</span>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+      ))}
     </div>
   );
 }
