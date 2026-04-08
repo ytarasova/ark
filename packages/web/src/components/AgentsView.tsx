@@ -3,16 +3,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
 import { useAgentsQuery } from "../hooks/useQueries.js";
 import { cn } from "../lib/utils.js";
-import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
-import { Separator } from "./ui/separator.js";
 import { Settings } from "lucide-react";
-import * as Dialog from "@radix-ui/react-dialog";
 
-function NewAgentModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
-  const [form, setForm] = useState({ name: "", description: "", model: "sonnet", runtime: "claude-code" });
+const selectClassName =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]";
+
+function NewAgentForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
+  const [form, setForm] = useState({ name: "", description: "", model: "sonnet", runtime: "claude-code", system_prompt: "" });
 
   function update(key: string, val: string) {
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -25,54 +25,47 @@ function NewAgentModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (
   }
 
   return (
-    <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] max-w-[90vw] bg-card border border-border rounded-xl p-6 z-[200] shadow-2xl">
-          <form onSubmit={handleSubmit}>
-            <Dialog.Title className="text-base font-semibold text-foreground mb-5">
-              New Agent
-            </Dialog.Title>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
-              <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="my-agent" />
-            </div>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Description</label>
-              <Input value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="What does this agent do?" />
-            </div>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Model</label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]"
-                value={form.model}
-                onChange={(e) => update("model", e.target.value)}
-              >
-                <option value="opus">opus</option>
-                <option value="sonnet">sonnet</option>
-                <option value="haiku">haiku</option>
-              </select>
-            </div>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Runtime</label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]"
-                value={form.runtime}
-                onChange={(e) => update("runtime", e.target.value)}
-              >
-                <option value="claude-code">claude-code</option>
-                <option value="cli-agent">cli-agent</option>
-              </select>
-            </div>
-            <Separator className="mt-5" />
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-              <Button type="submit" size="sm">Create Agent</Button>
-            </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <div className="flex flex-col h-full p-5 overflow-y-auto">
+      <h2 className="text-base font-semibold text-foreground mb-5">New Agent</h2>
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
+          <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="my-agent" />
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Description</label>
+          <Input value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="What does this agent do?" />
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Model</label>
+          <select className={selectClassName} value={form.model} onChange={(e) => update("model", e.target.value)}>
+            <option value="opus">opus</option>
+            <option value="sonnet">sonnet</option>
+            <option value="haiku">haiku</option>
+          </select>
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Runtime</label>
+          <select className={selectClassName} value={form.runtime} onChange={(e) => update("runtime", e.target.value)}>
+            <option value="claude-code">claude-code</option>
+            <option value="cli-agent">cli-agent</option>
+          </select>
+        </div>
+        <div className="mb-3.5 flex flex-col flex-1 min-h-0">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">System Prompt</label>
+          <textarea
+            className="flex-1 min-h-[200px] w-full resize-none bg-transparent border border-input rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+            value={form.system_prompt}
+            onChange={(e) => update("system_prompt", e.target.value)}
+            placeholder="Optional system prompt for the agent..."
+          />
+        </div>
+        <div className="flex gap-2 pt-4 border-t border-border mt-auto">
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="sm">Create Agent</Button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -133,10 +126,12 @@ export function AgentsView({ showCreate = false, onCloseCreate }: AgentsViewProp
           </div>
         ))}
       </div>
-      {/* Right: detail panel */}
-      <div className="p-5 overflow-y-auto bg-background">
-        {selected ? (
-          <>
+      {/* Right: detail panel or create form */}
+      <div className="overflow-y-auto bg-background">
+        {showCreate ? (
+          <NewAgentForm onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />
+        ) : selected ? (
+          <div className="p-5">
             <h2 className="text-lg font-semibold text-foreground mb-1">{selected.name}</h2>
             {selected.description && (
               <p className="text-sm text-muted-foreground mb-5">{selected.description}</p>
@@ -197,7 +192,7 @@ export function AgentsView({ showCreate = false, onCloseCreate }: AgentsViewProp
                 </Button>
               </div>
             )}
-          </>
+          </div>
         ) : (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
             Select an agent
@@ -205,7 +200,6 @@ export function AgentsView({ showCreate = false, onCloseCreate }: AgentsViewProp
         )}
       </div>
     </div>
-    {showCreate && <NewAgentModal onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />}
     </>
   );
 }

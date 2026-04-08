@@ -5,13 +5,13 @@ import { useComputeQuery } from "../hooks/useQueries.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
-import { Separator } from "./ui/separator.js";
-import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
 import { Server } from "lucide-react";
-import * as Dialog from "@radix-ui/react-dialog";
 
-function NewComputeModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
+const selectClassName =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]";
+
+function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
   const [form, setForm] = useState({ name: "", provider: "local", size: "", region: "", aws_profile: "", vpc_id: "", subnet_id: "" });
 
   function update(key: string, val: string) {
@@ -25,77 +25,61 @@ function NewComputeModal({ onClose, onSubmit }: { onClose: () => void; onSubmit:
   }
 
   return (
-    <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] max-w-[90vw] bg-card border border-border rounded-xl p-6 z-[200] shadow-2xl">
-          <form onSubmit={handleSubmit}>
-            <Dialog.Title className="text-base font-semibold text-foreground mb-5">
-              New Compute Target
-            </Dialog.Title>
+    <div className="flex flex-col h-full p-5 overflow-y-auto">
+      <h2 className="text-base font-semibold text-foreground mb-5">New Compute Target</h2>
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
+          <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="my-compute" />
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Provider</label>
+          <select className={selectClassName} value={form.provider} onChange={(e) => update("provider", e.target.value)}>
+            <option value="local">local</option>
+            <option value="docker">docker</option>
+            <option value="devcontainer">devcontainer</option>
+            <option value="ec2">ec2</option>
+            <option value="ec2-docker">ec2-docker</option>
+            <option value="ec2-devcontainer">ec2-devcontainer</option>
+          </select>
+        </div>
+        {(form.provider.startsWith("ec2")) && (
+          <>
             <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
-              <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="my-compute" />
-            </div>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Provider</label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]"
-                value={form.provider}
-                onChange={(e) => update("provider", e.target.value)}
-              >
-                <option value="local">local</option>
-                <option value="docker">docker</option>
-                <option value="devcontainer">devcontainer</option>
-                <option value="ec2">ec2</option>
-                <option value="ec2-docker">ec2-docker</option>
-                <option value="ec2-devcontainer">ec2-devcontainer</option>
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Size</label>
+              <select className={selectClassName} value={form.size} onChange={(e) => update("size", e.target.value)}>
+                <option value="">Default</option>
+                <option value="xs">XS (2 vCPU, 8 GB)</option>
+                <option value="s">S (4 vCPU, 16 GB)</option>
+                <option value="m">M (8 vCPU, 32 GB)</option>
+                <option value="l">L (16 vCPU, 64 GB)</option>
+                <option value="xl">XL (32 vCPU, 128 GB)</option>
               </select>
             </div>
-            {(form.provider.startsWith("ec2")) && (
-              <>
-                <div className="mb-3.5">
-                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Size</label>
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]"
-                    value={form.size}
-                    onChange={(e) => update("size", e.target.value)}
-                  >
-                    <option value="">Default</option>
-                    <option value="xs">XS (2 vCPU, 8 GB)</option>
-                    <option value="s">S (4 vCPU, 16 GB)</option>
-                    <option value="m">M (8 vCPU, 32 GB)</option>
-                    <option value="l">L (16 vCPU, 64 GB)</option>
-                    <option value="xl">XL (32 vCPU, 128 GB)</option>
-                  </select>
-                </div>
-                <div className="mb-3.5">
-                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Region</label>
-                  <Input value={form.region} onChange={(e) => update("region", e.target.value)} placeholder="us-east-1" />
-                </div>
-                <div className="mb-3.5">
-                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">AWS Profile</label>
-                  <Input value={form.aws_profile} onChange={(e) => update("aws_profile", e.target.value)} placeholder="default" />
-                </div>
-                <div className="mb-3.5">
-                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">VPC ID</label>
-                  <Input value={form.vpc_id} onChange={(e) => update("vpc_id", e.target.value)} placeholder="vpc-xxxxxxxx (optional)" />
-                </div>
-                <div className="mb-3.5">
-                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Subnet ID</label>
-                  <Input value={form.subnet_id} onChange={(e) => update("subnet_id", e.target.value)} placeholder="subnet-xxxxxxxx (optional)" />
-                </div>
-              </>
-            )}
-            <Separator className="mt-5" />
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-              <Button type="submit" size="sm">Create Compute</Button>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Region</label>
+              <Input value={form.region} onChange={(e) => update("region", e.target.value)} placeholder="us-east-1" />
             </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">AWS Profile</label>
+              <Input value={form.aws_profile} onChange={(e) => update("aws_profile", e.target.value)} placeholder="default" />
+            </div>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">VPC ID</label>
+              <Input value={form.vpc_id} onChange={(e) => update("vpc_id", e.target.value)} placeholder="vpc-xxxxxxxx (optional)" />
+            </div>
+            <div className="mb-3.5">
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Subnet ID</label>
+              <Input value={form.subnet_id} onChange={(e) => update("subnet_id", e.target.value)} placeholder="subnet-xxxxxxxx (optional)" />
+            </div>
+          </>
+        )}
+        <div className="flex gap-2 pt-4 border-t border-border mt-auto">
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="sm">Create Compute</Button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -215,10 +199,12 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
           </div>
         ))}
       </div>
-      {/* Right: detail panel */}
-      <div className="p-5 overflow-y-auto bg-background">
-        {selected ? (
-          <>
+      {/* Right: detail panel or create form */}
+      <div className="overflow-y-auto bg-background">
+        {showCreate ? (
+          <NewComputeForm onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />
+        ) : selected ? (
+          <div className="p-5">
             <h2 className="text-lg font-semibold text-foreground mb-1">{selected.name || selected.id}</h2>
             {/* Actions - hide for local provider */}
             {selected.provider !== "local" && (
@@ -305,7 +291,7 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
                 </div>
               </div>
             )}
-          </>
+          </div>
         ) : (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
             Select a compute target
@@ -313,7 +299,6 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
         )}
       </div>
     </div>
-    {showCreate && <NewComputeModal onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />}
     </>
   );
 }

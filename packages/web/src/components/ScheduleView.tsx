@@ -5,10 +5,7 @@ import { useSchedulesQuery } from "../hooks/useQueries.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
-import { Card } from "./ui/card.js";
-import { Separator } from "./ui/separator.js";
 import { Calendar } from "lucide-react";
-import * as Dialog from "@radix-ui/react-dialog";
 
 interface ScheduleViewProps {
   showCreate?: boolean;
@@ -75,10 +72,12 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
             </div>
           ))}
         </div>
-        {/* Right: detail panel */}
-        <div className="p-5 overflow-y-auto bg-background">
-          {selected ? (
-            <>
+        {/* Right: detail panel or create form */}
+        <div className="overflow-y-auto bg-background">
+          {showCreate ? (
+            <NewScheduleForm onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />
+          ) : selected ? (
+            <div className="p-5">
               <h2 className="text-lg font-semibold text-foreground mb-1">{selected.summary || selected.id}</h2>
               <div className="mb-4">
                 <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Schedule</h3>
@@ -137,7 +136,7 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
                   </Button>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
               Select a schedule
@@ -145,7 +144,6 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
           )}
         </div>
       </div>
-      {showCreate && <NewScheduleModal onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />}
     </>
   );
 }
@@ -153,7 +151,7 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
 const selectClassName =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]";
 
-function NewScheduleModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
+function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
   const [form, setForm] = useState({
     cron: "",
     flow: "",
@@ -184,91 +182,63 @@ function NewScheduleModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
   }
 
   return (
-    <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] max-w-[90vw] bg-card border border-border rounded-xl p-6 z-[200] shadow-2xl">
-          <form onSubmit={handleSubmit}>
-            <Dialog.Title className="text-base font-semibold text-foreground mb-5">
-              New Schedule
-            </Dialog.Title>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Cron Expression *</label>
-              <Input autoFocus value={form.cron} onChange={(e) => update("cron", e.target.value)} placeholder="*/30 * * * *" />
-            </div>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Summary</label>
-              <Input value={form.summary} onChange={(e) => update("summary", e.target.value)} placeholder="What should the scheduled agent do?" />
-            </div>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Flow</label>
-              <select
-                className={selectClassName}
-                value={form.flow}
-                onChange={(e) => update("flow", e.target.value)}
-              >
-                {flows.map((f) => (
-                  <option key={f.name} value={f.name}>{f.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Repository</label>
-              <Input value={form.repo} onChange={(e) => update("repo", e.target.value)} placeholder="/path/to/repo or ." />
-            </div>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Compute</label>
-              <select
-                className={selectClassName}
-                value={form.compute_name}
-                onChange={(e) => update("compute_name", e.target.value)}
-              >
-                {computes.map((c) => (
-                  <option key={c.name} value={c.name}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-3.5">
-              <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Group</label>
-              {groups.length > 0 && (
-                <select
-                  className={selectClassName}
-                  value={groups.includes(form.group_name) ? form.group_name : ""}
-                  onChange={(e) => update("group_name", e.target.value)}
-                >
-                  <option value="">none</option>
-                  {groups.map((g) => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </select>
-              )}
-              <Input
-                className={groups.length > 0 ? "mt-1.5" : ""}
-                value={form.group_name}
-                onChange={(e) => update("group_name", e.target.value)}
-                placeholder="Or type a new group name"
-              />
-            </div>
-            <Separator className="mt-5" />
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onClose}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-              >
-                Create Schedule
-              </Button>
-            </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <div className="flex flex-col h-full p-5 overflow-y-auto">
+      <h2 className="text-base font-semibold text-foreground mb-5">New Schedule</h2>
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Cron Expression *</label>
+          <Input autoFocus value={form.cron} onChange={(e) => update("cron", e.target.value)} placeholder="*/30 * * * *" />
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Summary</label>
+          <Input value={form.summary} onChange={(e) => update("summary", e.target.value)} placeholder="What should the scheduled agent do?" />
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Flow</label>
+          <select className={selectClassName} value={form.flow} onChange={(e) => update("flow", e.target.value)}>
+            {flows.map((f) => (
+              <option key={f.name} value={f.name}>{f.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Repository</label>
+          <Input value={form.repo} onChange={(e) => update("repo", e.target.value)} placeholder="/path/to/repo or ." />
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Compute</label>
+          <select className={selectClassName} value={form.compute_name} onChange={(e) => update("compute_name", e.target.value)}>
+            {computes.map((c) => (
+              <option key={c.name} value={c.name}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Group</label>
+          {groups.length > 0 && (
+            <select
+              className={selectClassName}
+              value={groups.includes(form.group_name) ? form.group_name : ""}
+              onChange={(e) => update("group_name", e.target.value)}
+            >
+              <option value="">none</option>
+              {groups.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+          )}
+          <Input
+            className={groups.length > 0 ? "mt-1.5" : ""}
+            value={form.group_name}
+            onChange={(e) => update("group_name", e.target.value)}
+            placeholder="Or type a new group name"
+          />
+        </div>
+        <div className="flex gap-2 pt-4 border-t border-border mt-auto">
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="sm">Create Schedule</Button>
+        </div>
+      </form>
+    </div>
   );
 }
