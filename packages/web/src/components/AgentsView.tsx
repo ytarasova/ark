@@ -46,7 +46,7 @@ function AgentForm({ onClose, onSubmit, agent, isEdit }: { onClose: () => void; 
   return (
     <div className="flex flex-col h-full p-5 overflow-y-auto">
       <h2 className="text-base font-semibold text-foreground mb-5">{isEdit ? `Edit Agent: ${agent?.name}` : "New Agent"}</h2>
-      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+      <form onSubmit={handleSubmit} className="flex flex-col">
         {!isEdit && (
           <div className="mb-3.5">
             <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
@@ -108,10 +108,10 @@ function AgentForm({ onClose, onSubmit, agent, isEdit }: { onClose: () => void; 
             </select>
           </div>
         )}
-        <div className="mb-3.5 flex flex-col flex-1 min-h-0">
+        <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">System Prompt</label>
           <textarea
-            className="flex-1 min-h-[200px] w-full resize-none bg-transparent border border-input rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+            className="min-h-[200px] w-full resize-y bg-transparent border border-input rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
             value={form.system_prompt}
             onChange={(e) => update("system_prompt", e.target.value)}
             placeholder="Optional system prompt for the agent..."
