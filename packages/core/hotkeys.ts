@@ -42,6 +42,7 @@ const DEFAULTS: HotkeyMap = {
   memory: "Y",
   verify: "V",
   archive: "Z",
+  export: "E",
 };
 
 let _hotkeys: HotkeyMap | null = null;

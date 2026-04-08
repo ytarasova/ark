@@ -160,6 +160,7 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
     hints.push(<KeyHint key="M" k="M" label="mcp" />);
     hints.push(<KeyHint key="K" k="K" label="skills" />);
     hints.push(<KeyHint key="Y" k="Y" label="memory" />);
+    hints.push(<KeyHint key="E" k="E" label="export" />);
     hints.push(<KeyHint key="x" k="x" label="delete" />);
   }
   hints.push(<KeyHint key="n" k="n" label="new" />);

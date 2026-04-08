@@ -312,6 +312,19 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
       } else if (selected?.status === "archived") {
         actions.restore(selected.id);
       }
+    } else if (matchesHotkey("export", input, key)) {
+      if (selected) {
+        const outPath = `session-${selected.id}.json`;
+        asyncState.run(`Exporting ${selected.id}...`, async () => {
+          const result = await ark.sessionExport(selected.id, outPath);
+          if (result.ok) {
+            status.show(`Exported to ${result.filePath ?? outPath}`);
+          } else {
+            status.show("Export failed");
+          }
+          refresh();
+        });
+      }
     } else if (input === "S") {
       if (selectedGroup && groupSessions.length > 0) {
         actions.stopGroup(groupSessions);

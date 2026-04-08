@@ -576,6 +576,10 @@ export class ArkClient {
     return this.rpc("verify/run", { sessionId });
   }
 
+  async sessionExport(sessionId: string, filePath?: string): Promise<{ ok: boolean; data?: any; filePath?: string }> {
+    return this.rpc("session/export", { sessionId, filePath });
+  }
+
   // ── Teardown ────────────────────────────────────────────────────────────────
 
   close(): void {

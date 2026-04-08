@@ -299,4 +299,18 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { runVerification } = await import("../../core/services/session-orchestration.js");
     return runVerification(sessionId);
   });
+
+  // ── Export ─────────────────────────────────────────────────────────────
+
+  router.handle("session/export", async (params) => {
+    const { sessionId, filePath } = extract<{ sessionId: string; filePath?: string }>(params, ["sessionId"]);
+    const { exportSession, exportSessionToFile } = await import("../../core/session-share.js");
+    if (filePath) {
+      const ok = exportSessionToFile(sessionId, filePath);
+      return { ok, filePath };
+    }
+    const data = exportSession(sessionId);
+    if (!data) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    return { ok: true, data };
+  });
 }
