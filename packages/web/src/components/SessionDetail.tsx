@@ -467,7 +467,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
                 Modified since last review: {diffData.modifiedSinceReview.join(", ")}
               </div>
             )}
-            <pre className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[400px] overflow-auto whitespace-pre-wrap break-all text-muted-foreground">
+            <pre className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] overflow-auto whitespace-pre-wrap break-all text-muted-foreground">
               {diffData.stat || diffData.message || "No changes"}
             </pre>
           </div>
@@ -543,7 +543,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
           <div className="mb-5">
             <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Files Changed ({s.config.filesChanged.length})</h3>
             <Separator className="mb-2" />
-            <div className="max-h-[200px] overflow-y-auto">
+            <div className="overflow-y-auto">
               {s.config.filesChanged.map((f: string) => (
                 <div key={f} className="text-[11px] text-muted-foreground py-px font-mono">{f}</div>
               ))}
@@ -585,7 +585,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
           <div className="mb-5">
             <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Conversation ({messages.length})</h3>
             <Separator className="mb-2" />
-            <div className="flex flex-col gap-1.5 max-h-[400px] overflow-y-auto">
+            <div className="flex flex-col gap-1.5 overflow-y-auto">
               {messages.map((m: any, i: number) => (
                 <div
                   key={m.id || i}
@@ -619,7 +619,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
           <div className="mb-5">
             <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Live Output</h3>
             <Separator className="mb-2" />
-            <div ref={outputRef} className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">{output}</div>
+            <div ref={outputRef} className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">{output}</div>
           </div>
         )}
 

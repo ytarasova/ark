@@ -582,7 +582,7 @@ function TranscriptMessages({ sessionId }: { sessionId: string }) {
   return (
     <div className="mb-4">
       <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Recent Messages ({turns.length})</h3>
-      <div className="flex flex-col gap-1.5 max-h-[500px] overflow-y-auto">
+      <div className="flex flex-col gap-1.5">
         {turns.map((t: any, i: number) => (
           <div
             key={i}
