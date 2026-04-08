@@ -13,12 +13,12 @@ let app: ElectronApplication;
 let window: Page;
 
 test.beforeAll(async () => {
-  // Build web frontend before tests
+  // Build web frontend before tests (allow 60s for CI)
   const { execFileSync } = require("child_process");
   execFileSync("bun", ["run", join(__dirname, "..", "..", "web", "build.ts")], {
     cwd: join(__dirname, "..", "..", ".."),
     stdio: "pipe",
-    timeout: 30_000,
+    timeout: 60_000,
   });
 
   // Launch Electron
@@ -58,7 +58,7 @@ test("window has minimum dimensions", async () => {
 
 test("sidebar shows all navigation items", async () => {
   const sidebar = window.locator(".sidebar-nav");
-  await expect(sidebar.locator(".nav-item")).toHaveCount(10); // Sessions through System
+  await expect(sidebar.locator(".nav-item")).toHaveCount(9); // Sessions through Costs (System removed)
 });
 
 test("sidebar logo shows Ark", async () => {
@@ -111,10 +111,6 @@ test("click Costs tab navigates to costs view", async () => {
   await expect(window.locator(".main-title")).toHaveText("Costs");
 });
 
-test("click System tab navigates to system view", async () => {
-  await window.locator(".nav-item", { hasText: "System" }).click();
-  await expect(window.locator(".main-title")).toHaveText("System");
-});
 
 // Navigate back to sessions for remaining tests
 test("click Sessions returns to sessions view", async () => {

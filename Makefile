@@ -13,7 +13,8 @@ install: ## Install deps and symlink `ark` onto PATH
 	ln -sf "$(CURDIR)/ark" $(ARK_BIN)
 	@echo "Done. Run 'ark' from anywhere."
 
-dev: install ## Install deps, symlink ark, then start TypeScript watcher
+dev: ## Install deps and start TypeScript watcher
+	$(BUN) install
 	$(BUN) run dev
 
 tui: ## Launch the terminal UI

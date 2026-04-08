@@ -5,6 +5,8 @@ dist/
 *.d.ts
 !packages/**/*.d.ts
 !shims/**/*.js
+!packages/desktop/main.js
+!packages/desktop/preload.js
 .env
 .worktrees/
 
