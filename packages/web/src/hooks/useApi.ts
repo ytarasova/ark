@@ -1,16 +1,43 @@
 const BASE = window.location.origin;
 const TOKEN = new URLSearchParams(window.location.search).get("token");
 
+let rpcId = 0;
+
 function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (TOKEN) headers["Authorization"] = `Bearer ${TOKEN}`;
   return headers;
 }
 
-function authParams(): string {
-  return TOKEN ? `?token=${TOKEN}` : "";
+/**
+ * Call the JSON-RPC endpoint. All API methods go through this single function.
+ */
+async function rpc<T>(method: string, params?: Record<string, unknown>): Promise<T> {
+  const id = ++rpcId;
+  const res = await fetch(`${BASE}/api/rpc`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ jsonrpc: "2.0", id, method, params: params ?? {} }),
+  });
+  const data = await res.json();
+  if (data.error) {
+    throw new Error(data.error.message || "RPC error");
+  }
+  return data.result as T;
 }
 
+/**
+ * SSE event source URL (still a separate endpoint).
+ */
+export function sseUrl(): string {
+  const sep = "?";
+  return `${BASE}/api/events/stream${TOKEN ? `${sep}token=${TOKEN}` : ""}`;
+}
+
+/**
+ * Fetch helper for non-RPC endpoints (SSE URL construction, etc).
+ * Kept for backward compatibility but most callers should use `api.*` below.
+ */
 export async function fetchApi<T>(path: string, opts?: RequestInit): Promise<T> {
   const sep = path.includes("?") ? "&" : "?";
   const url = opts?.method === "POST" || opts?.method === "PUT" || opts?.method === "DELETE"
@@ -30,128 +57,129 @@ export async function fetchApi<T>(path: string, opts?: RequestInit): Promise<T> 
   return resp.json();
 }
 
-async function apiPost<T>(path: string, body?: any): Promise<T> {
-  return fetchApi<T>(path, {
-    method: "POST",
-    body: body ? JSON.stringify(body) : undefined,
-  });
-}
-
 export const api = {
   // Sessions
-  getSessions: () => fetchApi<any[]>("/api/sessions"),
-  getSession: (id: string) => fetchApi<any>(`/api/sessions/${id}`),
-  getOutput: (id: string) => fetchApi<any>(`/api/sessions/${id}/output`),
-  getEvents: (id: string) => fetchApi<any[]>(`/api/sessions/${id}/events`),
-  getMessages: (id: string) => fetchApi<any>(`/api/sessions/${id}/messages`),
-  exportSession: (id: string) => fetchApi<any>(`/api/sessions/${id}/export`),
-  createSession: (data: any) => apiPost<any>("/api/sessions", data),
-  importSession: (data: any) => apiPost<any>("/api/sessions/import", data),
-  dispatch: (id: string) => apiPost<any>(`/api/sessions/${id}/dispatch`),
-  stop: (id: string) => apiPost<any>(`/api/sessions/${id}/stop`),
-  restart: (id: string) => apiPost<any>(`/api/sessions/${id}/restart`),
-  deleteSession: (id: string) => apiPost<any>(`/api/sessions/${id}/delete`),
-  undelete: (id: string) => apiPost<any>(`/api/sessions/${id}/undelete`),
-  fork: (id: string, name?: string) => apiPost<any>(`/api/sessions/${id}/fork`, { name }),
-  send: (id: string, message: string) => apiPost<any>(`/api/sessions/${id}/send`, { message }),
-  pause: (id: string, reason?: string) => apiPost<any>(`/api/sessions/${id}/pause`, { reason }),
-  interrupt: (id: string) => apiPost<any>(`/api/sessions/${id}/interrupt`),
-  archive: (id: string) => apiPost<any>(`/api/sessions/${id}/archive`),
-  restore: (id: string) => apiPost<any>(`/api/sessions/${id}/restore`),
-  advance: (id: string) => apiPost<any>(`/api/sessions/${id}/advance`),
-  complete: (id: string) => apiPost<any>(`/api/sessions/${id}/complete`),
-  spawnSubagent: (id: string, data: any) => apiPost<any>(`/api/sessions/${id}/spawn-subagent`, data),
+  getSessions: () => rpc<{ sessions: any[] }>("session/list", { limit: 200 }).then(r => r.sessions),
+  getSession: (id: string) => rpc<any>("session/read", { sessionId: id, include: ["events"] }),
+  getOutput: (id: string) => rpc<{ output: string }>("session/output", { sessionId: id }).then(r => ({ ok: true, output: r.output })),
+  getEvents: (id: string) => rpc<{ events: any[] }>("session/events", { sessionId: id }).then(r => r.events),
+  getMessages: (id: string) => rpc<any>("session/messages", { sessionId: id }),
+  exportSession: (id: string) => rpc<any>("session/export-data", { sessionId: id }),
+  createSession: (data: any) => rpc<any>("session/start", data).then(r => ({ ok: true, session: r.session })),
+  importSession: (data: any) => rpc<any>("session/import", data),
+  dispatch: (id: string) => rpc<any>("session/dispatch", { sessionId: id }),
+  stop: (id: string) => rpc<any>("session/stop", { sessionId: id }),
+  restart: (id: string) => rpc<any>("session/resume", { sessionId: id }),
+  deleteSession: (id: string) => rpc<any>("session/delete", { sessionId: id }),
+  undelete: (id: string) => rpc<any>("session/undelete", { sessionId: id }),
+  fork: (id: string, name?: string) => rpc<any>("session/clone", { sessionId: id, name }).then(r => ({ ok: true, sessionId: r.session?.id })),
+  send: (id: string, message: string) => rpc<any>("message/send", { sessionId: id, content: message }),
+  pause: (id: string, reason?: string) => rpc<any>("session/pause", { sessionId: id, reason }),
+  interrupt: (id: string) => rpc<any>("session/interrupt", { sessionId: id }),
+  archive: (id: string) => rpc<any>("session/archive", { sessionId: id }),
+  restore: (id: string) => rpc<any>("session/restore", { sessionId: id }),
+  advance: (id: string) => rpc<any>("session/advance", { sessionId: id }),
+  complete: (id: string) => rpc<any>("session/complete", { sessionId: id }),
+  spawnSubagent: (id: string, data: any) => rpc<any>("session/spawn", { sessionId: id, ...data }),
 
   // Todos & Verification
-  getTodos: (id: string) => fetchApi<any>(`/api/sessions/${id}/todos`),
-  addTodo: (id: string, content: string) => apiPost<any>(`/api/sessions/${id}/todos`, { content }),
-  toggleTodo: (id: number) => apiPost<any>(`/api/todos/${id}/toggle`),
-  deleteTodo: (id: number) => apiPost<any>(`/api/todos/${id}/delete`),
-  runVerification: (id: string) => apiPost<any>(`/api/sessions/${id}/verify`),
+  getTodos: (id: string) => rpc<{ todos: any[] }>("todo/list", { sessionId: id }).then(r => r.todos),
+  addTodo: (id: string, content: string) => rpc<any>("todo/add", { sessionId: id, content }).then(r => ({ ok: true, todo: r.todo })),
+  toggleTodo: (id: number) => rpc<any>("todo/toggle", { id }).then(r => ({ ok: true, todo: r.todo })),
+  deleteTodo: (id: number) => rpc<any>("todo/delete", { id }),
+  runVerification: (id: string) => rpc<any>("verify/run", { sessionId: id }),
 
   // Costs
-  getCosts: () => fetchApi<any>("/api/costs"),
-  exportCosts: (format: string) => fetchApi<any>(`/api/costs/export?format=${format}`),
+  getCosts: () => rpc<{ costs: any[]; total: number }>("costs/read").then(r => ({ sessions: r.costs, total: r.total })),
+  exportCosts: (format: string) => rpc<any>("cost/export", { format }),
 
   // Search
-  search: (q: string) => fetchApi<any>(`/api/search?q=${encodeURIComponent(q)}`),
-  searchGlobal: (q: string) => fetchApi<any>(`/api/search/global?q=${encodeURIComponent(q)}`),
+  search: (q: string) => rpc<any>("search/sessions", { query: q }),
+  searchGlobal: (q: string) => rpc<any>("search/global", { query: q }),
 
   // History (Claude Code transcripts)
-  getClaudeSessions: () => fetchApi<any[]>("/api/history/sessions"),
-  getConversation: (sessionId: string, limit = 50) => fetchApi<any[]>(`/api/history/conversation/${encodeURIComponent(sessionId)}?limit=${limit}`),
-  refreshHistory: () => apiPost<any>("/api/history/refresh"),
-  rebuildHistory: () => apiPost<any>("/api/history/rebuild"),
+  getClaudeSessions: () => rpc<{ items: any[] }>("history/list").then(r => r.items),
+  getConversation: (sessionId: string, limit = 50) => rpc<{ turns: any[] }>("session/conversation", { sessionId, limit }).then(r => r.turns || []),
+  refreshHistory: () => rpc<any>("history/refresh-and-index"),
+  rebuildHistory: () => rpc<any>("history/rebuild-fts"),
 
   // System
-  getStatus: () => fetchApi<any>("/api/status"),
-  getGroups: () => fetchApi<string[]>("/api/groups"),
-  getConfig: () => fetchApi<any>("/api/config"),
+  getStatus: () => rpc<any>("status/get"),
+  getGroups: () => rpc<{ groups: any[] }>("group/list").then(r => r.groups.map((g: any) => g.name)),
+  getConfig: () => rpc<any>("config/get"),
 
   // Profiles
-  getProfiles: () => fetchApi<any[]>("/api/profiles"),
-  createProfile: (name: string, desc?: string) => apiPost<any>("/api/profiles", { name, description: desc }),
-  deleteProfile: (name: string) => fetchApi<any>(`/api/profiles/${name}`, { method: "DELETE" }),
+  getProfiles: () => rpc<{ profiles: any[] }>("profile/list").then(r => r.profiles),
+  createProfile: (name: string, desc?: string) => rpc<any>("profile/create", { name, description: desc }).then(r => ({ ok: true, profile: r.profile })),
+  deleteProfile: (name: string) => rpc<any>("profile/delete", { name }).then(() => ({ ok: true, message: "Deleted" })),
 
   // Tools & MCP
-  getTools: (dir?: string) => fetchApi<any[]>(`/api/tools${dir ? `?dir=${encodeURIComponent(dir)}` : ""}`),
-  attachMcp: (dir: string, name: string, config: any) => apiPost<any>("/api/mcp/attach", { dir, name, config }),
-  detachMcp: (dir: string, name: string) => apiPost<any>("/api/mcp/detach", { dir, name }),
+  getTools: (dir?: string) => rpc<{ tools: any[] }>("tools/list", { projectRoot: dir }).then(r => r.tools),
+  attachMcp: (dir: string, name: string, config: any) => rpc<any>("mcp/attach-by-dir", { dir, name, config }),
+  detachMcp: (dir: string, name: string) => rpc<any>("mcp/detach-by-dir", { dir, name }),
 
   // Skills & Recipes
-  getSkills: () => fetchApi<any[]>("/api/skills"),
-  createSkill: (data: any) => apiPost<any>("/api/skills", data),
-  deleteSkill: (name: string, scope?: string) => fetchApi<any>(`/api/skills/${encodeURIComponent(name)}${scope ? `?scope=${scope}` : ""}`, { method: "DELETE" }),
-  getRecipes: () => fetchApi<any[]>("/api/recipes"),
-  deleteRecipe: (name: string, scope?: string) => fetchApi<any>(`/api/recipes/${encodeURIComponent(name)}${scope ? `?scope=${scope}` : ""}`, { method: "DELETE" }),
+  getSkills: () => rpc<{ skills: any[] }>("skill/list").then(r => r.skills),
+  createSkill: (data: any) => rpc<any>("skill/save", data).then(r => ({ ok: true, name: r.name })),
+  deleteSkill: (name: string, scope?: string) => rpc<any>("skill/delete", { name, scope }),
+  getRecipes: () => rpc<{ recipes: any[] }>("recipe/list").then(r => r.recipes),
+  deleteRecipe: (name: string, scope?: string) => rpc<any>("recipe/delete", { name, scope: scope ?? "global" }),
 
   // Agents & Flows
-  getAgents: () => fetchApi<any[]>("/api/agents"),
-  createAgent: (data: any) => apiPost<any>("/api/agents", data),
-  updateAgent: (name: string, data: any) => fetchApi<any>(`/api/agents/${encodeURIComponent(name)}`, { method: "PUT", body: JSON.stringify(data) }),
-  deleteAgent: (name: string) => fetchApi<any>(`/api/agents/${encodeURIComponent(name)}`, { method: "DELETE" }),
-  getFlows: () => fetchApi<any[]>("/api/flows"),
-  getFlowDetail: (name: string) => fetchApi<any>(`/api/flows/${encodeURIComponent(name)}`),
-  createFlow: (data: any) => apiPost<any>("/api/flows", data),
-  deleteFlow: (name: string) => fetchApi<any>(`/api/flows/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  getAgents: () => rpc<{ agents: any[] }>("agent/list").then(r => r.agents),
+  createAgent: (data: any) => rpc<any>("agent/create", data).then(r => ({ ok: true, name: r.name })),
+  updateAgent: (name: string, data: any) => rpc<any>("agent/update", { ...data, name }),
+  deleteAgent: (name: string) => rpc<any>("agent/delete", { name }),
+  getFlows: () => rpc<{ flows: any[] }>("flow/list").then(r => r.flows),
+  getFlowDetail: (name: string) => rpc<any>("flow/read", { name }).then(r => {
+    const flow = r.flow;
+    return {
+      name: flow.name,
+      stages: (flow.stages ?? []).map((st: any) => ({
+        name: st.name, gate: st.gate, agent: st.agent, type: st.type,
+      })),
+    };
+  }),
+  createFlow: (data: any) => rpc<any>("flow/create", data).then(r => ({ ok: true, name: r.name })),
+  deleteFlow: (name: string) => rpc<any>("flow/delete", { name }),
 
   // Worktrees
-  getWorktrees: () => fetchApi<any[]>("/api/worktrees"),
-  worktreeDiff: (id: string) => fetchApi<any>(`/api/worktrees/${id}/diff`),
-  finishWorktree: (id: string, opts?: any) => apiPost<any>(`/api/worktrees/${id}/finish`, opts),
-  worktreeCreatePR: (id: string, opts?: any) => apiPost<any>(`/api/worktrees/${id}/create-pr`, opts),
-  cleanupWorktrees: () => apiPost<any>("/api/worktrees/cleanup"),
+  getWorktrees: () => rpc<{ worktrees: any[] }>("worktree/list").then(r => r.worktrees),
+  worktreeDiff: (id: string) => rpc<any>("worktree/diff", { sessionId: id }),
+  finishWorktree: (id: string, opts?: any) => rpc<any>("worktree/finish", { sessionId: id, ...(opts ?? {}) }),
+  worktreeCreatePR: (id: string, opts?: any) => rpc<any>("worktree/create-pr", { sessionId: id, ...(opts ?? {}) }),
+  cleanupWorktrees: () => rpc<any>("worktree/cleanup"),
 
   // Conductor
-  getLearnings: () => fetchApi<any>("/api/conductor/learnings"),
-  recordLearning: (title: string, desc: string) => apiPost<any>("/api/conductor/learn", { title, description: desc }),
+  getLearnings: () => rpc<{ learnings: any[] }>("learning/list").then(r => r.learnings),
+  recordLearning: (title: string, desc: string) => rpc<any>("learning/add", { title, description: desc }),
 
   // Memory
-  getMemories: (scope?: string) => fetchApi<any[]>(`/api/memory${scope ? `?scope=${encodeURIComponent(scope)}` : ""}`),
-  recallMemory: (q: string) => fetchApi<any[]>(`/api/memory/recall?q=${encodeURIComponent(q)}`),
-  addMemory: (content: string, opts?: any) => apiPost<any>("/api/memory", { content, ...opts }),
-  forgetMemory: (id: string) => fetchApi<any>(`/api/memory/${id}`, { method: "DELETE" }),
+  getMemories: (scope?: string) => rpc<{ memories: any[] }>("memory/list", { scope }).then(r => r.memories),
+  recallMemory: (q: string) => rpc<{ results: any[] }>("memory/recall", { query: q }).then(r => r.results),
+  addMemory: (content: string, opts?: any) => rpc<any>("memory/add", { content, ...opts }).then(r => ({ ok: true, entry: r.memory })),
+  forgetMemory: (id: string) => rpc<any>("memory/forget", { id }).then(r => ({ ok: r.ok, message: r.ok ? "Forgotten" : "Not found" })),
 
   // Knowledge
-  ingestKnowledge: (path: string, opts?: any) => apiPost<any>("/api/knowledge/ingest", { path, ...opts }),
+  ingestKnowledge: (path: string, opts?: any) => rpc<any>("knowledge/ingest", { path, ...opts }),
 
   // Schedules
-  getSchedules: () => fetchApi<any[]>("/api/schedules"),
-  createSchedule: (data: any) => apiPost<any>("/api/schedules", data),
-  deleteSchedule: (id: string) => apiPost<any>(`/api/schedules/${id}/delete`),
-  enableSchedule: (id: string) => apiPost<any>(`/api/schedules/${id}/enable`),
-  disableSchedule: (id: string) => apiPost<any>(`/api/schedules/${id}/disable`),
+  getSchedules: () => rpc<{ schedules: any[] }>("schedule/list").then(r => r.schedules),
+  createSchedule: (data: any) => rpc<any>("schedule/create", data).then(r => ({ ok: true, schedule: r.schedule })),
+  deleteSchedule: (id: string) => rpc<any>("schedule/delete", { id }).then(r => ({ ok: r.ok, message: r.ok ? "Deleted" : "Not found" })),
+  enableSchedule: (id: string) => rpc<any>("schedule/enable", { id }).then(() => ({ ok: true })),
+  disableSchedule: (id: string) => rpc<any>("schedule/disable", { id }).then(() => ({ ok: true })),
 
   // Compute
-  getCompute: () => fetchApi<any[]>("/api/compute"),
-  createCompute: (data: any) => apiPost<any>("/api/compute", data),
-  getComputeDetail: (name: string) => fetchApi<any>(`/api/compute/${name}`),
-  provisionCompute: (name: string) => apiPost<any>(`/api/compute/${name}/provision`),
-  startCompute: (name: string) => apiPost<any>(`/api/compute/${name}/start`),
-  stopCompute: (name: string) => apiPost<any>(`/api/compute/${name}/stop`),
-  destroyCompute: (name: string) => apiPost<any>(`/api/compute/${name}/destroy`),
-  deleteCompute: (name: string) => apiPost<any>(`/api/compute/${name}/delete`),
+  getCompute: () => rpc<{ targets: any[] }>("compute/list").then(r => r.targets),
+  createCompute: (data: any) => rpc<any>("compute/create", data).then(r => ({ ok: true, compute: r.compute })),
+  getComputeDetail: (name: string) => rpc<any>("compute/read", { name }).then(r => r.compute),
+  provisionCompute: (name: string) => rpc<any>("compute/provision", { name }),
+  startCompute: (name: string) => rpc<any>("compute/start-instance", { name }),
+  stopCompute: (name: string) => rpc<any>("compute/stop-instance", { name }),
+  destroyCompute: (name: string) => rpc<any>("compute/destroy", { name }),
+  deleteCompute: (name: string) => rpc<any>("compute/delete", { name }),
 
   // Repo Map
-  getRepoMap: (dir?: string) => fetchApi<any>(`/api/repo-map${dir ? `?dir=${encodeURIComponent(dir)}` : ""}`),
+  getRepoMap: (dir?: string) => rpc<any>("repo-map/get", { dir }),
 };

@@ -80,15 +80,9 @@ test("create session via New Session inline form", async () => {
 // -- Create a second session for filtering tests ------------------------------
 
 test("create second session for filtering", async () => {
-  // Create via API for speed
-  const res = await fetch(`${ws.baseUrl}/api/sessions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ summary: "E2E test session beta", repo: ws.env.workdir, flow: "bare" }),
-  });
-  expect(res.ok).toBe(true);
-  const data = await res.json();
-  expect(data.ok).toBe(true);
+  // Create via RPC for speed
+  const data = await ws.rpc("session/start", { summary: "E2E test session beta", repo: ws.env.workdir, flow: "bare" });
+  expect(data.session).toBeTruthy();
 
   // Refresh the page to see both sessions
   await page.reload();
@@ -176,27 +170,21 @@ test("clone session via fork button", async () => {
   await page.waitForTimeout(1_000);
   await page.keyboard.press("Escape");
 
-  // Verify via API that there are now at least 3 sessions
-  const res = await fetch(`${ws.baseUrl}/api/sessions`);
-  const sessions = await res.json();
-  expect(sessions.length).toBeGreaterThanOrEqual(3);
+  // Verify via RPC that there are now at least 3 sessions
+  const sessionsData = await ws.rpc("session/list", { limit: 200 });
+  expect(sessionsData.sessions.length).toBeGreaterThanOrEqual(3);
 });
 
 // -- Archive and restore session ----------------------------------------------
 
 test("archive and restore session", async () => {
   // Create a session and mark it completed so archive is available
-  const createRes = await fetch(`${ws.baseUrl}/api/sessions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ summary: "E2E archive test", repo: ws.env.workdir, flow: "bare" }),
-  });
-  const createData = await createRes.json();
+  const createData = await ws.rpc("session/start", { summary: "E2E archive test", repo: ws.env.workdir, flow: "bare" });
   const sessionId = createData.session?.id;
   expect(sessionId).toBeTruthy();
 
-  // Complete the session via API so archive button shows
-  await fetch(`${ws.baseUrl}/api/sessions/${sessionId}/complete`, { method: "POST" });
+  // Complete the session via RPC so archive button shows
+  await ws.rpc("session/complete", { sessionId });
 
   // Reload and click into the completed session
   await page.reload();

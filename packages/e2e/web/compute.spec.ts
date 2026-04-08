@@ -39,25 +39,17 @@ test("compute page shows title and New Compute button", async () => {
   await expect(page.locator('button:has-text("New Compute")')).toBeVisible();
 });
 
-test("compute API returns array", async () => {
-  const res = await fetch(`${ws.baseUrl}/api/compute`);
-  expect(res.ok).toBe(true);
-  const data = await res.json();
-  expect(Array.isArray(data)).toBe(true);
+test("compute RPC returns array", async () => {
+  const data = await ws.rpc("compute/list");
+  expect(Array.isArray(data.targets)).toBe(true);
 });
 
 // -- Create compute via API and verify in UI ----------------------------------
 
 test("create compute target via API and verify in UI", async () => {
-  // Create a compute target via API
-  const createRes = await fetch(`${ws.baseUrl}/api/compute`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "e2e-test-compute", provider: "local", config: {} }),
-  });
-  expect(createRes.ok).toBe(true);
-  const createData = await createRes.json();
-  expect(createData.ok).toBe(true);
+  // Create a compute target via RPC
+  const createData = await ws.rpc("compute/create", { name: "e2e-test-compute", provider: "local", config: {} });
+  expect(createData.compute).toBeTruthy();
 
   // Reload and go to Compute page
   await page.reload();
@@ -87,11 +79,9 @@ test("click compute target shows detail panel", async () => {
 // -- Delete compute via API and verify removed from UI ------------------------
 
 test("delete compute target via API and verify removal", async () => {
-  // Delete via API
-  const deleteRes = await fetch(`${ws.baseUrl}/api/compute/e2e-test-compute/delete`, {
-    method: "POST",
-  });
-  expect(deleteRes.ok).toBe(true);
+  // Delete via RPC
+  const deleteData = await ws.rpc("compute/delete", { name: "e2e-test-compute" });
+  expect(deleteData.ok).toBe(true);
 
   // Reload and verify the compute target is gone
   await page.reload();
@@ -130,6 +120,6 @@ test("create compute via New Compute inline form", async () => {
   await goToCompute();
   await expect(page.locator("text=e2e-ui-compute")).toBeVisible({ timeout: 10_000 });
 
-  // Cleanup: delete via API
-  await fetch(`${ws.baseUrl}/api/compute/e2e-ui-compute/delete`, { method: "POST" });
+  // Cleanup: delete via RPC
+  await ws.rpc("compute/delete", { name: "e2e-ui-compute" });
 });

@@ -20,6 +20,10 @@ export interface WebServerEnv {
   env: E2EEnv;
   serverProcess: Subprocess;
   teardown: () => Promise<void>;
+  /** Send a JSON-RPC request to the web server and return the parsed result. */
+  rpc: <T = any>(method: string, params?: Record<string, unknown>) => Promise<T>;
+  /** Send a JSON-RPC request and return the raw response (for status checks). */
+  rpcRaw: (method: string, params?: Record<string, unknown>) => Promise<Response>;
 }
 
 function randomPort(): number {
@@ -30,7 +34,11 @@ async function pollReady(baseUrl: string, timeoutMs = 20_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`${baseUrl}/api/status`);
+      const res = await fetch(`${baseUrl}/api/rpc`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 0, method: "status/get", params: {} }),
+      });
       if (res.ok) return;
     } catch {
       // server not up yet
@@ -76,11 +84,30 @@ export async function setupWebServer(): Promise<WebServerEnv> {
     throw err;
   }
 
+  let rpcId = 0;
+
+  async function rpcRaw(method: string, params: Record<string, unknown> = {}): Promise<Response> {
+    return fetch(`${baseUrl}/api/rpc`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
+    });
+  }
+
+  async function rpc<T = any>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+    const res = await rpcRaw(method, params);
+    const data = await res.json() as any;
+    if (data.error) throw new Error(data.error.message || "RPC error");
+    return data.result as T;
+  }
+
   return {
     port,
     baseUrl,
     env,
     serverProcess,
+    rpc,
+    rpcRaw,
     teardown: async () => {
       serverProcess.kill();
       await env.teardown();

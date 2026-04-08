@@ -34,22 +34,13 @@ async function goToSessions() {
   await expect(page.locator("h1")).toContainText("Sessions");
 }
 
-/** Create a session via API and return the session ID */
+/** Create a session via RPC and return the session ID */
 async function createSession(summary: string): Promise<string> {
-  const res = await fetch(`${ws.baseUrl}/api/sessions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      summary,
-      repo: ws.env.workdir,
-      flow: "bare",
-    }),
-  });
-  const data = await res.json();
+  const data = await ws.rpc("session/start", { summary, repo: ws.env.workdir, flow: "bare" });
   return data.session.id;
 }
 
-/** Poll session status via API until it matches or times out */
+/** Poll session status via RPC until it matches or times out */
 async function waitForStatus(
   sessionId: string,
   statuses: string[],
@@ -57,13 +48,12 @@ async function waitForStatus(
 ): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const res = await fetch(`${ws.baseUrl}/api/sessions/${sessionId}`);
-    if (res.ok) {
-      const data = await res.json();
+    try {
+      const data = await ws.rpc("session/read", { sessionId });
       if (data.session && statuses.includes(data.session.status)) {
         return data.session.status;
       }
-    }
+    } catch { /* not ready yet */ }
     await new Promise((r) => setTimeout(r, 1_000));
   }
   throw new Error(`Session ${sessionId} did not reach status [${statuses.join(",")}] within ${timeoutMs}ms`);
@@ -74,11 +64,8 @@ async function waitForStatus(
 test("create and dispatch session, verify running status via API", async () => {
   const id = await createSession("E2E dispatch test");
 
-  // Dispatch via API
-  const dispatchRes = await fetch(`${ws.baseUrl}/api/sessions/${id}/dispatch`, {
-    method: "POST",
-  });
-  expect(dispatchRes.ok).toBe(true);
+  // Dispatch via RPC
+  await ws.rpc("session/dispatch", { sessionId: id });
 
   // Wait for session to be running (or waiting -- both mean dispatch worked)
   // It might fail quickly if claude is not available, so accept failed too
@@ -89,7 +76,7 @@ test("create and dispatch session, verify running status via API", async () => {
 
   // Cleanup: stop if running
   if (status === "running" || status === "waiting") {
-    await fetch(`${ws.baseUrl}/api/sessions/${id}/stop`, { method: "POST" });
+    await ws.rpc("session/stop", { sessionId: id });
   }
 });
 
@@ -98,10 +85,8 @@ test("create and dispatch session, verify running status via API", async () => {
 test("get output endpoint returns data for session", async () => {
   const id = await createSession("E2E output test");
 
-  // Output endpoint should work even for non-running sessions (returns empty)
-  const outputRes = await fetch(`${ws.baseUrl}/api/sessions/${id}/output`);
-  expect(outputRes.ok).toBe(true);
-  const outputData = await outputRes.json();
+  // Output RPC should work even for non-running sessions (returns empty)
+  const outputData = await ws.rpc("session/output", { sessionId: id });
   expect(outputData).toHaveProperty("output");
 });
 
@@ -111,21 +96,20 @@ test("stop session changes status", async () => {
   const id = await createSession("E2E stop test");
 
   // Dispatch
-  await fetch(`${ws.baseUrl}/api/sessions/${id}/dispatch`, { method: "POST" });
+  await ws.rpc("session/dispatch", { sessionId: id });
 
   // Wait for it to start or fail
   const startStatus = await waitForStatus(id, ["running", "waiting", "failed", "stopped"], 30_000);
 
   if (startStatus === "running" || startStatus === "waiting") {
     // Stop the session
-    const stopRes = await fetch(`${ws.baseUrl}/api/sessions/${id}/stop`, { method: "POST" });
-    expect(stopRes.ok).toBe(true);
+    await ws.rpc("session/stop", { sessionId: id });
 
     // Verify status changed to stopped
     const finalStatus = await waitForStatus(id, ["stopped", "failed"], 15_000);
     expect(["stopped", "failed"]).toContain(finalStatus);
   }
-  // If the dispatch itself failed, the test still passes -- we verified the API works
+  // If the dispatch itself failed, the test still passes -- we verified the RPC works
 });
 
 // -- Restart session ----------------------------------------------------------
@@ -134,17 +118,16 @@ test("restart stopped session", async () => {
   const id = await createSession("E2E restart test");
 
   // Dispatch then stop
-  await fetch(`${ws.baseUrl}/api/sessions/${id}/dispatch`, { method: "POST" });
+  await ws.rpc("session/dispatch", { sessionId: id });
   const startStatus = await waitForStatus(id, ["running", "waiting", "failed", "stopped"], 30_000);
 
   if (startStatus === "running" || startStatus === "waiting") {
-    await fetch(`${ws.baseUrl}/api/sessions/${id}/stop`, { method: "POST" });
+    await ws.rpc("session/stop", { sessionId: id });
     await waitForStatus(id, ["stopped", "failed"], 15_000);
   }
 
-  // Now restart -- the restart endpoint is POST /api/sessions/:id/restart
-  const restartRes = await fetch(`${ws.baseUrl}/api/sessions/${id}/restart`, { method: "POST" });
-  expect(restartRes.ok).toBe(true);
+  // Now restart via RPC
+  await ws.rpc("session/resume", { sessionId: id });
 
   // Wait for it to start again or fail
   const restartStatus = await waitForStatus(id, ["running", "waiting", "failed", "stopped"], 30_000);
@@ -152,7 +135,7 @@ test("restart stopped session", async () => {
 
   // Cleanup
   if (restartStatus === "running" || restartStatus === "waiting") {
-    await fetch(`${ws.baseUrl}/api/sessions/${id}/stop`, { method: "POST" });
+    await ws.rpc("session/stop", { sessionId: id });
   }
 });
 
@@ -168,7 +151,7 @@ test("dispatched session shows in UI with updated status", async () => {
   await expect(page.locator("text=E2E UI dispatch check")).toBeVisible({ timeout: 10_000 });
 
   // Dispatch
-  await fetch(`${ws.baseUrl}/api/sessions/${id}/dispatch`, { method: "POST" });
+  await ws.rpc("session/dispatch", { sessionId: id });
 
   // Wait a moment for status to change
   await waitForStatus(id, ["running", "waiting", "failed", "stopped"], 30_000);
@@ -184,12 +167,11 @@ test("dispatched session shows in UI with updated status", async () => {
 
   // The status badge should not be "pending" or "ready" anymore
   // It could be running, waiting, failed, or stopped
-  const sessionDetail = await fetch(`${ws.baseUrl}/api/sessions/${id}`);
-  const detail = await sessionDetail.json();
+  const detail = await ws.rpc("session/read", { sessionId: id });
   expect(["running", "waiting", "failed", "stopped"]).toContain(detail.session.status);
 
   // Cleanup
   if (detail.session.status === "running" || detail.session.status === "waiting") {
-    await fetch(`${ws.baseUrl}/api/sessions/${id}/stop`, { method: "POST" });
+    await ws.rpc("session/stop", { sessionId: id });
   }
 });

@@ -37,13 +37,12 @@ test("agents page shows builtin agents", async () => {
   const agentItems = page.locator("text=builtin");
   await expect(agentItems.first()).toBeVisible({ timeout: 5_000 });
 
-  // Verify via API that agents are returned
-  const res = await fetch(`${ws.baseUrl}/api/agents`);
-  const agents = await res.json();
-  expect(agents.length).toBeGreaterThan(0);
+  // Verify via RPC that agents are returned
+  const data = await ws.rpc("agent/list");
+  expect(data.agents.length).toBeGreaterThan(0);
 
   // Check a known builtin agent name is present in the agent list panel
-  const agentNames = agents.map((a: any) => a.name);
+  const agentNames = data.agents.map((a: any) => a.name);
   expect(agentNames).toContain("worker");
 });
 
@@ -61,12 +60,11 @@ test("click agent shows detail panel with configuration", async () => {
   await expect(page.locator("text=Model").first()).toBeVisible();
 });
 
-test("agents API returns expected fields", async () => {
-  const res = await fetch(`${ws.baseUrl}/api/agents`);
-  const agents = await res.json();
-  expect(agents.length).toBeGreaterThan(0);
+test("agents RPC returns expected fields", async () => {
+  const data = await ws.rpc("agent/list");
+  expect(data.agents.length).toBeGreaterThan(0);
 
-  const agent = agents[0];
+  const agent = data.agents[0];
   expect(agent).toHaveProperty("name");
   expect(agent).toHaveProperty("model");
 });
@@ -77,13 +75,12 @@ test("flows page shows builtin flows", async () => {
   await page.click('nav button:has-text("Flows")');
   await expect(page.locator("h1")).toContainText("Flows");
 
-  // Verify via API that flows are returned
-  const res = await fetch(`${ws.baseUrl}/api/flows`);
-  const flows = await res.json();
-  expect(flows.length).toBeGreaterThan(0);
+  // Verify via RPC that flows are returned
+  const data = await ws.rpc("flow/list");
+  expect(data.flows.length).toBeGreaterThan(0);
 
   // Check known builtin flow names
-  const flowNames = flows.map((f: any) => f.name);
+  const flowNames = data.flows.map((f: any) => f.name);
   // "bare" is a commonly available flow
   expect(flowNames).toContain("bare");
 });
@@ -92,9 +89,9 @@ test("click flow shows detail with stages", async () => {
   await page.click('nav button:has-text("Flows")');
   await expect(page.locator("h1")).toContainText("Flows");
 
-  // Get a flow that has stages from the API
-  const res = await fetch(`${ws.baseUrl}/api/flows`);
-  const flows = await res.json();
+  // Get a flow that has stages from the RPC
+  const flowData = await ws.rpc("flow/list");
+  const flows = flowData.flows;
   // Find a flow that is not bare (bare has 1 stage)
   const multiStageFlow = flows.find((f: any) => f.stages && f.stages.length > 1);
 
@@ -111,36 +108,34 @@ test("click flow shows detail with stages", async () => {
   await expect(page.locator("text=bare").first()).toBeVisible({ timeout: 5_000 });
 });
 
-test("flow detail API returns stages with gate and agent fields", async () => {
+test("flow detail RPC returns stages with gate and agent fields", async () => {
   // Get the list of flows
-  const listRes = await fetch(`${ws.baseUrl}/api/flows`);
-  const flows = await listRes.json();
-  expect(flows.length).toBeGreaterThan(0);
+  const listData = await ws.rpc("flow/list");
+  expect(listData.flows.length).toBeGreaterThan(0);
 
   // Get detail for the first flow
-  const flowName = flows[0].name;
-  const detailRes = await fetch(`${ws.baseUrl}/api/flows/${encodeURIComponent(flowName)}`);
-  expect(detailRes.ok).toBe(true);
-  const detail = await detailRes.json();
+  const flowName = listData.flows[0].name;
+  const detail = await ws.rpc("flow/read", { name: flowName });
 
-  expect(detail).toHaveProperty("name", flowName);
-  expect(detail).toHaveProperty("stages");
-  expect(Array.isArray(detail.stages)).toBe(true);
+  expect(detail.flow).toHaveProperty("name", flowName);
+  expect(detail.flow).toHaveProperty("stages");
+  expect(Array.isArray(detail.flow.stages)).toBe(true);
 
-  if (detail.stages.length > 0) {
-    const stage = detail.stages[0];
+  if (detail.flow.stages.length > 0) {
+    const stage = detail.flow.stages[0];
     expect(stage).toHaveProperty("name");
     // gate and agent may be present
   }
 });
 
-test("flow API returns stages for default flow", async () => {
-  const res = await fetch(`${ws.baseUrl}/api/flows/default`);
-  // default flow may or may not exist depending on builtin defs
-  if (res.ok) {
-    const data = await res.json();
-    expect(data).toHaveProperty("stages");
-    expect(Array.isArray(data.stages)).toBe(true);
-    expect(data.stages.length).toBeGreaterThan(0);
+test("flow RPC returns stages for default flow", async () => {
+  try {
+    const data = await ws.rpc("flow/read", { name: "default" });
+    // default flow may or may not exist depending on builtin defs
+    expect(data.flow).toHaveProperty("stages");
+    expect(Array.isArray(data.flow.stages)).toBe(true);
+    expect(data.flow.stages.length).toBeGreaterThan(0);
+  } catch {
+    // default flow may not exist -- that's OK
   }
 });

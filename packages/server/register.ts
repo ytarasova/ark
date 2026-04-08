@@ -10,6 +10,7 @@ import { registerToolsHandlers } from "./handlers/tools.js";
 import { registerMetricsHandlers } from "./handlers/metrics.js";
 import { registerMemoryHandlers } from "./handlers/memory.js";
 import { registerScheduleHandlers } from "./handlers/schedule.js";
+import { registerWebHandlers } from "./handlers/web.js";
 
 export function registerAllHandlers(router: Router, app: AppContext): void {
   router.handle("initialize", async (params, _notify) => ({
@@ -26,4 +27,5 @@ export function registerAllHandlers(router: Router, app: AppContext): void {
   registerMetricsHandlers(router, app);
   registerMemoryHandlers(router, app);
   registerScheduleHandlers(router, app);
+  registerWebHandlers(router, app);
 }

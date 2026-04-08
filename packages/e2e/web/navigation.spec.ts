@@ -116,40 +116,30 @@ test("SSE event stream connects successfully", async () => {
 
 // -- API endpoint health ------------------------------------------------------
 
-test("GET /api/status responds with session totals", async () => {
-  const res = await fetch(`${ws.baseUrl}/api/status`);
-  expect(res.ok).toBe(true);
-  const data = await res.json();
+test("status/get RPC responds with session totals", async () => {
+  const data = await ws.rpc("status/get");
   expect(data).toHaveProperty("total");
   expect(data).toHaveProperty("byStatus");
 });
 
-test("GET /api/sessions responds with array", async () => {
-  const res = await fetch(`${ws.baseUrl}/api/sessions`);
-  expect(res.ok).toBe(true);
-  const data = await res.json();
-  expect(Array.isArray(data)).toBe(true);
+test("session/list RPC responds with sessions array", async () => {
+  const data = await ws.rpc("session/list", { limit: 200 });
+  expect(Array.isArray(data.sessions)).toBe(true);
 });
 
-test("GET /api/agents responds with non-empty array", async () => {
-  const res = await fetch(`${ws.baseUrl}/api/agents`);
-  expect(res.ok).toBe(true);
-  const data = await res.json();
-  expect(Array.isArray(data)).toBe(true);
-  expect(data.length).toBeGreaterThan(0);
+test("agent/list RPC responds with non-empty array", async () => {
+  const data = await ws.rpc("agent/list");
+  expect(Array.isArray(data.agents)).toBe(true);
+  expect(data.agents.length).toBeGreaterThan(0);
 });
 
-test("GET /api/flows responds with non-empty array", async () => {
-  const res = await fetch(`${ws.baseUrl}/api/flows`);
-  expect(res.ok).toBe(true);
-  const data = await res.json();
-  expect(Array.isArray(data)).toBe(true);
-  expect(data.length).toBeGreaterThan(0);
+test("flow/list RPC responds with non-empty array", async () => {
+  const data = await ws.rpc("flow/list");
+  expect(Array.isArray(data.flows)).toBe(true);
+  expect(data.flows.length).toBeGreaterThan(0);
 });
 
-test("GET /api/compute responds with array", async () => {
-  const res = await fetch(`${ws.baseUrl}/api/compute`);
-  expect(res.ok).toBe(true);
-  const data = await res.json();
-  expect(Array.isArray(data)).toBe(true);
+test("compute/list RPC responds with array", async () => {
+  const data = await ws.rpc("compute/list");
+  expect(Array.isArray(data.targets)).toBe(true);
 });

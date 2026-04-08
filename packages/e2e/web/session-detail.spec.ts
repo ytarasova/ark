@@ -13,14 +13,9 @@ let ws: WebServerEnv;
 let browser: Browser;
 let page: Page;
 
-/** Helper to create a session via API and return its ID */
+/** Helper to create a session via RPC and return its ID */
 async function createSession(summary: string): Promise<string> {
-  const res = await fetch(`${ws.baseUrl}/api/sessions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ summary, repo: ws.env.workdir, flow: "bare" }),
-  });
-  const data = await res.json();
+  const data = await ws.rpc("session/start", { summary, repo: ws.env.workdir, flow: "bare" });
   return data.session.id;
 }
 
@@ -71,17 +66,9 @@ test("click session opens detail panel with ID and status", async () => {
 test("add todo via API and verify in detail panel", async () => {
   const id = await createSession("Todo test session");
 
-  // Add todos via API
-  await fetch(`${ws.baseUrl}/api/sessions/${id}/todos`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content: "Review the code" }),
-  });
-  await fetch(`${ws.baseUrl}/api/sessions/${id}/todos`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content: "Run the tests" }),
-  });
+  // Add todos via RPC
+  await ws.rpc("todo/add", { sessionId: id, content: "Review the code" });
+  await ws.rpc("todo/add", { sessionId: id, content: "Run the tests" });
 
   // Reload and navigate to the session detail
   await page.reload();
@@ -143,8 +130,8 @@ test("complete action changes session status", async () => {
   await page.locator("text=Complete test").click();
   await expect(page.locator("text=Details").first()).toBeVisible({ timeout: 5_000 });
 
-  // Complete the session via API (the UI button only shows for running/waiting/blocked)
-  await fetch(`${ws.baseUrl}/api/sessions/${id}/complete`, { method: "POST" });
+  // Complete the session via RPC (the UI button only shows for running/waiting/blocked)
+  await ws.rpc("session/complete", { sessionId: id });
 
   // Reload detail to see updated status
   await page.reload();
@@ -161,22 +148,14 @@ test("complete action changes session status", async () => {
 test("export and import session round-trip", async () => {
   const id = await createSession("Export test session");
 
-  // Export via API
-  const exportRes = await fetch(`${ws.baseUrl}/api/sessions/${id}/export`);
-  expect(exportRes.ok).toBe(true);
-  const exportData = await exportRes.json();
+  // Export via RPC
+  const exportData = await ws.rpc("session/export-data", { sessionId: id });
   expect(exportData.version).toBe(1);
   expect(exportData.session).toBeTruthy();
   expect(exportData.session.summary).toBe("Export test session");
 
-  // Import via API
-  const importRes = await fetch(`${ws.baseUrl}/api/sessions/import`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(exportData),
-  });
-  expect(importRes.ok).toBe(true);
-  const importData = await importRes.json();
+  // Import via RPC
+  const importData = await ws.rpc("session/import", exportData);
   expect(importData.ok).toBe(true);
   expect(importData.sessionId).toBeTruthy();
 
@@ -213,9 +192,8 @@ test("selecting another session replaces detail panel", async () => {
 test("session detail shows events when available", async () => {
   const id = await createSession("Events test session");
 
-  // Fetch detail via API -- events should be an empty array for a new session
-  const detailRes = await fetch(`${ws.baseUrl}/api/sessions/${id}`);
-  const detail = await detailRes.json();
+  // Fetch detail via RPC -- events should be an empty array for a new session
+  const detail = await ws.rpc("session/read", { sessionId: id, include: ["events"] });
   expect(detail.session).toBeTruthy();
   expect(Array.isArray(detail.events)).toBe(true);
 });
