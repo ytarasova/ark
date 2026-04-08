@@ -11,7 +11,7 @@
 #   make package       Package everything for distribution
 
 .PHONY: help install dev dev-web tui web desktop \
-        test test-file test-e2e test-watch lint \
+        test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-watch lint \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
         clean uninstall
@@ -39,8 +39,10 @@ help: ## Show available commands
 install: ## Install deps and symlink `ark` to PATH
 	@command -v bun >/dev/null 2>&1 || { echo "Bun not found. Install: curl -fsSL https://bun.sh/install | bash"; exit 1; }
 	$(BUN) install
-	@echo "Linking ark -> $(ARK_BIN)"
-	@ln -sf "$(CURDIR)/ark" $(ARK_BIN) 2>/dev/null || echo "  (needs sudo: sudo ln -sf $(CURDIR)/ark $(ARK_BIN))"
+	@mkdir -p $(HOME)/.ark/bin
+	@echo "Linking ark -> $(HOME)/.ark/bin/ark"
+	@ln -sf "$(CURDIR)/ark" $(HOME)/.ark/bin/ark
+	@ln -sf "$(CURDIR)/ark" $(ARK_BIN) 2>/dev/null || true
 	@echo "Done."
 
 dev: ## Hot-reload: ark web (:8420) + Vite dev server (:5173) with HMR
@@ -77,9 +79,19 @@ test: build-web ## Run all unit tests (sequential -- never parallel)
 test-file: ## Run a single test: make test-file F=packages/core/__tests__/foo.test.ts
 	$(BUN) test $(F)
 
-test-e2e: build-web ## Run Playwright E2E tests against the Web UI
-	@cd packages/desktop && npm install --silent 2>/dev/null
-	cd packages/desktop && npx playwright install chromium --with-deps 2>/dev/null; npx playwright test
+test-e2e: build-web ## Run all E2E tests (web + TUI, sequential)
+	cd packages/e2e && npx playwright install chromium --with-deps 2>/dev/null; npx playwright test
+	$(BUN) test packages/e2e/tui --concurrency 1
+
+test-e2e-fast: build-web ## Run fast-tier E2E only (CI-safe, no tmux dispatch)
+	cd packages/e2e && npx playwright test --grep-invert "dispatch"
+	$(BUN) test packages/e2e/tui/tabs.test.ts packages/e2e/tui/sessions.test.ts packages/e2e/tui/session-crud.test.ts packages/e2e/tui/talk.test.ts --concurrency 1
+
+test-e2e-web: build-web ## Run web E2E tests only (Playwright)
+	cd packages/e2e && npx playwright install chromium --with-deps 2>/dev/null; npx playwright test
+
+test-e2e-tui: ## Run TUI E2E tests only (tmux)
+	$(BUN) test packages/e2e/tui --concurrency 1
 
 test-watch: ## Run unit tests in watch mode
 	$(BUN) test --watch
