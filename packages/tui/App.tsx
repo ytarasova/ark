@@ -204,7 +204,7 @@ function AppInner() {
           ) : undefined}
         />
       ) : tab === "memory" ? (
-        <MemoryManager />
+        <MemoryManager pane={pane} />
       ) : tab === "costs" ? (
         <CostsTab pane={pane} />
       ) : tab === "schedules" ? (

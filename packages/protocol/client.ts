@@ -400,7 +400,7 @@ export class ArkClient {
   }
 
   async historyRefreshAndIndex(): Promise<HistoryRebuildFtsResult> {
-    return this.rpc<HistoryRebuildFtsResult>("history/refresh-and-index");
+    return this.rpc<HistoryRebuildFtsResult>("history/refresh-and-index", undefined, 120_000);
   }
 
   async historySearch(query: string, limit?: number): Promise<SearchResult[]> {

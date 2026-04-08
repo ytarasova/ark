@@ -57,7 +57,7 @@ function buildHistoryItems(arkSessions: any[], claudeSessions: ClaudeSession[]):
       type: "claude", id: cs.sessionId,
       date: ts.slice(0, 10),
       sortKey: ts,
-      summary: cs.summary || "",
+      summary: cs.summary || cs.project || "",
       messageCount: cs.messageCount, claudeSession: cs,
     });
   }
@@ -193,19 +193,29 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
               <TreeList
                 items={historyItems}
                 renderRow={(item) => {
-                  const label = item.summary || (item.claudeSession?.project.split("/").pop() ?? item.id.slice(0, 8));
-                  const tag = item.type === "ark" ? " ARK " : "     ";
-                  return `${item.date.slice(5)}${tag}${label}`;
+                  const project = item.claudeSession?.project.split("/").pop() ?? "";
+                  const label = item.summary ? item.summary.slice(0, 40) : project || item.id.slice(0, 8);
+                  const msgs = item.messageCount > 0 ? ` ${item.messageCount}m` : "";
+                  return `${label}${msgs}`;
                 }}
                 renderColoredRow={(item) => {
-                  const label = item.summary || (item.claudeSession?.project.split("/").pop() ?? item.id.slice(0, 8));
-                  const tag = item.type === "ark" ? " ARK " : "     ";
+                  const project = item.claudeSession?.project.split("/").pop() ?? "";
+                  const label = item.summary ? item.summary.slice(0, 36) : project || item.id.slice(0, 8);
+                  const msgs = item.messageCount > 0 ? String(item.messageCount) : "";
+                  const time = ago(item.sortKey);
                   return (
-                    <Text wrap="truncate">
-                      {"  "}<Text color={item.type === "ark" ? "green" : "dim"}>{item.date.slice(5)}</Text>
-                      <Text color={item.type === "ark" ? "green" : undefined} bold={item.type === "ark"}>{tag}</Text>
-                      {label}
-                    </Text>
+                    <Box flexDirection="column">
+                      <Text wrap="truncate">
+                        {"  "}
+                        {item.type === "ark" && <Text color="green" bold>{"ARK "}</Text>}
+                        <Text bold>{label}</Text>
+                      </Text>
+                      <Text wrap="truncate" dimColor>
+                        {"  "}
+                        {msgs && <Text>{msgs} msgs  </Text>}
+                        <Text>{time}</Text>
+                      </Text>
+                    </Box>
                   );
                 }}
                 sel={sel}
@@ -268,15 +278,26 @@ function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null;
       <KeyValue label="Active">{ago(cs.lastActivity || cs.timestamp)}</KeyValue>
       <KeyValue label="File">{cs.transcriptPath}</KeyValue>
 
-      {conversation.length > 0 && (
+      {conversation.length > 0 && (() => {
+        // Filter to only user/assistant messages with real text content
+        const filtered = conversation.filter((t: any) => {
+          if (!t.content || t.content.length < 2) return false;
+          if (t.role !== "user" && t.role !== "assistant") return false;
+          // Skip system prompts and channel XML
+          if (t.content.startsWith("<channel ") || t.content.startsWith("You are the ")) return false;
+          return true;
+        });
+        if (filtered.length === 0) return null;
+        return (
         <>
           <Text> </Text>
-          <SectionHeader title={`Recent conversation (${conversation.length})`} />
-          {conversation.map((turn: any, idx: number) => {
+          <SectionHeader title={`Recent conversation (${filtered.length})`} />
+          {filtered.map((turn: any, idx: number) => {
             const isUser = turn.role === "user";
-            const content = (turn.content || "").slice(0, 300) + ((turn.content || "").length > 300 ? "..." : "");
+            const raw = (turn.content || "").trim();
+            const content = raw.slice(0, 200) + (raw.length > 200 ? "..." : "");
             const label = isUser ? "You" : "Agent";
-            const ts = turn.timestamp ? ` ${ago(turn.timestamp)}` : "";
+            const ts = turn.timestamp ? `  ${ago(turn.timestamp)}` : "";
             return (
               <Box key={`conv-${idx}`} flexDirection="column" marginBottom={1}
                 paddingLeft={isUser ? 4 : 0}
@@ -291,7 +312,8 @@ function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null;
             );
           })}
         </>
-      )}
+        );
+      })()}
 
     </DetailPanel>
   );
