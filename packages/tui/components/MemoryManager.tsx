@@ -8,7 +8,7 @@ type Mode = "list" | "add" | "search";
 
 interface MemoryManagerProps {
   asyncState?: AsyncState;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 export function MemoryManager({ asyncState, onClose }: MemoryManagerProps) {

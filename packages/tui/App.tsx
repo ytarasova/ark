@@ -18,6 +18,7 @@ import { HistoryTab } from "./tabs/HistoryTab.js";
 import { ToolsTab } from "./tabs/ToolsTab.js";
 import { CostsTab } from "./tabs/CostsTab.js";
 import { SchedulesTab } from "./tabs/SchedulesTab.js";
+import { MemoryManager } from "./components/MemoryManager.js";
 import { loadUiState, saveUiState } from "../core/ui-state.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
@@ -214,6 +215,8 @@ function AppInner() {
             <NewComputeForm asyncState={computeAsync} onDone={() => { setShowForm(null); store.refresh(); }} />
           ) : undefined}
         />
+      ) : tab === "memory" ? (
+        <MemoryManager />
       ) : tab === "costs" ? (
         <CostsTab pane={pane} />
       ) : tab === "schedules" ? (

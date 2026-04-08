@@ -16,12 +16,12 @@ interface SidebarProps {
 const NAV: { id: string; icon: LucideIcon; label: string }[] = [
   { id: "sessions", icon: Play, label: "Sessions" },
   { id: "agents", icon: Settings, label: "Agents" },
-  { id: "tools", icon: Wrench, label: "Tools" },
   { id: "flows", icon: GitBranch, label: "Flows" },
-  { id: "history", icon: Clock, label: "History" },
   { id: "compute", icon: Server, label: "Compute" },
-  { id: "schedules", icon: Calendar, label: "Schedules" },
+  { id: "history", icon: Clock, label: "History" },
   { id: "memory", icon: BookOpen, label: "Memory" },
+  { id: "tools", icon: Wrench, label: "Tools" },
+  { id: "schedules", icon: Calendar, label: "Schedules" },
   { id: "costs", icon: DollarSign, label: "Costs" },
 ];
 

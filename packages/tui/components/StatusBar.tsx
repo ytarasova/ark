@@ -15,6 +15,7 @@ import {
   getHistoryHints,
   getCostsHints,
   getSchedulesHints,
+  getMemoryHints,
   getGenericHints,
 } from "../helpers/statusBarHints.js";
 
@@ -54,6 +55,7 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
     : tab === "flows" ? getFlowsHints()
     : tab === "compute" ? getComputeHints()
     : tab === "history" ? getHistoryHints()
+    : tab === "memory" ? getMemoryHints()
     : tab === "costs" ? getCostsHints()
     : tab === "schedules" ? getSchedulesHints()
     : getGenericHints(),

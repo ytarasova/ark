@@ -2,19 +2,20 @@ import React from "react";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 
-export type Tab = "sessions" | "agents" | "tools" | "flows" | "history" | "compute" | "costs" | "schedules";
+export type Tab = "sessions" | "agents" | "flows" | "compute" | "history" | "memory" | "tools" | "schedules" | "costs";
 
-export const TABS: Tab[] = ["sessions", "agents", "tools", "flows", "history", "compute", "costs", "schedules"];
+export const TABS: Tab[] = ["sessions", "agents", "flows", "compute", "history", "memory", "tools", "schedules", "costs"];
 
 const TAB_KEYS: Record<Tab, string> = {
   sessions: "1",
   agents: "2",
-  tools: "3",
-  flows: "4",
+  flows: "3",
+  compute: "4",
   history: "5",
-  compute: "6",
-  costs: "7",
+  memory: "6",
+  tools: "7",
   schedules: "8",
+  costs: "9",
 };
 
 interface TabBarProps {

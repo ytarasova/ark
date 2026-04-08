@@ -249,6 +249,16 @@ export function getSchedulesHints(): React.ReactNode[] {
   ];
 }
 
+export function getMemoryHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS, sep(0),
+    <KeyHint key="n" k="n" label="add" />,
+    <KeyHint key="/" k="/" label="search" />,
+    <KeyHint key="x" k="x" label="delete" />,
+    ...GLOBAL_HINTS,
+  ];
+}
+
 export function getGenericHints(): React.ReactNode[] {
   return [
     ...GLOBAL_HINTS,
