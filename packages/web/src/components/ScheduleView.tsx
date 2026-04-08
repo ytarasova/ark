@@ -1,5 +1,7 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
+import { useSchedulesQuery } from "../hooks/useQueries.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
@@ -8,31 +10,15 @@ import { Separator } from "./ui/separator.js";
 import { Calendar } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 
-export function ScheduleView() {
-  const [schedules, setSchedules] = useState<any[]>([]);
+interface ScheduleViewProps {
+  showCreate?: boolean;
+  onCloseCreate?: () => void;
+}
+
+export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleViewProps) {
+  const queryClient = useQueryClient();
+  const { data: schedules = [] } = useSchedulesQuery();
   const [selected, setSelected] = useState<any>(null);
-  const [showNew, setShowNew] = useState(false);
-
-  function load() {
-    api.getSchedules().then((data) => {
-      const list = data || [];
-      setSchedules(list);
-      if (selected) {
-        const updated = list.find((s: any) => s.id === selected.id);
-        setSelected(updated || (list.length ? list[0] : null));
-      } else if (list.length) {
-        setSelected(list[0]);
-      }
-    });
-  }
-
-  useEffect(() => { load(); }, []);
-
-  useEffect(() => {
-    const handler = () => setShowNew(true);
-    document.addEventListener("ark:new-item", handler);
-    return () => document.removeEventListener("ark:new-item", handler);
-  }, []);
 
   async function handleToggle(sched: any) {
     if (sched.enabled) {
@@ -40,22 +26,22 @@ export function ScheduleView() {
     } else {
       await api.enableSchedule(sched.id);
     }
-    load();
+    queryClient.invalidateQueries({ queryKey: ["schedules"] });
   }
 
   async function handleDelete(sched: any) {
     await api.deleteSchedule(sched.id);
     setSelected(null);
-    load();
+    queryClient.invalidateQueries({ queryKey: ["schedules"] });
   }
 
   async function handleCreate(form: any) {
     await api.createSchedule(form);
-    setShowNew(false);
-    load();
+    onCloseCreate?.();
+    queryClient.invalidateQueries({ queryKey: ["schedules"] });
   }
 
-  if (!schedules.length && !showNew) {
+  if (!schedules.length && !showCreate) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-180px)]">
         <div className="text-center">
@@ -159,7 +145,7 @@ export function ScheduleView() {
           )}
         </div>
       </div>
-      {showNew && <NewScheduleModal onClose={() => setShowNew(false)} onSubmit={handleCreate} />}
+      {showCreate && <NewScheduleModal onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />}
     </>
   );
 }

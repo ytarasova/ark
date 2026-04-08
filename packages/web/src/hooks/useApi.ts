@@ -13,7 +13,7 @@ function authParams(): string {
 
 export async function fetchApi<T>(path: string, opts?: RequestInit): Promise<T> {
   const sep = path.includes("?") ? "&" : "?";
-  const url = opts?.method === "POST"
+  const url = opts?.method === "POST" || opts?.method === "PUT" || opts?.method === "DELETE"
     ? `${BASE}${path}`
     : `${BASE}${path}${TOKEN ? `${sep}token=${TOKEN}` : ""}`;
   const resp = await fetch(url, {
@@ -23,6 +23,10 @@ export async function fetchApi<T>(path: string, opts?: RequestInit): Promise<T> 
       ...opts?.headers,
     },
   });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({ message: resp.statusText }));
+    throw new Error(body.message || `HTTP ${resp.status}`);
+  }
   return resp.json();
 }
 

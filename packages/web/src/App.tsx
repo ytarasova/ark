@@ -1,6 +1,7 @@
 import "./styles.css";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
+import { queryClient, QueryClientProvider } from "./providers/QueryProvider.js";
 import { Layout } from "./components/Layout.js";
 import { Toast } from "./components/Toast.js";
 import { SessionsPage } from "./pages/SessionsPage.js";
@@ -14,12 +15,24 @@ import { MemoryView } from "./components/MemoryView.js";
 import { CostsView } from "./components/CostsView.js";
 import { Button } from "./components/ui/button.js";
 
+const READ_ONLY = document.getElementById("root")?.dataset.readonly === "true";
+
 function App() {
   const [view, setView] = useState("sessions");
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null);
-  const readOnly = document.getElementById("root")?.dataset.readonly === "true";
+  const [toastKey, setToastKey] = useState(0);
+  const readOnly = READ_ONLY;
 
-  function showToast(msg: string, type: string) { setToast({ msg, type }); }
+  // Per-view "new item" state
+  const [showNewAgent, setShowNewAgent] = useState(false);
+  const [showNewCompute, setShowNewCompute] = useState(false);
+  const [showNewSchedule, setShowNewSchedule] = useState(false);
+  const [showNewMemory, setShowNewMemory] = useState(false);
+
+  function showToast(msg: string, type: string) {
+    setToast({ msg, type });
+    setToastKey((k) => k + 1);
+  }
 
   return (
     <>
@@ -28,8 +41,8 @@ function App() {
       )}
       {view === "agents" && (
         <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Agents" padded={false}
-          headerRight={!readOnly ? <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("ark:new-item"))}>+ New Agent</Button> : undefined}>
-          <AgentsView />
+          headerRight={!readOnly ? <Button size="sm" onClick={() => setShowNewAgent(true)}>+ New Agent</Button> : undefined}>
+          <AgentsView showCreate={showNewAgent} onCloseCreate={() => setShowNewAgent(false)} />
         </Layout>
       )}
       {view === "tools" && (
@@ -47,20 +60,20 @@ function App() {
       )}
       {view === "compute" && (
         <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Compute" padded={false}
-          headerRight={!readOnly ? <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("ark:new-item"))}>+ New Compute</Button> : undefined}>
-          <ComputeView />
+          headerRight={!readOnly ? <Button size="sm" onClick={() => setShowNewCompute(true)}>+ New Compute</Button> : undefined}>
+          <ComputeView showCreate={showNewCompute} onCloseCreate={() => setShowNewCompute(false)} />
         </Layout>
       )}
       {view === "schedules" && (
         <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Schedules" padded={false}
-          headerRight={!readOnly ? <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("ark:new-item"))}>+ New Schedule</Button> : undefined}>
-          <ScheduleView />
+          headerRight={!readOnly ? <Button size="sm" onClick={() => setShowNewSchedule(true)}>+ New Schedule</Button> : undefined}>
+          <ScheduleView showCreate={showNewSchedule} onCloseCreate={() => setShowNewSchedule(false)} />
         </Layout>
       )}
       {view === "memory" && (
         <Layout view={view} onNavigate={setView} readOnly={readOnly} title="Memory"
-          headerRight={!readOnly ? <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("ark:new-item"))}>+ Add Memory</Button> : undefined}>
-          <MemoryView />
+          headerRight={!readOnly ? <Button size="sm" onClick={() => setShowNewMemory(true)}>+ Add Memory</Button> : undefined}>
+          <MemoryView showCreate={showNewMemory} onCloseCreate={() => setShowNewMemory(false)} />
         </Layout>
       )}
       {view === "costs" && (
@@ -70,7 +83,7 @@ function App() {
       )}
       {toast && (
         <Toast
-          key={Date.now()}
+          key={toastKey}
           message={toast.msg}
           type={toast.type}
           onDone={() => setToast(null)}
@@ -82,4 +95,8 @@ function App() {
 
 // ---- Mount ----
 const root = createRoot(document.getElementById("root")!);
-root.render(<App />);
+root.render(
+  <QueryClientProvider client={queryClient}>
+    <App />
+  </QueryClientProvider>
+);

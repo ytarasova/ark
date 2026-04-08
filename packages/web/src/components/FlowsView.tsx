@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { api } from "../hooks/useApi.js";
+import { useFlowsQuery, useFlowDetail } from "../hooks/useQueries.js";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
@@ -13,24 +14,10 @@ const GATE_VARIANT: Record<string, "success" | "warning" | "info" | "default"> =
 };
 
 export function FlowsView() {
-  const [flows, setFlows] = useState<any[]>([]);
-  const [selected, setSelected] = useState<any>(null);
-
-  useEffect(() => {
-    api.getFlows().then((data) => {
-      setFlows(data || []);
-      if (data?.length) selectFlow(data[0]);
-    });
-  }, []);
-
-  function selectFlow(flow: any) {
-    // Fetch detail to get full stage objects (list endpoint only has stage names as strings)
-    api.getFlowDetail(flow.name).then((detail) => {
-      setSelected(detail || flow);
-    }).catch(() => {
-      setSelected(flow);
-    });
-  }
+  const { data: flows = [] } = useFlowsQuery();
+  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const { data: selectedDetail } = useFlowDetail(selectedName);
+  const selected = selectedDetail || (selectedName ? flows.find((f: any) => f.name === selectedName) : null);
 
   if (!flows.length) {
     return (
@@ -57,7 +44,7 @@ export function FlowsView() {
                 "hover:bg-accent",
                 selected?.name === f.name && "bg-accent border-l-2 border-l-primary font-semibold"
               )}
-              onClick={() => selectFlow(f)}
+              onClick={() => setSelectedName(f.name)}
             >
               <span className="text-foreground truncate">{f.name}</span>
               <Badge variant="secondary" className="text-[10px]">{stageCount} stage{stageCount !== 1 ? "s" : ""}</Badge>

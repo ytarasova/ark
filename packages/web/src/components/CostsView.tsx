@@ -1,15 +1,10 @@
-import { useState, useEffect } from "react";
-import { api } from "../hooks/useApi.js";
+import { useCostsQuery } from "../hooks/useQueries.js";
 import { fmtCost } from "../util.js";
 import { Card } from "./ui/card.js";
 import { DollarSign } from "lucide-react";
 
 export function CostsView() {
-  const [costs, setCosts] = useState<any>(null);
-
-  useEffect(() => {
-    api.getCosts().then(setCosts);
-  }, []);
+  const { data: costs } = useCostsQuery();
 
   if (!costs) return (
     <div className="flex items-center justify-center h-[calc(100vh-180px)]">

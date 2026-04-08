@@ -1,5 +1,7 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
+import { useComputeQuery } from "../hooks/useQueries.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
@@ -117,34 +119,16 @@ function ComputeActions({ compute, onAction }: { compute: any; onAction: (action
   );
 }
 
-export function ComputeView() {
-  const [computes, setComputes] = useState<any[]>([]);
+interface ComputeViewProps {
+  showCreate?: boolean;
+  onCloseCreate?: () => void;
+}
+
+export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewProps) {
+  const queryClient = useQueryClient();
+  const { data: computes = [] } = useComputeQuery();
   const [selected, setSelected] = useState<any>(null);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: string } | null>(null);
-  const [showNew, setShowNew] = useState(false);
-
-  function refresh() {
-    api.getCompute().then((data) => {
-      setComputes(data || []);
-      if (selected) {
-        const updated = (data || []).find((c: any) => (c.name || c.id) === (selected.name || selected.id));
-        setSelected(updated || null);
-      }
-    });
-  }
-
-  useEffect(() => {
-    api.getCompute().then((data) => {
-      setComputes(data || []);
-      if (data?.length) setSelected(data[0]);
-    });
-  }, []);
-
-  useEffect(() => {
-    const handler = () => setShowNew(true);
-    document.addEventListener("ark:new-item", handler);
-    return () => document.removeEventListener("ark:new-item", handler);
-  }, []);
 
   async function handleAction(action: string) {
     if (!selected) return;
@@ -161,7 +145,7 @@ export function ComputeView() {
       }
       if (res.ok !== false) {
         setActionMsg({ text: `${action} successful`, type: "success" });
-        refresh();
+        queryClient.invalidateQueries({ queryKey: ["compute"] });
       } else {
         setActionMsg({ text: res.message || "Action failed", type: "error" });
       }
@@ -177,15 +161,15 @@ export function ComputeView() {
       if (form.size) config.size = form.size;
       if (form.region) config.region = form.region;
       await api.createCompute({ name: form.name, provider: form.provider, config });
-      setShowNew(false);
-      refresh();
+      onCloseCreate?.();
+      queryClient.invalidateQueries({ queryKey: ["compute"] });
     } catch (err: any) {
       setActionMsg({ text: err.message || "Failed to create compute", type: "error" });
       setTimeout(() => setActionMsg(null), 3000);
     }
   }
 
-  if (!computes.length && !showNew) {
+  if (!computes.length && !showCreate) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-180px)]">
         <div className="text-center">
@@ -207,7 +191,7 @@ export function ComputeView() {
             className={cn(
               "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
               "hover:bg-accent",
-              selected === c && "bg-accent border-l-2 border-l-primary font-semibold"
+              (selected?.name || selected?.id) === (c.name || c.id) && "bg-accent border-l-2 border-l-primary font-semibold"
             )}
             onClick={() => setSelected(c)}
           >
@@ -317,7 +301,7 @@ export function ComputeView() {
         )}
       </div>
     </div>
-    {showNew && <NewComputeModal onClose={() => setShowNew(false)} onSubmit={handleCreate} />}
+    {showCreate && <NewComputeModal onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />}
     </>
   );
 }

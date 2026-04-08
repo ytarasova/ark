@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
+import { useSkillsQuery, useRecipesQuery } from "../hooks/useQueries.js";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
@@ -14,20 +16,12 @@ interface ToolsViewProps {
 }
 
 export function ToolsView({ activeTab = "skills", onTabChange }: ToolsViewProps) {
+  const queryClient = useQueryClient();
   const tab = activeTab;
-  const [skills, setSkills] = useState<any[]>([]);
-  const [recipes, setRecipes] = useState<any[]>([]);
+  const { data: skills = [] } = useSkillsQuery();
+  const { data: recipes = [] } = useRecipesQuery();
   const [selected, setSelected] = useState<any>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
-
-  function refreshItems() {
-    api.getSkills().then((d) => setSkills(d || []));
-    api.getRecipes().then((d) => setRecipes(d || []));
-  }
-
-  useEffect(() => {
-    refreshItems();
-  }, []);
 
   // Reset selection when tab changes
   useEffect(() => { setSelected(null); }, [tab]);
@@ -130,7 +124,8 @@ export function ToolsView({ activeTab = "skills", onTabChange }: ToolsViewProps)
                       if (tab === "skills") await api.deleteSkill(selected.name);
                       else await api.deleteRecipe(selected.name);
                       setSelected(null);
-                      refreshItems();
+                      queryClient.invalidateQueries({ queryKey: ["skills"] });
+                      queryClient.invalidateQueries({ queryKey: ["recipes"] });
                     } catch {}
                   }}>
                     Delete

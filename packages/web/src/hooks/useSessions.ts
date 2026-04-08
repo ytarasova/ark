@@ -1,20 +1,19 @@
-import { useState, useEffect } from "react";
-import { api } from "./useApi.js";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSessionsQuery, useGroupsQuery } from "./useQueries.js";
 import { useSse } from "./useSse.js";
 
 export function useSessions() {
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [groups, setGroups] = useState<string[]>([]);
-
-  useEffect(() => {
-    api.getSessions().then(setSessions);
-    api.getGroups().then(setGroups);
-  }, []);
+  const queryClient = useQueryClient();
+  const { data: sessions = [], refetch } = useSessionsQuery();
+  const { data: groups = [] } = useGroupsQuery();
 
   const sseData = useSse<any[]>("/api/events/stream");
+
   useEffect(() => {
     if (!sseData) return;
-    setSessions((prev) => {
+    queryClient.setQueryData<any[]>(["sessions"], (prev) => {
+      if (!prev) return prev;
       const map = new Map(prev.map((s) => [s.id, s]));
       for (const u of sseData) {
         const existing = map.get(u.id);
@@ -26,12 +25,7 @@ export function useSessions() {
       }
       return Array.from(map.values());
     });
-  }, [sseData]);
+  }, [sseData, queryClient]);
 
-  async function refresh() {
-    const data = await api.getSessions();
-    setSessions(data);
-  }
-
-  return { sessions, groups, refresh };
+  return { sessions, groups, refresh: refetch };
 }

@@ -1,5 +1,7 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
+import { useAgentsQuery } from "../hooks/useQueries.js";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
@@ -74,39 +76,21 @@ function NewAgentModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (
   );
 }
 
-export function AgentsView() {
-  const [agents, setAgents] = useState<any[]>([]);
+interface AgentsViewProps {
+  showCreate?: boolean;
+  onCloseCreate?: () => void;
+}
+
+export function AgentsView({ showCreate = false, onCloseCreate }: AgentsViewProps) {
+  const queryClient = useQueryClient();
+  const { data: agents = [] } = useAgentsQuery();
   const [selected, setSelected] = useState<any>(null);
-  const [showCreate, setShowCreate] = useState(false);
-
-  function refresh() {
-    api.getAgents().then((data) => {
-      setAgents(data || []);
-      if (selected) {
-        const updated = (data || []).find((a: any) => a.name === selected.name);
-        setSelected(updated || null);
-      }
-    });
-  }
-
-  useEffect(() => {
-    api.getAgents().then((data) => {
-      setAgents(data || []);
-      if (data?.length) setSelected(data[0]);
-    });
-  }, []);
-
-  useEffect(() => {
-    const handler = () => setShowCreate(true);
-    document.addEventListener("ark:new-item", handler);
-    return () => document.removeEventListener("ark:new-item", handler);
-  }, []);
 
   async function handleCreate(form: any) {
     try {
       await api.createAgent(form);
-      setShowCreate(false);
-      refresh();
+      onCloseCreate?.();
+      queryClient.invalidateQueries({ queryKey: ["agents"] });
     } catch {}
   }
 
@@ -114,7 +98,7 @@ export function AgentsView() {
     try {
       await api.deleteAgent(name);
       setSelected(null);
-      refresh();
+      queryClient.invalidateQueries({ queryKey: ["agents"] });
     } catch {}
   }
 
@@ -221,7 +205,7 @@ export function AgentsView() {
         )}
       </div>
     </div>
-    {showCreate && <NewAgentModal onClose={() => setShowCreate(false)} onSubmit={handleCreate} />}
+    {showCreate && <NewAgentModal onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />}
     </>
   );
 }

@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
+import { useMemoriesQuery } from "../hooks/useQueries.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
@@ -7,8 +9,14 @@ import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
 import { BookOpen, Search } from "lucide-react";
 
-export function MemoryView() {
-  const [memories, setMemories] = useState<any[]>([]);
+interface MemoryViewProps {
+  showCreate?: boolean;
+  onCloseCreate?: () => void;
+}
+
+export function MemoryView({ showCreate = false, onCloseCreate }: MemoryViewProps) {
+  const queryClient = useQueryClient();
+  const { data: memories = [] } = useMemoriesQuery();
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -16,13 +24,6 @@ export function MemoryView() {
   const [newTags, setNewTags] = useState("");
   const [newScope, setNewScope] = useState("global");
   const [loading, setLoading] = useState(false);
-
-  const loadMemories = useCallback(async () => {
-    const mems = await api.getMemories();
-    setMemories(mems || []);
-  }, []);
-
-  useEffect(() => { loadMemories(); }, [loadMemories]);
 
   const handleSearch = async () => {
     if (!search.trim()) { setSearchResults(null); return; }
@@ -43,15 +44,23 @@ export function MemoryView() {
     });
     setNewContent("");
     setNewTags("");
-    setShowAdd(false);
-    loadMemories();
+    closeAddForm();
+    queryClient.invalidateQueries({ queryKey: ["memories"] });
   };
 
   const handleForget = async (id: string) => {
     await api.forgetMemory(id);
-    loadMemories();
+    queryClient.invalidateQueries({ queryKey: ["memories"] });
     if (searchResults) setSearchResults(searchResults.filter(m => m.id !== id));
   };
+
+  // External showCreate prop opens the add form
+  const addFormVisible = showAdd || showCreate;
+
+  function closeAddForm() {
+    setShowAdd(false);
+    onCloseCreate?.();
+  }
 
   const displayList = searchResults ?? memories;
 
@@ -78,13 +87,13 @@ export function MemoryView() {
           </Button>
         )}
         <div className="flex-1" />
-        <Button variant="success" size="sm" onClick={() => setShowAdd(!showAdd)}>
-          {showAdd ? "Cancel" : "+ Add Memory"}
+        <Button variant="success" size="sm" onClick={() => addFormVisible ? closeAddForm() : setShowAdd(true)}>
+          {addFormVisible ? "Cancel" : "+ Add Memory"}
         </Button>
       </div>
 
       {/* Add form */}
-      {showAdd && (
+      {addFormVisible && (
         <Card className="mb-4 p-4">
           <div className="mb-3.5">
             <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Content</label>
@@ -119,7 +128,7 @@ export function MemoryView() {
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={handleAdd}>Save Memory</Button>
-            <Button variant="outline" size="sm" onClick={() => setShowAdd(false)}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={closeAddForm}>Cancel</Button>
           </div>
         </Card>
       )}
