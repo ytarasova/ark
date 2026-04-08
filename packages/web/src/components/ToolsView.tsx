@@ -7,8 +7,13 @@ import { Wrench } from "lucide-react";
 
 type Tab = "skills" | "recipes";
 
-export function ToolsView() {
-  const [tab, setTab] = useState<Tab>("skills");
+interface ToolsViewProps {
+  activeTab?: Tab;
+  onTabChange?: (tab: Tab) => void;
+}
+
+export function ToolsView({ activeTab = "skills", onTabChange }: ToolsViewProps) {
+  const tab = activeTab;
   const [skills, setSkills] = useState<any[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
@@ -18,43 +23,13 @@ export function ToolsView() {
     api.getRecipes().then((d) => setRecipes(d || []));
   }, []);
 
+  // Reset selection when tab changes
+  useEffect(() => { setSelected(null); }, [tab]);
+
   const items = tab === "skills" ? skills : recipes;
 
-  function handleSelect(item: any) {
-    setSelected(item);
-  }
-
-  function handleTab(t: Tab) {
-    setTab(t);
-    setSelected(null);
-  }
-
   return (
-    <div className="flex flex-col h-full">
-      {/* Tabs */}
-      <div className="flex gap-0 border-b border-border shrink-0">
-        <button
-          className={cn(
-            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-            tab === "skills" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-          onClick={() => handleTab("skills")}
-        >
-          Skills
-        </button>
-        <button
-          className={cn(
-            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-            tab === "recipes" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-          onClick={() => handleTab("recipes")}
-        >
-          Recipes
-        </button>
-      </div>
-
-      {/* Split view - fills remaining space */}
-      <div className="grid grid-cols-[260px_1fr] overflow-hidden flex-1 min-h-0">
+    <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
         {/* Left: list panel */}
         <div className="bg-card border-r border-border overflow-y-auto">
           {items.length === 0 && (
@@ -136,6 +111,5 @@ export function ToolsView() {
           )}
         </div>
       </div>
-    </div>
   );
 }

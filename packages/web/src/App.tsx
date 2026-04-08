@@ -46,6 +46,7 @@ function App() {
   const [groupFilter, setGroupFilter] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null);
+  const [toolsTab, setToolsTab] = useState<"skills" | "recipes">("skills");
 
   // Detect read-only from a data attribute on root (set by server)
   const readOnly = document.getElementById("root")?.dataset.readonly === "true";
@@ -113,6 +114,16 @@ function App() {
                 {failedCount > 0 && <span className="text-red-400">{failedCount}</span>}
               </div>
             )}
+            {view === "tools" && (
+              <div className="flex gap-1 ml-2">
+                {(["skills", "recipes"] as const).map(t => (
+                  <button key={t} onClick={() => setToolsTab(t)} className={cn(
+                    "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                    toolsTab === t ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {view === "sessions" && (
@@ -141,7 +152,7 @@ function App() {
             />
           )}
           {view === "agents" && <AgentsView />}
-          {view === "tools" && <ToolsView />}
+          {view === "tools" && <ToolsView activeTab={toolsTab} onTabChange={setToolsTab} />}
           {view === "flows" && <FlowsView />}
           {view === "history" && <HistoryView />}
           {view === "compute" && <ComputeView />}
