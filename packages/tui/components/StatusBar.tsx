@@ -58,7 +58,7 @@ export function StatusBar({ hints, overlayBarText, sessions, loading, error }: S
         </Box>
       )}
       <Box>
-        <Text backgroundColor={theme.surface} color={theme.text}>
+        <Text backgroundColor={theme.accent} color="white" bold>
           {` ${barText}`.padEnd(columns)}
         </Text>
       </Box>

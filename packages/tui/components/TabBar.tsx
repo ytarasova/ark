@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
+import { getTheme } from "../../core/theme.js";
 
 export type Tab = "sessions" | "agents" | "flows" | "compute" | "history" | "memory" | "tools" | "schedules" | "costs";
 
@@ -25,6 +26,7 @@ interface TabBarProps {
 }
 
 export function TabBar({ active, loading, loadingLabel }: TabBarProps) {
+  const theme = getTheme();
   return (
     <Box>
       {TABS.map((tab) => {
@@ -34,7 +36,7 @@ export function TabBar({ active, loading, loadingLabel }: TabBarProps) {
         return (
           <Box key={tab} marginRight={1}>
             {isActive ? (
-              <Text backgroundColor="cyan" color="white" bold>{` ${label} `}</Text>
+              <Text backgroundColor={theme.accent} color="white" bold>{` ${label} `}</Text>
             ) : (
               <Text dimColor>{` ${label} `}</Text>
             )}
