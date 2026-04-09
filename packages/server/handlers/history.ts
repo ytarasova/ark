@@ -43,8 +43,7 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("history/rebuild-fts", async () => {
-    const { getApp } = await import("../../core/app.js");
-    const db = getApp().db;
+    const db = app.db;
     db.run("DELETE FROM claude_sessions_cache");
     db.run("DELETE FROM transcript_index");
     const sessionCount = await core.refreshClaudeSessionsCache({});
