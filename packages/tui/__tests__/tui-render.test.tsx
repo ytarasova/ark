@@ -9,6 +9,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { App } from "../App.js";
+import { AppProvider } from "../context/AppProvider.js";
 import { ArkClientProvider } from "../context/ArkClientProvider.js";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
 
@@ -27,9 +28,11 @@ afterAll(async () => {
 async function renderApp() {
   let ready = false;
   const result = render(
-    <ArkClientProvider onReady={() => { ready = true; }}>
-      <App />
-    </ArkClientProvider>
+    <AppProvider app={app}>
+      <ArkClientProvider onReady={() => { ready = true; }}>
+        <App />
+      </ArkClientProvider>
+    </AppProvider>
   );
   for (let i = 0; i < 100; i++) {
     await new Promise(r => setTimeout(r, 20));

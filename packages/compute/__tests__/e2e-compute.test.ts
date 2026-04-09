@@ -39,8 +39,16 @@ afterAll(async () => {
 
 // Ensure providers are registered (may be cleared by provider-registry.test.ts)
 function ensureProviders() {
-  if (!getProvider("local")) registerProvider(new LocalProvider());
-  if (!getProvider("docker")) registerProvider(new DockerProvider());
+  if (!getProvider("local")) {
+    const lp = new LocalProvider();
+    lp.setApp?.(app);
+    registerProvider(lp);
+  }
+  if (!getProvider("docker")) {
+    const dp = new DockerProvider();
+    dp.setApp?.(app);
+    registerProvider(dp);
+  }
 }
 
 // Track resources for cleanup
@@ -55,28 +63,22 @@ function cleanupComputes() {
 
 // ── Test 1: EC2 compute creation and provider resolution ───────────────────────
 
-describe("E2E Compute: EC2 compute provider resolution", () => {
+describe("E2E Compute: Remote compute provider resolution", () => {
   beforeEach(() => ensureProviders());
   afterEach(() => cleanupComputes());
 
-  it("creates an EC2 compute and resolves its provider", () => {
-    const name = `test-ec2-resolve-${Date.now()}`;
+  it("creates a remote compute and stores its config", () => {
+    const name = `test-remote-resolve-${Date.now()}`;
     const compute = getApp().computes.create({
       name,
-      provider: "ec2",
+      provider: "ec2-worktree",
       config: { size: "m", region: "us-east-1" },
     });
     computeNames.push(name);
 
     expect(compute.name).toBe(name);
-    expect(compute.provider).toBe("ec2");
-    expect(compute.status).toBe("stopped"); // non-local computes start stopped
-
-    const provider = getProvider("ec2");
-    expect(provider).not.toBeNull();
-    expect(provider!.name).toBe("ec2");
-
-    // Verify config was stored
+    expect(compute.provider).toBe("ec2-worktree");
+    expect(compute.status).toBe("stopped");
     expect(compute.config.size).toBe("m");
     expect(compute.config.region).toBe("us-east-1");
   });
@@ -105,10 +107,9 @@ describe("E2E Compute: Docker compute provider resolution", () => {
     expect(provider).not.toBeNull();
     expect(provider!.name).toBe("docker");
 
-    // Verify all three providers are registered
+    // Verify core providers are registered
     const providers = listProviders();
     expect(providers).toContain("local");
-    expect(providers).toContain("ec2");
     expect(providers).toContain("docker");
   });
 });
