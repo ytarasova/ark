@@ -38,11 +38,11 @@
       <h2>ark tui</h2>
       <p>Launch the interactive TUI dashboard.</p>
       <pre><code><span class="prompt">$</span> ark tui</code></pre>
-      <p>Opens the terminal dashboard with 6 tabs: Sessions, Agents, Tools, Flows, History, Compute. See the <a href="tui.html">TUI Guide</a> for keyboard shortcuts.</p>
+      <p>Opens the terminal dashboard with 9 tabs: Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs. See the <a href="tui.html">TUI Guide</a> for keyboard shortcuts.</p>
 
       <!-- ── ark exec ────────────────────────────────────────────────────── -->
       <h2>ark exec</h2>
-      <p>Run a session non-interactively. Designed for CI/CD pipelines — blocks until the session completes, fails, or times out.</p>
+      <p>Run a session non-interactively. Designed for CI/CD pipelines -- blocks until the session completes, fails, or times out.</p>
       <pre><code><span class="prompt">$</span> ark exec --repo . --summary "Fix the login bug" --flow bare
 <span class="prompt">$</span> ark exec --repo /path/to/repo --summary "Add tests" --timeout 600 --output json</code></pre>
 
@@ -51,15 +51,15 @@
           <tr><th>Option</th><th>Default</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>--repo</code></td><td>—</td><td>Path to the repository</td></tr>
-          <tr><td><code>--summary</code></td><td>—</td><td>Task description for the agent</td></tr>
-          <tr><td><code>--ticket</code></td><td>—</td><td>Ticket identifier (e.g. JIRA key)</td></tr>
+          <tr><td><code>--repo</code></td><td>--</td><td>Path to the repository</td></tr>
+          <tr><td><code>--summary</code></td><td>--</td><td>Task description for the agent</td></tr>
+          <tr><td><code>--ticket</code></td><td>--</td><td>Ticket identifier (e.g. JIRA key)</td></tr>
           <tr><td><code>--flow</code></td><td><code>bare</code></td><td>Flow to run</td></tr>
-          <tr><td><code>--compute</code></td><td>—</td><td>Compute target name</td></tr>
-          <tr><td><code>--group</code></td><td>—</td><td>Assign to a group</td></tr>
-          <tr><td><code>--autonomy</code></td><td>—</td><td>Permission level: <code>full</code>, <code>execute</code>, <code>edit</code>, <code>read-only</code></td></tr>
+          <tr><td><code>--compute</code></td><td>--</td><td>Compute target name</td></tr>
+          <tr><td><code>--group</code></td><td>--</td><td>Assign to a group</td></tr>
+          <tr><td><code>--autonomy</code></td><td>--</td><td>Permission level: <code>full</code>, <code>execute</code>, <code>edit</code>, <code>read-only</code></td></tr>
           <tr><td><code>--output</code></td><td><code>text</code></td><td>Output format: <code>text</code> or <code>json</code></td></tr>
-          <tr><td><code>--timeout</code></td><td>—</td><td>Maximum runtime in seconds</td></tr>
+          <tr><td><code>--timeout</code></td><td>--</td><td>Maximum runtime in seconds</td></tr>
         </tbody>
       </table>
 
@@ -232,6 +232,58 @@
       <pre><code><span class="prompt">$</span> ark session delete s-1a2b
 <span class="prompt">$</span> ark session delete s-1a2b s-3c4d s-5e6f</code></pre>
 
+      <h3>ark session interrupt &lt;id&gt;</h3>
+      <p>Send Ctrl+C to a running agent without killing the tmux session. The agent pauses and can be re-engaged.</p>
+      <pre><code><span class="prompt">$</span> ark session interrupt s-1a2b</code></pre>
+
+      <h3>ark session archive &lt;id&gt;</h3>
+      <p>Archive a completed session for later reference. Archived sessions are hidden from the default list but preserved indefinitely.</p>
+      <pre><code><span class="prompt">$</span> ark session archive s-1a2b</code></pre>
+
+      <h3>ark session restore &lt;id&gt;</h3>
+      <p>Restore an archived session back to its previous status.</p>
+      <pre><code><span class="prompt">$</span> ark session restore s-1a2b</code></pre>
+
+      <h3>ark session verify &lt;id&gt;</h3>
+      <p>Run verification scripts configured for the session's flow stage. Reports pass/fail for each script and any unresolved todos.</p>
+      <pre><code><span class="prompt">$</span> ark session verify s-1a2b</code></pre>
+
+      <h3>ark session todo &lt;action&gt; &lt;id&gt; [text]</h3>
+      <p>Manage verification todos for a session. Todos block stage completion until resolved.</p>
+      <pre><code><span class="prompt">$</span> ark session todo list s-1a2b
+<span class="prompt">$</span> ark session todo add s-1a2b "Write migration docs"
+<span class="prompt">$</span> ark session todo done s-1a2b 1      <span class="yaml-comment"># toggle todo #1</span>
+<span class="prompt">$</span> ark session todo delete s-1a2b 1</code></pre>
+
+      <h3>ark session spawn &lt;parent-id&gt; &lt;task&gt;</h3>
+      <p>Spawn a child session for parallel work. The child inherits the parent's repo and compute. Supports agent and model overrides.</p>
+      <pre><code><span class="prompt">$</span> ark session spawn s-1a2b "Write unit tests"
+<span class="prompt">$</span> ark session spawn s-1a2b "Lint fix" --agent worker --dispatch</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-a, --agent</code></td><td>Override agent for the child session</td></tr>
+          <tr><td><code>-m, --model</code></td><td>Override model (e.g. <code>haiku</code>, <code>sonnet</code>, <code>opus</code>)</td></tr>
+          <tr><td><code>-d, --dispatch</code></td><td>Auto-dispatch after spawning</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark session undelete &lt;id&gt;</h3>
+      <p>Restore a recently deleted session. Must be run within 90 seconds of deletion.</p>
+      <pre><code><span class="prompt">$</span> ark session undelete s-1a2b</code></pre>
+
+      <h3>ark session export &lt;id&gt; [file]</h3>
+      <p>Export a session to a JSON file. Defaults to <code>session-&lt;id&gt;.json</code>.</p>
+      <pre><code><span class="prompt">$</span> ark session export s-1a2b
+<span class="prompt">$</span> ark session export s-1a2b backup.json</code></pre>
+
+      <h3>ark session import &lt;file&gt;</h3>
+      <p>Import a session from a previously exported JSON file.</p>
+      <pre><code><span class="prompt">$</span> ark session import session-s-1a2b.json</code></pre>
+
       <h3>ark session group &lt;id&gt; &lt;group&gt;</h3>
       <p>Assign a session to a group.</p>
       <pre><code><span class="prompt">$</span> ark session group s-1a2b my-feature</code></pre>
@@ -249,8 +301,8 @@
         </thead>
         <tbody>
           <tr><td><code>-l, --limit</code></td><td><code>20</code></td><td>Maximum number of results</td></tr>
-          <tr><td><code>-t, --transcripts</code></td><td>—</td><td>Also search Claude Code JSONL transcripts</td></tr>
-          <tr><td><code>--index</code></td><td>—</td><td>Rebuild the FTS5 index before searching</td></tr>
+          <tr><td><code>-t, --transcripts</code></td><td>--</td><td>Also search Claude Code JSONL transcripts</td></tr>
+          <tr><td><code>--index</code></td><td>--</td><td>Rebuild the FTS5 index before searching</td></tr>
         </tbody>
       </table>
 

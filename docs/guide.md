@@ -36,7 +36,7 @@ The `default` flow runs: plan > implement > PR > review > merge. Each stage uses
 ### Use the dashboard
 
 ```bash
-ark tui    # Terminal dashboard (7 tabs, keyboard-driven)
+ark tui    # Terminal dashboard (9 tabs, keyboard-driven)
 ark web    # Web dashboard (browser-based, SSE live updates)
 make desktop  # Desktop app (Electron, native window)
 ```
@@ -202,17 +202,19 @@ ark session list --group backend
 
 ## TUI Dashboard
 
-Launch with `ark tui`. The dashboard has 7 tabs, switched with number keys `1`-`7`:
+Launch with `ark tui`. The dashboard has 9 tabs, switched with number keys `1`-`9`:
 
 | # | Tab | Purpose |
 |---|-----|---------|
 | 1 | Sessions | Session list, detail pane, dispatch/stop/fork |
 | 2 | Agents | Browse and manage agent definitions |
-| 3 | Tools | MCP Servers, Commands, Skills, Recipes, Context |
-| 4 | Flows | Flow definitions and stage visualization |
+| 3 | Flows | Flow definitions and stage visualization |
+| 4 | Compute | Compute resource lifecycle management |
 | 5 | History | Claude Code session discovery and import |
-| 6 | Compute | Compute resource lifecycle management |
-| 7 | Costs | Token usage and cost tracking |
+| 6 | Memory | Cross-session memory store |
+| 7 | Tools | MCP Servers, Commands, Skills, Recipes, Context |
+| 8 | Schedules | Recurring cron-based sessions |
+| 9 | Costs | Per-session token usage and cost tracking |
 
 ### Session List Navigation
 

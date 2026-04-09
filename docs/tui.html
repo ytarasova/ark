@@ -35,14 +35,16 @@
       <p class="subtitle">Keyboard-driven terminal interface for managing agents.</p>
 
       <h2>Layout</h2>
-      <p>The TUI has 7 tabs accessible via number keys <kbd>1</kbd>-<kbd>7</kbd>:</p>
+      <p>The TUI has 9 tabs accessible via number keys <kbd>1</kbd>-<kbd>9</kbd>:</p>
       <ol>
         <li><strong>Sessions</strong> - manage agent sessions</li>
         <li><strong>Agents</strong> - create, edit, copy, delete agent definitions</li>
-        <li><strong>Tools</strong> - browse and manage tools available to agents</li>
-        <li><strong>Flows</strong> - view flow definitions</li>
-        <li><strong>History</strong> - browse and import Claude Code sessions</li>
+        <li><strong>Flows</strong> - view flow definitions and stage pipelines</li>
         <li><strong>Compute</strong> - manage compute resources</li>
+        <li><strong>History</strong> - browse and import Claude Code sessions</li>
+        <li><strong>Memory</strong> - cross-session memory store</li>
+        <li><strong>Tools</strong> - browse and manage tools available to agents</li>
+        <li><strong>Schedules</strong> - manage recurring cron-based sessions</li>
         <li><strong>Costs</strong> - per-session token usage and cost tracking</li>
       </ol>
       <p>Each tab has a split pane: left (list) and right (detail). Press <kbd>Tab</kbd> to switch focus between panes.</p>
@@ -54,7 +56,7 @@
           <tr><th>Key</th><th>Action</th></tr>
         </thead>
         <tbody>
-          <tr><td><kbd>1</kbd>-<kbd>7</kbd></td><td>Switch to tab</td></tr>
+          <tr><td><kbd>1</kbd>-<kbd>9</kbd></td><td>Switch to tab</td></tr>
           <tr><td><kbd>Tab</kbd></td><td>Toggle pane focus (list / detail)</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Back to list pane</td></tr>
           <tr><td><kbd>e</kbd></td><td>Toggle event log</td></tr>
@@ -151,7 +153,52 @@
         </tbody>
       </table>
 
-      <h2>Tools Tab (3)</h2>
+      <h2>Flows Tab (3)</h2>
+      <p>Browse flow definitions and visualize stage pipelines. Select a flow to see its stages, gates, and agent assignments.</p>
+
+      <h2>Compute Tab (4)</h2>
+      <p>Manage local, Docker, and EC2 compute resources.</p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>Enter</kbd></td><td>Provision a compute resource</td></tr>
+          <tr><td><kbd>n</kbd></td><td>Create new compute</td></tr>
+          <tr><td><kbd>s</kbd></td><td>Start / stop</td></tr>
+          <tr><td><kbd>a</kbd></td><td>SSH into running compute</td></tr>
+          <tr><td><kbd>x</kbd></td><td>Delete (with confirmation)</td></tr>
+        </tbody>
+      </table>
+
+      <h2>History Tab (5)</h2>
+      <p>Shows both Ark sessions and native Claude Code sessions from <code>~/.claude/projects/</code>.</p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>Enter</kbd></td><td>Import a Claude session into Ark</td></tr>
+          <tr><td><kbd>s</kbd></td><td>Search across all transcripts</td></tr>
+          <tr><td><kbd>R</kbd></td><td>Full rebuild of session cache and search index</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Memory Tab (6)</h2>
+      <p>Manage cross-session memories. Memories are tagged notes with scope and importance that survive across sessions. At dispatch time, relevant memories are scored against the session summary and injected into the agent's task prompt automatically.</p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>n</kbd></td><td>Add a new memory</td></tr>
+          <tr><td><kbd>/</kbd></td><td>Search memories by keyword</td></tr>
+          <tr><td><kbd>x</kbd></td><td>Delete selected memory</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Clear search / close</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Tools Tab (7)</h2>
       <p>Browse all tools available to agents in the current project. Tools are organized into 6 categories:</p>
       <ul>
         <li><strong>MCP Servers</strong> -- from <code>.mcp.json</code></li>
@@ -172,38 +219,21 @@
         </tbody>
       </table>
 
-      <h2>Flows Tab (4)</h2>
-      <p>Browse flow definitions and visualize stage pipelines. Select a flow to see its stages, gates, and agent assignments.</p>
-
-      <h2>History Tab (5)</h2>
-      <p>Shows both Ark sessions and native Claude Code sessions from <code>~/.claude/projects/</code>.</p>
+      <h2>Schedules Tab (8)</h2>
+      <p>Create and manage recurring sessions driven by cron expressions. Schedules automatically create and dispatch sessions at specified intervals.</p>
       <table>
         <thead>
           <tr><th>Key</th><th>Action</th></tr>
         </thead>
         <tbody>
-          <tr><td><kbd>Enter</kbd></td><td>Import a Claude session into Ark</td></tr>
-          <tr><td><kbd>s</kbd></td><td>Search across all transcripts</td></tr>
-          <tr><td><kbd>R</kbd></td><td>Full rebuild of session cache and search index</td></tr>
+          <tr><td><kbd>n</kbd></td><td>Create new schedule</td></tr>
+          <tr><td><kbd>e</kbd></td><td>Enable / disable selected schedule</td></tr>
+          <tr><td><kbd>x</kbd></td><td>Delete schedule (with confirmation)</td></tr>
+          <tr><td><kbd>r</kbd></td><td>Refresh schedule list</td></tr>
         </tbody>
       </table>
 
-      <h2>Compute Tab (6)</h2>
-      <p>Manage local, Docker, and EC2 compute resources.</p>
-      <table>
-        <thead>
-          <tr><th>Key</th><th>Action</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><kbd>Enter</kbd></td><td>Provision a compute resource</td></tr>
-          <tr><td><kbd>n</kbd></td><td>Create new compute</td></tr>
-          <tr><td><kbd>s</kbd></td><td>Start / stop</td></tr>
-          <tr><td><kbd>a</kbd></td><td>SSH into running compute</td></tr>
-          <tr><td><kbd>x</kbd></td><td>Delete (with confirmation)</td></tr>
-        </tbody>
-      </table>
-
-      <h2>Costs Tab (7)</h2>
+      <h2>Costs Tab (9)</h2>
       <p>View per-session token usage and cost breakdown. Shows input, output, cache read, and cache write tokens with calculated costs using per-model pricing. Aggregate totals and budget usage (daily/weekly/monthly) are displayed at the top.</p>
 
       <h2>Status Bar</h2>
