@@ -126,9 +126,8 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
   hints.push(...NAV_HINTS);
   hints.push(sep(0));
 
-  // Sessions
+  // Status-specific actions (only show what's relevant)
   if (s) {
-    // Interact with current session
     switch (s.status) {
       case "ready":
       case "blocked":
@@ -137,10 +136,9 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
         break;
       case "running":
         hints.push(<KeyHint key="a" k="a" label="attach" />);
-        hints.push(<KeyHint key="tT" k="t/T" label="chat/threads" />);
+        hints.push(<KeyHint key="t" k="t" label="chat" />);
         hints.push(<KeyHint key="s" k="s" label="stop" />);
-        hints.push(<KeyHint key="d" k="d" label="done" />);
-        hints.push(<KeyHint key="A" k="A" label="advance" />);
+        hints.push(<KeyHint key="I" k="I" label="interrupt" />);
         break;
       case "stopped":
       case "failed":
@@ -154,28 +152,24 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
         break;
       case "waiting":
         hints.push(<KeyHint key="a" k="a" label="attach" />);
-        hints.push(<KeyHint key="tT2" k="t/T" label="chat/threads" />);
+        hints.push(<KeyHint key="t" k="t" label="chat" />);
         hints.push(<KeyHint key="s" k="s" label="stop" />);
-        hints.push(<KeyHint key="A2" k="A" label="advance" />);
         break;
     }
-    // Create / duplicate
-    hints.push(<KeyHint key="fC" k="f/C" label="fork/clone" />);
+
+    hints.push(sep(1));
+
+    // Session actions (condensed)
     hints.push(<KeyHint key="W" k="W" label="worktree" />);
-    // Organize
-    hints.push(<KeyHint key="u" k="u" label="unread" />);
-    hints.push(<KeyHint key="m" k="m" label="move" />);
-    hints.push(<KeyHint key="M" k="M" label="mcp" />);
-    hints.push(<KeyHint key="K" k="K" label="skills" />);
-    hints.push(<KeyHint key="Y" k="Y" label="memory" />);
-    hints.push(<KeyHint key="E" k="E" label="export" />);
     hints.push(<KeyHint key="x" k="x" label="delete" />);
   }
+
+  hints.push(sep(2));
+
+  // Global session shortcuts
   hints.push(<KeyHint key="n" k="n" label="new" />);
-  hints.push(<KeyHint key="o" k="o" label="groups" />);
   hints.push(<KeyHint key="/" k="/" label="find" />);
   hints.push(<KeyHint key="filter" k="!/@/#/$" label="filter" />);
-  hints.push(<KeyHint key="P" k="P" label="settings" />);
   hints.push(...GLOBAL_HINTS);
   return hints;
 }
