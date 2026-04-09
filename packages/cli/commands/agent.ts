@@ -5,6 +5,7 @@ import { existsSync, writeFileSync, mkdirSync } from "fs";
 import { execFileSync } from "child_process";
 import YAML from "yaml";
 import * as core from "../../core/index.js";
+import { getApp } from "../../core/app.js";
 import { getArkClient } from "./_shared.js";
 
 export function registerAgentCommands(program: Command) {
@@ -40,7 +41,7 @@ export function registerAgentCommands(program: Command) {
     .action(async (name, opts) => {
       const projectRoot = core.findProjectRoot(process.cwd());
       const scope: "project" | "global" = opts.global || !projectRoot ? "global" : "project";
-      const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(core.ARK_DIR(), "agents");
+      const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(getApp().config.arkDir, "agents");
       const filePath = join(dir, `${name}.yaml`);
 
       if (existsSync(filePath)) {
@@ -89,7 +90,7 @@ export function registerAgentCommands(program: Command) {
         execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
       } else if (choice === "g") {
         core.saveAgent(a, "global");
-        const path = join(core.ARK_DIR(), "agents", `${name}.yaml`);
+        const path = join(getApp().config.arkDir, "agents", `${name}.yaml`);
         execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
       } else {
         console.log("Cancelled.");
@@ -138,7 +139,7 @@ export function registerAgentCommands(program: Command) {
       const copy = { ...a, name: targetName };
       core.saveAgent(copy, scope, scope === "project" ? projectRoot : undefined);
 
-      const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(core.ARK_DIR(), "agents");
+      const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(getApp().config.arkDir, "agents");
       console.log(chalk.green(`Copied '${name}' → ${scope} '${targetName}' at ${join(dir, `${targetName}.yaml`)}`));
     });
 }

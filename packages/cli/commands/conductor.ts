@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import * as core from "../../core/index.js";
+import { getApp } from "../../core/app.js";
 
 export function registerConductorCommands(program: Command) {
   const conductorCmd = program.command("conductor").description("Conductor operations");
@@ -20,7 +21,7 @@ export function registerConductorCommands(program: Command) {
     .description("Show conductor learnings and policies")
     .action(async () => {
       const core = await import("../../core/index.js");
-      const dir = core.conductorLearningsDir(core.ARK_DIR());
+      const dir = core.conductorLearningsDir(getApp().config.arkDir);
       const learnings = core.getLearnings(dir);
       const policies = core.getPolicies(dir);
 
@@ -52,7 +53,7 @@ export function registerConductorCommands(program: Command) {
     .argument("[description]")
     .action(async (title, description) => {
       const core = await import("../../core/index.js");
-      const dir = core.conductorLearningsDir(core.ARK_DIR());
+      const dir = core.conductorLearningsDir(getApp().config.arkDir);
       const result = core.recordLearning(dir, title, description ?? "");
       if (result.promoted) {
         console.log(chalk.green(`Promoted to policy: ${title} (recurrence: ${result.learning.recurrence})`));

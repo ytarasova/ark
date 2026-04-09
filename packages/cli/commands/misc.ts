@@ -367,7 +367,7 @@ export function registerMiscCommands(program: Command, app: AppContext) {
     .description("Open Ark config in your editor")
     .option("--path", "Just print the config path")
     .action((opts) => {
-      const configPath = join(core.ARK_DIR(), "config.yaml");
+      const configPath = join(core.getApp().config.arkDir, "config.yaml");
 
       // Create default config if missing
       if (!existsSync(configPath)) {
