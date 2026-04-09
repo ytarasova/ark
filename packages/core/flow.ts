@@ -16,7 +16,7 @@ import { substituteVars } from "./template.js";
 
 export interface StageDefinition {
   name: string;
-  type?: "agent" | "action" | "fork";
+  type?: "agent" | "action" | "fork" | "fan_out";
   agent?: string;
   action?: string;
   task?: string;  // Template for agent task prompt — supports {variable} substitution
@@ -26,7 +26,8 @@ export interface StageDefinition {
   optional?: boolean;
   model?: string;  // override model for this stage (e.g., "opus" for planning, "haiku" for docs)
   verify?: string[];  // Scripts that must pass before stage completion
-  // Fork-specific
+  depends_on?: string[];  // DAG: stage names that must complete before this stage runs
+  // Fork/fan_out-specific
   strategy?: string;
   max_parallel?: number;
   subtasks?: { name: string; task: string }[];
@@ -150,7 +151,7 @@ export function evaluateGate(
 // ── Stage action info ───────────────────────────────────────────────────────
 
 export interface StageAction {
-  type: "agent" | "action" | "fork" | "unknown";
+  type: "agent" | "action" | "fork" | "fan_out" | "unknown";
   agent?: string;
   action?: string;
   strategy?: string;
@@ -163,9 +164,9 @@ export function getStageAction(flowName: string, stageName: string): StageAction
   const stage = getStage(flowName, stageName);
   if (!stage) return { type: "unknown" };
 
-  if (stage.type === "fork") {
+  if (stage.type === "fork" || stage.type === "fan_out") {
     return {
-      type: "fork", agent: stage.agent ?? "implementer",
+      type: stage.type, agent: stage.agent ?? "implementer",
       strategy: stage.strategy ?? "plan", max_parallel: stage.max_parallel ?? 4,
       on_failure: stage.on_failure, optional: stage.optional,
     };
