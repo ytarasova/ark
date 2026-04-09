@@ -5,8 +5,8 @@ import { dispatch } from "../services/session-orchestration.js";
 let app: AppContext;
 beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
 afterAll(async () => {
-  // Give background child dispatches (fire-and-forget) time to settle before clearing app
-  await Bun.sleep(200);
+  // Stop all sessions (kills tmux + claude processes via provider)
+  if (app?.sessionService) await app.sessionService.stopAll();
   await app?.shutdown();
   clearApp();
 });

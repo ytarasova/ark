@@ -403,20 +403,17 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   return { ok: true, message: `Advanced to ${nextStage}` };
 }
 
-export async function stop(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
+export async function stop(app: AppContext, sessionId: string, opts?: { force?: boolean }): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  // Checkpoint before stopping (preserve state for potential recovery)
-  saveCheckpoint(sessionId);
+  // Skip if already stopped (unless force -- used by stopAll for cleanup)
+  if (!opts?.force && ["stopped", "completed", "failed"].includes(session.status) && !session.session_id) {
+    return { ok: true, message: "Already stopped" };
+  }
 
-  // Stop status poller if active (non-Claude executors)
-  try {
-    const { stopStatusPoller } = await import("../executors/status-poller.js");
-    stopStatusPoller(sessionId);
-  } catch { /* ignore */ }
-
-  // Kill agent + clean up provider resources
+  // Kill agent + clean up provider resources FIRST (before any DB writes)
+  // This ensures processes are stopped even if subsequent DB ops fail
   const stopped = await withProvider(session, `stop ${sessionId}`, async (p, c) => {
     await p.killAgent(c, session);
     await p.cleanupSession(c, session);
@@ -425,6 +422,15 @@ export async function stop(app: AppContext, sessionId: string): Promise<{ ok: bo
     // Fallback: direct tmux kill (no compute assigned)
     await tmux.killSessionAsync(session.session_id);
   }
+
+  // Stop status poller if active (non-Claude executors)
+  try {
+    const { stopStatusPoller } = await import("../executors/status-poller.js");
+    stopStatusPoller(sessionId);
+  } catch { /* ignore */ }
+
+  // Checkpoint before state transition
+  saveCheckpoint(sessionId);
 
   // Clean up hook config from working directory
   if (session.workdir) {
@@ -758,7 +764,7 @@ export async function handoff(app: AppContext, sessionId: string, toAgent: strin
 
 // ── Fork/Join ───────────────────────────────────────────────────────────────
 
-export function fork(app: AppContext, parentId: string, task: string, opts?: {
+export async function fork(app: AppContext, parentId: string, task: string, opts?: {
   agent?: string;
   dispatch?: boolean;
 }): SessionOpResult {
@@ -787,7 +793,7 @@ export function fork(app: AppContext, parentId: string, task: string, opts?: {
   });
 
   if (opts?.dispatch !== false) {
-    void dispatch(app, child.id);
+    await dispatch(app, child.id);
   }
   return { ok: true, sessionId: child.id };
 }
@@ -812,7 +818,7 @@ function dispatchFork(app: AppContext, sessionId: string, stageDef: flow.StageDe
   return { ok: true, message: `Forked into ${children.length} sessions` };
 }
 
-function dispatchFanOut(app: AppContext, sessionId: string, stageDef: flow.StageDefinition): { ok: boolean; message: string } {
+async function dispatchFanOut(app: AppContext, sessionId: string, stageDef: flow.StageDefinition): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId)!;
   const subtasks = extractSubtasks(session);
 
@@ -826,12 +832,12 @@ function dispatchFanOut(app: AppContext, sessionId: string, stageDef: flow.Stage
 
   if (!result.ok) return { ok: false, message: result.message ?? "Fan-out failed" };
 
-  // Auto-dispatch all children
-  for (const childId of result.childIds ?? []) {
-    void dispatch(app, childId);
-  }
+  // Dispatch all children -- await so their session_ids are registered before returning
+  const dispatched = await Promise.allSettled(
+    (result.childIds ?? []).map((childId) => dispatch(app, childId)),
+  );
 
-  return { ok: true, message: `Fan-out: ${result.childIds?.length ?? 0} children dispatched` };
+  return { ok: true, message: `Fan-out: ${dispatched.length} children dispatched` };
 }
 
 export async function joinFork(app: AppContext, parentId: string, force = false): Promise<{ ok: boolean; message: string }> {

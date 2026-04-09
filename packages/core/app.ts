@@ -240,7 +240,7 @@ export class AppContext {
     this._messages = new MessageRepository(this._db);
     this._todos = new TodoRepository(this._db);
 
-    this._sessionService = new SessionService(this._sessions, this._events, this._messages);
+    this._sessionService = new SessionService(this, this._sessions, this._events, this._messages);
     this._computeService = new ComputeService(this._computes);
     this._historyService = new HistoryService(this._db);
 
@@ -407,10 +407,11 @@ export class AppContext {
 
     // Reverse order of boot
 
-    // 0. In test mode, stop all running sessions to prevent process leaks.
+    // 0. In test mode, stop all sessions tracked in the session store.
+    // Uses session_id (tmux handle) from the DB -- no name parsing.
     // In production, sessions keep running independently of the TUI/CLI lifecycle.
     if (this.opts?.cleanupOnShutdown && this._sessionService) {
-      try { await this._sessionService.stopAll(); } catch {}
+      await this._sessionService.stopAll();
     }
 
     // 1. Remove signal handlers
