@@ -6,7 +6,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
-import { WORKTREES_DIR } from "../paths.js";
 import { deleteSessionAsync } from "../services/session-orchestration.js";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
 
@@ -26,7 +25,7 @@ afterEach(async () => {
 describe("deleteSessionAsync worktree cleanup", () => {
   it("removes worktree directory when session is deleted", async () => {
     const session = getApp().sessions.create({ summary: "wt-cleanup-test", repo: "/tmp/fake-repo" });
-    const wtPath = join(WORKTREES_DIR(), session.id);
+    const wtPath = join(getApp().config.worktreesDir, session.id);
 
     // Simulate a worktree directory existing
     mkdirSync(wtPath, { recursive: true });
@@ -44,7 +43,7 @@ describe("deleteSessionAsync worktree cleanup", () => {
 
   it("succeeds when no worktree directory exists", async () => {
     const session = getApp().sessions.create({ summary: "no-wt-test", repo: "/tmp/fake-repo" });
-    const wtPath = join(WORKTREES_DIR(), session.id);
+    const wtPath = join(getApp().config.worktreesDir, session.id);
 
     expect(existsSync(wtPath)).toBe(false);
 
@@ -58,7 +57,7 @@ describe("deleteSessionAsync worktree cleanup", () => {
 
   it("deletes session even if worktree cleanup fails gracefully", async () => {
     const session = getApp().sessions.create({ summary: "wt-no-repo-test" });
-    const wtPath = join(WORKTREES_DIR(), session.id);
+    const wtPath = join(getApp().config.worktreesDir, session.id);
 
     // Create a worktree dir but session has no repo — should still delete
     mkdirSync(wtPath, { recursive: true });

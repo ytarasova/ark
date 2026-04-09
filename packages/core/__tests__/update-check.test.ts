@@ -3,7 +3,7 @@ import { getCurrentVersion, checkForUpdate } from "../update-check.js";
 import { withTestContext } from "./test-helpers.js";
 import { writeFileSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "../paths.js";
+import { getApp } from "../app.js";
 
 withTestContext();
 
@@ -30,7 +30,7 @@ describe("checkForUpdate", () => {
 
   it("respects rate limiting from saved state", async () => {
     // Write a recent check state so it skips the network call
-    const statePath = join(ARK_DIR(), "update-check.json");
+    const statePath = join(getApp().config.arkDir, "update-check.json");
     const state = {
       lastCheck: new Date().toISOString(),
       latestVersion: getCurrentVersion(),
@@ -44,7 +44,7 @@ describe("checkForUpdate", () => {
   });
 
   it("reports update when saved state has newer version", async () => {
-    const statePath = join(ARK_DIR(), "update-check.json");
+    const statePath = join(getApp().config.arkDir, "update-check.json");
     const state = {
       lastCheck: new Date().toISOString(),
       latestVersion: "99.99.99",
@@ -57,7 +57,7 @@ describe("checkForUpdate", () => {
   });
 
   it("handles corrupted state file gracefully", async () => {
-    const statePath = join(ARK_DIR(), "update-check.json");
+    const statePath = join(getApp().config.arkDir, "update-check.json");
     writeFileSync(statePath, "not-valid-json{{{");
 
     // Should not throw, just proceed with the check
@@ -66,7 +66,7 @@ describe("checkForUpdate", () => {
   });
 
   it("handles missing state file", async () => {
-    const statePath = join(ARK_DIR(), "update-check.json");
+    const statePath = join(getApp().config.arkDir, "update-check.json");
     expect(existsSync(statePath)).toBe(false);
 
     // Should not throw

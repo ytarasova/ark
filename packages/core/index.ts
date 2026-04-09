@@ -4,8 +4,6 @@
 
 // Re-exports
 export { getApp, setApp, clearApp, AppContext } from "./app.js";
-/** @deprecated Use app.config.arkDir instead */
-export { ARK_DIR, DB_PATH, TRACKS_DIR, WORKTREES_DIR } from "./paths.js";
 export { safeParseConfig } from "./util.js";
 export { loadConfig, type ArkConfig, type OtlpSettings, type RollbackSettings, type TelemetrySettings } from "./config.js";
 

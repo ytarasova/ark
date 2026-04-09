@@ -8,13 +8,12 @@ import { withTestContext } from "./test-helpers.js";
 import { evaluateRecipeSetup } from "../recipe-eval.js";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "../paths.js";
 import { stringify as stringifyYaml } from "yaml";
 
 withTestContext();
 
 function writeTestRecipe(name: string) {
-  const dir = join(ARK_DIR(), "recipes");
+  const dir = join(getApp().config.arkDir, "recipes");
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${name}.yaml`), stringifyYaml({
     name,

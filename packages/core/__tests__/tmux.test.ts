@@ -15,7 +15,7 @@ import {
   sessionExists,
   listArkSessionsAsync,
 } from "../tmux.js";
-import { TRACKS_DIR } from "../paths.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -91,7 +91,7 @@ describe("writeLauncher", () => {
     const testSessionId = `test-launcher-${Date.now()}`;
     const path = writeLauncher(testSessionId, testContent);
 
-    expect(path).toBe(join(TRACKS_DIR(), testSessionId, "launch.sh"));
+    expect(path).toBe(join(getApp().config.tracksDir, testSessionId, "launch.sh"));
     expect(existsSync(path)).toBe(true);
   });
 
@@ -106,7 +106,7 @@ describe("writeLauncher", () => {
 
   it("creates parent directory if it does not exist", () => {
     const sessionId = `test-mkdir-${Date.now()}`;
-    const dir = join(TRACKS_DIR(), sessionId);
+    const dir = join(getApp().config.tracksDir, sessionId);
     expect(existsSync(dir)).toBe(false);
 
     writeLauncher(sessionId, "#!/bin/bash\n");

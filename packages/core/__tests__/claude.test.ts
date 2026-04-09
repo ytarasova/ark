@@ -18,7 +18,7 @@ import {
   type ClaudeArgsOpts,
   type LauncherOpts,
 } from "../claude.js";
-import { TRACKS_DIR } from "../paths.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
@@ -253,7 +253,7 @@ describe("writeChannelConfig", () => {
     const workdir = getCtx().arkDir;
     writeChannelConfig("s-abc123", "work", 19300, workdir);
 
-    const tracksFile = join(TRACKS_DIR(), "s-abc123", "mcp.json");
+    const tracksFile = join(getApp().config.tracksDir, "s-abc123", "mcp.json");
     expect(existsSync(tracksFile)).toBe(true);
     const content = JSON.parse(readFileSync(tracksFile, "utf-8"));
     expect(content.mcpServers["ark-channel"]).toBeDefined();

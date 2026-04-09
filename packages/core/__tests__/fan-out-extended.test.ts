@@ -5,7 +5,7 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext, setApp, clearApp, getApp } from "../app.js";
 import {
   fanOut,
   checkAutoJoin,
@@ -16,7 +16,6 @@ import {
   retryWithContext,
   dispatch,
 } from "../services/session-orchestration.js";
-import { WORKTREES_DIR } from "../paths.js";
 
 let app: AppContext;
 beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });

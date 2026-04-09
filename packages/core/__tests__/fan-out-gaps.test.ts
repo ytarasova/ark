@@ -34,7 +34,7 @@ import {
   retryWithContext,
   dispatch,
 } from "../services/session-orchestration.js";
-import { WORKTREES_DIR } from "../paths.js";
+import { getApp } from "../app.js";
 
 let app: AppContext;
 beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
@@ -593,7 +593,7 @@ describe("dispatchFanOut with PLAN.md parsing", () => {
     const parent = app.sessions.create({ summary: "Refactor auth", flow: "fan-out" });
     app.sessions.update(parent.id, { stage: "execute", status: "ready" });
 
-    const wtDir = join(WORKTREES_DIR(), parent.id);
+    const wtDir = join(getApp().config.worktreesDir, parent.id);
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(join(wtDir, "PLAN.md"), [
       "# Plan",
@@ -629,7 +629,7 @@ describe("dispatchFanOut with PLAN.md parsing", () => {
     const parent = app.sessions.create({ summary: "Tiny task", flow: "fan-out" });
     app.sessions.update(parent.id, { stage: "execute", status: "ready" });
 
-    const wtDir = join(WORKTREES_DIR(), parent.id);
+    const wtDir = join(getApp().config.worktreesDir, parent.id);
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(join(wtDir, "PLAN.md"), [
       "# Plan",
@@ -655,7 +655,7 @@ describe("dispatchFanOut with PLAN.md parsing", () => {
     const parent = app.sessions.create({ summary: "Many steps", flow: "fan-out" });
     app.sessions.update(parent.id, { stage: "execute", status: "ready" });
 
-    const wtDir = join(WORKTREES_DIR(), parent.id);
+    const wtDir = join(getApp().config.worktreesDir, parent.id);
     mkdirSync(wtDir, { recursive: true });
     const steps = Array.from({ length: 15 }, (_, i) =>
       `## Step ${i + 1}: Task ${i + 1}\nDescription for step ${i + 1}.`

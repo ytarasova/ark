@@ -18,13 +18,13 @@ import {
   getStageAction,
   resolveFlow,
 } from "../flow.js";
-import { ARK_DIR } from "../paths.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
 
 /** Directory where flow.ts looks for user flows (module-level constant). */
-const flowDir = () => join(ARK_DIR(), "flows");
+const flowDir = () => join(getApp().config.arkDir, "flows");
 
 /** Write a YAML flow definition to the user flows directory. */
 function writeUserFlow(name: string, def: Record<string, unknown>): void {

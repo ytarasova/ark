@@ -9,9 +9,8 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext, setApp, clearApp, getApp } from "../app.js";
 import { startSession, deleteSessionAsync } from "../services/session-orchestration.js";
-import { WORKTREES_DIR } from "../paths.js";
 import { writeHooksConfig } from "../claude.js";
 
 let app: AppContext;
@@ -85,7 +84,7 @@ describe("deleteSessionAsync", () => {
     });
 
     // Create a fake worktree directory under WORKTREES_DIR
-    const wtPath = join(WORKTREES_DIR(), session.id);
+    const wtPath = join(getApp().config.worktreesDir, session.id);
     mkdirSync(wtPath, { recursive: true });
     writeFileSync(join(wtPath, "dummy.txt"), "test content");
     expect(existsSync(wtPath)).toBe(true);
@@ -114,7 +113,7 @@ describe("deleteSessionAsync", () => {
     });
 
     // No worktree dir exists under WORKTREES_DIR
-    const wtPath = join(WORKTREES_DIR(), session.id);
+    const wtPath = join(getApp().config.worktreesDir, session.id);
     expect(existsSync(wtPath)).toBe(false);
 
     await deleteSessionAsync(app, session.id);

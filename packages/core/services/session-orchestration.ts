@@ -15,7 +15,7 @@ import { homedir } from "os";
 const execFileAsync = promisify(execFile);
 
 import type { AppContext } from "../app.js";
-import { TRACKS_DIR, WORKTREES_DIR } from "../paths.js";
+import { getApp } from "../app.js";
 import { safeParseConfig } from "../util.js";
 import type { Session, Compute, MessageRole, MessageType } from "../../types/index.js";
 import * as tmux from "../tmux.js";
@@ -1109,7 +1109,7 @@ async function launchAgentTmux(app: AppContext,
   const launcher = tmux.writeLauncher(session.id, launchContent);
 
   // Save task for reference
-  const sessionDir = join(TRACKS_DIR(), session.id);
+  const sessionDir = join(app.config.tracksDir, session.id);
   mkdirSync(sessionDir, { recursive: true });
   writeFileSync(join(sessionDir, "task.txt"), task);
 
@@ -1196,7 +1196,7 @@ async function appendPreviousStageContext(app: AppContext, session: Session): Pr
   }
 
   // Check for PLAN.md
-  const wtDir = join(WORKTREES_DIR(), session.id);
+  const wtDir = join(app.config.worktreesDir, session.id);
   const planPath = join(wtDir, "PLAN.md");
   if (existsSync(planPath)) {
     let plan = readFileSync(planPath, "utf-8");
@@ -1248,7 +1248,7 @@ async function buildTaskWithHandoff(app: AppContext, session: Session, stage: st
 }
 
 function extractSubtasks(session: Session): { name: string; task: string }[] {
-  const wtDir = join(WORKTREES_DIR(), session.id);
+  const wtDir = join(getApp().config.worktreesDir, session.id);
   const planPath = join(wtDir, "PLAN.md");
 
   if (existsSync(planPath)) {
@@ -1270,7 +1270,7 @@ function extractSubtasks(session: Session): { name: string; task: string }[] {
 }
 
 async function setupWorktree(repoPath: string, sessionId: string, branch?: string): Promise<string | null> {
-  const wtPath = join(WORKTREES_DIR(), sessionId);
+  const wtPath = join(getApp().config.worktreesDir, sessionId);
   if (existsSync(wtPath)) return wtPath;
 
   const branchName = branch ?? `ark-${sessionId}`;
@@ -1335,7 +1335,7 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
   if (!workdir || !repo) return { ok: false, stat: "", diff: "", branch: "", baseBranch: "", filesChanged: 0, insertions: 0, deletions: 0, modifiedSinceReview: [], message: "No workdir or repo" };
 
   // Determine the worktree path and branch
-  const wtDir = join(WORKTREES_DIR(), sessionId);
+  const wtDir = join(app.config.worktreesDir, sessionId);
   let branch = session.branch;
   if (!branch && existsSync(wtDir)) {
     try {
@@ -1424,7 +1424,7 @@ export async function createWorktreePR(app: AppContext, sessionId: string, opts?
   if (!repo) return { ok: false, message: "Session has no repo" };
 
   // Determine branch
-  const wtDir = join(WORKTREES_DIR(), sessionId);
+  const wtDir = join(app.config.worktreesDir, sessionId);
   let branch = session.branch;
   if (!branch && existsSync(wtDir)) {
     try {
@@ -1492,7 +1492,7 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
   }
 
   // Determine the worktree path and branch
-  const wtDir = join(WORKTREES_DIR(), sessionId);
+  const wtDir = join(app.config.worktreesDir, sessionId);
   const isWorktree = existsSync(wtDir);
 
   // Get the branch name from the worktree
@@ -2092,7 +2092,7 @@ export async function spawnParallelSubagents(app: AppContext, parentId: string, 
 
 /** Find orphaned worktrees -- worktree dirs with no matching session. */
 export function findOrphanedWorktrees(app: AppContext): string[] {
-  const wtDir = WORKTREES_DIR();
+  const wtDir = app.config.worktreesDir;
   if (!existsSync(wtDir)) return [];
 
   const sessionIds = new Set(app.sessions.list({ limit: 1000 }).map(s => s.id));
@@ -2116,7 +2116,7 @@ export async function cleanupWorktrees(app: AppContext): Promise<{ removed: numb
   const errors: string[] = [];
 
   for (const id of orphans) {
-    const wtPath = join(WORKTREES_DIR(), id);
+    const wtPath = join(app.config.worktreesDir, id);
     try {
       // Try git worktree remove first
       await execFileAsync("git", ["worktree", "remove", wtPath, "--force"], { encoding: "utf-8" });

@@ -11,12 +11,12 @@ import {
   resolveAgent, buildClaudeArgs, findProjectRoot,
   type AgentDefinition,
 } from "../agent.js";
-import { ARK_DIR } from "../paths.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 
-const agentDir = () => join(ARK_DIR(), "agents");
+const agentDir = () => join(getApp().config.arkDir, "agents");
 
 function writeAgentYaml(name: string, data: Record<string, unknown>) {
   mkdirSync(agentDir(), { recursive: true });

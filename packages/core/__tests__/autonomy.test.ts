@@ -11,12 +11,12 @@ import { join } from "path";
 import YAML from "yaml";
 import { buildArgs, writeHooksConfig } from "../claude.js";
 import { loadFlow, resolveFlow } from "../flow.js";
-import { ARK_DIR } from "../paths.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 
-const flowDir = () => join(ARK_DIR(), "flows");
+const flowDir = () => join(getApp().config.arkDir, "flows");
 
 function writeUserFlow(name: string, def: Record<string, unknown>): void {
   const dir = flowDir();

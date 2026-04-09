@@ -12,7 +12,6 @@ import { execFile, execFileSync, spawn } from "child_process";
 import { promisify } from "util";
 import { existsSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
-import { TRACKS_DIR } from "./paths.js";
 import { getApp } from "./app.js";
 
 const execFileAsync = promisify(execFile);
@@ -140,7 +139,7 @@ export async function capturePaneAsync(name: string, opts?: {
 
 /** Send text to a tmux session via load-buffer (async) */
 export async function sendTextAsync(name: string, text: string): Promise<void> {
-  const tmpFile = join(TRACKS_DIR(), `.msg-${Date.now()}.txt`);
+  const tmpFile = join(getApp().config.tracksDir, `.msg-${Date.now()}.txt`);
   writeFileSync(tmpFile, text);
   try {
     await execFileAsync("tmux", ["load-buffer", "-b", "ark-msg", tmpFile]);
@@ -186,7 +185,7 @@ export async function listArkSessionsAsync(): Promise<TmuxSession[]> {
 
 /** Write a launcher script and return the path */
 export function writeLauncher(sessionId: string, content: string): string {
-  const dir = join(TRACKS_DIR(), sessionId);
+  const dir = join(getApp().config.tracksDir, sessionId);
   mkdirSync(dir, { recursive: true });
   const path = join(dir, "launch.sh");
   writeFileSync(path, content);

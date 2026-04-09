@@ -8,7 +8,6 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 
-import { ARK_DIR } from "../paths.js";
 import { getApp } from "../app.js";
 import { startSession, advance, approveReviewGate } from "../services/session-orchestration.js";
 import { loadFlow, evaluateGate } from "../flow.js";
@@ -16,7 +15,7 @@ import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
 
-const flowDir = () => join(ARK_DIR(), "flows");
+const flowDir = () => join(getApp().config.arkDir, "flows");
 
 function writeUserFlow(name: string, def: Record<string, unknown>): void {
   const dir = flowDir();

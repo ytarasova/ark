@@ -9,15 +9,14 @@ import { writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
-import { ARK_DIR } from "../paths.js";
 import { resolveFlow } from "../flow.js";
 import { resolveAgent } from "../agent.js";
 import { substituteVars, buildSessionVars } from "../template.js";
 
 let app: AppContext;
 
-const flowDir = () => join(ARK_DIR(), "flows");
-const agentDir = () => join(ARK_DIR(), "agents");
+const flowDir = () => join(getApp().config.arkDir, "flows");
+const agentDir = () => join(getApp().config.arkDir, "agents");
 
 function writeFlowYaml(name: string, def: Record<string, unknown>): void {
   const dir = flowDir();

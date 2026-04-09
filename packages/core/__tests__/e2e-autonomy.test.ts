@@ -11,7 +11,6 @@ import { writeFileSync, mkdirSync, readFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
-import { ARK_DIR } from "../paths.js";
 import { buildArgs, writeHooksConfig, removeHooksConfig } from "../claude.js";
 import { loadFlow, resolveFlow } from "../flow.js";
 import { buildClaudeArgs } from "../agent.js";
@@ -19,7 +18,7 @@ import { buildSessionVars } from "../template.js";
 
 let app: AppContext;
 
-const flowDir = () => join(ARK_DIR(), "flows");
+const flowDir = () => join(getApp().config.arkDir, "flows");
 
 function writeUserFlow(name: string, def: Record<string, unknown>): void {
   const dir = flowDir();

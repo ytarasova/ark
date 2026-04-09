@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { AppContext, setApp, clearApp } from "../app.js";
 import { advance } from "../services/session-orchestration.js";
-import { ARK_DIR } from "../paths.js";
+import { getApp } from "../app.js";
 
 let app: AppContext;
 let dagFlowPath: string;
@@ -14,7 +14,7 @@ beforeAll(async () => {
   setApp(app);
 
   // Write a minimal DAG flow to the test ARK_DIR so flowUsesDAG() detects it
-  const flowsDir = join(ARK_DIR(), "flows");
+  const flowsDir = join(getApp().config.arkDir, "flows");
   mkdirSync(flowsDir, { recursive: true });
   dagFlowPath = join(flowsDir, "test-dag.yaml");
   writeFileSync(dagFlowPath, `
