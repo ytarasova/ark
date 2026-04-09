@@ -76,7 +76,7 @@ describe("spawnSubagent", () => {
 describe("sub-recipe composition", () => {
   it("listSubRecipes returns empty for recipes without sub_recipes", async () => {
     const { listSubRecipes } = await import("../recipe.js");
-    const subs = listSubRecipes("quick-fix");
+    const subs = listSubRecipes(getApp(), "quick-fix");
     expect(subs).toEqual([]);
   });
 });

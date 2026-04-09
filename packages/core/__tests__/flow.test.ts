@@ -8,8 +8,6 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import {
-  loadFlow,
-  listFlows,
   getStages,
   getStage,
   getFirstStage,
@@ -42,7 +40,7 @@ beforeEach(() => {
 
 describe("loadFlow", () => {
   it("returns null for a non-existent flow", () => {
-    expect(loadFlow("does-not-exist")).toBeNull();
+    expect(getApp().flows.get("does-not-exist")).toBeNull();
   });
 
   it("loads a user-defined flow from the user dir", () => {
@@ -51,7 +49,7 @@ describe("loadFlow", () => {
       description: "test flow",
       stages: [{ name: "alpha", agent: "planner", gate: "auto" }],
     });
-    const flow = loadFlow("my-flow");
+    const flow = getApp().flows.get("my-flow");
     expect(flow).not.toBeNull();
     expect(flow!.name).toBe("my-flow");
     expect(flow!.stages).toHaveLength(1);
@@ -59,7 +57,7 @@ describe("loadFlow", () => {
   });
 
   it("loads the builtin 'default' flow", () => {
-    const flow = loadFlow("default");
+    const flow = getApp().flows.get("default");
     expect(flow).not.toBeNull();
     expect(flow!.name).toBe("default");
     expect(flow!.stages.length).toBeGreaterThanOrEqual(1);
@@ -71,7 +69,7 @@ describe("loadFlow", () => {
       description: "user override",
       stages: [{ name: "only-stage", agent: "custom", gate: "manual" }],
     });
-    const flow = loadFlow("default");
+    const flow = getApp().flows.get("default");
     expect(flow).not.toBeNull();
     expect(flow!.description).toBe("user override");
     expect(flow!.stages).toHaveLength(1);
@@ -83,7 +81,7 @@ describe("loadFlow", () => {
 
 describe("listFlows", () => {
   it("includes builtin flows", () => {
-    const flows = listFlows();
+    const flows = getApp().flows.list();
     const names = flows.map((f) => f.name);
     expect(names).toContain("default");
   });
@@ -94,7 +92,7 @@ describe("listFlows", () => {
       description: "a custom flow",
       stages: [{ name: "s1", agent: "tester", gate: "auto" }],
     });
-    const flows = listFlows();
+    const flows = getApp().flows.list();
     const custom = flows.find((f) => f.name === "custom-flow");
     expect(custom).toBeDefined();
     expect(custom!.source).toBe("user");
@@ -107,7 +105,7 @@ describe("listFlows", () => {
       description: "overridden",
       stages: [{ name: "x", agent: "a", gate: "auto" }],
     });
-    const flows = listFlows();
+    const flows = getApp().flows.list();
     const defaults = flows.filter((f) => f.name === "default");
     expect(defaults).toHaveLength(1);
     expect(defaults[0].source).toBe("user");
@@ -115,7 +113,7 @@ describe("listFlows", () => {
   });
 
   it("returns stages as an array of stage names", () => {
-    const flows = listFlows();
+    const flows = getApp().flows.list();
     const def = flows.find((f) => f.name === "default");
     expect(def).toBeDefined();
     expect(Array.isArray(def!.stages)).toBe(true);
@@ -413,7 +411,7 @@ describe("resolveFlow", () => {
       ],
     });
 
-    const flow = loadFlow("task-field-flow");
+    const flow = getApp().flows.get("task-field-flow");
     expect(flow).not.toBeNull();
     expect(flow!.stages[0].task).toBe("Do the thing");
   });
