@@ -10,7 +10,6 @@ import { execFileSync } from "child_process";
 import { join } from "path";
 import { getApp } from "../app.js";
 import { startSession } from "../services/session-orchestration.js";
-import { listAgents } from "../agent.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -169,7 +168,7 @@ describe("CLI: session lifecycle", () => {
 
 describe("CLI: agent list", () => {
   it("lists available agents", () => {
-    const agents = listAgents();
+    const agents = getApp().agents.list();
     expect(agents.length).toBeGreaterThan(0);
   });
 });

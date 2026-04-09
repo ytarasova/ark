@@ -7,7 +7,6 @@ import { writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import {
-  loadAgent, listAgents, saveAgent, deleteAgent,
   resolveAgent, buildClaudeArgs, findProjectRoot,
   type AgentDefinition,
 } from "../agent.js";
@@ -40,7 +39,7 @@ beforeEach(() => {
 
 describe("loadAgent", () => {
   it("returns null for non-existent agent", () => {
-    expect(loadAgent("does-not-exist")).toBeNull();
+    expect(getApp().agents.get("does-not-exist")).toBeNull();
   });
 
   it("loads a user agent from YAML", () => {
@@ -51,7 +50,7 @@ describe("loadAgent", () => {
       system_prompt: "You are helpful.",
     });
 
-    const agent = loadAgent("my-agent");
+    const agent = getApp().agents.get("my-agent");
     expect(agent).not.toBeNull();
     expect(agent!.name).toBe("my-agent");
     expect(agent!.description).toBe("A test agent");
@@ -62,7 +61,7 @@ describe("loadAgent", () => {
   it("fills defaults for missing fields", () => {
     writeAgentYaml("minimal", { name: "minimal" });
 
-    const agent = loadAgent("minimal");
+    const agent = getApp().agents.get("minimal");
     expect(agent).not.toBeNull();
     expect(agent!.model).toBe("sonnet");
     expect(agent!.max_turns).toBe(200);
@@ -80,20 +79,20 @@ describe("loadAgent", () => {
   it("marks global agents with _source 'global'", () => {
     writeAgentYaml("tagged", { name: "tagged" });
 
-    const agent = loadAgent("tagged");
+    const agent = getApp().agents.get("tagged");
     expect(agent!._source).toBe("global");
   });
 
   it("sets _path to the YAML file path", () => {
     writeAgentYaml("pathed", { name: "pathed" });
 
-    const agent = loadAgent("pathed");
+    const agent = getApp().agents.get("pathed");
     expect(agent!._path).toBe(join(agentDir(), "pathed.yaml"));
   });
 
   it("loads a builtin agent (e.g. worker)", () => {
     // The builtin agents dir should have worker.yaml from the repo
-    const agent = loadAgent("worker");
+    const agent = getApp().agents.get("worker");
     expect(agent).not.toBeNull();
     expect(agent!.name).toBe("worker");
     expect(agent!._source).toBe("builtin");
@@ -106,7 +105,7 @@ describe("loadAgent", () => {
       model: "haiku",
     });
 
-    const agent = loadAgent("worker");
+    const agent = getApp().agents.get("worker");
     expect(agent).not.toBeNull();
     expect(agent!._source).toBe("global");
     expect(agent!.description).toBe("My custom worker");
@@ -118,7 +117,7 @@ describe("loadAgent", () => {
 
 describe("listAgents", () => {
   it("lists builtin agents when no user agents exist", () => {
-    const agents = listAgents();
+    const agents = getApp().agents.list();
     // Should include at least the builtin agents from agents/ dir
     expect(agents.length).toBeGreaterThan(0);
     const names = agents.map(a => a.name);
@@ -130,7 +129,7 @@ describe("listAgents", () => {
     writeAgentYaml("custom-one", { name: "custom-one", description: "First" });
     writeAgentYaml("custom-two", { name: "custom-two", description: "Second" });
 
-    const agents = listAgents();
+    const agents = getApp().agents.list();
     const names = agents.map(a => a.name);
     expect(names).toContain("custom-one");
     expect(names).toContain("custom-two");
@@ -142,7 +141,7 @@ describe("listAgents", () => {
       description: "Override",
     });
 
-    const agents = listAgents();
+    const agents = getApp().agents.list();
     const worker = agents.find(a => a.name === "worker");
     expect(worker).toBeDefined();
     expect(worker!._source).toBe("global");
@@ -152,7 +151,7 @@ describe("listAgents", () => {
   it("fills defaults for agents in listing", () => {
     writeAgentYaml("sparse", { name: "sparse" });
 
-    const agents = listAgents();
+    const agents = getApp().agents.list();
     const sparse = agents.find(a => a.name === "sparse");
     expect(sparse).toBeDefined();
     expect(sparse!.model).toBe("sonnet");
@@ -160,9 +159,9 @@ describe("listAgents", () => {
   });
 });
 
-// ── saveAgent ────────────────────────────────────────────────────────────────
+// ── agents.save ────────────────────────────────────────────────────────────────
 
-describe("saveAgent", () => {
+describe("agents.save", () => {
   it("round-trip: save then reload", () => {
     const agent: AgentDefinition = {
       name: "saved-agent",
@@ -179,9 +178,9 @@ describe("saveAgent", () => {
       env: { FOO: "bar" },
     };
 
-    saveAgent(agent);
+    getApp().agents.save(agent.name, agent, "global");
 
-    const loaded = loadAgent("saved-agent");
+    const loaded = getApp().agents.get("saved-agent");
     expect(loaded).not.toBeNull();
     expect(loaded!.name).toBe("saved-agent");
     expect(loaded!.description).toBe("Saved description");
@@ -198,7 +197,7 @@ describe("saveAgent", () => {
   it("creates agent directory if it does not exist", () => {
     rmSync(agentDir(), { recursive: true, force: true });
 
-    saveAgent({
+    getApp().agents.save("new-agent", {
       name: "new-agent",
       description: "",
       model: "sonnet",
@@ -211,7 +210,7 @@ describe("saveAgent", () => {
       context: [],
       permission_mode: "bypassPermissions",
       env: {},
-    });
+    } as AgentDefinition, "global");
 
     expect(existsSync(join(agentDir(), "new-agent.yaml"))).toBe(true);
   });
@@ -234,7 +233,7 @@ describe("saveAgent", () => {
       _path: "/some/path",
     };
 
-    saveAgent(agent);
+    getApp().agents.save(agent.name, agent, "global");
 
     const raw = YAML.parse(
       require("fs").readFileSync(join(agentDir(), "stripped.yaml"), "utf-8"),
@@ -244,29 +243,29 @@ describe("saveAgent", () => {
   });
 });
 
-// ── deleteAgent ──────────────────────────────────────────────────────────────
+// ── agents.delete ──────────────────────────────────────────────────────────────
 
-describe("deleteAgent", () => {
+describe("agents.delete", () => {
   it("returns false for non-existent agent", () => {
-    expect(deleteAgent("ghost")).toBe(false);
+    expect(getApp().agents.delete("ghost")).toBe(false);
   });
 
   it("returns true and removes the file", () => {
     writeAgentYaml("to-delete", { name: "to-delete" });
     expect(existsSync(join(agentDir(), "to-delete.yaml"))).toBe(true);
 
-    const result = deleteAgent("to-delete");
+    const result = getApp().agents.delete("to-delete");
     expect(result).toBe(true);
     expect(existsSync(join(agentDir(), "to-delete.yaml"))).toBe(false);
   });
 
   it("agent is no longer loadable after deletion", () => {
     writeAgentYaml("ephemeral", { name: "ephemeral" });
-    expect(loadAgent("ephemeral")).not.toBeNull();
+    expect(getApp().agents.get("ephemeral")).not.toBeNull();
 
-    deleteAgent("ephemeral");
+    getApp().agents.delete("ephemeral");
     // Should fall through to builtin lookup (which won't find "ephemeral")
-    expect(loadAgent("ephemeral")).toBeNull();
+    expect(getApp().agents.get("ephemeral")).toBeNull();
   });
 });
 
@@ -406,7 +405,7 @@ describe("three-tier resolution", () => {
     writeAgentYaml("my-agent", { name: "my-agent", description: "global" });
     writeProjectAgentYaml("my-agent", { name: "my-agent", description: "project" });
 
-    const agent = loadAgent("my-agent", projectDir());
+    const agent = getApp().agents.get("my-agent", projectDir());
     expect(agent).not.toBeNull();
     expect(agent!._source).toBe("project");
     expect(agent!.description).toBe("project");
@@ -415,7 +414,7 @@ describe("three-tier resolution", () => {
   it("project agent overrides builtin agent", () => {
     writeProjectAgentYaml("worker", { name: "worker", description: "project worker" });
 
-    const agent = loadAgent("worker", projectDir());
+    const agent = getApp().agents.get("worker", projectDir());
     expect(agent).not.toBeNull();
     expect(agent!._source).toBe("project");
     expect(agent!.description).toBe("project worker");
@@ -424,14 +423,14 @@ describe("three-tier resolution", () => {
   it("global agent overrides builtin when no project agent", () => {
     writeAgentYaml("worker", { name: "worker", description: "global worker" });
 
-    const agent = loadAgent("worker", projectDir());
+    const agent = getApp().agents.get("worker", projectDir());
     expect(agent).not.toBeNull();
     expect(agent!._source).toBe("global");
     expect(agent!.description).toBe("global worker");
   });
 
   it("falls back to builtin when no project or global agent", () => {
-    const agent = loadAgent("worker", projectDir());
+    const agent = getApp().agents.get("worker", projectDir());
     expect(agent).not.toBeNull();
     expect(agent!._source).toBe("builtin");
   });
@@ -440,7 +439,7 @@ describe("three-tier resolution", () => {
     writeProjectAgentYaml("only-project", { name: "only-project", description: "project only" });
 
     // Without projectRoot, should not find project-only agent
-    const agent = loadAgent("only-project");
+    const agent = getApp().agents.get("only-project");
     expect(agent).toBeNull();
   });
 });
@@ -452,7 +451,7 @@ describe("listAgents with projectRoot", () => {
     writeAgentYaml("global-only", { name: "global-only", description: "global" });
     writeProjectAgentYaml("project-only", { name: "project-only", description: "project" });
 
-    const agents = listAgents(projectDir());
+    const agents = getApp().agents.list(projectDir());
     const names = agents.map(a => a.name);
     expect(names).toContain("worker"); // builtin
     expect(names).toContain("global-only"); // global
@@ -463,7 +462,7 @@ describe("listAgents with projectRoot", () => {
     writeAgentYaml("worker", { name: "worker", description: "global worker" });
     writeProjectAgentYaml("worker", { name: "worker", description: "project worker" });
 
-    const agents = listAgents(projectDir());
+    const agents = getApp().agents.list(projectDir());
     const worker = agents.find(a => a.name === "worker");
     expect(worker).toBeDefined();
     expect(worker!._source).toBe("project");
@@ -473,7 +472,7 @@ describe("listAgents with projectRoot", () => {
   it("without projectRoot, does not include project agents", () => {
     writeProjectAgentYaml("project-only", { name: "project-only" });
 
-    const agents = listAgents();
+    const agents = getApp().agents.list();
     const names = agents.map(a => a.name);
     expect(names).not.toContain("project-only");
   });
@@ -481,7 +480,7 @@ describe("listAgents with projectRoot", () => {
 
 // ── saveAgent with scope ────────────────────────────────────────────────────
 
-describe("saveAgent with scope", () => {
+describe("agents.save with scope", () => {
   const minAgent: AgentDefinition = {
     name: "scoped-agent",
     description: "test",
@@ -498,12 +497,12 @@ describe("saveAgent with scope", () => {
   };
 
   it("saves to global by default", () => {
-    saveAgent(minAgent);
+    getApp().agents.save(minAgent.name, minAgent, "global");
     expect(existsSync(join(agentDir(), "scoped-agent.yaml"))).toBe(true);
   });
 
   it("saves to project when scope is 'project'", () => {
-    saveAgent(minAgent, "project", projectDir());
+    getApp().agents.save(minAgent.name, minAgent, "project", projectDir());
     const projectAgentPath = join(projectDir(), ".ark", "agents", "scoped-agent.yaml");
     expect(existsSync(projectAgentPath)).toBe(true);
     // Should NOT exist in global
@@ -511,25 +510,25 @@ describe("saveAgent with scope", () => {
   });
 
   it("falls back to global when scope is 'project' but no projectRoot", () => {
-    saveAgent(minAgent, "project");
+    getApp().agents.save(minAgent.name, minAgent, "project");
     expect(existsSync(join(agentDir(), "scoped-agent.yaml"))).toBe(true);
   });
 
   it("project-saved agent is loadable with projectRoot", () => {
-    saveAgent(minAgent, "project", projectDir());
-    const loaded = loadAgent("scoped-agent", projectDir());
+    getApp().agents.save(minAgent.name, minAgent, "project", projectDir());
+    const loaded = getApp().agents.get("scoped-agent", projectDir());
     expect(loaded).not.toBeNull();
     expect(loaded!._source).toBe("project");
   });
 });
 
-// ── deleteAgent with scope ──────────────────────────────────────────────────
+// ── agents.delete with scope ──────────────────────────────────────────────────
 
-describe("deleteAgent with scope", () => {
+describe("agents.delete with scope", () => {
 
   it("deletes from global by default", () => {
     writeAgentYaml("to-delete", { name: "to-delete" });
-    expect(deleteAgent("to-delete")).toBe(true);
+    expect(getApp().agents.delete("to-delete")).toBe(true);
     expect(existsSync(join(agentDir(), "to-delete.yaml"))).toBe(false);
   });
 
@@ -538,14 +537,14 @@ describe("deleteAgent with scope", () => {
     const projectPath = join(projectDir(), ".ark", "agents", "proj-del.yaml");
     expect(existsSync(projectPath)).toBe(true);
 
-    expect(deleteAgent("proj-del", "project", projectDir())).toBe(true);
+    expect(getApp().agents.delete("proj-del", "project", projectDir())).toBe(true);
     expect(existsSync(projectPath)).toBe(false);
   });
 
   it("returns false when agent does not exist in specified scope", () => {
     writeAgentYaml("global-only", { name: "global-only" });
-    // Try deleting from project scope — should not find it
-    expect(deleteAgent("global-only", "project", projectDir())).toBe(false);
+    // Try deleting from project scope -- should not find it
+    expect(getApp().agents.delete("global-only", "project", projectDir())).toBe(false);
     // Global copy should still exist
     expect(existsSync(join(agentDir(), "global-only.yaml"))).toBe(true);
   });
@@ -655,35 +654,35 @@ describe("buildClaudeArgs", () => {
 // ── Integration: full agent lifecycle ───────────────────────────────────────
 
 describe("full agent lifecycle", () => {
-  it("create → list → load → delete round-trip for project scope", () => {
+  it("create -> list -> load -> delete round-trip for project scope", () => {
     const root = projectDir();
     const agent = { name: "lifecycle-test", description: "Integration test agent", model: "haiku" } as AgentDefinition;
-    saveAgent(agent, "project", root);
+    getApp().agents.save(agent.name, agent, "project", root);
 
-    const agents = listAgents(root);
+    const agents = getApp().agents.list(root);
     const found = agents.find(a => a.name === "lifecycle-test");
     expect(found).not.toBeNull();
     expect(found!._source).toBe("project");
 
-    const loaded = loadAgent("lifecycle-test", root);
+    const loaded = getApp().agents.get("lifecycle-test", root);
     expect(loaded!.model).toBe("haiku");
 
-    deleteAgent("lifecycle-test", "project", root);
-    expect(loadAgent("lifecycle-test", root)).toBeNull();
+    getApp().agents.delete("lifecycle-test", "project", root);
+    expect(getApp().agents.get("lifecycle-test", root)).toBeNull();
   });
 
   it("project agent shadows global agent with same name", () => {
     const root = projectDir();
 
-    saveAgent({ name: "shadow-test", model: "sonnet" } as AgentDefinition, "global");
-    saveAgent({ name: "shadow-test", model: "opus" } as AgentDefinition, "project", root);
+    getApp().agents.save("shadow-test", { name: "shadow-test", model: "sonnet" } as AgentDefinition, "global");
+    getApp().agents.save("shadow-test", { name: "shadow-test", model: "opus" } as AgentDefinition, "project", root);
 
-    const loaded = loadAgent("shadow-test", root);
+    const loaded = getApp().agents.get("shadow-test", root);
     expect(loaded!.model).toBe("opus");
     expect(loaded!._source).toBe("project");
 
-    deleteAgent("shadow-test", "project", root);
-    const fallback = loadAgent("shadow-test", root);
+    getApp().agents.delete("shadow-test", "project", root);
+    const fallback = getApp().agents.get("shadow-test", root);
     expect(fallback!.model).toBe("sonnet");
     expect(fallback!._source).toBe("global");
   });
@@ -691,12 +690,12 @@ describe("full agent lifecycle", () => {
   it("global agent shadows builtin with same name", () => {
     writeAgentYaml("worker", { name: "worker", model: "haiku", description: "custom worker" });
 
-    const loaded = loadAgent("worker");
+    const loaded = getApp().agents.get("worker");
     expect(loaded!.model).toBe("haiku");
     expect(loaded!._source).toBe("global");
 
-    deleteAgent("worker", "global");
-    const fallback = loadAgent("worker");
+    getApp().agents.delete("worker", "global");
+    const fallback = getApp().agents.get("worker");
     expect(fallback!._source).toBe("builtin");
   });
 });

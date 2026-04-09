@@ -20,7 +20,7 @@ export * from "./flow.js";
 export { substituteVars, buildSessionVars } from "./template.js";
 
 // Agent
-export { loadAgent, listAgents, saveAgent, deleteAgent, resolveAgent, buildClaudeArgs, findProjectRoot, type AgentDefinition } from "./agent.js";
+export { resolveAgent, buildClaudeArgs, findProjectRoot, type AgentDefinition } from "./agent.js";
 
 // Skill
 export { type SkillDefinition } from "./skill.js";

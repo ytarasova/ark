@@ -73,7 +73,7 @@ export function registerAgentCommands(program: Command) {
 
   agent.command("edit").description("Edit an agent definition").argument("<name>").action(async (name) => {
     const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-    const a = core.loadAgent(name, projectRoot);
+    const a = getApp().agents.get(name, projectRoot);
     if (!a) { console.log(chalk.red(`Agent '${name}' not found`)); return; }
 
     if (a._source === "builtin") {
@@ -85,11 +85,11 @@ export function registerAgentCommands(program: Command) {
       rl.close();
       const choice = answer.trim().toLowerCase();
       if (choice === "p" && projectRoot) {
-        core.saveAgent(a, "project", projectRoot);
+        getApp().agents.save(a.name, a, "project", projectRoot);
         const path = join(projectRoot, ".ark", "agents", `${name}.yaml`);
         execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
       } else if (choice === "g") {
-        core.saveAgent(a, "global");
+        getApp().agents.save(a.name, a, "global");
         const path = join(getApp().config.arkDir, "agents", `${name}.yaml`);
         execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
       } else {
@@ -103,7 +103,7 @@ export function registerAgentCommands(program: Command) {
 
   agent.command("delete").description("Delete a custom agent").argument("<name>").action(async (name) => {
     const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-    const a = core.loadAgent(name, projectRoot);
+    const a = getApp().agents.get(name, projectRoot);
     if (!a) { console.log(chalk.red(`Agent '${name}' not found`)); return; }
 
     if (a._source === "builtin") {
@@ -120,7 +120,7 @@ export function registerAgentCommands(program: Command) {
 
     if (answer.trim().toLowerCase() === "y") {
       const scope = a._source as "project" | "global";
-      core.deleteAgent(name, scope, scope === "project" ? projectRoot : undefined);
+      getApp().agents.delete(name, scope, scope === "project" ? projectRoot : undefined);
       console.log(chalk.green(`Deleted '${name}'.`));
     } else {
       console.log("Cancelled.");
@@ -131,13 +131,13 @@ export function registerAgentCommands(program: Command) {
     .option("--global", "Save to ~/.ark/agents/ instead of project")
     .action((name, newName, opts) => {
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-      const a = core.loadAgent(name, projectRoot);
+      const a = getApp().agents.get(name, projectRoot);
       if (!a) { console.log(chalk.red(`Agent '${name}' not found`)); return; }
 
       const targetName = newName || name;
       const scope: "project" | "global" = opts.global || !projectRoot ? "global" : "project";
       const copy = { ...a, name: targetName };
-      core.saveAgent(copy, scope, scope === "project" ? projectRoot : undefined);
+      getApp().agents.save(copy.name, copy, scope, scope === "project" ? projectRoot : undefined);
 
       const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(getApp().config.arkDir, "agents");
       console.log(chalk.green(`Copied '${name}' → ${scope} '${targetName}' at ${join(dir, `${targetName}.yaml`)}`));

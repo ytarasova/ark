@@ -1226,7 +1226,7 @@ async function buildTaskWithHandoff(app: AppContext, session: Session, stage: st
   // Apply message filter if agent config specifies one
   try {
     const projectRoot = agentRegistry.findProjectRoot(session.workdir || session.repo) ?? undefined;
-    const agent = agentRegistry.loadAgent(agentName, projectRoot);
+    const agent = app.agents.get(agentName, projectRoot);
     if (agent) {
       const mFilter = parseMessageFilter(agent);
       if (mFilter) {
