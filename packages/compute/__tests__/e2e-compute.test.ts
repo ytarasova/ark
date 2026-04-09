@@ -19,7 +19,6 @@ import {
   resolvePortDecls,
   registerProvider,
   LocalProvider,
-  EC2Provider,
   DockerProvider,
 } from "../index.js";
 
@@ -41,7 +40,6 @@ afterAll(async () => {
 // Ensure providers are registered (may be cleared by provider-registry.test.ts)
 function ensureProviders() {
   if (!getProvider("local")) registerProvider(new LocalProvider());
-  if (!getProvider("ec2")) registerProvider(new EC2Provider());
   if (!getProvider("docker")) registerProvider(new DockerProvider());
 }
 

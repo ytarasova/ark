@@ -231,7 +231,6 @@ export class AppContext {
       // Legacy providers (backward compat -- same names: "local", "ec2", "docker")
       const providers = [
         new compute.LocalProvider(),
-        new compute.EC2Provider(),
         new compute.DockerProvider(),
         // ArkD-backed providers (new: "devcontainer", "firecracker", "ec2-docker", etc.)
         new compute.LocalDevcontainerProvider(),

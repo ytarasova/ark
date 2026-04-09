@@ -3,7 +3,6 @@
  *
  * Validates that each provider reports the correct isolation modes:
  * - LocalProvider: worktree + inplace
- * - EC2Provider: inplace only
  * - DockerProvider: container only
  */
 
@@ -50,21 +49,6 @@ describe("provider isolation modes", () => {
     expect(inplace!.label).toContain("direct");
   });
 
-  it("EC2Provider has inplace mode only", () => {
-    const provider = app.getProvider("ec2");
-    expect(provider).not.toBeNull();
-
-    const modes = provider!.isolationModes;
-    expect(modes.length).toBe(1);
-    expect(modes[0].value).toBe("inplace");
-  });
-
-  it("EC2Provider inplace mode has correct label", () => {
-    const provider = app.getProvider("ec2")!;
-    const inplace = provider.isolationModes[0];
-    expect(inplace.label).toContain("Remote");
-  });
-
   it("DockerProvider has container mode only", () => {
     const provider = app.getProvider("docker");
     expect(provider).not.toBeNull();
@@ -83,7 +67,6 @@ describe("provider isolation modes", () => {
   it("all providers are registered after boot", () => {
     const providers = app.listProviders();
     expect(providers).toContain("local");
-    expect(providers).toContain("ec2");
     expect(providers).toContain("docker");
   });
 
@@ -98,10 +81,6 @@ describe("provider isolation modes", () => {
 
     const localModes = getIsolationModes("local");
     expect(localModes.length).toBe(2);
-
-    const ec2Modes = getIsolationModes("ec2");
-    expect(ec2Modes.length).toBe(1);
-    expect(ec2Modes[0].value).toBe("inplace");
 
     const dockerModes = getIsolationModes("docker");
     expect(dockerModes.length).toBe(1);

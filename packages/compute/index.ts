@@ -55,8 +55,6 @@ export function clearProviders(): void {
 import { LocalProvider } from "./providers/local/index.js";
 export { LocalProvider };
 
-import { EC2Provider } from "./providers/ec2/index.js";
-export { EC2Provider };
 
 import { DockerProvider } from "./providers/docker/index.js";
 export { DockerProvider };
