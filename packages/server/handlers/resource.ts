@@ -1,10 +1,8 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { findProjectRoot, loadAgent, listAgents } from "../../core/agent.js";
-import { listFlows, loadFlow } from "../../core/flow.js";
-import { listSkills, loadSkill } from "../../core/skill.js";
-import { listRecipes, loadRecipe, instantiateRecipe } from "../../core/recipe.js";
+import { findProjectRoot } from "../../core/agent.js";
+import { instantiateRecipe } from "../../core/recipe.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type {
   AgentReadParams,
@@ -36,37 +34,37 @@ async function cleanZombieSessions(app: AppContext): Promise<number> {
 }
 
 export function registerResourceHandlers(router: Router, app: AppContext): void {
-  router.handle("agent/list", async () => ({ agents: listAgents() }));
+  router.handle("agent/list", async () => ({ agents: app.agents.list() }));
   router.handle("agent/read", async (p) => {
     const { name } = extract<AgentReadParams>(p, ["name"]);
     const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
-    const agent = loadAgent(name, projectRoot);
+    const agent = app.agents.get(name, projectRoot);
     if (!agent) throw new Error(`Agent '${name}' not found`);
     return { agent };
   });
-  router.handle("flow/list", async () => ({ flows: listFlows() }));
+  router.handle("flow/list", async () => ({ flows: app.flows.list() }));
   router.handle("flow/read", async (p) => {
     const { name } = extract<FlowReadParams>(p, ["name"]);
-    const flow = loadFlow(name);
+    const flow = app.flows.get(name);
     if (!flow) throw new Error(`Flow '${name}' not found`);
     return { flow };
   });
-  router.handle("skill/list", async () => ({ skills: listSkills() }));
+  router.handle("skill/list", async () => ({ skills: app.skills.list() }));
   router.handle("skill/read", async (p) => {
     const { name } = extract<SkillReadParams>(p, ["name"]);
-    return { skill: loadSkill(name) };
+    return { skill: app.skills.get(name) };
   });
-  router.handle("recipe/list", async () => ({ recipes: listRecipes() }));
+  router.handle("recipe/list", async () => ({ recipes: app.recipes.list() }));
   router.handle("recipe/read", async (p) => {
     const { name } = extract<RecipeReadParams>(p, ["name"]);
-    const recipe = loadRecipe(name);
+    const recipe = app.recipes.get(name);
     if (!recipe) throw new Error(`Recipe '${name}' not found`);
     return { recipe };
   });
 
   router.handle("recipe/use", async (p) => {
     const { name, variables } = extract<RecipeUseParams>(p, ["name"]);
-    const recipe = loadRecipe(name);
+    const recipe = app.recipes.get(name);
     if (!recipe) throw new Error(`Recipe '${name}' not found`);
     const instance = instantiateRecipe(recipe, (variables ?? {}) as Record<string, string>);
     const session = app.sessionService.start(instance);
