@@ -12,7 +12,7 @@ import { join } from "path";
 import YAML from "yaml";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { buildArgs, writeHooksConfig, removeHooksConfig } from "../claude.js";
-import { loadFlow, resolveFlow } from "../flow.js";
+import { resolveFlow } from "../flow.js";
 import { buildClaudeArgs } from "../agent.js";
 import { buildSessionVars } from "../template.js";
 
@@ -50,8 +50,8 @@ describe("E2E: flow YAML autonomy through resolveFlow", () => {
       ],
     });
 
-    // loadFlow preserves raw autonomy
-    const raw = loadFlow("review-pipeline");
+    // flows.get preserves raw autonomy
+    const raw = getApp().flows.get("review-pipeline");
     expect(raw).not.toBeNull();
     expect(raw!.stages[0].autonomy).toBe("read-only");
     expect(raw!.stages[1].autonomy).toBe("full");

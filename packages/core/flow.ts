@@ -6,9 +6,6 @@
  * Fork stages split into parallel children.
  */
 
-import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
-import { join } from "path";
-import YAML from "yaml";
 import { substituteVars } from "./template.js";
 import { getApp } from "./app.js";
 
@@ -39,79 +36,13 @@ export interface FlowDefinition {
   stages: StageDefinition[];
 }
 
-// ── Paths (used by backward-compat wrappers and helper functions) ───────────
-
-import { fileURLToPath } from "url";
-import { dirname } from "path";
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const BUILTIN_DIR = join(__dirname, "..", "..", "flows", "definitions");
-function USER_DIR() { try { return join(getApp().config.arkDir, "flows"); } catch { return ""; } }
-
-// ── Loading ─────────────────────────────────────────────────────────────────
-
-function loadYaml(path: string): Record<string, unknown> {
-  return YAML.parse(readFileSync(path, "utf-8")) ?? {};
-}
-
-/** @deprecated Use app.flows.get(name) instead */
-export function loadFlow(name: string): FlowDefinition | null {
-  try { return getApp().flows.get(name); } catch {
-    // Fallback for cases where AppContext is not booted (e.g. early init)
-    for (const dir of [USER_DIR(), BUILTIN_DIR]) {
-      const path = join(dir, `${name}.yaml`);
-      if (existsSync(path)) return loadYaml(path) as unknown as FlowDefinition;
-    }
-    return null;
-  }
-}
-
-/** @deprecated Use app.flows.list() instead */
-export function listFlows(): { name: string; description: string; stages: string[]; source: string }[] {
-  try { return getApp().flows.list(); } catch {
-    // Fallback for cases where AppContext is not booted
-    const result: Map<string, { name: string; description: string; stages: string[]; source: string }> = new Map();
-    for (const [dir, source] of [[BUILTIN_DIR, "builtin"], [USER_DIR(), "user"]] as const) {
-      if (!existsSync(dir)) continue;
-      for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml"))) {
-        const p = loadYaml(join(dir, file)) as Record<string, unknown>;
-        const name = (p.name as string) ?? file.replace(".yaml", "");
-        const stages = (Array.isArray(p.stages) ? p.stages : []) as Array<{ name: string }>;
-        result.set(name, {
-          name,
-          description: (p.description as string) ?? "",
-          stages: stages.map(s => s.name),
-          source,
-        });
-      }
-    }
-    return [...result.values()];
-  }
-}
-
-// ── Save / Delete ──────────────────────────────────────────────────────────
-
-/** @deprecated Use app.flows.save(name, flow, scope) instead */
-export function saveFlow(flow: FlowDefinition, scope: "global" | "project" = "global", projectRoot?: string): void {
-  try {
-    getApp().flows.save(flow.name, flow, scope);
-    return;
-  } catch { /* fallback */ }
-  const dir = scope === "project" && projectRoot ? join(projectRoot, ".ark", "flows") : USER_DIR();
-  mkdirSync(dir, { recursive: true });
-  const { ...data } = flow;
-  writeFileSync(join(dir, `${flow.name}.yaml`), YAML.stringify(data));
-}
-
-/** @deprecated Use app.flows.delete(name, scope) instead */
-export function deleteFlow(name: string, scope: "global" | "project" = "global", projectRoot?: string): boolean {
-  try { return getApp().flows.delete(name, scope); } catch { /* fallback */ }
-  const dir = scope === "project" && projectRoot ? join(projectRoot, ".ark", "flows") : USER_DIR();
-  const path = join(dir, `${name}.yaml`);
-  if (existsSync(path)) { unlinkSync(path); return true; }
-  return false;
-}
-
 // ── Stage navigation ────────────────────────────────────────────────────────
+
+/** Load a flow by name via the AppContext store. */
+function loadFlow(name: string): FlowDefinition | null {
+  return getApp().flows.get(name);
+}
+
 
 export function getStages(flowName: string): StageDefinition[] {
   return loadFlow(flowName)?.stages ?? [];

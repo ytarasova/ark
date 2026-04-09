@@ -10,7 +10,7 @@ import YAML from "yaml";
 
 import { getApp } from "../app.js";
 import { startSession, advance, approveReviewGate } from "../services/session-orchestration.js";
-import { loadFlow, evaluateGate } from "../flow.js";
+import { evaluateGate } from "../flow.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -134,7 +134,7 @@ describe("review flow YAML loading", () => {
       ],
     });
 
-    const flow = loadFlow("yaml-review");
+    const flow = getApp().flows.get("yaml-review");
     expect(flow).not.toBeNull();
     expect(flow!.name).toBe("yaml-review");
     expect(flow!.stages).toHaveLength(3);

@@ -10,7 +10,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { buildArgs, writeHooksConfig } from "../claude.js";
-import { loadFlow, resolveFlow } from "../flow.js";
+import { resolveFlow } from "../flow.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -136,7 +136,7 @@ describe("flow autonomy field", () => {
       ],
     });
 
-    const flow = loadFlow("autonomy-flow");
+    const flow = getApp().flows.get("autonomy-flow");
     expect(flow).not.toBeNull();
     expect(flow!.stages[0].autonomy).toBe("read-only");
     expect(flow!.stages[1].autonomy).toBe("full");
@@ -150,7 +150,7 @@ describe("flow autonomy field", () => {
       ],
     });
 
-    const flow = loadFlow("no-autonomy-flow");
+    const flow = getApp().flows.get("no-autonomy-flow");
     expect(flow).not.toBeNull();
     expect(flow!.stages[0].autonomy).toBeUndefined();
   });

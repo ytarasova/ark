@@ -11,7 +11,6 @@ import { join } from "path";
 import { getApp } from "../app.js";
 import { startSession } from "../services/session-orchestration.js";
 import { listAgents } from "../agent.js";
-import { listFlows } from "../flow.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -177,7 +176,7 @@ describe("CLI: agent list", () => {
 
 describe("CLI: flow list", () => {
   it("lists available flows", () => {
-    const flows = listFlows();
+    const flows = getApp().flows.list();
     expect(flows.length).toBeGreaterThan(0);
   });
 });
