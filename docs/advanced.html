@@ -354,6 +354,51 @@
         <strong>Note:</strong> Run <code>ark auth</code> once before dispatching your first remote session. The token persists across reboots -- you do not need to re-run it unless you revoke your Claude credentials.
       </div>
 
+      <!-- ── ArkD Daemon ──────────────────────────────────────────────────── -->
+      <h2>ArkD (Agent Daemon)</h2>
+      <p>ArkD is a stateless HTTP daemon that runs on every compute target -- local, Docker, and EC2. It provides a uniform interface for agent lifecycle management, file operations, metrics collection, and channel relay regardless of the underlying provider.</p>
+
+      <h3>What ArkD Does</h3>
+      <ul>
+        <li><strong>Agent lifecycle</strong> -- launch, kill, and query agent status on the compute target</li>
+        <li><strong>File operations</strong> -- read, write, and sync files on the remote host</li>
+        <li><strong>Metrics</strong> -- collect CPU, memory, disk, and network metrics from the host</li>
+        <li><strong>Channel relay</strong> -- forward MCP channel messages between agents and the conductor</li>
+      </ul>
+
+      <h3>Running ArkD</h3>
+      <p>ArkD is started automatically by remote providers during provisioning. For manual use:</p>
+      <pre><code><span class="prompt">$</span> ark arkd                                          <span class="yaml-comment"># default: port 19300, bind 0.0.0.0</span>
+<span class="prompt">$</span> ark arkd --port 19400 --conductor-url http://remote:19100</code></pre>
+
+      <h3>Architecture</h3>
+      <p>The communication flow is: <strong>Agent</strong> → <strong>MCP Channel</strong> → <strong>ArkD</strong> → <strong>Conductor</strong>. On local compute, channel.ts reports directly to the conductor. On remote compute, channel.ts reports to ArkD first, and ArkD forwards to the conductor. This extra hop handles network boundaries between compute targets and the control plane.</p>
+
+      <div class="callout info">
+        <p>ArkD is stateless -- it does not persist any data. All state lives in the conductor's SQLite database. Restarting ArkD has no effect on running sessions.</p>
+      </div>
+
+      <!-- ── Fan-Out / Sub-Agent Spawning ──────────────────────────────────── -->
+      <h2>Fan-Out and Sub-Agent Spawning</h2>
+      <p>Ark supports decomposing tasks into parallel child sessions. This enables fan-out patterns where a parent session spawns N children that work concurrently, with the parent auto-joining when all children complete.</p>
+
+      <h3>Manual Spawning</h3>
+      <pre><code><span class="prompt">$</span> ark session spawn s-1a2b "Write unit tests" --agent worker --dispatch
+<span class="prompt">$</span> ark session spawn s-1a2b "Fix lint errors" --model haiku --dispatch
+<span class="prompt">$</span> ark session join s-1a2b            <span class="yaml-comment"># wait for all children</span>
+<span class="prompt">$</span> ark session join s-1a2b --force    <span class="yaml-comment"># join even if children are incomplete</span></code></pre>
+
+      <h3>Automatic Fan-Out</h3>
+      <p>Use a <code>fan-out</code> or <code>dag-parallel</code> flow to enable automatic task decomposition. The planner outputs a JSON array of tasks, and Ark spawns child sessions automatically. See <a href="workflows.html">Workflows</a> for flow YAML syntax.</p>
+
+      <h3>Child Session Behavior</h3>
+      <ul>
+        <li>Children inherit the parent's repo, compute target, and worktree</li>
+        <li>Each child gets its own tmux session and agent process</li>
+        <li>The conductor monitors child status and auto-joins when all complete</li>
+        <li>If any child fails, the parent is notified but not automatically failed</li>
+      </ul>
+
       <div class="doc-footer">
         <a href="workflows.html">&larr; Workflows</a>
         <a href="./">Home &rarr;</a>

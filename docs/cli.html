@@ -293,7 +293,8 @@
       <p>Full-text search across sessions, events, messages, and Claude Code transcripts. Uses FTS5 when the index is available; falls back to file scanning otherwise.</p>
       <pre><code><span class="prompt">$</span> ark search "authentication bug"
 <span class="prompt">$</span> ark search "OAuth" --transcripts --limit 50
-<span class="prompt">$</span> ark search "login" --index</code></pre>
+<span class="prompt">$</span> ark search "login" --index
+<span class="prompt">$</span> ark search "rate limiting" --hybrid</code></pre>
 
       <table>
         <thead>
@@ -303,6 +304,23 @@
           <tr><td><code>-l, --limit</code></td><td><code>20</code></td><td>Maximum number of results</td></tr>
           <tr><td><code>-t, --transcripts</code></td><td>--</td><td>Also search Claude Code JSONL transcripts</td></tr>
           <tr><td><code>--index</code></td><td>--</td><td>Rebuild the FTS5 index before searching</td></tr>
+          <tr><td><code>--hybrid</code></td><td>--</td><td>Hybrid search (memory + knowledge + transcripts with LLM re-ranking). Requires <code>ANTHROPIC_API_KEY</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark search-all ──────────────────────────────────────────────── -->
+      <h2>ark search-all &lt;query&gt;</h2>
+      <p>Search across all Claude Code conversations on disk, not just Ark-managed sessions.</p>
+      <pre><code><span class="prompt">$</span> ark search-all "migration strategy"
+<span class="prompt">$</span> ark search-all "deploy" --days 7 --limit 100</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-n, --limit</code></td><td><code>20</code></td><td>Maximum number of results</td></tr>
+          <tr><td><code>--days</code></td><td><code>90</code></td><td>Limit to conversations from the last N days</td></tr>
         </tbody>
       </table>
 
@@ -571,8 +589,220 @@
         <strong>Note:</strong> The conductor port is used by agent hooks and MCP channels to report status back to Ark. All sessions on the same machine must point to the same conductor port.
       </div>
 
+      <!-- ── ark web ─────────────────────────────────────────────────────── -->
+      <h2>ark web</h2>
+      <p>Start the browser-based web dashboard. See <a href="web.html">Web Dashboard</a> for full details.</p>
+      <pre><code><span class="prompt">$</span> ark web
+<span class="prompt">$</span> ark web --port 9000 --token my-secret --read-only</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--port</code></td><td><code>8420</code></td><td>Listen port</td></tr>
+          <tr><td><code>--read-only</code></td><td>--</td><td>Disable all mutation endpoints</td></tr>
+          <tr><td><code>--token</code></td><td>--</td><td>Require <code>Authorization: Bearer &lt;token&gt;</code> on every request</td></tr>
+          <tr><td><code>--api-only</code></td><td>--</td><td>API only, skip static file serving (for dev with Vite)</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark arkd ────────────────────────────────────────────────────── -->
+      <h2>ark arkd</h2>
+      <p>Start the ArkD universal agent daemon. Runs on every compute target (local and remote) to manage agent lifecycle, file operations, metrics collection, and channel relay.</p>
+      <pre><code><span class="prompt">$</span> ark arkd
+<span class="prompt">$</span> ark arkd --port 19400 --conductor-url http://remote:19100</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-p, --port</code></td><td><code>19300</code></td><td>ArkD listen port</td></tr>
+          <tr><td><code>--hostname</code></td><td><code>0.0.0.0</code></td><td>Bind address</td></tr>
+          <tr><td><code>--conductor-url</code></td><td><code>http://localhost:19100</code></td><td>Conductor URL for channel relay</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark worktree ────────────────────────────────────────────────── -->
+      <h2>ark worktree</h2>
+      <p>Manage git worktrees created by sessions. See <a href="advanced.html">Advanced Features</a> for full worktree documentation.</p>
+
+      <h3>ark worktree list</h3>
+      <p>List all active worktrees.</p>
+      <pre><code><span class="prompt">$</span> ark worktree list</code></pre>
+
+      <h3>ark worktree diff &lt;id&gt;</h3>
+      <p>Preview changes in a session's worktree branch.</p>
+      <pre><code><span class="prompt">$</span> ark worktree diff s-1a2b --base main</code></pre>
+
+      <h3>ark worktree finish &lt;id&gt;</h3>
+      <p>Merge the session branch into the base branch, or create a PR if the repo has a remote.</p>
+      <pre><code><span class="prompt">$</span> ark worktree finish s-1a2b --into main --pr</code></pre>
+
+      <h3>ark worktree pr &lt;id&gt;</h3>
+      <p>Push the session branch and open a GitHub pull request.</p>
+      <pre><code><span class="prompt">$</span> ark worktree pr s-1a2b --title "Add OAuth support" --draft</code></pre>
+
+      <h3>ark worktree cleanup &lt;id&gt;</h3>
+      <p>Remove a session's worktree.</p>
+      <pre><code><span class="prompt">$</span> ark worktree cleanup s-1a2b --dry-run</code></pre>
+
+      <!-- ── ark memory ──────────────────────────────────────────────────── -->
+      <h2>ark memory</h2>
+      <p>Manage persistent cross-session memories. See <a href="advanced.html">Advanced Features</a> for details.</p>
+      <pre><code><span class="prompt">$</span> ark memory list
+<span class="prompt">$</span> ark memory add "Always use transactions for DB writes" --tags db,safety --importance high
+<span class="prompt">$</span> ark memory recall "database"
+<span class="prompt">$</span> ark memory forget mem-3a4b
+<span class="prompt">$</span> ark memory clear --scope project --force</code></pre>
+
+      <!-- ── ark profile ─────────────────────────────────────────────────── -->
+      <h2>ark profile</h2>
+      <p>Manage isolated session namespaces. See <a href="advanced.html">Advanced Features</a> for details.</p>
+      <pre><code><span class="prompt">$</span> ark profile list
+<span class="prompt">$</span> ark profile create work
+<span class="prompt">$</span> ark profile delete work
+<span class="prompt">$</span> ark -p work session list</code></pre>
+
+      <!-- ── ark costs ───────────────────────────────────────────────────── -->
+      <h2>ark costs</h2>
+      <p>View per-session token usage and cost breakdown.</p>
+      <pre><code><span class="prompt">$</span> ark costs
+<span class="prompt">$</span> ark costs --limit 50</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-n, --limit</code></td><td><code>20</code></td><td>Number of sessions to show</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark costs-sync</h3>
+      <p>Backfill cost data from Claude Code transcripts.</p>
+      <pre><code><span class="prompt">$</span> ark costs-sync</code></pre>
+
+      <h3>ark costs-export</h3>
+      <p>Export cost data to CSV or JSON.</p>
+      <pre><code><span class="prompt">$</span> ark costs-export --format csv --output costs.csv
+<span class="prompt">$</span> ark costs-export --format json</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--format</code></td><td><code>json</code></td><td><code>csv</code> or <code>json</code></td></tr>
+          <tr><td><code>-o, --output</code></td><td>stdout</td><td>Output file path</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark init ────────────────────────────────────────────────────── -->
+      <h2>ark init</h2>
+      <p>Initialize Ark for the current repository. Checks prerequisites, verifies Claude authentication, and creates a <code>.ark.yaml</code> config file.</p>
+      <pre><code><span class="prompt">$</span> ark init</code></pre>
+
+      <!-- ── ark doctor ──────────────────────────────────────────────────── -->
+      <h2>ark doctor</h2>
+      <p>Check that all system prerequisites are installed (Bun, tmux, git, Claude CLI, gh).</p>
+      <pre><code><span class="prompt">$</span> ark doctor</code></pre>
+
+      <!-- ── ark config ──────────────────────────────────────────────────── -->
+      <h2>ark config</h2>
+      <p>Open the Ark config file (<code>~/.ark/config.yaml</code>) in your editor. Creates a default config if it does not exist.</p>
+      <pre><code><span class="prompt">$</span> ark config                <span class="yaml-comment"># open in $EDITOR</span>
+<span class="prompt">$</span> ark config --path          <span class="yaml-comment"># print config path</span></code></pre>
+
+      <!-- ── ark try ─────────────────────────────────────────────────────── -->
+      <h2>ark try &lt;task&gt;</h2>
+      <p>Run a one-shot sandboxed session that auto-cleans up when done. Useful for quick experiments.</p>
+      <pre><code><span class="prompt">$</span> ark try "Fix the login bug"
+<span class="prompt">$</span> ark try "Add tests" --image node:20</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--image</code></td><td><code>ubuntu:22.04</code></td><td>Docker image for the sandbox</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark watch ───────────────────────────────────────────────────── -->
+      <h2>ark watch</h2>
+      <p>Watch a GitHub repository for newly opened issues with a specific label and auto-create sessions.</p>
+      <pre><code><span class="prompt">$</span> ark watch --label ark --dispatch
+<span class="prompt">$</span> ark watch --label ark --dispatch --interval 30000</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-l, --label</code></td><td><code>ark</code></td><td>GitHub issue label to watch for</td></tr>
+          <tr><td><code>-d, --dispatch</code></td><td>--</td><td>Auto-dispatch created sessions</td></tr>
+          <tr><td><code>-i, --interval</code></td><td><code>60000</code></td><td>Polling interval in milliseconds</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark eval ────────────────────────────────────────────────────── -->
+      <h2>ark eval &lt;recipe&gt;</h2>
+      <p>Evaluate a recipe by creating N test sessions and reporting success rate, duration, and cost.</p>
+      <pre><code><span class="prompt">$</span> ark eval quick-fix
+<span class="prompt">$</span> ark eval quick-fix --iterations 5</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-n, --iterations</code></td><td><code>3</code></td><td>Number of test iterations</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark repo-map ────────────────────────────────────────────────── -->
+      <h2>ark repo-map [dir]</h2>
+      <p>Generate a repository structure map showing directory layout and file counts.</p>
+      <pre><code><span class="prompt">$</span> ark repo-map
+<span class="prompt">$</span> ark repo-map /path/to/repo --json --max-files 1000</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--max-files</code></td><td><code>500</code></td><td>Maximum files to include</td></tr>
+          <tr><td><code>--max-depth</code></td><td><code>10</code></td><td>Maximum directory depth</td></tr>
+          <tr><td><code>--json</code></td><td>--</td><td>Output as JSON instead of text</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark server ──────────────────────────────────────────────────── -->
+      <h2>ark server</h2>
+      <p>Start the JSON-RPC server for programmatic access to Ark.</p>
+      <pre><code><span class="prompt">$</span> ark server start --stdio       <span class="yaml-comment"># JSONL on stdin/stdout</span>
+<span class="prompt">$</span> ark server start --ws --port 19400  <span class="yaml-comment"># WebSocket transport</span></code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--stdio</code></td><td>--</td><td>Use stdio transport (JSONL)</td></tr>
+          <tr><td><code>--ws</code></td><td>--</td><td>Use WebSocket transport</td></tr>
+          <tr><td><code>-p, --port</code></td><td><code>19400</code></td><td>WebSocket port</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── ark openapi ─────────────────────────────────────────────────── -->
+      <h2>ark openapi</h2>
+      <p>Generate the OpenAPI specification for the Ark JSON-RPC API as JSON on stdout.</p>
+      <pre><code><span class="prompt">$</span> ark openapi > openapi.json</code></pre>
+
       <div class="doc-footer">
-        <a href="tui.html">&larr; TUI Guide</a>
+        <a href="web.html">&larr; Web Dashboard</a>
         <a href="configuration.html">Configuration &rarr;</a>
       </div>
     </main>
