@@ -474,13 +474,24 @@ session.command("spawn")
   .description("Spawn a child session for parallel work")
   .argument("<parent-id>")
   .argument("<task>")
-  .action(async (parentId, task) => {
+  .option("-a, --agent <agent>", "Agent override")
+  .option("-m, --model <model>", "Model override (e.g., haiku, sonnet, opus)")
+  .option("-d, --dispatch", "Auto-dispatch after spawning")
+  .action(async (parentId, task, opts) => {
     const ark = await getArkClient();
-    try {
-      const forked = await ark.sessionFork(parentId, task);
-      console.log(chalk.green(`Spawned → ${forked.id}`));
-    } catch (e: any) {
-      console.log(chalk.red(e.message));
+    const r = await ark.sessionSpawn(parentId, {
+      task,
+      agent: opts.agent,
+      model: opts.model,
+    });
+    if (r.ok) {
+      console.log(chalk.green(`Spawned -> ${r.sessionId}`));
+      if (opts.dispatch && r.sessionId) {
+        const d = await ark.sessionDispatch(r.sessionId);
+        console.log(d.ok ? chalk.green(`Dispatched: ${d.message}`) : chalk.red(d.message));
+      }
+    } else {
+      console.log(chalk.red(r.message));
     }
   });
 
