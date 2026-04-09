@@ -42,18 +42,85 @@ export function mergeComputeConfig(name: string, config: Record<string, unknown>
 export function deleteCompute(name: string) { return _getApp().computes.delete(name); }
 
 // Session lifecycle (the main API)
-export {
-  startSession, dispatch, advance, stop, resume, complete, pause, interrupt,
-  archive, restore,
-  forkSession, cloneSession, handoff, fork, joinFork, getOutput, send,
-  deleteSessionAsync, undeleteSessionAsync, waitForCompletion, approveReviewGate,
-  applyHookStatus, applyReport, cleanupOnTerminal,
-  retryWithContext, fanOut, worktreeDiff, finishWorktree, createWorktreePR, detectStatus, executeAction,
-  spawnSubagent, spawnParallelSubagents,
-  findOrphanedWorktrees, cleanupWorktrees,
-  runVerification,
+// Thin wrappers inject _getApp() so callers don't need to pass AppContext.
+import {
+  startSession as _startSession,
+  dispatch as _dispatch,
+  advance as _advance,
+  stop as _stop,
+  resume as _resume,
+  complete as _complete,
+  pause as _pause,
+  interrupt as _interrupt,
+  archive as _archive,
+  restore as _restore,
+  forkSession as _forkSession,
+  cloneSession as _cloneSession,
+  handoff as _handoff,
+  fork as _fork,
+  joinFork as _joinFork,
+  getOutput as _getOutput,
+  send as _send,
+  deleteSessionAsync as _deleteSessionAsync,
+  undeleteSessionAsync as _undeleteSessionAsync,
+  waitForCompletion as _waitForCompletion,
+  approveReviewGate as _approveReviewGate,
+  applyHookStatus as _applyHookStatus,
+  applyReport as _applyReport,
+  cleanupOnTerminal as _cleanupOnTerminal,
+  retryWithContext as _retryWithContext,
+  fanOut as _fanOut,
+  worktreeDiff as _worktreeDiff,
+  finishWorktree as _finishWorktree,
+  createWorktreePR as _createWorktreePR,
+  detectStatus as _detectStatus,
+  executeAction as _executeAction,
+  spawnSubagent as _spawnSubagent,
+  spawnParallelSubagents as _spawnParallelSubagents,
+  findOrphanedWorktrees as _findOrphanedWorktrees,
+  cleanupWorktrees as _cleanupWorktrees,
+  runVerification as _runVerification,
   type HookStatusResult, type ReportResult, type SessionOpResult,
 } from "./services/session-orchestration.js";
+
+export type { HookStatusResult, ReportResult, SessionOpResult };
+
+export function startSession(...args: Parameters<typeof _startSession> extends [any, ...infer R] ? R : never) { return _startSession(_getApp(), ...args); }
+export function dispatch(...args: Parameters<typeof _dispatch> extends [any, ...infer R] ? R : never) { return _dispatch(_getApp(), ...args); }
+export function advance(...args: Parameters<typeof _advance> extends [any, ...infer R] ? R : never) { return _advance(_getApp(), ...args); }
+export function stop(...args: Parameters<typeof _stop> extends [any, ...infer R] ? R : never) { return _stop(_getApp(), ...args); }
+export function resume(...args: Parameters<typeof _resume> extends [any, ...infer R] ? R : never) { return _resume(_getApp(), ...args); }
+export function complete(...args: Parameters<typeof _complete> extends [any, ...infer R] ? R : never) { return _complete(_getApp(), ...args); }
+export function pause(...args: Parameters<typeof _pause> extends [any, ...infer R] ? R : never) { return _pause(_getApp(), ...args); }
+export function interrupt(...args: Parameters<typeof _interrupt> extends [any, ...infer R] ? R : never) { return _interrupt(_getApp(), ...args); }
+export function archive(...args: Parameters<typeof _archive> extends [any, ...infer R] ? R : never) { return _archive(_getApp(), ...args); }
+export function restore(...args: Parameters<typeof _restore> extends [any, ...infer R] ? R : never) { return _restore(_getApp(), ...args); }
+export function forkSession(...args: Parameters<typeof _forkSession> extends [any, ...infer R] ? R : never) { return _forkSession(_getApp(), ...args); }
+export function cloneSession(...args: Parameters<typeof _cloneSession> extends [any, ...infer R] ? R : never) { return _cloneSession(_getApp(), ...args); }
+export function handoff(...args: Parameters<typeof _handoff> extends [any, ...infer R] ? R : never) { return _handoff(_getApp(), ...args); }
+export function fork(...args: Parameters<typeof _fork> extends [any, ...infer R] ? R : never) { return _fork(_getApp(), ...args); }
+export function joinFork(...args: Parameters<typeof _joinFork> extends [any, ...infer R] ? R : never) { return _joinFork(_getApp(), ...args); }
+export function getOutput(...args: Parameters<typeof _getOutput> extends [any, ...infer R] ? R : never) { return _getOutput(_getApp(), ...args); }
+export function send(...args: Parameters<typeof _send> extends [any, ...infer R] ? R : never) { return _send(_getApp(), ...args); }
+export function deleteSessionAsync(...args: Parameters<typeof _deleteSessionAsync> extends [any, ...infer R] ? R : never) { return _deleteSessionAsync(_getApp(), ...args); }
+export function undeleteSessionAsync(...args: Parameters<typeof _undeleteSessionAsync> extends [any, ...infer R] ? R : never) { return _undeleteSessionAsync(_getApp(), ...args); }
+export function waitForCompletion(...args: Parameters<typeof _waitForCompletion> extends [any, ...infer R] ? R : never) { return _waitForCompletion(_getApp(), ...args); }
+export function approveReviewGate(...args: Parameters<typeof _approveReviewGate> extends [any, ...infer R] ? R : never) { return _approveReviewGate(_getApp(), ...args); }
+export function applyHookStatus(...args: Parameters<typeof _applyHookStatus> extends [any, ...infer R] ? R : never) { return _applyHookStatus(_getApp(), ...args); }
+export function applyReport(...args: Parameters<typeof _applyReport> extends [any, ...infer R] ? R : never) { return _applyReport(_getApp(), ...args); }
+export function cleanupOnTerminal(...args: Parameters<typeof _cleanupOnTerminal> extends [any, ...infer R] ? R : never) { return _cleanupOnTerminal(_getApp(), ...args); }
+export function retryWithContext(...args: Parameters<typeof _retryWithContext> extends [any, ...infer R] ? R : never) { return _retryWithContext(_getApp(), ...args); }
+export function fanOut(...args: Parameters<typeof _fanOut> extends [any, ...infer R] ? R : never) { return _fanOut(_getApp(), ...args); }
+export function worktreeDiff(...args: Parameters<typeof _worktreeDiff> extends [any, ...infer R] ? R : never) { return _worktreeDiff(_getApp(), ...args); }
+export function finishWorktree(...args: Parameters<typeof _finishWorktree> extends [any, ...infer R] ? R : never) { return _finishWorktree(_getApp(), ...args); }
+export function createWorktreePR(...args: Parameters<typeof _createWorktreePR> extends [any, ...infer R] ? R : never) { return _createWorktreePR(_getApp(), ...args); }
+export function detectStatus(...args: Parameters<typeof _detectStatus> extends [any, ...infer R] ? R : never) { return _detectStatus(_getApp(), ...args); }
+export function executeAction(...args: Parameters<typeof _executeAction> extends [any, ...infer R] ? R : never) { return _executeAction(_getApp(), ...args); }
+export function spawnSubagent(...args: Parameters<typeof _spawnSubagent> extends [any, ...infer R] ? R : never) { return _spawnSubagent(_getApp(), ...args); }
+export function spawnParallelSubagents(...args: Parameters<typeof _spawnParallelSubagents> extends [any, ...infer R] ? R : never) { return _spawnParallelSubagents(_getApp(), ...args); }
+export function findOrphanedWorktrees(...args: Parameters<typeof _findOrphanedWorktrees> extends [any, ...infer R] ? R : never) { return _findOrphanedWorktrees(_getApp(), ...args); }
+export function cleanupWorktrees(...args: Parameters<typeof _cleanupWorktrees> extends [any, ...infer R] ? R : never) { return _cleanupWorktrees(_getApp(), ...args); }
+export function runVerification(...args: Parameters<typeof _runVerification> extends [any, ...infer R] ? R : never) { return _runVerification(_getApp(), ...args); }
 
 // Flow
 export * from "./flow.js";

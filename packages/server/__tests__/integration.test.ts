@@ -25,12 +25,12 @@ function createInMemoryPair(): { client: ArkClient; server: ArkServer } {
   let serverHandler: (msg: JsonRpcMessage) => void = () => {};
 
   const clientTransport: Transport = {
-    send(app, msg) { setTimeout(() => serverHandler(msg), 0); },
+    send(msg) { setTimeout(() => serverHandler(msg), 0); },
     onMessage(h) { clientHandler = h; },
     close() {},
   };
   const serverTransport: Transport = {
-    send(app, msg) { setTimeout(() => clientHandler(msg), 0); },
+    send(msg) { setTimeout(() => clientHandler(msg), 0); },
     onMessage(h) { serverHandler = h; },
     close() {},
   };
