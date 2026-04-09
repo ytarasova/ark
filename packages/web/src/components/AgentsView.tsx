@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
-import { useAgentsQuery } from "../hooks/useQueries.js";
+import { useAgentsQuery } from "../hooks/useAgentQueries.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";

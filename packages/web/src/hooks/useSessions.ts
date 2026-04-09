@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSessionsQuery, useGroupsQuery } from "./useQueries.js";
+import { useSessionsQuery, useGroupsQuery } from "./useSessionQueries.js";
 import { useSse } from "./useSse.js";
 
 export function useSessions() {

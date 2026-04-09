@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useCostsQuery } from "../hooks/useQueries.js";
+import { useCostsQuery } from "../hooks/useCostQueries.js";
 import { fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";

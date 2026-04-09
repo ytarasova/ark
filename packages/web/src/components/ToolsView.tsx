@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
-import { useSkillsQuery, useRecipesQuery } from "../hooks/useQueries.js";
+import { useSkillsQuery, useRecipesQuery } from "../hooks/useToolQueries.js";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";

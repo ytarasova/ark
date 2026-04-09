@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
-import { useSchedulesQuery } from "../hooks/useQueries.js";
+import { useSchedulesQuery } from "../hooks/useScheduleQueries.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
