@@ -154,7 +154,6 @@ export function resolveAgent(name: string, session: Record<string, unknown>, pro
 // ── Build claude CLI args ───────────────────────────────────────────────────
 
 import * as claude from "./claude.js";
-import { loadSkill } from "./skill.js";
 
 export function buildClaudeArgs(agent: AgentDefinition, opts?: {
   task?: string;
@@ -168,7 +167,7 @@ export function buildClaudeArgs(agent: AgentDefinition, opts?: {
   // Inject skill prompts into system prompt
   if (agent.skills?.length) {
     const skillPrompts = agent.skills
-      .map((name: string) => loadSkill(name, opts?.projectRoot))
+      .map((name: string) => getApp().skills.get(name, opts?.projectRoot))
       .filter(Boolean)
       .map((s: any) => `## Skill: ${s.name}\n${s.prompt}`);
     if (skillPrompts.length) {

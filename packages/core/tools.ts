@@ -11,8 +11,7 @@
 import { existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync, unlinkSync } from "fs";
 import { join, basename } from "path";
 import stripJsonComments from "strip-json-comments";
-import { listSkills } from "./skill.js";
-import { listRecipes } from "./recipe.js";
+import { getApp } from "./app.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -104,7 +103,7 @@ function discoverContext(projectDir: string): ToolEntry[] {
 }
 
 function discoverArkSkills(projectDir?: string): ToolEntry[] {
-  return listSkills(projectDir).map(s => ({
+  return getApp().skills.list(projectDir).map(s => ({
     kind: "ark-skill" as const,
     name: s.name,
     description: s.description ?? "",
@@ -113,7 +112,7 @@ function discoverArkSkills(projectDir?: string): ToolEntry[] {
 }
 
 function discoverArkRecipes(projectDir?: string): ToolEntry[] {
-  return listRecipes(projectDir).map(r => ({
+  return getApp().recipes.list(projectDir).map(r => ({
     kind: "ark-recipe" as const,
     name: r.name,
     description: r.description ?? "",

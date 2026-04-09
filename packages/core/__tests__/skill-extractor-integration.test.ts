@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { extractAndSaveSkills } from "../skill-extractor.js";
-import { listSkills } from "../skill.js";
+import { getApp } from "../app.js";
 
 withTestContext();
 
@@ -16,7 +16,7 @@ describe("skill extraction integration", () => {
     const saved = extractAndSaveSkills("s-test", conversation);
     expect(saved).toBeGreaterThan(0);
 
-    const skills = listSkills();
+    const skills = getApp().skills.list();
     const extracted = skills.find(s => s._source === "global" && s.tags?.includes("extracted"));
     expect(extracted).toBeDefined();
   });

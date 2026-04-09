@@ -23,7 +23,7 @@ export { substituteVars, buildSessionVars } from "./template.js";
 export { loadAgent, listAgents, saveAgent, deleteAgent, resolveAgent, buildClaudeArgs, findProjectRoot, type AgentDefinition } from "./agent.js";
 
 // Skill
-export { listSkills, loadSkill, saveSkill, deleteSkill, type SkillDefinition } from "./skill.js";
+export { type SkillDefinition } from "./skill.js";
 
 // Recipe
 export { listRecipes, loadRecipe, instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecipes, saveRecipe, deleteRecipe, sessionToRecipe, type RecipeDefinition, type RecipeVariable, type RecipeParameter, type RecipeInstance, type SubRecipeRef } from "./recipe.js";

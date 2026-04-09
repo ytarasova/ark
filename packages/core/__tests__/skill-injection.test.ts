@@ -4,8 +4,8 @@
 
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
-import { saveAgent, buildClaudeArgs } from "../agent.js";
-import { saveSkill } from "../skill.js";
+import { buildClaudeArgs } from "../agent.js";
+import { getApp } from "../app.js";
 import type { AgentDefinition } from "../agent.js";
 
 const { getCtx } = withTestContext();
@@ -29,14 +29,14 @@ function makeAgent(overrides: Partial<AgentDefinition> & { name: string }): Agen
 
 describe("skill injection via buildClaudeArgs", () => {
   it("injects skill prompts into agent system prompt", () => {
-    saveSkill({
+    getApp().skills.save("test-skill", {
       name: "test-skill",
       description: "test",
       prompt: "Always write tests first.",
     }, "global");
 
     const agent = makeAgent({ name: "test-agent", skills: ["test-skill"] });
-    saveAgent(agent, "global");
+    getApp().agents.save(agent.name, agent, "global");
 
     const args = buildClaudeArgs(agent, {});
     const systemPromptArg = args.join(" ");
@@ -48,7 +48,7 @@ describe("skill injection via buildClaudeArgs", () => {
 
   it("handles missing skills gracefully", () => {
     const agent = makeAgent({ name: "no-skills-agent", skills: ["nonexistent-skill"] });
-    saveAgent(agent, "global");
+    getApp().agents.save(agent.name, agent, "global");
 
     // Should not throw, just skip missing skills
     const args = buildClaudeArgs(agent, {});
@@ -60,7 +60,7 @@ describe("skill injection via buildClaudeArgs", () => {
 
   it("agent without skills works normally", () => {
     const agent = makeAgent({ name: "plain-agent", skills: [] });
-    saveAgent(agent, "global");
+    getApp().agents.save(agent.name, agent, "global");
 
     const args = buildClaudeArgs(agent, {});
     expect(args.length).toBeGreaterThan(0);
@@ -70,20 +70,20 @@ describe("skill injection via buildClaudeArgs", () => {
   });
 
   it("injects multiple skills in order", () => {
-    saveSkill({
+    getApp().skills.save("skill-a", {
       name: "skill-a",
       description: "first",
       prompt: "Follow TDD methodology.",
     }, "global");
 
-    saveSkill({
+    getApp().skills.save("skill-b", {
       name: "skill-b",
       description: "second",
       prompt: "Use conventional commits.",
     }, "global");
 
     const agent = makeAgent({ name: "multi-skill-agent", skills: ["skill-a", "skill-b"] });
-    saveAgent(agent, "global");
+    getApp().agents.save(agent.name, agent, "global");
 
     const args = buildClaudeArgs(agent, {});
     const systemPromptArg = args.join(" ");
