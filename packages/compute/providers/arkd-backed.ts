@@ -8,6 +8,7 @@
  */
 
 import { ArkdClient } from "../../arkd/client.js";
+import type { AppContext } from "../../core/app.js";
 import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
   ComputeSnapshot, PortDecl, PortStatus, Compute, Session, IsolationMode,
@@ -21,6 +22,12 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
   abstract readonly supportsWorktree: boolean;
   abstract readonly initialStatus: string;
   abstract readonly needsAuth: boolean;
+
+  protected app!: AppContext;
+
+  setApp(app: AppContext): void {
+    this.app = app;
+  }
 
   // ── Abstract: provider-specific ─────────────────────────────────────────
 

@@ -16,7 +16,7 @@ import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
   ComputeSnapshot, PortDecl, PortStatus, Compute, Session,
 } from "../../types.js";
-import { getApp } from "../../../core/app.js";
+import type { AppContext } from "../../../core/app.js";
 import * as tmux from "../../../core/tmux.js";
 import { collectLocalMetrics } from "./metrics.js";
 import { safeAsync } from "../../../core/safe.js";
@@ -45,6 +45,12 @@ export class LocalProvider implements ComputeProvider {
   readonly supportsWorktree = true;
   readonly initialStatus = "running";
   readonly needsAuth = false;
+
+  private app!: AppContext;
+
+  setApp(app: AppContext): void {
+    this.app = app;
+  }
 
   async provision(_compute: Compute, _opts?: ProvisionOpts): Promise<void> {
     // No-op: your machine is already provisioned
@@ -80,7 +86,7 @@ export class LocalProvider implements ComputeProvider {
   }
 
   async cleanupSession(_compute: Compute, session: Session): Promise<void> {
-    const wtPath = join(getApp().config.worktreesDir, session.id);
+    const wtPath = join(this.app.config.worktreesDir, session.id);
     if (!existsSync(wtPath)) return;
 
     const repo = session.workdir ?? session.repo;

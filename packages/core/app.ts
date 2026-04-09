@@ -226,18 +226,28 @@ export class AppContext {
     // 4. Register compute providers
     await safeAsync("boot: load compute providers", async () => {
       const compute = await import("../compute/index.js");
+      // Initialize compute registry with this AppContext
+      compute.setComputeApp(this);
       // Legacy providers (backward compat -- same names: "local", "ec2", "docker")
-      this.registerProvider(new compute.LocalProvider());
-      this.registerProvider(new compute.EC2Provider());
-      this.registerProvider(new compute.DockerProvider());
-
-      // ArkD-backed providers (new: "devcontainer", "firecracker", "ec2-docker", etc.)
-      this.registerProvider(new compute.LocalDevcontainerProvider());
-      this.registerProvider(new compute.LocalFirecrackerProvider());
-      this.registerProvider(new compute.RemoteDockerProvider());
-      this.registerProvider(new compute.RemoteDevcontainerProvider());
-      this.registerProvider(new compute.RemoteFirecrackerProvider());
+      const providers = [
+        new compute.LocalProvider(),
+        new compute.EC2Provider(),
+        new compute.DockerProvider(),
+        // ArkD-backed providers (new: "devcontainer", "firecracker", "ec2-docker", etc.)
+        new compute.LocalDevcontainerProvider(),
+        new compute.LocalFirecrackerProvider(),
+        new compute.RemoteDockerProvider(),
+        new compute.RemoteDevcontainerProvider(),
+        new compute.RemoteFirecrackerProvider(),
+      ];
+      for (const p of providers) {
+        p.setApp?.(this);
+        this.registerProvider(p);
+      }
     });
+
+    // 4b. Wire SessionService with AppContext
+    this.sessionService.setApp(this);
 
     // 5. Wire provider resolver for session.ts
     setProviderResolver((session: Session) => this.resolveProvider(session));
@@ -279,7 +289,7 @@ export class AppContext {
     // 10. Detect orphaned sessions (crashed while running)
     await safeAsync("boot: detect orphaned sessions", async () => {
       const { findOrphanedSessions } = await import("./checkpoint.js");
-      const orphaned = findOrphanedSessions();
+      const orphaned = findOrphanedSessions(this);
       if (orphaned.length > 0) {
         this._orphanedSessions = orphaned;
         for (const s of orphaned) {

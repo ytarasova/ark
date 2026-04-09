@@ -69,8 +69,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   async provision(compute: Compute, opts?: ProvisionOpts): Promise<void> {
     const log = opts?.onLog ?? (() => {});
     const cfg = compute.config as RemoteConfig;
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "provisioning" });
+    this.app.computes.update(compute.name, { status: "provisioning" });
 
     try {
       const { ensurePulumi, provisionStack, resolveInstanceType } = await import("./ec2/provision.js");
@@ -111,8 +110,8 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       });
 
       log(`Instance ${result.instance_id} launched (IP: ${result.ip ?? "pending"})`);
-      getApp().computes.update(compute.name, { status: "running" });
-      getApp().computes.mergeConfig(compute.name, {
+      this.app.computes.update(compute.name, { status: "running" });
+      this.app.computes.mergeConfig(compute.name, {
         ...result as unknown as Record<string, unknown>,
         arkd_url: `http://${result.ip}:${ARKD_REMOTE_PORT}`,
       });
@@ -123,7 +122,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
         opts?.arch ?? cfg.arch ?? "x64",
       );
       const rate = hourlyRate(instanceType);
-      if (rate > 0) getApp().computes.mergeConfig(compute.name, { hourlyRate: rate });
+      if (rate > 0) this.app.computes.mergeConfig(compute.name, { hourlyRate: rate });
 
       // Wait for SSH + cloud-init
       if (result.ip) {
@@ -165,11 +164,10 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
         await this.postProvision(compute, log);
       }
 
-      getApp().computes.mergeConfig(compute.name, { cloud_init_done: true });
+      this.app.computes.mergeConfig(compute.name, { cloud_init_done: true });
     } catch (err) {
-      const { getApp: ga } = await import("../../core/app.js");
-      ga().computes.mergeConfig(compute.name, { last_error: err instanceof Error ? err.message : String(err) });
-      ga().computes.update(compute.name, { status: "stopped" });
+      this.app.computes.mergeConfig(compute.name, { last_error: err instanceof Error ? err.message : String(err) });
+      this.app.computes.update(compute.name, { status: "stopped" });
       throw err;
     }
   }
@@ -180,12 +178,11 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   async destroy(compute: Compute): Promise<void> {
     const { destroyStack } = await import("./ec2/provision.js");
     const { destroyPool } = await import("./ec2/pool.js");
-    const { getApp } = await import("../../core/app.js");
     await safeAsync(`[remote] destroy: ${compute.name}`, async () => {
       await destroyStack(compute.name);
       destroyPool(compute.name);
     });
-    getApp().computes.update(compute.name, { status: "destroyed" });
+    this.app.computes.update(compute.name, { status: "destroyed" });
   }
 
   async start(compute: Compute): Promise<void> {
@@ -194,7 +191,6 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
     const { EC2Client, StartInstancesCommand, DescribeInstancesCommand } = await import("@aws-sdk/client-ec2");
     const { fromIni } = await import("@aws-sdk/credential-providers");
-    const { getApp } = await import("../../core/app.js");
     const { poll } = await import("../util.js");
 
     const ec2 = new EC2Client({
@@ -215,7 +211,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       { maxAttempts: 30, delayMs: 5000 },
     );
 
-    getApp().computes.mergeConfig(compute.name, {
+    this.app.computes.mergeConfig(compute.name, {
       ip: ip!,
       arkd_url: `http://${ip}:${ARKD_REMOTE_PORT}`,
     });
@@ -232,7 +228,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       { maxAttempts: 30, delayMs: 2000 },
     );
 
-    getApp().computes.update(compute.name, { status: "running" });
+    this.app.computes.update(compute.name, { status: "running" });
   }
 
   async stop(compute: Compute): Promise<void> {
@@ -241,7 +237,6 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
     const { EC2Client, StopInstancesCommand } = await import("@aws-sdk/client-ec2");
     const { fromIni } = await import("@aws-sdk/credential-providers");
-    const { getApp } = await import("../../core/app.js");
 
     const ec2 = new EC2Client({
       region: cfg.region ?? "us-east-1",
@@ -249,7 +244,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     });
 
     await ec2.send(new StopInstancesCommand({ InstanceIds: [cfg.instance_id] }));
-    getApp().computes.update(compute.name, { status: "stopped" });
+    this.app.computes.update(compute.name, { status: "stopped" });
   }
 
   async attach(_compute: Compute, _session: Session): Promise<void> {
@@ -374,8 +369,7 @@ export class RemoteDockerProvider extends RemoteArkdBase {
     });
     await client.run({ command: "docker", args: ["start", container] });
 
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.mergeConfig(compute.name, { container_name: container });
+    this.app.computes.mergeConfig(compute.name, { container_name: container });
     log("Remote Docker container ready.");
   }
 
@@ -419,8 +413,7 @@ export class RemoteDevcontainerProvider extends RemoteArkdBase {
       });
     }
 
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.mergeConfig(compute.name, { devcontainer_workdir: workdir });
+    this.app.computes.mergeConfig(compute.name, { devcontainer_workdir: workdir });
     log("Remote devcontainer ready.");
   }
 
@@ -480,8 +473,7 @@ export class RemoteFirecrackerProvider extends RemoteArkdBase {
       timeout: 120_000,
     });
 
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.mergeConfig(compute.name, {
+    this.app.computes.mergeConfig(compute.name, {
       firecracker_installed: true,
       kernel_path: "/opt/firecracker/vmlinux",
     });

@@ -7,6 +7,7 @@
  */
 
 import type { ComputeProvider } from "./types.js";
+import type { AppContext } from "../core/app.js";
 
 // Re-export types
 export type {
@@ -22,9 +23,16 @@ export function getIsolationModes(providerName: string): { value: string; label:
 
 // ── Provider registry (delegates to AppContext) ─────────────────────────────
 
-function app() {
-  const { getApp } = require("../core/app.js");
-  return getApp();
+let _app: AppContext | null = null;
+
+/** Set the AppContext used by the compute registry. Called from AppContext.boot(). */
+export function setComputeApp(app: AppContext): void {
+  _app = app;
+}
+
+function app(): AppContext {
+  if (!_app) throw new Error("Compute registry not initialized -- call setComputeApp() first");
+  return _app;
 }
 
 export function registerProvider(provider: ComputeProvider): void {

@@ -22,7 +22,7 @@ import type {
   ComputeSnapshot, ComputeMetrics, ComputeProcess, PortDecl, PortStatus,
 } from "../../types.js";
 import type { Compute, Session } from "../../../types/index.js";
-import { getApp } from "../../../core/app.js";
+import type { AppContext } from "../../../core/app.js";
 import { buildDevcontainer, detectDevcontainer } from "./devcontainer.js";
 import {
   pullImage, createContainer, startContainer, stopContainer, removeContainer, DEFAULT_IMAGE,
@@ -85,6 +85,12 @@ export class DockerProvider implements ComputeProvider {
   readonly initialStatus = "stopped";
   readonly needsAuth = false;
 
+  private app!: AppContext;
+
+  setApp(app: AppContext): void {
+    this.app = app;
+  }
+
   // ── Provision ────────────────────────────────────────────────────────────
 
   async provision(compute: Compute, _opts?: ProvisionOpts): Promise<void> {
@@ -96,7 +102,7 @@ export class DockerProvider implements ComputeProvider {
     const image = (cfg.image as string) || DEFAULT_IMAGE;
     const extraVolumes = (cfg.volumes as string[]) ?? [];
 
-    getApp().computes.update(compute.name, { status: "provisioning" });
+    this.app.computes.update(compute.name, { status: "provisioning" });
 
     try {
       if (useDevcontainer) {
@@ -109,7 +115,7 @@ export class DockerProvider implements ComputeProvider {
         if (!result.ok) {
           throw new Error(`devcontainer up failed: ${result.error}`);
         }
-        getApp().computes.mergeConfig(compute.name, {
+        this.app.computes.mergeConfig(compute.name, {
           container_name: name,
           devcontainer: true,
           workdir,
@@ -125,18 +131,18 @@ export class DockerProvider implements ComputeProvider {
           "inspect", "--format", "{{.Id}}", name,
         ]);
 
-        getApp().computes.mergeConfig(compute.name, {
+        this.app.computes.mergeConfig(compute.name, {
           image,
           container_id: containerId || name,
           container_name: name,
         });
       }
 
-      getApp().computes.update(compute.name, { status: "running" });
+      this.app.computes.update(compute.name, { status: "running" });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      getApp().computes.mergeConfig(compute.name, { last_error: message });
-      getApp().computes.update(compute.name, { status: "stopped" });
+      this.app.computes.mergeConfig(compute.name, { last_error: message });
+      this.app.computes.update(compute.name, { status: "stopped" });
       throw err;
     }
   }
@@ -150,7 +156,7 @@ export class DockerProvider implements ComputeProvider {
     } catch (err) {
       throw new Error(`Failed to start container ${name}: ${err instanceof Error ? err.message : err}`);
     }
-    getApp().computes.update(compute.name, { status: "running" });
+    this.app.computes.update(compute.name, { status: "running" });
   }
 
   async stop(compute: Compute): Promise<void> {
@@ -158,7 +164,7 @@ export class DockerProvider implements ComputeProvider {
     await safeAsync(`[docker] stop: container ${name}`, async () => {
       await stopContainer(name);
     });
-    getApp().computes.update(compute.name, { status: "stopped" });
+    this.app.computes.update(compute.name, { status: "stopped" });
   }
 
   // ── Destroy ──────────────────────────────────────────────────────────────
@@ -168,7 +174,7 @@ export class DockerProvider implements ComputeProvider {
     await safeAsync(`[docker] destroy: rm container ${name}`, async () => {
       await removeContainer(name);
     });
-    getApp().computes.update(compute.name, { status: "destroyed" });
+    this.app.computes.update(compute.name, { status: "destroyed" });
   }
 
   // ── Launch ───────────────────────────────────────────────────────────────

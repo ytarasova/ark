@@ -27,8 +27,7 @@ import type {
   PortStatus,
 } from "../../types.js";
 import type { Compute, Session } from "../../../types/index.js";
-import { getApp } from "../../../core/app.js";
-import { ARK_DIR } from "../../../core/paths.js";
+import type { AppContext } from "../../../core/app.js";
 import { sshKeyPath, sshExec, sshExecAsync, waitForSsh, waitForSshAsync, generateSshKey, rsyncPush } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType } from "./provision.js";
@@ -73,10 +72,10 @@ interface EC2HostConfig {
   tags?: Record<string, string>;
 }
 
-/** Try to read oauth token from ~/.ark/claude-oauth-token. Returns null on failure. */
-function readOauthTokenFromDisk(): string | null {
+/** Try to read oauth token from <arkDir>/claude-oauth-token. Returns null on failure. */
+function readOauthTokenFromDisk(arkDir: string): string | null {
   try {
-    const p = join(ARK_DIR(), "claude-oauth-token");
+    const p = join(arkDir, "claude-oauth-token");
     if (existsSync(p)) return readFileSync(p, "utf-8").trim();
   } catch {}
   return null;
@@ -112,7 +111,7 @@ const REQUIRED_TOOLS: ToolCheck[] = [
 
 /** Poll cloud-init until .ark-ready sentinel appears. */
 async function waitForCloudInit(
-  key: string, ip: string, computeName: string, onLog: (msg: string) => void,
+  app: AppContext, key: string, ip: string, computeName: string, onLog: (msg: string) => void,
 ): Promise<void> {
   onLog("Waiting for cloud-init to complete...");
   await poll(
@@ -120,7 +119,7 @@ async function waitForCloudInit(
       const { stdout } = await sshExecAsync(key, ip, `cat ${REMOTE_HOME}/.ark-ready 2>/dev/null || echo 'not ready'`, { timeout: 15_000 });
       if (stdout.trim().includes("provisioning complete")) {
         onLog("Cloud-init complete");
-        getApp().computes.mergeConfig(computeName, { cloud_init_done: true });
+        app.computes.mergeConfig(computeName, { cloud_init_done: true });
         return true;
       }
       const { stdout: progress } = await sshExecAsync(key, ip,
@@ -269,9 +268,9 @@ async function setupRemoteLauncher(
 
 /** Set up channel forward tunnel and reverse tunnel to conductor. */
 async function setupSessionTunnels(
-  key: string, ip: string, session: Session, opts: LaunchOpts,
+  app: AppContext, key: string, ip: string, session: Session, opts: LaunchOpts,
 ): Promise<void> {
-  const channelPort = getApp().sessions.channelPort(session.id);
+  const channelPort = app.sessions.channelPort(session.id);
   const channelPortDecl: PortDecl = { port: channelPort, name: "channel", source: "ark" };
   setupTunnels(key, ip, [...opts.ports, channelPortDecl]);
   setupReverseTunnel(key, ip, 19100);
@@ -289,7 +288,12 @@ export class EC2Provider implements ComputeProvider {
   readonly initialStatus = "stopped";
   readonly needsAuth = true;
 
+  private app!: AppContext;
   private queues = new Map<string, SSHQueue>();
+
+  setApp(app: AppContext): void {
+    this.app = app;
+  }
 
   /** Get or create the pool + queue for a compute host. */
   private getQueue(compute: Compute): { pool: SSHPool; queue: SSHQueue } {
@@ -306,7 +310,7 @@ export class EC2Provider implements ComputeProvider {
   async provision(compute: Compute, opts?: ProvisionOpts): Promise<void> {
     const log = opts?.onLog ?? (() => {});
     const cfg = compute.config as EC2HostConfig;
-    getApp().computes.update(compute.name, { status: "provisioning" });
+    this.app.computes.update(compute.name, { status: "provisioning" });
 
     // Generate SSH key pair for this compute
     log("Generating SSH key pair...");
@@ -335,8 +339,8 @@ export class EC2Provider implements ComputeProvider {
 
     // Update compute with runtime state
     log(`Instance ${result.instance_id} launched (IP: ${result.ip ?? "pending"})`);
-    getApp().computes.update(compute.name, { status: "running" });
-    getApp().computes.mergeConfig(compute.name, result as unknown as Record<string, unknown>);
+    this.app.computes.update(compute.name, { status: "running" });
+    this.app.computes.mergeConfig(compute.name, result as unknown as Record<string, unknown>);
 
     // Store hourly rate for cost tracking
     const instanceType = resolveInstanceType(
@@ -345,7 +349,7 @@ export class EC2Provider implements ComputeProvider {
     );
     const rate = hourlyRate(instanceType);
     if (rate > 0) {
-      getApp().computes.mergeConfig(compute.name, { hourlyRate: rate });
+      this.app.computes.mergeConfig(compute.name, { hourlyRate: rate });
       log(`Cost: $${rate.toFixed(3)}/hr (~$${(rate * 24).toFixed(2)}/day)`);
     }
 
@@ -368,7 +372,7 @@ export class EC2Provider implements ComputeProvider {
       // Poll cloud-init, verify tools, sync credentials
       if (sshOk) {
         const key = sshKeyPath(compute.name);
-        await waitForCloudInit(key, result.ip!, compute.name, log);
+        await waitForCloudInit(this.app, key, result.ip!, compute.name, log);
         await verifyRemoteTools(key, result.ip!, log);
         await syncRemoteCredentials(key, result.ip!, compute.name, log);
       }
@@ -387,8 +391,8 @@ export class EC2Provider implements ComputeProvider {
       sg_id: cfg.sg_id,
       key_name: cfg.key_name,
     });
-    getApp().computes.update(compute.name, { status: "destroyed" });
-    getApp().computes.mergeConfig(compute.name, { instance_id: null, ip: null });
+    this.app.computes.update(compute.name, { status: "destroyed" });
+    this.app.computes.mergeConfig(compute.name, { instance_id: null, ip: null });
   }
 
   async start(compute: Compute): Promise<void> {
@@ -414,8 +418,8 @@ export class EC2Provider implements ComputeProvider {
       { maxAttempts: 60, delayMs: 5000 },
     );
 
-    getApp().computes.update(compute.name, { status: "running" });
-    getApp().computes.mergeConfig(compute.name, { ip });
+    this.app.computes.update(compute.name, { status: "running" });
+    this.app.computes.mergeConfig(compute.name, { ip });
 
     if (ip) {
       const key = sshKeyPath(compute.name);
@@ -443,8 +447,8 @@ export class EC2Provider implements ComputeProvider {
       { maxAttempts: 60, delayMs: 5000 },
     );
 
-    getApp().computes.update(compute.name, { status: "stopped" });
-    getApp().computes.mergeConfig(compute.name, { ip: null });
+    this.app.computes.update(compute.name, { status: "stopped" });
+    this.app.computes.mergeConfig(compute.name, { ip: null });
   }
 
   async reboot(compute: Compute, opts?: { onLog?: (msg: string) => void; onProgress?: (msg: string) => void }): Promise<void> {
@@ -472,7 +476,7 @@ export class EC2Provider implements ComputeProvider {
       const inst = desc.Reservations?.[0]?.Instances?.[0];
       const newIp = inst?.PublicIpAddress;
       if (newIp && newIp !== currentIp) {
-        getApp().computes.mergeConfig(compute.name, { ip: newIp });
+        this.app.computes.mergeConfig(compute.name, { ip: newIp });
         log(`IP changed: ${currentIp} → ${newIp}`);
         currentIp = newIp;
       }
@@ -481,15 +485,15 @@ export class EC2Provider implements ComputeProvider {
       const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), currentIp, "echo ok", { timeout: 10_000 });
       if (exitCode === 0) {
         log("Host is back online");
-        getApp().computes.update(compute.name, { status: "running" });
+        this.app.computes.update(compute.name, { status: "running" });
         return;
       }
     }
 
     // Timed out
     log("Host did not come back after 3 minutes");
-    getApp().computes.update(compute.name, { status: "stopped" });
-    getApp().computes.mergeConfig(compute.name, { last_error: "Reboot timeout — host unreachable" });
+    this.app.computes.update(compute.name, { status: "stopped" });
+    this.app.computes.mergeConfig(compute.name, { last_error: "Reboot timeout — host unreachable" });
   }
 
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
@@ -524,11 +528,10 @@ export class EC2Provider implements ComputeProvider {
     await autoAcceptChannelPrompt(key, ip, opts.tmuxName);
 
     // 6. Setup tunnels (forward + reverse)
-    await setupSessionTunnels(key, ip, session, opts);
+    await setupSessionTunnels(this.app, key, ip, session, opts);
 
     // 7. Store remote workdir in session config for display
-    const { getApp } = await import("../../../core/app.js");
-    getApp().sessions.update(session.id, {
+    this.app.sessions.update(session.id, {
       config: { ...(session.config ?? {}), remoteWorkdir },
     });
 
@@ -584,7 +587,7 @@ export class EC2Provider implements ComputeProvider {
 
     // Re-establish tunnels from session's port list + channel port
     const ports: PortDecl[] = (session.config?.ports as PortDecl[] | undefined) ?? [];
-    const channelPort = getApp().sessions.channelPort(session.id);
+    const channelPort = this.app.sessions.channelPort(session.id);
     const channelPortDecl: PortDecl = { port: channelPort, name: "channel", source: "ark" };
     setupTunnels(key, ip, [...ports, channelPortDecl]);
 
@@ -724,7 +727,7 @@ export class EC2Provider implements ComputeProvider {
     const env: Record<string, string> = {};
     const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
     if (token) env.CLAUDE_CODE_SESSION_ACCESS_TOKEN = token;
-    const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN ?? readOauthTokenFromDisk();
+    const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN ?? readOauthTokenFromDisk(this.app.config.arkDir);
     if (oauthToken) env.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
     return env;
   }

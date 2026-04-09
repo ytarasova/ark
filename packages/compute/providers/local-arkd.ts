@@ -96,8 +96,7 @@ export class LocalWorktreeProvider extends LocalArkdBase {
   }
 
   async cleanupSession(_compute: Compute, session: Session): Promise<void> {
-    const { WORKTREES_DIR } = await import("../../core/paths.js");
-    const wtPath = join(WORKTREES_DIR(), session.id);
+    const wtPath = join(this.app.config.worktreesDir, session.id);
     if (!existsSync(wtPath)) return;
 
     const repo = session.workdir ?? session.repo;
@@ -138,20 +137,18 @@ export class LocalDockerProvider extends LocalArkdBase {
     const image = (cfg.image as string) || DEFAULT_IMAGE;
     const extraVolumes = (cfg.volumes as string[]) ?? [];
 
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "provisioning" });
+    this.app.computes.update(compute.name, { status: "provisioning" });
 
     try {
       await pullImage(image);
       await createContainer(name, image, extraVolumes);
       await startContainer(name);
 
-      getApp().computes.mergeConfig(compute.name, { image, container_name: name });
-      getApp().computes.update(compute.name, { status: "running" });
+      this.app.computes.mergeConfig(compute.name, { image, container_name: name });
+      this.app.computes.update(compute.name, { status: "running" });
     } catch (err) {
-      const { getApp: ga } = await import("../../core/app.js");
-      ga().computes.mergeConfig(compute.name, { last_error: err instanceof Error ? err.message : String(err) });
-      ga().computes.update(compute.name, { status: "stopped" });
+      this.app.computes.mergeConfig(compute.name, { last_error: err instanceof Error ? err.message : String(err) });
+      this.app.computes.update(compute.name, { status: "stopped" });
       throw err;
     }
   }
@@ -161,15 +158,13 @@ export class LocalDockerProvider extends LocalArkdBase {
     await safeAsync(`[docker] destroy: rm container ${name}`, async () => {
       await removeContainer(name);
     });
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "destroyed" });
+    this.app.computes.update(compute.name, { status: "destroyed" });
   }
 
   async start(compute: Compute): Promise<void> {
     const name = this.containerName(compute);
     await startContainer(name);
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "running" });
+    this.app.computes.update(compute.name, { status: "running" });
   }
 
   async stop(compute: Compute): Promise<void> {
@@ -177,8 +172,7 @@ export class LocalDockerProvider extends LocalArkdBase {
     await safeAsync(`[docker] stop: container ${name}`, async () => {
       await stopContainer(name);
     });
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "stopped" });
+    this.app.computes.update(compute.name, { status: "stopped" });
   }
 
   async cleanupSession(compute: Compute, _session: Session): Promise<void> {
@@ -225,20 +219,18 @@ export class LocalDevcontainerProvider extends LocalArkdBase {
       throw new Error(`No devcontainer.json found in ${workdir}`);
     }
 
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "provisioning" });
+    this.app.computes.update(compute.name, { status: "provisioning" });
 
     const result = await buildDevcontainer(workdir);
     if (!result.ok) throw new Error(`devcontainer up failed: ${result.error}`);
 
-    getApp().computes.mergeConfig(compute.name, { devcontainer: true, workdir });
-    getApp().computes.update(compute.name, { status: "running" });
+    this.app.computes.mergeConfig(compute.name, { devcontainer: true, workdir });
+    this.app.computes.update(compute.name, { status: "running" });
   }
 
   async destroy(compute: Compute): Promise<void> {
     // devcontainer doesn't have a clean "destroy" - stop is enough
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "destroyed" });
+    this.app.computes.update(compute.name, { status: "destroyed" });
   }
 
   async start(compute: Compute): Promise<void> {
@@ -246,13 +238,11 @@ export class LocalDevcontainerProvider extends LocalArkdBase {
     const workdir = (cfg.workdir as string) || process.cwd();
     const { buildDevcontainer } = await import("./docker/devcontainer.js");
     await buildDevcontainer(workdir);
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "running" });
+    this.app.computes.update(compute.name, { status: "running" });
   }
 
   async stop(compute: Compute): Promise<void> {
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "stopped" });
+    this.app.computes.update(compute.name, { status: "stopped" });
   }
 
   async cleanupSession(_compute: Compute, _session: Session): Promise<void> {
@@ -296,8 +286,7 @@ export class LocalFirecrackerProvider extends LocalArkdBase {
     }
 
     const cfg = compute.config as Record<string, unknown>;
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "provisioning" });
+    this.app.computes.update(compute.name, { status: "provisioning" });
 
     // Firecracker provisioning:
     // 1. Download kernel + rootfs if not present
@@ -344,13 +333,13 @@ export class LocalFirecrackerProvider extends LocalArkdBase {
              "-H", "Content-Type: application/json", "-d", '{"action_type":"InstanceStart"}'],
     });
 
-    getApp().computes.mergeConfig(compute.name, {
+    this.app.computes.mergeConfig(compute.name, {
       vm_id: vmId,
       socket_path: socketPath,
       kernel: kernelPath,
       rootfs: rootfsPath,
     });
-    getApp().computes.update(compute.name, { status: "running" });
+    this.app.computes.update(compute.name, { status: "running" });
   }
 
   async destroy(compute: Compute): Promise<void> {
@@ -364,8 +353,7 @@ export class LocalFirecrackerProvider extends LocalArkdBase {
                "-H", "Content-Type: application/json", "-d", '{"action_type":"SendCtrlAltDel"}'],
       });
     }
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "destroyed" });
+    this.app.computes.update(compute.name, { status: "destroyed" });
   }
 
   async start(compute: Compute): Promise<void> {
@@ -375,8 +363,7 @@ export class LocalFirecrackerProvider extends LocalArkdBase {
 
   async stop(compute: Compute): Promise<void> {
     await this.destroy(compute);
-    const { getApp } = await import("../../core/app.js");
-    getApp().computes.update(compute.name, { status: "stopped" });
+    this.app.computes.update(compute.name, { status: "stopped" });
   }
 
   async cleanupSession(_compute: Compute, _session: Session): Promise<void> {
