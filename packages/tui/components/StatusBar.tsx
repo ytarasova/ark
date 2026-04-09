@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useStdout } from "ink";
 import { getTheme } from "../../core/theme.js";
 import { getActiveProfile } from "../../core/index.js";
 import type { Tab } from "./TabBar.js";
@@ -32,6 +32,8 @@ interface StatusBarProps {
 
 export function StatusBar({ tab, sessions, selectedSession, loading, error, label, pane, overlay }: StatusBarProps) {
   const theme = getTheme();
+  const { stdout } = useStdout();
+  const columns = stdout?.columns ?? 120;
   const profile = useMemo(() => { try { return getActiveProfile(); } catch { return "default"; } }, []);
 
   const counts = useMemo(() => {
@@ -72,6 +74,19 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
     return [hints, []];
   }, [hints]);
 
+  // Build the secondary bar text for padding calculation
+  const secondaryText = useMemo(() => {
+    if (!secondaryHints.length) return "";
+    // Rough character count for padding
+    let len = 1; // leading space
+    for (const h of secondaryHints) {
+      if (React.isValidElement(h) && h.props?.k && h.props?.label) {
+        len += h.props.k.length + 1 + h.props.label.length + 2; // "k:label  "
+      }
+    }
+    return len;
+  }, [secondaryHints]);
+
   return (
     <Box flexDirection="column">
       {error && (
@@ -80,19 +95,39 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
         </Box>
       )}
       <Box>
-        {profile !== "default" && <Text color="magenta">{` [${profile}]`}</Text>}
-        <Text bold>{` ${sessions.length} sessions`}</Text>
-        {!loading && counts.running > 0 && <Text color={theme.running}>{`  ● ${counts.running}`}</Text>}
-        {counts.waiting > 0 && <Text color={theme.waiting}>{`  ◑ ${counts.waiting}`}</Text>}
-        {counts.completed > 0 && <Text color={theme.running}>{`  ✔ ${counts.completed}`}</Text>}
-        {counts.failed > 0 && <Text color={theme.error}>{`  ✕ ${counts.failed}`}</Text>}
-        <Text>{"   "}</Text>
-        {primaryHints}
+        <Box>
+          {profile !== "default" && <Text color="magenta">{` [${profile}]`}</Text>}
+          <Text bold>{` ${sessions.length} sessions`}</Text>
+          {!loading && counts.running > 0 && <Text color={theme.running}>{`  ● ${counts.running}`}</Text>}
+          {counts.waiting > 0 && <Text color={theme.waiting}>{`  ◑ ${counts.waiting}`}</Text>}
+          {counts.completed > 0 && <Text color={theme.running}>{`  ✔ ${counts.completed}`}</Text>}
+          {counts.failed > 0 && <Text color={theme.error}>{`  ✕ ${counts.failed}`}</Text>}
+        </Box>
+        <Box flexGrow={1} justifyContent="flex-end">
+          {primaryHints}
+        </Box>
       </Box>
       {secondaryHints.length > 0 && (
         <Box>
-          <Text>{"  "}</Text>
-          {secondaryHints}
+          <Text backgroundColor={theme.surface}>
+            {" "}
+          </Text>
+          {secondaryHints.map((hint, i) =>
+            React.isValidElement(hint)
+              ? React.cloneElement(hint as React.ReactElement, {
+                  key: hint.key ?? `sh-${i}`,
+                  children: React.Children.map(
+                    (hint as React.ReactElement).props.children,
+                    (child) => React.isValidElement(child)
+                      ? React.cloneElement(child as React.ReactElement, { backgroundColor: theme.surface })
+                      : child,
+                  ),
+                })
+              : hint,
+          )}
+          <Text backgroundColor={theme.surface}>
+            {" ".repeat(Math.max(0, columns - (secondaryText as number) - 1))}
+          </Text>
         </Box>
       )}
     </Box>
