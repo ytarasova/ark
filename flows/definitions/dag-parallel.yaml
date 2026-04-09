@@ -1,0 +1,42 @@
+name: dag-parallel
+description: "Plan, then parallel implement + test, integrate, review, PR"
+stages:
+  - name: plan
+    agent: planner
+    gate: manual
+    task: |
+      Analyze {summary} and create PLAN.md.
+      Decompose into independent implementation tasks.
+
+  - name: implement
+    agent: implementer
+    gate: auto
+    depends_on: [plan]
+    task: |
+      Implement the code changes from PLAN.md for: {summary}
+
+  - name: test
+    agent: implementer
+    gate: auto
+    depends_on: [plan]
+    task: |
+      Write tests for: {summary}
+      Focus on unit and integration tests.
+
+  - name: integrate
+    agent: implementer
+    gate: auto
+    depends_on: [implement, test]
+    task: |
+      Merge implementation and test branches.
+      Run all tests. Fix any integration issues.
+
+  - name: review
+    agent: reviewer
+    gate: manual
+    depends_on: [integrate]
+
+  - name: pr
+    action: create_pr
+    gate: auto
+    depends_on: [review]
