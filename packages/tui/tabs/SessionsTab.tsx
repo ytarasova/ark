@@ -4,6 +4,7 @@ import type { Session, SearchResult } from "../../core/index.js";
 import { ICON } from "../constants.js";
 import { getStatusColor } from "../helpers/colors.js";
 import { ago } from "../helpers.js";
+import { KeyHint, sep } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { ThreadsPanel } from "../components/ThreadsPanel.js";
@@ -580,5 +581,52 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
       )}
     </Box>
   );
+}
+
+export function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
+  const hints: React.ReactNode[] = [];
+
+  if (s) {
+    // Status-specific actions
+    switch (s.status) {
+      case "ready":
+      case "blocked":
+        hints.push(<KeyHint key="enter" k="Enter" label="dispatch" />);
+        hints.push(<KeyHint key="A3" k="A" label="advance" />);
+        break;
+      case "running":
+        hints.push(<KeyHint key="a" k="a" label="attach" />);
+        hints.push(<KeyHint key="t" k="t" label="chat" />);
+        hints.push(<KeyHint key="s" k="s" label="stop" />);
+        hints.push(<KeyHint key="I" k="I" label="interrupt" />);
+        break;
+      case "stopped":
+      case "failed":
+      case "completed":
+        hints.push(<KeyHint key="enter" k="Enter" label="restart" />);
+        hints.push(<KeyHint key="r" k="r" label="replay" />);
+        hints.push(<KeyHint key="Z" k="Z" label="archive" />);
+        break;
+      case "archived":
+        hints.push(<KeyHint key="Z" k="Z" label="restore" />);
+        break;
+      case "waiting":
+        hints.push(<KeyHint key="a" k="a" label="attach" />);
+        hints.push(<KeyHint key="t" k="t" label="chat" />);
+        hints.push(<KeyHint key="s" k="s" label="stop" />);
+        break;
+    }
+
+    hints.push(sep(1));
+
+    // Session management
+    hints.push(<KeyHint key="fC" k="f/C" label="fork/clone" />);
+    hints.push(<KeyHint key="W" k="W" label="worktree" />);
+    hints.push(<KeyHint key="m" k="m" label="move" />);
+    hints.push(<KeyHint key="M" k="M" label="mcp" />);
+    hints.push(<KeyHint key="x" k="x" label="delete" />);
+  }
+
+  return hints;
 }
 

@@ -7,13 +7,11 @@
 
 import { describe, it, expect } from "bun:test";
 import React from "react";
-import {
-  getOverlayHints,
-  getSessionHints,
-  getComputeHints,
-  getToolsHints,
-  getFlowsHints,
-} from "../helpers/statusBarHints.js";
+import { getOverlayHints } from "../helpers/statusBarHints.js";
+import { getSessionHints } from "../tabs/SessionsTab.js";
+import { getComputeHints } from "../tabs/ComputeTab.js";
+import { getToolsHints } from "../tabs/ToolsTab.js";
+import { getFlowsHints } from "../tabs/FlowsTab.js";
 import type { Session } from "../../core/index.js";
 
 /**
@@ -89,14 +87,10 @@ describe("getOverlayHints", () => {
 });
 
 describe("getSessionHints", () => {
-  it("null session returns nav hints + new + groups + quit", () => {
+  it("null session returns empty hints (no session-specific actions)", () => {
     const hints = getSessionHints(null);
-    expect(hasKey(hints, "j/k")).toBe(true);
-    expect(hasLabel(hints, "move")).toBe(true);
-    expect(hasLabel(hints, "new")).toBe(true);
-    expect(hasLabel(hints, "groups")).toBe(true);
-    expect(hasLabel(hints, "quit")).toBe(true);
-    // Should NOT contain session-specific actions
+    // No session selected = no context-specific actions
+    expect(hints).toHaveLength(0);
     expect(hasLabel(hints, "attach")).toBe(false);
     expect(hasLabel(hints, "stop")).toBe(false);
   });

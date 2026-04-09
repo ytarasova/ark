@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { findProjectRoot, loadAgent, saveAgent, deleteAgent } from "../../core/index.js";
 import type { AgentDefinition } from "../../core/index.js";
+import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
@@ -173,4 +174,15 @@ function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
       )}
     </DetailPanel>
   );
+}
+
+export function getAgentsHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS, sep(0),
+    <KeyHint key="n" k="n" label="new" />,
+    <KeyHint key="e" k="e" label="edit" />,
+    <KeyHint key="c" k="c" label="copy" />,
+    <KeyHint key="x" k="x" label="delete" />,
+    ...GLOBAL_HINTS,
+  ];
 }

@@ -1,7 +1,6 @@
 import React from "react";
 import { Text } from "ink";
 import type { Tab } from "../components/TabBar.js";
-import type { Session } from "../../core/index.js";
 
 export function KeyHint({ k, label }: { k: string; label: string }) {
   return (
@@ -12,7 +11,7 @@ export function KeyHint({ k, label }: { k: string; label: string }) {
   );
 }
 
-const sep = (id: number) => <Text key={`sep-${id}`} dimColor>{" | "}</Text>;
+export const sep = (id: number) => <Text key={`sep-${id}`} dimColor>{" | "}</Text>;
 
 /** Convert JSX hint elements to a plain text string for solid-background rendering */
 export function flattenHints(hints: React.ReactNode[]): string {
@@ -29,18 +28,21 @@ export function flattenHints(hints: React.ReactNode[]): string {
 }
 
 /** Navigation hints shared by all left panes */
-const NAV_HINTS = [
+export const NAV_HINTS = [
   <KeyHint key="jk" k="j/k" label="move" />,
   <KeyHint key="fb" k="f/b" label="page" />,
   <KeyHint key="gG" k="g/G" label="top/end" />,
 ];
 
-/** Global hints -- split onto second line via sep(99) */
-const GLOBAL_HINTS = [
+/** Global hints -- appear on second bar line */
+export const GLOBAL_HINTS = [
   sep(99),
   <KeyHint key="?" k="?" label="help" />,
   <KeyHint key="q" k="q" label="quit" />,
 ];
+
+/** Navigation bar text (always shown on line 2) */
+export const NAV_BAR_TEXT = "j/k:move  f/b:page  g/G:top/end  Tab:pane  |  n:new  /:find  !/@/#/$:filter  |  ?:help  q:quit";
 
 export function getOverlayHints(overlay: string): React.ReactNode[] {
   switch (overlay) {
@@ -131,145 +133,6 @@ export function getRightPaneHints(tab?: Tab): React.ReactNode[] {
   hints.push(<KeyHint key="tab" k="Tab" label="back" />);
   hints.push(...GLOBAL_HINTS);
   return hints;
-}
-
-export function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
-  const hints: React.ReactNode[] = [];
-
-  // Navigation
-  hints.push(...NAV_HINTS);
-  hints.push(sep(0));
-
-  // Status-specific actions (only show what's relevant)
-  if (s) {
-    switch (s.status) {
-      case "ready":
-      case "blocked":
-        hints.push(<KeyHint key="enter" k="Enter" label="dispatch" />);
-        hints.push(<KeyHint key="A3" k="A" label="advance" />);
-        break;
-      case "running":
-        hints.push(<KeyHint key="a" k="a" label="attach" />);
-        hints.push(<KeyHint key="t" k="t" label="chat" />);
-        hints.push(<KeyHint key="s" k="s" label="stop" />);
-        hints.push(<KeyHint key="I" k="I" label="interrupt" />);
-        break;
-      case "stopped":
-      case "failed":
-      case "completed":
-        hints.push(<KeyHint key="enter" k="Enter" label="restart" />);
-        hints.push(<KeyHint key="r" k="r" label="replay" />);
-        hints.push(<KeyHint key="Z" k="Z" label="archive" />);
-        break;
-      case "archived":
-        hints.push(<KeyHint key="Z" k="Z" label="restore" />);
-        break;
-      case "waiting":
-        hints.push(<KeyHint key="a" k="a" label="attach" />);
-        hints.push(<KeyHint key="t" k="t" label="chat" />);
-        hints.push(<KeyHint key="s" k="s" label="stop" />);
-        break;
-    }
-
-    hints.push(sep(1));
-
-    // Session actions
-    hints.push(<KeyHint key="fC" k="f/C" label="fork/clone" />);
-    hints.push(<KeyHint key="W" k="W" label="worktree" />);
-    hints.push(<KeyHint key="m" k="m" label="move" />);
-    hints.push(<KeyHint key="x" k="x" label="delete" />);
-  }
-
-  // Line 2: global shortcuts (after sep(99) split point)
-  hints.push(...GLOBAL_HINTS);
-  hints.push(<KeyHint key="n" k="n" label="new" />);
-  hints.push(<KeyHint key="o" k="o" label="groups" />);
-  hints.push(<KeyHint key="/" k="/" label="find" />);
-  hints.push(<KeyHint key="M" k="M" label="mcp" />);
-  hints.push(<KeyHint key="K" k="K" label="skills" />);
-  hints.push(<KeyHint key="Y" k="Y" label="memory" />);
-  hints.push(<KeyHint key="P" k="P" label="settings" />);
-  hints.push(<KeyHint key="filter" k="!/@/#/$" label="filter" />);
-  return hints;
-}
-
-export function getComputeHints(): React.ReactNode[] {
-  return [
-    ...NAV_HINTS, sep(0),
-    <KeyHint key="enter" k="Enter" label="provision" />,
-    <KeyHint key="s" k="s" label="start/stop" />,
-    <KeyHint key="R" k="R" label="reboot" />,
-    <KeyHint key="t" k="t" label="test" />,
-    <KeyHint key="x" k="x" label="delete" />,
-    <KeyHint key="c" k="c" label="clean" />,
-    <KeyHint key="n" k="n" label="new" />,
-    ...GLOBAL_HINTS,
-  ];
-}
-
-export function getHistoryHints(): React.ReactNode[] {
-  return [
-    ...NAV_HINTS, sep(0),
-    <KeyHint key="enter" k="Enter" label="import Claude" />,
-    <KeyHint key="r" k="r/R" label="refresh/rebuild" />,
-    <KeyHint key="/" k="/" label="search" />,
-    ...GLOBAL_HINTS,
-  ];
-}
-
-export function getAgentsHints(): React.ReactNode[] {
-  return [
-    ...NAV_HINTS, sep(0),
-    <KeyHint key="n" k="n" label="new" />,
-    <KeyHint key="e" k="e" label="edit" />,
-    <KeyHint key="c" k="c" label="copy" />,
-    <KeyHint key="x" k="x" label="delete" />,
-    ...GLOBAL_HINTS,
-  ];
-}
-
-export function getToolsHints(): React.ReactNode[] {
-  return [
-    ...NAV_HINTS, sep(0),
-    <KeyHint key="enter" k="Enter" label="use recipe" />,
-    <KeyHint key="x" k="x" label="delete" />,
-    ...GLOBAL_HINTS,
-  ];
-}
-
-export function getFlowsHints(): React.ReactNode[] {
-  return [
-    ...NAV_HINTS,
-    <KeyHint key="tab" k="Tab" label="detail" />,
-    ...GLOBAL_HINTS,
-  ];
-}
-
-export function getCostsHints(): React.ReactNode[] {
-  return [
-    ...GLOBAL_HINTS,
-  ];
-}
-
-export function getSchedulesHints(): React.ReactNode[] {
-  return [
-    ...NAV_HINTS, sep(0),
-    <KeyHint key="n" k="n" label="new" />,
-    <KeyHint key="e" k="e" label="enable/disable" />,
-    <KeyHint key="x" k="x" label="delete" />,
-    <KeyHint key="r" k="r" label="refresh" />,
-    ...GLOBAL_HINTS,
-  ];
-}
-
-export function getMemoryHints(): React.ReactNode[] {
-  return [
-    ...NAV_HINTS, sep(0),
-    <KeyHint key="n" k="n" label="add" />,
-    <KeyHint key="/" k="/" label="search" />,
-    <KeyHint key="x" k="x" label="delete" />,
-    ...GLOBAL_HINTS,
-  ];
 }
 
 export function getGenericHints(): React.ReactNode[] {

@@ -10,15 +10,21 @@ import type { Tab } from "./components/TabBar.js";
 import type { Pane } from "./components/SplitPane.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { EventLog } from "./components/EventLog.js";
-import { SessionsTab } from "./tabs/SessionsTab.js";
-import { ComputeTab } from "./tabs/ComputeTab.js";
-import { AgentsTab } from "./tabs/AgentsTab.js";
-import { FlowsTab } from "./tabs/FlowsTab.js";
-import { HistoryTab } from "./tabs/HistoryTab.js";
-import { ToolsTab } from "./tabs/ToolsTab.js";
-import { CostsTab } from "./tabs/CostsTab.js";
-import { SchedulesTab } from "./tabs/SchedulesTab.js";
-import { MemoryManager } from "./components/MemoryManager.js";
+import {
+  getOverlayHints,
+  getRightPaneHints,
+  getGenericHints,
+  flattenHints,
+} from "./helpers/statusBarHints.js";
+import { SessionsTab, getSessionHints } from "./tabs/SessionsTab.js";
+import { ComputeTab, getComputeHints } from "./tabs/ComputeTab.js";
+import { AgentsTab, getAgentsHints } from "./tabs/AgentsTab.js";
+import { FlowsTab, getFlowsHints } from "./tabs/FlowsTab.js";
+import { HistoryTab, getHistoryHints } from "./tabs/HistoryTab.js";
+import { ToolsTab, getToolsHints } from "./tabs/ToolsTab.js";
+import { CostsTab, getCostsHints } from "./tabs/CostsTab.js";
+import { SchedulesTab, getSchedulesHints } from "./tabs/SchedulesTab.js";
+import { MemoryManager, getMemoryHints } from "./components/MemoryManager.js";
 import { loadUiState, saveUiState } from "../core/ui-state.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
@@ -221,14 +227,24 @@ function AppInner() {
       />
 
       <StatusBar
-        tab={tab}
+        hints={useMemo(() =>
+          focus.owner ? getOverlayHints(focus.owner)
+          : pane === "right" ? getRightPaneHints(tab)
+          : tab === "sessions" ? getSessionHints(selectedSession)
+          : tab === "agents" ? getAgentsHints()
+          : tab === "tools" ? getToolsHints()
+          : tab === "flows" ? getFlowsHints()
+          : tab === "compute" ? getComputeHints()
+          : tab === "history" ? getHistoryHints()
+          : tab === "memory" ? getMemoryHints()
+          : tab === "costs" ? getCostsHints()
+          : tab === "schedules" ? getSchedulesHints()
+          : getGenericHints(),
+        [tab, pane, focus.owner, selectedSession])}
+        overlayBarText={focus.owner ? flattenHints(getOverlayHints(focus.owner)) : null}
         sessions={store.sessions}
-        selectedSession={selectedSession}
         loading={asyncState.loading}
         error={asyncState.error}
-        label={asyncState.label}
-        pane={pane}
-        overlay={focus.owner}
       />
     </Box>
   );

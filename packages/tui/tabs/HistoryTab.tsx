@@ -4,6 +4,7 @@ import Spinner from "ink-spinner";
 import type { ClaudeSession, SearchResult } from "../../core/index.js";
 import { ago } from "../helpers.js";
 import { sanitizeForTerminal } from "../helpers/sessionFormatting.js";
+import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { ScrollBox } from "../components/ScrollBox.js";
@@ -361,4 +362,14 @@ function ConversationScrollContent({ turns }: { turns: any[] }) {
       })}
     </>
   );
+}
+
+export function getHistoryHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS, sep(0),
+    <KeyHint key="enter" k="Enter" label="import Claude" />,
+    <KeyHint key="r" k="r/R" label="refresh/rebuild" />,
+    <KeyHint key="/" k="/" label="search" />,
+    ...GLOBAL_HINTS,
+  ];
 }

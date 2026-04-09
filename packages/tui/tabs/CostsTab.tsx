@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Box, Text } from "ink";
 import { useArkClient } from "../hooks/useArkClient.js";
+import { GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { formatCost } from "../../core/costs.js";
@@ -99,4 +100,10 @@ export function CostsTab({ pane }: CostsTabProps) {
       }
     />
   );
+}
+
+export function getCostsHints(): React.ReactNode[] {
+  return [
+    ...GLOBAL_HINTS,
+  ];
 }

@@ -12,6 +12,11 @@ import { TabBar } from "../components/TabBar.js";
 import { StatusBar } from "../components/StatusBar.js";
 import { MetricBar } from "../components/MetricBar.js";
 import { SectionHeader } from "../components/SectionHeader.js";
+import { getSessionHints } from "../tabs/SessionsTab.js";
+import { getComputeHints } from "../tabs/ComputeTab.js";
+import { getAgentsHints } from "../tabs/AgentsTab.js";
+import { getFlowsHints } from "../tabs/FlowsTab.js";
+import { getToolsHints } from "../tabs/ToolsTab.js";
 
 // ── TabBar ──────────────────────────────────────────────────────────────────
 
@@ -82,7 +87,7 @@ describe("StatusBar", () => {
   it("shows session count", () => {
     const sessions = makeSessions(["running", "pending", "completed"]);
     const { lastFrame } = render(
-      <StatusBar tab="sessions" sessions={sessions} loading={false} error={null} label={null} />
+      <StatusBar hints={getSessionHints(null)} sessions={sessions} loading={false} error={null} />
     );
     const frame = lastFrame()!;
     // ink may truncate in narrow default terminal, so check count and prefix of label
@@ -93,22 +98,22 @@ describe("StatusBar", () => {
   it("shows running count when sessions are running", () => {
     const sessions = makeSessions(["running", "running", "pending"]);
     const { lastFrame } = render(
-      <StatusBar tab="sessions" sessions={sessions} loading={false} error={null} label={null} />
+      <StatusBar hints={getSessionHints(null)} sessions={sessions} loading={false} error={null} />
     );
     const frame = lastFrame()!;
-    // StatusBar uses "● N" for running — ink may truncate the count in narrow test terminal
+    // StatusBar uses "● N" for running -- ink may truncate the count in narrow test terminal
     expect(frame).toContain("●");
   });
 
   it("shows error message when error is set", () => {
     const sessions = makeSessions([]);
     const { lastFrame } = render(
-      <StatusBar tab="sessions" sessions={sessions} loading={false} error="Something broke" label={null} />
+      <StatusBar hints={getSessionHints(null)} sessions={sessions} loading={false} error="Something broke" />
     );
     expect(lastFrame()!).toContain("Something broke");
   });
 
-  it("shows loading state — spinner is in TabBar, not StatusBar", () => {
+  it("shows loading state -- spinner is in TabBar, not StatusBar", () => {
     // The loading spinner and label moved to TabBar; StatusBar only suppresses
     // the running-count dot when loading=true. Verify TabBar shows the label.
     const { lastFrame } = render(
@@ -120,24 +125,23 @@ describe("StatusBar", () => {
   it("shows error count for failed sessions", () => {
     const sessions = makeSessions(["failed", "failed", "running"]);
     const { lastFrame } = render(
-      <StatusBar tab="sessions" sessions={sessions} loading={false} error={null} label={null} />
+      <StatusBar hints={getSessionHints(null)} sessions={sessions} loading={false} error={null} />
     );
     const frame = lastFrame()!;
-    // StatusBar uses "✕ N" for failed — ink may truncate the count in narrow test terminal
+    // StatusBar uses "✕ N" for failed -- ink may truncate the count in narrow test terminal
     expect(frame).toContain("✕");
   });
 
   it("shows key hints for the active tab", () => {
     const sessions = makeSessions([]);
     const { lastFrame: f1 } = render(
-      <StatusBar tab="sessions" sessions={sessions} loading={false} error={null} label={null} />
+      <StatusBar hints={getSessionHints(null)} sessions={sessions} loading={false} error={null} />
     );
-    // With no selected session, shows "new" and "quit"
-    expect(f1()!).toContain("new");
-    expect(f1()!).toContain("quit");
+    // With no selected session, hints are empty (no session-specific actions)
+    expect(f1()!).toContain("session");
 
     const { lastFrame: f2 } = render(
-      <StatusBar tab="compute" sessions={sessions} loading={false} error={null} label={null} />
+      <StatusBar hints={getComputeHints()} sessions={sessions} loading={false} error={null} />
     );
     // ink may truncate, so check prefix of "provision"
     expect(f2()!).toContain("provis");
@@ -146,7 +150,7 @@ describe("StatusBar", () => {
   it("shows navigation hints for agents tab", () => {
     const sessions = makeSessions([]);
     const { lastFrame } = render(
-      <StatusBar tab="agents" sessions={sessions} loading={false} error={null} label={null} />
+      <StatusBar hints={getAgentsHints()} sessions={sessions} loading={false} error={null} />
     );
     const frame = lastFrame()!;
     expect(frame).toContain("j/k");
@@ -156,7 +160,7 @@ describe("StatusBar", () => {
   it("shows navigation hints for flows tab", () => {
     const sessions = makeSessions([]);
     const { lastFrame } = render(
-      <StatusBar tab="flows" sessions={sessions} loading={false} error={null} label={null} />
+      <StatusBar hints={getFlowsHints()} sessions={sessions} loading={false} error={null} />
     );
     const frame = lastFrame()!;
     expect(frame).toContain("j/k");
@@ -169,7 +173,7 @@ describe("StatusBar", () => {
   it("shows quit hint for tools tab", () => {
     const sessions = makeSessions([]);
     const { lastFrame } = render(
-      <StatusBar tab="tools" sessions={sessions} loading={false} error={null} label={null} />
+      <StatusBar hints={getToolsHints()} sessions={sessions} loading={false} error={null} />
     );
     const frame = lastFrame()!;
     expect(frame).toContain("quit");

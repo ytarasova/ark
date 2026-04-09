@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { loadFlow, saveFlow, deleteFlow, findProjectRoot } from "../../core/index.js";
 import type { FlowDefinition } from "../../core/index.js";
+import { KeyHint, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
@@ -139,4 +140,12 @@ function FlowDetail({ flow, pane, statusMessage }: {
       })}
     </DetailPanel>
   );
+}
+
+export function getFlowsHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS,
+    <KeyHint key="tab" k="Tab" label="detail" />,
+    ...GLOBAL_HINTS,
+  ];
 }

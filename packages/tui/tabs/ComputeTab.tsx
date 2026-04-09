@@ -6,6 +6,7 @@ import { homedir } from "os";
 import type { Session, Compute } from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
 import { getComputeStatusColor } from "../helpers/colors.js";
+import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import type { ComputeSnapshot } from "../../types/index.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { SectionHeader } from "../components/SectionHeader.js";
@@ -344,4 +345,18 @@ function ComputePortList({ sessions, computeName }: { sessions: Session[]; compu
       })}
     </>
   );
+}
+
+export function getComputeHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS, sep(0),
+    <KeyHint key="enter" k="Enter" label="provision" />,
+    <KeyHint key="s" k="s" label="start/stop" />,
+    <KeyHint key="R" k="R" label="reboot" />,
+    <KeyHint key="t" k="t" label="test" />,
+    <KeyHint key="x" k="x" label="delete" />,
+    <KeyHint key="c" k="c" label="clean" />,
+    <KeyHint key="n" k="n" label="new" />,
+    ...GLOBAL_HINTS,
+  ];
 }

@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import type { ToolEntry } from "../../core/tools.js";
 import type { RecipeInstance } from "../../core/index.js";
 import { findProjectRoot } from "../../core/agent.js";
+import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
@@ -445,3 +446,12 @@ function isDeletable(item: ToolEntry): boolean {
 }
 
 // deleteToolItem is now handled server-side via ark.toolsDeleteItem()
+
+export function getToolsHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS, sep(0),
+    <KeyHint key="enter" k="Enter" label="use recipe" />,
+    <KeyHint key="x" k="x" label="delete" />,
+    ...GLOBAL_HINTS,
+  ];
+}

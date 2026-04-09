@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import type { Schedule } from "../../types/index.js";
 import { useArkClient } from "../hooks/useArkClient.js";
 import { useAsync } from "../hooks/useAsync.js";
+import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useConfirmation } from "../hooks/useConfirmation.js";
@@ -401,4 +402,15 @@ function describeCron(cron: string): string {
   }
 
   return cron;
+}
+
+export function getSchedulesHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS, sep(0),
+    <KeyHint key="n" k="n" label="new" />,
+    <KeyHint key="e" k="e" label="enable/disable" />,
+    <KeyHint key="x" k="x" label="delete" />,
+    <KeyHint key="r" k="r" label="refresh" />,
+    ...GLOBAL_HINTS,
+  ];
 }

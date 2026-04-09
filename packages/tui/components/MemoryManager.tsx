@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import { useArkClient } from "../hooks/useArkClient.js";
+import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { TextInputEnhanced } from "./TextInputEnhanced.js";
 import { SplitPane } from "./SplitPane.js";
 import { TreeList } from "./TreeList.js";
@@ -223,4 +224,14 @@ export function MemoryManager({ asyncState, pane = "left", onClose }: MemoryMana
       }
     />
   );
+}
+
+export function getMemoryHints(): React.ReactNode[] {
+  return [
+    ...NAV_HINTS, sep(0),
+    <KeyHint key="n" k="n" label="add" />,
+    <KeyHint key="/" k="/" label="search" />,
+    <KeyHint key="x" k="x" label="delete" />,
+    ...GLOBAL_HINTS,
+  ];
 }
