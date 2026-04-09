@@ -35,7 +35,7 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
       }
       case "ark-skill": {
         const resolvedScope = (scope as "project" | "global") ?? "global";
-        if (source !== "builtin") core.deleteSkill(name as string, resolvedScope, projectRoot);
+        if (source !== "builtin") app.skills.delete(name as string, resolvedScope, projectRoot);
         break;
       }
     }

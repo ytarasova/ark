@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
-import { saveAgent } from "../../core/index.js";
+import { getApp } from "../../core/app.js";
 import type { AgentDefinition } from "../../core/index.js";
 import { useFormNavigation } from "../components/form/useFormNavigation.js";
 import { FormTextField } from "../components/form/FormTextField.js";
@@ -105,7 +105,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
 
     submitForm({
       create: () => {
-        saveAgent(agentDef as AgentDefinition, saveScope, saveScope === "project" ? projectRoot : undefined);
+        getApp().agents.save(agentDef.name, agentDef as AgentDefinition, saveScope, saveScope === "project" ? projectRoot : undefined);
       },
       onDone,
       asyncState,

@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { readFileSync } from "fs";
 import YAML from "yaml";
 import * as core from "../../core/index.js";
+import { getApp } from "../../core/app.js";
 import { getArkClient } from "./_shared.js";
 
 export function registerSkillCommands(program: Command) {
@@ -56,7 +57,7 @@ export function registerSkillCommands(program: Command) {
         catch { console.error(chalk.red(`Cannot read file: ${opts.from}`)); process.exit(1); }
         const skill = YAML.parse(content);
         if (!skill.name) { console.error(chalk.red("YAML must have a 'name' field")); process.exit(1); }
-        core.saveSkill(skill, scope, projectRoot);
+        getApp().skills.save(skill.name, skill, scope, projectRoot);
         console.log(chalk.green(`Created skill: ${skill.name} (${scope})`));
         return;
       }
@@ -64,7 +65,7 @@ export function registerSkillCommands(program: Command) {
       if (!name) { console.error(chalk.red("Name required (or use --from)")); process.exit(1); }
       if (!opts.prompt) { console.error(chalk.red("--prompt required")); process.exit(1); }
 
-      core.saveSkill({
+      getApp().skills.save(name, {
         name,
         description: opts.description ?? "",
         prompt: opts.prompt,
@@ -81,7 +82,7 @@ export function registerSkillCommands(program: Command) {
       const scope = opts.scope as "global" | "project";
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
 
-      const skill = core.loadSkill(name, projectRoot);
+      const skill = getApp().skills.get(name, projectRoot);
       if (skill && skill._source === "builtin") {
         console.error(chalk.red(`Cannot delete builtin skill: ${name}`));
         process.exit(1);
@@ -91,7 +92,7 @@ export function registerSkillCommands(program: Command) {
         process.exit(1);
       }
 
-      core.deleteSkill(name, scope, projectRoot);
+      getApp().skills.delete(name, scope, projectRoot);
       console.log(chalk.green(`Deleted skill: ${name}`));
     });
 }

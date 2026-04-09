@@ -322,7 +322,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
 
   // Graph flow routing: if flow definition has edges, use DAG successor resolution
   try {
-    const flowDef = flow.loadFlow(flowName);
+    const flowDef = app.flows.get(flowName);
     if (flowDef && (flowDef as FlowDefinition & { edges?: unknown[] }).edges?.length > 0) {
       const graphFlow = parseGraphFlow(flowDef);
       const successors = getSuccessors(graphFlow, stage, session.config);
@@ -1738,7 +1738,7 @@ export function applyHookStatus(app: AppContext,
 
   // Check termination conditions from flow stage config
   try {
-    const flowDef = flow.loadFlow(session.flow);
+    const flowDef = app.flows.get(session.flow);
     const termStageDef = flowDef?.stages?.find((s) => s.name === session.stage);
     const termConfig = (termStageDef as { termination?: unknown })?.termination;
     if (termConfig) {

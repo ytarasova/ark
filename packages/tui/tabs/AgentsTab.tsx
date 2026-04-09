@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import { findProjectRoot, loadAgent, saveAgent, deleteAgent } from "../../core/index.js";
+import { findProjectRoot } from "../../core/index.js";
+import { getApp } from "../../core/app.js";
 import type { AgentDefinition } from "../../core/index.js";
 import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
@@ -60,7 +61,7 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
       const copyName = `${selected.name}-copy`;
       const scope = projectRoot ? "project" : "global";
       asyncState.run("Copying agent...", async () => {
-        saveAgent({ ...selected, name: copyName } as AgentDefinition, scope, scope === "project" ? projectRoot : undefined);
+        getApp().agents.save(copyName, { ...selected, name: copyName } as AgentDefinition, scope, scope === "project" ? projectRoot : undefined);
         status.show(`Copied -> '${copyName}' (${scope})`);
         refresh();
       });
@@ -74,7 +75,7 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
       }
       const scope = selected._source as "project" | "global";
       asyncState.run("Deleting agent...", async () => {
-        deleteAgent(selected.name, scope, scope === "project" ? projectRoot : undefined);
+        getApp().agents.delete(selected.name, scope, scope === "project" ? projectRoot : undefined);
         status.show(`Deleted '${selected.name}'`);
         refresh();
       });
@@ -126,7 +127,7 @@ function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
   }
 
   const a = useMemo(() => {
-    try { return loadAgent(agent.name, projectRoot); } catch { return null; }
+    try { return getApp().agents.get(agent.name, projectRoot); } catch { return null; }
   }, [agent.name, projectRoot]);
   if (!a) return <Text dimColor>{"  Failed to load agent"}</Text>;
 

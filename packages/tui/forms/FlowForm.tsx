@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
-import { saveFlow, listAgents, findProjectRoot } from "../../core/index.js";
+import { findProjectRoot } from "../../core/index.js";
+import { getApp } from "../../core/app.js";
 import type { FlowDefinition, StageDefinition } from "../../core/index.js";
 import { useFormNavigation } from "../components/form/useFormNavigation.js";
 import { FormTextField } from "../components/form/FormTextField.js";
@@ -41,7 +42,7 @@ export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
   const [stageField, setStageField] = useState<"name" | "agent" | "gate">("name");
 
   const agents = React.useMemo(() => {
-    try { return listAgents(projectRoot).map(a => a.name); } catch { return []; }
+    try { return getApp().agents.list(projectRoot).map(a => a.name); } catch { return []; }
   }, [projectRoot]);
 
   const agentChoices = React.useMemo(() => [
@@ -79,7 +80,7 @@ export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
 
     submitForm({
       create: () => {
-        saveFlow(flowDef, scope, scope === "project" ? projectRoot : undefined);
+        getApp().flows.save(flowDef.name, flowDef, scope);
       },
       onDone,
       asyncState,

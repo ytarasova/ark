@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
-import { loadFlow, saveFlow, deleteFlow, findProjectRoot } from "../../core/index.js";
+import { findProjectRoot } from "../../core/index.js";
+import { getApp } from "../../core/app.js";
 import type { FlowDefinition } from "../../core/index.js";
 import { KeyHint, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
@@ -54,7 +55,7 @@ export function FlowsTab({ flows, pane, asyncState, refresh }: FlowsTabProps) {
         return;
       }
       asyncState.run("Deleting flow...", async () => {
-        deleteFlow(selected.name);
+        getApp().flows.delete(selected.name);
         status.show(`Deleted '${selected.name}'`);
         refresh();
       });
@@ -106,7 +107,7 @@ function FlowDetail({ flow, pane, statusMessage }: {
   useEffect(() => {
     if (!flow) { setP(null); return; }
     try {
-      const loaded = loadFlow(flow.name);
+      const loaded = getApp().flows.get(flow.name);
       setP(loaded);
     } catch { setP(null); }
   }, [flow?.name]);
