@@ -112,23 +112,57 @@ export function searchTranscripts(query: string, opts?: SearchOpts): SearchResul
 
 function searchTranscriptsFTS(query: string, limit: number): SearchResult[] {
   const db = getApp().db;
-  const ftsQuery = escapeFtsQuery(query);
+  const terms = query.replace(/['"*()]/g, "").split(/\s+/).filter(w => w.length > 0);
+  if (terms.length === 0) return [];
 
+  // Single term: simple FTS query
+  if (terms.length === 1) {
+    const rows = db.prepare(
+      `SELECT session_id, role, content, timestamp,
+              snippet(transcript_index, 3, '>>>','<<<', '...', ${FTS_SNIPPET_WORDS}) as snippet
+       FROM transcript_index
+       WHERE transcript_index MATCH ?
+       ORDER BY rank
+       LIMIT ?`
+    ).all(`"${terms[0]}"`, limit) as FtsRow[];
+    return rows.map(ftsRowToResult);
+  }
+
+  // Multi-term: match at session level (terms can appear in different turns)
+  // 1. Find session IDs matching each term, intersect in JS
+  let matchingSessions: Set<string> | null = null;
+  for (const term of terms) {
+    const rows = db.prepare(
+      `SELECT DISTINCT session_id FROM transcript_index WHERE transcript_index MATCH ?`
+    ).all(`"${term}"`) as { session_id: string }[];
+    const ids = new Set(rows.map(r => r.session_id));
+    if (matchingSessions === null) {
+      matchingSessions = ids;
+    } else {
+      matchingSessions = new Set([...matchingSessions].filter(id => ids.has(id)));
+    }
+    if (matchingSessions.size === 0) return [];
+  }
+
+  // 2. Get snippets from matching sessions (OR query for highlighting)
+  const sessionIds = [...matchingSessions!];
+  const placeholders = sessionIds.map(() => "?").join(",");
+  const orQuery = terms.map(t => `"${t}"`).join(" OR ");
   const rows = db.prepare(
     `SELECT session_id, role, content, timestamp,
             snippet(transcript_index, 3, '>>>','<<<', '...', ${FTS_SNIPPET_WORDS}) as snippet
      FROM transcript_index
-     WHERE transcript_index MATCH ?
+     WHERE session_id IN (${placeholders})
+       AND transcript_index MATCH ?
      ORDER BY rank
      LIMIT ?`
-  ).all(ftsQuery, limit) as { session_id: string; role: string; content: string | null; timestamp: string | null; snippet: string | null }[];
+  ).all(...sessionIds, orQuery, limit) as FtsRow[];
+  return rows.map(ftsRowToResult);
+}
 
-  return rows.map(r => ({
-    sessionId: r.session_id,
-    source: "transcript" as const,
-    match: r.snippet || r.content?.slice(0, 120) || "",
-    timestamp: r.timestamp,
-  }));
+type FtsRow = { session_id: string; role: string; content: string | null; timestamp: string | null; snippet: string | null };
+function ftsRowToResult(r: FtsRow): SearchResult {
+  return { sessionId: r.session_id, source: "transcript", match: r.snippet || r.content?.slice(0, 120) || "", timestamp: r.timestamp ?? undefined };
 }
 
 function searchTranscriptsFiles(query: string, opts?: SearchOpts): SearchResult[] {
@@ -239,21 +273,9 @@ export async function indexTranscripts(opts?: { transcriptsDir?: string; onProgr
       const filePath = join(projectPath, file);
       const sessionId = file.replace(".jsonl", "");
 
-      // For large files, read only the last 64KB (recent conversation)
-      // For small files, read the whole thing
       let content: string;
       try {
-        const fstat = statSync(filePath);
-        if (fstat.size > MAX_TRANSCRIPT_TAIL_BYTES) {
-          // Large file — read tail only (recent conversation)
-          const fd = openSync(filePath, "r");
-          const buf = Buffer.alloc(MAX_TRANSCRIPT_TAIL_BYTES);
-          readSync(fd, buf, 0, MAX_TRANSCRIPT_TAIL_BYTES, fstat.size - MAX_TRANSCRIPT_TAIL_BYTES);
-          closeSync(fd);
-          content = buf.toString("utf-8");
-        } else {
-          content = readFileSync(filePath, "utf-8");
-        }
+        content = readTranscriptTail(filePath);
       } catch { continue; }
 
       for (const line of content.split("\n")) {
@@ -305,19 +327,9 @@ export function indexSession(transcriptPath: string, sessionId: string, project?
 
   let indexed = 0;
 
-  // For large files, read only the last 64KB (recent conversation)
   let content: string;
   try {
-    const fstat = statSync(transcriptPath);
-    if (fstat.size > MAX_TRANSCRIPT_TAIL_BYTES) {
-      const fd = openSync(transcriptPath, "r");
-      const buf = Buffer.alloc(MAX_TRANSCRIPT_TAIL_BYTES);
-      readSync(fd, buf, 0, MAX_TRANSCRIPT_TAIL_BYTES, fstat.size - MAX_TRANSCRIPT_TAIL_BYTES);
-      closeSync(fd);
-      content = buf.toString("utf-8");
-    } else {
-      content = readFileSync(transcriptPath, "utf-8");
-    }
+    content = readTranscriptTail(transcriptPath);
   } catch { return 0; }
 
   for (const line of content.split("\n")) {
@@ -357,6 +369,25 @@ export function getIndexStats(): { entries: number; sessions: number } {
   } catch {
     return { entries: 0, sessions: 0 };
   }
+}
+
+// ── Transcript tail reader ──────────────────────────────────────────────────
+
+/**
+ * Read the tail of a transcript file. For files larger than MAX_TRANSCRIPT_TAIL_BYTES
+ * (256KB), reads only the last 256KB to capture recent conversation while staying fast.
+ * Small files are read in full.
+ */
+export function readTranscriptTail(filePath: string): string {
+  const fstat = statSync(filePath);
+  if (fstat.size > MAX_TRANSCRIPT_TAIL_BYTES) {
+    const fd = openSync(filePath, "r");
+    const buf = Buffer.alloc(MAX_TRANSCRIPT_TAIL_BYTES);
+    readSync(fd, buf, 0, MAX_TRANSCRIPT_TAIL_BYTES, fstat.size - MAX_TRANSCRIPT_TAIL_BYTES);
+    closeSync(fd);
+    return buf.toString("utf-8");
+  }
+  return readFileSync(filePath, "utf-8");
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

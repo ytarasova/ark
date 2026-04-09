@@ -13,6 +13,7 @@ import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 import { ArkdBackedProvider } from "./arkd-backed.js";
 import { safeAsync } from "../../core/safe.js";
+import { sshKeyPath } from "./ec2/ssh.js";
 import type {
   Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
 } from "../types.js";
@@ -85,7 +86,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
       log("Building cloud-init script with arkd...");
       const conductorUrl = process.env.ARK_CONDUCTOR_URL ?? `http://localhost:${process.env.ARK_CONDUCTOR_PORT ?? "19100"}`;
-      const userData = buildUserDataWithArkd({
+      const userData = await buildUserDataWithArkd({
         idleMinutes: cfg.idle_minutes ?? 60,
         isolation: this.isolationType,
         conductorUrl,
@@ -218,6 +219,19 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       ip: ip!,
       arkd_url: `http://${ip}:${ARKD_REMOTE_PORT}`,
     });
+
+    // Wait for arkd to be reachable before marking as running
+    const arkdUrl = `http://${ip}:${ARKD_REMOTE_PORT}`;
+    await poll(
+      async () => {
+        try {
+          const res = await fetch(`${arkdUrl}/health`, { signal: AbortSignal.timeout(5000) });
+          return res.ok;
+        } catch { return false; }
+      },
+      { maxAttempts: 30, delayMs: 2000 },
+    );
+
     getApp().computes.update(compute.name, { status: "running" });
   }
 
@@ -257,7 +271,6 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   getAttachCommand(compute: Compute, session: Session): string[] {
     const cfg = compute.config as RemoteConfig;
     if (!session.session_id || !cfg.ip) return [];
-    const { sshKeyPath } = require("./ec2/ssh.js");
     return [
       "ssh", "-i", sshKeyPath(compute.name),
       "-o", "StrictHostKeyChecking=no",
@@ -498,8 +511,8 @@ export class RemoteFirecrackerProvider extends RemoteArkdBase {
 
 // ── Cloud-init with arkd ────────────────────────────────────────────────────
 
-function buildUserDataWithArkd(opts: { idleMinutes?: number; isolation?: string; conductorUrl?: string }): string {
-  const { buildUserData } = require("./ec2/cloud-init.js");
+async function buildUserDataWithArkd(opts: { idleMinutes?: number; isolation?: string; conductorUrl?: string }): Promise<string> {
+  const { buildUserData } = await import("./ec2/cloud-init.js");
   let base = buildUserData(opts) as string;
 
   const conductorFlag = opts.conductorUrl ? ` --conductor-url ${opts.conductorUrl}` : "";

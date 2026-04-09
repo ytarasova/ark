@@ -400,7 +400,7 @@ export class ArkClient {
   }
 
   async historyRefreshAndIndex(): Promise<HistoryRebuildFtsResult> {
-    return this.rpc<HistoryRebuildFtsResult>("history/refresh-and-index", undefined, 120_000);
+    return this.rpc<HistoryRebuildFtsResult>("history/refresh-and-index");
   }
 
   async historySearch(query: string, limit?: number): Promise<SearchResult[]> {
@@ -576,15 +576,13 @@ export class ArkClient {
     return this.rpc("verify/run", { sessionId });
   }
 
-  async sessionExport(sessionId: string, filePath?: string): Promise<{ ok: boolean; data?: any; filePath?: string }> {
-    return this.rpc("session/export", { sessionId, filePath });
-  }
-
   // ── Teardown ────────────────────────────────────────────────────────────────
 
   close(): void {
-    // Clear pending requests without rejecting to avoid unhandled rejections
-    // during teardown (callers are likely already unmounted/destroyed)
+    const err = new Error("ArkClient closed");
+    for (const [, p] of this.pending) {
+      p.reject(err);
+    }
     this.pending.clear();
     this.listeners.clear();
     this.transport.close();

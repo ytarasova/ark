@@ -1,5 +1,5 @@
 /**
- * Claude CLI integration — model mapping, argument building, trust management,
+ * Claude CLI integration -- model mapping, argument building, trust management,
  * channel config, launcher generation, and prompt auto-accept.
  *
  * All Claude-specific knowledge lives here so session.ts and agent.ts
@@ -15,7 +15,7 @@ import { dirname } from "path";
 
 import * as tmux from "./tmux.js";
 import { TRACKS_DIR } from "./paths.js";
-// TRACKS_DIR is now a function — call it at usage sites, not module level
+// TRACKS_DIR is now a function -- call it at usage sites, not module level
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -284,7 +284,7 @@ export function parseTranscriptUsage(transcriptPath: string): TranscriptUsage {
       usage.output_tokens += u.output_tokens ?? 0;
       usage.cache_read_input_tokens += u.cache_read_input_tokens ?? 0;
       usage.cache_creation_input_tokens += u.cache_creation_input_tokens ?? 0;
-    } catch { /* individual JSONL line may be malformed — skip to avoid log spam */ }
+    } catch { /* individual JSONL line may be malformed -- skip to avoid log spam */ }
   }
 
   usage.total_tokens = usage.input_tokens + usage.output_tokens
@@ -324,7 +324,7 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   const envBlock = envExports ? envExports + "\n" : "";
 
   // Ensure tools are in PATH (claude, bun, nvm live in ~/.local/bin etc)
-  // Can't source .bashrc — it exits early for non-interactive shells
+  // Can't source .bashrc -- it exits early for non-interactive shells
   const pathSetup = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.nvm/versions/node/*/bin:$PATH"\n`;
 
   let content: string;
@@ -404,7 +404,7 @@ const CLAUDE_WORKING_MARKERS = [
  * The launcher may use `--resume <id> || --session-id <id>`, which causes
  * TWO Claude startups (and two channel prompts) when resume fails.
  * To handle this, we keep polling after acceptance until Claude is actually
- * working — we don't return after the first accept.
+ * working -- we don't return after the first accept.
  *
  * Four outcomes per poll:
  * 1. Prompt found → send "1" + Enter, keep polling for a second prompt
@@ -425,7 +425,7 @@ export async function autoAcceptChannelPrompt(
     try {
       const output = await tmux.capturePaneAsync(tmuxName, { lines: 30 });
 
-      // Found the prompt — accept it and keep polling
+      // Found the prompt -- accept it and keep polling
       if (CHANNEL_PROMPT_MARKERS.some(m => output.includes(m))) {
         await tmux.sendKeysAsync(tmuxName, "1");
         await Bun.sleep(300);
@@ -434,12 +434,12 @@ export async function autoAcceptChannelPrompt(
         continue;
       }
 
-      // Claude is actively working — safe to stop polling.
+      // Claude is actively working -- safe to stop polling.
       // These only appear after Claude has fully started and is past any prompts.
       if (CLAUDE_WORKING_MARKERS.some(m => output.includes(m))) {
         return;
       }
-    } catch { /* tmux pane may not exist yet during startup — retry on next iteration */ }
+    } catch { /* tmux pane may not exist yet during startup -- retry on next iteration */ }
   }
 }
 
@@ -487,7 +487,7 @@ export async function deliverTask(
           });
           return;
         }
-      } catch { /* channel port not ready yet — retry */ }
+      } catch { /* channel port not ready yet -- retry */ }
       await Bun.sleep(1000);
     }
   } finally {

@@ -100,8 +100,9 @@ export function useArkStore(): StoreData {
       setInitialLoading(false);
     } catch {
       // Non-fatal: leave stale data in place
+    } finally {
+      running.current = false;
     }
-    running.current = false;
   }, [ark]);
 
   // ── Initial fetch ───────────────────────────────────────────────────────────

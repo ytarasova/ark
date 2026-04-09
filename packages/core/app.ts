@@ -1,5 +1,5 @@
 /**
- * AppContext — central owner of all services and their lifecycle.
+ * AppContext -- central owner of all services and their lifecycle.
  *
  * Replaces scattered singletons with explicit boot/shutdown. Every service
  * (database, event bus, conductor, metrics) is created during boot() and
@@ -97,52 +97,52 @@ export class AppContext {
   get arkDir(): string { return this.config.arkDir; }
 
   get db(): Database {
-    if (!this._db) throw new Error("AppContext not booted — db not available");
+    if (!this._db) throw new Error("AppContext not booted -- db not available");
     return this._db;
   }
 
   get eventBus(): typeof eventBus {
-    if (!this._eventBus) throw new Error("AppContext not booted — eventBus not available");
+    if (!this._eventBus) throw new Error("AppContext not booted -- eventBus not available");
     return this._eventBus;
   }
 
   get sessions(): SessionRepository {
-    if (!this._sessions) throw new Error("AppContext not booted — sessions not available");
+    if (!this._sessions) throw new Error("AppContext not booted -- sessions not available");
     return this._sessions;
   }
 
   get computes(): ComputeRepository {
-    if (!this._computes) throw new Error("AppContext not booted — computes not available");
+    if (!this._computes) throw new Error("AppContext not booted -- computes not available");
     return this._computes;
   }
 
   get events(): EventRepository {
-    if (!this._events) throw new Error("AppContext not booted — events not available");
+    if (!this._events) throw new Error("AppContext not booted -- events not available");
     return this._events;
   }
 
   get messages(): MessageRepository {
-    if (!this._messages) throw new Error("AppContext not booted — messages not available");
+    if (!this._messages) throw new Error("AppContext not booted -- messages not available");
     return this._messages;
   }
 
   get todos(): TodoRepository {
-    if (!this._todos) this._todos = new TodoRepository(this.db);
+    if (!this._todos) throw new Error("AppContext not booted -- todos not available");
     return this._todos;
   }
 
   get sessionService(): SessionService {
-    if (!this._sessionService) throw new Error("AppContext not booted — sessionService not available");
+    if (!this._sessionService) throw new Error("AppContext not booted -- sessionService not available");
     return this._sessionService;
   }
 
   get computeService(): ComputeService {
-    if (!this._computeService) throw new Error("AppContext not booted — computeService not available");
+    if (!this._computeService) throw new Error("AppContext not booted -- computeService not available");
     return this._computeService;
   }
 
   get historyService(): HistoryService {
-    if (!this._historyService) throw new Error("AppContext not booted — historyService not available");
+    if (!this._historyService) throw new Error("AppContext not booted -- historyService not available");
     return this._historyService;
   }
 
@@ -207,6 +207,7 @@ export class AppContext {
     this._computes = new ComputeRepository(this._db);
     this._events = new EventRepository(this._db);
     this._messages = new MessageRepository(this._db);
+    this._todos = new TodoRepository(this._db);
 
     this._sessionService = new SessionService(this._sessions, this._events, this._messages);
     this._computeService = new ComputeService(this._computes);
@@ -215,7 +216,7 @@ export class AppContext {
     // 4. Register compute providers
     await safeAsync("boot: load compute providers", async () => {
       const compute = await import("../compute/index.js");
-      // Legacy providers (backward compat — same names: "local", "ec2", "docker")
+      // Legacy providers (backward compat -- same names: "local", "ec2", "docker")
       this.registerProvider(new compute.LocalProvider());
       this.registerProvider(new compute.EC2Provider());
       this.registerProvider(new compute.DockerProvider());
@@ -432,7 +433,7 @@ export class AppContext {
 
     if (this._db) {
       try { this._db.close(); } catch (e: any) {
-        // DB may already be closed — log but don't fail shutdown
+        // DB may already be closed -- log but don't fail shutdown
         logError("general", `shutdown: failed to close database: ${e?.message ?? e}`);
       }
       this._db = null;
@@ -442,6 +443,9 @@ export class AppContext {
     if (this.options.cleanupOnShutdown && existsSync(this.config.arkDir)) {
       rmSync(this.config.arkDir, { recursive: true, force: true });
     }
+
+    // Clear global singleton if this instance is the current one
+    if (_app === this) _app = null;
 
     this.phase = "stopped";
   }
@@ -523,7 +527,7 @@ let _app: AppContext | null = null;
 
 /** Get the global AppContext. Throws if not set. */
 export function getApp(): AppContext {
-  if (!_app) throw new Error("AppContext not initialized — call setApp() first");
+  if (!_app) throw new Error("AppContext not initialized -- call setApp() first");
   return _app;
 }
 

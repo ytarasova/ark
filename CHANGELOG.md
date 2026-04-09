@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.11.0 (2026-04-09)
+
+### Code Quality & Security
+- **Shell injection protection**: added `shellEscape()` for all SSH command interpolation in EC2 provider
+- **OAuth token safety**: base64-encode tokens before remote shell interpolation
+- **Validation bypass fix**: server handlers now pass only validated fields to save functions
+- **Auth-aware fetch**: web UI schedule/session forms now use authenticated API calls instead of raw fetch
+- **ES module compliance**: replaced all `require()` calls (11 sites) and `__dirname` usage (2 sites) with proper ES module patterns
+- **React hooks fix**: fixed Rules of Hooks violation in TUI HistoryDetail component
+- **ArkD bind address**: arkd now accepts `--hostname` option, defaults to `0.0.0.0` for remote accessibility
+- **AppContext lifecycle**: `shutdown()` clears singleton, `todos` accessor initialized at boot
+
+### Code Cleanup
+- **CLI deduplication**: fork/clone handlers unified, server start AppContext leak fixed, exec singleton overwrite fixed
+- **TUI improvements**: useArkStore running guard in `finally` block, attach logic deduplicated, buildHistoryItems memoized, focus stack mass-pop replaced with targeted pop, useEffect dependencies corrected
+- **Web error handling**: try/catch added to all action handlers across SessionDetail, AgentsView, FlowsView, ScheduleView
+- **Compute deduplication**: Docker provision logic extracted to shared helpers, clean/clean-zombies handlers unified
+- **Search optimization**: extracted `readTranscriptTail` helper, fixed stale 64KB comment
+- **Shared styles**: extracted `selectClassName` to shared module across 5 web components
+- **Structured logging**: `safeAsync` now uses `logError` instead of `console.error`
+- **Em dash cleanup**: replaced all U+2014 em dashes with `--` per code style
+
+### Documentation
+- **README rewrite**: improved pitch and positioning, updated architecture and features
+- **Web UI guide**: comprehensive documentation of all web dashboard views and interactions
+- **CLI reference**: added 10+ missing commands (doctor, init, costs-export, openapi, acp, repo-map, eval, worktree cleanup, spawn-subagent)
+- **CLI agent docs**: documented multi-tool support (Codex, Gemini, Aider, etc.)
+
+### Testing
+- **45 new tests** across 8 new test files covering shell escaping, validation, client lifecycle, app lifecycle, store recovery, and more
+- **2233 total tests**, 0 failures
+
 ## v0.10.0 (2026-04-07)
 
 ### New Features

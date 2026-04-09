@@ -24,11 +24,10 @@ import type {
 import type { Compute, Session } from "../../../types/index.js";
 import { getApp } from "../../../core/app.js";
 import { buildDevcontainer, detectDevcontainer } from "./devcontainer.js";
+import {
+  pullImage, createContainer, startContainer, stopContainer, removeContainer, DEFAULT_IMAGE,
+} from "./helpers.js";
 import { safeAsync } from "../../../core/safe.js";
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const DEFAULT_IMAGE = "ubuntu:22.04";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -116,42 +115,10 @@ export class DockerProvider implements ComputeProvider {
           workdir,
         });
       } else {
-        // Plain Docker path — pull image, create persistent container
-        await execFileAsync("docker", ["pull", image], {
-          timeout: 300_000, // images can be large
-        });
-
-        const home = homedir();
-        const createArgs = [
-          "create",
-          "--name", name,
-          "-it",
-          // Mount credentials read-only
-          "-v", `${join(home, ".ssh")}:/root/.ssh:ro`,
-          "-v", `${join(home, ".claude")}:/root/.claude:ro`,
-        ];
-
-        // Optional AWS creds
-        const awsDir = join(home, ".aws");
-        if (existsSync(awsDir)) {
-          createArgs.push("-v", `${awsDir}:/root/.aws:ro`);
-        }
-
-        // Extra volumes from config
-        for (const vol of extraVolumes) {
-          createArgs.push("-v", vol);
-        }
-
-        createArgs.push(image, "bash");
-
-        await execFileAsync("docker", createArgs, {
-          timeout: 30_000,
-        });
-
-        // Start the container
-        await execFileAsync("docker", ["start", name], {
-          timeout: 15_000,
-        });
+        // Plain Docker path -- pull image, create persistent container
+        await pullImage(image);
+        await createContainer(name, image, extraVolumes);
+        await startContainer(name);
 
         // Read back the real container ID
         const containerId = await run("docker", [
@@ -179,9 +146,7 @@ export class DockerProvider implements ComputeProvider {
   async start(compute: Compute): Promise<void> {
     const name = containerName(compute.name);
     try {
-      await execFileAsync("docker", ["start", name], {
-        timeout: 15_000,
-      });
+      await startContainer(name);
     } catch (err) {
       throw new Error(`Failed to start container ${name}: ${err instanceof Error ? err.message : err}`);
     }
@@ -191,7 +156,7 @@ export class DockerProvider implements ComputeProvider {
   async stop(compute: Compute): Promise<void> {
     const name = containerName(compute.name);
     await safeAsync(`[docker] stop: container ${name}`, async () => {
-      await execFileAsync("docker", ["stop", name], { timeout: 15_000 });
+      await stopContainer(name);
     });
     getApp().computes.update(compute.name, { status: "stopped" });
   }
@@ -201,7 +166,7 @@ export class DockerProvider implements ComputeProvider {
   async destroy(compute: Compute): Promise<void> {
     const name = containerName(compute.name);
     await safeAsync(`[docker] destroy: rm container ${name}`, async () => {
-      await execFileAsync("docker", ["rm", "-f", name], { timeout: 15_000 });
+      await removeContainer(name);
     });
     getApp().computes.update(compute.name, { status: "destroyed" });
   }
@@ -255,7 +220,7 @@ export class DockerProvider implements ComputeProvider {
   async cleanupSession(compute: Compute, _session: Session): Promise<void> {
     const name = containerName(compute.name);
     await safeAsync(`[docker] cleanupSession: stop container ${name}`, async () => {
-      await execFileAsync("docker", ["stop", name], { timeout: 15_000 });
+      await stopContainer(name);
     });
   }
 

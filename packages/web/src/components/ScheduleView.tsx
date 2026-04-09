@@ -6,6 +6,7 @@ import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { Calendar } from "lucide-react";
+import { selectClassName } from "./ui/styles.js";
 
 interface ScheduleViewProps {
   showCreate?: boolean;
@@ -37,25 +38,44 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
   const { data: schedules = [] } = useSchedulesQuery();
   const [selected, setSelected] = useState<any>(null);
 
+  const [actionMsg, setActionMsg] = useState<{ text: string; type: string } | null>(null);
+
+  function showActionMsg(text: string, type: string) {
+    setActionMsg({ text, type });
+    setTimeout(() => setActionMsg(null), 3000);
+  }
+
   async function handleToggle(sched: any) {
-    if (sched.enabled) {
-      await api.disableSchedule(sched.id);
-    } else {
-      await api.enableSchedule(sched.id);
+    try {
+      if (sched.enabled) {
+        await api.disableSchedule(sched.id);
+      } else {
+        await api.enableSchedule(sched.id);
+      }
+      queryClient.invalidateQueries({ queryKey: ["schedules"] });
+    } catch (err: any) {
+      showActionMsg(err.message || "Failed to toggle schedule", "error");
     }
-    queryClient.invalidateQueries({ queryKey: ["schedules"] });
   }
 
   async function handleDelete(sched: any) {
-    await api.deleteSchedule(sched.id);
-    setSelected(null);
-    queryClient.invalidateQueries({ queryKey: ["schedules"] });
+    try {
+      await api.deleteSchedule(sched.id);
+      setSelected(null);
+      queryClient.invalidateQueries({ queryKey: ["schedules"] });
+    } catch (err: any) {
+      showActionMsg(err.message || "Failed to delete schedule", "error");
+    }
   }
 
   async function handleCreate(form: any) {
-    await api.createSchedule(form);
-    onCloseCreate?.();
-    queryClient.invalidateQueries({ queryKey: ["schedules"] });
+    try {
+      await api.createSchedule(form);
+      onCloseCreate?.();
+      queryClient.invalidateQueries({ queryKey: ["schedules"] });
+    } catch (err: any) {
+      showActionMsg(err.message || "Failed to create schedule", "error");
+    }
   }
 
   return (
@@ -157,6 +177,11 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
                     Delete
                   </Button>
                 </div>
+                {actionMsg && (
+                  <div className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-red-400" : "text-emerald-400")}>
+                    {actionMsg.text}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -169,9 +194,6 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
     </>
   );
 }
-
-const selectClassName =
-  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_0.75rem_center]";
 
 function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
   const [form, setForm] = useState({
@@ -188,9 +210,9 @@ function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit:
   const [groups, setGroups] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch("/api/flows").then(r => r.json()).then(setFlows).catch(() => {});
-    fetch("/api/compute").then(r => r.json()).then(setComputes).catch(() => {});
-    fetch("/api/groups").then(r => r.json()).then(setGroups).catch(() => {});
+    api.getFlows().then(setFlows).catch(() => {});
+    api.getCompute().then(setComputes).catch(() => {});
+    api.getGroups().then(setGroups).catch(() => {});
   }, []);
 
   function update(key: string, val: string) {

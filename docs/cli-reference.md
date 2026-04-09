@@ -266,6 +266,27 @@ ark session spawn s-parent "Implement feature A"
 ark session spawn s-parent "Implement feature B"
 ```
 
+### ark session spawn-subagent
+
+Spawn a subagent within a session with optional model/agent override.
+
+```
+ark session spawn-subagent <parent-id> <task> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-m, --model <model>` | Model override (e.g., haiku, sonnet, opus) |
+| `-a, --agent <agent>` | Agent override |
+| `-g, --group <name>` | Group name |
+| `-d, --dispatch` | Auto-dispatch after spawning |
+
+```bash
+ark session spawn-subagent s-parent "Write unit tests" --dispatch
+ark session spawn-subagent s-parent "Refactor auth module" --model haiku --agent implementer
+ark session spawn-subagent s-parent "Review changes" --group backend --dispatch
+```
+
 ### ark session join
 
 Join all forked children back to the parent.
@@ -501,6 +522,23 @@ ark worktree pr s-a1b2c3 --title "Add OAuth2 support"
 ark worktree pr s-a1b2c3 --base develop --draft
 ```
 
+### ark worktree cleanup
+
+Find and remove orphaned worktrees (worktrees that no longer have a matching session).
+
+```
+ark worktree cleanup [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--dry-run` | Only show what would be removed |
+
+```bash
+ark worktree cleanup --dry-run
+ark worktree cleanup
+```
+
 ---
 
 ## ark costs
@@ -518,6 +556,42 @@ ark costs [options]
 ```bash
 ark costs
 ark costs --limit 50
+```
+
+---
+
+## ark costs-sync
+
+Backfill cost data from Claude transcripts. Scans transcripts and populates cost fields for sessions that are missing them.
+
+```
+ark costs-sync
+```
+
+```bash
+ark costs-sync
+```
+
+---
+
+## ark costs-export
+
+Export cost data to CSV or JSON.
+
+```
+ark costs-export [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--format <format>` | Output format: csv or json | `json` |
+| `-o, --output <file>` | Output file (prints to stdout if omitted) | -- |
+
+```bash
+ark costs-export
+ark costs-export --format csv
+ark costs-export --format csv -o costs.csv
+ark costs-export -o costs.json
 ```
 
 ---
@@ -1270,6 +1344,34 @@ See [TUI Reference](tui-reference.md) for keyboard shortcuts.
 
 ---
 
+## ark doctor
+
+Check system prerequisites (Bun, tmux, git, Claude CLI). Reports which tools are available and flags any missing required dependencies.
+
+```
+ark doctor
+```
+
+```bash
+ark doctor
+```
+
+---
+
+## ark init
+
+Initialize Ark for the current repository. Runs an interactive wizard that checks prerequisites, verifies Claude CLI authentication, and creates a `.ark.yaml` configuration stub if one does not already exist.
+
+```
+ark init
+```
+
+```bash
+ark init
+```
+
+---
+
 ## ark arkd
 
 Start the ArkD universal agent daemon.
@@ -1281,11 +1383,13 @@ ark arkd [options]
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-p, --port <port>` | Port | `19300` |
+| `--hostname <host>` | Bind address | `0.0.0.0` |
 | `--conductor-url <url>` | Conductor URL for channel relay | `http://localhost:19100` |
 
 ```bash
 ark arkd
 ark arkd --port 19400 --conductor-url http://localhost:19100
+ark arkd --hostname 127.0.0.1
 ```
 
 ---
@@ -1398,6 +1502,77 @@ Run the MCP channel server (used by remote agents). Internal command.
 
 ```
 ark channel
+```
+
+---
+
+## ark openapi
+
+Generate an OpenAPI spec from the JSON-RPC methods. Outputs JSON to stdout.
+
+```
+ark openapi
+```
+
+```bash
+ark openapi
+ark openapi > openapi.json
+```
+
+---
+
+## ark acp
+
+Start a headless ACP (Agent Communication Protocol) server on stdin/stdout using JSON-RPC. Used for programmatic access to Ark without the TUI or web interface.
+
+```
+ark acp
+```
+
+```bash
+ark acp
+```
+
+---
+
+## ark repo-map
+
+Generate a repository structure map showing files and directory layout.
+
+```
+ark repo-map [dir] [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--max-files <n>` | Max files to include | `500` |
+| `--max-depth <n>` | Max directory depth | `10` |
+| `--json` | Output as JSON instead of text | -- |
+
+```bash
+ark repo-map
+ark repo-map /path/to/project
+ark repo-map --max-files 200 --max-depth 5
+ark repo-map --json
+```
+
+---
+
+## ark eval
+
+Evaluate a recipe by creating N test sessions. Reports success rate, duration, and cost for each iteration.
+
+```
+ark eval <recipe> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-n, --iterations <n>` | Number of iterations | `3` |
+
+```bash
+ark eval quick-fix
+ark eval feature-build --iterations 5
 ```
 
 ---

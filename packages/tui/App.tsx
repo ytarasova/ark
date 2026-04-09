@@ -74,10 +74,10 @@ function AppInner() {
     else focus.pop("form");
   }, [showForm]);
 
-  // Auto-focus right pane when any child takes focus
+  // Auto-switch pane when a child takes focus (based on focus entry's target pane)
   useEffect(() => {
-    if (!focus.appActive) setPane("right");
-  }, [focus.appActive]);
+    if (!focus.appActive && focus.targetPane) setPane(focus.targetPane);
+  }, [focus.appActive, focus.targetPane]);
 
   // Active tab's async state
   const asyncState = tab === "agents" ? agentsAsync : tab === "flows" ? flowsAsync : tab === "history" ? historyAsync : tab === "compute" ? computeAsync : sessionsAsync;

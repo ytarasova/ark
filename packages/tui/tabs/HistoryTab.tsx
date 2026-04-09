@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import type { ClaudeSession, SearchResult } from "../../core/index.js";
@@ -6,8 +6,7 @@ import { ago } from "../helpers.js";
 import { sanitizeForTerminal } from "../helpers/sessionFormatting.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
-import { SectionHeader } from "../components/SectionHeader.js";
-import { DetailPanel } from "../components/DetailPanel.js";
+import { ScrollBox } from "../components/ScrollBox.js";
 import { KeyValue } from "../components/KeyValue.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
@@ -75,47 +74,56 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [mode, setMode] = useState<"recent" | "search">("recent");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchInputActive, setSearchInputActive] = useState(false);
   const status = useStatusMessage();
 
-  // Push/pop focus when search mode is active
+  // Push/pop focus when search input is active (left pane stays focused)
   useEffect(() => {
-    if (mode === "search") focus.push("search");
+    if (searchInputActive) focus.push("search", "left");
     else focus.pop("search");
-  }, [mode]);
+  }, [searchInputActive]);
 
-  const historyItems = buildHistoryItems(arkSessions, claudeSessions);
+  const historyItems = useMemo(
+    () => buildHistoryItems(arkSessions, claudeSessions),
+    [arkSessions, claudeSessions],
+  );
 
   const { sel } = useListNavigation(
     mode === "recent" ? historyItems.length : searchResults.length,
-    { active: pane === "left" && mode !== "search" },
+    { active: pane === "left" && !searchInputActive },
   );
   const selectedItem = mode === "recent" ? historyItems[sel] ?? null : null;
+  const selectedSearchResult = mode === "search" ? searchResults[sel] ?? null : null;
+
+  // Derive a display ID for the detail panel (works for both modes)
+  const detailSessionId = selectedItem?.id ?? selectedSearchResult?.sessionId ?? null;
 
   // Load conversation preview from FTS5 index (fast SQLite read, no file I/O)
   const [conversationPreview, setConversationPreview] = useState<any[]>([]);
   useEffect(() => {
-    if (!selectedItem) {
-      setConversationPreview([]);
-      return;
-    }
-    // Use claude session ID for Claude sessions, ark session ID for ark sessions
-    const convId = selectedItem.claudeSession?.sessionId || selectedItem.arkSession?.claude_session_id || selectedItem.id;
+    setConversationPreview([]); // Clear immediately to avoid stale data
+    if (!detailSessionId) return;
+    const convId = selectedItem?.claudeSession?.sessionId || selectedItem?.arkSession?.claude_session_id || detailSessionId;
     ark.sessionConversation(convId, 50).then((turns: any[]) => {
       setConversationPreview(turns);
     }).catch(() => setConversationPreview([]));
-  }, [selectedItem?.id]);
+  }, [detailSessionId]);
+
+  // Stable ref for asyncState so the mount effect does not re-trigger on every render
+  const asyncStateRef = useRef(asyncState);
+  asyncStateRef.current = asyncState;
 
   // Load from cache (instant), then always refresh in background
   useEffect(() => {
     ark.historyList(RECENT_LIMIT).then(setClaudeSessions);
 
-    // Always refresh cache in background — picks up new sessions + fixes summaries
-    asyncState.run("Refreshing...", async () => {
+    // Always refresh cache in background -- picks up new sessions + fixes summaries
+    asyncStateRef.current.run("Refreshing...", async () => {
       await ark.historyRefresh();
       const items = await ark.historyList(RECENT_LIMIT);
       setClaudeSessions(items);
     });
-  }, []);
+  }, [ark]);
 
   useInput((input, key) => {
     if (pane !== "left") return;
@@ -130,12 +138,22 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
       return;
     }
 
-    if (input === "s" && mode !== "search") {
+    if (input === "/" && !searchInputActive) {
       setMode("search"); setSearchQuery(""); setSearchResults([]);
+      setSearchInputActive(true);
       return;
     }
 
-    if (key.escape && mode === "search") { setMode("recent"); setSearchQuery(""); setSearchResults([]); return; }
+    if (key.escape && mode === "search") {
+      if (searchInputActive) {
+        // Esc while typing: close input, keep results navigable
+        setSearchInputActive(false);
+      } else {
+        // Esc while browsing results: back to recent
+        setMode("recent"); setSearchQuery(""); setSearchResults([]);
+      }
+      return;
+    }
 
     // R (shift) — force full rebuild (clear cache first)
     if (input === "R" && mode !== "search") {
@@ -162,6 +180,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
 
   const doSearch = (query: string) => {
     if (!query.trim()) return;
+    setSearchInputActive(false); // Release focus so j/k navigate results
     asyncState.run("Searching...", async () => {
       const results = await ark.historySearch(query, 20);
       setSearchResults(results);
@@ -178,15 +197,19 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
         left={
           <Box flexDirection="column">
             {mode === "search" && (
-              <Box>
-                <Text color="cyan">{"/"}</Text>
-                <TextInputEnhanced
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  onSubmit={() => doSearch(searchQuery)}
-                  placeholder="search sessions and transcripts..."
-                />
-              </Box>
+              searchInputActive ? (
+                <Box>
+                  <Text color="cyan">{"/"}</Text>
+                  <TextInputEnhanced
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    onSubmit={() => doSearch(searchQuery)}
+                    placeholder="search sessions and transcripts..."
+                  />
+                </Box>
+              ) : (
+                <Text dimColor>{`  /${searchQuery}`}</Text>
+              )
             )}
             {asyncState.loading && historyItems.length === 0 ? (
               <Text><Spinner type="dots" /> <Text dimColor>{asyncState.label || "loading..."}</Text></Text>
@@ -239,7 +262,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
           </Box>
         }
         right={
-          <HistoryDetail item={selectedItem} pane={pane} conversation={conversationPreview} />
+          <HistoryDetail item={selectedItem} searchResult={selectedSearchResult} pane={pane} conversation={conversationPreview} />
         }
       />
     </Box>
@@ -248,70 +271,82 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
 
 // -- Detail ------------------------------------------------------------------
 
-function HistoryDetail({ item, pane, conversation }: { item: HistoryItem | null; pane: string; conversation: any[] }) {
-  if (!item) return <Box flexGrow={1}><Text dimColor>{"  No session selected."}</Text></Box>;
+function HistoryDetail({ item, searchResult, pane, conversation }: { item: HistoryItem | null; searchResult?: SearchResult | null; pane: string; conversation: any[] }) {
+  const detailId = item?.id ?? searchResult?.sessionId ?? null;
 
-  if (item.type === "ark") {
-    const s = item.arkSession;
-    return (
-      <DetailPanel active={pane === "right"}>
-        <KeyValue label="Name">{s.summary || s.ticket || "(unnamed)"}</KeyValue>
-        <KeyValue label="ID">{s.id}</KeyValue>
-        <KeyValue label="Status">{s.status}</KeyValue>
-        <KeyValue label="Flow">{s.flow}{s.stage ? ` / ${s.stage}` : ""}</KeyValue>
-        {s.repo && <KeyValue label="Repo">{s.repo}</KeyValue>}
-        {s.claude_session_id && <KeyValue label="Claude ID">{s.claude_session_id}</KeyValue>}
-        <KeyValue label="Age">{ago(s.updated_at || s.created_at)}</KeyValue>
-
-        <ConversationView turns={conversation} />
-      </DetailPanel>
-    );
+  if (!detailId) {
+    return <Box flexGrow={1}><Text dimColor>{"  No session selected."}</Text></Box>;
   }
 
-  const cs = item.claudeSession!;
+  return <HistoryDetailContent item={item} searchResult={searchResult} pane={pane} conversation={conversation} detailId={detailId} />;
+}
+
+function HistoryDetailContent({ item, searchResult, pane, conversation, detailId }: { item: HistoryItem | null; searchResult?: SearchResult | null; pane: string; conversation: any[]; detailId: string }) {
+  const metadata = item ? (
+    item.type === "ark" ? (
+      <>
+        <KeyValue label="Name">{item.arkSession.summary || item.arkSession.ticket || "(unnamed)"}</KeyValue>
+        <KeyValue label="ID">{item.arkSession.id}</KeyValue>
+        <KeyValue label="Status">{item.arkSession.status}</KeyValue>
+        <KeyValue label="Flow">{item.arkSession.flow}{item.arkSession.stage ? ` / ${item.arkSession.stage}` : ""}</KeyValue>
+        {item.arkSession.repo && <KeyValue label="Repo">{item.arkSession.repo}</KeyValue>}
+        {item.arkSession.claude_session_id && <KeyValue label="Claude ID">{item.arkSession.claude_session_id}</KeyValue>}
+        <KeyValue label="Age">{ago(item.arkSession.updated_at || item.arkSession.created_at)}</KeyValue>
+      </>
+    ) : (
+      <>
+        <KeyValue label="Session ID">{item.claudeSession!.sessionId}</KeyValue>
+        <KeyValue label="Project">{item.claudeSession!.project}</KeyValue>
+        <KeyValue label="Messages">{String(item.claudeSession!.messageCount)}</KeyValue>
+        <KeyValue label="Active">{ago(item.claudeSession!.lastActivity || item.claudeSession!.timestamp)}</KeyValue>
+      </>
+    )
+  ) : searchResult ? (
+    <>
+      <KeyValue label="Session">{searchResult.sessionId}</KeyValue>
+      <KeyValue label="Source">{searchResult.source}</KeyValue>
+      {searchResult.match && <KeyValue label="Match">{searchResult.match.slice(0, 80)}</KeyValue>}
+    </>
+  ) : null;
+
   return (
-    <DetailPanel active={pane === "right"}>
-      <KeyValue label="Session ID">{cs.sessionId}</KeyValue>
-      <KeyValue label="Project">{cs.project}</KeyValue>
-      <KeyValue label="Messages">{String(cs.messageCount)}</KeyValue>
-      <KeyValue label="Active">{ago(cs.lastActivity || cs.timestamp)}</KeyValue>
-      <KeyValue label="File">{cs.transcriptPath}</KeyValue>
-
-      <ConversationView turns={conversation} />
-
-    </DetailPanel>
+    <Box flexDirection="column" flexGrow={1}>
+      {/* Fixed metadata section */}
+      <Box flexDirection="column" paddingBottom={1}>
+        {metadata}
+      </Box>
+      {/* Scrollable conversation section */}
+      <Box flexDirection="column" flexGrow={1} borderStyle="single" borderColor="gray" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false}>
+        <ScrollBox active={pane === "right"} reserveRows={18} resetKey={detailId}>
+          <ConversationScrollContent turns={conversation} />
+        </ScrollBox>
+      </Box>
+    </Box>
   );
 }
 
-function ConversationView({ turns }: { turns: any[] }) {
-  if (!turns || turns.length === 0) return null;
-
-  const filtered = turns.filter((t: any) => {
-    if (!t) return false;
-    // Handle old string format
-    if (typeof t === "string") return t.length > 2;
-    if (!t.content || t.content.length < 2) return false;
+function ConversationScrollContent({ turns }: { turns: any[] }) {
+  const filtered = (turns || []).filter((t: any) => {
+    if (!t || !t.content || t.content.length < 2) return false;
     if (t.role !== "user" && t.role !== "assistant") return false;
     const c = t.content;
     if (c.startsWith("<channel ") || c.startsWith("You are the ") || c.startsWith("Session ")) return false;
     return true;
   });
 
-  if (filtered.length === 0) return null;
+  if (filtered.length === 0) {
+    return <Text dimColor>{"  No conversation."}</Text>;
+  }
 
   return (
     <>
+      <Text dimColor>{`  Conversation (${filtered.length})`}</Text>
       <Text> </Text>
-      <Text dimColor>{"  " + "─".repeat(40)}</Text>
-      <SectionHeader title={`Conversation (${filtered.length})`} />
       {filtered.map((turn: any, idx: number) => {
-        // Handle both object {role, content, timestamp} and legacy string "Role: content"
-        const isString = typeof turn === "string";
-        const isUser = isString ? turn.startsWith("You:") : turn.role === "user";
-        const rawText = isString ? turn.replace(/^(You|Claude): ?/, "") : (turn.content || "").trim();
-        const content = sanitizeForTerminal(rawText, 120);
+        const isUser = turn.role === "user";
+        const content = sanitizeForTerminal((turn.content || "").trim(), 120);
         const label = isUser ? " You " : " Agent ";
-        const time = !isString && turn.timestamp ? `  ${ago(turn.timestamp)}` : "";
+        const time = turn.timestamp ? `  ${ago(turn.timestamp)}` : "";
         return (
           <Box key={idx} flexDirection="column" marginBottom={1} paddingLeft={isUser ? 2 : 0}>
             <Text>

@@ -50,6 +50,10 @@ import { emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStage
 import { detectInjection } from "../prompt-guard.js";
 import { generateRepoMap, formatRepoMap } from "../repo-map.js";
 import { getExecutor } from "../executor.js";
+import type { ComputeProvider } from "../../compute/types.js";
+import { resolveProvider } from "../provider-registry.js";
+
+const DEFAULT_BASE_BRANCH = "main";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 function sessionAsVars(session: Session): Record<string, unknown> {
@@ -235,7 +239,7 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
     } catch { /* skip repo map on error */ }
   }
 
-  // Resolve executor — defaults to claude-code
+  // Resolve executor -- defaults to claude-code
   const runtime = agent.runtime ?? "claude-code";
   const executor = getExecutor(runtime);
   if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
@@ -657,7 +661,7 @@ export async function interrupt(sessionId: string): Promise<{ ok: boolean; messa
 
 // ── Review gate ─────────────────────────────────────────────────────────────
 
-/** Open a review gate — called when PR is approved via webhook. */
+/** Open a review gate -- called when PR is approved via webhook. */
 export async function approveReviewGate(sessionId: string): Promise<{ ok: boolean; message: string }> {
   const s = getApp().sessions.get(sessionId);
   if (!s) return { ok: false, message: "Session not found" };
@@ -863,10 +867,6 @@ export async function undeleteSessionAsync(sessionId: string): Promise<{ ok: boo
 
 // ── Provider resolution ──────────────────────────────────────────────────────
 
-import type { ComputeProvider } from "../../compute/types.js";
-import { resolveProvider, setProviderResolver, clearProviderResolver } from "../provider-registry.js";
-export { resolveProvider, setProviderResolver, clearProviderResolver };
-
 /** Safely run a provider method for a session. Resolves provider, handles null, logs errors. */
 async function withProvider(
   session: Session,
@@ -1025,7 +1025,7 @@ async function launchAgentTmux(
   const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
   const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig });
 
-  // Status hooks — write .claude/settings.local.json for agent status detection
+  // Status hooks -- write .claude/settings.local.json for agent status detection
   claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts?.autonomy });
 
   // Build launch env from agent config + provider-specific env (e.g. auth tokens for remote)
@@ -1098,8 +1098,8 @@ function formatTaskHeader(session: Session, stage: string, agentName: string): s
     parts.push(stageDef.task);
     parts.push(`\nYou are the ${agentName} agent, running the '${stage}' stage.`);
   } else if (isBare) {
-    // Bare flow: interactive session — no predefined task pipeline
-    parts.push(`Session ${session.id}${session.summary ? ` — ${session.summary}` : ""}`);
+    // Bare flow: interactive session -- no predefined task pipeline
+    parts.push(`Session ${session.id}${session.summary ? ` -- ${session.summary}` : ""}`);
     parts.push(`\nYou are the ${agentName} agent in an interactive session.`);
     parts.push(`You will receive instructions from the user via steer messages.`);
   } else {
@@ -1279,7 +1279,7 @@ export async function worktreeDiff(sessionId: string, opts?: {
   }
   if (!branch) return { ok: false, stat: "", diff: "", branch: "", baseBranch: "", filesChanged: 0, insertions: 0, deletions: 0, modifiedSinceReview: [], message: "Cannot determine branch" };
 
-  const baseBranch = opts?.base ?? "main";
+  const baseBranch = opts?.base ?? DEFAULT_BASE_BRANCH;
 
   try {
     // Get diff stat
@@ -1368,7 +1368,7 @@ export async function createWorktreePR(sessionId: string, opts?: {
   }
   if (!branch) return { ok: false, message: "Cannot determine worktree branch" };
 
-  const base = opts?.base ?? "main";
+  const base = opts?.base ?? DEFAULT_BASE_BRANCH;
   const title = opts?.title ?? session.summary ?? `ark: ${sessionId}`;
   const body = opts?.body ?? `Session: ${sessionId}\nFlow: ${session.flow}\nAgent: ${session.agent ?? "default"}`;
 
@@ -1440,7 +1440,7 @@ export async function finishWorktree(sessionId: string, opts?: {
 
   if (!branch) return { ok: false, message: "Cannot determine worktree branch" };
 
-  const targetBranch = opts?.into ?? "main";
+  const targetBranch = opts?.into ?? DEFAULT_BASE_BRANCH;
 
   // 1. Stop the session if running
   if (!["completed", "failed", "stopped", "pending"].includes(session.status)) {
@@ -1492,7 +1492,7 @@ export async function finishWorktree(sessionId: string, opts?: {
     try {
       await execFileAsync("git", ["-C", repo, "branch", "-d", branch], { encoding: "utf-8" });
     } catch (e: any) {
-      // Branch may not exist or not be fully merged — try force delete
+      // Branch may not exist or not be fully merged -- try force delete
       try { await execFileAsync("git", ["-C", repo, "branch", "-D", branch], { encoding: "utf-8" }); } catch { /* ignore */ }
     }
   }
@@ -1594,9 +1594,13 @@ export interface HookStatusResult {
 }
 
 /**
- * Pure business logic for processing a hook status event.
- * Determines status transitions, events to log, and side effects
- * without touching the store or event bus directly.
+ * Business logic for processing a hook status event.
+ * Determines status transitions, events to log, and side effects.
+ *
+ * NOTE: This function is *mostly* pure, but has one fire-and-forget side effect:
+ * on SessionEnd/Stop, it runs handoff detection asynchronously (lines below),
+ * which writes events and config to the store via getApp(). This is intentional --
+ * handoff detection is best-effort and should not block the hook response.
  */
 export function applyHookStatus(
   session: Session,
@@ -1618,7 +1622,7 @@ export function applyHookStatus(
 
   let newStatus = statusMap[hookEvent];
 
-  // Don't override terminal status — late hooks can fire after session is done or manually stopped
+  // Don't override terminal status -- late hooks can fire after session is done or manually stopped
   if (newStatus && session.status === "completed" && newStatus !== "completed") {
     newStatus = undefined;
   }
@@ -1699,7 +1703,7 @@ export function applyHookStatus(
       }
     } catch (e: any) { logError("session", "transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) }); }
 
-    // Index transcript for FTS5 search — only if the transcript belongs to THIS session's agent
+    // Index transcript for FTS5 search -- only if the transcript belongs to THIS session's agent
     const hookClaudeSession = payload.session_id as string | undefined;
     if (hookClaudeSession && session.claude_session_id &&
         transcriptPath.includes(hookClaudeSession)) {
@@ -1808,7 +1812,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
         commits: rr.commits as string[] | undefined,
       };
 
-      // Check gate type — manual gates keep session running (user decides when done)
+      // Check gate type -- manual gates keep session running (user decides when done)
       const stageDef = flow.getStage(session.flow, session.stage ?? "");
       const isManualGate = stageDef?.gate === "manual";
 
@@ -1822,7 +1826,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
             data: { summary: (report as unknown as Record<string, unknown>).summary },
           },
         });
-        // Don't change status — session stays running, agent stays alive
+        // Don't change status -- session stays running, agent stays alive
       } else {
         // Auto gate: advance to next stage or complete the session
         result.updates.status = "ready";
@@ -1846,7 +1850,7 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
       break;
     }
     case "progress": {
-      // Agent is actively reporting — ensure status reflects that.
+      // Agent is actively reporting -- ensure status reflects that.
       if (session.status === "waiting") {
         result.updates.status = "running";
         result.updates.breakpoint_reason = null;
@@ -1950,7 +1954,7 @@ export function fanOut(
 // ── Subagents ────────────────────────────────────────────────────────────────
 
 /**
- * Spawn a subagent — an independent child session with its own model/agent.
+ * Spawn a subagent -- an independent child session with its own model/agent.
  * Unlike fork (which copies the parent's config), subagents can use different
  * models and agents for cost optimization or specialization.
  */
@@ -2020,7 +2024,7 @@ export async function spawnParallelSubagents(parentId: string, tasks: Array<{
 
 // ── Worktree cleanup ──────────────────────────────────────────────────────
 
-/** Find orphaned worktrees — worktree dirs with no matching session. */
+/** Find orphaned worktrees -- worktree dirs with no matching session. */
 export function findOrphanedWorktrees(): string[] {
   const wtDir = WORKTREES_DIR();
   if (!existsSync(wtDir)) return [];

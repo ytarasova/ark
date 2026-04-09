@@ -1,13 +1,13 @@
 /**
- * Tests for search — searchSessions across metadata, events, messages;
- * searchTranscripts across Claude JSONL files.
+ * Tests for search -- searchSessions across metadata, events, messages;
+ * searchTranscripts across Claude JSONL files; readTranscriptTail helper.
  */
 
 import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { getApp } from "../app.js";
-import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation } from "../search.js";
+import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, readTranscriptTail } from "../search.js";
 import type { MessageRole } from "../../types/index.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -239,6 +239,31 @@ describe("indexTranscripts", () => {
     const results = searchTranscripts("SQL injection");
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].source).toBe("transcript");
+  });
+
+  it("multi-term query matches across turns in the same session", async () => {
+    const projectDir = join(getCtx().arkDir, "claude-projects", "-test-project");
+    mkdirSync(projectDir, { recursive: true });
+    // "alpha" in one turn, "bravo" in another turn, same session
+    writeFileSync(join(projectDir, "sess-multi.jsonl"), [
+      JSON.stringify({ type: "user", message: { role: "user", content: "tell me about alpha" }, timestamp: "2025-01-01T00:00:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "here is info about bravo" }] }, timestamp: "2025-01-01T00:00:01Z" }),
+    ].join("\n"));
+    await indexTranscripts({ transcriptsDir: join(getCtx().arkDir, "claude-projects") });
+
+    // Single terms find the session
+    const alphaResults = searchTranscripts("alpha");
+    expect(alphaResults.some(r => r.sessionId === "sess-multi")).toBe(true);
+    const bravoResults = searchTranscripts("bravo");
+    expect(bravoResults.some(r => r.sessionId === "sess-multi")).toBe(true);
+
+    // Multi-term: both terms exist in the session (different turns) — should find it
+    const multiResults = searchTranscripts("alpha bravo");
+    expect(multiResults.some(r => r.sessionId === "sess-multi")).toBe(true);
+
+    // Multi-term with a non-existent term — should NOT find it
+    const noResults = searchTranscripts("alpha zzzznonexistent");
+    expect(noResults.some(r => r.sessionId === "sess-multi")).toBe(false);
   });
 
   it("is fast — sub-100ms for indexed search", async () => {
@@ -482,6 +507,38 @@ describe("indexSession improvements", () => {
 
     const turns = getSessionConversation("incr-test");
     expect(turns.length).toBe(2); // not 3 (no duplicate)
+  });
+});
+
+// ── readTranscriptTail ──────────────────────────────────────────────────────
+
+describe("readTranscriptTail", () => {
+  it("returns full content for small files", () => {
+    const filePath = join(getCtx().arkDir, "small-transcript.jsonl");
+    const content = "line1\nline2\nline3\n";
+    writeFileSync(filePath, content);
+
+    const result = readTranscriptTail(filePath);
+    expect(result).toBe(content);
+  });
+
+  it("returns tail content for large files (> 256KB)", () => {
+    const filePath = join(getCtx().arkDir, "large-transcript.jsonl");
+    // Create a file larger than 256KB (262144 bytes)
+    const tailContent = "TAIL_MARKER_" + "x".repeat(1000) + "\n";
+    const paddingSize = 262144 + 10000; // well over the threshold
+    const padding = "a".repeat(paddingSize);
+    writeFileSync(filePath, padding + tailContent);
+
+    const result = readTranscriptTail(filePath);
+    // The result should contain the tail marker (it's in the last 256KB)
+    expect(result).toContain("TAIL_MARKER_");
+    // The result should NOT contain the full file (it was truncated)
+    expect(result.length).toBeLessThanOrEqual(262144);
+  });
+
+  it("throws for non-existent files", () => {
+    expect(() => readTranscriptTail("/tmp/no-such-file-ever.jsonl")).toThrow();
   });
 });
 

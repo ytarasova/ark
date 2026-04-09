@@ -26,6 +26,8 @@ interface TreeListProps<T> {
   onSelect?: (item: T | null) => void;
   /** Message when list is empty and no groups exist. */
   emptyMessage?: string;
+  /** Add a blank line between rows for visual breathing room */
+  spacing?: boolean;
 }
 
 /**
@@ -48,6 +50,7 @@ export function TreeList<T>({
   sel,
   onSelect,
   emptyMessage = "No items.",
+  spacing = false,
 }: TreeListProps<T>) {
   // Group items and sort keys (memoized to avoid rebuilding on every render)
   const { sortedKeys, groupMap } = useMemo(() => {
@@ -112,6 +115,9 @@ export function TreeList<T>({
             {renderChildren?.(item)}
           </Box>
         );
+        if (spacing) {
+          rows.push(<Text key={`sp-${flatIndex}`}>{" "}</Text>);
+        }
       }
     }
   }

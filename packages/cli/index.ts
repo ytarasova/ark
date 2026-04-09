@@ -12,7 +12,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { resolve, basename, join, dirname } from "path";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "fs";
 import { homedir } from "os";
 import { execSync, execFileSync } from "child_process";
 import YAML from "yaml";
@@ -21,6 +21,8 @@ import { getProvider } from "../compute/index.js";
 import { AppContext, setApp } from "../core/app.js";
 import { loadConfig } from "../core/config.js";
 import { getArkClient, closeArkClient } from "./client.js";
+import { execSession } from "./exec.js";
+import { sanitizeSummary, splitEditorCommand } from "./helpers.js";
 
 const app = new AppContext(loadConfig(), { skipConductor: true, skipMetrics: true });
 setApp(app);
@@ -114,7 +116,8 @@ session.command("start")
 
     // Sanitize session name: alphanumeric, dash, underscore only
     const rawName = opts.summary ?? ticket ?? "";
-    const summary = rawName.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || rawName;
+    const summary = sanitizeSummary(rawName);
+    if (summary !== rawName) console.log(`Note: session name sanitized to "${summary}"`);
 
     const s = await ark.sessionStart({
       ticket, summary,
@@ -317,7 +320,7 @@ session.command("attach")
       s = (await ark.sessionRead(id)).session;
     }
     const cmd = core.attachCommand(s.session_id!);
-    require("child_process").execSync(cmd, { stdio: "inherit" });
+    execSync(cmd, { stdio: "inherit" });
   });
 
 session.command("output")
@@ -357,23 +360,25 @@ session.command("undelete")
     }
   });
 
+async function forkCloneHandler(id: string, opts: { task?: string; group?: string; dispatch?: boolean }) {
+  const ark = await getArkClient();
+  try {
+    const forked = await ark.sessionClone(id, opts.task);
+    if (opts.group) await ark.sessionUpdate(forked.id, { group_name: opts.group });
+    console.log(chalk.green(`Forked → ${forked.id}`));
+    if (opts.dispatch) await ark.sessionDispatch(forked.id);
+  } catch (e: any) {
+    console.log(chalk.red(e.message));
+  }
+}
+
 session.command("fork")
   .description("Fork a session (branches the conversation)")
   .argument("<id>")
   .option("-t, --task <text>", "Task description for forked session")
   .option("-g, --group <name>", "Group for forked session")
   .option("-d, --dispatch", "Auto-dispatch")
-  .action(async (id, opts) => {
-    const ark = await getArkClient();
-    try {
-      const forked = await ark.sessionClone(id, opts.task);
-      if (opts.group) await ark.sessionUpdate(forked.id, { group_name: opts.group });
-      console.log(chalk.green(`Forked → ${forked.id}`));
-      if (opts.dispatch) await ark.sessionDispatch(forked.id);
-    } catch (e: any) {
-      console.log(chalk.red(e.message));
-    }
-  });
+  .action(forkCloneHandler);
 
 session.command("clone")
   .description("Alias for fork (branches the conversation)")
@@ -381,17 +386,7 @@ session.command("clone")
   .option("-t, --task <text>", "Task description for forked session")
   .option("-g, --group <name>", "Group for forked session")
   .option("-d, --dispatch", "Auto-dispatch")
-  .action(async (id, opts) => {
-    const ark = await getArkClient();
-    try {
-      const cloned = await ark.sessionClone(id, opts.task);
-      if (opts.group) await ark.sessionUpdate(cloned.id, { group_name: opts.group });
-      console.log(chalk.green(`Forked → ${cloned.id}`));
-      if (opts.dispatch) await ark.sessionDispatch(cloned.id);
-    } catch (e: any) {
-      console.log(chalk.red(e.message));
-    }
-  });
+  .action(forkCloneHandler);
 
 session.command("todo")
   .description("Manage session verification todos")
@@ -610,8 +605,8 @@ pr.command("list")
 pr.command("status")
   .description("Show session bound to a PR URL")
   .argument("<pr-url>", "GitHub PR URL")
-  .action((prUrl) => {
-    const { findSessionByPR } = require("../core/github-pr.js");
+  .action(async (prUrl) => {
+    const { findSessionByPR } = await import("../core/github-pr.js");
     const session = findSessionByPR(prUrl);
     if (!session) {
       console.log(chalk.yellow(`No session for ${prUrl}`));
@@ -636,7 +631,7 @@ program.command("watch")
     const label = opts.label;
     const intervalMs = parseInt(opts.interval, 10);
 
-    console.log(chalk.blue(`Watching issues labeled '${label}' (poll every ${intervalMs / 1000}s)${opts.dispatch ? " — auto-dispatch on" : ""}`));
+    console.log(chalk.blue(`Watching issues labeled '${label}' (poll every ${intervalMs / 1000}s)${opts.dispatch ? " -- auto-dispatch on" : ""}`));
     console.log(chalk.dim("Press Ctrl+C to stop.\n"));
 
     const poller = startIssuePoller({
@@ -1106,7 +1101,7 @@ knowledgeCmd.command("ingest")
       console.log(chalk.red(`Path not found: ${resolved}`));
       return;
     }
-    const stat = require("fs").statSync(resolved);
+    const stat = statSync(resolved);
     if (stat.isDirectory()) {
       const result = core.ingestDirectory(resolved, { scope: opts.scope, tags: opts.tag });
       console.log(chalk.green(`Ingested ${result.files} files (${result.chunks} chunks) from ${resolved}`));
@@ -1189,7 +1184,7 @@ computeCmd.command("create")
       } else if (opts.provider === "ec2") {
         let sizeLabel = opts.size;
         try {
-          const { INSTANCE_SIZES } = require("../compute/providers/ec2/provision.js");
+          const { INSTANCE_SIZES } = await import("../compute/providers/ec2/provision.js");
           const tier = INSTANCE_SIZES[opts.size];
           if (tier) sizeLabel = tier.label;
         } catch { /* not ec2 provider */ }
@@ -1433,7 +1428,7 @@ computeCmd.command("ssh")
     if (keyPath) sshArgs.unshift("-i", keyPath);
     console.log(chalk.dim(`$ ssh ${sshArgs.join(" ")}`));
     try {
-      require("child_process").execFileSync("ssh", sshArgs, { stdio: "inherit" });
+      execFileSync("ssh", sshArgs, { stdio: "inherit" });
     } catch (e: any) {
       console.log(chalk.red(`SSH failed: ${e.message}`));
     }
@@ -1713,11 +1708,12 @@ conductorCmd.command("notify")
 program.command("arkd")
   .description("Start the arkd agent daemon")
   .option("-p, --port <port>", "Port", "19300")
+  .option("--hostname <host>", "Bind address (default: 0.0.0.0)", "0.0.0.0")
   .option("--conductor-url <url>", "Conductor URL for channel relay")
   .action(async (opts) => {
     const { startArkd } = await import("../arkd/index.js");
     const conductorUrl = opts.conductorUrl || process.env.ARK_CONDUCTOR_URL || "http://localhost:19100";
-    startArkd(parseInt(opts.port), { conductorUrl });
+    startArkd(parseInt(opts.port), { conductorUrl, hostname: opts.hostname });
     // Keep alive
     setInterval(() => {}, 60_000);
   });
@@ -1996,8 +1992,6 @@ schedule.command("disable")
 
 // ── Exec (headless CI mode) ─────────────────────────────────────────────────
 
-import { execSession } from "./exec.js";
-
 program.command("exec")
   .description("Run a session non-interactively (for CI/CD)")
   .option("-r, --repo <path>", "Repository path", ".")
@@ -2011,8 +2005,8 @@ program.command("exec")
   .option("--timeout <seconds>", "Timeout in seconds (0=unlimited)", "0")
   .action(async (opts) => {
     // ark exec needs the conductor running (for hooks)
-    const { AppContext, setApp } = await import("../core/app.js");
-    const { loadConfig } = await import("../core/config.js");
+    // Shut down the CLI app before replacing with exec app
+    await app.shutdown();
     const execApp = new AppContext(loadConfig());
     await execApp.boot();
     setApp(execApp);
@@ -2044,7 +2038,7 @@ profile.command("list")
     const { profiles, active } = await ark.profileList();
     for (const p of profiles) {
       const marker = p.name === active ? chalk.green(" (active)") : "";
-      console.log(`  ${p.name}${marker}${p.description ? chalk.dim(` — ${p.description}`) : ""}`);
+      console.log(`  ${p.name}${marker}${p.description ? chalk.dim(` -- ${p.description}`) : ""}`);
     }
   });
 
@@ -2146,7 +2140,7 @@ program.command("config")
 
     // Create default config if missing
     if (!existsSync(configPath)) {
-      mkdirSync(require("path").dirname(configPath), { recursive: true });
+      mkdirSync(dirname(configPath), { recursive: true });
       writeFileSync(configPath, [
         "# Ark configuration",
         "# See: https://github.com/your-org/ark#configuration",
@@ -2169,8 +2163,8 @@ program.command("config")
 
     const editor = process.env.EDITOR ?? process.env.VISUAL ?? "vi";
     console.log(chalk.dim(`Opening ${configPath} in ${editor}...`));
-    // Interactive editor - requires shell stdio passthrough
-    execSync(`${editor} ${configPath}`, { stdio: "inherit" });
+    const { command: editorCmd, args: editorArgs } = splitEditorCommand(editor);
+    execFileSync(editorCmd, [...editorArgs, configPath], { stdio: "inherit" });
   });
 
 // ── Web dashboard ──────────────────────────────────────────────────────────
@@ -2282,20 +2276,21 @@ serverCmd
     const { ArkServer } = await import("../server/index.js");
     const { registerAllHandlers } = await import("../server/register.js");
 
-    const app = new AppContext(loadConfig());
-    await app.boot();
+    const serverApp = new AppContext(loadConfig());
+    await serverApp.boot();
 
     const server = new ArkServer();
-    registerAllHandlers(server.router, app);
+    registerAllHandlers(server.router, serverApp);
 
     if (opts.stdio) {
       server.startStdio();
+      process.on("SIGINT", () => { serverApp.shutdown(); process.exit(0); });
       await new Promise(() => {});
     } else {
       const port = parseInt(opts.port);
       const ws = server.startWebSocket(port);
       console.log(`Ark server listening on ws://localhost:${port}`);
-      process.on("SIGINT", () => { ws.stop(); app.shutdown(); process.exit(0); });
+      process.on("SIGINT", () => { ws.stop(); serverApp.shutdown(); process.exit(0); });
       await new Promise(() => {});
     }
   });

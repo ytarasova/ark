@@ -1,13 +1,21 @@
 import { useState, useEffect, useRef } from "react";
 import { StatusBadge } from "./StatusDot.js";
 import { api } from "../hooks/useApi.js";
-import { relTime } from "../util.js";
+import { relTime, fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { Separator } from "./ui/separator.js";
 import { Badge } from "./ui/badge.js";
 import { X } from "lucide-react";
+
+/** Format a token count for display (e.g. 1500 -> "1.5k"). */
+function humanTokens(n: number): string {
+  if (!n) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
 
 interface SessionDetailProps {
   sessionId: string;
@@ -161,94 +169,126 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
   }, [output]);
 
   async function handleAction(action: string) {
-    let res: any;
-    switch (action) {
-      case "dispatch": res = await api.dispatch(sessionId); break;
-      case "stop": res = await api.stop(sessionId); break;
-      case "restart": res = await api.restart(sessionId); break;
-      case "delete": res = await api.deleteSession(sessionId); break;
-      case "undelete": res = await api.undelete(sessionId); break;
-      case "pause": res = await api.pause(sessionId); break;
-      case "interrupt": res = await api.interrupt(sessionId); break;
-      case "advance": res = await api.advance(sessionId); break;
-      case "complete": res = await api.complete(sessionId); break;
-      case "fork": res = await api.fork(sessionId); break;
-      case "archive": res = await api.archive(sessionId); break;
-      case "restore": res = await api.restore(sessionId); break;
-      default: return;
-    }
-    if (res.ok !== false) {
-      onToast(`${action} successful`, "success");
-      const d = await api.getSession(sessionId);
-      setDetail(d);
-    } else {
-      onToast(res.message || "Action failed", "error");
+    try {
+      let res: any;
+      switch (action) {
+        case "dispatch": res = await api.dispatch(sessionId); break;
+        case "stop": res = await api.stop(sessionId); break;
+        case "restart": res = await api.restart(sessionId); break;
+        case "delete": res = await api.deleteSession(sessionId); break;
+        case "undelete": res = await api.undelete(sessionId); break;
+        case "pause": res = await api.pause(sessionId); break;
+        case "interrupt": res = await api.interrupt(sessionId); break;
+        case "advance": res = await api.advance(sessionId); break;
+        case "complete": res = await api.complete(sessionId); break;
+        case "fork": res = await api.fork(sessionId); break;
+        case "archive": res = await api.archive(sessionId); break;
+        case "restore": res = await api.restore(sessionId); break;
+        default: return;
+      }
+      if (res.ok !== false) {
+        onToast(`${action} successful`, "success");
+        const d = await api.getSession(sessionId);
+        setDetail(d);
+      } else {
+        onToast(res.message || "Action failed", "error");
+      }
+    } catch (err: any) {
+      onToast(err.message || "Action failed", "error");
     }
   }
 
   async function handlePreviewDiff() {
-    const data = await api.worktreeDiff(sessionId);
-    setDiffData(data);
-    setShowDiff(true);
+    try {
+      const data = await api.worktreeDiff(sessionId);
+      setDiffData(data);
+      setShowDiff(true);
+    } catch (err: any) {
+      onToast(err.message || "Failed to load diff", "error");
+    }
   }
 
   async function handleCreatePR() {
-    const res = await api.worktreeCreatePR(sessionId, {
-      title: prTitle || undefined,
-      draft: prDraft || undefined,
-    });
-    if (res.ok !== false) {
-      onToast("PR created", "success");
-      if (res.pr_url) setPrUrl(res.pr_url);
-      setShowPRForm(false);
-      const d = await api.getSession(sessionId);
-      setDetail(d);
-    } else {
-      onToast(res.message || "PR creation failed", "error");
+    try {
+      const res = await api.worktreeCreatePR(sessionId, {
+        title: prTitle || undefined,
+        draft: prDraft || undefined,
+      });
+      if (res.ok !== false) {
+        onToast("PR created", "success");
+        if (res.pr_url) setPrUrl(res.pr_url);
+        setShowPRForm(false);
+        const d = await api.getSession(sessionId);
+        setDetail(d);
+      } else {
+        onToast(res.message || "PR creation failed", "error");
+      }
+    } catch (err: any) {
+      onToast(err.message || "PR creation failed", "error");
     }
   }
 
   async function handleAddTodo() {
-    if (!newTodo.trim()) return;
-    const res = await api.addTodo(sessionId, newTodo.trim());
-    if (res.ok !== false && res.todo) {
-      setTodos([...todos, res.todo]);
-      setNewTodo("");
-    } else {
-      onToast("Failed to add todo", "error");
+    try {
+      if (!newTodo.trim()) return;
+      const res = await api.addTodo(sessionId, newTodo.trim());
+      if (res.ok !== false && res.todo) {
+        setTodos([...todos, res.todo]);
+        setNewTodo("");
+      } else {
+        onToast("Failed to add todo", "error");
+      }
+    } catch (err: any) {
+      onToast(err.message || "Failed to add todo", "error");
     }
   }
 
   async function handleToggleTodo(id: number) {
-    const res = await api.toggleTodo(id);
-    if (res.ok !== false && res.todo) {
-      setTodos(todos.map(t => t.id === id ? res.todo : t));
+    try {
+      const res = await api.toggleTodo(id);
+      if (res.ok !== false && res.todo) {
+        setTodos(todos.map(t => t.id === id ? res.todo : t));
+      }
+    } catch (err: any) {
+      onToast(err.message || "Failed to toggle todo", "error");
     }
   }
 
   async function handleDeleteTodo(id: number) {
-    const res = await api.deleteTodo(id);
-    if (res.ok !== false) {
-      setTodos(todos.filter(t => t.id !== id));
+    try {
+      const res = await api.deleteTodo(id);
+      if (res.ok !== false) {
+        setTodos(todos.filter(t => t.id !== id));
+      }
+    } catch (err: any) {
+      onToast(err.message || "Failed to delete todo", "error");
     }
   }
 
   async function handleRunVerification() {
-    const result = await api.runVerification(sessionId);
-    setVerifyResult(result);
-    if (result.ok) {
-      onToast("Verification passed", "success");
-    } else {
-      onToast("Verification failed", "error");
+    try {
+      const result = await api.runVerification(sessionId);
+      setVerifyResult(result);
+      if (result.ok) {
+        onToast("Verification passed", "success");
+      } else {
+        onToast("Verification failed", "error");
+      }
+    } catch (err: any) {
+      onToast(err.message || "Verification failed", "error");
     }
   }
 
   async function handleSend(message: string) {
-    const res = await api.send(sessionId, message);
-    if (res.ok !== false) {
-      onToast("Message sent", "success");
-    } else {
-      onToast(res.message || "Send failed", "error");
+    try {
+      const res = await api.send(sessionId, message);
+      if (res.ok !== false) {
+        onToast("Message sent", "success");
+      } else {
+        onToast(res.message || "Send failed", "error");
+      }
+    } catch (err: any) {
+      onToast(err.message || "Send failed", "error");
     }
   }
 
@@ -270,21 +310,6 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
 
   // Channel port: deterministic from session ID
   const channelPort = 19200 + (parseInt(s.id.replace("s-", ""), 16) % 10000);
-
-  // Token formatting helper
-  function humanTokens(n: number): string {
-    if (!n) return "0";
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-    return String(n);
-  }
-
-  // Cost formatting helper
-  function formatCost(cost: number): string {
-    if (cost === 0) return "$0.00";
-    if (cost < 0.01) return "<$0.01";
-    return `$${cost.toFixed(2)}`;
-  }
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -404,7 +429,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
               {s.config.usage.total_cost != null && s.config.usage.total_cost > 0 && (
                 <>
                   <span className="text-muted-foreground">Cost</span>
-                  <span className="text-amber-400 font-mono">{formatCost(s.config.usage.total_cost)}</span>
+                  <span className="text-amber-400 font-mono">{fmtCost(s.config.usage.total_cost)}</span>
                 </>
               )}
             </div>

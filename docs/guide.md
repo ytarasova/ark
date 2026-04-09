@@ -12,7 +12,8 @@ brew install tmux
 curl -fsSL https://bun.sh/install | bash
 
 # Install Ark
-git clone https://github.com/your-org/ark.git
+# Clone the Ark repository
+git clone <ark-repo-url>
 cd ark && make install
 ```
 
@@ -46,6 +47,22 @@ make desktop  # Desktop app (Electron, native window)
 ark recipe list                                          # See available templates
 ark session start --recipe quick-fix --repo . --dispatch # One-command session from template
 ```
+
+### Check Prerequisites
+
+```bash
+ark doctor    # verifies Bun, tmux, git, Claude CLI are installed and working
+```
+
+`ark doctor` checks each prerequisite and reports pass/fail with version info. Run it after a fresh install or when something seems off.
+
+### Initialize a Repository
+
+```bash
+ark init      # interactive setup: prereq check, auth check, .ark.yaml creation
+```
+
+`ark init` walks you through first-time setup in a repo: verifies prerequisites (like `doctor`), checks Claude auth, and creates an `.ark.yaml` config file with your preferred defaults (flow, agent, compute, etc.).
 
 ---
 
@@ -297,20 +314,72 @@ ark web --read-only                  # No mutations allowed
 ark web --token my-secret-token      # Require Bearer token auth
 ```
 
-### Features
+### Views
 
-- **Session management**: create, dispatch, stop, restart, interrupt, pause, advance, complete, fork, send, archive sessions
-- **Compute lifecycle**: provision, start, stop, destroy compute resources
-- **Scheduling**: create, enable/disable, delete scheduled sessions
-- **Verification**: run verification, manage todos
-- **Diff preview**: view changes before merging or creating PRs
-- **PR creation**: create GitHub PRs from session worktrees
-- **Cost tracking**: per-session and aggregate cost display
-- **Memory view**: add, search, and delete cross-session memories from the sidebar
-- **System status**: conductor health, active sessions count
-- **SSE live updates**: real-time session status changes pushed to the browser
-- **Token auth**: protect the dashboard with a Bearer token
-- **Read-only mode**: view sessions without mutation capability
+The web dashboard provides a full-featured browser UI with these pages (accessible from the sidebar):
+
+| View | Purpose |
+|------|---------|
+| **Sessions** | Session list with status indicators, detail panel, and all lifecycle actions |
+| **Agents** | Browse agent definitions, view configs, and manage custom agents |
+| **Tools** | MCP servers, commands, skills, recipes, and context management |
+| **Flows** | Flow definitions with stage visualization and gate configuration |
+| **History** | Claude Code session discovery, search, and import into Ark |
+| **Compute** | Compute resource provisioning and lifecycle (local, Docker, EC2) |
+| **Costs** | Per-session and aggregate token usage with budget tracking |
+| **Schedules** | Cron-based recurring session management (create, enable/disable, delete) |
+| **Memory** | Cross-session persistent memory -- add, search, and delete memories |
+| **Settings** | Dashboard and system configuration |
+
+### Session Interactions
+
+From the Sessions view, you can perform the full session lifecycle:
+
+- **Create**: open the New Session modal to configure repo, summary, flow, agent, and compute
+- **Dispatch / Stop / Restart**: launch, halt, or restart agents on selected sessions
+- **Send messages**: type messages to running agents in the detail panel
+- **Interrupt**: send Ctrl+C to pause a running agent without killing the tmux session
+- **Pause / Advance / Complete**: control flow stage progression
+- **Fork**: create a branched copy of a session with a new task description
+- **Archive / Restore**: archive completed sessions or restore them
+
+### Diff Preview and PR Creation
+
+The Sessions detail panel includes a diff preview that shows the git diff stat for the session's worktree branch. From there you can:
+
+- Review changed files before merging
+- Create a GitHub PR directly from the web UI
+- Merge the worktree branch into your target branch
+
+### Cost Tracking
+
+The Costs view shows:
+
+- Per-session token breakdown (input, output, cache read, cache write)
+- Cost per session calculated from per-model pricing
+- Aggregate totals across all sessions
+- Budget usage against configured daily/weekly/monthly limits
+
+### Memory Sidebar
+
+The Memory view lets you manage persistent cross-session knowledge:
+
+- Add new memories with tags, scope, and importance
+- Search existing memories by keyword
+- Delete individual memories or clear by scope
+
+### Live Updates
+
+The dashboard uses Server-Sent Events (SSE) for real-time updates -- no polling. Session status changes, new events, and agent progress are pushed to the browser as they happen.
+
+### Access Control
+
+- **Token auth**: pass `--token <secret>` to require a `Bearer` token on all requests. Clients must send `Authorization: Bearer <secret>` headers.
+- **Read-only mode**: pass `--read-only` to disable all mutation endpoints. The dashboard becomes a monitoring-only view.
+
+### Desktop App
+
+The Electron desktop app (`make desktop`) wraps this same web UI in a native window. All views and interactions are identical -- see the [Desktop App](#desktop-app) section for native-specific details.
 
 ---
 
@@ -421,6 +490,55 @@ env:
 ```bash
 ark agent list    # Shows all agents with their runtime type
 ```
+
+### CLI Agent (Multi-Tool Orchestration)
+
+Ark can orchestrate any CLI coding tool, not just Claude. The `cli-agent` runtime launches arbitrary CLI tools in tmux with worktree isolation, the same way it launches Claude Code.
+
+**Builtin CLI agents:**
+
+| Agent | Tool | Description |
+|-------|------|-------------|
+| `codex-worker` | OpenAI Codex CLI | Full-auto Codex agent |
+| `gemini-worker` | Google Gemini CLI | Gemini coding agent |
+| `aider-worker` | Aider | Aider chat-based coding |
+| `generic-cli` | Any CLI | Generic wrapper for custom tools |
+
+**Example agent YAML:**
+
+```yaml
+name: codex-worker
+description: OpenAI Codex CLI coding agent
+runtime: cli-agent
+command: ["codex", "--approval-mode", "full-auto"]
+task_delivery: arg       # how the task is sent to the CLI tool
+model: o4-mini
+max_turns: 200
+system_prompt: ""
+tools: []
+permission_mode: bypassPermissions
+env: {}
+```
+
+**Task delivery modes** control how Ark passes the task to the CLI tool:
+
+| Mode | Behavior | Example |
+|------|----------|---------|
+| `stdin` | Pipes the task via cat to stdin | `echo "task" \| codex` |
+| `file` | Writes task to a temp file and passes the path | `codex --task /tmp/task.txt` |
+| `arg` | Appends the task as the last CLI argument (default) | `codex "Fix the login bug"` |
+
+**Usage:**
+
+```bash
+# Use a builtin CLI agent
+ark session start --repo . --summary "Fix the bug" --agent codex-worker --dispatch
+
+# Or define your own
+ark agent create my-tool    # set runtime: cli-agent in the YAML
+```
+
+CLI agents get the same worktree isolation, session tracking, and lifecycle management as Claude Code agents. The only difference is the executor that launches them.
 
 ### Flow Definitions
 
@@ -1214,29 +1332,28 @@ This is a lightweight heuristic layer, not a security boundary. It catches commo
 
 ## Testing
 
-Tests use `bun:test`. Always run with `bun test` or `make test`, never `npm test` (the package.json test script is wrong).
+Tests use `bun:test`. Always run with `make test` -- never call `bun test` directly (concurrency flags matter and `make test` handles them correctly).
 
 ### Critical: never run tests in parallel
 
-Tests share SQLite databases and hardcoded network ports (19100, 19200, 19300). Running tests in parallel causes port collisions and database corruption. Always use `--concurrency 1`:
+Tests share SQLite databases and hardcoded network ports (19100, 19200, 19300). Running tests in parallel causes port collisions and database corruption. Always use `make test`:
 
 ```bash
-bun test --concurrency 1              # all tests, sequential
-bun test --concurrency 1 packages/core    # core tests only
-make test                             # uses --concurrency 1 by default
+make test                                                  # all tests, sequential
+make test-file F=packages/core/__tests__/session.test.ts   # single file
 ```
 
 ### Test isolation
 
 Every test must create and clean up its own context to avoid leaking state:
 
-```bash
-const ctx = withTestContext();  # handles setup + teardown automatically
+```ts
+const ctx = withTestContext();  // handles setup + teardown automatically
 ```
 
 Or manually:
 
-```bash
+```ts
 let ctx: TestContext;
 beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
 afterEach(() => { ctx.cleanup(); });

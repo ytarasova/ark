@@ -13,6 +13,8 @@ interface ScrollBoxProps {
    * and does NOT handle j/k internally (the parent owns navigation).
    */
   followIndex?: number;
+  /** When this value changes, scroll resets to the top. */
+  resetKey?: string;
 }
 
 /**
@@ -23,10 +25,15 @@ interface ScrollBoxProps {
  * 2. Follow mode (followIndex set): auto-scrolls to keep the followed index visible.
  *    Used by left/list panes where useListNavigation owns j/k.
  */
-export function ScrollBox({ children, reserveRows = 6, active = true, followIndex }: ScrollBoxProps) {
+export function ScrollBox({ children, reserveRows = 6, active = true, followIndex, resetKey }: ScrollBoxProps) {
   const { stdout } = useStdout();
   const maxHeight = (stdout?.rows ?? 40) - reserveRows;
   const [offset, setOffset] = useState(0);
+
+  // Reset scroll to top when resetKey changes
+  useEffect(() => {
+    setOffset(0);
+  }, [resetKey]);
 
   const items = useMemo(() => {
     const flat: React.ReactNode[] = [];

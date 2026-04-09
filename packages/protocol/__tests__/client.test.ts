@@ -145,7 +145,7 @@ describe("ArkClient", () => {
     client.close();
   });
 
-  it("clears pending requests on close()", async () => {
+  it("rejects pending requests on close()", async () => {
     let clientHandler: (msg: JsonRpcMessage) => void = () => {};
     // Create a transport that never responds
     const blackHoleTransport: Transport = {
@@ -154,11 +154,12 @@ describe("ArkClient", () => {
       close() {},
     };
     const client = new ArkClient(blackHoleTransport);
-    client.initialize().catch(() => {});
-    // close() clears pending requests without rejecting (avoids unhandled rejections)
+    const pending = client.initialize().catch((err) => err);
+    // close() rejects all pending requests
     client.close();
-    // Verify no crash and pending map is cleared
-    expect(true).toBe(true);
+    const err = await pending;
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe("ArkClient closed");
   });
 
   it("lists resources (agents, flows, skills, recipes)", async () => {

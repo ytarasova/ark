@@ -10,13 +10,19 @@
  */
 
 import { existsSync, rmSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { homedir } from "os";
 import { ArkdBackedProvider } from "./arkd-backed.js";
 import { safeAsync } from "../../core/safe.js";
+import {
+  pullImage, createContainer, startContainer, stopContainer, removeContainer, DEFAULT_IMAGE,
+} from "./docker/helpers.js";
 import type {
   Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
 } from "../types.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const ARKD_PORT = 19300;
 const ARKD_URL = `http://localhost:${ARKD_PORT}`;
@@ -127,35 +133,18 @@ export class LocalDockerProvider extends LocalArkdBase {
   }
 
   async provision(compute: Compute, _opts?: ProvisionOpts): Promise<void> {
-    const { execFile } = await import("child_process");
-    const { promisify } = await import("util");
-    const execFileAsync = promisify(execFile);
-
     const cfg = compute.config as Record<string, unknown>;
     const name = this.containerName(compute);
-    const image = (cfg.image as string) || "ubuntu:22.04";
+    const image = (cfg.image as string) || DEFAULT_IMAGE;
     const extraVolumes = (cfg.volumes as string[]) ?? [];
 
     const { getApp } = await import("../../core/app.js");
     getApp().computes.update(compute.name, { status: "provisioning" });
 
     try {
-      await execFileAsync("docker", ["pull", image], { timeout: 300_000 });
-
-      const home = homedir();
-      const createArgs = [
-        "create", "--name", name, "-it",
-        "-v", `${join(home, ".ssh")}:/root/.ssh:ro`,
-        "-v", `${join(home, ".claude")}:/root/.claude:ro`,
-      ];
-      if (existsSync(join(home, ".aws"))) {
-        createArgs.push("-v", `${join(home, ".aws")}:/root/.aws:ro`);
-      }
-      for (const vol of extraVolumes) createArgs.push("-v", vol);
-      createArgs.push(image, "bash");
-
-      await execFileAsync("docker", createArgs, { timeout: 30_000 });
-      await execFileAsync("docker", ["start", name], { timeout: 15_000 });
+      await pullImage(image);
+      await createContainer(name, image, extraVolumes);
+      await startContainer(name);
 
       getApp().computes.mergeConfig(compute.name, { image, container_name: name });
       getApp().computes.update(compute.name, { status: "running" });
@@ -168,46 +157,34 @@ export class LocalDockerProvider extends LocalArkdBase {
   }
 
   async destroy(compute: Compute): Promise<void> {
-    const { execFile } = await import("child_process");
-    const { promisify } = await import("util");
-    const execFileAsync = promisify(execFile);
     const name = this.containerName(compute);
     await safeAsync(`[docker] destroy: rm container ${name}`, async () => {
-      await execFileAsync("docker", ["rm", "-f", name], { timeout: 15_000 });
+      await removeContainer(name);
     });
     const { getApp } = await import("../../core/app.js");
     getApp().computes.update(compute.name, { status: "destroyed" });
   }
 
   async start(compute: Compute): Promise<void> {
-    const { execFile } = await import("child_process");
-    const { promisify } = await import("util");
-    const execFileAsync = promisify(execFile);
     const name = this.containerName(compute);
-    await execFileAsync("docker", ["start", name], { timeout: 15_000 });
+    await startContainer(name);
     const { getApp } = await import("../../core/app.js");
     getApp().computes.update(compute.name, { status: "running" });
   }
 
   async stop(compute: Compute): Promise<void> {
-    const { execFile } = await import("child_process");
-    const { promisify } = await import("util");
-    const execFileAsync = promisify(execFile);
     const name = this.containerName(compute);
     await safeAsync(`[docker] stop: container ${name}`, async () => {
-      await execFileAsync("docker", ["stop", name], { timeout: 15_000 });
+      await stopContainer(name);
     });
     const { getApp } = await import("../../core/app.js");
     getApp().computes.update(compute.name, { status: "stopped" });
   }
 
   async cleanupSession(compute: Compute, _session: Session): Promise<void> {
-    const { execFile } = await import("child_process");
-    const { promisify } = await import("util");
-    const execFileAsync = promisify(execFile);
     const name = this.containerName(compute);
     await safeAsync(`[docker] cleanupSession: stop container ${name}`, async () => {
-      await execFileAsync("docker", ["stop", name], { timeout: 15_000 });
+      await stopContainer(name);
     });
   }
 

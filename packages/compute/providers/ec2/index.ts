@@ -28,6 +28,7 @@ import type {
 } from "../../types.js";
 import type { Compute, Session } from "../../../types/index.js";
 import { getApp } from "../../../core/app.js";
+import { ARK_DIR } from "../../../core/paths.js";
 import { sshKeyPath, sshExec, sshExecAsync, waitForSsh, waitForSshAsync, generateSshKey, rsyncPush } from "./ssh.js";
 import { buildUserData } from "./cloud-init.js";
 import { provisionStack, destroyStack, resolveInstanceType } from "./provision.js";
@@ -75,7 +76,6 @@ interface EC2HostConfig {
 /** Try to read oauth token from ~/.ark/claude-oauth-token. Returns null on failure. */
 function readOauthTokenFromDisk(): string | null {
   try {
-    const { ARK_DIR } = require("../../../core/paths.js");
     const p = join(ARK_DIR(), "claude-oauth-token");
     if (existsSync(p)) return readFileSync(p, "utf-8").trim();
   } catch {}
@@ -87,6 +87,11 @@ function createEc2Client(cfg: EC2HostConfig): EC2Client {
     region: cfg.region ?? "us-east-1",
     ...(cfg.aws_profile ? { credentials: fromIni({ profile: cfg.aws_profile }) } : {}),
   });
+}
+
+/** Escape a string for safe interpolation in single-quoted shell arguments. */
+export function shellEscape(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
 // ── Extracted helpers for provision() ─────────────────────────────────────────
@@ -197,32 +202,33 @@ async function syncRemoteCredentials(
 async function uploadSessionConfigs(
   key: string, ip: string, remoteWorkdir: string, opts: LaunchOpts,
 ): Promise<void> {
+  const wd = shellEscape(remoteWorkdir);
   const localMcpJson = join(opts.workdir, ".mcp.json");
   if (existsSync(localMcpJson)) {
     const encoded = Buffer.from(readFileSync(localMcpJson, "utf-8")).toString("base64");
     await sshExecAsync(key, ip,
-      `echo '${encoded}' | base64 -d > '${remoteWorkdir}/.mcp.json'`,
+      `echo '${encoded}' | base64 -d > ${wd}/.mcp.json`,
       { timeout: 15_000 });
   }
   const localHooksConfig = join(opts.workdir, ".claude", "settings.local.json");
   if (existsSync(localHooksConfig)) {
     const encoded = Buffer.from(readFileSync(localHooksConfig, "utf-8")).toString("base64");
     await sshExecAsync(key, ip,
-      `mkdir -p '${remoteWorkdir}/.claude' && echo '${encoded}' | base64 -d > '${remoteWorkdir}/.claude/settings.local.json'`,
+      `mkdir -p ${wd}/.claude && echo '${encoded}' | base64 -d > ${wd}/.claude/settings.local.json`,
       { timeout: 15_000 });
   }
 
   // Sync .claude/commands/ if it exists
   const commandsDir = join(opts.workdir, ".claude", "commands");
   if (existsSync(commandsDir)) {
-    await sshExecAsync(key, ip, `mkdir -p '${remoteWorkdir}/.claude/commands'`, { timeout: 15_000 });
+    await sshExecAsync(key, ip, `mkdir -p ${wd}/.claude/commands`, { timeout: 15_000 });
     await rsyncPush(key, ip, commandsDir + "/", `${remoteWorkdir}/.claude/commands/`);
   }
 
   // Sync .claude/skills/ if it exists
   const skillsDir = join(opts.workdir, ".claude", "skills");
   if (existsSync(skillsDir)) {
-    await sshExecAsync(key, ip, `mkdir -p '${remoteWorkdir}/.claude/skills'`, { timeout: 15_000 });
+    await sshExecAsync(key, ip, `mkdir -p ${wd}/.claude/skills`, { timeout: 15_000 });
     await rsyncPush(key, ip, skillsDir + "/", `${remoteWorkdir}/.claude/skills/`);
   }
 
@@ -231,7 +237,7 @@ async function uploadSessionConfigs(
   if (existsSync(claudeMd)) {
     const encoded = Buffer.from(readFileSync(claudeMd, "utf-8")).toString("base64");
     await sshExecAsync(key, ip,
-      `echo '${encoded}' | base64 -d > '${remoteWorkdir}/CLAUDE.md'`,
+      `echo '${encoded}' | base64 -d > ${wd}/CLAUDE.md`,
       { timeout: 15_000 });
   }
 
@@ -252,7 +258,7 @@ async function setupRemoteLauncher(
     const escaped = opts.workdir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     remoteLauncher = remoteLauncher.replace(new RegExp(escaped, 'g'), remoteWorkdir);
   }
-  remoteLauncher = remoteLauncher.replace(/^cd .*$/m, `cd '${remoteWorkdir}'`);
+  remoteLauncher = remoteLauncher.replace(/^cd .*$/m, `cd ${shellEscape(remoteWorkdir)}`);
 
   const encoded = Buffer.from(remoteLauncher).toString("base64");
   const remoteDir = `~/.ark/tracks/${session.id}`;
@@ -511,7 +517,7 @@ export class EC2Provider implements ComputeProvider {
     await setupRemoteLauncher(key, ip, session, remoteWorkdir, opts);
     const remoteDir = `~/.ark/tracks/${session.id}`;
     await sshExecAsync(key, ip,
-      `tmux new-session -d -s '${opts.tmuxName}' -c '${remoteWorkdir}' 'bash ${remoteDir}/launch.sh'`,
+      `tmux new-session -d -s ${shellEscape(opts.tmuxName)} -c ${shellEscape(remoteWorkdir)} 'bash ${remoteDir}/launch.sh'`,
       { timeout: 15_000 });
 
     // 5. Auto-accept channel prompt
@@ -565,7 +571,7 @@ export class EC2Provider implements ComputeProvider {
     const { queue } = this.getQueue(compute);
     await safeAsync(`[ec2] cleanupSession: rm remote workdir for ${session.id} on ${compute.name}`, () =>
       queue.command(async (p) => {
-        await p.exec(`rm -rf '${remoteWorkdir}'`, { timeout: 15_000 });
+        await p.exec(`rm -rf ${shellEscape(remoteWorkdir)}`, { timeout: 15_000 });
       }),
     );
   }
@@ -621,10 +627,11 @@ export class EC2Provider implements ComputeProvider {
     // Periodically refresh auth token on remote (piggyback on metrics cycle)
     if (process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN) {
       const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
+      const encodedToken = Buffer.from(token).toString("base64");
       safeAsync(`[ec2] getMetrics: token refresh on ${compute.name}`, () =>
         queue.command(async (p) => {
           await p.exec(
-            `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN '${token}' 2>/dev/null; done`,
+            `TOKEN=$(echo '${encodedToken}' | base64 -d); for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN "$TOKEN" 2>/dev/null; done`,
             { timeout: 10_000 },
           );
         }),

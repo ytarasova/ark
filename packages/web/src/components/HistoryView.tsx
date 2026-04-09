@@ -115,7 +115,7 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
     if (searched && query.trim()) {
       doSearch();
     }
-  }, [mode]);
+  }, [mode, doSearch]);
 
   function handleClear() {
     setQuery("");

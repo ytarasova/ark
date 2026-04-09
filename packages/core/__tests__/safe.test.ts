@@ -1,8 +1,8 @@
 /**
- * Tests for safe.ts — async error suppression utility.
+ * Tests for safe.ts -- async error suppression utility.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, mock, afterEach } from "bun:test";
 import { safeAsync } from "../safe.js";
 
 describe("safeAsync", () => {
@@ -45,5 +45,17 @@ describe("safeAsync", () => {
   it("handles async rejections", async () => {
     const result = await safeAsync("test", () => Promise.reject(new Error("rejected")));
     expect(result).toBe(false);
+  });
+
+  it("does not call console.error (uses structured logging)", async () => {
+    const origConsoleError = console.error;
+    const consoleMock = mock(() => {});
+    console.error = consoleMock;
+    try {
+      await safeAsync("test", async () => { throw new Error("should use logError"); });
+      expect(consoleMock).not.toHaveBeenCalled();
+    } finally {
+      console.error = origConsoleError;
+    }
   });
 });

@@ -15,7 +15,7 @@ function FocusInspector() {
   const focus = useFocus();
   focusRef = focus;
   return (
-    <Text>{`owner=${focus.owner ?? "null"} appActive=${focus.appActive}`}</Text>
+    <Text>{`owner=${focus.owner ?? "null"} appActive=${focus.appActive} pane=${focus.targetPane ?? "null"}`}</Text>
   );
 }
 
@@ -122,6 +122,83 @@ describe("useFocus", () => {
     // Stack should be unchanged
     expect(focusRef!.owner).toBe("form");
     expect(focusRef!.appActive).toBe(false);
+    unmount();
+  });
+
+  it("push defaults targetPane to right", async () => {
+    const { unmount } = render(<Wrapped />);
+    expect(focusRef!.targetPane).toBeNull();
+
+    focusRef!.push("form");
+    await waitFor(() => focusRef!.owner === "form");
+    expect(focusRef!.targetPane).toBe("right");
+    unmount();
+  });
+
+  it("push with explicit left pane sets targetPane to left", async () => {
+    const { unmount } = render(<Wrapped />);
+    focusRef!.push("search", "left");
+    await waitFor(() => focusRef!.owner === "search");
+    expect(focusRef!.targetPane).toBe("left");
+    unmount();
+  });
+
+  it("pushing an overlay then popping exactly that overlay restores previous state", async () => {
+    const { unmount } = render(<Wrapped />);
+
+    // Simulate overlay lifecycle: push "talk" overlay, then pop it
+    focusRef!.push("talk");
+    await waitFor(() => focusRef!.owner === "talk");
+    expect(focusRef!.appActive).toBe(false);
+
+    // Simulate setting overlay to null -- pop exactly the pushed overlay
+    focusRef!.pop("talk");
+    await waitFor(() => focusRef!.owner === null);
+    expect(focusRef!.owner).toBeNull();
+    expect(focusRef!.appActive).toBe(true);
+    unmount();
+  });
+
+  it("push overlay, pop only that overlay -- does not pop unrelated entries", async () => {
+    const { unmount } = render(<Wrapped />);
+
+    // Simulate a base focus entry (like a search input)
+    focusRef!.push("search", "left");
+    await waitFor(() => focusRef!.owner === "search");
+
+    // Overlay opens on top
+    focusRef!.push("talk");
+    await waitFor(() => focusRef!.owner === "talk");
+
+    // Overlay closes -- only pop "talk", not "search"
+    focusRef!.pop("talk");
+    await waitFor(() => focusRef!.owner === "search");
+    expect(focusRef!.owner).toBe("search");
+    expect(focusRef!.appActive).toBe(false);
+
+    // Clean up
+    focusRef!.pop("search");
+    await waitFor(() => focusRef!.owner === null);
+    unmount();
+  });
+
+  it("targetPane follows top of stack", async () => {
+    const { unmount } = render(<Wrapped />);
+    focusRef!.push("search", "left");
+    await waitFor(() => focusRef!.owner === "search");
+    expect(focusRef!.targetPane).toBe("left");
+
+    focusRef!.push("overlay");
+    await waitFor(() => focusRef!.owner === "overlay");
+    expect(focusRef!.targetPane).toBe("right");
+
+    focusRef!.pop("overlay");
+    await waitFor(() => focusRef!.owner === "search");
+    expect(focusRef!.targetPane).toBe("left");
+
+    focusRef!.pop("search");
+    await waitFor(() => focusRef!.owner === null);
+    expect(focusRef!.targetPane).toBeNull();
     unmount();
   });
 });

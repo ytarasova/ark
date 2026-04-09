@@ -1,10 +1,10 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { findProjectRoot, loadAgent, listAgents, saveAgent, deleteAgent } from "../../core/agent.js";
-import { listFlows, loadFlow, saveFlow, deleteFlow } from "../../core/flow.js";
-import { listSkills, loadSkill, saveSkill, deleteSkill } from "../../core/skill.js";
-import { listRecipes, loadRecipe, instantiateRecipe, deleteRecipe } from "../../core/recipe.js";
+import { findProjectRoot, loadAgent, listAgents } from "../../core/agent.js";
+import { listFlows, loadFlow } from "../../core/flow.js";
+import { listSkills, loadSkill } from "../../core/skill.js";
+import { listRecipes, loadRecipe, instantiateRecipe } from "../../core/recipe.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type {
   AgentReadParams,
@@ -17,6 +17,23 @@ import type {
   GroupCreateParams,
   GroupDeleteParams,
 } from "../../types/index.js";
+
+/** Kill tmux sessions for zombie ark sessions (no DB record or terminal status). */
+async function cleanZombieSessions(app: AppContext): Promise<number> {
+  const { listArkSessionsAsync, killSessionAsync } = await import("../../core/tmux.js");
+  const tmuxSessions = await listArkSessionsAsync();
+  let cleaned = 0;
+  for (const ts of tmuxSessions) {
+    const sessionId = ts.name.replace("ark-", "");
+    const dbSession = app.sessions.get(sessionId);
+    if (!dbSession || ["failed", "completed"].includes(dbSession.status)) {
+      await killSessionAsync(ts.name);
+      if (dbSession) app.sessions.update(dbSession.id, { session_id: null });
+      cleaned++;
+    }
+  }
+  return cleaned;
+}
 
 export function registerResourceHandlers(router: Router, app: AppContext): void {
   router.handle("agent/list", async () => ({ agents: listAgents() }));
@@ -138,18 +155,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = app.computes.get(name);
     if (!compute) throw new Error("Compute not found");
-    const { listArkSessionsAsync, killSessionAsync } = await import("../../core/tmux.js");
-    const tmuxSessions = await listArkSessionsAsync();
-    let cleaned = 0;
-    for (const ts of tmuxSessions) {
-      const sessionId = ts.name.replace("ark-", "");
-      const dbSession = app.sessions.get(sessionId);
-      if (!dbSession || ["failed", "completed"].includes(dbSession.status)) {
-        await killSessionAsync(ts.name);
-        if (dbSession) app.sessions.update(dbSession.id, { session_id: null });
-        cleaned++;
-      }
-    }
+    const cleaned = await cleanZombieSessions(app);
     return { ok: true, cleaned };
   });
   router.handle("compute/reboot", async (p) => {
@@ -191,74 +197,9 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     }
   });
   router.handle("compute/clean-zombies", async () => {
-    const { listArkSessionsAsync, killSessionAsync } = await import("../../core/tmux.js");
-    const tmuxSessions = await listArkSessionsAsync();
-    let cleaned = 0;
-    for (const ts of tmuxSessions) {
-      const sessionId = ts.name.replace("ark-", "");
-      const dbSession = app.sessions.get(sessionId);
-      if (!dbSession || ["failed", "completed"].includes(dbSession.status)) {
-        await killSessionAsync(ts.name);
-        if (dbSession) app.sessions.update(dbSession.id, { session_id: null });
-        cleaned++;
-      }
-    }
+    const cleaned = await cleanZombieSessions(app);
     return { cleaned };
   });
-  // ── Skill mutations ─────────────────────────────────────────────────────
-  router.handle("skill/save", async (p) => {
-    const { name, content, scope, projectRoot } = extract<{ name: string; content?: string; scope?: "project" | "global"; projectRoot?: string }>(p, ["name"]);
-    saveSkill(p as any, (scope ?? "global") as "project" | "global", projectRoot);
-    return { ok: true, name };
-  });
-  router.handle("skill/delete", async (p) => {
-    const { name, scope, projectRoot } = extract<{ name: string; scope?: "project" | "global"; projectRoot?: string }>(p, ["name"]);
-    deleteSkill(name, scope, projectRoot);
-    return { ok: true };
-  });
-
-  // ── Recipe mutations ───────────────────────────────────────────────────
-  router.handle("recipe/delete", async (p) => {
-    const { name, scope } = extract<{ name: string; scope?: "project" | "global" }>(p, ["name"]);
-    deleteRecipe(name, (scope ?? "global") as "project" | "global");
-    return { ok: true };
-  });
-
-  // ── Agent mutations ────────────────────────────────────────────────────
-  router.handle("agent/create", async (p) => {
-    const agent = extract<{ name: string }>(p, ["name"]);
-    saveAgent(p as any);
-    return { ok: true, name: agent.name };
-  });
-  router.handle("agent/update", async (p) => {
-    const { name } = extract<{ name: string }>(p, ["name"]);
-    saveAgent(p as any);
-    return { ok: true, name };
-  });
-  router.handle("agent/delete", async (p) => {
-    const { name } = extract<{ name: string }>(p, ["name"]);
-    deleteAgent(name);
-    return { ok: true };
-  });
-
-  // ── Flow mutations ─────────────────────────────────────────────────────
-  router.handle("flow/create", async (p) => {
-    const { name } = extract<{ name: string }>(p, ["name"]);
-    saveFlow(p as any);
-    return { ok: true, name };
-  });
-  router.handle("flow/delete", async (p) => {
-    const { name } = extract<{ name: string }>(p, ["name"]);
-    const all = listFlows();
-    const flow = all.find(f => f.name === name);
-    if (flow && (flow as any).source === "builtin") {
-      throw new RpcError("Cannot delete builtin flows", ErrorCodes.INVALID_REQUEST);
-    }
-    deleteFlow(name);
-    return { ok: true };
-  });
-
-  // ── Groups ─────────────────────────────────────────────────────────────
   router.handle("group/list", async () => ({ groups: app.sessions.getGroups() }));
   router.handle("group/create", async (p) => {
     const { name } = extract<GroupCreateParams>(p, ["name"]);

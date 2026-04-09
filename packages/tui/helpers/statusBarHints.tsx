@@ -199,7 +199,7 @@ export function getHistoryHints(): React.ReactNode[] {
     ...NAV_HINTS, sep(0),
     <KeyHint key="enter" k="Enter" label="import Claude" />,
     <KeyHint key="r" k="r/R" label="refresh/rebuild" />,
-    <KeyHint key="s" k="s" label="search" />,
+    <KeyHint key="/" k="/" label="search" />,
     ...GLOBAL_HINTS,
   ];
 }

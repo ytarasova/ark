@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Session, SearchResult } from "../../core/index.js";
 import { ICON } from "../constants.js";
@@ -78,9 +78,14 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   const { sel, setSel } = useListNavigation(filteredTopLevel.length, { active: pane === "left" && !hasOverlay });
 
   // Push/pop focus when overlay opens/closes
+  const prevOverlayRef = useRef<Overlay>(null);
   useEffect(() => {
-    if (overlay) focus.push(overlay);
-    else focus.pop("move"), focus.pop("group"), focus.pop("talk"), focus.pop("inbox"), focus.pop("fork"), focus.pop("search"), focus.pop("replay"), focus.pop("mcp"), focus.pop("skills"), focus.pop("settings"), focus.pop("find"), focus.pop("memory"), focus.pop("worktreeFinish");
+    if (overlay) {
+      focus.push(overlay);
+    } else if (prevOverlayRef.current) {
+      focus.pop(prevOverlayRef.current);
+    }
+    prevOverlayRef.current = overlay;
   }, [overlay]);
 
   const selected = filteredTopLevel[sel] ?? null;
@@ -100,12 +105,60 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
     [filteredTopLevel, selectedGroup],
   );
 
-  // Memoize group list — depends on sessions (groups derived from session group_names + groups table)
+  // Memoize group list -- depends on sessions (groups derived from session group_names + groups table)
   const [groups, setGroups] = useState<any[]>([]);
-  useEffect(() => { ark.groupList().then(setGroups); }, [sessions]);
+  useEffect(() => { ark.groupList().then(setGroups); }, [sessions.length]);
 
   const actions = useSessionActions(asyncState, status.show);
   const groupActions = useGroupActions(asyncState);
+
+  // Extracted attach helper -- shared between left-pane useInput and right-pane overlay callback
+  const doAttach = useCallback((session: Session) => {
+    if (!session.session_id) return;
+    const sid = session.session_id;
+    asyncState.run("Attaching...", async () => {
+      const compute = session.compute_name ? await ark.computeRead(session.compute_name).catch(() => null) : null;
+      const attachCompute = compute ?? await ark.computeRead("local");
+      const { getProvider } = await import("../../compute/index.js");
+      const provider = getProvider(attachCompute.provider);
+      if (!provider) { status.show("Provider not found"); return; }
+
+      const exists = await provider.checkSession(attachCompute, sid);
+      if (!exists) {
+        status.show(`Session not found on ${attachCompute.name}`);
+        return;
+      }
+
+      const attachCmd = provider.getAttachCommand(attachCompute, session);
+      if (attachCmd.length === 0) { status.show("Cannot attach to this session"); return; }
+
+      // Attach: mute Ink, reset terminal for tmux, spawn+wait, restore Ink
+      const origWrite = process.stdout.write.bind(process.stdout);
+      const origErrWrite = process.stderr.write.bind(process.stderr);
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      process.stderr.write = (() => true) as typeof process.stderr.write;
+      setTimeout(() => {
+        process.stdout.write = origWrite;
+        process.stderr.write = origErrWrite;
+        // Reset terminal state so tmux gets a clean terminal
+        try { process.stdin.setRawMode(false); } catch {}
+        process.stdout.write("\x1b[?1049l"); // exit alt screen if active
+        process.stdout.write("\x1b[?25h");    // show cursor
+        // Spawn attach command -- local tmux or SSH+tmux for remote
+        const result = Bun.spawnSync(attachCmd, {
+          stdin: "inherit",
+          stdout: "inherit",
+          stderr: "inherit",
+          env: { ...process.env, TERM: "xterm-256color" },
+        });
+        // Restore terminal for Ink
+        try { process.stdin.setRawMode(true); } catch {}
+        process.stdout.write("\x1b[?25l");      // hide cursor
+        process.stdout.write("\x1b[2J\x1b[H");  // clear screen
+        status.show("Detached from session");
+      }, 100);
+    });
+  }, [ark, asyncState, status]);
 
   // Auth status for selected session's compute target
   const [selectedCompute, setSelectedCompute] = useState<any>(null);
@@ -220,52 +273,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
         status.show("Deleted. Ctrl+Z to undo (90s)");
       }
     } else if (matchesHotkey("attach", input, key)) {
-      if (selected?.session_id) {
-        const sid = selected.session_id;
-        const selectedId = selected.id;
-        asyncState.run("Attaching...", async () => {
-          const compute = selected?.compute_name ? await ark.computeRead(selected.compute_name).catch(() => null) : null;
-          const attachCompute = compute ?? await ark.computeRead("local");
-          const { getProvider } = await import("../../compute/index.js");
-          const provider = getProvider(attachCompute.provider);
-          if (!provider) { status.show("Provider not found"); return; }
-
-          const exists = await provider.checkSession(attachCompute, sid);
-          if (!exists) {
-            status.show(`Session not found on ${attachCompute.name}`);
-            return;
-          }
-
-          const attachCmd = provider.getAttachCommand(attachCompute, selected!);
-          if (attachCmd.length === 0) { status.show("Cannot attach to this session"); return; }
-
-          // Attach: mute Ink, reset terminal for tmux, spawn+wait, restore Ink
-          const origWrite = process.stdout.write.bind(process.stdout);
-          const origErrWrite = process.stderr.write.bind(process.stderr);
-          process.stdout.write = (() => true) as typeof process.stdout.write;
-          process.stderr.write = (() => true) as typeof process.stderr.write;
-          setTimeout(() => {
-            process.stdout.write = origWrite;
-            process.stderr.write = origErrWrite;
-            // Reset terminal state so tmux gets a clean terminal
-            try { process.stdin.setRawMode(false); } catch {}
-            process.stdout.write("\x1b[?1049l"); // exit alt screen if active
-            process.stdout.write("\x1b[?25h");    // show cursor
-            // Spawn attach command — local tmux or SSH+tmux for remote
-            const result = Bun.spawnSync(attachCmd, {
-              stdin: "inherit",
-              stdout: "inherit",
-              stderr: "inherit",
-              env: { ...process.env, TERM: "xterm-256color" },
-            });
-            // Restore terminal for Ink
-            try { process.stdin.setRawMode(true); } catch {}
-            process.stdout.write("\x1b[?25l");      // hide cursor
-            process.stdout.write("\x1b[2J\x1b[H");  // clear screen
-            status.show("Detached from session");
-          }, 100);
-        });
-      }
+      if (selected) doAttach(selected);
     } else if (matchesHotkey("move", input, key)) {
       if (selected) setOverlay("move");
     } else if (matchesHotkey("mcp", input, key)) {
@@ -546,39 +554,8 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
                 restore: actions.restore,
               }}
               onOverlay={(name) => {
-                if (name === "attach" && selected?.session_id) {
-                  // Trigger attach logic via left-pane handler
-                  const sid = selected.session_id;
-                  asyncState.run("Attaching...", async () => {
-                    const compute = selected?.compute_name ? await ark.computeRead(selected.compute_name).catch(() => null) : null;
-                    const attachCompute = compute ?? await ark.computeRead("local");
-                    const { getProvider } = await import("../../compute/index.js");
-                    const provider = getProvider(attachCompute.provider);
-                    if (!provider) { status.show("Provider not found"); return; }
-                    const exists = await provider.checkSession(attachCompute, sid);
-                    if (!exists) { status.show(`Session not found on ${attachCompute.name}`); return; }
-                    const attachCmd = provider.getAttachCommand(attachCompute, selected!);
-                    if (attachCmd.length === 0) { status.show("Cannot attach to this session"); return; }
-                    const origWrite = process.stdout.write.bind(process.stdout);
-                    const origErrWrite = process.stderr.write.bind(process.stderr);
-                    process.stdout.write = (() => true) as typeof process.stdout.write;
-                    process.stderr.write = (() => true) as typeof process.stderr.write;
-                    setTimeout(() => {
-                      process.stdout.write = origWrite;
-                      process.stderr.write = origErrWrite;
-                      try { process.stdin.setRawMode(false); } catch {}
-                      process.stdout.write("\x1b[?1049l");
-                      process.stdout.write("\x1b[?25h");
-                      const result = Bun.spawnSync(attachCmd, {
-                        stdin: "inherit", stdout: "inherit", stderr: "inherit",
-                        env: { ...process.env, TERM: "xterm-256color" },
-                      });
-                      try { process.stdin.setRawMode(true); } catch {}
-                      process.stdout.write("\x1b[?25l");
-                      process.stdout.write("\x1b[2J\x1b[H");
-                      status.show("Detached from session");
-                    }, 100);
-                  });
+                if (name === "attach" && selected) {
+                  doAttach(selected);
                 } else if (name === "verify" && selected) {
                   asyncState.run("Verifying...", async () => {
                     const result = await ark.verifyRun(selected.id);

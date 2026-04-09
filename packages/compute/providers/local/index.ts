@@ -6,9 +6,12 @@
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import { existsSync, rmSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+import { homedir } from "os";
 
 const execFileAsync = promisify(execFile);
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
   ComputeSnapshot, PortDecl, PortStatus, Compute, Session,
@@ -124,7 +127,6 @@ export class LocalProvider implements ComputeProvider {
   }
 
   buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
-    const { homedir } = require("os");
     return {
       command: join(homedir(), ".bun", "bin", "bun"),
       args: [join(__dirname, "../../../core/channel.ts")],

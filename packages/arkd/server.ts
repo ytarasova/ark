@@ -60,15 +60,17 @@ const DEFAULT_PORT = 19300;
 export interface ArkdOpts {
   quiet?: boolean;
   conductorUrl?: string;
+  hostname?: string;
 }
 
 export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void; setConductorUrl(url: string): void } {
   // Mutable runtime config
   let conductorUrl: string | null = opts?.conductorUrl ?? null;
+  const bindHost = opts?.hostname ?? "0.0.0.0";
 
   const server = Bun.serve({
     port,
-    hostname: "127.0.0.1",
+    hostname: bindHost,
     async fetch(req) {
       const url = new URL(req.url);
       const path = url.pathname;
@@ -229,7 +231,7 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
     },
   });
 
-  if (!opts?.quiet) process.stderr.write(`[arkd] listening on localhost:${port}\n`);
+  if (!opts?.quiet) process.stderr.write(`[arkd] listening on ${bindHost}:${port}\n`);
 
   return {
     stop() { server.stop(); },

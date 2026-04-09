@@ -83,7 +83,7 @@ export function useMessages(opts: UseMessagesOpts): UseMessagesResult {
   // Reload immediately when sessionId changes
   useEffect(() => {
     loadMessages();
-  }, [sessionId]);
+  }, [sessionId, loadMessages]);
 
   useEffect(() => {
     const t = setInterval(loadMessages, pollMs);
