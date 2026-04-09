@@ -13,7 +13,7 @@ describe("skill extraction integration", () => {
       { role: "user", content: "Thanks" },
       { role: "assistant", content: "You're welcome!" },
     ];
-    const saved = extractAndSaveSkills("s-test", conversation);
+    const saved = extractAndSaveSkills("s-test", conversation, getApp());
     expect(saved).toBeGreaterThan(0);
 
     const skills = getApp().skills.list();
@@ -28,7 +28,7 @@ describe("skill extraction integration", () => {
       { role: "user", content: "Thanks" },
       { role: "assistant", content: "Done:\n1. Step one\n2. Step two" },
     ];
-    const saved = extractAndSaveSkills("s-test2", conversation);
+    const saved = extractAndSaveSkills("s-test2", conversation, getApp());
     expect(saved).toBe(0);
   });
 });

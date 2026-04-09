@@ -89,7 +89,7 @@ describe("writeLauncher", () => {
 
   it("creates launch.sh and returns its path", () => {
     const testSessionId = `test-launcher-${Date.now()}`;
-    const path = writeLauncher(testSessionId, testContent);
+    const path = writeLauncher(testSessionId, testContent, getApp().config.tracksDir);
 
     expect(path).toBe(join(getApp().config.tracksDir, testSessionId, "launch.sh"));
     expect(existsSync(path)).toBe(true);
@@ -98,7 +98,7 @@ describe("writeLauncher", () => {
   it("file content matches the input", () => {
     const sessionId = `test-content-${Date.now()}`;
     const content = "#!/bin/bash\nset -e\ncd /app && npm start\n";
-    const path = writeLauncher(sessionId, content);
+    const path = writeLauncher(sessionId, content, getApp().config.tracksDir);
 
     const written = readFileSync(path, "utf-8");
     expect(written).toBe(content);
@@ -109,14 +109,14 @@ describe("writeLauncher", () => {
     const dir = join(getApp().config.tracksDir, sessionId);
     expect(existsSync(dir)).toBe(false);
 
-    writeLauncher(sessionId, "#!/bin/bash\n");
+    writeLauncher(sessionId, "#!/bin/bash\n", getApp().config.tracksDir);
 
     expect(existsSync(dir)).toBe(true);
   });
 
   it("sets executable permissions (755)", () => {
     const sessionId = `test-perms-${Date.now()}`;
-    const path = writeLauncher(sessionId, "#!/bin/bash\n");
+    const path = writeLauncher(sessionId, "#!/bin/bash\n", getApp().config.tracksDir);
 
     const mode = statSync(path).mode & 0o777;
     expect(mode).toBe(0o755);

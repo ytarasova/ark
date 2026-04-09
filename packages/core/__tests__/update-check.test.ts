@@ -23,7 +23,7 @@ describe("getCurrentVersion", () => {
 
 describe("checkForUpdate", () => {
   it("returns null or a version string", async () => {
-    const result = await checkForUpdate();
+    const result = await checkForUpdate(getApp().config.arkDir);
     // null = no update or network error, string = new version
     expect(result === null || typeof result === "string").toBe(true);
   });
@@ -38,7 +38,7 @@ describe("checkForUpdate", () => {
     };
     writeFileSync(statePath, JSON.stringify(state));
 
-    const result = await checkForUpdate();
+    const result = await checkForUpdate(getApp().config.arkDir);
     // Same version as current = no update
     expect(result).toBeNull();
   });
@@ -52,7 +52,7 @@ describe("checkForUpdate", () => {
     };
     writeFileSync(statePath, JSON.stringify(state));
 
-    const result = await checkForUpdate();
+    const result = await checkForUpdate(getApp().config.arkDir);
     expect(result).toBe("99.99.99");
   });
 
@@ -61,7 +61,7 @@ describe("checkForUpdate", () => {
     writeFileSync(statePath, "not-valid-json{{{");
 
     // Should not throw, just proceed with the check
-    const result = await checkForUpdate();
+    const result = await checkForUpdate(getApp().config.arkDir);
     expect(result === null || typeof result === "string").toBe(true);
   });
 
@@ -70,7 +70,7 @@ describe("checkForUpdate", () => {
     expect(existsSync(statePath)).toBe(false);
 
     // Should not throw
-    const result = await checkForUpdate();
+    const result = await checkForUpdate(getApp().config.arkDir);
     expect(result === null || typeof result === "string").toBe(true);
   });
 });

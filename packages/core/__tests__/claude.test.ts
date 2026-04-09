@@ -251,7 +251,7 @@ describe("writeChannelConfig", () => {
 
   it("also writes mcp.json to tracks dir", () => {
     const workdir = getCtx().arkDir;
-    writeChannelConfig("s-abc123", "work", 19300, workdir);
+    writeChannelConfig("s-abc123", "work", 19300, workdir, { tracksDir: getApp().config.tracksDir });
 
     const tracksFile = join(getApp().config.tracksDir, "s-abc123", "mcp.json");
     expect(existsSync(tracksFile)).toBe(true);

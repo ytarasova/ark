@@ -5,10 +5,9 @@ import { AppContext, setApp, clearApp } from "../../core/app.js";
 import type { Compute, Session } from "../../types/index.js";
 
 let app: AppContext;
-beforeEach(async () => { if (app) { await app.shutdown(); clearApp(); } app = AppContext.forTest(); setApp(app); await app.boot(); });
-afterEach(async () => { if (app) { await app.shutdown(); clearApp(); } });
-
 const provider = new LocalProvider();
+beforeEach(async () => { if (app) { await app.shutdown(); clearApp(); } app = AppContext.forTest(); setApp(app); await app.boot(); provider.setApp(app); });
+afterEach(async () => { if (app) { await app.shutdown(); clearApp(); } });
 
 const fakeCompute: Compute = {
   name: "local",

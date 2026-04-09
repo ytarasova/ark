@@ -273,7 +273,7 @@ describe("agents.delete", () => {
 
 describe("resolveAgent", () => {
   it("returns null for unknown agent", () => {
-    expect(resolveAgent("nonexistent", {})).toBeNull();
+    expect(resolveAgent(getApp(), "nonexistent", {})).toBeNull();
   });
 
   it("substitutes template vars in system_prompt", () => {
@@ -282,7 +282,7 @@ describe("resolveAgent", () => {
       system_prompt: "Working on {ticket}: {summary} in {repo} on branch {branch}.",
     });
 
-    const agent = resolveAgent("templated", {
+    const agent = resolveAgent(getApp(), "templated", {
       ticket: "PROJ-123",
       summary: "Fix the bug",
       repo: "/code/myrepo",
@@ -301,7 +301,7 @@ describe("resolveAgent", () => {
       system_prompt: "Dir: {workdir}, Track: {track_id}, Stage: {stage}",
     });
 
-    const agent = resolveAgent("vars-agent", {
+    const agent = resolveAgent(getApp(), "vars-agent", {
       workdir: "/tmp/work",
       id: "s-abc123",
       stage: "implement",
@@ -318,7 +318,7 @@ describe("resolveAgent", () => {
       system_prompt: "Ticket: {jira_key}, Summary: {jira_summary}",
     });
 
-    const agent = resolveAgent("compat-agent", {
+    const agent = resolveAgent(getApp(), "compat-agent", {
       ticket: "JIRA-456",
       summary: "Do the thing",
     });
@@ -334,7 +334,7 @@ describe("resolveAgent", () => {
       system_prompt: "Known: {ticket}, Unknown: {custom_var}",
     });
 
-    const agent = resolveAgent("unknown-vars", { ticket: "T-1" });
+    const agent = resolveAgent(getApp(), "unknown-vars", { ticket: "T-1" });
     expect(agent!.system_prompt).toBe("Known: T-1, Unknown: {custom_var}");
   });
 
@@ -344,14 +344,14 @@ describe("resolveAgent", () => {
       system_prompt: "Ticket={ticket}, Repo={repo}",
     });
 
-    const agent = resolveAgent("empty-session", {});
+    const agent = resolveAgent(getApp(), "empty-session", {});
     expect(agent!.system_prompt).toBe("Ticket=, Repo=");
   });
 
   it("handles agent with no system_prompt", () => {
     writeAgentYaml("no-prompt", { name: "no-prompt" });
 
-    const agent = resolveAgent("no-prompt", { ticket: "X-1" });
+    const agent = resolveAgent(getApp(), "no-prompt", { ticket: "X-1" });
     expect(agent).not.toBeNull();
     expect(agent!.system_prompt).toBe("");
   });
@@ -362,7 +362,7 @@ describe("resolveAgent", () => {
       system_prompt: "Dir: {workdir}",
     });
 
-    const agent = resolveAgent("workdir-default", {});
+    const agent = resolveAgent(getApp(), "workdir-default", {});
     expect(agent!.system_prompt).toBe("Dir: .");
   });
 });
@@ -560,7 +560,7 @@ describe("resolveAgent with projectRoot", () => {
       system_prompt: "Working on {ticket} in {repo}",
     });
 
-    const agent = resolveAgent("proj-tmpl", { ticket: "T-1", repo: "/code" }, projectDir());
+    const agent = resolveAgent(getApp(), "proj-tmpl", { ticket: "T-1", repo: "/code" }, projectDir());
     expect(agent).not.toBeNull();
     expect(agent!._source).toBe("project");
     expect(agent!.system_prompt).toBe("Working on T-1 in /code");

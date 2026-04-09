@@ -72,7 +72,7 @@ describe("Flow templating E2E", () => {
       system_prompt: "Working on {ticket} in {repo}",
     });
 
-    const agent = resolveAgent("test-agent", {
+    const agent = resolveAgent(getApp(), "test-agent", {
       ticket: "BUG-789", repo: "/code/project",
     });
     expect(agent).not.toBeNull();

@@ -68,10 +68,11 @@ describe("provider registry (via AppContext)", () => {
     expect(app.getProvider("fake")).toBe(updated);
   });
 
-  it("boot auto-registers local, ec2, docker providers", () => {
+  it("boot auto-registers local, docker, devcontainer, firecracker providers", () => {
     expect(app.getProvider("local")).not.toBeNull();
     expect(app.getProvider("local")!.name).toBe("local");
-    expect(app.getProvider("ec2")).not.toBeNull();
     expect(app.getProvider("docker")).not.toBeNull();
+    expect(app.getProvider("devcontainer")).not.toBeNull();
+    expect(app.getProvider("firecracker")).not.toBeNull();
   });
 });

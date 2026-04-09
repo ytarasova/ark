@@ -66,10 +66,10 @@ describe("v0.5 gaps integration", () => {
   });
 
   it("hybridSearch returns results without errors", async () => {
-    core.remember("Integration test memory for hybrid search", {
+    core.remember(getApp(), "Integration test memory for hybrid search", {
       tags: ["integration"], scope: "global", importance: 0.8,
     });
-    const results = await core.hybridSearch("integration test", {
+    const results = await core.hybridSearch(getApp(), "integration test", {
       sources: ["memory"], rerank: false, limit: 5,
     });
     expect(results.length).toBeGreaterThan(0);
