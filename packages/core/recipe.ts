@@ -9,6 +9,7 @@ import { readdirSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, exists
 import { join, basename } from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { ARK_DIR } from "./paths.js";
+import { getApp } from "./app.js";
 import type { Session } from "../types/index.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -88,21 +89,28 @@ function loadFromDir(dir: string, source: RecipeDefinition["_source"]): RecipeDe
   return recipes;
 }
 
-// ── Public API ──────────────────────────────────────────────────────────────
+// ── Public API (backward-compat wrappers delegating to AppContext stores) ───
 
+/** @deprecated Use app.recipes.list(projectRoot) instead */
 export function listRecipes(projectRoot?: string): RecipeDefinition[] {
-  const builtin = loadFromDir(BUILTIN_DIR, "builtin");
-  const global = loadFromDir(join(ARK_DIR(), "recipes"), "global");
-  const project = projectRoot ? loadFromDir(join(projectRoot, ".ark", "recipes"), "project") : [];
-  const byName = new Map<string, RecipeDefinition>();
-  for (const r of builtin) byName.set(r.name, r);
-  for (const r of global) byName.set(r.name, r);
-  for (const r of project) byName.set(r.name, r);
-  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  try { return getApp().recipes.list(projectRoot); } catch {
+    // Fallback for cases where AppContext is not booted
+    const builtin = loadFromDir(BUILTIN_DIR, "builtin");
+    const global = loadFromDir(join(ARK_DIR(), "recipes"), "global");
+    const project = projectRoot ? loadFromDir(join(projectRoot, ".ark", "recipes"), "project") : [];
+    const byName = new Map<string, RecipeDefinition>();
+    for (const r of builtin) byName.set(r.name, r);
+    for (const r of global) byName.set(r.name, r);
+    for (const r of project) byName.set(r.name, r);
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
 }
 
+/** @deprecated Use app.recipes.get(name, projectRoot) instead */
 export function loadRecipe(name: string, projectRoot?: string): RecipeDefinition | null {
-  return listRecipes(projectRoot).find(r => r.name === name) ?? null;
+  try { return getApp().recipes.get(name, projectRoot); } catch {
+    return listRecipes(projectRoot).find(r => r.name === name) ?? null;
+  }
 }
 
 export function instantiateRecipe(recipe: RecipeDefinition, values: Record<string, string>): RecipeInstance {
@@ -118,7 +126,12 @@ export function instantiateRecipe(recipe: RecipeDefinition, values: Record<strin
   };
 }
 
+/** @deprecated Use app.recipes.save(name, recipe, scope, projectRoot) instead */
 export function saveRecipe(recipe: RecipeDefinition, scope: "project" | "global", projectRoot?: string): void {
+  try {
+    getApp().recipes.save(recipe.name, recipe, scope, projectRoot);
+    return;
+  } catch { /* fallback */ }
   const dir = scope === "project" && projectRoot
     ? join(projectRoot, ".ark", "recipes")
     : join(ARK_DIR(), "recipes");
@@ -127,7 +140,12 @@ export function saveRecipe(recipe: RecipeDefinition, scope: "project" | "global"
   writeFileSync(join(dir, `${recipe.name}.yaml`), stringifyYaml(data));
 }
 
+/** @deprecated Use app.recipes.delete(name, scope, projectRoot) instead */
 export function deleteRecipe(name: string, scope: "project" | "global", projectRoot?: string): void {
+  try {
+    getApp().recipes.delete(name, scope, projectRoot);
+    return;
+  } catch { /* fallback */ }
   const dir = scope === "project" && projectRoot
     ? join(projectRoot, ".ark", "recipes")
     : join(ARK_DIR(), "recipes");

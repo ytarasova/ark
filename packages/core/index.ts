@@ -280,3 +280,9 @@ export { SessionRepository, ComputeRepository, EventRepository, MessageRepositor
 
 // Services
 export { SessionService, ComputeService, HistoryService } from "./services/index.js";
+
+// Resource stores
+export { type FlowStore, type FlowSummary, FileFlowStore } from "./stores/index.js";
+export { type SkillStore, FileSkillStore } from "./stores/index.js";
+export { type AgentStore, FileAgentStore } from "./stores/index.js";
+export { type RecipeStore, FileRecipeStore } from "./stores/index.js";

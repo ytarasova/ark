@@ -12,6 +12,7 @@ import { join } from "path";
 import YAML from "yaml";
 import { ARK_DIR } from "./paths.js";
 import { substituteVars, buildSessionVars } from "./template.js";
+import { getApp } from "./app.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -73,50 +74,65 @@ export function findProjectRoot(cwd?: string): string | null {
 
 function PROJECT_DIR(root: string) { return join(root, ".ark", "agents"); }
 
-// ── Loading ─────────────────────────────────────────────────────────────────
+// ── Loading (backward-compat wrappers delegating to AppContext stores) ──────
 
+/** @deprecated Use app.agents.get(name, projectRoot) instead */
 export function loadAgent(name: string, projectRoot?: string): AgentDefinition | null {
-  const dirs: [string, AgentDefinition["_source"]][] = [];
-  if (projectRoot) dirs.push([PROJECT_DIR(projectRoot), "project"]);
-  dirs.push([GLOBAL_DIR(), "global"], [BUILTIN_DIR, "builtin"]);
+  try { return getApp().agents.get(name, projectRoot); } catch {
+    // Fallback for cases where AppContext is not booted
+    const dirs: [string, AgentDefinition["_source"]][] = [];
+    if (projectRoot) dirs.push([PROJECT_DIR(projectRoot), "project"]);
+    dirs.push([GLOBAL_DIR(), "global"], [BUILTIN_DIR, "builtin"]);
 
-  for (const [dir, source] of dirs) {
-    const path = join(dir, `${name}.yaml`);
-    if (existsSync(path)) {
-      const raw = YAML.parse(readFileSync(path, "utf-8")) ?? {};
-      return { ...DEFAULTS, ...raw, _source: source, _path: path } as AgentDefinition;
+    for (const [dir, source] of dirs) {
+      const path = join(dir, `${name}.yaml`);
+      if (existsSync(path)) {
+        const raw = YAML.parse(readFileSync(path, "utf-8")) ?? {};
+        return { ...DEFAULTS, ...raw, _source: source, _path: path } as AgentDefinition;
+      }
     }
+    return null;
   }
-  return null;
 }
 
+/** @deprecated Use app.agents.list(projectRoot) instead */
 export function listAgents(projectRoot?: string): AgentDefinition[] {
-  const agents = new Map<string, AgentDefinition>();
-  const dirs: [string, AgentDefinition["_source"]][] = [
-    [BUILTIN_DIR, "builtin"],
-    [GLOBAL_DIR(), "global"],
-  ];
-  if (projectRoot) dirs.push([PROJECT_DIR(projectRoot), "project"]);
+  try { return getApp().agents.list(projectRoot); } catch {
+    // Fallback for cases where AppContext is not booted
+    const agents = new Map<string, AgentDefinition>();
+    const dirs: [string, AgentDefinition["_source"]][] = [
+      [BUILTIN_DIR, "builtin"],
+      [GLOBAL_DIR(), "global"],
+    ];
+    if (projectRoot) dirs.push([PROJECT_DIR(projectRoot), "project"]);
 
-  for (const [dir, source] of dirs) {
-    if (!existsSync(dir)) continue;
-    for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml"))) {
-      const raw = YAML.parse(readFileSync(join(dir, file), "utf-8")) ?? {};
-      const name = raw.name ?? file.replace(".yaml", "");
-      agents.set(name, { ...DEFAULTS, ...raw, name, _source: source, _path: join(dir, file) });
+    for (const [dir, source] of dirs) {
+      if (!existsSync(dir)) continue;
+      for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml"))) {
+        const raw = YAML.parse(readFileSync(join(dir, file), "utf-8")) ?? {};
+        const name = raw.name ?? file.replace(".yaml", "");
+        agents.set(name, { ...DEFAULTS, ...raw, name, _source: source, _path: join(dir, file) });
+      }
     }
+    return [...agents.values()];
   }
-  return [...agents.values()];
 }
 
+/** @deprecated Use app.agents.save(name, agent, scope, projectRoot) instead */
 export function saveAgent(agent: AgentDefinition, scope: "project" | "global" = "global", projectRoot?: string): void {
+  try {
+    getApp().agents.save(agent.name, agent, scope, projectRoot);
+    return;
+  } catch { /* fallback */ }
   const dir = scope === "project" && projectRoot ? PROJECT_DIR(projectRoot) : GLOBAL_DIR();
   mkdirSync(dir, { recursive: true });
   const { _source, _path, ...data } = agent;
   writeFileSync(join(dir, `${agent.name}.yaml`), YAML.stringify(data));
 }
 
+/** @deprecated Use app.agents.delete(name, scope, projectRoot) instead */
 export function deleteAgent(name: string, scope: "project" | "global" = "global", projectRoot?: string): boolean {
+  try { return getApp().agents.delete(name, scope, projectRoot); } catch { /* fallback */ }
   const dir = scope === "project" && projectRoot ? PROJECT_DIR(projectRoot) : GLOBAL_DIR();
   const path = join(dir, `${name}.yaml`);
   if (existsSync(path)) { unlinkSync(path); return true; }

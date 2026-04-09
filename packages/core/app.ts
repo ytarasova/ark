@@ -9,6 +9,7 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync, rmSync, existsSync, mkdtempSync, readFileSync } from "fs";
 import { join } from "path";
+import { fileURLToPath } from "url";
 import { tmpdir } from "os";
 
 import { loadConfig, type ArkConfig } from "./config.js";
@@ -30,6 +31,8 @@ import { subprocessExecutor } from "./executors/subprocess.js";
 import { cliAgentExecutor } from "./executors/cli-agent.js";
 import { SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
+import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore } from "./stores/index.js";
+import type { FlowStore, SkillStore, AgentStore, RecipeStore } from "./stores/index.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -68,6 +71,12 @@ export class AppContext {
   private _sessionService: SessionService | null = null;
   private _computeService: ComputeService | null = null;
   private _historyService: HistoryService | null = null;
+
+  // Resource stores
+  private _flows: FlowStore | null = null;
+  private _skills: SkillStore | null = null;
+  private _agents: AgentStore | null = null;
+  private _recipes: RecipeStore | null = null;
 
   conductor: { stop(): void } | null = null;
   metricsPoller: { stop(): void } | null = null;
@@ -146,6 +155,28 @@ export class AppContext {
     return this._historyService;
   }
 
+  // ── Resource stores ────────────────────────────────────────────────────
+
+  get flows(): FlowStore {
+    if (!this._flows) throw new Error("AppContext not booted -- flows not available");
+    return this._flows;
+  }
+
+  get skills(): SkillStore {
+    if (!this._skills) throw new Error("AppContext not booted -- skills not available");
+    return this._skills;
+  }
+
+  get agents(): AgentStore {
+    if (!this._agents) throw new Error("AppContext not booted -- agents not available");
+    return this._agents;
+  }
+
+  get recipes(): RecipeStore {
+    if (!this._recipes) throw new Error("AppContext not booted -- recipes not available");
+    return this._recipes;
+  }
+
   // ── Provider registry ──────────────────────────────────────────────────
 
   registerProvider(provider: ComputeProvider): void {
@@ -212,6 +243,25 @@ export class AppContext {
     this._sessionService = new SessionService(this._sessions, this._events, this._messages);
     this._computeService = new ComputeService(this._computes);
     this._historyService = new HistoryService(this._db);
+
+    // 3c. Create resource stores (file-backed)
+    const storeBaseDir = join(fileURLToPath(import.meta.url), "..", "..", "..");
+    this._flows = new FileFlowStore({
+      builtinDir: join(storeBaseDir, "flows", "definitions"),
+      userDir: join(this.config.arkDir, "flows"),
+    });
+    this._skills = new FileSkillStore({
+      builtinDir: join(storeBaseDir, "skills"),
+      userDir: join(this.config.arkDir, "skills"),
+    });
+    this._agents = new FileAgentStore({
+      builtinDir: join(storeBaseDir, "agents"),
+      userDir: join(this.config.arkDir, "agents"),
+    });
+    this._recipes = new FileRecipeStore({
+      builtinDir: join(storeBaseDir, "recipes"),
+      userDir: join(this.config.arkDir, "recipes"),
+    });
 
     // 4. Register compute providers
     await safeAsync("boot: load compute providers", async () => {
@@ -421,7 +471,11 @@ export class AppContext {
     // 9. Clear provider resolver + close database
     clearProviderResolver();
 
-    // Null out services and repositories before closing DB
+    // Null out stores, services and repositories before closing DB
+    this._flows = null;
+    this._skills = null;
+    this._agents = null;
+    this._recipes = null;
     this._historyService = null;
     this._computeService = null;
     this._sessionService = null;

@@ -11,6 +11,7 @@ import { join } from "path";
 import YAML from "yaml";
 import { ARK_DIR } from "./paths.js";
 import { substituteVars } from "./template.js";
+import { getApp } from "./app.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,7 +40,7 @@ export interface FlowDefinition {
   stages: StageDefinition[];
 }
 
-// ── Paths ───────────────────────────────────────────────────────────────────
+// ── Paths (used by backward-compat wrappers and helper functions) ───────────
 
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -53,45 +54,58 @@ function loadYaml(path: string): Record<string, unknown> {
   return YAML.parse(readFileSync(path, "utf-8")) ?? {};
 }
 
+/** @deprecated Use app.flows.get(name) instead */
 export function loadFlow(name: string): FlowDefinition | null {
-  // User overrides builtin
-  for (const dir of [USER_DIR(), BUILTIN_DIR]) {
-    const path = join(dir, `${name}.yaml`);
-    if (existsSync(path)) return loadYaml(path) as unknown as FlowDefinition;
+  try { return getApp().flows.get(name); } catch {
+    // Fallback for cases where AppContext is not booted (e.g. early init)
+    for (const dir of [USER_DIR(), BUILTIN_DIR]) {
+      const path = join(dir, `${name}.yaml`);
+      if (existsSync(path)) return loadYaml(path) as unknown as FlowDefinition;
+    }
+    return null;
   }
-  return null;
 }
 
+/** @deprecated Use app.flows.list() instead */
 export function listFlows(): { name: string; description: string; stages: string[]; source: string }[] {
-  const result: Map<string, { name: string; description: string; stages: string[]; source: string }> = new Map();
-
-  for (const [dir, source] of [[BUILTIN_DIR, "builtin"], [USER_DIR(), "user"]] as const) {
-    if (!existsSync(dir)) continue;
-    for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml"))) {
-      const p = loadYaml(join(dir, file)) as Record<string, unknown>;
-      const name = (p.name as string) ?? file.replace(".yaml", "");
-      const stages = (Array.isArray(p.stages) ? p.stages : []) as Array<{ name: string }>;
-      result.set(name, {
-        name,
-        description: (p.description as string) ?? "",
-        stages: stages.map(s => s.name),
-        source,
-      });
+  try { return getApp().flows.list(); } catch {
+    // Fallback for cases where AppContext is not booted
+    const result: Map<string, { name: string; description: string; stages: string[]; source: string }> = new Map();
+    for (const [dir, source] of [[BUILTIN_DIR, "builtin"], [USER_DIR(), "user"]] as const) {
+      if (!existsSync(dir)) continue;
+      for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml"))) {
+        const p = loadYaml(join(dir, file)) as Record<string, unknown>;
+        const name = (p.name as string) ?? file.replace(".yaml", "");
+        const stages = (Array.isArray(p.stages) ? p.stages : []) as Array<{ name: string }>;
+        result.set(name, {
+          name,
+          description: (p.description as string) ?? "",
+          stages: stages.map(s => s.name),
+          source,
+        });
+      }
     }
+    return [...result.values()];
   }
-  return [...result.values()];
 }
 
 // ── Save / Delete ──────────────────────────────────────────────────────────
 
+/** @deprecated Use app.flows.save(name, flow, scope) instead */
 export function saveFlow(flow: FlowDefinition, scope: "global" | "project" = "global", projectRoot?: string): void {
+  try {
+    getApp().flows.save(flow.name, flow, scope);
+    return;
+  } catch { /* fallback */ }
   const dir = scope === "project" && projectRoot ? join(projectRoot, ".ark", "flows") : USER_DIR();
   mkdirSync(dir, { recursive: true });
   const { ...data } = flow;
   writeFileSync(join(dir, `${flow.name}.yaml`), YAML.stringify(data));
 }
 
+/** @deprecated Use app.flows.delete(name, scope) instead */
 export function deleteFlow(name: string, scope: "global" | "project" = "global", projectRoot?: string): boolean {
+  try { return getApp().flows.delete(name, scope); } catch { /* fallback */ }
   const dir = scope === "project" && projectRoot ? join(projectRoot, ".ark", "flows") : USER_DIR();
   const path = join(dir, `${name}.yaml`);
   if (existsSync(path)) { unlinkSync(path); return true; }
