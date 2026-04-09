@@ -365,90 +365,56 @@ export class AppContext {
 
   async shutdown(): Promise<void> {
     if (this.phase === "stopped" || this.phase === "shutting_down") return;
+    const wasBooted = this.phase === "ready";
     this.phase = "shutting_down";
+
+    // Fast path: if never booted, skip all infrastructure teardown
+    if (!wasBooted) {
+      await this._container.dispose();
+      if (this.options.cleanupOnShutdown && existsSync(this.config.arkDir)) {
+        rmSync(this.config.arkDir, { recursive: true, force: true });
+      }
+      if (_app === this) _app = null;
+      this.phase = "stopped";
+      return;
+    }
 
     // Reverse order of boot
 
-    // 0. In test mode, stop all sessions tracked in the session store.
-    // Uses session_id (tmux handle) from the DB -- no name parsing.
-    // In production, sessions keep running independently of the TUI/CLI lifecycle.
+    // Shutdown in reverse order of boot.
+    // Step 0: stop running sessions (test mode only -- production sessions survive)
     if (this.options?.cleanupOnShutdown) {
-      try { await this.sessionService.stopAll(); } catch {}
+      await this.sessionService.stopAll();
     }
 
-    // 1. Remove signal handlers
+    // Step 1: tear down infrastructure (reverse of boot steps 7-10)
     this._removeSignalHandlers();
 
-    // 1b. Stop status pollers for non-Claude executors
-    try {
-      const { stopAllPollers } = await import("./executors/status-poller.js");
-      stopAllPollers();
-    } catch { /* ignore */ }
+    try { const { stopAllPollers } = await import("./executors/status-poller.js"); stopAllPollers(); } catch {}
 
-    // 2. Close SSH connection pools
-    await safeAsync("shutdown: destroy SSH pools", async () => {
-      const { destroyAllPools } = await import("../compute/providers/ec2/pool.js");
-      await destroyAllPools();
-    });
-
-    // 3. Stop notification daemon
-    if (this._notifyDaemon) {
-      this._notifyDaemon.stop();
-      this._notifyDaemon = null;
-    }
-
-    // 4. Clear tmux status bar
-    if (this._tmuxStatusInterval) {
-      clearInterval(this._tmuxStatusInterval);
-      this._tmuxStatusInterval = null;
-    }
+    if (this._notifyDaemon) { this._notifyDaemon.stop(); this._notifyDaemon = null; }
+    if (this._tmuxStatusInterval) { clearInterval(this._tmuxStatusInterval); this._tmuxStatusInterval = null; }
     clearTmuxStatusBar();
+    if (this._purgeInterval) { clearInterval(this._purgeInterval); this._purgeInterval = null; }
+    if (this.metricsPoller) { this.metricsPoller.stop(); this.metricsPoller = null; }
+    if (this.conductor) { this.conductor.stop(); this.conductor = null; }
+    if (this._eventBus) { this._eventBus.clear(); this._eventBus = null; }
 
-    // 5. Stop purge interval
-    if (this._purgeInterval) {
-      clearInterval(this._purgeInterval);
-      this._purgeInterval = null;
-    }
-
-    // 6. Stop metrics poller
-    if (this.metricsPoller) {
-      this.metricsPoller.stop();
-      this.metricsPoller = null;
-    }
-
-    // 7. Stop conductor
-    if (this.conductor) {
-      this.conductor.stop();
-      this.conductor = null;
-    }
-
-    // 8. Clear event bus
-    if (this._eventBus) {
-      this._eventBus.clear();
-      this._eventBus = null;
-    }
-
-    // 8b. Flush telemetry and OTLP before shutdown
+    // Step 2: flush observability
     try {
       const { flush: flushTelemetry } = await import("./telemetry.js");
       const { flushSpans, resetOtlp } = await import("./otlp.js");
       await flushTelemetry();
       await flushSpans();
       resetOtlp();
-    } catch { /* best-effort */ }
+    } catch {}
 
-    // 9. Clear provider resolver and dispose the container (closes DB, cleans up singletons)
+    // Step 3: tear down compute + DI container (reverse of boot steps 3-5)
     clearProviderResolver();
-
-    // Close the database before disposing the container
-    try { this._container.resolve("db").close(); } catch (e: any) {
-      // DB may already be closed or not yet registered -- log but don't fail shutdown
-      logError("general", `shutdown: failed to close database: ${e?.message ?? e}`);
-    }
-
+    try { this._container.resolve("db").close(); } catch {}
     await this._container.dispose();
 
-    // 10. Clean up temp directory (test mode)
+    // Step 4: clean up temp directory (test mode)
     if (this.options.cleanupOnShutdown && existsSync(this.config.arkDir)) {
       rmSync(this.config.arkDir, { recursive: true, force: true });
     }

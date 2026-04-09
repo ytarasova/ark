@@ -798,14 +798,14 @@ export async function fork(app: AppContext, parentId: string, task: string, opts
   return { ok: true, sessionId: child.id };
 }
 
-function dispatchFork(app: AppContext, sessionId: string, stageDef: flow.StageDefinition): { ok: boolean; message: string } {
+async function dispatchFork(app: AppContext, sessionId: string, stageDef: flow.StageDefinition): Promise<{ ok: boolean; message: string }> {
   // Read PLAN.md or use default subtasks
   const session = app.sessions.get(sessionId)!;
   const subtasks = extractSubtasks(session);
 
   const children: string[] = [];
   for (const sub of subtasks.slice(0, stageDef.max_parallel ?? 4)) {
-    const result = fork(app, sessionId, sub.task, { dispatch: true });
+    const result = await fork(app, sessionId, sub.task, { dispatch: true });
     if (result.ok) children.push(result.sessionId);
   }
 

@@ -100,13 +100,12 @@ export class SessionService {
    * Goes through the proper stop sequence for each (provider kill + cleanup).
    */
   async stopAll(): Promise<void> {
-    // Force-stop ALL sessions that have a compute handle, regardless of DB status.
-    // Uses the provider's killAgent for proper cleanup (tmux, Docker, EC2, etc.).
+    const app = getApp();
     const { stop: orchStop } = await import("./session-orchestration.js");
     const all = this.sessions.list({});
     for (const s of all) {
       if (s.session_id) {
-        try { await orchStop(getApp(), s.id, { force: true }); } catch {}
+        await orchStop(app, s.id, { force: true });
       }
     }
   }
