@@ -12,6 +12,8 @@ import { join } from "path";
 import { fileURLToPath } from "url";
 import { tmpdir } from "os";
 
+import { asClass, asValue } from "awilix";
+import { createAppContainer, type AppContainer } from "./container.js";
 import { loadConfig, type ArkConfig } from "./config.js";
 import { configureOtlp } from "./otlp.js";
 import { safeAsync } from "./safe.js";
@@ -55,28 +57,11 @@ export class AppContext {
   phase: Phase = "created";
   readonly config: ArkConfig;
   private readonly options: AppOptions;
+  private _container: AppContainer;
 
-  private _db: Database | null = null;
+  // Keep infrastructure fields that aren't in the container
   private _eventBus: typeof eventBus | null = null;
   private _providers = new Map<string, ComputeProvider>();
-
-  // Repositories
-  private _sessions: SessionRepository | null = null;
-  private _computes: ComputeRepository | null = null;
-  private _events: EventRepository | null = null;
-  private _messages: MessageRepository | null = null;
-  private _todos: TodoRepository | null = null;
-
-  // Services
-  private _sessionService: SessionService | null = null;
-  private _computeService: ComputeService | null = null;
-  private _historyService: HistoryService | null = null;
-
-  // Resource stores
-  private _flows: FlowStore | null = null;
-  private _skills: SkillStore | null = null;
-  private _agents: AgentStore | null = null;
-  private _recipes: RecipeStore | null = null;
 
   conductor: { stop(): void } | null = null;
   metricsPoller: { stop(): void } | null = null;
@@ -98,84 +83,52 @@ export class AppContext {
   constructor(config: ArkConfig, options: AppOptions = {}) {
     this.config = config;
     this.options = options;
+    this._container = createAppContainer();
+    this._container.register({ config: asValue(config) });
   }
 
-  // ── Accessors ──────────────────────────────────────────────────────────
+  // ── Accessors (resolved from the DI container) ────────────────────────
 
   /** Convenience shortcut for config.arkDir (used heavily in tests). */
   get arkDir(): string { return this.config.arkDir; }
 
-  get db(): Database {
-    if (!this._db) throw new Error("AppContext not booted -- db not available");
-    return this._db;
-  }
+  get db(): Database { return this._resolve("db"); }
 
   get eventBus(): typeof eventBus {
     if (!this._eventBus) throw new Error("AppContext not booted -- eventBus not available");
     return this._eventBus;
   }
 
-  get sessions(): SessionRepository {
-    if (!this._sessions) throw new Error("AppContext not booted -- sessions not available");
-    return this._sessions;
-  }
+  get sessions(): SessionRepository { return this._resolve("sessions"); }
+  get computes(): ComputeRepository { return this._resolve("computes"); }
+  get events(): EventRepository { return this._resolve("events"); }
+  get messages(): MessageRepository { return this._resolve("messages"); }
+  get todos(): TodoRepository { return this._resolve("todos"); }
 
-  get computes(): ComputeRepository {
-    if (!this._computes) throw new Error("AppContext not booted -- computes not available");
-    return this._computes;
-  }
-
-  get events(): EventRepository {
-    if (!this._events) throw new Error("AppContext not booted -- events not available");
-    return this._events;
-  }
-
-  get messages(): MessageRepository {
-    if (!this._messages) throw new Error("AppContext not booted -- messages not available");
-    return this._messages;
-  }
-
-  get todos(): TodoRepository {
-    if (!this._todos) throw new Error("AppContext not booted -- todos not available");
-    return this._todos;
-  }
-
-  get sessionService(): SessionService {
-    if (!this._sessionService) throw new Error("AppContext not booted -- sessionService not available");
-    return this._sessionService;
-  }
-
-  get computeService(): ComputeService {
-    if (!this._computeService) throw new Error("AppContext not booted -- computeService not available");
-    return this._computeService;
-  }
-
-  get historyService(): HistoryService {
-    if (!this._historyService) throw new Error("AppContext not booted -- historyService not available");
-    return this._historyService;
-  }
+  get sessionService(): SessionService { return this._resolve("sessionService"); }
+  get computeService(): ComputeService { return this._resolve("computeService"); }
+  get historyService(): HistoryService { return this._resolve("historyService"); }
 
   // ── Resource stores ────────────────────────────────────────────────────
 
-  get flows(): FlowStore {
-    if (!this._flows) throw new Error("AppContext not booted -- flows not available");
-    return this._flows;
+  get flows(): FlowStore { return this._resolve("flows"); }
+  get skills(): SkillStore { return this._resolve("skills"); }
+  get agents(): AgentStore { return this._resolve("agents"); }
+  get recipes(): RecipeStore { return this._resolve("recipes"); }
+
+  /** Resolve from container with a user-friendly error if not booted yet. */
+  private _resolve<K extends keyof import("./container.js").Cradle>(key: K): import("./container.js").Cradle[K] {
+    try {
+      return this._container.resolve(key);
+    } catch {
+      throw new Error(`AppContext not booted -- ${key} not available`);
+    }
   }
 
-  get skills(): SkillStore {
-    if (!this._skills) throw new Error("AppContext not booted -- skills not available");
-    return this._skills;
-  }
+  // ── Container access ───────────────────────────────────────────────────
 
-  get agents(): AgentStore {
-    if (!this._agents) throw new Error("AppContext not booted -- agents not available");
-    return this._agents;
-  }
-
-  get recipes(): RecipeStore {
-    if (!this._recipes) throw new Error("AppContext not booted -- recipes not available");
-    return this._recipes;
-  }
+  /** Expose the DI container for advanced use (e.g. registering test doubles). */
+  get container(): AppContainer { return this._container; }
 
   // ── Provider registry ──────────────────────────────────────────────────
 
@@ -195,7 +148,7 @@ export class AppContext {
   resolveProvider(session: Session): { provider: ComputeProvider | null; compute: Compute | null } {
     const computeName = session.compute_name || "local";
     // Query compute directly via the app DB to avoid circular imports
-    const row = this._db?.prepare("SELECT * FROM compute WHERE name = ?").get(computeName) as
+    const row = this.db?.prepare("SELECT * FROM compute WHERE name = ?").get(computeName) as
       { name: string; provider: string; status: string; config: string; created_at: string; updated_at: string } | undefined;
     if (!row) return { provider: null, compute: null };
     const compute = { ...row, config: safeParseConfig(row.config) } as unknown as Compute;
@@ -225,42 +178,49 @@ export class AppContext {
     }
 
     // 2. Open database with pragmas
-    this._db = new Database(this.config.dbPath);
-    this._db.run("PRAGMA journal_mode = WAL");
-    this._db.run("PRAGMA busy_timeout = 5000");
+    const db = new Database(this.config.dbPath);
+    db.run("PRAGMA journal_mode = WAL");
+    db.run("PRAGMA busy_timeout = 5000");
 
     // 3. Initialize schema (new column names: ticket, summary, flow)
-    initRepoSchema(this._db);
-    seedLocalCompute(this._db);
+    initRepoSchema(db);
+    seedLocalCompute(db);
 
-    // 3b. Create repositories and services
-    this._sessions = new SessionRepository(this._db);
-    this._computes = new ComputeRepository(this._db);
-    this._events = new EventRepository(this._db);
-    this._messages = new MessageRepository(this._db);
-    this._todos = new TodoRepository(this._db);
-
-    this._sessionService = new SessionService(this, this._sessions, this._events, this._messages);
-    this._computeService = new ComputeService(this._computes);
-    this._historyService = new HistoryService(this._db);
-
-    // 3c. Create resource stores (file-backed)
+    // 3b. Register all dependencies in the container
     const storeBaseDir = join(fileURLToPath(import.meta.url), "..", "..", "..");
-    this._flows = new FileFlowStore({
-      builtinDir: join(storeBaseDir, "flows", "definitions"),
-      userDir: join(this.config.arkDir, "flows"),
-    });
-    this._skills = new FileSkillStore({
-      builtinDir: join(storeBaseDir, "skills"),
-      userDir: join(this.config.arkDir, "skills"),
-    });
-    this._agents = new FileAgentStore({
-      builtinDir: join(storeBaseDir, "agents"),
-      userDir: join(this.config.arkDir, "agents"),
-    });
-    this._recipes = new FileRecipeStore({
-      builtinDir: join(storeBaseDir, "recipes"),
-      userDir: join(this.config.arkDir, "recipes"),
+
+    this._container.register({
+      db: asValue(db),
+
+      // Repositories
+      sessions: asClass(SessionRepository).singleton(),
+      computes: asClass(ComputeRepository).singleton(),
+      events: asClass(EventRepository).singleton(),
+      messages: asClass(MessageRepository).singleton(),
+      todos: asClass(TodoRepository).singleton(),
+
+      // Services
+      sessionService: asClass(SessionService).singleton(),
+      computeService: asClass(ComputeService).singleton(),
+      historyService: asClass(HistoryService).singleton(),
+
+      // Resource stores (constructed with config, not DI)
+      flows: asValue(new FileFlowStore({
+        builtinDir: join(storeBaseDir, "flows", "definitions"),
+        userDir: join(this.config.arkDir, "flows"),
+      })),
+      skills: asValue(new FileSkillStore({
+        builtinDir: join(storeBaseDir, "skills"),
+        userDir: join(this.config.arkDir, "skills"),
+      })),
+      agents: asValue(new FileAgentStore({
+        builtinDir: join(storeBaseDir, "agents"),
+        userDir: join(this.config.arkDir, "agents"),
+      })),
+      recipes: asValue(new FileRecipeStore({
+        builtinDir: join(storeBaseDir, "recipes"),
+        userDir: join(this.config.arkDir, "recipes"),
+      })),
     });
 
     // 4. Register compute providers
@@ -330,14 +290,16 @@ export class AppContext {
 
     // 11. Purge expired soft-deletes every 30s
     this._purgeInterval = setInterval(() => {
-      const deleted = this._sessions?.listDeleted() ?? [];
-      const cutoff = Date.now() - 90 * 1000;
-      for (const s of deleted) {
-        const deletedAt = s.config?._deleted_at as string | undefined;
-        if (deletedAt && new Date(deletedAt).getTime() < cutoff) {
-          this._sessions?.delete(s.id);
+      try {
+        const deleted = this.sessions.listDeleted();
+        const cutoff = Date.now() - 90 * 1000;
+        for (const s of deleted) {
+          const deletedAt = s.config?._deleted_at as string | undefined;
+          if (deletedAt && new Date(deletedAt).getTime() < cutoff) {
+            this.sessions.delete(s.id);
+          }
         }
-      }
+      } catch { /* container may be disposed during shutdown */ }
     }, 30_000);
 
     // 12. Update tmux status bar every 5s
@@ -365,8 +327,8 @@ export class AppContext {
           if (cmd.includes("ark-status")) {
             const match = cmd.match(/session=([^'&\s]+)/);
             const sid = match?.[1];
-            if (sid && this._sessions) {
-              const session = this._sessions.get(sid);
+            if (sid) {
+              const session = this.sessions.get(sid);
               if (!session || !["running", "waiting"].includes(session.status)) {
                 const { removeHooksConfig } = await import("./claude.js");
                 removeHooksConfig(cwd);
@@ -380,15 +342,15 @@ export class AppContext {
     // 16. Detect stale running sessions (tmux died while TUI was closed)
     await safeAsync("boot: detect stale sessions", async () => {
       const { sessionExistsAsync } = await import("./tmux.js");
-      const running = this._sessions?.list({ status: "running" }) ?? [];
+      const running = this.sessions.list({ status: "running" });
       for (const s of running) {
         if (s.session_id && !(await sessionExistsAsync(s.session_id))) {
-          this._sessions?.update(s.id, {
+          this.sessions.update(s.id, {
             status: "failed",
             error: "Agent process exited while Ark was not running",
             session_id: null,
           });
-          this._events?.log(s.id, "session_stale_detected", { actor: "system" });
+          this.events.log(s.id, "session_stale_detected", { actor: "system" });
         }
       }
     });
@@ -410,8 +372,8 @@ export class AppContext {
     // 0. In test mode, stop all sessions tracked in the session store.
     // Uses session_id (tmux handle) from the DB -- no name parsing.
     // In production, sessions keep running independently of the TUI/CLI lifecycle.
-    if (this.opts?.cleanupOnShutdown && this._sessionService) {
-      await this._sessionService.stopAll();
+    if (this.options?.cleanupOnShutdown) {
+      try { await this.sessionService.stopAll(); } catch {}
     }
 
     // 1. Remove signal handlers
@@ -475,32 +437,18 @@ export class AppContext {
       resetOtlp();
     } catch { /* best-effort */ }
 
-    // 9. Clear provider resolver + close database
+    // 9. Clear provider resolver and dispose the container (closes DB, cleans up singletons)
     clearProviderResolver();
 
-    // Null out stores, services and repositories before closing DB
-    this._flows = null;
-    this._skills = null;
-    this._agents = null;
-    this._recipes = null;
-    this._historyService = null;
-    this._computeService = null;
-    this._sessionService = null;
-    this._todos = null;
-    this._messages = null;
-    this._events = null;
-    this._computes = null;
-    this._sessions = null;
-
-    if (this._db) {
-      try { this._db.close(); } catch (e: any) {
-        // DB may already be closed -- log but don't fail shutdown
-        logError("general", `shutdown: failed to close database: ${e?.message ?? e}`);
-      }
-      this._db = null;
+    // Close the database before disposing the container
+    try { this._container.resolve("db").close(); } catch (e: any) {
+      // DB may already be closed or not yet registered -- log but don't fail shutdown
+      logError("general", `shutdown: failed to close database: ${e?.message ?? e}`);
     }
 
-    // 6. Clean up temp directory (test mode)
+    await this._container.dispose();
+
+    // 10. Clean up temp directory (test mode)
     if (this.options.cleanupOnShutdown && existsSync(this.config.arkDir)) {
       rmSync(this.config.arkDir, { recursive: true, force: true });
     }
@@ -516,7 +464,7 @@ export class AppContext {
   private _startMetricsPoller(): { stop(): void } {
     const handle = setInterval(async () => {
       await safeAsync("metrics: poll computes", async () => {
-        const computes = this._computes?.list({ status: "running" }) ?? [];
+        const computes = this.computes?.list({ status: "running" }) ?? [];
         for (const c of computes) {
           await safeAsync(`metrics: poll compute "${c.name}"`, async () => {
             const compute = await import("../compute/index.js") as Record<string, unknown>;
