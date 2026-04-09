@@ -61,6 +61,17 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
     : getGenericHints(),
   [tab, pane, overlay, selectedSession]);
 
+  const [primaryHints, secondaryHints] = useMemo(() => {
+    if (!hints.length) return [[], []];
+    // Split at the last separator -- everything after it goes to line 2
+    const sepIdx = hints.reduce((last, h, i) =>
+      React.isValidElement(h) && h.key?.toString().startsWith("sep-") ? i : last, -1);
+    if (sepIdx > 0) {
+      return [hints.slice(0, sepIdx), hints.slice(sepIdx + 1)];
+    }
+    return [hints, []];
+  }, [hints]);
+
   return (
     <Box flexDirection="column">
       {error && (
@@ -76,8 +87,14 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
         {counts.completed > 0 && <Text color={theme.running}>{`  ✔ ${counts.completed}`}</Text>}
         {counts.failed > 0 && <Text color={theme.error}>{`  ✕ ${counts.failed}`}</Text>}
         <Text>{"   "}</Text>
-        {hints}
+        {primaryHints}
       </Box>
+      {secondaryHints.length > 0 && (
+        <Box>
+          <Text>{"  "}</Text>
+          {secondaryHints}
+        </Box>
+      )}
     </Box>
   );
 }

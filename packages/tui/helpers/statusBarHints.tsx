@@ -21,7 +21,7 @@ const NAV_HINTS = [
   <KeyHint key="gG" k="g/G" label="top/end" />,
 ];
 
-/** Global hints that appear on every non-overlay screen */
+/** Global hints -- split onto second line via sep(99) */
 const GLOBAL_HINTS = [
   sep(99),
   <KeyHint key="?" k="?" label="help" />,
@@ -159,18 +159,23 @@ export function getSessionHints(s: Session | null | undefined): React.ReactNode[
 
     hints.push(sep(1));
 
-    // Session actions (condensed)
+    // Session actions
+    hints.push(<KeyHint key="fC" k="f/C" label="fork/clone" />);
     hints.push(<KeyHint key="W" k="W" label="worktree" />);
+    hints.push(<KeyHint key="m" k="m" label="move" />);
     hints.push(<KeyHint key="x" k="x" label="delete" />);
   }
 
-  hints.push(sep(2));
-
-  // Global session shortcuts
-  hints.push(<KeyHint key="n" k="n" label="new" />);
-  hints.push(<KeyHint key="/" k="/" label="find" />);
-  hints.push(<KeyHint key="filter" k="!/@/#/$" label="filter" />);
+  // Line 2: global shortcuts (after sep(99) split point)
   hints.push(...GLOBAL_HINTS);
+  hints.push(<KeyHint key="n" k="n" label="new" />);
+  hints.push(<KeyHint key="o" k="o" label="groups" />);
+  hints.push(<KeyHint key="/" k="/" label="find" />);
+  hints.push(<KeyHint key="M" k="M" label="mcp" />);
+  hints.push(<KeyHint key="K" k="K" label="skills" />);
+  hints.push(<KeyHint key="Y" k="Y" label="memory" />);
+  hints.push(<KeyHint key="P" k="P" label="settings" />);
+  hints.push(<KeyHint key="filter" k="!/@/#/$" label="filter" />);
   return hints;
 }
 

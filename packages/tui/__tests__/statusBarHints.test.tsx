@@ -101,14 +101,13 @@ describe("getSessionHints", () => {
     expect(hasLabel(hints, "stop")).toBe(false);
   });
 
-  it("running session includes attach, chat, stop, done", () => {
+  it("running session includes attach, chat, stop, interrupt", () => {
     const session = { status: "running" } as Session;
     const hints = getSessionHints(session);
     expect(hasLabel(hints, "attach")).toBe(true);
-    expect(hasLabel(hints, "chat/threads")).toBe(true);
+    expect(hasLabel(hints, "chat")).toBe(true);
     expect(hasLabel(hints, "stop")).toBe(true);
-    expect(hasLabel(hints, "done")).toBe(true);
-    expect(hasLabel(hints, "quit")).toBe(true);
+    expect(hasLabel(hints, "interrupt")).toBe(true);
   });
 
   it("ready session includes dispatch", () => {
