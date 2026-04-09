@@ -98,7 +98,7 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
       </Box>
       {secondaryLine && (
         <Box>
-          <Text backgroundColor="cyan" color="white">
+          <Text backgroundColor="cyan" color="white" bold>
             {` ${secondaryLine}`.padEnd(columns)}
           </Text>
         </Box>
