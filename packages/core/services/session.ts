@@ -299,6 +299,14 @@ export class SessionService {
   }
 
   /**
+   * Fan-out: create parallel child sessions from a parent.
+   */
+  async fanOut(sessionId: string, opts: { tasks: Array<{ summary: string; agent?: string; flow?: string }> }) {
+    const { fanOut } = await import("./session-orchestration.js");
+    return fanOut(sessionId, opts);
+  }
+
+  /**
    * Handoff: clone session to a different agent and dispatch.
    */
   async handoff(id: string, agent: string, instructions?: string): Promise<SessionOpResult> {

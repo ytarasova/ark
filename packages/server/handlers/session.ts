@@ -212,6 +212,17 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return result;
   });
 
+  router.handle("session/fan-out", async (params, notify) => {
+    const { sessionId, tasks } = extract<{ sessionId: string; tasks: Array<{ summary: string; agent?: string; flow?: string }> }>(params, ["sessionId", "tasks"]);
+    const result = await app.sessionService.fanOut(sessionId, { tasks });
+    if (!result.ok) throw new RpcError(result.message ?? "Fan-out failed", SESSION_NOT_FOUND);
+    for (const childId of result.childIds ?? []) {
+      const session = app.sessions.get(childId);
+      if (session) notify("session/created", { session });
+    }
+    return result;
+  });
+
   router.handle("session/resume", async (params, notify) => {
     const { sessionId } = extract<SessionResumeParams>(params, ["sessionId"]);
     const result = await app.sessionService.resume(sessionId);
