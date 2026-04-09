@@ -45,7 +45,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILTIN_DIR = join(__dirname, "..", "..", "flows", "definitions");
-function USER_DIR() { return join(ARK_DIR(), "flows"); }
+function USER_DIR() { try { return join(ARK_DIR(), "flows"); } catch { return ""; } }
 
 // ── Loading ─────────────────────────────────────────────────────────────────
 

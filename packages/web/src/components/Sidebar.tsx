@@ -91,7 +91,7 @@ export function Sidebar({ activeView, onNavigate, readOnly, collapsed, onToggle 
 
       {/* Footer */}
       <div className="h-8 flex items-center justify-center text-[10px] text-muted-foreground/40 font-mono shrink-0 no-drag">
-        {collapsed ? "" : readOnly ? "read-only" : "v0.10.0"}
+        {collapsed ? "" : readOnly ? "read-only" : `v${__ARK_VERSION__}`}
       </div>
     </div>
   );
