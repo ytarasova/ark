@@ -27,6 +27,8 @@
       <div class="section-title">Reference</div>
       <a href="agents-reference.html">Agents</a>
       <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
       <div class="section-title">Links</div>
       <a href="https://github.com/ytarasova/ark">GitHub</a>
       <a href="https://github.com/ytarasova/ark/releases">Releases</a>
@@ -51,6 +53,15 @@
       <pre><code><span class="prompt">$</span> git clone https://github.com/ytarasova/ark.git
 <span class="prompt">$</span> cd ark
 <span class="prompt">$</span> make install</code></pre>
+
+      <h2>Verify Your Setup</h2>
+      <pre><code><span class="prompt">$</span> ark doctor</code></pre>
+      <p>Checks that Bun, tmux, git, and Claude CLI are installed and working. Run this after a fresh install or when something seems off.</p>
+
+      <h2>Initialize a Repository</h2>
+      <pre><code><span class="prompt">$</span> cd your-project
+<span class="prompt">$</span> ark init</code></pre>
+      <p>Interactive setup wizard: verifies prerequisites, checks Claude authentication, and creates an <code>.ark.yaml</code> config file with your preferred defaults (flow, agent, compute).</p>
 
       <h2>Your First Session</h2>
 

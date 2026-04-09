@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recipes Reference - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Recipes Reference</h1>
+      <p class="subtitle">Session templates for quick-launching common workflows.</p>
+
+      <!-- ── Overview ─────────────────────────────────────────────────────── -->
+      <h2>Overview</h2>
+      <p>Recipes are session templates with variables, default flows, and optional agent overrides. They let you define reusable session configurations -- instead of typing <code>--repo . --flow bare --summary "..."</code> every time, create a recipe and launch with <code>--recipe quick-fix</code>.</p>
+
+      <!-- ── Resolution ───────────────────────────────────────────────────── -->
+      <h2>Three-Tier Resolution</h2>
+      <p>Recipes are resolved using the same three-tier lookup as skills and agents:</p>
+      <table>
+        <thead>
+          <tr><th>Tier</th><th>Location</th><th>Scope</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Project</td><td><code>.ark/recipes/&lt;name&gt;.yaml</code></td><td>Committed to repo, shared with team</td></tr>
+          <tr><td>Global</td><td><code>~/.ark/recipes/&lt;name&gt;.yaml</code></td><td>User-wide personal templates</td></tr>
+          <tr><td>Builtin</td><td><code>recipes/&lt;name&gt;.yaml</code></td><td>Shipped with Ark</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── YAML Schema ──────────────────────────────────────────────────── -->
+      <h2>Recipe YAML Schema</h2>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">my-recipe</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"What this recipe does"</span>
+<span class="yaml-key">flow</span>: <span class="yaml-value">bare</span>                   <span class="yaml-comment"># flow to use</span>
+<span class="yaml-key">agent</span>: <span class="yaml-value">worker</span>                 <span class="yaml-comment"># optional: override default agent</span>
+<span class="yaml-key">variables</span>:
+  - <span class="yaml-key">name</span>: <span class="yaml-value">repo</span>
+    <span class="yaml-key">description</span>: <span class="yaml-value">"Repository path"</span>
+    <span class="yaml-key">required</span>: <span class="yaml-value">true</span>
+  - <span class="yaml-key">name</span>: <span class="yaml-value">summary</span>
+    <span class="yaml-key">description</span>: <span class="yaml-value">"Task description"</span>
+    <span class="yaml-key">required</span>: <span class="yaml-value">true</span>
+  - <span class="yaml-key">name</span>: <span class="yaml-value">ticket</span>
+    <span class="yaml-key">description</span>: <span class="yaml-value">"Ticket ID (optional)"</span>
+<span class="yaml-key">defaults</span>:
+  <span class="yaml-key">summary</span>: <span class="yaml-value">"Default summary text"</span>
+<span class="yaml-key">agent_overrides</span>:              <span class="yaml-comment"># optional: per-stage agent tweaks</span>
+  <span class="yaml-key">implement</span>:
+    <span class="yaml-key">system_prompt_append</span>: <span class="yaml-value">|</span>
+      <span class="yaml-value">Extra instructions for the implement stage.</span>
+<span class="yaml-key">config</span>:
+  <span class="yaml-key">auto_merge</span>: <span class="yaml-value">false</span>
+  <span class="yaml-key">breakpoint</span>: <span class="yaml-value">review</span></code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique recipe identifier</td></tr>
+          <tr><td><code>description</code></td><td>string</td><td>Yes</td><td>Shown in <code>ark recipe list</code></td></tr>
+          <tr><td><code>flow</code></td><td>string</td><td>No</td><td>Flow to use (defaults to repo/global default)</td></tr>
+          <tr><td><code>agent</code></td><td>string</td><td>No</td><td>Override the default agent for the flow</td></tr>
+          <tr><td><code>variables</code></td><td>Variable[]</td><td>No</td><td>Prompted inputs when using the recipe</td></tr>
+          <tr><td><code>defaults</code></td><td>object</td><td>No</td><td>Default values for session fields</td></tr>
+          <tr><td><code>agent_overrides</code></td><td>object</td><td>No</td><td>Per-stage agent configuration overrides</td></tr>
+          <tr><td><code>config</code></td><td>object</td><td>No</td><td>Session config (auto_merge, breakpoint, etc.)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Variable Schema</h3>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>name</code></td><td>string</td><td>Variable name (used in templates as <code>{name}</code>)</td></tr>
+          <tr><td><code>description</code></td><td>string</td><td>Prompt text shown when asking for input</td></tr>
+          <tr><td><code>required</code></td><td>boolean</td><td>Whether the variable must be provided</td></tr>
+          <tr><td><code>default</code></td><td>string</td><td>Default value if not provided</td></tr>
+          <tr><td><code>type</code></td><td>string</td><td>Variable type hint (e.g. <code>string</code>)</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── Builtin Recipes ──────────────────────────────────────────────── -->
+      <h2>Builtin Recipes</h2>
+
+      <h3>quick-fix</h3>
+      <p>Quick single-agent bug fix using the <code>bare</code> flow with a <code>worker</code> agent. No planning or review stages -- just fix and done.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Flow</td><td><code>bare</code></td></tr>
+          <tr><td>Agent</td><td><code>worker</code></td></tr>
+          <tr><td>Variables</td><td><code>repo</code> (required), <code>summary</code> (required)</td></tr>
+        </tbody>
+      </table>
+      <pre><code><span class="prompt">$</span> ark session start --recipe quick-fix --repo . --summary "Fix null check in auth" --dispatch</code></pre>
+
+      <h3>feature-build</h3>
+      <p>Full plan-implement-review cycle using the <code>default</code> flow. Best for new features that benefit from a planning stage before implementation.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Flow</td><td><code>default</code></td></tr>
+          <tr><td>Variables</td><td><code>repo</code> (required), <code>summary</code> (required), <code>ticket</code> (optional)</td></tr>
+        </tbody>
+      </table>
+      <pre><code><span class="prompt">$</span> ark session start --recipe feature-build --repo . --summary "Add OAuth support" --dispatch</code></pre>
+
+      <h3>code-review</h3>
+      <p>Review current branch changes using the <code>reviewer</code> agent in a <code>bare</code> flow.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Flow</td><td><code>bare</code></td></tr>
+          <tr><td>Agent</td><td><code>reviewer</code></td></tr>
+          <tr><td>Variables</td><td><code>repo</code> (required)</td></tr>
+          <tr><td>Default summary</td><td>"Review the code changes on this branch"</td></tr>
+        </tbody>
+      </table>
+      <pre><code><span class="prompt">$</span> ark session start --recipe code-review --repo . --dispatch</code></pre>
+
+      <h3>fix-bug</h3>
+      <p>Bug fix recipe using the <code>default</code> flow with agent overrides that instruct the implementer to reproduce first, write a failing test, then fix with minimal changes.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Flow</td><td><code>default</code></td></tr>
+          <tr><td>Variables</td><td><code>ticket</code> (required), <code>repo</code> (required)</td></tr>
+          <tr><td>Config</td><td><code>auto_merge: false</code>, <code>breakpoint: review</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>new-feature</h3>
+      <p>New feature recipe using the <code>default</code> flow with no special overrides. Similar to <code>feature-build</code> but uses the older parameter syntax.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Flow</td><td><code>default</code></td></tr>
+          <tr><td>Variables</td><td><code>ticket</code> (required), <code>repo</code> (required)</td></tr>
+          <tr><td>Config</td><td><code>auto_merge: false</code></td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── Using Recipes ────────────────────────────────────────────────── -->
+      <h2>Using Recipes</h2>
+      <p>Pass <code>--recipe</code> to <code>ark session start</code>:</p>
+      <pre><code><span class="prompt">$</span> ark session start --recipe quick-fix --repo . --summary "Fix typo" --dispatch
+<span class="prompt">$</span> ark session start --recipe feature-build --repo . --summary "Add caching" -t PROJ-42 --dispatch</code></pre>
+      <p>Variables defined in the recipe are prompted interactively if not provided via CLI flags. The <code>--dispatch</code> flag dispatches the session immediately after creation.</p>
+
+      <!-- ── Creating Recipes ─────────────────────────────────────────────── -->
+      <h2>Creating Custom Recipes</h2>
+
+      <h3>From a YAML file</h3>
+      <pre><code><span class="prompt">$</span> ark recipe create --from my-recipe.yaml
+<span class="prompt">$</span> ark recipe create --from my-recipe.yaml --scope project</code></pre>
+
+      <h3>From an existing session</h3>
+      <p>Capture a successful session's configuration as a reusable recipe:</p>
+      <pre><code><span class="prompt">$</span> ark recipe create --from-session s-abc123 --name my-template
+<span class="prompt">$</span> ark recipe create --from-session s-abc123 --name my-template --scope project</code></pre>
+      <p>This extracts the session's flow, agent, repo, summary, and config into a recipe YAML file.</p>
+
+      <h3>Manually</h3>
+      <p>Create a YAML file directly in <code>~/.ark/recipes/</code> (global) or <code>.ark/recipes/</code> (project).</p>
+
+      <!-- ── Deleting Recipes ─────────────────────────────────────────────── -->
+      <h2>Deleting Recipes</h2>
+      <pre><code><span class="prompt">$</span> ark recipe delete my-recipe
+<span class="prompt">$</span> ark recipe delete my-recipe --scope project</code></pre>
+
+      <div class="callout info">
+        <strong>Note:</strong> Builtin recipes cannot be deleted. To override a builtin, create a project or global recipe with the same name.
+      </div>
+
+      <!-- ── CLI Commands ─────────────────────────────────────────────────── -->
+      <h2>CLI Commands</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ark recipe list</code></td><td>List all recipes across all tiers</td></tr>
+          <tr><td><code>ark recipe show &lt;name&gt;</code></td><td>Show recipe details, variables, and defaults</td></tr>
+          <tr><td><code>ark recipe create</code></td><td>Create from YAML (<code>--from</code>) or session (<code>--from-session</code>)</td></tr>
+          <tr><td><code>ark recipe delete &lt;name&gt;</code></td><td>Delete a global or project recipe</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Create options</h3>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--from &lt;file&gt;</code></td><td>Create from a YAML file</td></tr>
+          <tr><td><code>--from-session &lt;id&gt;</code></td><td>Create from an existing session</td></tr>
+          <tr><td><code>-n, --name &lt;name&gt;</code></td><td>Recipe name (required with <code>--from-session</code>)</td></tr>
+          <tr><td><code>-s, --scope &lt;scope&gt;</code></td><td><code>global</code> (default) or <code>project</code></td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── TUI ──────────────────────────────────────────────────────────── -->
+      <h2>Recipes in the TUI</h2>
+      <p>Recipes appear in the <strong>Tools tab (7)</strong> under the "Recipes" category. You can also use a recipe when creating a new session (<code>n</code>) in the Sessions tab by selecting a recipe from the form.</p>
+
+      <!-- ── Recipe Evaluation ────────────────────────────────────────────── -->
+      <h2>Recipe Evaluation</h2>
+      <p>Test a recipe by running it multiple times and collecting results:</p>
+      <pre><code><span class="prompt">$</span> ark eval quick-fix -n 3</code></pre>
+      <p>Reports success rate, average duration, and average cost across iterations. Useful for benchmarking different recipe configurations.</p>
+
+      <div class="doc-footer">
+        <a href="skills-reference.html">&larr; Skills Reference</a>
+        <a href="quickstart.html">Quick Start &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

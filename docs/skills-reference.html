@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skills Reference - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Skills Reference</h1>
+      <p class="subtitle">Reusable prompt fragments that extend agent capabilities.</p>
+
+      <!-- ── Overview ─────────────────────────────────────────────────────── -->
+      <h2>Overview</h2>
+      <p>Skills are reusable prompt fragments that get injected into an agent's system prompt at dispatch time. They let you encode domain knowledge, coding standards, review criteria, or any recurring instructions once and attach them to any agent.</p>
+      <p>Skills are YAML files with a <code>prompt</code> field containing the text to inject. Attach skills to agents via the <code>skills</code> field in agent YAML.</p>
+
+      <!-- ── Resolution ───────────────────────────────────────────────────── -->
+      <h2>Three-Tier Resolution</h2>
+      <p>Skills are resolved using a three-tier lookup (highest priority first):</p>
+      <table>
+        <thead>
+          <tr><th>Tier</th><th>Location</th><th>Scope</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Project</td><td><code>.ark/skills/&lt;name&gt;.yaml</code></td><td>Committed to repo, shared with team</td></tr>
+          <tr><td>Global</td><td><code>~/.ark/skills/&lt;name&gt;.yaml</code></td><td>User-wide, personal preferences</td></tr>
+          <tr><td>Builtin</td><td><code>skills/&lt;name&gt;.yaml</code></td><td>Shipped with Ark</td></tr>
+        </tbody>
+      </table>
+      <p>A project-level skill with the same name as a builtin skill overrides it. This lets you customize builtin behavior per-repo without modifying Ark itself.</p>
+
+      <!-- ── YAML Schema ──────────────────────────────────────────────────── -->
+      <h2>Skill YAML Schema</h2>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">my-skill</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"What this skill teaches the agent"</span>
+<span class="yaml-key">prompt</span>: <span class="yaml-value">|</span>
+  <span class="yaml-value">Multi-line prompt text that gets injected</span>
+  <span class="yaml-value">into the agent's system prompt at dispatch.</span>
+<span class="yaml-key">tags</span>: <span class="yaml-value">[review, quality]</span></code></pre>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Unique skill identifier (used in agent YAML <code>skills</code> field)</td></tr>
+          <tr><td><code>description</code></td><td>string</td><td>Yes</td><td>Brief description shown in <code>ark skill list</code></td></tr>
+          <tr><td><code>prompt</code></td><td>string</td><td>Yes</td><td>Prompt text injected into agent's system prompt</td></tr>
+          <tr><td><code>tags</code></td><td>string[]</td><td>No</td><td>Categorical tags for organization</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── Builtin Skills ───────────────────────────────────────────────── -->
+      <h2>Builtin Skills</h2>
+
+      <h3>code-review</h3>
+      <p>Reviews code changes for bugs, security issues, performance problems, and style violations. Rates each issue P0-P3 with specific fix suggestions.</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">code-review</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">Reviews code changes for bugs, style, and best practices</span>
+<span class="yaml-key">tags</span>: <span class="yaml-value">[review, quality]</span></code></pre>
+      <p><strong>Prompt behavior:</strong> Instructs the agent to run <code>git diff main...HEAD</code>, check for bugs/security/performance/style, and produce structured output with P0-P3 severity ratings.</p>
+      <p><strong>Used by:</strong> The <code>reviewer</code> agent in the <code>default</code> and <code>pr-review</code> flows.</p>
+
+      <h3>test-writing</h3>
+      <p>Writes comprehensive tests for existing code, covering happy paths, edge cases, error conditions, and boundary values.</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">test-writing</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">Writes comprehensive tests for existing code</span>
+<span class="yaml-key">tags</span>: <span class="yaml-value">[testing, quality]</span></code></pre>
+      <p><strong>Prompt behavior:</strong> Analyzes specified code and writes tests following the project's existing test patterns and framework conventions.</p>
+
+      <!-- ── Attaching Skills ─────────────────────────────────────────────── -->
+      <h2>Attaching Skills to Agents</h2>
+      <p>Add skills to an agent definition via the <code>skills</code> field:</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">my-reviewer</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"Custom reviewer with code-review skill"</span>
+<span class="yaml-key">model</span>: <span class="yaml-value">opus</span>
+<span class="yaml-key">skills</span>: <span class="yaml-value">[code-review]</span>
+<span class="yaml-key">system_prompt</span>: <span class="yaml-value">|</span>
+  <span class="yaml-value">Review the changes on branch {branch} in {repo}.</span></code></pre>
+      <p>At dispatch, Ark resolves each skill name, reads the prompt text, and appends it to the agent's system prompt. Multiple skills are concatenated in order.</p>
+
+      <!-- ── Creating Skills ──────────────────────────────────────────────── -->
+      <h2>Creating Custom Skills</h2>
+
+      <h3>From the CLI</h3>
+      <pre><code><span class="prompt">$</span> ark skill create my-lint --prompt "Run eslint with --fix before committing" -d "Auto-lint skill"
+<span class="prompt">$</span> ark skill create my-lint --scope project   <span class="comment"># save to .ark/skills/ instead of ~/.ark/skills/</span></code></pre>
+
+      <h3>From a YAML file</h3>
+      <pre><code><span class="prompt">$</span> ark skill create --from my-skill.yaml
+<span class="prompt">$</span> ark skill create --from my-skill.yaml --scope project</code></pre>
+
+      <h3>Manually</h3>
+      <p>Create a YAML file directly in the appropriate directory:</p>
+      <pre><code><span class="comment"># ~/.ark/skills/my-style.yaml (global)</span>
+<span class="yaml-key">name</span>: <span class="yaml-value">my-style</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"Enforce our team's coding style"</span>
+<span class="yaml-key">prompt</span>: <span class="yaml-value">|</span>
+  <span class="yaml-value">Follow these style rules:</span>
+  <span class="yaml-value">- Use 2-space indentation</span>
+  <span class="yaml-value">- Prefer const over let</span>
+  <span class="yaml-value">- No default exports</span>
+<span class="yaml-key">tags</span>: <span class="yaml-value">[style, linting]</span></code></pre>
+
+      <!-- ── Skill Extraction ─────────────────────────────────────────────── -->
+      <h2>Skill Extraction</h2>
+      <p>Ark can analyze completed agent conversations and extract reusable procedures as skills. Extracted skills are named <code>extracted-&lt;sessionId&gt;-N</code> and saved to the global tier. Review and rename them before attaching to agents.</p>
+
+      <!-- ── CLI Commands ─────────────────────────────────────────────────── -->
+      <h2>CLI Commands</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ark skill list</code></td><td>List all skills across all tiers (shows source tier)</td></tr>
+          <tr><td><code>ark skill show &lt;name&gt;</code></td><td>Show skill details and full prompt text</td></tr>
+          <tr><td><code>ark skill create &lt;name&gt;</code></td><td>Create a new skill (<code>--prompt</code>, <code>--from</code>, <code>--scope</code>)</td></tr>
+          <tr><td><code>ark skill delete &lt;name&gt;</code></td><td>Delete a global or project skill (cannot delete builtins)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Create options</h3>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-p, --prompt &lt;text&gt;</code></td><td>Skill prompt text (required unless <code>--from</code>)</td></tr>
+          <tr><td><code>-d, --description &lt;desc&gt;</code></td><td>Skill description</td></tr>
+          <tr><td><code>--from &lt;file&gt;</code></td><td>Create from a YAML file</td></tr>
+          <tr><td><code>-s, --scope &lt;scope&gt;</code></td><td><code>global</code> (default) or <code>project</code></td></tr>
+          <tr><td><code>--tags &lt;tags&gt;</code></td><td>Comma-separated tags</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Delete options</h3>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-s, --scope &lt;scope&gt;</code></td><td><code>global</code> (default) or <code>project</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout info">
+        <strong>Note:</strong> Builtin skills cannot be deleted. To override a builtin, create a project or global skill with the same name -- the higher-priority tier wins.
+      </div>
+
+      <!-- ── TUI ──────────────────────────────────────────────────────────── -->
+      <h2>Skills in the TUI</h2>
+      <p>Skills appear in the <strong>Tools tab (7)</strong> under the "Ark Skills" category. You can browse, view, and use skills from the TUI without the CLI.</p>
+
+      <div class="doc-footer">
+        <a href="flows-reference.html">&larr; Flows Reference</a>
+        <a href="recipes-reference.html">Recipes Reference &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

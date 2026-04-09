@@ -27,6 +27,8 @@
       <div class="section-title">Reference</div>
       <a href="agents-reference.html">Agents</a>
       <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
       <div class="section-title">Links</div>
       <a href="https://github.com/ytarasova/ark">GitHub</a>
       <a href="https://github.com/ytarasova/ark/releases">Releases</a>
@@ -35,73 +37,234 @@
   <div class="page-layout">
     <main class="content">
       <h1>Configuration</h1>
-      <p class="subtitle">YAML definitions, environment variables, and project settings.</p>
+      <p class="subtitle">All configuration files, environment variables, and project settings.</p>
 
-      <h2>Repo-Scoped Config (.ark.yaml)</h2>
-      <p>Place a <code>.ark.yaml</code> in your repo root to set defaults for sessions created from that repo:</p>
-      <pre><code><span class="yaml-key">flow</span>: <span class="yaml-value">quick</span>          <span class="yaml-comment"># default flow</span>
-<span class="yaml-key">compute</span>: <span class="yaml-value">ec2-dev</span>     <span class="yaml-comment"># default compute</span>
-<span class="yaml-key">group</span>: <span class="yaml-value">my-project</span>    <span class="yaml-comment"># default group</span></code></pre>
+      <!-- ── Overview ─────────────────────────────────────────────────────── -->
+      <h2>Configuration Files</h2>
+      <table>
+        <thead>
+          <tr><th>File</th><th>Purpose</th><th>Managed by</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>~/.ark/config.yaml</code></td><td>Global user preferences</td><td>User</td></tr>
+          <tr><td><code>~/.ark/bridge.json</code></td><td>Messaging bridge credentials</td><td>User</td></tr>
+          <tr><td><code>~/.ark/profiles.json</code></td><td>Profile definitions</td><td><code>ark profile</code> commands</td></tr>
+          <tr><td><code>~/.ark/ui-state.json</code></td><td>TUI state persistence</td><td>Auto-managed by TUI</td></tr>
+          <tr><td><code>.ark.yaml</code> (repo root)</td><td>Per-repository defaults</td><td>User</td></tr>
+        </tbody>
+      </table>
 
-      <h2>Agent Definitions</h2>
-      <p>Agents live in <code>agents/&lt;name&gt;.yaml</code> (built-in) or <code>~/.ark/agents/&lt;name&gt;.yaml</code> (user).</p>
-      <p>Full agent schema:</p>
-      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">implementer</span>
-<span class="yaml-key">description</span>: <span class="yaml-value">"Implements features with tests"</span>
-<span class="yaml-key">model</span>: <span class="yaml-value">opus</span>              <span class="yaml-comment"># opus | sonnet | haiku</span>
+      <!-- ── config.yaml ──────────────────────────────────────────────────── -->
+      <h2>~/.ark/config.yaml</h2>
+      <p>The main configuration file. Open it with <code>ark config</code> (creates a default if missing).</p>
+
+      <h3>Hotkey Remapping</h3>
+      <p>All TUI keyboard shortcuts can be remapped. Set a value to <code>null</code> to disable the shortcut.</p>
+      <pre><code><span class="yaml-key">hotkeys</span>:
+  <span class="yaml-key">dispatch</span>: <span class="yaml-value">Enter</span>
+  <span class="yaml-key">stop</span>: <span class="yaml-value">s</span>
+  <span class="yaml-key">restart</span>: <span class="yaml-value">r</span>
+  <span class="yaml-key">fork</span>: <span class="yaml-value">f</span>
+  <span class="yaml-key">delete</span>: <span class="yaml-value">x</span>
+  <span class="yaml-key">attach</span>: <span class="yaml-value">a</span>
+  <span class="yaml-key">talk</span>: <span class="yaml-value">t</span>
+  <span class="yaml-key">mcp</span>: <span class="yaml-value">M</span>
+  <span class="yaml-key">move</span>: <span class="yaml-value">m</span>
+  <span class="yaml-key">search</span>: <span class="yaml-value">/</span>
+  <span class="yaml-key">newSession</span>: <span class="yaml-value">n</span>
+  <span class="yaml-key">complete</span>: <span class="yaml-value">d</span>
+  <span class="yaml-key">clone</span>: <span class="yaml-value">C</span>
+  <span class="yaml-key">group</span>: <span class="yaml-value">o</span>
+  <span class="yaml-key">inbox</span>: <span class="yaml-value">T</span>
+  <span class="yaml-key">events</span>: <span class="yaml-value">e</span>
+  <span class="yaml-key">undo</span>: <span class="yaml-value">ctrl+z</span>
+  <span class="yaml-key">advance</span>: <span class="yaml-value">A</span>
+  <span class="yaml-key">worktreeFinish</span>: <span class="yaml-value">W</span>
+  <span class="yaml-key">interrupt</span>: <span class="yaml-value">I</span>
+  <span class="yaml-key">verify</span>: <span class="yaml-value">V</span>
+  <span class="yaml-key">archive</span>: <span class="yaml-value">Z</span></code></pre>
+      <p>Example customization:</p>
+      <pre><code><span class="yaml-key">hotkeys</span>:
+  <span class="yaml-key">clone</span>: <span class="yaml-value">null</span>        <span class="yaml-comment"># disable the clone shortcut</span>
+  <span class="yaml-key">fork</span>: <span class="yaml-value">F</span>            <span class="yaml-comment"># remap fork to uppercase F</span>
+  <span class="yaml-key">undo</span>: <span class="yaml-value">ctrl+z</span>       <span class="yaml-comment"># ctrl+ prefix for modifier keys</span></code></pre>
+
+      <h3>Budget Limits</h3>
+      <p>Set spending limits to prevent runaway costs. All values in USD.</p>
+      <pre><code><span class="yaml-key">budgets</span>:
+  <span class="yaml-key">dailyLimit</span>: <span class="yaml-value">50</span>       <span class="yaml-comment"># USD per day</span>
+  <span class="yaml-key">weeklyLimit</span>: <span class="yaml-value">200</span>     <span class="yaml-comment"># USD per week</span>
+  <span class="yaml-key">monthlyLimit</span>: <span class="yaml-value">500</span>    <span class="yaml-comment"># USD per month</span></code></pre>
+      <p>Omit a field to have no limit for that period. When a limit is approached or exceeded, Ark displays a warning before dispatching.</p>
+
+      <h3>Theme</h3>
+      <pre><code><span class="yaml-key">theme</span>: <span class="yaml-value">dark</span>     <span class="yaml-comment"># dark | light | system</span></code></pre>
+      <p><code>system</code> auto-detects from macOS system appearance. The dark theme uses Tokyo Night colors.</p>
+      <table>
+        <thead>
+          <tr><th>Element</th><th>Dark</th><th>Light</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Accent</td><td><code>#7aa2f7</code></td><td><code>#2e7de9</code></td></tr>
+          <tr><td>Running</td><td><code>#9ece6a</code></td><td><code>#587539</code></td></tr>
+          <tr><td>Waiting</td><td><code>#e0af68</code></td><td><code>#8c6c3e</code></td></tr>
+          <tr><td>Error</td><td><code>#f7768e</code></td><td><code>#f52a65</code></td></tr>
+          <tr><td>Surface</td><td><code>#24283b</code></td><td><code>#e1e2e7</code></td></tr>
+          <tr><td>Text</td><td><code>#c0caf5</code></td><td><code>#3760bf</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>OTLP (OpenTelemetry Traces)</h3>
+      <p>Export session and stage spans as OpenTelemetry traces to any OTLP/HTTP collector.</p>
+      <pre><code><span class="yaml-key">otlp</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">endpoint</span>: <span class="yaml-value">"http://localhost:4318/v1/traces"</span>
+  <span class="yaml-key">headers</span>:
+    <span class="yaml-key">Authorization</span>: <span class="yaml-value">"Bearer ..."</span></code></pre>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>enabled</code></td><td>boolean</td><td><code>false</code></td><td>Enable OTLP trace export</td></tr>
+          <tr><td><code>endpoint</code></td><td>string</td><td>--</td><td>OTLP/HTTP endpoint (Jaeger, Tempo, Honeycomb, etc.)</td></tr>
+          <tr><td><code>headers</code></td><td>object</td><td>--</td><td>Optional headers (auth tokens, API keys)</td></tr>
+        </tbody>
+      </table>
+      <p>One trace per session with child spans per flow stage. Spans include session ID, agent, stage name, duration, and cost.</p>
+
+      <h3>Auto-Rollback</h3>
+      <p>Automatically revert merged PRs when CI fails after merge.</p>
+      <pre><code><span class="yaml-key">rollback</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">false</span>
+  <span class="yaml-key">timeout</span>: <span class="yaml-value">600</span>          <span class="yaml-comment"># seconds to wait for CI</span>
+  <span class="yaml-key">on_timeout</span>: <span class="yaml-value">ignore</span>    <span class="yaml-comment"># rollback | ignore</span>
+  <span class="yaml-key">auto_merge</span>: <span class="yaml-value">false</span>      <span class="yaml-comment"># auto-merge the revert PR</span>
+  <span class="yaml-key">health_url</span>: <span class="yaml-value">null</span>       <span class="yaml-comment"># optional URL to probe after CI passes</span></code></pre>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>enabled</code></td><td>boolean</td><td><code>false</code></td><td>Activate post-merge monitoring</td></tr>
+          <tr><td><code>timeout</code></td><td>number</td><td><code>600</code></td><td>Seconds to wait for CI check suites</td></tr>
+          <tr><td><code>on_timeout</code></td><td>string</td><td><code>"ignore"</code></td><td><code>"rollback"</code> creates a revert PR, <code>"ignore"</code> does nothing</td></tr>
+          <tr><td><code>auto_merge</code></td><td>boolean</td><td><code>false</code></td><td>Auto-merge the revert PR</td></tr>
+          <tr><td><code>health_url</code></td><td>string</td><td><code>null</code></td><td>URL to poll after CI passes (non-2xx triggers rollback)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Default Compute</h3>
+      <pre><code><span class="yaml-key">default_compute</span>: <span class="yaml-value">my-ec2</span></code></pre>
+      <p>Name of a provisioned compute resource to use by default. Also settable via <code>ARK_DEFAULT_COMPUTE</code> env var. CLI flags and per-repo <code>.ark.yaml</code> override this.</p>
+
+      <h3>Notifications</h3>
+      <pre><code><span class="yaml-key">notifications</span>: <span class="yaml-value">true</span></code></pre>
+      <p>Enable or disable desktop notifications for session events.</p>
+
+      <h3>Telemetry</h3>
+      <pre><code><span class="yaml-key">telemetry</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">false</span>
+  <span class="yaml-key">endpoint</span>: <span class="yaml-value">null</span></code></pre>
+      <p>Optional anonymous usage telemetry. Disabled by default. Can also be enabled via <code>ARK_TELEMETRY=1</code>.</p>
+
+      <!-- ── bridge.json ──────────────────────────────────────────────────── -->
+      <h2>~/.ark/bridge.json</h2>
+      <p>Configuration for messaging bridges (Telegram, Slack, Discord). All fields are optional -- only configure the platforms you want.</p>
+      <pre><code>{
+  <span class="yaml-key">"telegram"</span>: {
+    <span class="yaml-key">"botToken"</span>: <span class="yaml-value">"123456789:AABBccDDeeFFggHHiiJJ"</span>,
+    <span class="yaml-key">"chatId"</span>: <span class="yaml-value">"12345678"</span>
+  },
+  <span class="yaml-key">"slack"</span>: {
+    <span class="yaml-key">"webhookUrl"</span>: <span class="yaml-value">"https://hooks.slack.com/services/T00/B00/xxx"</span>
+  },
+  <span class="yaml-key">"discord"</span>: {
+    <span class="yaml-key">"webhookUrl"</span>: <span class="yaml-value">"https://discord.com/api/webhooks/..."</span>
+  }
+}</code></pre>
+      <table>
+        <thead>
+          <tr><th>Platform</th><th>Fields</th><th>How to obtain</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Telegram</td><td><code>botToken</code>, <code>chatId</code></td><td>Create a bot via <code>@BotFather</code>, get chat ID from <code>@userinfobot</code></td></tr>
+          <tr><td>Slack</td><td><code>webhookUrl</code></td><td>Create an Incoming Webhook in your Slack workspace</td></tr>
+          <tr><td>Discord</td><td><code>webhookUrl</code></td><td>Channel Settings > Integrations > Webhooks</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── .ark.yaml ────────────────────────────────────────────────────── -->
+      <h2>.ark.yaml (Per-Repository)</h2>
+      <p>Place in your repo root. Ark reads it when starting sessions in that repo. Recognized file names (in priority order): <code>.ark.yaml</code>, <code>.ark.yml</code>, <code>ark.yaml</code>.</p>
+      <pre><code><span class="yaml-key">flow</span>: <span class="yaml-value">quick</span>               <span class="yaml-comment"># default flow</span>
+<span class="yaml-key">group</span>: <span class="yaml-value">my-team</span>             <span class="yaml-comment"># default group name</span>
+<span class="yaml-key">compute</span>: <span class="yaml-value">my-ec2</span>            <span class="yaml-comment"># default compute resource</span>
+<span class="yaml-key">agent</span>: <span class="yaml-value">implementer</span>         <span class="yaml-comment"># default agent</span>
+<span class="yaml-key">auto_pr</span>: <span class="yaml-value">true</span>              <span class="yaml-comment"># auto-create PR on agent completion</span>
+<span class="yaml-key">env</span>:
+  <span class="yaml-key">CUSTOM_VAR</span>: <span class="yaml-value">"value"</span>
+<span class="yaml-key">verify</span>:                     <span class="yaml-comment"># verification scripts for all stages</span>
+  - <span class="yaml-value">"npm test"</span>
+  - <span class="yaml-value">"npm run lint"</span></code></pre>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>flow</code></td><td>string</td><td>Default flow name</td></tr>
+          <tr><td><code>group</code></td><td>string</td><td>Default group name</td></tr>
+          <tr><td><code>compute</code></td><td>string</td><td>Default compute resource</td></tr>
+          <tr><td><code>agent</code></td><td>string</td><td>Default agent name</td></tr>
+          <tr><td><code>env</code></td><td>object</td><td>Environment variables for agents</td></tr>
+          <tr><td><code>verify</code></td><td>string[]</td><td>Verification scripts run before stage completion</td></tr>
+          <tr><td><code>auto_pr</code></td><td>boolean</td><td>Auto-create PR on agent completion (default: true for repos with remotes)</td></tr>
+        </tbody>
+      </table>
+      <p>CLI flags always override <code>.ark.yaml</code> defaults:</p>
+      <pre><code><span class="prompt">$</span> ark session start --repo .                     <span class="yaml-comment"># uses flow from .ark.yaml</span>
+<span class="prompt">$</span> ark session start --repo . --flow bare          <span class="yaml-comment"># overrides flow to "bare"</span></code></pre>
+
+      <!-- ── Agent YAML ───────────────────────────────────────────────────── -->
+      <h2>Agent YAML</h2>
+      <p>Agent definitions live in <code>agents/&lt;name&gt;.yaml</code> (builtin), <code>.ark/agents/&lt;name&gt;.yaml</code> (project), or <code>~/.ark/agents/&lt;name&gt;.yaml</code> (global). See <a href="agents-reference.html">Agents Reference</a> for detailed per-agent documentation.</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">my-agent</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"What this agent does"</span>
+<span class="yaml-key">model</span>: <span class="yaml-value">opus</span>               <span class="yaml-comment"># opus | sonnet | haiku</span>
 <span class="yaml-key">max_turns</span>: <span class="yaml-value">200</span>
 <span class="yaml-key">system_prompt</span>: <span class="yaml-value">|</span>
   <span class="yaml-value">Working on {repo}. Task: {summary}. Ticket: {ticket}.</span>
-<span class="yaml-key">tools</span>:
-  - <span class="yaml-value">Bash</span>
-  - <span class="yaml-value">Read</span>
-  - <span class="yaml-value">Write</span>
-  - <span class="yaml-value">Edit</span>
-  - <span class="yaml-value">Glob</span>
-  - <span class="yaml-value">Grep</span>
-  - <span class="yaml-value">WebSearch</span>
+<span class="yaml-key">tools</span>: <span class="yaml-value">[Bash, Read, Write, Edit, Glob, Grep, WebSearch]</span>
 <span class="yaml-key">permission_mode</span>: <span class="yaml-value">bypassPermissions</span>
-<span class="yaml-key">mcp_servers</span>: <span class="yaml-value">[]</span>          <span class="yaml-comment"># MCP server names</span>
-<span class="yaml-key">skills</span>: <span class="yaml-value">[]</span>               <span class="yaml-comment"># Skill paths</span>
-<span class="yaml-key">memories</span>: <span class="yaml-value">[]</span>             <span class="yaml-comment"># Memory file paths</span>
+<span class="yaml-key">skills</span>: <span class="yaml-value">[code-review]</span>     <span class="yaml-comment"># skills injected into system prompt</span>
+<span class="yaml-key">memories</span>: <span class="yaml-value">[]</span>              <span class="yaml-comment"># memory categories recalled at dispatch</span>
+<span class="yaml-key">context</span>: <span class="yaml-value">[CLAUDE.md]</span>      <span class="yaml-comment"># files included as context</span>
 <span class="yaml-key">env</span>:
   <span class="yaml-key">CLAUDE_AUTOCOMPACT_PCT_OVERRIDE</span>: <span class="yaml-value">"80"</span></code></pre>
-      <p>Template variables available: <code>{ticket}</code>, <code>{summary}</code>, <code>{workdir}</code>, <code>{repo}</code>, <code>{branch}</code>.</p>
-      <p>Built-in agents: <code>planner</code>, <code>implementer</code>, <code>reviewer</code>, <code>documenter</code>, <code>worker</code>.</p>
+      <p>Template variables substituted at dispatch: <code>{ticket}</code>, <code>{summary}</code>, <code>{workdir}</code>, <code>{repo}</code>, <code>{branch}</code>.</p>
+      <p>Built-in agents: <code>planner</code>, <code>implementer</code>, <code>reviewer</code>, <code>documenter</code>, <code>worker</code>, <code>codex-worker</code>, <code>gemini-worker</code>, <code>aider-worker</code>.</p>
 
-      <h2>Flow Definitions</h2>
-      <p>Flows live in <code>flows/definitions/&lt;name&gt;.yaml</code> (built-in) or <code>~/.ark/flows/&lt;name&gt;.yaml</code> (user).</p>
-      <p>Full flow schema:</p>
-      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">default</span>
-<span class="yaml-key">description</span>: <span class="yaml-value">"Full SDLC pipeline"</span>
+      <!-- ── Flow YAML ────────────────────────────────────────────────────── -->
+      <h2>Flow YAML</h2>
+      <p>Flows live in <code>flows/definitions/&lt;name&gt;.yaml</code> (builtin), <code>.ark/flows/&lt;name&gt;.yaml</code> (project), or <code>~/.ark/flows/&lt;name&gt;.yaml</code> (global). See <a href="flows-reference.html">Flows Reference</a> for detailed per-flow documentation.</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">my-flow</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"Custom workflow"</span>
 <span class="yaml-key">stages</span>:
   - <span class="yaml-key">name</span>: <span class="yaml-value">plan</span>
     <span class="yaml-key">agent</span>: <span class="yaml-value">planner</span>
-    <span class="yaml-key">gate</span>: <span class="yaml-value">manual</span>         <span class="yaml-comment"># auto | manual | review | condition</span>
-    <span class="yaml-key">autonomy</span>: <span class="yaml-value">edit</span>       <span class="yaml-comment"># full | execute | edit | read-only</span>
-    <span class="yaml-key">task</span>: <span class="yaml-value">|</span>
-      <span class="yaml-value">Plan the implementation for {summary}.</span>
+    <span class="yaml-key">gate</span>: <span class="yaml-value">manual</span>           <span class="yaml-comment"># auto | manual | review | condition</span>
     <span class="yaml-key">on_failure</span>: <span class="yaml-value">notify</span>
-
   - <span class="yaml-key">name</span>: <span class="yaml-value">implement</span>
     <span class="yaml-key">agent</span>: <span class="yaml-value">implementer</span>
     <span class="yaml-key">gate</span>: <span class="yaml-value">auto</span>
     <span class="yaml-key">on_failure</span>: <span class="yaml-value">"retry(3)"</span>
+    <span class="yaml-key">verify</span>:
+      - <span class="yaml-value">"npm test"</span></code></pre>
+      <p>Built-in flows: <code>default</code>, <code>quick</code>, <code>bare</code>, <code>parallel</code>, <code>fan-out</code>, <code>pr-review</code>, <code>dag-parallel</code>.</p>
 
-  - <span class="yaml-key">name</span>: <span class="yaml-value">review</span>
-    <span class="yaml-key">agent</span>: <span class="yaml-value">reviewer</span>
-    <span class="yaml-key">gate</span>: <span class="yaml-value">review</span>         <span class="yaml-comment"># waits for GitHub PR approval</span></code></pre>
-      <p>Built-in flows: <code>bare</code> (single agent), <code>quick</code> (implement+review), <code>default</code> (full pipeline), <code>parallel</code> (fan-out).</p>
-      <p>Gate types:</p>
-      <ul>
-        <li><strong>auto</strong>: advances if agent completes without error</li>
-        <li><strong>manual</strong>: waits for human to advance</li>
-        <li><strong>review</strong>: waits for GitHub PR approval webhook</li>
-        <li><strong>condition</strong>: evaluates an expression</li>
-      </ul>
-
+      <!-- ── Skills ───────────────────────────────────────────────────────── -->
       <h2>Skill Definitions</h2>
-      <p>Skills are reusable prompt fragments for agents. They live in three locations (highest priority first):</p>
+      <p>Skills are reusable prompt fragments for agents. Three-tier resolution (highest priority first):</p>
       <table>
         <thead>
           <tr><th>Location</th><th>Scope</th></tr>
@@ -112,21 +275,11 @@
           <tr><td><code>skills/&lt;name&gt;.md</code></td><td>Builtin (shipped with Ark)</td></tr>
         </tbody>
       </table>
-      <p>Attach skills to agents via the <code>skills</code> field in agent YAML. A skill is a markdown file containing instructions, patterns, or domain knowledge that gets injected into the agent context.</p>
+      <p>Attach skills to agents via the <code>skills</code> field in agent YAML. At dispatch, skill content is automatically injected into the agent's system prompt.</p>
 
+      <!-- ── Recipes ──────────────────────────────────────────────────────── -->
       <h2>Recipe Definitions</h2>
-      <p>Recipes are session templates with variables. They live in three locations (highest priority first):</p>
-      <table>
-        <thead>
-          <tr><th>Location</th><th>Scope</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>.ark/recipes/&lt;name&gt;.yaml</code></td><td>Project-local</td></tr>
-          <tr><td><code>~/.ark/recipes/&lt;name&gt;.yaml</code></td><td>Global</td></tr>
-          <tr><td><code>recipes/&lt;name&gt;.yaml</code></td><td>Builtin</td></tr>
-        </tbody>
-      </table>
-      <p>Recipe schema:</p>
+      <p>Recipes are session templates with variables. Same three-tier resolution as skills.</p>
       <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">quick-fix</span>
 <span class="yaml-key">description</span>: <span class="yaml-value">"Fast bugfix with bare flow"</span>
 <span class="yaml-key">repo</span>: <span class="yaml-value">.</span>
@@ -135,120 +288,66 @@
 <span class="yaml-key">variables</span>:
   - <span class="yaml-key">name</span>: <span class="yaml-value">issue</span>
     <span class="yaml-key">prompt</span>: <span class="yaml-value">"Describe the issue"</span></code></pre>
-      <p>Built-in recipes: <code>quick-fix</code>, <code>feature-build</code>, <code>code-review</code>. Create a recipe from an existing session with <code>sessionToRecipe</code>.</p>
+      <p>Built-in recipes: <code>quick-fix</code>, <code>feature-build</code>, <code>code-review</code>, <code>fix-bug</code>, <code>new-feature</code>.</p>
 
-      <h2>Guardrails</h2>
-      <p>Guardrails are pattern-based tool authorization rules defined in agent or flow configuration. They block dangerous commands before execution. Example patterns: <code>rm -rf /</code>, <code>git push --force</code>, <code>DROP TABLE</code>.</p>
-
+      <!-- ── Environment Variables ────────────────────────────────────────── -->
       <h2>Environment Variables</h2>
       <table>
         <thead>
-          <tr>
-            <th>Variable</th>
-            <th>Default</th>
-            <th>Purpose</th>
-          </tr>
+          <tr><th>Variable</th><th>Default</th><th>Purpose</th></tr>
         </thead>
         <tbody>
-          <tr>
-            <td><code>ARK_CONDUCTOR_PORT</code></td>
-            <td><code>19100</code></td>
-            <td>Conductor HTTP server port</td>
-          </tr>
-          <tr>
-            <td><code>ARK_CONDUCTOR_URL</code></td>
-            <td><code>http://localhost:19100</code></td>
-            <td>Conductor URL</td>
-          </tr>
-          <tr>
-            <td><code>ARK_ARKD_URL</code></td>
-            <td><code>http://localhost:19300</code></td>
-            <td>ArkD daemon URL (channel relay target)</td>
-          </tr>
-          <tr>
-            <td><code>ARK_ARKD_PORT</code></td>
-            <td><code>19300</code></td>
-            <td>ArkD daemon port</td>
-          </tr>
-          <tr>
-            <td><code>ARK_CHANNEL_PORT</code></td>
-            <td>auto</td>
-            <td>Per-session MCP channel port</td>
-          </tr>
-          <tr>
-            <td><code>ARK_SESSION_ID</code></td>
-            <td>--</td>
-            <td>Set in channel context</td>
-          </tr>
-          <tr>
-            <td><code>ARK_STAGE</code></td>
-            <td>--</td>
-            <td>Current flow stage</td>
-          </tr>
-          <tr>
-            <td><code>ARK_TEST_DIR</code></td>
-            <td>--</td>
-            <td>Temp dir for test isolation</td>
-          </tr>
-          <tr>
-            <td><code>ARK_GITHUB_WEBHOOK_SECRET</code></td>
-            <td>--</td>
-            <td>HMAC secret for PR monitoring</td>
-          </tr>
-          <tr>
-            <td><code>ARK_HOME</code></td>
-            <td><code>~/.ark</code></td>
-            <td>Override install/data directory</td>
-          </tr>
+          <tr><td><code>ARK_CONDUCTOR_PORT</code></td><td><code>19100</code></td><td>Conductor HTTP server port</td></tr>
+          <tr><td><code>ARK_CONDUCTOR_URL</code></td><td><code>http://localhost:19100</code></td><td>Conductor URL (fallback if arkd unavailable)</td></tr>
+          <tr><td><code>ARK_ARKD_URL</code></td><td><code>http://localhost:19300</code></td><td>ArkD URL -- channel reports go here first</td></tr>
+          <tr><td><code>ARK_ARKD_PORT</code></td><td><code>19300</code></td><td>ArkD daemon port</td></tr>
+          <tr><td><code>ARK_CHANNEL_PORT</code></td><td>auto</td><td>Per-session MCP channel port</td></tr>
+          <tr><td><code>ARK_SESSION_ID</code></td><td>--</td><td>Set in channel context</td></tr>
+          <tr><td><code>ARK_STAGE</code></td><td>--</td><td>Current flow stage in channel</td></tr>
+          <tr><td><code>ARK_PROFILE</code></td><td><code>default</code></td><td>Active profile name</td></tr>
+          <tr><td><code>ARK_DEFAULT_COMPUTE</code></td><td>--</td><td>Default compute resource name</td></tr>
+          <tr><td><code>ARK_TELEMETRY</code></td><td>--</td><td>Set to <code>1</code> to enable telemetry (overrides config)</td></tr>
+          <tr><td><code>ARK_TEST_DIR</code></td><td>--</td><td>Temp directory for test isolation (development only)</td></tr>
+          <tr><td><code>ANTHROPIC_API_KEY</code></td><td>--</td><td>Required for hybrid search LLM re-ranking</td></tr>
+          <tr><td><code>EDITOR</code></td><td><code>vi</code></td><td>Editor for <code>ark config</code> and <code>ark agent create/edit</code></td></tr>
         </tbody>
       </table>
 
+      <!-- ── Data Locations ───────────────────────────────────────────────── -->
       <h2>Data Locations</h2>
       <table>
         <thead>
-          <tr>
-            <th>Path</th>
-            <th>Purpose</th>
-          </tr>
+          <tr><th>Path</th><th>Purpose</th></tr>
         </thead>
         <tbody>
-          <tr>
-            <td><code>~/.ark/ark.db</code></td>
-            <td>SQLite database (WAL mode)</td>
-          </tr>
-          <tr>
-            <td><code>~/.ark/tracks/&lt;id&gt;/</code></td>
-            <td>Launcher scripts, channel configs</td>
-          </tr>
-          <tr>
-            <td><code>~/.ark/worktrees/&lt;id&gt;/</code></td>
-            <td>Git worktrees for isolated sessions</td>
-          </tr>
-          <tr>
-            <td><code>~/.ark/agents/</code></td>
-            <td>User agent definitions</td>
-          </tr>
-          <tr>
-            <td><code>~/.ark/flows/</code></td>
-            <td>User flow definitions</td>
-          </tr>
-          <tr>
-            <td><code>~/.ark/skills/</code></td>
-            <td>Global skill definitions</td>
-          </tr>
-          <tr>
-            <td><code>~/.ark/recipes/</code></td>
-            <td>Global recipe definitions</td>
-          </tr>
-          <tr>
-            <td><code>~/.claude/projects/</code></td>
-            <td>Claude Code session transcripts</td>
-          </tr>
+          <tr><td><code>~/.ark/ark.db</code></td><td>SQLite database (WAL mode, 5s busy timeout)</td></tr>
+          <tr><td><code>~/.ark/config.yaml</code></td><td>User configuration</td></tr>
+          <tr><td><code>~/.ark/bridge.json</code></td><td>Messaging bridge credentials</td></tr>
+          <tr><td><code>~/.ark/profiles.json</code></td><td>Profile definitions</td></tr>
+          <tr><td><code>~/.ark/ui-state.json</code></td><td>TUI state persistence</td></tr>
+          <tr><td><code>~/.ark/claude-oauth-token</code></td><td>Saved OAuth token from <code>ark auth</code></td></tr>
+          <tr><td><code>~/.ark/tracks/&lt;sessionId&gt;/</code></td><td>Launcher scripts, channel configs per session</td></tr>
+          <tr><td><code>~/.ark/worktrees/&lt;sessionId&gt;/</code></td><td>Git worktrees for isolated sessions</td></tr>
+          <tr><td><code>~/.ark/skills/</code></td><td>Global skill definitions</td></tr>
+          <tr><td><code>~/.ark/recipes/</code></td><td>Global recipe definitions</td></tr>
+          <tr><td><code>~/.ark/agents/</code></td><td>Global agent definitions</td></tr>
+          <tr><td><code>~/.ark/flows/</code></td><td>Global flow definitions</td></tr>
+          <tr><td><code>~/.ark/logs/</code></td><td>Log files</td></tr>
+          <tr><td><code>~/.ark/conductor/</code></td><td>Conductor learnings and policies</td></tr>
+          <tr><td><code>~/.claude/projects/</code></td><td>Claude Code session transcripts (read by search/import)</td></tr>
         </tbody>
       </table>
 
+      <!-- ── Profiles ─────────────────────────────────────────────────────── -->
+      <h2>Profiles</h2>
+      <p>Profiles provide isolated session namespaces. Managed by <code>ark profile</code> commands -- stored in <code>~/.ark/profiles.json</code>.</p>
+      <pre><code><span class="prompt">$</span> ark profile list
+<span class="prompt">$</span> ark profile create work "Work projects"
+<span class="prompt">$</span> ark -p work session list               <span class="yaml-comment"># scope to a profile</span></code></pre>
+
+      <!-- ── Cron Schedules ───────────────────────────────────────────────── -->
       <h2>Cron Schedules</h2>
-      <pre><code>ark schedule add --cron "0 2 * * *" --flow bare --repo /path --summary "Nightly tests"</code></pre>
+      <pre><code><span class="prompt">$</span> ark schedule add --cron "0 2 * * *" --flow bare --repo /path --summary "Nightly tests"</code></pre>
       <p>Cron format: minute hour day-of-month month day-of-week. Supports wildcards (<code>*</code>), ranges (<code>1-5</code>), steps (<code>*/5</code>), and comma lists (<code>1,3,5</code>).</p>
 
       <div class="doc-footer">
