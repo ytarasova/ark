@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agents Reference - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Agents Reference</h1>
+      <p class="subtitle">Complete reference for all builtin agent definitions. See the <a href="workflows.html#agents">Workflows guide</a> for an overview.</p>
+
+      <h2>Three-Tier Resolution</h2>
+      <p>Agents resolve in priority order:</p>
+      <ol>
+        <li><strong>Project</strong>: <code>.ark/agents/&lt;name&gt;.yaml</code> in the repo</li>
+        <li><strong>Global</strong>: <code>~/.ark/agents/&lt;name&gt;.yaml</code></li>
+        <li><strong>Builtin</strong>: <code>agents/&lt;name&gt;.yaml</code> shipped with Ark</li>
+      </ol>
+      <p>Higher-priority agents shadow lower ones. Use <code>ark agent copy</code> to customize a builtin.</p>
+
+      <!-- ── Claude Code Agents ──────────────────────────────────────────── -->
+      <h2>Claude Code Agents</h2>
+      <p>These agents use the default <code>claude-code</code> executor, which launches Claude Code in tmux with hooks and an MCP channel for status reporting.</p>
+
+      <h3>implementer</h3>
+      <p>The primary coding agent. Reads the codebase, implements features or fixes, writes tests, and creates commits.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Model</td><td><code>opus</code></td></tr>
+          <tr><td>Max turns</td><td>200</td></tr>
+          <tr><td>Tools</td><td>Bash, Read, Write, Edit, Glob, Grep, WebSearch</td></tr>
+          <tr><td>Memories</td><td>code-style, architecture, testing-patterns</td></tr>
+          <tr><td>Context</td><td>CLAUDE.md, PLAN.md</td></tr>
+        </tbody>
+      </table>
+      <p><strong>System prompt summary</strong>: Follows PLAN.md if it exists, otherwise analyzes the ticket independently. Creates atomic commits and ensures tests pass. Asks (via AskUserQuestion) when encountering ambiguity.</p>
+      <p><strong>Used by flows</strong>: default, quick, parallel, fan-out, dag-parallel, pr-review</p>
+
+      <h3>planner</h3>
+      <p>Creates implementation plans. Reads the codebase, designs the approach, and writes a PLAN.md.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Model</td><td><code>sonnet</code></td></tr>
+          <tr><td>Max turns</td><td>50</td></tr>
+          <tr><td>Tools</td><td>Bash, Read, Write, Edit, Glob, Grep, WebSearch</td></tr>
+          <tr><td>Memories</td><td>code-style, architecture</td></tr>
+          <tr><td>Context</td><td>CLAUDE.md</td></tr>
+        </tbody>
+      </table>
+      <p><strong>System prompt summary</strong>: Identifies files to change, designs the implementation approach, writes PLAN.md with summary, files to modify, step-by-step plan, testing strategy, and risk assessment. Commits PLAN.md to the branch.</p>
+      <p><strong>Used by flows</strong>: default, parallel, fan-out, dag-parallel, pr-review</p>
+
+      <h3>reviewer</h3>
+      <p>Reviews code changes for quality, correctness, security, and standards compliance.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Model</td><td><code>sonnet</code></td></tr>
+          <tr><td>Max turns</td><td>50</td></tr>
+          <tr><td>Tools</td><td>Bash, Read, Glob, Grep</td></tr>
+          <tr><td>Memories</td><td>code-style, review-checklist</td></tr>
+          <tr><td>Context</td><td>CLAUDE.md</td></tr>
+        </tbody>
+      </table>
+      <p><strong>System prompt summary</strong>: Runs <code>git diff main...HEAD</code> and the test suite. Checks correctness, test coverage, code quality, security (OWASP top 10), performance, and documentation. Reports blocking issues or confirms approval.</p>
+      <p><strong>Used by flows</strong>: default, parallel, fan-out, dag-parallel</p>
+
+      <h3>documenter</h3>
+      <p>Updates documentation based on code changes.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Model</td><td><code>sonnet</code></td></tr>
+          <tr><td>Max turns</td><td>30</td></tr>
+          <tr><td>Tools</td><td>Bash, Read, Write, Edit, Glob, Grep</td></tr>
+          <tr><td>Memories</td><td>doc-style</td></tr>
+          <tr><td>Context</td><td>CLAUDE.md</td></tr>
+        </tbody>
+      </table>
+      <p><strong>System prompt summary</strong>: Reviews the diff and updates affected docs (README, API docs, architecture docs, inline comments). Only updates docs genuinely affected by changes. Does not create new doc files unless a wholly new feature needs one.</p>
+      <p><strong>Used by flows</strong>: default (optional final stage)</p>
+
+      <h3>worker</h3>
+      <p>General-purpose agent with no predefined system prompt. A blank slate for custom tasks.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Model</td><td><code>opus</code></td></tr>
+          <tr><td>Max turns</td><td>200</td></tr>
+          <tr><td>Tools</td><td>Bash, Read, Write, Edit, Glob, Grep, WebSearch</td></tr>
+          <tr><td>Memories</td><td>none</td></tr>
+          <tr><td>Context</td><td>none</td></tr>
+        </tbody>
+      </table>
+      <p><strong>System prompt summary</strong>: Empty. The task prompt from the flow stage or user provides all context.</p>
+      <p><strong>Used by flows</strong>: bare, pr-review</p>
+
+      <!-- ── CLI Agents ──────────────────────────────────────────────────── -->
+      <h2>CLI Agents</h2>
+      <p>These agents use the <code>cli-agent</code> executor, which launches third-party CLI tools in tmux with the same worktree isolation and session tracking as Claude Code agents.</p>
+
+      <h3>codex-worker</h3>
+      <p>Runs OpenAI Codex CLI in full-auto mode.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Runtime</td><td><code>cli-agent</code></td></tr>
+          <tr><td>Command</td><td><code>codex --approval-mode full-auto</code></td></tr>
+          <tr><td>Task delivery</td><td><code>arg</code> (task appended as CLI argument)</td></tr>
+          <tr><td>Model</td><td><code>o4-mini</code></td></tr>
+          <tr><td>Max turns</td><td>200</td></tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        <p><strong>Prerequisite</strong>: <code>codex</code> CLI must be installed and authenticated.</p>
+      </div>
+
+      <h3>gemini-worker</h3>
+      <p>Runs Google Gemini CLI.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Runtime</td><td><code>cli-agent</code></td></tr>
+          <tr><td>Command</td><td><code>gemini</code></td></tr>
+          <tr><td>Task delivery</td><td><code>stdin</code> (task piped via stdin)</td></tr>
+          <tr><td>Model</td><td><code>gemini</code></td></tr>
+          <tr><td>Max turns</td><td>200</td></tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        <p><strong>Prerequisite</strong>: <code>gemini</code> CLI must be installed and authenticated.</p>
+      </div>
+
+      <h3>aider-worker</h3>
+      <p>Runs Aider AI pair programming tool.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Runtime</td><td><code>cli-agent</code></td></tr>
+          <tr><td>Command</td><td><code>aider --yes-always --no-git</code></td></tr>
+          <tr><td>Task delivery</td><td><code>arg</code> (task appended as CLI argument)</td></tr>
+          <tr><td>Model</td><td><code>aider</code></td></tr>
+          <tr><td>Max turns</td><td>200</td></tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        <p><strong>Prerequisite</strong>: <code>aider</code> must be installed (<code>pip install aider-chat</code>).</p>
+      </div>
+
+      <h3>generic-cli</h3>
+      <p>Template for wrapping any CLI tool as an Ark agent. Copy and customize for your tool.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Runtime</td><td><code>cli-agent</code></td></tr>
+          <tr><td>Command</td><td><code>echo "Override this command..."</code></td></tr>
+          <tr><td>Task delivery</td><td><code>stdin</code></td></tr>
+          <tr><td>Model</td><td><code>custom</code></td></tr>
+          <tr><td>Max turns</td><td>200</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Usage</strong>: Copy this agent and replace the <code>command</code> field:</p>
+      <pre><code><span class="prompt">$</span> ark agent copy generic-cli my-tool
+<span class="yaml-comment"># Edit to set your tool's command, task_delivery mode, etc.</span></code></pre>
+
+      <!-- ── Agent YAML Fields ───────────────────────────────────────────── -->
+      <h2>Agent YAML Fields</h2>
+      <p>Full field reference for agent definition files.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>name</code></td><td>string</td><td>yes</td><td>Agent identifier (matches filename without extension)</td></tr>
+          <tr><td><code>description</code></td><td>string</td><td>yes</td><td>Short description shown in <code>ark agent list</code></td></tr>
+          <tr><td><code>model</code></td><td>string</td><td>yes</td><td>Model alias: <code>opus</code>, <code>sonnet</code>, <code>haiku</code>, or tool-specific (e.g., <code>o4-mini</code>)</td></tr>
+          <tr><td><code>max_turns</code></td><td>number</td><td>yes</td><td>Maximum conversation turns before the agent stops</td></tr>
+          <tr><td><code>system_prompt</code></td><td>string</td><td>yes</td><td>System prompt text. Supports template variables (see below)</td></tr>
+          <tr><td><code>tools</code></td><td>string[]</td><td>yes</td><td>Claude tools the agent can use</td></tr>
+          <tr><td><code>permission_mode</code></td><td>string</td><td>yes</td><td>Claude permission mode (e.g., <code>bypassPermissions</code>)</td></tr>
+          <tr><td><code>mcp_servers</code></td><td>string[]</td><td>no</td><td>MCP server names to attach</td></tr>
+          <tr><td><code>skills</code></td><td>string[]</td><td>no</td><td>Skill names injected into the system prompt at dispatch</td></tr>
+          <tr><td><code>memories</code></td><td>string[]</td><td>no</td><td>Memory categories recalled at dispatch</td></tr>
+          <tr><td><code>context</code></td><td>string[]</td><td>no</td><td>Files included as context at dispatch</td></tr>
+          <tr><td><code>env</code></td><td>object</td><td>no</td><td>Environment variables exported before agent launch</td></tr>
+          <tr><td><code>runtime</code></td><td>string</td><td>no</td><td>Executor: <code>claude-code</code> (default), <code>cli-agent</code>, or <code>subprocess</code></td></tr>
+          <tr><td><code>command</code></td><td>string[]</td><td>no</td><td>Command for <code>cli-agent</code> and <code>subprocess</code> runtimes</td></tr>
+          <tr><td><code>task_delivery</code></td><td>string</td><td>no</td><td>How task is sent to CLI agents: <code>stdin</code>, <code>file</code>, or <code>arg</code> (default)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Template Variables</h3>
+      <p>These variables are substituted in <code>system_prompt</code> at dispatch time:</p>
+      <table>
+        <thead>
+          <tr><th>Variable</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>{ticket}</code></td><td>Session ticket reference (e.g., PROJ-123)</td></tr>
+          <tr><td><code>{summary}</code></td><td>Session task summary</td></tr>
+          <tr><td><code>{workdir}</code></td><td>Working directory path</td></tr>
+          <tr><td><code>{repo}</code></td><td>Repository name</td></tr>
+          <tr><td><code>{branch}</code></td><td>Git branch name</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── Managing Agents ─────────────────────────────────────────────── -->
+      <h2>Managing Agents</h2>
+      <pre><code><span class="prompt">$</span> ark agent list                         <span class="yaml-comment"># List all agents (scope, name, model, tools)</span>
+<span class="prompt">$</span> ark agent show implementer             <span class="yaml-comment"># Show full agent definition</span>
+<span class="prompt">$</span> ark agent create my-agent              <span class="yaml-comment"># Create new agent (opens in $EDITOR)</span>
+<span class="prompt">$</span> ark agent create my-agent --global     <span class="yaml-comment"># Create in ~/.ark/agents/</span>
+<span class="prompt">$</span> ark agent edit my-agent                <span class="yaml-comment"># Edit existing agent</span>
+<span class="prompt">$</span> ark agent copy implementer fast-impl   <span class="yaml-comment"># Copy agent for customization</span>
+<span class="prompt">$</span> ark agent copy implementer --global    <span class="yaml-comment"># Copy to global scope</span>
+<span class="prompt">$</span> ark agent delete my-agent              <span class="yaml-comment"># Delete custom agent (cannot delete builtins)</span></code></pre>
+      <p>In the TUI, press <kbd>2</kbd> to switch to the Agents tab. Use <kbd>n</kbd> to create, <kbd>e</kbd> to edit, <kbd>c</kbd> to copy, <kbd>x</kbd> to delete.</p>
+
+      <div class="doc-footer">
+        <a href="workflows.html">&larr; Workflows</a>
+        <a href="flows-reference.html">Flows Reference &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

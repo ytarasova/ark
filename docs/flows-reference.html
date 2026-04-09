@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flows Reference - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Flows Reference</h1>
+      <p class="subtitle">Complete reference for all builtin flow definitions. See the <a href="workflows.html">Workflows guide</a> for an overview.</p>
+
+      <h2>Three-Tier Resolution</h2>
+      <p>Flows resolve in priority order:</p>
+      <ol>
+        <li><strong>Project</strong>: <code>.ark/flows/&lt;name&gt;.yaml</code> in the repo</li>
+        <li><strong>Global</strong>: <code>~/.ark/flows/&lt;name&gt;.yaml</code></li>
+        <li><strong>Builtin</strong>: <code>flows/definitions/&lt;name&gt;.yaml</code> shipped with Ark</li>
+      </ol>
+
+      <!-- ── Builtin Flows ───────────────────────────────────────────────── -->
+      <h2>Builtin Flows</h2>
+
+      <h3>default</h3>
+      <p>Full SDLC pipeline with planning, implementation, PR, review, build, merge, and documentation stages.</p>
+      <pre><code>plan (manual) -> implement (auto) -> pr (auto) -> review (auto) -> build (auto) -> merge (manual) -> close (auto) -> docs (auto, optional)</code></pre>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Agent/Action</th><th>Gate</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>plan</td><td>planner</td><td>manual</td><td>Creates PLAN.md. Human reviews before proceeding.</td></tr>
+          <tr><td>implement</td><td>implementer</td><td>auto</td><td>Implements the plan. Retries up to 3 times on failure.</td></tr>
+          <tr><td>pr</td><td><code>create_pr</code> action</td><td>auto</td><td>Pushes branch and creates a GitHub PR.</td></tr>
+          <tr><td>review</td><td>reviewer</td><td>auto</td><td>Reviews the diff for quality, security, and correctness.</td></tr>
+          <tr><td>build</td><td><code>wait_flow</code> action</td><td>auto</td><td>Waits for CI. Notifies on failure.</td></tr>
+          <tr><td>merge</td><td><code>merge_pr</code> action</td><td>manual</td><td>Human approves the merge.</td></tr>
+          <tr><td>close</td><td><code>close_ticket</code> action</td><td>auto</td><td>Closes the associated ticket.</td></tr>
+          <tr><td>docs</td><td>documenter</td><td>auto</td><td>Updates documentation. Optional -- skipped if not needed.</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Best for</strong>: Feature development with full human oversight.</p>
+      <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Add OAuth2 login" --flow default --dispatch</code></pre>
+
+      <h3>quick</h3>
+      <p>Streamlined flow: implement, create PR, wait for build, then merge. No planning or review stages.</p>
+      <pre><code>implement (auto) -> pr (auto) -> build (auto) -> merge (manual)</code></pre>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Agent/Action</th><th>Gate</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>implement</td><td>implementer</td><td>auto</td><td>Retries up to 3 times on failure.</td></tr>
+          <tr><td>pr</td><td><code>create_pr</code> action</td><td>auto</td><td>Pushes branch and creates a PR.</td></tr>
+          <tr><td>build</td><td><code>wait_flow</code> action</td><td>auto</td><td>Waits for CI. Notifies on failure.</td></tr>
+          <tr><td>merge</td><td><code>merge_pr</code> action</td><td>manual</td><td>Human approves.</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Best for</strong>: Bug fixes and small changes where planning is overhead.</p>
+      <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Fix login timeout" --flow quick --dispatch</code></pre>
+
+      <h3>bare</h3>
+      <p>Single-agent session with no predefined stages beyond one. The user decides when to stop.</p>
+      <pre><code>work (manual)</code></pre>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Agent/Action</th><th>Gate</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>work</td><td>worker</td><td>manual</td><td>Open-ended. Human marks done when satisfied.</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Best for</strong>: Interactive pairing, exploration, one-off tasks, CI/CD (<code>ark exec</code>).</p>
+      <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Explore the auth module" --flow bare --dispatch --attach</code></pre>
+
+      <h3>parallel</h3>
+      <p>Plan first, then fork the implementation into parallel child sessions, review, and merge.</p>
+      <pre><code>plan (manual) -> implement[fork] (auto) -> review (auto) -> pr (auto) -> merge (manual)</code></pre>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Agent/Action</th><th>Gate</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>plan</td><td>planner</td><td>manual</td><td>Creates PLAN.md with decomposed subtasks.</td></tr>
+          <tr><td>implement</td><td>implementer (forked)</td><td>auto</td><td><code>type: fork</code>. Reads PLAN.md to split into subtasks. Up to 4 parallel children.</td></tr>
+          <tr><td>review</td><td>reviewer</td><td>auto</td><td>Reviews the combined changes.</td></tr>
+          <tr><td>pr</td><td><code>create_pr</code> action</td><td>auto</td><td>Creates PR for the merged work.</td></tr>
+          <tr><td>merge</td><td><code>merge_pr</code> action</td><td>manual</td><td>Human approves.</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Best for</strong>: Large features that can be decomposed into independent subtasks.</p>
+      <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Migrate to new API" --flow parallel --dispatch</code></pre>
+
+      <h3>fan-out</h3>
+      <p>Plan then execute multiple tasks in parallel via the fan-out stage type.</p>
+      <pre><code>plan (manual) -> execute[fan_out] (auto) -> review (auto)</code></pre>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Agent/Action</th><th>Gate</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>plan</td><td>planner</td><td>manual</td><td>Decomposes the task into a JSON array of subtasks.</td></tr>
+          <tr><td>execute</td><td>fan_out</td><td>auto</td><td>Spawns parallel child sessions from the planner's subtask list. Parent auto-joins when all children complete.</td></tr>
+          <tr><td>review</td><td>reviewer</td><td>auto</td><td>Reviews the combined output.</td></tr>
+        </tbody>
+      </table>
+      <p>The planner's output must include a JSON array: <code>[{"summary": "...", "agent": "implementer"}, ...]</code></p>
+      <p><strong>Best for</strong>: Task decomposition where the planner decides the split.</p>
+      <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Add tests for all API endpoints" --flow fan-out --dispatch</code></pre>
+
+      <h3>pr-review</h3>
+      <p>Review-focused flow: plan, implement, create PR, wait for human review approval, then merge.</p>
+      <pre><code>plan (manual) -> implement (auto) -> review (review gate) -> merge (auto)</code></pre>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Agent/Action</th><th>Gate</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>plan</td><td>planner</td><td>manual</td><td>Creates PLAN.md.</td></tr>
+          <tr><td>implement</td><td>implementer</td><td>auto</td><td>Implements the plan.</td></tr>
+          <tr><td>review</td><td>worker</td><td>review</td><td>Creates a PR, addresses review comments. Advances when PR is approved.</td></tr>
+          <tr><td>merge</td><td>worker</td><td>auto</td><td>Merges the approved PR and verifies the build.</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Best for</strong>: Workflows that need human PR review before merge.</p>
+      <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Add rate limiting" --flow pr-review --dispatch</code></pre>
+
+      <h3>dag-parallel</h3>
+      <p>DAG-based parallel execution with explicit dependency edges between stages.</p>
+      <pre><code>plan (manual) -> implement + test [parallel, depends_on: plan] -> integrate [depends_on: implement, test] -> review (manual) -> pr (auto)</code></pre>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Agent/Action</th><th>Gate</th><th>Depends On</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>plan</td><td>planner</td><td>manual</td><td>--</td></tr>
+          <tr><td>implement</td><td>implementer</td><td>auto</td><td>plan</td></tr>
+          <tr><td>test</td><td>implementer</td><td>auto</td><td>plan</td></tr>
+          <tr><td>integrate</td><td>implementer</td><td>auto</td><td>implement, test</td></tr>
+          <tr><td>review</td><td>reviewer</td><td>manual</td><td>integrate</td></tr>
+          <tr><td>pr</td><td><code>create_pr</code> action</td><td>auto</td><td>review</td></tr>
+        </tbody>
+      </table>
+      <p>Stages with the same dependencies run in parallel. The <code>depends_on</code> field creates a directed acyclic graph (DAG) that the scheduler resolves.</p>
+      <p><strong>Best for</strong>: Complex tasks where implementation and testing can proceed in parallel, then converge.</p>
+      <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Refactor auth system" --flow dag-parallel --dispatch</code></pre>
+
+      <!-- ── Flow YAML Fields ────────────────────────────────────────────── -->
+      <h2>Flow YAML Fields</h2>
+      <p>Full field reference for flow definition files.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>name</code></td><td>string</td><td>yes</td><td>Flow identifier (matches filename without extension)</td></tr>
+          <tr><td><code>description</code></td><td>string</td><td>yes</td><td>Short description shown in <code>ark flow list</code></td></tr>
+          <tr><td><code>stages</code></td><td>array</td><td>yes</td><td>Ordered list of stage definitions</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Stage Fields</h3>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>name</code></td><td>string</td><td>yes</td><td>Stage name (must be unique within the flow)</td></tr>
+          <tr><td><code>agent</code></td><td>string</td><td>no</td><td>Agent to run for this stage</td></tr>
+          <tr><td><code>action</code></td><td>string</td><td>no</td><td>Built-in action: <code>create_pr</code>, <code>merge_pr</code>, <code>wait_flow</code>, <code>close_ticket</code></td></tr>
+          <tr><td><code>gate</code></td><td>string</td><td>yes</td><td>Gate type: <code>manual</code>, <code>auto</code>, <code>review</code>, or <code>condition</code></td></tr>
+          <tr><td><code>type</code></td><td>string</td><td>no</td><td>Stage type: <code>fork</code> (parallel fork/join) or <code>fan_out</code> (dynamic fan-out)</td></tr>
+          <tr><td><code>on_failure</code></td><td>string</td><td>no</td><td>Failure handling: <code>retry(N)</code> or <code>notify</code></td></tr>
+          <tr><td><code>verify</code></td><td>string[]</td><td>no</td><td>Shell scripts that must pass before stage completion</td></tr>
+          <tr><td><code>artifacts</code></td><td>string[]</td><td>no</td><td>Files produced by this stage</td></tr>
+          <tr><td><code>task</code></td><td>string</td><td>no</td><td>Custom task prompt (overrides auto-generated prompt)</td></tr>
+          <tr><td><code>optional</code></td><td>boolean</td><td>no</td><td>If true, stage can be skipped</td></tr>
+          <tr><td><code>strategy</code></td><td>string</td><td>no</td><td>Fork strategy: <code>plan</code> (reads PLAN.md for subtasks)</td></tr>
+          <tr><td><code>max_parallel</code></td><td>number</td><td>no</td><td>Max concurrent children for <code>fork</code> type</td></tr>
+          <tr><td><code>depends_on</code></td><td>string[]</td><td>no</td><td>Stage names this stage depends on (DAG scheduling)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Gate Types</h3>
+      <table>
+        <thead>
+          <tr><th>Gate</th><th>Behavior</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>manual</code></td><td>Human must approve before advancing (TUI: <kbd>A</kbd> or <kbd>Enter</kbd>)</td></tr>
+          <tr><td><code>auto</code></td><td>Advances automatically when the agent completes</td></tr>
+          <tr><td><code>review</code></td><td>Advances when an external review (e.g., PR approval) is received</td></tr>
+          <tr><td><code>condition</code></td><td>Advances when a condition expression evaluates to true</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Built-in Actions</h3>
+      <table>
+        <thead>
+          <tr><th>Action</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>create_pr</code></td><td>Pushes the worktree branch and creates a GitHub PR</td></tr>
+          <tr><td><code>merge_pr</code></td><td>Merges the PR into the target branch</td></tr>
+          <tr><td><code>wait_flow</code></td><td>Waits for CI check suites to complete</td></tr>
+          <tr><td><code>close_ticket</code></td><td>Closes the associated ticket</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── Managing Flows ──────────────────────────────────────────────── -->
+      <h2>Managing Flows</h2>
+      <pre><code><span class="prompt">$</span> ark flow list              <span class="yaml-comment"># List all available flows</span>
+<span class="prompt">$</span> ark flow show default      <span class="yaml-comment"># Show flow definition with stages</span>
+<span class="prompt">$</span> ark flow show quick        <span class="yaml-comment"># Show the quick flow</span></code></pre>
+      <p>In the TUI, press <kbd>3</kbd> to switch to the Flows tab. Navigate with <kbd>j</kbd>/<kbd>k</kbd> and toggle to the detail pane with <kbd>Tab</kbd>.</p>
+
+      <div class="doc-footer">
+        <a href="agents-reference.html">&larr; Agents Reference</a>
+        <a href="advanced.html">Advanced &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>
