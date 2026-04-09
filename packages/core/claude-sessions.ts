@@ -10,7 +10,7 @@ import { join, basename } from "path";
 import { homedir } from "os";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -184,8 +184,8 @@ interface MaxTsRow {
  * List Claude sessions from cache (instant).
  * Call refreshClaudeSessionsCache() to populate/update the cache.
  */
-export function listClaudeSessions(opts?: ListOpts): ClaudeSession[] {
-  const db = getApp().db;
+export function listClaudeSessions(app: AppContext, opts?: ListOpts): ClaudeSession[] {
+  const db = app.db;
   const limit = opts?.limit ?? 100;
 
   let sql = "SELECT * FROM claude_sessions_cache WHERE 1=1";
@@ -223,8 +223,8 @@ export function listClaudeSessions(opts?: ListOpts): ClaudeSession[] {
 /**
  * Find a specific Claude session by ID (prefix match supported).
  */
-export function getClaudeSession(sessionId: string, opts?: ListOpts): ClaudeSession | null {
-  const db = getApp().db;
+export function getClaudeSession(app: AppContext, sessionId: string, opts?: ListOpts): ClaudeSession | null {
+  const db = app.db;
   try {
     const row = db.prepare(
       "SELECT * FROM claude_sessions_cache WHERE session_id = ? OR session_id LIKE ?"
@@ -247,11 +247,11 @@ export function getClaudeSession(sessionId: string, opts?: ListOpts): ClaudeSess
  * Refresh the cache by scanning ~/.claude/projects/.
  * Async with periodic yields so the TUI stays responsive.
  */
-export async function refreshClaudeSessionsCache(opts?: { baseDir?: string; onProgress?: (processed: number, total: number) => void }): Promise<number> {
+export async function refreshClaudeSessionsCache(app: AppContext, opts?: { baseDir?: string; onProgress?: (processed: number, total: number) => void }): Promise<number> {
   const baseDir = opts?.baseDir ?? join(homedir(), ".claude", "projects");
   if (!existsSync(baseDir)) return 0;
 
-  const db = getApp().db;
+  const db = app.db;
 
   const insert = db.prepare(
     `INSERT OR REPLACE INTO claude_sessions_cache

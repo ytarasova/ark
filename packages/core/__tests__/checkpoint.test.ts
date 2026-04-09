@@ -22,7 +22,7 @@ describe("saveCheckpoint", () => {
       agent: "implementer",
     });
 
-    saveCheckpoint(session.id);
+    saveCheckpoint(getApp(), session.id);
 
     const events = getApp().events.list(session.id, { type: "checkpoint" });
     expect(events.length).toBe(1);
@@ -42,7 +42,7 @@ describe("saveCheckpoint", () => {
 
   it("does nothing for nonexistent session", () => {
     // Should not throw
-    saveCheckpoint("s-nonexistent");
+    saveCheckpoint(getApp(), "s-nonexistent");
   });
 });
 
@@ -50,12 +50,12 @@ describe("getCheckpoint", () => {
   it("returns latest checkpoint", () => {
     const session = getApp().sessions.create({ summary: "multi checkpoint" });
     getApp().sessions.update(session.id, { stage: "plan", status: "running" });
-    saveCheckpoint(session.id);
+    saveCheckpoint(getApp(), session.id);
 
     getApp().sessions.update(session.id, { stage: "implement", status: "running" });
-    saveCheckpoint(session.id);
+    saveCheckpoint(getApp(), session.id);
 
-    const cp = getCheckpoint(session.id);
+    const cp = getCheckpoint(getApp(), session.id);
     expect(cp).not.toBeNull();
     expect(cp!.stage).toBe("implement");
     expect(cp!.sessionId).toBe(session.id);
@@ -63,7 +63,7 @@ describe("getCheckpoint", () => {
 
   it("returns null when no checkpoints exist", () => {
     const session = getApp().sessions.create({ summary: "no checkpoints" });
-    expect(getCheckpoint(session.id)).toBeNull();
+    expect(getCheckpoint(getApp(), session.id)).toBeNull();
   });
 });
 
@@ -72,15 +72,15 @@ describe("listCheckpoints", () => {
     const session = getApp().sessions.create({ summary: "list test" });
 
     getApp().sessions.update(session.id, { stage: "plan", status: "running" });
-    saveCheckpoint(session.id);
+    saveCheckpoint(getApp(), session.id);
 
     getApp().sessions.update(session.id, { stage: "implement", status: "running" });
-    saveCheckpoint(session.id);
+    saveCheckpoint(getApp(), session.id);
 
     getApp().sessions.update(session.id, { stage: "review", status: "running" });
-    saveCheckpoint(session.id);
+    saveCheckpoint(getApp(), session.id);
 
-    const checkpoints = listCheckpoints(session.id);
+    const checkpoints = listCheckpoints(getApp(), session.id);
     expect(checkpoints.length).toBe(3);
     expect(checkpoints[0].stage).toBe("plan");
     expect(checkpoints[1].stage).toBe("implement");
@@ -89,7 +89,7 @@ describe("listCheckpoints", () => {
 
   it("returns empty array when no checkpoints", () => {
     const session = getApp().sessions.create({ summary: "empty" });
-    expect(listCheckpoints(session.id)).toEqual([]);
+    expect(listCheckpoints(getApp(), session.id)).toEqual([]);
   });
 });
 
@@ -98,7 +98,7 @@ describe("findOrphanedSessions", () => {
     const session = getApp().sessions.create({ summary: "orphan no tmux" });
     getApp().sessions.update(session.id, { status: "running", session_id: null });
 
-    const orphaned = findOrphanedSessions();
+    const orphaned = findOrphanedSessions(getApp());
     expect(orphaned.some((s) => s.id === session.id)).toBe(true);
   });
 
@@ -109,7 +109,7 @@ describe("findOrphanedSessions", () => {
     const pending = getApp().sessions.create({ summary: "pending" });
     // pending is default status
 
-    const orphaned = findOrphanedSessions();
+    const orphaned = findOrphanedSessions(getApp());
     expect(orphaned.some((s) => s.id === stopped.id)).toBe(false);
     expect(orphaned.some((s) => s.id === pending.id)).toBe(false);
   });
@@ -119,7 +119,7 @@ describe("findOrphanedSessions", () => {
     // Use a tmux name that definitely doesn't exist
     getApp().sessions.update(session.id, { status: "running", session_id: "ark-nonexistent-test-session-xyz" });
 
-    const orphaned = findOrphanedSessions();
+    const orphaned = findOrphanedSessions(getApp());
     expect(orphaned.some((s) => s.id === session.id)).toBe(true);
   });
 });
@@ -134,10 +134,10 @@ describe("recoverSession", () => {
       session_id: "ark-dead-session",
     });
 
-    saveCheckpoint(session.id);
+    saveCheckpoint(getApp(), session.id);
 
     // Simulate crash: session still says "running" but tmux is dead
-    const result = recoverSession(session.id);
+    const result = recoverSession(getApp(),session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toContain("Recovered from checkpoint");
 
@@ -163,7 +163,7 @@ describe("recoverSession", () => {
     });
 
     // No checkpoint saved — recover from current state
-    const result = recoverSession(session.id);
+    const result = recoverSession(getApp(),session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toContain("no checkpoint");
 
@@ -173,7 +173,7 @@ describe("recoverSession", () => {
   });
 
   it("returns error for nonexistent session", () => {
-    const result = recoverSession("s-nonexistent");
+    const result = recoverSession(getApp(),"s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -187,7 +187,7 @@ describe("recoverSession", () => {
       session_id: "ark-dead",
     });
 
-    const result = recoverSession(session.id);
+    const result = recoverSession(getApp(),session.id);
     expect(result.ok).toBe(true);
 
     const recovered = getApp().sessions.get(session.id)!;

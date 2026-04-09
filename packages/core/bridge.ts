@@ -4,7 +4,6 @@
  */
 
 import type { Session } from "../types/index.js";
-import { getApp } from "./app.js";
 
 
 /** Telegram getUpdates API response shape. */
@@ -16,11 +15,6 @@ interface TelegramResponse {
   }>;
 }
 
-/** Safe session list — uses AppContext if available, falls back to store. */
-function safeListSessions(opts?: { limit?: number }): Array<{ status: string }> {
-  try { return safeListSessions(opts); }
-  catch { return []; }
-}
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -172,7 +166,8 @@ export class Bridge {
 
   /** Send a summary of all session statuses. */
   async notifyStatusSummary(): Promise<void> {
-    const sessions = safeListSessions({ limit: 100 });
+    let sessions: Array<{ status: string }> = [];
+    try { sessions = getApp().sessions.list({ limit: 100 }); } catch { /* app not booted */ }
     const counts: Record<string, number> = {};
     for (const s of sessions) {
       counts[s.status] = (counts[s.status] ?? 0) + 1;
@@ -216,11 +211,11 @@ export class Bridge {
 
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./paths.js";
+import { getApp } from "./app.js";
 
 /** Load bridge config from ~/.ark/bridge.json */
 export function loadBridgeConfig(): BridgeConfig | null {
-  const configPath = join(ARK_DIR(), "bridge.json");
+  const configPath = join(getApp().config.arkDir, "bridge.json");
   if (!existsSync(configPath)) return null;
 
   try {

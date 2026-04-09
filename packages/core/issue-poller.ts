@@ -9,7 +9,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import type { Session } from "../types/index.js";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 import { safeAsync } from "./safe.js";
 
@@ -73,10 +73,8 @@ export async function fetchLabeledIssues(
  * Check if a session already exists for a given issue ticket.
  * Ticket format is "#<number>" (e.g. "#42").
  */
-export function issueAlreadyTracked(ticket: string): boolean {
-  let sessions;
-  try { sessions = getApp().sessions.list({ limit: 500 }); }
-  catch { sessions = []; }
+export function issueAlreadyTracked(app: AppContext, ticket: string): boolean {
+  const sessions = app.sessions.list({ limit: 500 });
   return sessions.some(s => s.ticket === ticket);
 }
 
@@ -85,17 +83,18 @@ export function issueAlreadyTracked(ticket: string): boolean {
  * Returns the created session, or null if skipped (duplicate).
  */
 export async function createSessionFromIssue(
+  app: AppContext,
   issue: GhIssue,
   opts?: { autoDispatch?: boolean },
 ): Promise<Session | null> {
   const ticket = `#${issue.number}`;
 
-  if (issueAlreadyTracked(ticket)) return null;
+  if (issueAlreadyTracked(app, ticket)) return null;
 
   // Lazy import to avoid circular deps (same pattern as pr-poller.ts)
   const { startSession, dispatch } = await import("./services/session-orchestration.js");
 
-  const session = startSession(getApp(), {
+  const session = startSession(app, {
     ticket,
     summary: issue.title,
     config: {
@@ -105,20 +104,18 @@ export async function createSessionFromIssue(
     },
   });
 
-  const evOpts = {
+  app.events.log(session.id, "issue_imported", {
     actor: "github",
     data: {
       issue_number: issue.number,
       issue_url: issue.url,
       title: issue.title,
     },
-  };
-  try { getApp().events.log(session.id, "issue_imported", evOpts); }
-  catch { /* app not booted */ }
+  });
 
   if (opts?.autoDispatch) {
     await safeAsync(`issue-poller: dispatch ${session.id}`, async () => {
-      await dispatch(getApp(), session.id);
+      await dispatch(app, session.id);
     });
   }
 
@@ -128,7 +125,7 @@ export async function createSessionFromIssue(
 /**
  * Main poller tick. Fetches labeled issues and creates sessions for new ones.
  */
-export async function pollIssues(opts?: IssuePollerOptions): Promise<void> {
+export async function pollIssues(app: AppContext, opts?: IssuePollerOptions): Promise<void> {
   const label = opts?.label ?? "ark";
   const ghExec = opts?.ghExec ?? _ghExec;
 
@@ -137,7 +134,7 @@ export async function pollIssues(opts?: IssuePollerOptions): Promise<void> {
 
   for (const issue of issues) {
     await safeAsync(`issue-poller: process issue #${issue.number}`, async () => {
-      await createSessionFromIssue(issue, { autoDispatch: opts?.autoDispatch });
+      await createSessionFromIssue(app, issue, { autoDispatch: opts?.autoDispatch });
     });
   }
 }
@@ -145,14 +142,14 @@ export async function pollIssues(opts?: IssuePollerOptions): Promise<void> {
 /**
  * Start a recurring issue poller. Returns a handle to stop it.
  */
-export function startIssuePoller(opts?: IssuePollerOptions): { stop: () => void } {
+export function startIssuePoller(app: AppContext, opts?: IssuePollerOptions): { stop: () => void } {
   const intervalMs = opts?.intervalMs ?? 60_000;
 
   // Run immediately on start
-  safeAsync("issue-poller: initial poll", () => pollIssues(opts));
+  safeAsync("issue-poller: initial poll", () => pollIssues(app, opts));
 
   const timer = setInterval(
-    () => safeAsync("issue-poller: poll tick", () => pollIssues(opts)),
+    () => safeAsync("issue-poller: poll tick", () => pollIssues(app, opts)),
     intervalMs,
   );
 

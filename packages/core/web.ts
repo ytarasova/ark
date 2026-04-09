@@ -14,7 +14,7 @@
 import { readFileSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
 import { join } from "path";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 import { eventBus } from "./hooks.js";
 import { Router } from "../server/router.js";
 import { registerAllHandlers } from "../server/register.js";
@@ -76,7 +76,7 @@ const WRITE_METHODS = new Set([
   "tools/delete",
 ]);
 
-export function startWebServer(opts?: WebServerOptions): { stop: () => void; url: string } {
+export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop: () => void; url: string } {
   const port = opts?.port ?? 8420;
   const readOnly = opts?.readOnly ?? false;
   const apiOnly = opts?.apiOnly ?? false;
@@ -84,7 +84,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
 
   // ── Set up in-process RPC router ─────────────────────────────────────────
   const router = new Router();
-  registerAllHandlers(router, getApp());
+  registerAllHandlers(router, app);
   router.markInitialized();
 
   // Auto-build web frontend if dist doesn't exist (skip in API-only mode)
@@ -109,7 +109,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
   }
 
   function broadcastSessions() {
-    const sessions = getApp().sessions.list({ limit: 200 });
+    const sessions = app.sessions.list({ limit: 200 });
     broadcast("sessions", sessions.map(s => ({
       id: s.id, summary: s.summary, status: s.status,
       agent: s.agent, repo: s.repo, group: s.group_name,
@@ -195,7 +195,7 @@ export function startWebServer(opts?: WebServerOptions): { stop: () => void; url
             flow: url.searchParams.get("flow") ?? undefined,
             group: url.searchParams.get("group") ?? undefined,
           };
-          const result = await handleIssueWebhook(payload, config);
+          const result = await handleIssueWebhook(app, payload, config);
           return jsonResponse(result, result.ok ? 200 : 400);
         } catch (err) {
           return errorResponse(err);

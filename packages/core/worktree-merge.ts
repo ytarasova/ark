@@ -1,13 +1,14 @@
 import { execFileSync } from "child_process";
 import { existsSync } from "fs";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 import type { Session } from "../types/index.js";
 
 export async function mergeChildBranches(
+  app: AppContext,
   parentId: string,
   children: Session[],
 ): Promise<{ merged: string[]; conflicts: string[] }> {
-  const parent = getApp().sessions.get(parentId);
+  const parent = app.sessions.get(parentId);
   if (!parent?.workdir) return { merged: [], conflicts: [] };
 
   const parentWorktree = `${process.env.HOME}/.ark/worktrees/${parentId}`;
@@ -46,11 +47,11 @@ export async function mergeChildBranches(
   }
 
   if (conflicts.length > 0) {
-    getApp().events.log(parentId, "merge_conflict", {
+    app.events.log(parentId, "merge_conflict", {
       actor: "system",
       data: { merged, conflicts },
     });
-    getApp().sessions.update(parentId, { status: "waiting" });
+    app.sessions.update(parentId, { status: "waiting" });
   }
 
   return { merged, conflicts };

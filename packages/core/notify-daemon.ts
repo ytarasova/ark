@@ -4,15 +4,9 @@
  */
 
 import type { Session } from "../types/index.js";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 import { Bridge, loadBridgeConfig } from "./bridge.js";
-
-/** Safe session list — uses AppContext if available, falls back to store. */
-function safeListSessions(opts?: { limit?: number }): any[] {
-  try { return getApp().sessions.list(opts); }
-  catch { return []; }
-}
 
 export interface NotifyDaemonOptions {
   /** Polling interval when sessions are running (ms). Default: 3000. */
@@ -30,13 +24,15 @@ const DEFAULTS: Required<NotifyDaemonOptions> = {
 };
 
 export class NotifyDaemon {
+  private app: AppContext;
   private bridge: Bridge;
   private opts: Required<NotifyDaemonOptions>;
   private lastStatuses = new Map<string, string>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
 
-  constructor(bridge: Bridge, opts?: NotifyDaemonOptions) {
+  constructor(app: AppContext, bridge: Bridge, opts?: NotifyDaemonOptions) {
+    this.app = app;
     this.bridge = bridge;
     this.opts = { ...DEFAULTS, ...opts };
   }
@@ -59,7 +55,7 @@ export class NotifyDaemon {
     if (!this.running) return;
 
     try {
-      const sessions = safeListSessions({ limit: 200 });
+      const sessions = this.app.sessions.list({ limit: 200 });
       let hasRunning = false;
       let hasWaiting = false;
 
@@ -102,11 +98,11 @@ export class NotifyDaemon {
 }
 
 /** Create and start a notification daemon. Returns null if no bridge config. */
-export function startNotifyDaemon(opts?: NotifyDaemonOptions): NotifyDaemon | null {
+export function startNotifyDaemon(app: AppContext, opts?: NotifyDaemonOptions): NotifyDaemon | null {
   const config = loadBridgeConfig();
   if (!config) return null;
   const bridge = new Bridge(config);
-  const daemon = new NotifyDaemon(bridge, opts);
+  const daemon = new NotifyDaemon(app, bridge, opts);
   daemon.start();
   return daemon;
 }

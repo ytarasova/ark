@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
-import { buildReplay } from "../../core/index.js";
+import { buildReplay, getApp } from "../../core/index.js";
 import type { Session, ReplayStep } from "../../core/index.js";
 import { eventTypeColor } from "../helpers/colors.js";
 import { ScrollBox } from "../components/ScrollBox.js";
@@ -16,7 +16,7 @@ export interface SessionReplayProps {
 /** Replay overlay - step through a session's event timeline */
 export function SessionReplay({ session, onClose }: SessionReplayProps) {
   const theme = getTheme();
-  const steps = useMemo(() => buildReplay(session.id), [session.id]);
+  const steps = useMemo(() => buildReplay(getApp(), session.id), [session.id]);
   const [sel, setSel] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [searchMode, setSearchMode] = useState(false);

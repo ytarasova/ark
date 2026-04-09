@@ -5,7 +5,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./paths.js";
+import { getApp } from "./app.js";
 
 export interface Profile {
   name: string;
@@ -15,7 +15,7 @@ export interface Profile {
 }
 
 function profilesPath(): string {
-  return join(ARK_DIR(), "profiles.json");
+  return join(getApp().config.arkDir, "profiles.json");
 }
 
 function loadProfiles(): Profile[] {

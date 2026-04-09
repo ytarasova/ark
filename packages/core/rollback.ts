@@ -2,7 +2,7 @@
  * Auto-rollback pipeline — monitors merged PRs, polls CI, creates revert PRs on failure.
  */
 
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 import { eventBus } from "./hooks.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ export async function pollCheckSuites(sha: string, fetcher: CheckSuiteFetcher): 
 }
 
 /** Full health check loop: poll CI + optional health URL. */
-export async function watchMergedPR(opts: {
+export async function watchMergedPR(app: AppContext, opts: {
   sessionId: string; sha: string; owner: string; repo: string;
   prNumber: number; prTitle: string; branch: string; baseBranch?: string;
   config: RollbackConfig;
@@ -93,7 +93,7 @@ export async function watchMergedPR(opts: {
       });
       await opts.onRevert(payload);
       if (opts.onStop) await opts.onStop(opts.sessionId);
-      getApp().events.log(opts.sessionId, "rollback", {
+      app.events.log(opts.sessionId, "rollback", {
         actor: "system",
         data: { prNumber: opts.prNumber, failedChecks, revertBranch: payload.head },
       });
@@ -116,7 +116,7 @@ export async function watchMergedPR(opts: {
           });
           await opts.onRevert(payload);
           if (opts.onStop) await opts.onStop(opts.sessionId);
-          getApp().events.log(opts.sessionId, "rollback", {
+          app.events.log(opts.sessionId, "rollback", {
             actor: "system",
             data: { prNumber: opts.prNumber, failedChecks, revertBranch: payload.head },
           });
@@ -142,7 +142,7 @@ export async function watchMergedPR(opts: {
     });
     await opts.onRevert(payload);
     if (opts.onStop) await opts.onStop(opts.sessionId);
-    getApp().events.log(opts.sessionId, "rollback", {
+    app.events.log(opts.sessionId, "rollback", {
       actor: "system",
       data: { prNumber: opts.prNumber, failedChecks, revertBranch: payload.head },
     });

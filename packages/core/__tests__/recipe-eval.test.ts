@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 import { evaluateRecipeSetup } from "../recipe-eval.js";
 import { writeFileSync, mkdirSync } from "fs";
@@ -26,7 +27,7 @@ function writeTestRecipe(name: string) {
 
 describe("evaluateRecipeSetup", () => {
   it("returns empty result for missing recipe", () => {
-    const result = evaluateRecipeSetup("nonexistent-recipe", 3);
+    const result = evaluateRecipeSetup(getApp(), "nonexistent-recipe", 3);
     expect(result.recipeName).toBe("nonexistent-recipe");
     expect(result.iterations).toBe(0);
     expect(result.results).toEqual([]);
@@ -35,7 +36,7 @@ describe("evaluateRecipeSetup", () => {
 
   it("creates sessions for each iteration", () => {
     writeTestRecipe("eval-test");
-    const result = evaluateRecipeSetup("eval-test", 3);
+    const result = evaluateRecipeSetup(getApp(), "eval-test", 3);
 
     expect(result.recipeName).toBe("eval-test");
     expect(result.iterations).toBe(3);
@@ -50,7 +51,7 @@ describe("evaluateRecipeSetup", () => {
 
   it("calculates summary statistics", () => {
     writeTestRecipe("eval-summary");
-    const result = evaluateRecipeSetup("eval-summary", 2);
+    const result = evaluateRecipeSetup(getApp(), "eval-summary", 2);
 
     expect(result.summary.successRate).toBe(1);
     expect(result.summary.avgDurationMs).toBeGreaterThanOrEqual(0);
@@ -60,7 +61,7 @@ describe("evaluateRecipeSetup", () => {
 
   it("handles zero iterations", () => {
     writeTestRecipe("eval-zero");
-    const result = evaluateRecipeSetup("eval-zero", 0);
+    const result = evaluateRecipeSetup(getApp(), "eval-zero", 0);
 
     expect(result.iterations).toBe(0);
     expect(result.results).toEqual([]);

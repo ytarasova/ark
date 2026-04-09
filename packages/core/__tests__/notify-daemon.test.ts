@@ -12,27 +12,27 @@ describe("NotifyDaemon", () => {
 
   it("constructs without error", () => {
     const bridge = new Bridge({});
-    daemon = new NotifyDaemon(bridge);
+    daemon = new NotifyDaemon(getApp(), bridge);
     expect(daemon).toBeDefined();
   });
 
   it("start and stop are safe", () => {
     const bridge = new Bridge({});
-    daemon = new NotifyDaemon(bridge);
+    daemon = new NotifyDaemon(getApp(), bridge);
     daemon.start();
     daemon.stop();
   });
 
   it("stop is idempotent", () => {
     const bridge = new Bridge({});
-    daemon = new NotifyDaemon(bridge);
+    daemon = new NotifyDaemon(getApp(), bridge);
     daemon.stop();
     daemon.stop();
   });
 
   it("start is idempotent", () => {
     const bridge = new Bridge({});
-    daemon = new NotifyDaemon(bridge);
+    daemon = new NotifyDaemon(getApp(), bridge);
     daemon.start();
     daemon.start();
     daemon.stop();
@@ -40,7 +40,7 @@ describe("NotifyDaemon", () => {
 
   it("accepts custom polling intervals", () => {
     const bridge = new Bridge({});
-    daemon = new NotifyDaemon(bridge, {
+    daemon = new NotifyDaemon(getApp(), bridge, {
       activeIntervalMs: 1000,
       waitingIntervalMs: 5000,
       idleIntervalMs: 15000,
@@ -52,7 +52,7 @@ describe("NotifyDaemon", () => {
 
   it("polls sessions without crashing when sessions exist", async () => {
     const bridge = new Bridge({});
-    daemon = new NotifyDaemon(bridge, {
+    daemon = new NotifyDaemon(getApp(), bridge, {
       activeIntervalMs: 50,
       waitingIntervalMs: 50,
       idleIntervalMs: 50,
@@ -76,7 +76,7 @@ describe("NotifyDaemon", () => {
     // Override notify to track calls
     bridge.notify = async (text: string) => { notifications.push(text); };
 
-    daemon = new NotifyDaemon(bridge, {
+    daemon = new NotifyDaemon(getApp(), bridge, {
       activeIntervalMs: 30,
       waitingIntervalMs: 30,
       idleIntervalMs: 30,
@@ -104,7 +104,7 @@ describe("NotifyDaemon", () => {
     const bridge = new Bridge({});
     bridge.notify = async (text: string) => { notifications.push(text); };
 
-    daemon = new NotifyDaemon(bridge, {
+    daemon = new NotifyDaemon(getApp(), bridge, {
       activeIntervalMs: 30,
       waitingIntervalMs: 30,
       idleIntervalMs: 30,

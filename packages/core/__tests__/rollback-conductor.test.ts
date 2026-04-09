@@ -18,7 +18,7 @@ describe("watchMergedPR integration", () => {
       return { check_suites: [{ id: 1, conclusion: "success", status: "completed" }] };
     };
     const onRevert = async () => { throw new Error("should not be called"); };
-    const result = await watchMergedPR({
+    const result = await watchMergedPR(getApp(), {
       sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
       prTitle: "test", branch: "feat/x", config, fetcher, onRevert,
     });
@@ -33,7 +33,7 @@ describe("watchMergedPR integration", () => {
       check_suites: [{ id: 1, conclusion: "failure", status: "completed" }] as CheckSuiteResult[],
     });
     const onRevert = async () => { reverted = true; };
-    const result = await watchMergedPR({
+    const result = await watchMergedPR(getApp(), {
       sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
       prTitle: "test PR", branch: "feat/x", config, fetcher, onRevert,
     });
@@ -47,7 +47,7 @@ describe("watchMergedPR integration", () => {
       check_suites: [{ id: 1, conclusion: null, status: "in_progress" }] as CheckSuiteResult[],
     });
     const shortConfig = { ...config, timeout: 0 };
-    const result = await watchMergedPR({
+    const result = await watchMergedPR(getApp(), {
       sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
       prTitle: "test", branch: "feat/x", config: shortConfig, fetcher,
       onRevert: async () => {},
@@ -62,7 +62,7 @@ describe("watchMergedPR integration", () => {
       check_suites: [{ id: 1, conclusion: null, status: "in_progress" }] as CheckSuiteResult[],
     });
     const timeoutConfig = { ...config, timeout: 0, on_timeout: "rollback" as const };
-    const result = await watchMergedPR({
+    const result = await watchMergedPR(getApp(), {
       sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
       prTitle: "test", branch: "feat/x", config: timeoutConfig, fetcher,
       onRevert: async () => { reverted = true; },
@@ -78,7 +78,7 @@ describe("watchMergedPR integration", () => {
       check_suites: [{ id: 1, conclusion: "success", status: "completed" }] as CheckSuiteResult[],
     });
     const healthConfig = { ...config, health_url: "http://localhost:19999/health" };
-    const result = await watchMergedPR({
+    const result = await watchMergedPR(getApp(), {
       sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
       prTitle: "test", branch: "feat/x", config: healthConfig, fetcher,
       healthFetcher: async () => false,

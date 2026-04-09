@@ -26,10 +26,10 @@ describe("indexTranscripts transaction safety", () => {
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: "response to first session" }, timestamp: "2026-01-01T00:02:00Z" }),
     ].join("\n"));
 
-    const count1 = await indexTranscripts({ transcriptsDir });
+    const count1 = await indexTranscripts(getApp(), { transcriptsDir });
     expect(count1).toBe(2);
 
-    const stats1 = getIndexStats();
+    const stats1 = getIndexStats(getApp());
     expect(stats1.entries).toBe(2);
   });
 
@@ -42,7 +42,7 @@ describe("indexTranscripts transaction safety", () => {
       JSON.stringify({ type: "user", message: { role: "user", content: "transaction test content here" }, timestamp: "2026-01-01T00:01:00Z" }),
     ].join("\n"));
 
-    await indexTranscripts({ transcriptsDir });
+    await indexTranscripts(getApp(), { transcriptsDir });
 
     // Data should be committed and queryable
     const db = getApp().db;
@@ -56,14 +56,14 @@ describe("indexTranscripts transaction safety", () => {
 describe("ftsTableExists", () => {
   it("returns true when transcript_index table exists", () => {
     // The test context creates the schema including the FTS5 table
-    expect(ftsTableExists()).toBe(true);
+    expect(ftsTableExists(getApp())).toBe(true);
   });
 
   it("returns false when table does not exist", () => {
     // Drop the table and check
     const db = getApp().db;
     db.exec("DROP TABLE IF EXISTS transcript_index");
-    expect(ftsTableExists()).toBe(false);
+    expect(ftsTableExists(getApp())).toBe(false);
   });
 });
 
@@ -82,8 +82,8 @@ describe("MIN_MESSAGE_COUNT filters trivial conversations", () => {
     ];
     writeFileSync(join(projectDir, "short-sess.jsonl"), lines.join("\n"));
 
-    await refreshClaudeSessionsCache({ baseDir: bd });
-    const sessions = listClaudeSessions();
+    await refreshClaudeSessionsCache(getApp(), { baseDir: bd });
+    const sessions = listClaudeSessions(getApp());
 
     // With MIN_MESSAGE_COUNT=5, this 2-message session should be excluded
     const found = sessions.find(s => s.sessionId === "short-sess");
@@ -107,8 +107,8 @@ describe("MIN_MESSAGE_COUNT filters trivial conversations", () => {
     }
     writeFileSync(join(projectDir, "real-sess.jsonl"), lines.join("\n"));
 
-    await refreshClaudeSessionsCache({ baseDir: bd });
-    const sessions = listClaudeSessions();
+    await refreshClaudeSessionsCache(getApp(), { baseDir: bd });
+    const sessions = listClaudeSessions(getApp());
 
     const found = sessions.find(s => s.sessionId === "real-sess");
     expect(found).toBeDefined();

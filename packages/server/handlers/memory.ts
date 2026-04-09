@@ -13,30 +13,30 @@ import type {
 export function registerMemoryHandlers(router: Router, app: AppContext): void {
   router.handle("memory/list", async (p) => {
     const { scope } = extract<MemoryListParams>(p, []);
-    return { memories: core.listMemories(scope) };
+    return { memories: core.listMemories(app, scope) };
   });
 
   router.handle("memory/recall", async (p) => {
     const { query, scope, limit } = extract<MemoryRecallParams>(p, ["query"]);
     return {
-      results: core.recall(query, { scope, limit }),
+      results: core.recall(app, query, { scope, limit }),
     };
   });
 
   router.handle("memory/forget", async (p) => {
     const { id } = extract<MemoryForgetParams>(p, ["id"]);
-    return { ok: core.forget(id) };
+    return { ok: core.forget(app, id) };
   });
 
   router.handle("memory/add", async (p) => {
     const { content, tags, scope, importance } = extract<MemoryAddParams>(p, ["content"]);
     return {
-      memory: core.remember(content, { tags, scope, importance }),
+      memory: core.remember(app, content, { tags, scope, importance }),
     };
   });
 
   router.handle("memory/clear", async (p) => {
     const { scope } = extract<MemoryClearParams>(p, []);
-    return { count: core.clearMemories(scope) };
+    return { count: core.clearMemories(app, scope) };
   });
 }

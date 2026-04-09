@@ -6,7 +6,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./paths.js";
+import type { AppContext } from "./app.js";
 
 export interface MemoryEntry {
   id: string;
@@ -19,29 +19,29 @@ export interface MemoryEntry {
   accessCount: number;
 }
 
-function memoryPath(): string {
-  return join(ARK_DIR(), "memories.json");
+function memoryPath(app: AppContext): string {
+  return join(app.config.arkDir, "memories.json");
 }
 
-function loadAll(): MemoryEntry[] {
-  const path = memoryPath();
+function loadAll(app: AppContext): MemoryEntry[] {
+  const path = memoryPath(app);
   if (!existsSync(path)) return [];
   try { return JSON.parse(readFileSync(path, "utf-8")); }
   catch { return []; }
 }
 
-function saveAll(entries: MemoryEntry[]): void {
-  mkdirSync(ARK_DIR(), { recursive: true });
-  writeFileSync(memoryPath(), JSON.stringify(entries, null, 2));
+function saveAll(app: AppContext, entries: MemoryEntry[]): void {
+  mkdirSync(app.config.arkDir, { recursive: true });
+  writeFileSync(memoryPath(app), JSON.stringify(entries, null, 2));
 }
 
 /** Store a memory entry. */
-export function remember(content: string, opts?: {
+export function remember(app: AppContext, content: string, opts?: {
   tags?: string[];
   scope?: string;
   importance?: number;
 }): MemoryEntry {
-  const entries = loadAll();
+  const entries = loadAll(app);
   const entry: MemoryEntry = {
     id: `mem-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     content,
@@ -53,17 +53,17 @@ export function remember(content: string, opts?: {
     accessCount: 0,
   };
   entries.push(entry);
-  saveAll(entries);
+  saveAll(app, entries);
   return entry;
 }
 
 /** Recall memories relevant to a query. Uses keyword overlap scoring. */
-export function recall(query: string, opts?: {
+export function recall(app: AppContext, query: string, opts?: {
   scope?: string;
   limit?: number;
   minScore?: number;
 }): MemoryEntry[] {
-  const entries = loadAll();
+  const entries = loadAll(app);
   const limit = opts?.limit ?? 10;
   const minScore = opts?.minScore ?? 0.1;
   const queryWords = new Set(query.toLowerCase().split(/\s+/).filter(w => w.length > 2));
@@ -103,38 +103,38 @@ export function recall(query: string, opts?: {
     }
     return e;
   });
-  saveAll(updated);
+  saveAll(app, updated);
 
   return scored.map(s => s.entry);
 }
 
 /** Forget a specific memory. */
-export function forget(id: string): boolean {
-  const entries = loadAll();
+export function forget(app: AppContext, id: string): boolean {
+  const entries = loadAll(app);
   const idx = entries.findIndex(e => e.id === id);
   if (idx < 0) return false;
   entries.splice(idx, 1);
-  saveAll(entries);
+  saveAll(app, entries);
   return true;
 }
 
 /** List all memories, optionally filtered by scope. */
-export function listMemories(scope?: string): MemoryEntry[] {
-  const entries = loadAll();
+export function listMemories(app: AppContext, scope?: string): MemoryEntry[] {
+  const entries = loadAll(app);
   if (!scope) return entries;
   return entries.filter(e => e.scope === scope || e.scope === "global");
 }
 
 /** Clear all memories for a scope. */
-export function clearMemories(scope?: string): number {
+export function clearMemories(app: AppContext, scope?: string): number {
   if (!scope) {
-    const count = loadAll().length;
-    saveAll([]);
+    const count = loadAll(app).length;
+    saveAll(app, []);
     return count;
   }
-  const entries = loadAll();
+  const entries = loadAll(app);
   const kept = entries.filter(e => e.scope !== scope);
-  saveAll(kept);
+  saveAll(app, kept);
   return entries.length - kept.length;
 }
 

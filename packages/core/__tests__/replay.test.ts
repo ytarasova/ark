@@ -9,7 +9,7 @@ withTestContext();
 describe("buildReplay", () => {
   it("returns empty array for session with no events beyond creation", () => {
     // createSession logs a session_created event, so we test a non-existent session
-    const steps = buildReplay("s-nonexistent");
+    const steps = buildReplay(getApp(), "s-nonexistent");
     expect(steps).toEqual([]);
   });
 
@@ -18,7 +18,7 @@ describe("buildReplay", () => {
     getApp().events.log(session.id, "stage_ready", { stage: "plan", data: { stage: "plan" } });
     getApp().events.log(session.id, "stage_started", { stage: "plan", actor: "planner", data: { stage: "plan", agent: "planner" } });
 
-    const steps = buildReplay(session.id);
+    const steps = buildReplay(getApp(), session.id);
     expect(steps.length).toBeGreaterThanOrEqual(3);
 
     // Verify chronological order
@@ -32,7 +32,7 @@ describe("buildReplay", () => {
     getApp().events.log(session.id, "stage_ready", { data: { stage: "plan" } });
     getApp().events.log(session.id, "stage_started", { data: { stage: "plan", agent: "planner" } });
 
-    const steps = buildReplay(session.id);
+    const steps = buildReplay(getApp(), session.id);
     steps.forEach((step, i) => {
       expect(step.index).toBe(i);
     });
@@ -40,7 +40,7 @@ describe("buildReplay", () => {
 
   it("steps have elapsed time formatted as HH:MM:SS", () => {
     const session = startSession(getApp(), { summary: "elapsed test" });
-    const steps = buildReplay(session.id);
+    const steps = buildReplay(getApp(), session.id);
     expect(steps.length).toBeGreaterThan(0);
     // First step should be near 00:00:00
     expect(steps[0].elapsed).toMatch(/^\d{2}:\d{2}:\d{2}$/);
@@ -51,7 +51,7 @@ describe("buildReplay", () => {
     getApp().events.log(session.id, "session_created", {
       data: { flow: "quick", summary: "My important task" },
     });
-    const steps = buildReplay(session.id);
+    const steps = buildReplay(getApp(), session.id);
     const created = steps.find((s) => s.type === "session_created");
     expect(created).toBeDefined();
     expect(created!.summary).toContain("quick");
@@ -66,7 +66,7 @@ describe("buildReplay", () => {
       data: { stage: "implement", agent: "implementer" },
     });
 
-    const steps = buildReplay(session.id);
+    const steps = buildReplay(getApp(), session.id);
     const started = steps.find((s) => s.type === "stage_started");
     expect(started).toBeDefined();
     expect(started!.summary).toContain("implement");
@@ -79,7 +79,7 @@ describe("buildReplay", () => {
       data: { error: "TypeError: Cannot read properties of null" },
     });
 
-    const steps = buildReplay(session.id);
+    const steps = buildReplay(getApp(), session.id);
     const errorStep = steps.find((s) => s.type === "agent_error");
     expect(errorStep).toBeDefined();
     expect(errorStep!.summary).toContain("TypeError");
@@ -91,7 +91,7 @@ describe("buildReplay", () => {
       data: { status: "busy", hook_event: "tool_use" },
     });
 
-    const steps = buildReplay(session.id);
+    const steps = buildReplay(getApp(), session.id);
     const hookStep = steps.find((s) => s.type === "hook_status");
     expect(hookStep).toBeDefined();
     expect(hookStep!.summary).toContain("busy");
@@ -104,7 +104,7 @@ describe("buildReplay", () => {
       data: { attempt: 2, error: "tests failed" },
     });
 
-    const steps = buildReplay(session.id);
+    const steps = buildReplay(getApp(), session.id);
     const retryStep = steps.find((s) => s.type === "retry_with_context");
     expect(retryStep).toBeDefined();
     expect(retryStep!.summary).toContain("2");
@@ -117,7 +117,7 @@ describe("buildReplay", () => {
       data: { summary: "Done", files_changed: 5, commits: 2 },
     });
 
-    const steps = buildReplay(session.id);
+    const steps = buildReplay(getApp(), session.id);
     const completed = steps.find((s) => s.type === "agent_completed");
     expect(completed).toBeDefined();
     expect(completed!.detail).toBeTruthy();
@@ -132,7 +132,7 @@ describe("buildReplay", () => {
       data: { stage: "review", agent: "reviewer" },
     });
 
-    const steps = buildReplay(session.id);
+    const steps = buildReplay(getApp(), session.id);
     const started = steps.find((s) => s.type === "stage_started");
     expect(started).toBeDefined();
     expect(started!.stage).toBe("review");

@@ -1,3 +1,4 @@
+import { getApp } from "../app.js";
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { remember } from "../memory.js";
@@ -31,10 +32,10 @@ describe("mergeAndDeduplicate", () => {
 
 describe("hybridSearch", () => {
   it("returns results from memory source", async () => {
-    remember("TypeScript compiler options for strict mode", {
+    remember(getApp(),"TypeScript compiler options for strict mode", {
       tags: ["typescript", "config"], scope: "global", importance: 0.8,
     });
-    const results = await hybridSearch("typescript strict", {
+    const results = await hybridSearch(getApp(), "typescript strict", {
       sources: ["memory"], rerank: false,
     });
     expect(results.length).toBeGreaterThan(0);
@@ -44,18 +45,18 @@ describe("hybridSearch", () => {
 
   it("respects limit option", async () => {
     for (let i = 0; i < 5; i++) {
-      remember(`Memory entry number ${i} about testing`, {
+      remember(getApp(),`Memory entry number ${i} about testing`, {
         tags: ["test"], scope: "global", importance: 0.5,
       });
     }
-    const results = await hybridSearch("testing", {
+    const results = await hybridSearch(getApp(), "testing", {
       sources: ["memory"], rerank: false, limit: 2,
     });
     expect(results.length).toBeLessThanOrEqual(2);
   });
 
   it("returns empty array for no matches", async () => {
-    const results = await hybridSearch("xyznonexistent987", {
+    const results = await hybridSearch(getApp(), "xyznonexistent987", {
       sources: ["memory"], rerank: false,
     });
     expect(results).toEqual([]);

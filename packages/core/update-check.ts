@@ -7,7 +7,7 @@ const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./paths.js";
+import { getApp } from "./app.js";
 
 interface UpdateState {
   lastCheck: string;
@@ -16,7 +16,7 @@ interface UpdateState {
 }
 
 function statePath(): string {
-  return join(ARK_DIR(), "update-check.json");
+  return join(getApp().config.arkDir, "update-check.json");
 }
 
 /** Get the current version from package.json. */

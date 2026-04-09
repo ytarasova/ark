@@ -3,6 +3,7 @@
  * deduplicates, and optionally re-ranks via Claude Haiku.
  */
 
+import type { AppContext } from "./app.js";
 import { recall, type MemoryEntry } from "./memory.js";
 import { queryKnowledge } from "./knowledge.js";
 import { searchTranscripts, type SearchResult as TranscriptSearchResult } from "./search.js";
@@ -127,6 +128,7 @@ ${numbered}`;
 // ── Main API ───────────────────────────────────────────────────────────────
 
 export async function hybridSearch(
+  app: AppContext,
   query: string,
   opts?: HybridSearchOpts,
 ): Promise<HybridSearchResult[]> {
@@ -137,17 +139,17 @@ export async function hybridSearch(
   const allResults: HybridSearchResult[] = [];
 
   if (sources.includes("memory")) {
-    const memories = recall(query, { limit: 20 });
+    const memories = recall(app, query, { limit: 20 });
     allResults.push(...memories.map(m => memoryToResult(m, "memory")));
   }
 
   if (sources.includes("knowledge")) {
-    const knowledge = queryKnowledge(query, { limit: 20 });
+    const knowledge = queryKnowledge(app, query, { limit: 20 });
     allResults.push(...knowledge.map(m => memoryToResult(m, "knowledge")));
   }
 
   if (sources.includes("transcript")) {
-    const transcripts = searchTranscripts(query, { limit: 20 });
+    const transcripts = searchTranscripts(app, query, { limit: 20 });
     allResults.push(...transcripts.map(transcriptToResult));
   }
 

@@ -8,7 +8,6 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "fs";
 import { join, basename } from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { ARK_DIR } from "./paths.js";
 import { getApp } from "./app.js";
 import type { Session } from "../types/index.js";
 
@@ -96,7 +95,7 @@ export function listRecipes(projectRoot?: string): RecipeDefinition[] {
   try { return getApp().recipes.list(projectRoot); } catch {
     // Fallback for cases where AppContext is not booted
     const builtin = loadFromDir(BUILTIN_DIR, "builtin");
-    const global = loadFromDir(join(ARK_DIR(), "recipes"), "global");
+    const global = loadFromDir(join(getApp().config.arkDir, "recipes"), "global");
     const project = projectRoot ? loadFromDir(join(projectRoot, ".ark", "recipes"), "project") : [];
     const byName = new Map<string, RecipeDefinition>();
     for (const r of builtin) byName.set(r.name, r);
@@ -134,7 +133,7 @@ export function saveRecipe(recipe: RecipeDefinition, scope: "project" | "global"
   } catch { /* fallback */ }
   const dir = scope === "project" && projectRoot
     ? join(projectRoot, ".ark", "recipes")
-    : join(ARK_DIR(), "recipes");
+    : join(getApp().config.arkDir, "recipes");
   mkdirSync(dir, { recursive: true });
   const { _source, ...data } = recipe;
   writeFileSync(join(dir, `${recipe.name}.yaml`), stringifyYaml(data));
@@ -148,7 +147,7 @@ export function deleteRecipe(name: string, scope: "project" | "global", projectR
   } catch { /* fallback */ }
   const dir = scope === "project" && projectRoot
     ? join(projectRoot, ".ark", "recipes")
-    : join(ARK_DIR(), "recipes");
+    : join(getApp().config.arkDir, "recipes");
   for (const ext of [".yaml", ".yml"]) {
     const path = join(dir, `${name}${ext}`);
     if (existsSync(path)) { unlinkSync(path); return; }

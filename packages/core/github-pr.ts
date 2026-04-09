@@ -5,7 +5,7 @@
  */
 
 import { createHmac } from "crypto";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 import { safeParseConfig } from "./util.js";
 import type { Session, SessionStatus } from "../types/index.js";
 import { safeAsync } from "./safe.js";
@@ -126,8 +126,8 @@ interface SessionRow {
   updated_at: string;
 }
 
-export function findSessionByPR(prUrl: string): Session | null {
-  const db = getApp().db;
+export function findSessionByPR(app: AppContext, prUrl: string): Session | null {
+  const db = app.db;
   const row = db.prepare(
     "SELECT * FROM sessions WHERE pr_url = ? ORDER BY rowid DESC LIMIT 1"
   ).get(prUrl) as SessionRow | undefined;
@@ -140,7 +140,7 @@ export function findSessionByPR(prUrl: string): Session | null {
 
 // ── Main handler ────────────────────────────────────────────────────────────
 
-export function handleGitHubWebhook(event: string, payload: Record<string, any>): WebhookResult {
+export function handleGitHubWebhook(app: AppContext, event: string, payload: Record<string, any>): WebhookResult {
   // Only handle review-related events
   if (event !== "pull_request_review" && event !== "pull_request_review_comment") {
     return { action: "ignore", message: `Unhandled event: ${event}` };
@@ -153,7 +153,7 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
   }
 
   // Find matching session
-  const session = findSessionByPR(prUrl);
+  const session = findSessionByPR(app, prUrl);
   if (!session) {
     return { action: "ignore", message: `No session for PR: ${prUrl}` };
   }
@@ -164,7 +164,7 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
 
   // Handle approved reviews
   if (event === "pull_request_review" && payload.review?.state === "approved") {
-    getApp().events.log(session.id, "webhook_review_approved", {
+    app.events.log(session.id, "webhook_review_approved", {
       actor: "github",
       data: { pr_url: prUrl, reviewer: payload.review?.user?.login },
     });
@@ -176,9 +176,9 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
     const prompt = formatReviewPrompt(prTitle, prNumber, comments, payload.review?.state);
 
     // Store as a message so TUI shows it
-    getApp().messages.send(session.id, "system", prompt, "text");
+    app.messages.send(session.id, "system", prompt, "text");
 
-    getApp().events.log(session.id, "webhook_review_steer", {
+    app.events.log(session.id, "webhook_review_steer", {
       actor: "github",
       data: {
         pr_url: prUrl,
@@ -190,7 +190,7 @@ export function handleGitHubWebhook(event: string, payload: Record<string, any>)
 
     // Steer via channel if session is running (fire-and-forget)
     if (session.status === "running") {
-      const channelPort = getApp().sessions.channelPort(session.id);
+      const channelPort = app.sessions.channelPort(session.id);
       const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
       safeAsync(`[github-pr] deliverToChannel for ${session.id}`, async () => {
         const { deliverToChannel } = await import("./conductor.js");

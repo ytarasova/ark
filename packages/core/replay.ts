@@ -6,7 +6,7 @@
  */
 
 import type { Event } from "../types/index.js";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 export interface ReplayStep {
   index: number;
@@ -123,10 +123,10 @@ function buildDetail(type: string, data: Record<string, unknown> | null): string
 }
 
 /** Build a replay timeline from a session's events */
-export function buildReplay(sessionId: string): ReplayStep[] {
+export function buildReplay(app: AppContext, sessionId: string): ReplayStep[] {
   let events, session;
-  events = getApp().events.list(sessionId, { limit: 1000 }) as Event[];
-  session = getApp().sessions.get(sessionId);
+  events = app.events.list(sessionId, { limit: 1000 }) as Event[];
+  session = app.sessions.get(sessionId);
   if (events.length === 0) return [];
   const baseTime = session
     ? new Date(session.created_at).getTime()

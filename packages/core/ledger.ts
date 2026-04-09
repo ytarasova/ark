@@ -5,7 +5,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./paths.js";
+import type { AppContext } from "./app.js";
 
 export interface LedgerEntry {
   id: string;
@@ -24,12 +24,12 @@ export interface Ledger {
   stallCount: number;
 }
 
-function ledgerPath(conductorId: string): string {
-  return join(ARK_DIR(), "conductor", conductorId, "ledger.json");
+function ledgerPath(app: AppContext, conductorId: string): string {
+  return join(app.config.arkDir, "conductor", conductorId, "ledger.json");
 }
 
-export function loadLedger(conductorId: string): Ledger {
-  const path = ledgerPath(conductorId);
+export function loadLedger(app: AppContext, conductorId: string): Ledger {
+  const path = ledgerPath(app, conductorId);
   if (existsSync(path)) {
     try { return JSON.parse(readFileSync(path, "utf-8")); }
     catch { /* fall through */ }
@@ -37,15 +37,15 @@ export function loadLedger(conductorId: string): Ledger {
   return { conductorId, entries: [], lastActivity: new Date().toISOString(), stallCount: 0 };
 }
 
-export function saveLedger(ledger: Ledger): void {
-  const dir = join(ARK_DIR(), "conductor", ledger.conductorId);
+export function saveLedger(app: AppContext, ledger: Ledger): void {
+  const dir = join(app.config.arkDir, "conductor", ledger.conductorId);
   mkdirSync(dir, { recursive: true });
   ledger.lastActivity = new Date().toISOString();
-  writeFileSync(ledgerPath(ledger.conductorId), JSON.stringify(ledger, null, 2));
+  writeFileSync(ledgerPath(app, ledger.conductorId), JSON.stringify(ledger, null, 2));
 }
 
-export function addEntry(conductorId: string, type: LedgerEntry["type"], content: string, sessionId?: string): LedgerEntry {
-  const ledger = loadLedger(conductorId);
+export function addEntry(app: AppContext, conductorId: string, type: LedgerEntry["type"], content: string, sessionId?: string): LedgerEntry {
+  const ledger = loadLedger(app, conductorId);
   const entry: LedgerEntry = {
     id: `le-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     type,
@@ -56,22 +56,22 @@ export function addEntry(conductorId: string, type: LedgerEntry["type"], content
     updatedAt: new Date().toISOString(),
   };
   ledger.entries.push(entry);
-  saveLedger(ledger);
+  saveLedger(app, ledger);
   return entry;
 }
 
-export function updateEntry(conductorId: string, entryId: string, updates: Partial<LedgerEntry>): void {
-  const ledger = loadLedger(conductorId);
+export function updateEntry(app: AppContext, conductorId: string, entryId: string, updates: Partial<LedgerEntry>): void {
+  const ledger = loadLedger(app, conductorId);
   const entry = ledger.entries.find(e => e.id === entryId);
   if (entry) {
     Object.assign(entry, updates, { updatedAt: new Date().toISOString() });
-    saveLedger(ledger);
+    saveLedger(app, ledger);
   }
 }
 
 /** Detect stalls — no progress entries in the last N minutes. */
-export function detectStall(conductorId: string, thresholdMinutes: number = 10): boolean {
-  const ledger = loadLedger(conductorId);
+export function detectStall(app: AppContext, conductorId: string, thresholdMinutes: number = 10): boolean {
+  const ledger = loadLedger(app, conductorId);
   const progressEntries = ledger.entries.filter(e => e.type === "progress");
   if (progressEntries.length === 0) return false;
 
@@ -89,15 +89,15 @@ export function detectStall(conductorId: string, thresholdMinutes: number = 10):
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
-    saveLedger(ledger);
+    saveLedger(app, ledger);
   }
 
   return stalled;
 }
 
 /** Get a summary of the ledger for injection into conductor prompt. */
-export function formatLedgerForPrompt(conductorId: string): string {
-  const ledger = loadLedger(conductorId);
+export function formatLedgerForPrompt(app: AppContext, conductorId: string): string {
+  const ledger = loadLedger(app, conductorId);
   if (ledger.entries.length === 0) return "";
 
   const facts = ledger.entries.filter(e => e.type === "fact").map(e => `- ${e.content}`);

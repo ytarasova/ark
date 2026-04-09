@@ -12,7 +12,8 @@ import { execFile, execFileSync, spawn } from "child_process";
 import { promisify } from "util";
 import { existsSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
-import { TRACKS_DIR, ARK_DIR } from "./paths.js";
+import { TRACKS_DIR } from "./paths.js";
+import { getApp } from "./app.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -31,7 +32,7 @@ bind -n C-q detach-client
 
 /** Ensure ~/.ark/tmux.conf exists, return its path */
 function ensureTmuxConf(): string {
-  const confPath = join(ARK_DIR(), "tmux.conf");
+  const confPath = join(getApp().config.arkDir, "tmux.conf");
   writeFileSync(confPath, ARK_TMUX_CONF + "\n");
   return confPath;
 }

@@ -12,7 +12,7 @@ import type {
 export function registerHistoryHandlers(router: Router, app: AppContext): void {
   router.handle("history/list", async (p) => {
     const { limit } = extract<HistoryListParams>(p, []);
-    const items = core.listClaudeSessions({ limit: limit ?? 100 });
+    const items = core.listClaudeSessions(app, { limit: limit ?? 100 });
     return { items };
   });
 
@@ -30,15 +30,15 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("history/refresh", async (p) => {
-    const count = await core.refreshClaudeSessionsCache({
+    const count = await core.refreshClaudeSessionsCache(app,{
       onProgress: () => {},
     });
-    const items = core.listClaudeSessions();
+    const items = core.listClaudeSessions(app);
     return { ok: true, count: items.length, sessionCount: count };
   });
 
   router.handle("history/index", async () => {
-    const count = await core.indexTranscripts({ onProgress: () => {} });
+    const count = await core.indexTranscripts(app,{ onProgress: () => {} });
     return { ok: true, count };
   });
 
@@ -46,28 +46,28 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
     const db = app.db;
     db.run("DELETE FROM claude_sessions_cache");
     db.run("DELETE FROM transcript_index");
-    const sessionCount = await core.refreshClaudeSessionsCache({});
-    const indexCount = await core.indexTranscripts({});
-    const items = core.listClaudeSessions();
+    const sessionCount = await core.refreshClaudeSessionsCache(app,{});
+    const indexCount = await core.indexTranscripts(app,{});
+    const items = core.listClaudeSessions(app);
     return { ok: true, sessionCount, indexCount, items };
   });
 
   router.handle("history/refresh-and-index", async () => {
-    const sessionCount = await core.refreshClaudeSessionsCache({});
-    const indexCount = await core.indexTranscripts({});
-    const items = core.listClaudeSessions();
+    const sessionCount = await core.refreshClaudeSessionsCache(app,{});
+    const indexCount = await core.indexTranscripts(app,{});
+    const items = core.listClaudeSessions(app);
     return { ok: true, sessionCount, indexCount, items };
   });
 
   router.handle("history/index-stats", async () => {
-    const stats = core.getIndexStats();
+    const stats = core.getIndexStats(app);
     return { stats };
   });
 
   router.handle("history/search", async (p) => {
     const { query, limit } = extract<HistorySearchParams>(p, ["query"]);
-    const dbResults = core.searchSessions(query, { limit: limit ?? 20 });
-    const txResults = core.searchTranscripts(query, { limit: limit ?? 20 });
+    const dbResults = core.searchSessions(app, query, { limit: limit ?? 20 });
+    const txResults = core.searchTranscripts(app, query, { limit: limit ?? 20 });
     return { results: [...dbResults, ...txResults] };
   });
 }

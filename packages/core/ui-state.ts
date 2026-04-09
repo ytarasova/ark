@@ -5,7 +5,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./paths.js";
+import { getApp } from "./app.js";
 
 export interface UiState {
   activeTab: number;
@@ -24,7 +24,7 @@ const DEFAULT_STATE: UiState = {
 };
 
 function statePath(): string {
-  return join(ARK_DIR(), "ui-state.json");
+  return join(getApp().config.arkDir, "ui-state.json");
 }
 
 /** Load persisted UI state. Returns defaults if file missing or corrupt. */

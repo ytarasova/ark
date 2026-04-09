@@ -101,10 +101,10 @@ export function registerMemoryCommands(program: Command) {
       }
       const stat = statSync(resolved);
       if (stat.isDirectory()) {
-        const result = core.ingestDirectory(resolved, { scope: opts.scope, tags: opts.tag });
+        const result = core.ingestDirectory(core.getApp(), resolved, { scope: opts.scope, tags: opts.tag });
         console.log(chalk.green(`Ingested ${result.files} files (${result.chunks} chunks) from ${resolved}`));
       } else {
-        const chunks = core.ingestFile(resolved, { scope: opts.scope, tags: opts.tag });
+        const chunks = core.ingestFile(core.getApp(), resolved, { scope: opts.scope, tags: opts.tag });
         console.log(chunks > 0
           ? chalk.green(`Ingested ${resolved} (${chunks} chunks)`)
           : chalk.yellow(`Skipped ${resolved} (unsupported or empty)`));

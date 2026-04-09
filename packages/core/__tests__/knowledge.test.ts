@@ -2,6 +2,7 @@
  * Tests for knowledge ingestion: chunkText, ingestFile, queryKnowledge.
  */
 
+import { getApp } from "../app.js";
 import { describe, it, expect } from "bun:test";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -41,33 +42,33 @@ describe("ingestFile", () => {
     const filePath = join(dir, "test-doc.md");
     writeFileSync(filePath, "# Guide\n\nThis is a test document about TypeScript configuration.\n\nIt has multiple paragraphs explaining important concepts about the build system.");
 
-    const count = ingestFile(filePath, { scope: "test", tags: ["docs"] });
+    const count = ingestFile(getApp(), filePath, { scope: "test", tags: ["docs"] });
     expect(count).toBeGreaterThanOrEqual(1);
 
-    const memories = listMemories("test");
+    const memories = listMemories(getApp(),"test");
     expect(memories.length).toBeGreaterThanOrEqual(1);
     expect(memories.some(m => m.tags.includes("docs"))).toBe(true);
     expect(memories.some(m => m.tags.some(t => t.startsWith("file:")))).toBe(true);
   });
 
   it("returns 0 for nonexistent file", () => {
-    expect(ingestFile("/nonexistent/file.md")).toBe(0);
+    expect(ingestFile(getApp(), "/nonexistent/file.md")).toBe(0);
   });
 
   it("returns 0 for unsupported extension", () => {
     const dir = getCtx().arkDir;
     const filePath = join(dir, "binary.exe");
     writeFileSync(filePath, "not really binary");
-    expect(ingestFile(filePath)).toBe(0);
+    expect(ingestFile(getApp(), filePath)).toBe(0);
   });
 
   it("skips tiny chunks under 20 chars", () => {
     const dir = getCtx().arkDir;
     const filePath = join(dir, "tiny.txt");
     writeFileSync(filePath, "ok");
-    const count = ingestFile(filePath);
+    const count = ingestFile(getApp(), filePath);
     // "ok" is < 20 chars, so nothing should be ingested
-    const memories = listMemories("knowledge");
+    const memories = listMemories(getApp(),"knowledge");
     const fromFile = memories.filter(m => m.tags.some(t => t.includes("tiny.txt")));
     expect(fromFile.length).toBe(0);
   });
@@ -85,7 +86,7 @@ describe("ingestDirectory", () => {
     writeFileSync(join(subDir, "setup.txt"), "Setup guide with detailed instructions for installing dependencies and running the project locally.");
     writeFileSync(join(docsDir, "image.png"), "not a text file");
 
-    const result = ingestDirectory(docsDir, { scope: "test-dir" });
+    const result = ingestDirectory(getApp(), docsDir, { scope: "test-dir" });
     expect(result.files).toBeGreaterThanOrEqual(2);
     expect(result.chunks).toBeGreaterThanOrEqual(2);
   });
@@ -101,12 +102,12 @@ describe("ingestDirectory", () => {
     writeFileSync(join(root, "node_modules", "dep.txt"), "This is a dependency file that should not be ingested during directory scanning.");
     writeFileSync(join(root, "src", "code.md"), "# Source Code\n\nDocumentation for the source code including architecture and design patterns.");
 
-    const result = ingestDirectory(root, { scope: "test-skip" });
+    const result = ingestDirectory(getApp(), root, { scope: "test-skip" });
     expect(result.files).toBe(1);  // only src/code.md
   });
 
   it("returns zeros for nonexistent directory", () => {
-    const result = ingestDirectory("/nonexistent/dir");
+    const result = ingestDirectory(getApp(), "/nonexistent/dir");
     expect(result).toEqual({ files: 0, chunks: 0 });
   });
 });
@@ -117,9 +118,9 @@ describe("queryKnowledge", () => {
     const filePath = join(dir, "knowledge-test.md");
     writeFileSync(filePath, "# Authentication\n\nThe authentication system uses JWT tokens for secure session management and API authorization.");
 
-    ingestFile(filePath, { scope: "knowledge" });
+    ingestFile(getApp(), filePath, { scope: "knowledge" });
 
-    const results = queryKnowledge("authentication JWT tokens");
+    const results = queryKnowledge(getApp(), "authentication JWT tokens");
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results[0].content).toContain("authentication");
   });

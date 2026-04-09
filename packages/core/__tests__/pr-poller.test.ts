@@ -90,7 +90,7 @@ describe("pollPRReviews", () => {
     getApp().sessions.update(session.id, { status: "running", stage: "review" });
     // No pr_url set
 
-    await pollPRReviews();
+    await pollPRReviews(getApp(), );
 
     // Should not have created any pr_ events
     const events = getApp().events.list(session.id);
@@ -106,7 +106,7 @@ describe("pollPRReviews", () => {
       stage: "implement", // auto gate, not review
     });
 
-    await pollPRReviews();
+    await pollPRReviews(getApp(), );
 
     const events = getApp().events.list(session.id);
     const prEvents = events.filter(e => e.type.startsWith("pr_"));
@@ -124,7 +124,7 @@ describe("pollPRReviews", () => {
       { author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" },
     ]}), stderr: "" };
 
-    await pollPRReviews();
+    await pollPRReviews(getApp(), );
 
     // Should have been skipped due to cooldown - no pr_approved event
     const events = getApp().events.list(session.id);
@@ -145,7 +145,7 @@ describe("checkSessionPR", () => {
       ],
     }), stderr: "" };
 
-    await checkSessionPR(session);
+    await checkSessionPR(getApp(), session);
 
     const events = getApp().events.list(session.id);
     const approvals = events.filter(e => e.type === "pr_approved");
@@ -164,7 +164,7 @@ describe("checkSessionPR", () => {
       ],
     }), stderr: "" };
 
-    await checkSessionPR(session);
+    await checkSessionPR(getApp(), session);
 
     // Should have logged pr_review_feedback event
     const events = getApp().events.list(session.id);
@@ -183,7 +183,7 @@ describe("checkSessionPR", () => {
     execFileShouldThrow = true;
 
     // Should not throw
-    await checkSessionPR(session);
+    await checkSessionPR(getApp(), session);
 
     // No events should have been created
     const events = getApp().events.list(session.id);
@@ -195,7 +195,7 @@ describe("checkSessionPR", () => {
     const session = createReviewSession();
     execFileResult = { stdout: makeGhOutput({ reviews: [] }), stderr: "" };
 
-    await checkSessionPR(session);
+    await checkSessionPR(getApp(), session);
 
     // Only timestamp update, no review events
     const events = getApp().events.list(session.id);
@@ -207,7 +207,7 @@ describe("checkSessionPR", () => {
     const session = createReviewSession();
     execFileResult = { stdout: makeGhOutput({ state: "MERGED", reviews: [] }), stderr: "" };
 
-    await checkSessionPR(session);
+    await checkSessionPR(getApp(), session);
 
     const events = getApp().events.list(session.id);
     const statusEvents = events.filter(e => e.type === "pr_status");
@@ -232,7 +232,7 @@ describe("checkSessionPR", () => {
       ],
     }), stderr: "" };
 
-    await checkSessionPR(session);
+    await checkSessionPR(getApp(), session);
 
     // Should not create pr_approved because review_count hasn't increased
     const events = getApp().events.list(session.id);
@@ -288,7 +288,7 @@ describe("processReviewFeedback", () => {
       reviews: [{ author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
     };
 
-    await processReviewFeedback(session, data, config);
+    await processReviewFeedback(getApp(), session, data, config);
 
     const events = getApp().events.list(session.id);
     const prEvents = events.filter(e => e.type.startsWith("pr_"));
@@ -303,7 +303,7 @@ describe("processReviewFeedback", () => {
       reviews: [{ author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
     };
 
-    await processReviewFeedback(session, data, config);
+    await processReviewFeedback(getApp(), session, data, config);
 
     const events = getApp().events.list(session.id);
     const approvals = events.filter(e => e.type === "pr_approved");
@@ -318,7 +318,7 @@ describe("processReviewFeedback", () => {
       reviews: [{ author: { login: "bob" }, body: "Needs rework", state: "CHANGES_REQUESTED", submittedAt: "2026-03-27T12:00:00Z" }],
     };
 
-    await processReviewFeedback(session, data, config);
+    await processReviewFeedback(getApp(), session, data, config);
 
     const events = getApp().events.list(session.id);
     const feedback = events.filter(e => e.type === "pr_review_feedback");
@@ -338,7 +338,7 @@ describe("processReviewFeedback", () => {
       reviews: [{ author: { login: "alice" }, body: "ok", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
     };
 
-    await processReviewFeedback(session, data, config);
+    await processReviewFeedback(getApp(), session, data, config);
 
     const updated = getApp().sessions.get(session.id)!;
     const updatedConfig = updated.config as Record<string, any>;

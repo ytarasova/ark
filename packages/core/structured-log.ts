@@ -4,7 +4,7 @@
 
 import { appendFileSync, existsSync, statSync, renameSync, mkdirSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./paths.js";
+import { getApp } from "./app.js";
 
 export type LogComponent = "session" | "conductor" | "mcp" | "status" | "web" | "bridge" | "pool" | "compute" | "general";
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -30,7 +30,7 @@ export function setLogComponents(components: LogComponent[] | null): void {
 const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
 function logPath(): string {
-  return join(ARK_DIR(), "ark.jsonl");
+  return join(getApp().config.arkDir, "ark.jsonl");
 }
 
 function shouldLog(level: LogLevel, component: LogComponent): boolean {
@@ -68,7 +68,7 @@ export function log(level: LogLevel, component: LogComponent, message: string, d
   };
 
   try {
-    const dir = ARK_DIR();
+    const dir = getApp().config.arkDir;
     mkdirSync(dir, { recursive: true });
     rotate();
     appendFileSync(logPath(), JSON.stringify(entry) + "\n");

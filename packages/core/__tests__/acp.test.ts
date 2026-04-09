@@ -15,7 +15,7 @@ function req(method: string, params?: Record<string, unknown>, id: number = 1): 
 
 describe("handleAcpRequest", () => {
   it("session/create creates a new session", async () => {
-    const resp = await handleAcpRequest(req("session/create", {
+    const resp = await handleAcpRequest(getApp(), req("session/create", {
       summary: "ACP test session",
       repo: "/tmp/test-repo",
       flow: "quick",
@@ -39,7 +39,7 @@ describe("handleAcpRequest", () => {
     getApp().sessions.create({ summary: "list test 1", repo: "." });
     getApp().sessions.create({ summary: "list test 2", repo: "." });
 
-    const resp = await handleAcpRequest(req("session/list", { limit: 10 }));
+    const resp = await handleAcpRequest(getApp(), req("session/list", { limit: 10 }));
 
     expect(resp.error).toBeUndefined();
     const sessions = resp.result as Record<string, unknown>[];
@@ -49,7 +49,7 @@ describe("handleAcpRequest", () => {
   it("session/get returns a specific session", async () => {
     const session = getApp().sessions.create({ summary: "get test", repo: "." });
 
-    const resp = await handleAcpRequest(req("session/get", { sessionId: session.id }));
+    const resp = await handleAcpRequest(getApp(), req("session/get", { sessionId: session.id }));
 
     expect(resp.error).toBeUndefined();
     const result = resp.result as Record<string, unknown>;
@@ -58,7 +58,7 @@ describe("handleAcpRequest", () => {
   });
 
   it("returns method not found for unknown methods", async () => {
-    const resp = await handleAcpRequest(req("session/nonexistent"));
+    const resp = await handleAcpRequest(getApp(), req("session/nonexistent"));
 
     expect(resp.error).toBeDefined();
     expect(resp.error!.code).toBe(-32601);
@@ -66,7 +66,7 @@ describe("handleAcpRequest", () => {
   });
 
   it("returns error for session/get with bad id", async () => {
-    const resp = await handleAcpRequest(req("session/get", { sessionId: "s-doesnotexist" }));
+    const resp = await handleAcpRequest(getApp(), req("session/get", { sessionId: "s-doesnotexist" }));
 
     // getSession returns undefined for missing sessions, which is a valid result
     expect(resp.error).toBeUndefined();
@@ -76,7 +76,7 @@ describe("handleAcpRequest", () => {
   it("session/delete removes a session", async () => {
     const session = getApp().sessions.create({ summary: "delete test", repo: "." });
 
-    const resp = await handleAcpRequest(req("session/delete", { sessionId: session.id }));
+    const resp = await handleAcpRequest(getApp(), req("session/delete", { sessionId: session.id }));
 
     expect(resp.error).toBeUndefined();
     const result = resp.result as Record<string, unknown>;

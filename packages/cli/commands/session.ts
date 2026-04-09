@@ -58,7 +58,7 @@ export function registerSessionCommands(program: Command) {
       // Import from Claude session if specified
       let claudeSessionId: string | undefined;
       if (opts.claudeSession) {
-        const cs = await core.getClaudeSession(opts.claudeSession);
+        const cs = await core.getClaudeSession(core.getApp(), opts.claudeSession);
         if (!cs) {
           console.log(chalk.red(`Claude session '${opts.claudeSession}' not found. Run 'ark claude list' to see available sessions.`));
           return;
@@ -544,7 +544,7 @@ export function registerSessionCommands(program: Command) {
     .argument("[file]")
     .action((id, file) => {
       const outPath = file ?? `session-${id}.json`;
-      if (core.exportSessionToFile(id, outPath)) {
+      if (core.exportSessionToFile(core.getApp(), id, outPath)) {
         console.log(chalk.green(`Exported to ${outPath}`));
       } else {
         console.log(chalk.red("Session not found"));
@@ -555,7 +555,7 @@ export function registerSessionCommands(program: Command) {
     .description("Import session from file")
     .argument("<file>")
     .action((file) => {
-      const result = core.importSessionFromFile(file);
+      const result = core.importSessionFromFile(core.getApp(), file);
       console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
     });
 }

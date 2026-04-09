@@ -9,7 +9,6 @@
 import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import { ARK_DIR } from "./paths.js";
 import { substituteVars } from "./template.js";
 import { getApp } from "./app.js";
 
@@ -46,7 +45,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILTIN_DIR = join(__dirname, "..", "..", "flows", "definitions");
-function USER_DIR() { try { return join(ARK_DIR(), "flows"); } catch { return ""; } }
+function USER_DIR() { try { return join(getApp().config.arkDir, "flows"); } catch { return ""; } }
 
 // ── Loading ─────────────────────────────────────────────────────────────────
 

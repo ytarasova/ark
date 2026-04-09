@@ -36,7 +36,7 @@ const defaultConfig: IssueWebhookConfig = {
 describe("handleIssueWebhook", () => {
   it("creates session for labeled action with matching label", async () => {
     const payload = makePayload();
-    const result = await handleIssueWebhook(payload, defaultConfig);
+    const result = await handleIssueWebhook(getApp(), payload, defaultConfig);
 
     expect(result.ok).toBe(true);
     expect(result.sessionId).toBeDefined();
@@ -56,7 +56,7 @@ describe("handleIssueWebhook", () => {
 
   it("logs a webhook event", async () => {
     const payload = makePayload();
-    const result = await handleIssueWebhook(payload, defaultConfig);
+    const result = await handleIssueWebhook(getApp(), payload, defaultConfig);
 
     const events = getApp().events.list(result.sessionId!);
     const webhookEvents = events.filter(e => e.type === "issue_webhook_triggered");
@@ -67,7 +67,7 @@ describe("handleIssueWebhook", () => {
 
   it("ignores non-labeled action", async () => {
     const payload = makePayload({ action: "opened" });
-    const result = await handleIssueWebhook(payload, defaultConfig);
+    const result = await handleIssueWebhook(getApp(), payload, defaultConfig);
 
     expect(result.ok).toBe(false);
     expect(result.message).toContain("Ignoring action: opened");
@@ -76,7 +76,7 @@ describe("handleIssueWebhook", () => {
 
   it("ignores non-matching label", async () => {
     const payload = makePayload({ label: { name: "bug" } });
-    const result = await handleIssueWebhook(payload, defaultConfig);
+    const result = await handleIssueWebhook(getApp(), payload, defaultConfig);
 
     expect(result.ok).toBe(false);
     expect(result.message).toContain("does not match trigger");
@@ -91,7 +91,7 @@ describe("handleIssueWebhook", () => {
       group: "custom-group",
     };
     const payload = makePayload();
-    const result = await handleIssueWebhook(payload, config);
+    const result = await handleIssueWebhook(getApp(), payload, config);
 
     const session = getApp().sessions.get(result.sessionId!);
     expect(session!.flow).toBe("parallel");

@@ -9,7 +9,7 @@ withTestContext();
 
 describe("log manager", () => {
   it("truncateLog keeps last N lines", () => {
-    const dir = logDir();
+    const dir = logDir(getApp(), );
     mkdirSync(dir, { recursive: true });
     const path = join(dir, "test.log");
     const lines = Array.from({ length: 100 }, (_, i) => `line ${i}`);
@@ -23,7 +23,7 @@ describe("log manager", () => {
   });
 
   it("truncateLog skips files under limit", () => {
-    const dir = logDir();
+    const dir = logDir(getApp(), );
     mkdirSync(dir, { recursive: true });
     const path = join(dir, "small.log");
     writeFileSync(path, "line1\nline2\nline3");
@@ -41,12 +41,12 @@ describe("log manager", () => {
 
 describe("cleanupLogs", () => {
   it("returns zeros when log directory does not exist", () => {
-    const result = cleanupLogs();
+    const result = cleanupLogs(getApp(), );
     expect(result).toEqual({ truncated: 0, removed: 0 });
   });
 
   it("removes orphaned log files for sessions that no longer exist", () => {
-    const dir = logDir();
+    const dir = logDir(getApp(), );
     mkdirSync(dir, { recursive: true });
 
     // Create a session so we know its ID format
@@ -56,14 +56,14 @@ describe("cleanupLogs", () => {
     writeFileSync(join(dir, `ark-${session.id}.log`), "real log");
     writeFileSync(join(dir, `ark-s-deadbeef.log`), "orphan log");
 
-    const result = cleanupLogs({ removeOrphans: true });
+    const result = cleanupLogs(getApp(), { removeOrphans: true });
     expect(result.removed).toBe(1);
     expect(existsSync(join(dir, `ark-${session.id}.log`))).toBe(true);
     expect(existsSync(join(dir, `ark-s-deadbeef.log`))).toBe(false);
   });
 
   it("truncates oversized log files", () => {
-    const dir = logDir();
+    const dir = logDir(getApp(), );
     mkdirSync(dir, { recursive: true });
 
     const session = getApp().sessions.create({ summary: "large log" });
@@ -74,7 +74,7 @@ describe("cleanupLogs", () => {
     writeFileSync(logPath, bigContent);
 
     // Use tiny maxSizeMb so the file counts as oversized
-    const result = cleanupLogs({ maxSizeMb: 0.001, maxLines: 100, removeOrphans: false });
+    const result = cleanupLogs(getApp(), { maxSizeMb: 0.001, maxLines: 100, removeOrphans: false });
     expect(result.truncated).toBe(1);
 
     const after = readFileSync(logPath, "utf-8");

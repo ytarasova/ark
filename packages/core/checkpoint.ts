@@ -7,19 +7,9 @@
  */
 
 import type { Session, Event } from "../types/index.js";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 import * as tmux from "./tmux.js";
 import { safeAsync } from "./safe.js";
-
-/** Safe accessor — uses AppContext if available, falls back to store (for boot + tests). */
-function getSessions() {
-  try { return getApp().sessions; }
-  catch { return null; }
-}
-function getEvents() {
-  try { return getApp().events; }
-  catch { return null; }
-}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -38,8 +28,8 @@ export interface Checkpoint {
 // ── Save / Load ────────────────────────────────────────────────────────────
 
 /** Save a checkpoint for a session. Stores full state snapshot as a checkpoint event. */
-export function saveCheckpoint(sessionId: string): void {
-  const session = getSessions()?.get(sessionId);
+export function saveCheckpoint(app: AppContext, sessionId: string): void {
+  const session = app.sessions.get(sessionId);
   if (!session) return;
 
   const data: Record<string, unknown> = {
@@ -56,14 +46,12 @@ export function saveCheckpoint(sessionId: string): void {
     config: session.config,
   };
 
-  const ev = getEvents();
-  if (ev) ev.log(sessionId, "checkpoint", { stage: session.stage ?? undefined, actor: "system", data });
-  else getApp().events.log(sessionId, "checkpoint", { stage: session.stage ?? undefined, actor: "system", data });
+  app.events.log(sessionId, "checkpoint", { stage: session.stage ?? undefined, actor: "system", data });
 }
 
 /** Get the latest checkpoint for a session. */
-export function getCheckpoint(sessionId: string): Checkpoint | null {
-  const events = getEvents()?.list(sessionId, { type: "checkpoint" }) ?? [];
+export function getCheckpoint(app: AppContext, sessionId: string): Checkpoint | null {
+  const events = app.events.list(sessionId, { type: "checkpoint" }) ?? [];
   if (events.length === 0) return null;
 
   const latest = events[events.length - 1];
@@ -71,8 +59,8 @@ export function getCheckpoint(sessionId: string): Checkpoint | null {
 }
 
 /** List all checkpoints for a session, oldest first. */
-export function listCheckpoints(sessionId: string): Checkpoint[] {
-  const events = getEvents()?.list(sessionId, { type: "checkpoint" }) ?? [];
+export function listCheckpoints(app: AppContext, sessionId: string): Checkpoint[] {
+  const events = app.events.list(sessionId, { type: "checkpoint" }) ?? [];
   return events.map((e) => eventToCheckpoint(sessionId, e));
 }
 
@@ -83,10 +71,9 @@ export function listCheckpoints(sessionId: string): Checkpoint[] {
  * A session is orphaned if its status is "running" or "waiting" but its
  * tmux session no longer exists.
  */
-export function findOrphanedSessions(): Session[] {
-  const repo = getSessions();
-  const running = repo ? repo.list({ status: "running" }) : [];
-  const waiting = repo ? repo.list({ status: "waiting" }) : [];
+export function findOrphanedSessions(app: AppContext): Session[] {
+  const running = app.sessions.list({ status: "running" });
+  const waiting = app.sessions.list({ status: "waiting" });
   const candidates = [...running, ...waiting];
 
   return candidates.filter((session) => {
@@ -110,11 +97,11 @@ export function findOrphanedSessions(): Session[] {
  * 3. Preserve claude_session_id for --resume on next dispatch
  * 4. Log recovery event
  */
-export function recoverSession(sessionId: string): { ok: boolean; message: string } {
-  const session = getSessions()?.get(sessionId);
+export function recoverSession(app: AppContext, sessionId: string): { ok: boolean; message: string } {
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  const checkpoint = getCheckpoint(sessionId);
+  const checkpoint = getCheckpoint(app, sessionId);
 
   // Build recovery fields
   const updates: Partial<Session> = {
@@ -134,12 +121,9 @@ export function recoverSession(sessionId: string): { ok: boolean; message: strin
     updates.claude_session_id = claudeId;
   }
 
-  const repo = getSessions();
-  if (repo) repo.update(sessionId, updates);
-  else getApp().sessions.update(sessionId, updates);
+  app.sessions.update(sessionId, updates);
 
-  const ev = getEvents();
-  const evOpts = {
+  app.events.log(sessionId, "session_recovered", {
     stage: updates.stage ?? session.stage ?? undefined,
     actor: "system",
     data: {
@@ -147,9 +131,7 @@ export function recoverSession(sessionId: string): { ok: boolean; message: strin
       had_checkpoint: !!checkpoint,
       claude_session_id: claudeId,
     },
-  };
-  if (ev) ev.log(sessionId, "session_recovered", evOpts);
-  else getApp().events.log(sessionId, "session_recovered", evOpts);
+  });
 
   return { ok: true, message: checkpoint
     ? `Recovered from checkpoint (stage: ${checkpoint.stage})`

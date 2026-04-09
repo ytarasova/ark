@@ -4,14 +4,7 @@
 
 import { readdirSync, statSync, readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./paths.js";
-import { getApp } from "./app.js";
-
-/** Safe session list — uses AppContext if available, falls back to store (needed during boot). */
-function safeListSessions(opts?: { limit?: number }): any[] {
-  try { return getApp().sessions.list(opts); }
-  catch { return []; }
-}
+import type { AppContext } from "./app.js";
 
 export interface LogManagerOptions {
   maxSizeMb?: number;    // Max log file size (default: 10)
@@ -26,8 +19,8 @@ const DEFAULTS: Required<LogManagerOptions> = {
 };
 
 /** Get the log directory path. */
-export function logDir(): string {
-  return join(ARK_DIR(), "logs");
+export function logDir(app: AppContext): string {
+  return join(app.config.arkDir, "logs");
 }
 
 /** Truncate a log file to maxLines, keeping the most recent. */
@@ -41,15 +34,15 @@ export function truncateLog(filePath: string, maxLines: number): void {
 }
 
 /** Clean up log files: truncate oversized, remove orphans. */
-export function cleanupLogs(opts?: LogManagerOptions): { truncated: number; removed: number } {
+export function cleanupLogs(app: AppContext, opts?: LogManagerOptions): { truncated: number; removed: number } {
   const o = { ...DEFAULTS, ...opts };
-  const dir = logDir();
+  const dir = logDir(app);
   if (!existsSync(dir)) return { truncated: 0, removed: 0 };
 
   let truncated = 0;
   let removed = 0;
 
-  const sessionIds = new Set(safeListSessions({ limit: 1000 }).map(s => s.id));
+  const sessionIds = new Set(app.sessions.list({ limit: 1000 }).map(s => s.id));
   const files = readdirSync(dir).filter(f => f.endsWith(".log"));
 
   for (const file of files) {

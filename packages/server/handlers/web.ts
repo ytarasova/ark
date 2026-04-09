@@ -33,8 +33,8 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   // ── Search ───────────────────────────────────────────────────────────────
   router.handle("search/sessions", async (p) => {
     const { query, limit } = extract<{ query: string; limit?: number }>(p, ["query"]);
-    const sessions = searchSessions(query, { limit: limit ?? 50 });
-    const transcripts = searchTranscripts(query, { limit: limit ?? 50 });
+    const sessions = searchSessions(app, query, { limit: limit ?? 50 });
+    const transcripts = searchTranscripts(app, query, { limit: limit ?? 50 });
     return { sessions, transcripts };
   });
 
@@ -79,10 +79,10 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
       path: string; directory?: boolean; scope?: string; tags?: string[]; recursive?: boolean;
     }>(p, ["path"]);
     if (directory) {
-      const result = ingestDirectory(path, { scope, tags, recursive });
+      const result = ingestDirectory(app, path, { scope, tags, recursive });
       return { ok: true, ...result };
     }
-    const chunks = ingestFile(path, { scope, tags });
+    const chunks = ingestFile(app, path, { scope, tags });
     return { ok: true, chunks };
   });
 
@@ -143,7 +143,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   // ── Session export (by id, no file path) ─────────────────────────────────
   router.handle("session/export-data", async (p) => {
     const { sessionId } = extract<{ sessionId: string }>(p, ["sessionId"]);
-    const data = exportSession(sessionId);
+    const data = exportSession(app, sessionId);
     if (!data) throw new Error("Session not found");
     return data;
   });

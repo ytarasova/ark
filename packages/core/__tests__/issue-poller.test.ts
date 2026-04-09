@@ -83,17 +83,17 @@ describe("fetchLabeledIssues", () => {
 
 describe("issueAlreadyTracked", () => {
   it("returns false when no matching session exists", () => {
-    expect(issueAlreadyTracked("#42")).toBe(false);
+    expect(issueAlreadyTracked(getApp(), "#42")).toBe(false);
   });
 
   it("returns true when session with same ticket exists", () => {
     getApp().sessions.create({ ticket: "#42", summary: "existing" });
-    expect(issueAlreadyTracked("#42")).toBe(true);
+    expect(issueAlreadyTracked(getApp(), "#42")).toBe(true);
   });
 
   it("does not match different ticket numbers", () => {
     getApp().sessions.create({ ticket: "#99", summary: "other issue" });
-    expect(issueAlreadyTracked("#42")).toBe(false);
+    expect(issueAlreadyTracked(getApp(), "#42")).toBe(false);
   });
 });
 
@@ -102,7 +102,7 @@ describe("issueAlreadyTracked", () => {
 describe("createSessionFromIssue", () => {
   it("creates session with correct ticket and summary", async () => {
     const issue = makeIssue();
-    const session = await createSessionFromIssue(issue);
+    const session = await createSessionFromIssue(getApp(), issue);
 
     expect(session).not.toBeNull();
     expect(session!.ticket).toBe("#42");
@@ -111,7 +111,7 @@ describe("createSessionFromIssue", () => {
 
   it("stores issue URL and body in config", async () => {
     const issue = makeIssue();
-    const session = await createSessionFromIssue(issue);
+    const session = await createSessionFromIssue(getApp(), issue);
 
     const config = session!.config as Record<string, any>;
     expect(config.issue_url).toBe("https://github.com/org/repo/issues/42");
@@ -121,7 +121,7 @@ describe("createSessionFromIssue", () => {
 
   it("logs issue_imported event", async () => {
     const issue = makeIssue();
-    const session = await createSessionFromIssue(issue);
+    const session = await createSessionFromIssue(getApp(), issue);
 
     const events = getApp().events.list(session!.id);
     const imported = events.filter(e => e.type === "issue_imported");
@@ -136,7 +136,7 @@ describe("createSessionFromIssue", () => {
     getApp().sessions.create({ ticket: "#42", summary: "already tracked" });
 
     const issue = makeIssue();
-    const session = await createSessionFromIssue(issue);
+    const session = await createSessionFromIssue(getApp(), issue);
     expect(session).toBeNull();
   });
 });
@@ -150,7 +150,7 @@ describe("pollIssues", () => {
       makeIssue({ number: 11, title: "Bug B" }),
     ]);
 
-    await pollIssues({ label: "ark" });
+    await pollIssues(getApp(), { label: "ark" });
 
     const sessions = getApp().sessions.list();
     const tickets = sessions.map(s => s.ticket);
@@ -166,7 +166,7 @@ describe("pollIssues", () => {
       makeIssue({ number: 11, title: "Bug B" }),
     ]);
 
-    await pollIssues({ label: "ark" });
+    await pollIssues(getApp(), { label: "ark" });
 
     const sessions = getApp().sessions.list();
     const ticket11 = sessions.filter(s => s.ticket === "#11");
@@ -180,7 +180,7 @@ describe("pollIssues", () => {
     ghShouldThrow = true;
 
     // Should not throw
-    await pollIssues({ label: "ark" });
+    await pollIssues(getApp(), { label: "ark" });
 
     const sessions = getApp().sessions.list();
     expect(sessions).toHaveLength(0);
@@ -193,7 +193,7 @@ describe("pollIssues", () => {
       return { stdout: "[]" };
     });
 
-    await pollIssues({ label: "agent" });
+    await pollIssues(getApp(), { label: "agent" });
 
     expect(capturedArgs).toContain("agent");
   });
@@ -205,7 +205,7 @@ describe("startIssuePoller", () => {
   it("returns a handle with a stop function", () => {
     setGhExec(async () => ({ stdout: "[]" }));
 
-    const handle = startIssuePoller({ intervalMs: 60_000 });
+    const handle = startIssuePoller(getApp(), { intervalMs: 60_000 });
     expect(typeof handle.stop).toBe("function");
 
     // Clean up the interval immediately
@@ -215,7 +215,7 @@ describe("startIssuePoller", () => {
   it("stop() cleans up the interval", () => {
     setGhExec(async () => ({ stdout: "[]" }));
 
-    const handle = startIssuePoller({ intervalMs: 100_000 });
+    const handle = startIssuePoller(getApp(), { intervalMs: 100_000 });
     // Should not throw on stop
     handle.stop();
   });

@@ -6,7 +6,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, openSync, readSync, closeSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 /**
  * Max bytes to read from the tail of large transcript files for indexing.
@@ -31,7 +31,7 @@ export interface SearchOpts {
   transcriptsDir?: string;
 }
 
-export function searchSessions(query: string, opts?: SearchOpts): SearchResult[] {
+export function searchSessions(app: AppContext, query: string, opts?: SearchOpts): SearchResult[] {
   const limit = opts?.limit ?? 50;
   const results: SearchResult[] = [];
   const seen = new Set<string>();
@@ -43,7 +43,7 @@ export function searchSessions(query: string, opts?: SearchOpts): SearchResult[]
     results.push(r);
   };
 
-  const db = getApp().db;
+  const db = app.db;
   const pattern = `%${query}%`;
 
   // 1. Session metadata
@@ -85,15 +85,15 @@ export function searchSessions(query: string, opts?: SearchOpts): SearchResult[]
 }
 
 /** Check if the FTS5 transcript_index table exists in the database */
-export function ftsTableExists(): boolean {
-  const db = getApp().db;
+export function ftsTableExists(app: AppContext): boolean {
+  const db = app.db;
   const row = db.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='transcript_index'"
   ).get();
   return !!row;
 }
 
-export function searchTranscripts(query: string, opts?: SearchOpts): SearchResult[] {
+export function searchTranscripts(app: AppContext, query: string, opts?: SearchOpts): SearchResult[] {
   const limit = opts?.limit ?? 50;
 
   // When a custom transcriptsDir is provided, always use file scanning (used by tests)
@@ -102,16 +102,16 @@ export function searchTranscripts(query: string, opts?: SearchOpts): SearchResul
   }
 
   // Use FTS5 index when the table exists (even if empty — empty means no transcripts indexed yet)
-  if (ftsTableExists()) {
-    return searchTranscriptsFTS(query, limit);
+  if (ftsTableExists(app)) {
+    return searchTranscriptsFTS(app, query, limit);
   }
 
   // Fallback to file scanning only when FTS table hasn't been created yet
   return searchTranscriptsFiles(query, opts);
 }
 
-function searchTranscriptsFTS(query: string, limit: number): SearchResult[] {
-  const db = getApp().db;
+function searchTranscriptsFTS(app: AppContext, query: string, limit: number): SearchResult[] {
+  const db = app.db;
   const terms = query.replace(/['"*()]/g, "").split(/\s+/).filter(w => w.length > 0);
   if (terms.length === 0) return [];
 
@@ -210,9 +210,9 @@ function searchTranscriptsFiles(query: string, opts?: SearchOpts): SearchResult[
 // ── Per-session conversation ─────────────────────────────────────────────────
 
 /** Get conversation turns for a specific session, ordered chronologically */
-export function getSessionConversation(sessionId: string, opts?: { limit?: number }): { role: string; content: string; timestamp: string }[] {
-  if (!ftsTableExists()) return [];
-  const db = getApp().db;
+export function getSessionConversation(app: AppContext, sessionId: string, opts?: { limit?: number }): { role: string; content: string; timestamp: string }[] {
+  if (!ftsTableExists(app)) return [];
+  const db = app.db;
   const limit = opts?.limit ?? 100;
   try {
     return (db.prepare(
@@ -223,9 +223,9 @@ export function getSessionConversation(sessionId: string, opts?: { limit?: numbe
 }
 
 /** Search within a specific session's conversation */
-export function searchSessionConversation(sessionId: string, query: string, opts?: { limit?: number }): SearchResult[] {
-  if (!ftsTableExists()) return [];
-  const db = getApp().db;
+export function searchSessionConversation(app: AppContext, sessionId: string, query: string, opts?: { limit?: number }): SearchResult[] {
+  if (!ftsTableExists(app)) return [];
+  const db = app.db;
   const limit = opts?.limit ?? 20;
   const ftsQuery = escapeFtsQuery(query);
   try {
@@ -247,11 +247,11 @@ export function searchSessionConversation(sessionId: string, query: string, opts
 
 // ── Indexing ──────────────────────────────────────────────────────────────────
 
-export async function indexTranscripts(opts?: { transcriptsDir?: string; onProgress?: (indexed: number, total: number) => void }): Promise<number> {
+export async function indexTranscripts(app: AppContext, opts?: { transcriptsDir?: string; onProgress?: (indexed: number, total: number) => void }): Promise<number> {
   const transcriptsDir = opts?.transcriptsDir ?? join(homedir(), ".claude", "projects");
   if (!existsSync(transcriptsDir)) return 0;
 
-  const db = getApp().db;
+  const db = app.db;
 
   // Clear existing index
   db.exec("DELETE FROM transcript_index");
@@ -307,10 +307,10 @@ export async function indexTranscripts(opts?: { transcriptsDir?: string; onProgr
   return indexed;
 }
 
-export function indexSession(transcriptPath: string, sessionId: string, project?: string): number {
+export function indexSession(app: AppContext, transcriptPath: string, sessionId: string, project?: string): number {
   if (!existsSync(transcriptPath)) return 0;
 
-  const db = getApp().db;
+  const db = app.db;
 
   // Incremental: find the max timestamp already indexed for this session
   let maxTs: string | null = null;
@@ -360,8 +360,8 @@ export function indexSession(transcriptPath: string, sessionId: string, project?
   return indexed;
 }
 
-export function getIndexStats(): { entries: number; sessions: number } {
-  const db = getApp().db;
+export function getIndexStats(app: AppContext): { entries: number; sessions: number } {
+  const db = app.db;
   try {
     const entries = (db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as { c: number } | undefined)?.c ?? 0;
     const sessions = (db.prepare("SELECT COUNT(DISTINCT session_id) as c FROM transcript_index").get() as { c: number } | undefined)?.c ?? 0;

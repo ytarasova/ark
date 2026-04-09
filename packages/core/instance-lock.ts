@@ -3,14 +3,14 @@
  * Uses a heartbeat table to detect and coordinate concurrent instances.
  */
 
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 const HEARTBEAT_INTERVAL_MS = 2000;
 const STALE_THRESHOLD_MS = 10000;
 
 /** Register this instance and start heartbeat. Returns cleanup function. */
-export function registerInstance(instanceId: string): { stop: () => void; isPrimary: () => boolean } {
-  const db = getApp().db;
+export function registerInstance(app: AppContext, instanceId: string): { stop: () => void; isPrimary: () => boolean } {
+  const db = app.db;
 
   // Create heartbeat table if needed
   db.exec(`
@@ -23,7 +23,7 @@ export function registerInstance(instanceId: string): { stop: () => void; isPrim
   `);
 
   // Clean stale instances
-  cleanStaleInstances();
+  cleanStaleInstances(app);
 
   // Register
   const now = new Date().toISOString();
@@ -37,7 +37,7 @@ export function registerInstance(instanceId: string): { stop: () => void; isPrim
     try {
       db.prepare("UPDATE instance_heartbeat SET last_heartbeat = ? WHERE id = ?")
         .run(new Date().toISOString(), instanceId);
-      cleanStaleInstances();
+      cleanStaleInstances(app);
     } catch { /* DB may be closed */ }
   }, HEARTBEAT_INTERVAL_MS);
 
@@ -60,24 +60,24 @@ export function registerInstance(instanceId: string): { stop: () => void; isPrim
 }
 
 /** Remove instances that haven't sent a heartbeat recently. */
-function cleanStaleInstances(): void {
+function cleanStaleInstances(app: AppContext): void {
   try {
-    const db = getApp().db;
+    const db = app.db;
     const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
     db.prepare("DELETE FROM instance_heartbeat WHERE last_heartbeat < ?").run(cutoff);
   } catch { /* ignore */ }
 }
 
 /** Get count of active instances. */
-export function activeInstanceCount(): number {
+export function activeInstanceCount(app: AppContext): number {
   try {
-    const db = getApp().db;
+    const db = app.db;
     // Ensure table exists
     db.exec(`CREATE TABLE IF NOT EXISTS instance_heartbeat (
       id TEXT PRIMARY KEY, pid INTEGER NOT NULL,
       started_at TEXT NOT NULL, last_heartbeat TEXT NOT NULL
     )`);
-    cleanStaleInstances();
+    cleanStaleInstances(app);
     const row = db.prepare("SELECT COUNT(*) as count FROM instance_heartbeat").get() as { count: number };
     return row.count;
   } catch { return 0; }

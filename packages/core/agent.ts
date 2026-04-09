@@ -10,7 +10,6 @@
 import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import { ARK_DIR } from "./paths.js";
 import { substituteVars, buildSessionVars } from "./template.js";
 import { getApp } from "./app.js";
 
@@ -59,7 +58,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILTIN_DIR = join(__dirname, "..", "..", "agents");
-function GLOBAL_DIR() { return join(ARK_DIR(), "agents"); }
+function GLOBAL_DIR() { return join(getApp().config.arkDir, "agents"); }
 
 /** Walk up from cwd looking for .git/ to find project root. */
 export function findProjectRoot(cwd?: string): string | null {

@@ -29,7 +29,7 @@ export function registerSearchCommands(program: Command) {
       }
 
       if (opts.hybrid) {
-        const hybridResults = await core.hybridSearch(query, { limit, rerank: true });
+        const hybridResults = await core.hybridSearch(core.getApp(), query, { limit, rerank: true });
         if (hybridResults.length === 0) {
           console.log(chalk.yellow("No hybrid search results found."));
           return;

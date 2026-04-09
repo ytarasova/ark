@@ -3,7 +3,7 @@
  * When an issue gets a specific label, auto-create and dispatch a session.
  */
 
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 import { dispatch } from "./services/session-orchestration.js";
 
@@ -33,6 +33,7 @@ export interface IssueWebhookConfig {
 
 /** Handle a GitHub issue webhook event. */
 export async function handleIssueWebhook(
+  app: AppContext,
   payload: IssueWebhookPayload,
   config: IssueWebhookConfig,
 ): Promise<{ ok: boolean; sessionId?: string; message: string }> {
@@ -63,16 +64,15 @@ export async function handleIssueWebhook(
     },
   };
   let session;
-  session = getApp().sessions.create(createOpts);
+  session = app.sessions.create(createOpts);
 
   const evOpts = { actor: "github", data: { issue_number: issue.number, label: config.triggerLabel, repo: repo.full_name } };
-  try { getApp().events.log(session.id, "issue_webhook_triggered", evOpts); }
-  catch { /* app not booted */ }
+  app.events.log(session.id, "issue_webhook_triggered", evOpts);
 
   // Auto-dispatch if configured
   if (config.autoDispatch) {
     try {
-      await dispatch(getApp(), session.id);
+      await dispatch(app, session.id);
     } catch (e: any) {
       return { ok: true, sessionId: session.id, message: `Session created but dispatch failed: ${e.message}` };
     }

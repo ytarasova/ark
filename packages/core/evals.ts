@@ -5,7 +5,7 @@
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./paths.js";
+import type { AppContext } from "./app.js";
 
 export interface EvalScenario {
   name: string;
@@ -34,9 +34,9 @@ export interface EvalSuite {
 }
 
 /** Load eval scenarios from ~/.ark/evals/ directory. */
-export function loadEvalSuite(name: string): EvalSuite | null {
+export function loadEvalSuite(app: AppContext, name: string): EvalSuite | null {
   const dirs = [
-    join(ARK_DIR(), "evals"),
+    join(app.config.arkDir, "evals"),
     join(process.cwd(), ".ark", "evals"),
     join(process.cwd(), "evals"),
   ];
@@ -72,8 +72,8 @@ export function scoreOutput(output: string, expected: string[]): { score: number
 }
 
 /** Save eval results to ~/.ark/evals/results/ */
-export function saveEvalResults(suiteName: string, results: EvalResult[]): string {
-  const dir = join(ARK_DIR(), "evals", "results");
+export function saveEvalResults(app: AppContext, suiteName: string, results: EvalResult[]): string {
+  const dir = join(app.config.arkDir, "evals", "results");
   mkdirSync(dir, { recursive: true });
   const filename = `${suiteName}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
   const path = join(dir, filename);
@@ -82,9 +82,9 @@ export function saveEvalResults(suiteName: string, results: EvalResult[]): strin
 }
 
 /** List available eval suites. */
-export function listEvalSuites(): string[] {
+export function listEvalSuites(app: AppContext): string[] {
   const suites: string[] = [];
-  const dirs = [join(ARK_DIR(), "evals"), join(process.cwd(), "evals")];
+  const dirs = [join(app.config.arkDir, "evals"), join(process.cwd(), "evals")];
   for (const dir of dirs) {
     if (!existsSync(dir)) continue;
     try {

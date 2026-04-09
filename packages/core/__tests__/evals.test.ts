@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { scoreOutput, summarizeResults, listEvalSuites } from "../evals.js";
 import type { EvalResult } from "../evals.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -48,7 +49,7 @@ describe("evals", () => {
   });
 
   it("listEvalSuites returns array", () => {
-    const suites = listEvalSuites();
+    const suites = listEvalSuites(getApp(), );
     expect(Array.isArray(suites)).toBe(true);
   });
 });

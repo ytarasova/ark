@@ -6,7 +6,7 @@
 import type { TranscriptUsage } from "./claude.js";
 import { parseTranscriptUsage } from "./claude.js";
 import type { Session } from "../types/index.js";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 import { readdirSync, statSync, existsSync } from "fs";
 import { join } from "path";
@@ -111,10 +111,8 @@ export function checkBudget(sessions: Session[], budgets: BudgetConfig): BudgetS
 }
 
 /** Sync cost data from Claude transcripts into session configs. */
-export function syncCosts(): { synced: number; skipped: number } {
-  let sessions;
-  try { sessions = getApp().sessions.list({ limit: 1000 }); }
-  catch { sessions = []; }
+export function syncCosts(app: AppContext): { synced: number; skipped: number } {
+  const sessions = app.sessions.list({ limit: 1000 });
   let synced = 0;
   let skipped = 0;
 
@@ -140,8 +138,7 @@ export function syncCosts(): { synced: number; skipped: number } {
               const transcriptPath = join(projectDir, file);
               const usage = parseTranscriptUsage(transcriptPath);
               if (usage.total_tokens > 0) {
-                try { getApp().sessions.update(session.id, { config: { ...session.config, usage } }); }
-                catch { /* app not booted */ }
+                app.sessions.update(session.id, { config: { ...session.config, usage } });
                 synced++;
               }
               break;

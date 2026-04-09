@@ -141,14 +141,14 @@ describe("findSessionByPR", () => {
     const session = getApp().sessions.create({ summary: "test session" });
     getApp().sessions.update(session.id, { pr_url: "https://github.com/org/repo/pull/42" });
 
-    const found = findSessionByPR("https://github.com/org/repo/pull/42");
+    const found = findSessionByPR(getApp(), "https://github.com/org/repo/pull/42");
     expect(found).not.toBeNull();
     expect(found!.id).toBe(session.id);
     expect(found!.pr_url).toBe("https://github.com/org/repo/pull/42");
   });
 
   it("returns null for unknown PR", () => {
-    const found = findSessionByPR("https://github.com/org/repo/pull/999");
+    const found = findSessionByPR(getApp(), "https://github.com/org/repo/pull/999");
     expect(found).toBeNull();
   });
 
@@ -162,7 +162,7 @@ describe("findSessionByPR", () => {
     const newer = getApp().sessions.create({ summary: "newer" });
     getApp().sessions.update(newer.id, { pr_url: prUrl });
 
-    const found = findSessionByPR(prUrl);
+    const found = findSessionByPR(getApp(), prUrl);
     expect(found).not.toBeNull();
     expect(found!.id).toBe(newer.id);
     expect(found!.summary).toBe("newer");
@@ -188,7 +188,7 @@ describe("handleGitHubWebhook", () => {
     const session = getApp().sessions.create({ summary: "webhook test" });
     getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
 
-    const result = handleGitHubWebhook("pull_request_review", makePRPayload(prUrl, {
+    const result = handleGitHubWebhook(getApp(), "pull_request_review", makePRPayload(prUrl, {
       review: {
         state: "approved",
         body: "LGTM",
@@ -205,7 +205,7 @@ describe("handleGitHubWebhook", () => {
     const session = getApp().sessions.create({ summary: "steer test" });
     getApp().sessions.update(session.id, { pr_url: prUrl, status: "stopped" });
 
-    const result = handleGitHubWebhook("pull_request_review", makePRPayload(prUrl, {
+    const result = handleGitHubWebhook(getApp(), "pull_request_review", makePRPayload(prUrl, {
       review: {
         state: "changes_requested",
         body: "Fix the error handling",
@@ -223,7 +223,7 @@ describe("handleGitHubWebhook", () => {
     const session = getApp().sessions.create({ summary: "comment test" });
     getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
 
-    const result = handleGitHubWebhook("pull_request_review_comment", makePRPayload(prUrl, {
+    const result = handleGitHubWebhook(getApp(), "pull_request_review_comment", makePRPayload(prUrl, {
       comment: {
         body: "Use a map here instead",
         user: { login: "commenter" },
@@ -239,12 +239,12 @@ describe("handleGitHubWebhook", () => {
   });
 
   it("ignores unknown event types", () => {
-    const result = handleGitHubWebhook("push", { ref: "refs/heads/main" });
+    const result = handleGitHubWebhook(getApp(), "push", { ref: "refs/heads/main" });
     expect(result.action).toBe("ignore");
   });
 
   it("ignores events without PR URL", () => {
-    const result = handleGitHubWebhook("pull_request_review", {
+    const result = handleGitHubWebhook(getApp(), "pull_request_review", {
       review: { state: "approved", body: "ok", user: { login: "x" } },
     });
     expect(result.action).toBe("ignore");
@@ -252,7 +252,7 @@ describe("handleGitHubWebhook", () => {
   });
 
   it("ignores events with no matching session", () => {
-    const result = handleGitHubWebhook("pull_request_review", makePRPayload(
+    const result = handleGitHubWebhook(getApp(), "pull_request_review", makePRPayload(
       "https://github.com/org/repo/pull/9999",
       { review: { state: "approved", body: "ok", user: { login: "x" } } },
     ));

@@ -314,16 +314,16 @@ export class AppContext {
 
     // 12. Update tmux status bar every 5s
     this._tmuxStatusInterval = setInterval(() => {
-      updateTmuxStatusBar();
+      updateTmuxStatusBar(this);
     }, 5_000);
 
     // 13. Start notification daemon (if bridge config exists)
-    this._notifyDaemon = startNotifyDaemon();
+    this._notifyDaemon = startNotifyDaemon(this);
 
     // 14. Clean up logs on boot (non-blocking)
     safeAsync("boot: cleanup logs", async () => {
       const { cleanupLogs } = await import("./log-manager.js");
-      cleanupLogs();
+      cleanupLogs(this);
     });
 
     // 15. Clean up stale hook configs in cwd

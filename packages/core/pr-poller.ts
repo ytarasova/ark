@@ -8,7 +8,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import type { Session } from "../types/index.js";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 import * as flow from "./flow.js";
 import { formatReviewPrompt, type ReviewComment } from "./github-pr.js";
@@ -75,6 +75,7 @@ export async function fetchPRReviews(
  * store messages, log events, and steer running agents.
  */
 export async function processReviewFeedback(
+  app: AppContext,
   session: Session,
   data: GhPRData,
   config: Record<string, any>,
@@ -89,7 +90,7 @@ export async function processReviewFeedback(
   if (newReviews.length === 0) return;
 
   // Update state
-  getApp().sessions.update(session.id, {
+  app.sessions.update(session.id, {
     config: {
       ...config,
       last_review_check: new Date().toISOString(),
@@ -102,7 +103,7 @@ export async function processReviewFeedback(
   // Check for approvals
   const approvals = newReviews.filter(r => r.state === "APPROVED");
   if (approvals.length > 0) {
-    getApp().events.log(session.id, "pr_approved", {
+    app.events.log(session.id, "pr_approved", {
       actor: "github",
       data: {
         pr_url: session.pr_url,
@@ -113,8 +114,7 @@ export async function processReviewFeedback(
     // Advance the review gate
     try {
       const { approveReviewGate } = await import("./services/session-orchestration.js");
-      const { getApp } = await import("./app.js");
-      await approveReviewGate(getApp(), session.id);
+      await approveReviewGate(app, session.id);
     } catch {}
     return;
   }
@@ -128,9 +128,9 @@ export async function processReviewFeedback(
   const prompt = formatReviewPrompt(data.title, data.number, comments, newReviews[0]?.state);
 
   // Store as message for TUI
-  getApp().messages.send(session.id, "system", prompt, "text");
+  app.messages.send(session.id, "system", prompt, "text");
 
-  getApp().events.log(session.id, "pr_review_feedback", {
+  app.events.log(session.id, "pr_review_feedback", {
     actor: "github",
     data: {
       pr_url: session.pr_url,
@@ -142,7 +142,7 @@ export async function processReviewFeedback(
   // Steer via channel if running
   if (session.status !== "running") return;
 
-  const channelPort = getApp().sessions.channelPort(session.id);
+  const channelPort = app.sessions.channelPort(session.id);
   const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
   const delivered = await safeAsync(`pr-poller: deliverToChannel for ${session.id}`, async () => {
     const { deliverToChannel } = await import("./conductor.js");
@@ -164,8 +164,8 @@ export async function processReviewFeedback(
  * Main poller tick. Called every 60s from the conductor.
  * Finds sessions with pr_url in review-gated stages and checks for new reviews.
  */
-export async function pollPRReviews(opts?: PRPollerOptions): Promise<void> {
-  const sessions = getApp().sessions.list({ limit: 100 }) as Session[];
+export async function pollPRReviews(app: AppContext, opts?: PRPollerOptions): Promise<void> {
+  const sessions = app.sessions.list({ limit: 100 }) as Session[];
   const now = Date.now();
 
   for (const s of sessions) {
@@ -182,7 +182,7 @@ export async function pollPRReviews(opts?: PRPollerOptions): Promise<void> {
     if (now - lastCheck < POLL_COOLDOWN_MS) continue;
 
     try {
-      await checkSessionPR(s, opts);
+      await checkSessionPR(app, s, opts);
     } catch {
       // Don't let one session's failure block others
     }
@@ -192,7 +192,7 @@ export async function pollPRReviews(opts?: PRPollerOptions): Promise<void> {
 /**
  * Check a single session's PR for new review activity.
  */
-export async function checkSessionPR(session: Session, opts?: PRPollerOptions): Promise<void> {
+export async function checkSessionPR(app: AppContext, session: Session, opts?: PRPollerOptions): Promise<void> {
   const config = (session.config ?? {}) as Record<string, any>;
   const ghExec = opts?.ghExec ?? _ghExec;
 
@@ -200,18 +200,18 @@ export async function checkSessionPR(session: Session, opts?: PRPollerOptions): 
   if (!data) return;
 
   // Update check timestamp
-  getApp().sessions.update(session.id, {
+  app.sessions.update(session.id, {
     config: { ...config, last_review_check: new Date().toISOString(), pr_state: data.state },
   });
 
   // PR merged or closed - stop polling
   if (data.state === "MERGED" || data.state === "CLOSED") {
-    getApp().events.log(session.id, "pr_status", {
+    app.events.log(session.id, "pr_status", {
       actor: "github",
       data: { state: data.state, pr_url: session.pr_url },
     });
     return;
   }
 
-  await processReviewFeedback(session, data, config);
+  await processReviewFeedback(app, session, data, config);
 }

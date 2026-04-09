@@ -145,13 +145,13 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   // Index transcript
   if (result.shouldIndex && result.indexTranscript) {
     await safeAsync("transcript indexing", async () => {
-      indexSession(result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId);
+      indexSession(_app, result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId);
     });
   }
 
   // Track progress in conductor ledger
   if (result.newStatus) {
-    try { addEntry("default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId); } catch { /* skip ledger on error */ }
+    try { addEntry(_app, "default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId); } catch { /* skip ledger on error */ }
   }
 
   return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
@@ -250,7 +250,7 @@ async function handlePRMergeWebhook(req: Request): Promise<Response> {
     });
   };
 
-  watchMergedPR({
+  watchMergedPR(_app, {
     sessionId: matchedSession.id, sha: pr.merge_commit_sha, owner: repo.owner.login,
     repo: repo.name, prNumber: pr.number, prTitle: pr.title,
     branch: pr.head.ref, baseBranch: pr.base.ref,
@@ -310,7 +310,7 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
 
   // Schedule poller — check every 60 seconds
   const scheduleTimer = setInterval(() => safeAsync("schedule polling", async () => {
-    const schedules = listSchedules().filter(s => s.enabled);
+    const schedules = listSchedules(app).filter(s => s.enabled);
     const now = new Date();
     for (const sched of schedules) {
       if (!cronMatches(sched.cron, now)) continue;
@@ -331,7 +331,7 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
           group_name: sched.group_name ?? undefined,
         });
         await session.dispatch(_app, s.id);
-        updateScheduleLastRun(sched.id);
+        updateScheduleLastRun(app, sched.id);
         _app.events.log(s.id, "scheduled_dispatch", {
           actor: "scheduler",
           data: { schedule_id: sched.id, cron: sched.cron },
@@ -342,7 +342,7 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
 
   // PR review poller - check every 60 seconds
   const prTimer = setInterval(() =>
-    safeAsync("PR review polling", () => pollPRReviews()),
+    safeAsync("PR review polling", () => pollPRReviews(app)),
   POLL_INTERVAL_MS);
 
   // Issue poller - only start if a label is configured
@@ -350,9 +350,9 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
   if (opts?.issueLabel) {
     const issueOpts = { label: opts.issueLabel, autoDispatch: opts.issueAutoDispatch };
     // Run immediately on start
-    safeAsync("issue polling: initial", () => pollIssues(issueOpts));
+    safeAsync("issue polling: initial", () => pollIssues(app,issueOpts));
     issueTimer = setInterval(() =>
-      safeAsync("issue polling", () => pollIssues(issueOpts)),
+      safeAsync("issue polling", () => pollIssues(app,issueOpts)),
     POLL_INTERVAL_MS);
   }
 

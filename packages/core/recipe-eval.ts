@@ -4,7 +4,7 @@
 
 import { loadRecipe, instantiateRecipe } from "./recipe.js";
 import { startSession } from "./services/session-orchestration.js";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 import type { Session } from "../types/index.js";
 import { getSessionCost } from "./costs.js";
 
@@ -26,8 +26,8 @@ export interface RecipeEvalResult {
   };
 }
 
-/** Run a recipe evaluation (creates sessions but does NOT dispatch — that requires real agents). */
-export function evaluateRecipeSetup(recipeName: string, iterations: number, variables?: Record<string, string>): RecipeEvalResult {
+/** Run a recipe evaluation (creates sessions but does NOT dispatch -- that requires real agents). */
+export function evaluateRecipeSetup(app: AppContext, recipeName: string, iterations: number, variables?: Record<string, string>): RecipeEvalResult {
   const recipe = loadRecipe(recipeName);
   if (!recipe) {
     return {
@@ -44,7 +44,7 @@ export function evaluateRecipeSetup(recipeName: string, iterations: number, vari
     const start = Date.now();
     try {
       const instance = instantiateRecipe(recipe, variables ?? {});
-      const session = startSession(getApp(), {
+      const session = startSession(app, {
         summary: `[eval] ${recipeName} #${i + 1}`,
         repo: instance.repo ?? ".",
         flow: instance.flow ?? recipe.flow ?? "quick",

@@ -5,10 +5,11 @@
 
 import { readFileSync, existsSync, readdirSync, statSync } from "fs";
 import { join, extname } from "path";
+import type { AppContext } from "./app.js";
 import { remember, recall, type MemoryEntry } from "./memory.js";
 
 /** Ingest a file into the memory system. */
-export function ingestFile(filePath: string, opts?: { scope?: string; tags?: string[] }): number {
+export function ingestFile(app: AppContext, filePath: string, opts?: { scope?: string; tags?: string[] }): number {
   if (!existsSync(filePath)) return 0;
 
   const ext = extname(filePath).toLowerCase();
@@ -20,7 +21,7 @@ export function ingestFile(filePath: string, opts?: { scope?: string; tags?: str
 
   for (const chunk of chunks) {
     if (chunk.trim().length < 20) continue;  // skip tiny chunks
-    remember(chunk.trim(), {
+    remember(app, chunk.trim(), {
       scope: opts?.scope ?? "knowledge",
       tags: [...(opts?.tags ?? []), `file:${filePath}`],
       importance: 0.7,
@@ -31,7 +32,7 @@ export function ingestFile(filePath: string, opts?: { scope?: string; tags?: str
 }
 
 /** Ingest all supported files in a directory. */
-export function ingestDirectory(dirPath: string, opts?: { scope?: string; tags?: string[]; recursive?: boolean }): { files: number; chunks: number } {
+export function ingestDirectory(app: AppContext, dirPath: string, opts?: { scope?: string; tags?: string[]; recursive?: boolean }): { files: number; chunks: number } {
   if (!existsSync(dirPath)) return { files: 0, chunks: 0 };
 
   let fileCount = 0;
@@ -43,12 +44,12 @@ export function ingestDirectory(dirPath: string, opts?: { scope?: string; tags?:
     const stat = statSync(fullPath);
 
     if (stat.isFile()) {
-      const n = ingestFile(fullPath, opts);
+      const n = ingestFile(app, fullPath, opts);
       if (n > 0) { fileCount++; chunkCount += n; }
     } else if (stat.isDirectory() && opts?.recursive !== false) {
       // Skip hidden dirs and common non-content dirs
       if (entry.startsWith(".") || ["node_modules", "dist", "build", "__pycache__"].includes(entry)) continue;
-      const sub = ingestDirectory(fullPath, opts);
+      const sub = ingestDirectory(app, fullPath, opts);
       fileCount += sub.files;
       chunkCount += sub.chunks;
     }
@@ -58,8 +59,8 @@ export function ingestDirectory(dirPath: string, opts?: { scope?: string; tags?:
 }
 
 /** Query knowledge base. */
-export function queryKnowledge(query: string, opts?: { scope?: string; limit?: number }): MemoryEntry[] {
-  return recall(query, { scope: opts?.scope ?? "knowledge", limit: opts?.limit ?? 5 });
+export function queryKnowledge(app: AppContext, query: string, opts?: { scope?: string; limit?: number }): MemoryEntry[] {
+  return recall(app, query, { scope: opts?.scope ?? "knowledge", limit: opts?.limit ?? 5 });
 }
 
 /** Split text into chunks of approximately N words. */

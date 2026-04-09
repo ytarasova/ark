@@ -7,13 +7,14 @@ import {
   createSchedule, listSchedules, getSchedule, deleteSchedule,
   enableSchedule, updateScheduleLastRun, cronMatches,
 } from "../index.js";
+import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
 
 describe("schedule CRUD", () => {
   it("createSchedule returns schedule with ID", () => {
-    const sched = createSchedule({ cron: "0 2 * * *" });
+    const sched = createSchedule(getApp(), { cron: "0 2 * * *" });
     expect(sched.id).toMatch(/^sched-/);
     expect(sched.cron).toBe("0 2 * * *");
     expect(sched.flow).toBe("bare");
@@ -22,9 +23,9 @@ describe("schedule CRUD", () => {
   });
 
   it("listSchedules returns created schedules", () => {
-    createSchedule({ cron: "0 2 * * *", summary: "nightly" });
-    createSchedule({ cron: "0 9 * * 1", summary: "weekly" });
-    const list = listSchedules();
+    createSchedule(getApp(), { cron: "0 2 * * *", summary: "nightly" });
+    createSchedule(getApp(), { cron: "0 9 * * 1", summary: "weekly" });
+    const list = listSchedules(getApp());
     expect(list.length).toBe(2);
     const summaries = list.map((s) => s.summary);
     expect(summaries).toContain("nightly");
@@ -32,51 +33,51 @@ describe("schedule CRUD", () => {
   });
 
   it("getSchedule by ID", () => {
-    const sched = createSchedule({ cron: "*/5 * * * *", repo: "my/repo" });
-    const found = getSchedule(sched.id);
+    const sched = createSchedule(getApp(), { cron: "*/5 * * * *", repo: "my/repo" });
+    const found = getSchedule(getApp(),sched.id);
     expect(found).not.toBeNull();
     expect(found!.id).toBe(sched.id);
     expect(found!.repo).toBe("my/repo");
   });
 
   it("getSchedule returns null for missing ID", () => {
-    const found = getSchedule("sched-nonexistent");
+    const found = getSchedule(getApp(),"sched-nonexistent");
     expect(found).toBeNull();
   });
 
   it("deleteSchedule removes it", () => {
-    const sched = createSchedule({ cron: "0 0 * * *" });
-    expect(deleteSchedule(sched.id)).toBe(true);
-    expect(getSchedule(sched.id)).toBeNull();
+    const sched = createSchedule(getApp(), { cron: "0 0 * * *" });
+    expect(deleteSchedule(getApp(),sched.id)).toBe(true);
+    expect(getSchedule(getApp(),sched.id)).toBeNull();
   });
 
   it("deleteSchedule returns false for missing ID", () => {
-    expect(deleteSchedule("sched-nonexistent")).toBe(false);
+    expect(deleteSchedule(getApp(),"sched-nonexistent")).toBe(false);
   });
 
   it("enableSchedule toggles enabled flag", () => {
-    const sched = createSchedule({ cron: "0 0 * * *" });
+    const sched = createSchedule(getApp(), { cron: "0 0 * * *" });
     expect(sched.enabled).toBe(true);
 
-    enableSchedule(sched.id, false);
-    expect(getSchedule(sched.id)!.enabled).toBe(false);
+    enableSchedule(getApp(),sched.id, false);
+    expect(getSchedule(getApp(),sched.id)!.enabled).toBe(false);
 
-    enableSchedule(sched.id, true);
-    expect(getSchedule(sched.id)!.enabled).toBe(true);
+    enableSchedule(getApp(),sched.id, true);
+    expect(getSchedule(getApp(),sched.id)!.enabled).toBe(true);
   });
 
   it("updateScheduleLastRun updates timestamp", () => {
-    const sched = createSchedule({ cron: "0 0 * * *" });
+    const sched = createSchedule(getApp(), { cron: "0 0 * * *" });
     expect(sched.last_run).toBeNull();
 
-    updateScheduleLastRun(sched.id);
-    const updated = getSchedule(sched.id)!;
+    updateScheduleLastRun(getApp(),sched.id);
+    const updated = getSchedule(getApp(),sched.id)!;
     expect(updated.last_run).toBeTruthy();
     expect(updated.last_run).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it("createSchedule stores all optional fields", () => {
-    const sched = createSchedule({
+    const sched = createSchedule(getApp(), {
       cron: "0 9 * * 1-5",
       flow: "deploy",
       repo: "org/repo",

@@ -225,7 +225,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
 
   // Inject relevant memories into agent context
   try {
-    const memories = recall(session.summary ?? "", { scope: session.repo ?? undefined, limit: 5 });
+    const memories = recall(app, session.summary ?? "", { scope: session.repo ?? undefined, limit: 5 });
     const memoryContext = formatMemoriesForPrompt(memories);
     if (memoryContext) {
       task = task + memoryContext;
@@ -282,10 +282,10 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   });
 
   // Persist flow state: mark current stage
-  try { setCurrentStage(sessionId, session.stage!, session.flow); } catch { /* skip flow-state on error */ }
+  try { setCurrentStage(app, sessionId, session.stage!, session.flow); } catch { /* skip flow-state on error */ }
 
   // Checkpoint after successful dispatch
-  saveCheckpoint(sessionId);
+  saveCheckpoint(app, sessionId);
 
   // Start status poller for non-Claude runtimes (Claude uses hook-based status)
   if (runtime !== "claude-code") {
@@ -315,7 +315,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   }
 
   // Checkpoint before advancing to next stage
-  saveCheckpoint(sessionId);
+  saveCheckpoint(app, sessionId);
 
   // Observability: track stage advancement
   recordEvent({ type: "agent_turn", sessionId, data: { stage } });
@@ -329,15 +329,15 @@ export async function advance(app: AppContext, sessionId: string, force = false)
       if (successors.length > 0) {
         const graphNextStage = successors[0];
         // Persist flow state before advancing
-        try { markStageCompleted(sessionId, stage); } catch { /* skip */ }
-        try { setCurrentStage(sessionId, graphNextStage, flowName); } catch { /* skip */ }
+        try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
+        try { setCurrentStage(app, sessionId, graphNextStage, flowName); } catch { /* skip */ }
         app.sessions.update(sessionId, { stage: graphNextStage, status: "ready" });
         app.events.log(sessionId, "stage_advanced", { actor: "system", stage: graphNextStage, data: { via: "graph-flow", successors } });
         emitStageSpanEnd(sessionId, { status: "completed" });
         const graphAction = flow.getStageAction(flowName, graphNextStage);
         const graphStageDef = flow.getStage(flowName, graphNextStage);
         emitStageSpanStart(sessionId, { stage: graphNextStage, agent: graphAction?.agent, gate: graphStageDef?.gate });
-        saveCheckpoint(sessionId);
+        saveCheckpoint(app, sessionId);
         return { ok: true, message: `Advanced to ${graphNextStage} (graph-flow)` };
       }
     }
@@ -346,7 +346,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   const nextStage = flow.getNextStage(flowName, stage);
   if (!nextStage) {
     // Flow complete -- persist final stage completion
-    try { markStageCompleted(sessionId, stage); } catch { /* skip */ }
+    try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
     app.sessions.update(sessionId, { status: "completed" });
     app.events.log(sessionId, "session_completed", {
       stage, actor: "system",
@@ -369,7 +369,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
     try {
       const { extractAndSaveSkills } = await import("../skill-extractor.js");
       const { getSessionConversation } = await import("../search.js");
-      const conv = getSessionConversation(sessionId);
+      const conv = getSessionConversation(app, sessionId);
       if (conv.length > 0) {
         const turns = conv.map((c) => ({ role: c.role === "message" ? "user" : "assistant", content: c.content }));
         extractAndSaveSkills(sessionId, turns);
@@ -380,8 +380,8 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   }
 
   // Persist flow state: mark completed + set next
-  try { markStageCompleted(sessionId, stage); } catch { /* skip */ }
-  try { setCurrentStage(sessionId, nextStage, flowName); } catch { /* skip */ }
+  try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
+  try { setCurrentStage(app, sessionId, nextStage, flowName); } catch { /* skip */ }
 
   const nextAction = flow.getStageAction(flowName, nextStage);
   app.sessions.update(sessionId, { stage: nextStage, status: "ready", error: null });
@@ -399,7 +399,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   emitStageSpanStart(sessionId, { stage: nextStage, agent: nextAction?.agent, gate: nextStageDef?.gate });
 
   // Checkpoint after advancing to new stage
-  saveCheckpoint(sessionId);
+  saveCheckpoint(app, sessionId);
 
   return { ok: true, message: `Advanced to ${nextStage}` };
 }
@@ -431,7 +431,7 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
   } catch { /* ignore */ }
 
   // Checkpoint before state transition
-  saveCheckpoint(sessionId);
+  saveCheckpoint(app, sessionId);
 
   // Clean up hook config from working directory
   if (session.workdir) {

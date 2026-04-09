@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 export interface Schedule {
   id: string;
@@ -33,7 +33,7 @@ interface ScheduleRow {
 function now() { return new Date().toISOString(); }
 function genId() { return `sched-${randomBytes(3).toString("hex")}`; }
 
-export function createSchedule(opts: {
+export function createSchedule(app: AppContext, opts: {
   cron: string;
   flow?: string;
   repo?: string;
@@ -42,7 +42,7 @@ export function createSchedule(opts: {
   compute_name?: string;
   group_name?: string;
 }): Schedule {
-  const db = getApp().db;
+  const db = app.db;
   const id = genId();
   const ts = now();
   db.prepare(
@@ -50,33 +50,33 @@ export function createSchedule(opts: {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(id, opts.cron, opts.flow ?? "bare", opts.repo ?? null, opts.workdir ?? null,
     opts.summary ?? null, opts.compute_name ?? null, opts.group_name ?? null, ts);
-  return getSchedule(id)!;
+  return getSchedule(app, id)!;
 }
 
-export function listSchedules(): Schedule[] {
-  const db = getApp().db;
+export function listSchedules(app: AppContext): Schedule[] {
+  const db = app.db;
   return (db.prepare("SELECT * FROM schedules ORDER BY created_at DESC").all() as ScheduleRow[]).map(mapRow);
 }
 
-export function getSchedule(id: string): Schedule | null {
-  const db = getApp().db;
+export function getSchedule(app: AppContext, id: string): Schedule | null {
+  const db = app.db;
   const row = db.prepare("SELECT * FROM schedules WHERE id = ?").get(id) as ScheduleRow | undefined;
   return row ? mapRow(row) : null;
 }
 
-export function deleteSchedule(id: string): boolean {
-  const db = getApp().db;
+export function deleteSchedule(app: AppContext, id: string): boolean {
+  const db = app.db;
   const result = db.prepare("DELETE FROM schedules WHERE id = ?").run(id);
   return result.changes > 0;
 }
 
-export function updateScheduleLastRun(id: string): void {
-  const db = getApp().db;
+export function updateScheduleLastRun(app: AppContext, id: string): void {
+  const db = app.db;
   db.prepare("UPDATE schedules SET last_run = ? WHERE id = ?").run(now(), id);
 }
 
-export function enableSchedule(id: string, enabled: boolean): void {
-  const db = getApp().db;
+export function enableSchedule(app: AppContext, id: string, enabled: boolean): void {
+  const db = app.db;
   db.prepare("UPDATE schedules SET enabled = ? WHERE id = ?").run(enabled ? 1 : 0, id);
 }
 

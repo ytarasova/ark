@@ -5,7 +5,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
-import { ARK_DIR } from "./paths.js";
+import type { AppContext } from "./app.js";
 
 export interface FlowState {
   sessionId: string;
@@ -17,25 +17,25 @@ export interface FlowState {
   updatedAt: string;
 }
 
-function stateDir(): string {
-  return join(ARK_DIR(), "flow-state");
+function stateDir(app: AppContext): string {
+  return join(app.config.arkDir, "flow-state");
 }
 
-function statePath(sessionId: string): string {
-  return join(stateDir(), `${sessionId}.json`);
+function statePath(app: AppContext, sessionId: string): string {
+  return join(stateDir(app), `${sessionId}.json`);
 }
 
 /** Save flow execution state. */
-export function saveFlowState(state: FlowState): void {
-  const dir = stateDir();
+export function saveFlowState(app: AppContext, state: FlowState): void {
+  const dir = stateDir(app);
   mkdirSync(dir, { recursive: true });
   state.updatedAt = new Date().toISOString();
-  writeFileSync(statePath(state.sessionId), JSON.stringify(state, null, 2));
+  writeFileSync(statePath(app, state.sessionId), JSON.stringify(state, null, 2));
 }
 
 /** Load flow execution state. Returns null if not found. */
-export function loadFlowState(sessionId: string): FlowState | null {
-  const path = statePath(sessionId);
+export function loadFlowState(app: AppContext, sessionId: string): FlowState | null {
+  const path = statePath(app, sessionId);
   if (!existsSync(path)) return null;
   try {
     return JSON.parse(readFileSync(path, "utf-8")) as FlowState;
@@ -43,8 +43,8 @@ export function loadFlowState(sessionId: string): FlowState | null {
 }
 
 /** Mark a stage as completed in the flow state. */
-export function markStageCompleted(sessionId: string, stageName: string, data?: Record<string, unknown>): void {
-  let state = loadFlowState(sessionId);
+export function markStageCompleted(app: AppContext, sessionId: string, stageName: string, data?: Record<string, unknown>): void {
+  let state = loadFlowState(app, sessionId);
   if (!state) {
     state = {
       sessionId,
@@ -66,12 +66,12 @@ export function markStageCompleted(sessionId: string, stageName: string, data?: 
     data,
   };
   state.currentStage = null;
-  saveFlowState(state);
+  saveFlowState(app, state);
 }
 
 /** Set the current executing stage. */
-export function setCurrentStage(sessionId: string, stageName: string, flowName?: string): void {
-  let state = loadFlowState(sessionId);
+export function setCurrentStage(app: AppContext, sessionId: string, stageName: string, flowName?: string): void {
+  let state = loadFlowState(app, sessionId);
   if (!state) {
     state = {
       sessionId,
@@ -85,18 +85,18 @@ export function setCurrentStage(sessionId: string, stageName: string, flowName?:
   }
   state.currentStage = stageName;
   if (flowName) state.flowName = flowName;
-  saveFlowState(state);
+  saveFlowState(app, state);
 }
 
 /** Check if a stage was already completed (for skip-on-resume). */
-export function isStageCompleted(sessionId: string, stageName: string): boolean {
-  const state = loadFlowState(sessionId);
+export function isStageCompleted(app: AppContext, sessionId: string, stageName: string): boolean {
+  const state = loadFlowState(app, sessionId);
   return state?.completedStages.includes(stageName) ?? false;
 }
 
 /** Delete flow state (on session deletion). */
-export function deleteFlowState(sessionId: string): void {
-  const path = statePath(sessionId);
+export function deleteFlowState(app: AppContext, sessionId: string): void {
+  const path = statePath(app, sessionId);
   if (existsSync(path)) {
     try { unlinkSync(path); } catch { /* ignore */ }
   }

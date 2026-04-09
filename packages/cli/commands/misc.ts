@@ -36,7 +36,8 @@ export function registerMiscCommands(program: Command, app: AppContext) {
     .argument("<pr-url>", "GitHub PR URL")
     .action(async (prUrl) => {
       const { findSessionByPR } = await import("../../core/github-pr.js");
-      const session = findSessionByPR(prUrl);
+      const { getApp } = await import("../../core/app.js");
+      const session = findSessionByPR(getApp(), prUrl);
       if (!session) {
         console.log(chalk.yellow(`No session for ${prUrl}`));
         return;
@@ -63,7 +64,8 @@ export function registerMiscCommands(program: Command, app: AppContext) {
       console.log(chalk.blue(`Watching issues labeled '${label}' (poll every ${intervalMs / 1000}s)${opts.dispatch ? " -- auto-dispatch on" : ""}`));
       console.log(chalk.dim("Press Ctrl+C to stop.\n"));
 
-      const poller = startIssuePoller({
+      const { getApp } = await import("../../core/app.js");
+      const poller = startIssuePoller(getApp(), {
         label,
         intervalMs,
         autoDispatch: opts.dispatch,
@@ -261,7 +263,7 @@ export function registerMiscCommands(program: Command, app: AppContext) {
   program.command("costs-sync")
     .description("Backfill cost data from Claude transcripts")
     .action(() => {
-      const result = core.syncCosts();
+      const result = core.syncCosts(core.getApp());
       console.log(chalk.green(`Synced: ${result.synced} sessions, Skipped: ${result.skipped}`));
     });
 
@@ -407,7 +409,7 @@ export function registerMiscCommands(program: Command, app: AppContext) {
     .option("--token <token>", "Bearer token for auth")
     .option("--api-only", "API only, skip static file serving (for dev with Vite)")
     .action(async (opts) => {
-      const server = core.startWebServer({
+      const server = core.startWebServer(core.getApp(), {
         port: Number(opts.port),
         readOnly: opts.readOnly,
         token: opts.token,
@@ -441,7 +443,7 @@ export function registerMiscCommands(program: Command, app: AppContext) {
   program.command("acp")
     .description("Start headless ACP server on stdin/stdout (JSON-RPC)")
     .action(() => {
-      core.runAcpServer();
+      core.runAcpServer(core.getApp());
     });
 
   // ── Repo map ──────────────────────────────────────────────────────────────
@@ -475,7 +477,7 @@ export function registerMiscCommands(program: Command, app: AppContext) {
     .argument("<recipe>", "Recipe name")
     .option("-n, --iterations <n>", "Number of iterations", "3")
     .action((recipe, opts) => {
-      const result = core.evaluateRecipeSetup(recipe, Number(opts.iterations));
+      const result = core.evaluateRecipeSetup(core.getApp(), recipe, Number(opts.iterations));
       if (result.iterations === 0) {
         console.log(chalk.red(`Recipe '${recipe}' not found.`));
         return;

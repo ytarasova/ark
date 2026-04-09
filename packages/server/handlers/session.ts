@@ -161,19 +161,19 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/search", async (params, _notify) => {
     const { query } = extract<SessionSearchParams>(params, ["query"]);
-    const results = searchSessions(query);
+    const results = searchSessions(app, query);
     return { results };
   });
 
   router.handle("session/conversation", async (params, _notify) => {
     const { sessionId, limit } = extract<{ sessionId: string; limit?: number }>(params, ["sessionId"]);
-    const turns = getSessionConversation(sessionId, { limit });
+    const turns = getSessionConversation(app, sessionId, { limit });
     return { turns };
   });
 
   router.handle("session/search-conversation", async (params, _notify) => {
     const { sessionId, query } = extract<{ sessionId: string; query: string }>(params, ["sessionId", "query"]);
-    const results = searchSessionConversation(sessionId, query);
+    const results = searchSessionConversation(app, sessionId, query);
     return { results };
   });
 
@@ -317,10 +317,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { sessionId, filePath } = extract<{ sessionId: string; filePath?: string }>(params, ["sessionId"]);
     const { exportSession, exportSessionToFile } = await import("../../core/session-share.js");
     if (filePath) {
-      const ok = exportSessionToFile(sessionId, filePath);
+      const ok = exportSessionToFile(app, sessionId, filePath);
       return { ok, filePath };
     }
-    const data = exportSession(sessionId);
+    const data = exportSession(app, sessionId);
     if (!data) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     return { ok: true, data };
   });

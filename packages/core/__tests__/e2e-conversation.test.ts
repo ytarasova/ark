@@ -2,7 +2,7 @@
  * End-to-end tests for the unified conversation view.
  *
  * Tests the full flow: hook event -> transcript indexing -> conversation query/search.
- * Validates that the conductor's /hooks/status endpoint triggers indexSession(),
+ * Validates that the conductor's /hooks/status endpoint triggers indexSession(getApp(), ),
  * and that getSessionConversation / searchSessionConversation / searchTranscripts
  * return correct, scoped, deduplicated results.
  */
@@ -109,7 +109,7 @@ describe("E2E: Hook -> Index -> Query flow", () => {
     });
     expect(resp.status).toBe(200);
 
-    const turns = getSessionConversation(session.id);
+    const turns = getSessionConversation(getApp(), session.id);
     expect(turns.length).toBe(4);
     expect(turns[0].role).toBe("user");
     expect(turns[0].content).toContain("auth bug");
@@ -136,7 +136,7 @@ describe("E2E: Incremental indexing", () => {
       transcript_path: transcriptPath,
     });
 
-    let turns = getSessionConversation(session.id);
+    let turns = getSessionConversation(getApp(), session.id);
     expect(turns.length).toBe(2);
 
     // Append more conversation to the transcript
@@ -152,7 +152,7 @@ describe("E2E: Incremental indexing", () => {
       transcript_path: transcriptPath,
     });
 
-    turns = getSessionConversation(session.id);
+    turns = getSessionConversation(getApp(), session.id);
     expect(turns.length).toBe(4); // not 6 (no duplicates)
     expect(turns[0].content).toContain("caching layer");
     expect(turns[2].content).toContain("cache invalidation");
@@ -181,18 +181,18 @@ describe("E2E: Per-session search", () => {
     await postHookStatus(sessionB.id, { hook_event_name: "Stop", transcript_path: pathB });
 
     // Search A for "authentication" — should find results
-    const resultsA = searchSessionConversation(sessionA.id, "authentication");
+    const resultsA = searchSessionConversation(getApp(), sessionA.id, "authentication");
     expect(resultsA.length).toBeGreaterThan(0);
     for (const r of resultsA) {
       expect(r.sessionId).toBe(sessionA.id);
     }
 
     // Search B for "authentication" — should find nothing (it's about database)
-    const resultsB = searchSessionConversation(sessionB.id, "authentication");
+    const resultsB = searchSessionConversation(getApp(), sessionB.id, "authentication");
     expect(resultsB.length).toBe(0);
 
     // Search B for "database" — should find results
-    const resultsBdb = searchSessionConversation(sessionB.id, "database");
+    const resultsBdb = searchSessionConversation(getApp(), sessionB.id, "database");
     expect(resultsBdb.length).toBeGreaterThan(0);
     for (const r of resultsBdb) {
       expect(r.sessionId).toBe(sessionB.id);
@@ -219,7 +219,7 @@ describe("E2E: Cross-session search", () => {
     await postHookStatus(sessionD.id, { hook_event_name: "Stop", transcript_path: pathD });
 
     // Cross-session search for "deployment"
-    const results = searchTranscripts("deployment");
+    const results = searchTranscripts(getApp(), "deployment");
     expect(results.length).toBe(2);
     const sessionIds = results.map(r => r.sessionId);
     expect(sessionIds).toContain(sessionC.id);
@@ -289,7 +289,7 @@ describe("E2E: Noise filtering", () => {
       transcript_path: transcriptPath,
     });
 
-    const turns = getSessionConversation(session.id);
+    const turns = getSessionConversation(getApp(), session.id);
     // Should only have the 4 real messages, not the tool_use/tool_result noise
     expect(turns.length).toBe(4);
     for (const turn of turns) {

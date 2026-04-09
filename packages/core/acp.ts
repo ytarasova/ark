@@ -4,7 +4,7 @@
  */
 
 import { startSession, dispatch, stop, resume, deleteSessionAsync, getOutput, send } from "./services/session-orchestration.js";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 export interface AcpRequest {
   jsonrpc: "2.0";
@@ -21,13 +21,13 @@ export interface AcpResponse {
 }
 
 /** Handle a single ACP request. */
-export async function handleAcpRequest(req: AcpRequest): Promise<AcpResponse> {
+export async function handleAcpRequest(app: AppContext, req: AcpRequest): Promise<AcpResponse> {
   const id = req.id;
   try {
     switch (req.method) {
       case "session/create": {
         const p = req.params ?? {};
-        const session = startSession(getApp(), {
+        const session = startSession(app, {
           summary: p.summary as string,
           repo: p.repo as string,
           flow: p.flow as string,
@@ -38,49 +38,49 @@ export async function handleAcpRequest(req: AcpRequest): Promise<AcpResponse> {
 
       case "session/dispatch": {
         const sessionId = req.params?.sessionId as string;
-        await dispatch(getApp(), sessionId);
+        await dispatch(app, sessionId);
         return { jsonrpc: "2.0", result: { ok: true }, id };
       }
 
       case "session/stop": {
         const sessionId = req.params?.sessionId as string;
-        await stop(getApp(), sessionId);
+        await stop(app, sessionId);
         return { jsonrpc: "2.0", result: { ok: true }, id };
       }
 
       case "session/restart": {
         const sessionId = req.params?.sessionId as string;
-        await resume(getApp(), sessionId);
+        await resume(app, sessionId);
         return { jsonrpc: "2.0", result: { ok: true }, id };
       }
 
       case "session/delete": {
         const sessionId = req.params?.sessionId as string;
-        const result = await deleteSessionAsync(getApp(), sessionId);
+        const result = await deleteSessionAsync(app, sessionId);
         return { jsonrpc: "2.0", result, id };
       }
 
       case "session/get": {
         const sessionId = req.params?.sessionId as string;
-        const session = getApp().sessions.get(sessionId);
+        const session = app.sessions.get(sessionId);
         return { jsonrpc: "2.0", result: session, id };
       }
 
       case "session/list": {
-        const sessions = getApp().sessions.list({ limit: req.params?.limit as number ?? 100 });
+        const sessions = app.sessions.list({ limit: req.params?.limit as number ?? 100 });
         return { jsonrpc: "2.0", result: sessions, id };
       }
 
       case "session/output": {
         const sessionId = req.params?.sessionId as string;
-        const output = await getOutput(getApp(), sessionId, { lines: req.params?.lines as number });
+        const output = await getOutput(app, sessionId, { lines: req.params?.lines as number });
         return { jsonrpc: "2.0", result: { output }, id };
       }
 
       case "session/send": {
         const sessionId = req.params?.sessionId as string;
         const message = req.params?.message as string;
-        const result = await send(getApp(), sessionId, message);
+        const result = await send(app, sessionId, message);
         return { jsonrpc: "2.0", result, id };
       }
 
@@ -93,14 +93,14 @@ export async function handleAcpRequest(req: AcpRequest): Promise<AcpResponse> {
 }
 
 /** Run ACP server on stdin/stdout (for headless CLI mode). */
-export function runAcpServer(): void {
+export function runAcpServer(app: AppContext): void {
   const readline = require("readline");
   const rl = readline.createInterface({ input: process.stdin });
 
   rl.on("line", async (line: string) => {
     try {
       const req = JSON.parse(line) as AcpRequest;
-      const resp = await handleAcpRequest(req);
+      const resp = await handleAcpRequest(app, req);
       process.stdout.write(JSON.stringify(resp) + "\n");
     } catch (e: any) {
       const resp: AcpResponse = {

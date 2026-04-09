@@ -8,7 +8,6 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "fs";
 import { join, basename } from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { ARK_DIR } from "./paths.js";
 import { getApp } from "./app.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -55,7 +54,7 @@ export function listSkills(projectRoot?: string): SkillDefinition[] {
   try { return getApp().skills.list(projectRoot); } catch {
     // Fallback for cases where AppContext is not booted
     const builtin = loadFromDir(BUILTIN_DIR, "builtin");
-    const global = loadFromDir(join(ARK_DIR(), "skills"), "global");
+    const global = loadFromDir(join(getApp().config.arkDir, "skills"), "global");
     const project = projectRoot ? loadFromDir(join(projectRoot, ".ark", "skills"), "project") : [];
 
     const byName = new Map<string, SkillDefinition>();
@@ -81,7 +80,7 @@ export function saveSkill(skill: SkillDefinition, scope: "project" | "global" = 
   } catch { /* fallback */ }
   const dir = scope === "project" && projectRoot
     ? join(projectRoot, ".ark", "skills")
-    : join(ARK_DIR(), "skills");
+    : join(getApp().config.arkDir, "skills");
   mkdirSync(dir, { recursive: true });
   const { _source, ...data } = skill;
   writeFileSync(join(dir, `${skill.name}.yaml`), stringifyYaml(data));
@@ -95,7 +94,7 @@ export function deleteSkill(name: string, scope: "project" | "global" = "global"
   } catch { /* fallback */ }
   const dir = scope === "project" && projectRoot
     ? join(projectRoot, ".ark", "skills")
-    : join(ARK_DIR(), "skills");
+    : join(getApp().config.arkDir, "skills");
   for (const ext of [".yaml", ".yml"]) {
     const path = join(dir, `${name}${ext}`);
     if (existsSync(path)) { unlinkSync(path); return; }
