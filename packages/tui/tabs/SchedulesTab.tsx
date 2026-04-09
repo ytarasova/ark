@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { Schedule } from "../../types/index.js";
 import { useArkClient } from "../hooks/useArkClient.js";
 import { useAsync } from "../hooks/useAsync.js";
@@ -23,6 +24,7 @@ interface SchedulesTabProps {
 }
 
 export function SchedulesTab({ pane }: SchedulesTabProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const asyncState = useAsync();
   const confirmation = useConfirmation();
@@ -150,7 +152,7 @@ export function SchedulesTab({ pane }: SchedulesTabProps) {
       />
       {(status.message || confirmation.status.message) && (
         <Box>
-          <Text color={confirmation.pending === "delete" ? "red" : "cyan"}>
+          <Text color={confirmation.pending === "delete" ? "red" : theme.accent}>
             {` ${confirmation.status.message ?? status.message}`}
           </Text>
         </Box>
@@ -248,6 +250,7 @@ interface NewScheduleFormProps {
 }
 
 function NewScheduleForm({ ark, asyncState, onDone }: NewScheduleFormProps) {
+  const theme = getTheme();
   const [cron, setCron] = useState("*/30 * * * *");
   const [summary, setSummary] = useState("");
   const [flow, setFlow] = useState("bare");
@@ -312,7 +315,7 @@ function NewScheduleForm({ ark, asyncState, onDone }: NewScheduleFormProps) {
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Text bold color="cyan">{" New Schedule "}</Text>
+      <Text bold color={theme.accent}>{" New Schedule "}</Text>
       <Text> </Text>
 
       <FormTextField

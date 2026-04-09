@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { Session } from "../../core/index.js";
 import { roleColor } from "../helpers/colors.js";
 import { ScrollBox } from "../components/ScrollBox.js";
@@ -14,6 +15,7 @@ export interface TalkToSessionProps {
 }
 
 export function TalkToSession({ session, asyncState, onDone }: TalkToSessionProps) {
+  const theme = getTheme();
   const [msg, setMsg] = useState("");
   const [scrollMode, setScrollMode] = useState(false);
 
@@ -62,7 +64,7 @@ export function TalkToSession({ session, asyncState, onDone }: TalkToSessionProp
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Text bold color="cyan">{` Chat: ${session.summary ?? session.id} `}</Text>
+      <Text bold color={theme.accent}>{` Chat: ${session.summary ?? session.id} `}</Text>
       <Text> </Text>
 
       {/* Messages — j/k/g/G scroll when focused, auto-follow when input focused */}
@@ -79,8 +81,8 @@ export function TalkToSession({ session, asyncState, onDone }: TalkToSessionProp
       )}
 
       {/* Input panel */}
-      <Box borderStyle="single" borderColor={inputFocused ? "cyan" : "gray"} paddingX={1} width="100%" flexShrink={0}>
-        <Text color={inputFocused ? "cyan" : "gray"}>{"> "}</Text>
+      <Box borderStyle="single" borderColor={inputFocused ? theme.accent : "gray"} paddingX={1} width="100%" flexShrink={0}>
+        <Text color={inputFocused ? theme.accent : "gray"}>{"> "}</Text>
         <TextInputEnhanced
           value={msg}
           onChange={setMsg}

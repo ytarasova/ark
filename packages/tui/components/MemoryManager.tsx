@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { useArkClient } from "../hooks/useArkClient.js";
 import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { TextInputEnhanced } from "./TextInputEnhanced.js";
@@ -20,6 +21,7 @@ interface MemoryManagerProps {
 }
 
 export function MemoryManager({ asyncState, pane = "left", onClose }: MemoryManagerProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const [memories, setMemories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,7 +138,7 @@ export function MemoryManager({ asyncState, pane = "left", onClose }: MemoryMana
         <Box flexDirection="column">
           {mode === "search" && (
             <Box paddingX={1}>
-              <Text color="cyan">{"/ "}</Text>
+              <Text color={theme.accent}>{"/ "}</Text>
               <TextInputEnhanced
                 value={searchQuery}
                 onChange={setSearchQuery}
@@ -173,7 +175,7 @@ export function MemoryManager({ asyncState, pane = "left", onClose }: MemoryMana
         mode === "add" ? (
           <Box flexDirection="column" paddingX={1} paddingTop={1}>
             <Box>
-              <Text color={addField === "content" ? "cyan" : "gray"}>
+              <Text color={addField === "content" ? theme.accent : "gray"}>
                 {addField === "content" ? "> " : "  "}Content:{" "}
               </Text>
               {addField === "content" ? (
@@ -189,7 +191,7 @@ export function MemoryManager({ asyncState, pane = "left", onClose }: MemoryMana
               )}
             </Box>
             <Box>
-              <Text color={addField === "tags" ? "cyan" : "gray"}>
+              <Text color={addField === "tags" ? theme.accent : "gray"}>
                 {addField === "tags" ? "> " : "  "}Tags:{" "}
               </Text>
               {addField === "tags" ? (

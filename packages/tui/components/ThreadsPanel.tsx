@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { Session } from "../../core/index.js";
 import { roleColor } from "../helpers/colors.js";
 import { TextInputEnhanced } from "./TextInputEnhanced.js";
@@ -75,6 +76,7 @@ export function parseMentions(
 }
 
 export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
+  const theme = getTheme();
   const [msg, setMsg] = useState("");
   const [completionIndex, setCompletionIndex] = useState(0);
 
@@ -152,7 +154,7 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Text bold color="cyan">{" Threads "}</Text>
+      <Text bold color={theme.accent}>{" Threads "}</Text>
       <Text> </Text>
 
       {/* Message stream — j/k/g/G scroll when focused, auto-follow when input focused */}
@@ -188,10 +190,10 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
         <Box flexDirection="column" marginLeft={2}>
           {completions.slice(0, 8).map((c, i) => (
             <Text key={c.id}>
-              <Text color={i === completionIndex ? "cyan" : undefined} bold={i === completionIndex}>
+              <Text color={i === completionIndex ? theme.accent : undefined} bold={i === completionIndex}>
                 {i === completionIndex ? "❯ " : "  "}
               </Text>
-              <Text color={i === completionIndex ? "cyan" : "white"} bold={i === completionIndex}>
+              <Text color={i === completionIndex ? theme.accent : "white"} bold={i === completionIndex}>
                 {c.label}
               </Text>
               <Text dimColor>{` (${c.id})`}</Text>
@@ -201,8 +203,8 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
       )}
 
       {/* Input panel */}
-      <Box borderStyle="single" borderColor={inputFocused ? "cyan" : "gray"} paddingX={1} width="100%" flexShrink={0}>
-        <Text color={inputFocused ? "cyan" : "gray"}>{"> "}</Text>
+      <Box borderStyle="single" borderColor={inputFocused ? theme.accent : "gray"} paddingX={1} width="100%" flexShrink={0}>
+        <Text color={inputFocused ? theme.accent : "gray"}>{"> "}</Text>
         <TextInputEnhanced
           value={msg}
           onChange={setMsg}

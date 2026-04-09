@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { Session } from "../../core/index.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
@@ -14,6 +15,7 @@ export interface GroupManagerProps {
 }
 
 export function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const [action, setAction] = useState<"menu" | "create" | "delete">("menu");
   const [newName, setNewName] = useState("");
@@ -31,11 +33,11 @@ export function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps
   if (action === "create") {
     return (
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold color="cyan">{" Create Group "}</Text>
+        <Text bold color={theme.accent}>{" Create Group "}</Text>
         <Text> </Text>
         <Text>{"Group name:"}</Text>
         <Box>
-          <Text color="cyan">{"> "}</Text>
+          <Text color={theme.accent}>{"> "}</Text>
           <TextInputEnhanced
             value={newName}
             onChange={setNewName}
@@ -62,7 +64,7 @@ export function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps
     if (deleteChoices.length === 0) {
       return (
         <Box flexDirection="column" flexGrow={1}>
-          <Text bold color="cyan">{" Delete Group "}</Text>
+          <Text bold color={theme.accent}>{" Delete Group "}</Text>
           <Text> </Text>
           <Text dimColor>{"  No groups to delete."}</Text>
           <Box flexGrow={1} />
@@ -91,7 +93,7 @@ export function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps
   // Menu
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Text bold color="cyan">{" Groups "}</Text>
+      <Text bold color={theme.accent}>{" Groups "}</Text>
       <Text> </Text>
       <SelectMenu
         items={[

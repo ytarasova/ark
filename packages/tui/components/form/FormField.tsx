@@ -5,6 +5,7 @@
 
 import React from "react";
 import { Box, Text } from "ink";
+import { getTheme } from "../../../core/theme.js";
 
 interface FormFieldProps {
   label: string;
@@ -15,9 +16,10 @@ interface FormFieldProps {
 }
 
 export function FormField({ label, active, editing, children }: FormFieldProps) {
+  const theme = getTheme();
   return (
     <Box>
-      <Text color={active ? "cyan" : "gray"}>
+      <Text color={active ? theme.accent : "gray"}>
         {active ? (editing ? "* " : "> ") : "  "}
       </Text>
       <Text color={active ? "white" : "gray"} bold={active}>

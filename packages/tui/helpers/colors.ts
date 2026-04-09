@@ -52,7 +52,7 @@ export function eventTypeColor(type: string): InkColor {
 
 /** Map a role string to an Ink color for message display. */
 export function roleColor(role: string): InkColor {
-  if (role === "user") return "cyan";
+  if (role === "user") return getTheme().accent as InkColor;
   if (role === "agent") return "green";
   if (role === "system") return "gray";
   return "gray";
@@ -62,6 +62,6 @@ export function roleColor(role: string): InkColor {
 export function eventLogColor(type: string): InkColor {
   if (type.includes("error") || type.includes("exit") || type.includes("fail")) return "red";
   if (type.includes("complete")) return "green";
-  if (type.includes("start")) return "cyan";
+  if (type.includes("start")) return getTheme().accent as InkColor;
   return "gray";
 }

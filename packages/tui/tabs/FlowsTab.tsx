@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { loadFlow, saveFlow, deleteFlow, findProjectRoot } from "../../core/index.js";
 import type { FlowDefinition } from "../../core/index.js";
 import { KeyHint, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
@@ -99,6 +100,7 @@ function FlowDetail({ flow, pane, statusMessage }: {
   pane: "left" | "right";
   statusMessage: string | null;
 }) {
+  const theme = getTheme();
   const [p, setP] = useState<any>(null);
 
   useEffect(() => {
@@ -132,7 +134,7 @@ function FlowDetail({ flow, pane, statusMessage }: {
         return (
           <Text key={s.name}>
             {"  "}{`${i + 1}. ${s.name.padEnd(14)} `}
-            <Text color="cyan">{`[${type}:${detail}]`}</Text>
+            <Text color={theme.accent}>{`[${type}:${detail}]`}</Text>
             {` gate=${s.gate}`}
             {opt && <Text dimColor>{opt}</Text>}
           </Text>

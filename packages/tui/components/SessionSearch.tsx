@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { Session } from "../../core/index.js";
 
 interface SessionSearchProps {
@@ -19,6 +20,7 @@ function fuzzyMatch(text: string, query: string): boolean {
 }
 
 export function SessionSearch({ sessions, onSelect, onClose }: SessionSearchProps) {
+  const theme = getTheme();
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
 
@@ -59,13 +61,13 @@ export function SessionSearch({ sessions, onSelect, onClose }: SessionSearchProp
   return (
     <Box flexDirection="column">
       <Box>
-        <Text color="cyan" bold>/ </Text>
+        <Text color={theme.accent} bold>/ </Text>
         <Text>{query}</Text>
         <Text color="gray">█</Text>
       </Box>
       {results.map((s, i) => (
         <Box key={s.id}>
-          <Text color={i === cursor ? "cyan" : undefined} bold={i === cursor}>
+          <Text color={i === cursor ? theme.accent : undefined} bold={i === cursor}>
             {i === cursor ? ">" : " "} {s.summary ?? s.id}
           </Text>
           <Text color="gray"> ({s.status})</Text>

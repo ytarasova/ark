@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import Spinner from "ink-spinner";
 import type { ClaudeSession, SearchResult } from "../../core/index.js";
 import { ago } from "../helpers.js";
@@ -69,6 +70,7 @@ function buildHistoryItems(arkSessions: any[], claudeSessions: ClaudeSession[]):
 }
 
 export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, onImport }: HistoryTabProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const focus = useFocus();
   const [claudeSessions, setClaudeSessions] = useState<ClaudeSession[]>([]);
@@ -200,7 +202,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
             {mode === "search" && (
               searchInputActive ? (
                 <Box>
-                  <Text color="cyan">{"/"}</Text>
+                  <Text color={theme.accent}>{"/"}</Text>
                   <TextInputEnhanced
                     value={searchQuery}
                     onChange={setSearchQuery}
@@ -252,7 +254,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
                 }}
                 renderColoredRow={(r) => (
                   <Text wrap="truncate">
-                    {"  "}<Text color={r.source === "transcript" ? "magenta" : "cyan"}>{r.source.slice(0, 4).padEnd(4)}</Text>
+                    {"  "}<Text color={r.source === "transcript" ? "magenta" : theme.accent}>{r.source.slice(0, 4).padEnd(4)}</Text>
                     {` ${r.match?.slice(0, 50) || ""}`}
                   </Text>
                 )}
@@ -327,6 +329,7 @@ function HistoryDetailContent({ item, searchResult, pane, conversation, detailId
 }
 
 function ConversationScrollContent({ turns }: { turns: any[] }) {
+  const theme = getTheme();
   const filtered = (turns || []).filter((t: any) => {
     if (!t || !t.content || t.content.length < 2) return false;
     if (t.role !== "user" && t.role !== "assistant") return false;
@@ -351,7 +354,7 @@ function ConversationScrollContent({ turns }: { turns: any[] }) {
         return (
           <Box key={idx} flexDirection="column" marginBottom={1} paddingLeft={isUser ? 2 : 0}>
             <Text>
-              <Text color={isUser ? "cyan" : "green"} bold>{label}</Text>
+              <Text color={isUser ? theme.accent : "green"} bold>{label}</Text>
               {time ? <Text dimColor>{time}</Text> : null}
             </Text>
             <Text wrap="wrap" color={isUser ? "white" : undefined} dimColor={!isUser}>

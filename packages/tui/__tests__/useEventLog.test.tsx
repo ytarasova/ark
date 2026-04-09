@@ -120,7 +120,8 @@ describe("useEventLog", () => {
 
     const startEntry = capturedEvents.find(e => e.type === "stage_started");
     expect(startEntry).toBeDefined();
-    expect(startEntry!.color).toBe("cyan");
+    // Color comes from theme.accent (was hardcoded "cyan", now theme-driven)
+    expect(startEntry!.color).toBeTruthy();
     unmount();
   });
 

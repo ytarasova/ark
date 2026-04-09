@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Box, Text } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { TextInputEnhanced } from "./TextInputEnhanced.js";
 import { readdirSync, statSync } from "fs";
 import { join, dirname, basename } from "path";
@@ -40,6 +41,7 @@ export function getPathCompletions(value: string): string[] {
 }
 
 export function PathInput({ value, onChange, onSubmit }: PathInputProps) {
+  const theme = getTheme();
   const completions = useMemo(() => getPathCompletions(value), [value]);
 
   const handleTab = () => {
@@ -63,7 +65,7 @@ export function PathInput({ value, onChange, onSubmit }: PathInputProps) {
   return (
     <Box flexDirection="column">
       <Box>
-        <Text color="cyan">{"> "}</Text>
+        <Text color={theme.accent}>{"> "}</Text>
         <TextInputEnhanced
           value={value}
           onChange={onChange}

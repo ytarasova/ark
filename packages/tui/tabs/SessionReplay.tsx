@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { buildReplay } from "../../core/index.js";
 import type { Session, ReplayStep } from "../../core/index.js";
 import { eventTypeColor } from "../helpers/colors.js";
@@ -14,6 +15,7 @@ export interface SessionReplayProps {
 
 /** Replay overlay - step through a session's event timeline */
 export function SessionReplay({ session, onClose }: SessionReplayProps) {
+  const theme = getTheme();
   const steps = useMemo(() => buildReplay(session.id), [session.id]);
   const [sel, setSel] = useState(0);
   const [expanded, setExpanded] = useState(false);
@@ -90,7 +92,7 @@ export function SessionReplay({ session, onClose }: SessionReplayProps) {
       {/* Search bar */}
       {searchMode && (
         <Box>
-          <Text color="cyan">{" / "}</Text>
+          <Text color={theme.accent}>{" / "}</Text>
           <TextInputEnhanced
             value={searchQuery}
             onChange={setSearchQuery}
@@ -122,7 +124,7 @@ export function SessionReplay({ session, onClose }: SessionReplayProps) {
           return (
             <React.Fragment key={step.index}>
               <Text wrap="truncate">
-                <Text color={isSel ? "cyan" : undefined} bold={isSel}>{pointer}</Text>
+                <Text color={isSel ? theme.accent : undefined} bold={isSel}>{pointer}</Text>
                 {" "}
                 <Text dimColor>[{step.elapsed}]</Text>
                 {" "}

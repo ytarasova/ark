@@ -1,18 +1,20 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { getThemeMode, getActiveProfile, setThemeMode } from "../../core/index.js";
+import { getTheme, getThemeMode, getActiveProfile, setThemeMode } from "../../core/index.js";
+import type { ThemeMode } from "../../core/theme.js";
 
 interface SettingsPanelProps {
   onClose: () => void;
 }
 
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
-  const theme = getThemeMode();
+  const colors = getTheme();
+  const [themeMode, setTheme] = useState(getThemeMode());
   const profile = getActiveProfile();
   const [cursor, setCursor] = useState(0);
 
   const settings = [
-    { key: "theme", label: "Theme", value: theme, options: ["dark", "light", "system"] },
+    { key: "theme", label: "Theme", value: themeMode, options: ["dark", "light", "system"] as ThemeMode[] },
     { key: "profile", label: "Profile", value: profile },
   ];
 
@@ -23,25 +25,26 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     if (key.return) {
       const s = settings[cursor];
       if (s.key === "theme" && s.options) {
-        const idx = s.options.indexOf(s.value);
+        const idx = s.options.indexOf(s.value as ThemeMode);
         const next = s.options[(idx + 1) % s.options.length];
-        setThemeMode(next as import("../../core/theme.js").ThemeMode);
+        setThemeMode(next);
+        setTheme(next);
       }
     }
   });
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1}>
-      <Box marginBottom={1}><Text bold color="yellow">Settings</Text></Box>
+    <Box flexDirection="column" borderStyle="round" borderColor={colors.accent} paddingX={1}>
+      <Box marginBottom={1}><Text bold color={colors.accent}>Settings</Text></Box>
       {settings.map((s, i) => (
         <Box key={s.key}>
-          <Text color={i === cursor ? "yellow" : undefined} bold={i === cursor}>
+          <Text color={i === cursor ? colors.accent : undefined} bold={i === cursor}>
             {i === cursor ? ">" : " "} {s.label}: {s.value}
           </Text>
-          {s.options && <Text color="gray"> (Enter to cycle)</Text>}
+          {s.options && <Text color={colors.dimText}> (Enter to cycle)</Text>}
         </Box>
       ))}
-      <Box marginTop={1}><Text color="gray">Enter:toggle  Esc:close</Text></Box>
+      <Box marginTop={1}><Text color={colors.dimText}>Enter:toggle  Esc:close</Text></Box>
     </Box>
   );
 }

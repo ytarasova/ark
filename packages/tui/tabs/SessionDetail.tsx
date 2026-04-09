@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { Session, Event, SearchResult } from "../../core/index.js";
 import { ICON } from "../constants.js";
 import { getStatusColor } from "../helpers/colors.js";
@@ -48,6 +49,7 @@ export interface SessionDetailProps {
 }
 
 export function SessionDetail({ session: s, sessions, pane, searchMode, searchQuery, searchResults, onSearchToggle, onSearchQueryChange, onSearchSubmit, onTodoChange, actions, onOverlay }: SessionDetailProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const [events, setEvents] = useState<Event[]>([]);
   const [conversation, setConversation] = useState<{ role: string; content: string; timestamp: string }[]>([]);
@@ -228,11 +230,11 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
       <Box flexDirection="column" flexGrow={1} paddingX={2} paddingTop={1}>
         {sessions.length === 0 ? (
           <>
-            <Text bold color="cyan">Welcome to Ark</Text>
+            <Text bold color={theme.accent}>Welcome to Ark</Text>
             <Text> </Text>
-            <Text>  <Text bold color="cyan">n</Text>  Create your first session</Text>
-            <Text>  <Text bold color="cyan">?</Text>  See all keyboard shortcuts</Text>
-            <Text>  <Text bold color="cyan">q</Text>  Quit</Text>
+            <Text>  <Text bold color={theme.accent}>n</Text>  Create your first session</Text>
+            <Text>  <Text bold color={theme.accent}>?</Text>  See all keyboard shortcuts</Text>
+            <Text>  <Text bold color={theme.accent}>q</Text>  Quit</Text>
             <Text> </Text>
             <Text dimColor>Or from the terminal:</Text>
             <Text dimColor>  ark session start --repo . --summary "Fix a bug" --dispatch</Text>
@@ -249,7 +251,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
       {/* Search bar */}
       {searchMode && (
         <Box marginBottom={1}>
-          <Text color="cyan">{" / "}</Text>
+          <Text color={theme.accent}>{" / "}</Text>
           <TextInputEnhanced
             value={searchQuery}
             onChange={onSearchQueryChange}
@@ -312,7 +314,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
               return (
                 <React.Fragment key={st.name}>
                   {idx > 0 && <Text dimColor>{" > "}</Text>}
-                  <Text color={isCurrent ? "cyan" : isPast ? "green" : undefined} bold={isCurrent} dimColor={!isCurrent && !isPast}>
+                  <Text color={isCurrent ? theme.accent : isPast ? "green" : undefined} bold={isCurrent} dimColor={!isCurrent && !isPast}>
                     {isCurrent ? `[${st.name}]` : st.name}
                   </Text>
                 </React.Fragment>
@@ -324,7 +326,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
 
       {s.pr_url && (
         <KeyValue label="PR">
-          <Link url={s.pr_url} color="cyan">{s.pr_url.replace("https://github.com/", "")}</Link>
+          <Link url={s.pr_url} color={theme.accent}>{s.pr_url.replace("https://github.com/", "")}</Link>
         </KeyValue>
       )}
 
@@ -352,7 +354,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
           })}
           {todoAddMode && (
             <Box>
-              <Text color="cyan">{"  + "}</Text>
+              <Text color={theme.accent}>{"  + "}</Text>
               <TextInputEnhanced
                 value={todoAddText}
                 onChange={setTodoAddText}
@@ -377,7 +379,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
           <SectionHeader title="Todos" />
           {todoAddMode ? (
             <Box>
-              <Text color="cyan">{"  + "}</Text>
+              <Text color={theme.accent}>{"  + "}</Text>
               <TextInputEnhanced
                 value={todoAddText}
                 onChange={setTodoAddText}
@@ -463,7 +465,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
           <SectionHeader title="Conversation" />
           {conversation.map((turn, idx) => {
             const label = turn.role === "user" ? "You" : turn.role === "assistant" ? "Claude" : turn.role;
-            const color: InkColor | undefined = turn.role === "user" ? "cyan" : undefined;
+            const color: InkColor | undefined = turn.role === "user" ? theme.accent : undefined;
             const dim = turn.role !== "user";
             return (
               <Text key={`${turn.role}-${turn.timestamp}-${idx}`} wrap="wrap">

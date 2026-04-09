@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { existsSync } from "fs";
 import { resolve as resolvePath, basename } from "path";
 import { useArkClient } from "../hooks/useArkClient.js";
@@ -37,6 +38,7 @@ interface NewSessionFormProps {
 // Isolation choices are provider-driven — see ComputeProvider.isolationModes
 
 export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessionFormProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const [name, setName] = useState(prefill?.summary || prefill?.name || generateName());
   const [repoPath, setRepoPath] = useState(prefill?.repo || process.cwd());
@@ -168,7 +170,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Text bold color="cyan">{" New Session "}</Text>
+      <Text bold color={theme.accent}>{" New Session "}</Text>
       <Text> </Text>
 
       <FormTextField

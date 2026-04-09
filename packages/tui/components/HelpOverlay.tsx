@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 
 interface HelpOverlayProps {
   onClose: () => void;
@@ -64,6 +65,7 @@ const GROUPS: ShortcutGroup[] = [
 ];
 
 export function HelpOverlay({ onClose }: HelpOverlayProps) {
+  const theme = getTheme();
   useInput((input, key) => {
     if (key.escape || input === "?") onClose();
   });
@@ -73,10 +75,10 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
       <Box marginBottom={1}><Text bold>Keyboard Shortcuts</Text></Box>
       {GROUPS.map((group, gi) => (
         <Box key={group.title} flexDirection="column" marginBottom={gi < GROUPS.length - 1 ? 1 : 0}>
-          <Text bold color="cyan">{group.title}</Text>
+          <Text bold color={theme.accent}>{group.title}</Text>
           {group.items.map(([shortcut, desc]) => (
             <Box key={shortcut}>
-              <Text color="cyan" bold>{"  "}{shortcut.padEnd(10)}</Text>
+              <Text color={theme.accent} bold>{"  "}{shortcut.padEnd(10)}</Text>
               <Text>{desc}</Text>
             </Box>
           ))}

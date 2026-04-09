@@ -23,6 +23,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 
 /** Max lines to render in the input box before collapsing. */
 const MAX_DISPLAY_LINES = 3;
@@ -263,12 +264,13 @@ export function TextInputEnhanced({
   // show a compact summary instead of the full text
   const lines = value.split("\n");
   if (lines.length > MAX_DISPLAY_LINES) {
+    const theme = getTheme();
     const firstLine = lines[0].length > 60 ? lines[0].slice(0, 57) + "..." : lines[0];
     const extra = lines.length - 1;
     return (
       <Box>
         <Text>{firstLine} </Text>
-        <Text dimColor color="cyan">{`[+${extra} lines]`}</Text>
+        <Text dimColor color={theme.accent}>{`[+${extra} lines]`}</Text>
         <Text inverse>{" "}</Text>
       </Box>
     );

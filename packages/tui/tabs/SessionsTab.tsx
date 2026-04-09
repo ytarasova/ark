@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { Session, SearchResult } from "../../core/index.js";
 import { ICON } from "../constants.js";
 import { getStatusColor } from "../helpers/colors.js";
@@ -43,6 +44,7 @@ interface SessionsTabProps extends StoreData {
 }
 
 export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const focus = useFocus();
   const [overlay, setOverlay] = useState<Overlay>(null);
@@ -403,7 +405,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
               return (
                 <Text>
                   {" "} <Text color={color}>{icon}</Text>{` ${summary}`}
-                  {s.branch && <Text color="cyan">{` [${s.branch}]`}</Text>}
+                  {s.branch && <Text color={theme.accent}>{` [${s.branch}]`}</Text>}
                   {` ${stage} ${age}`}
                   {unread > 0 && <Text color="yellow" bold>{` (${unread})`}</Text>}
                 </Text>
@@ -522,8 +524,8 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
             <Box flexDirection="column" padding={1}>
               <Text bold>Finish Worktree</Text>
               <Text> </Text>
-              <Text>  <Text color="cyan" bold>M</Text> Merge locally</Text>
-              <Text>  <Text color="cyan" bold>P</Text> Create PR on GitHub</Text>
+              <Text>  <Text color={theme.accent} bold>M</Text> Merge locally</Text>
+              <Text>  <Text color={theme.accent} bold>P</Text> Create PR on GitHub</Text>
               <Text> </Text>
               <Text dimColor>  Esc to cancel</Text>
             </Box>
@@ -576,7 +578,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
       />
       {status.message && (
         <Box>
-          <Text color="cyan">{` ${status.message}`}</Text>
+          <Text color={theme.accent}>{` ${status.message}`}</Text>
         </Box>
       )}
     </Box>

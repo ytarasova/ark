@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { execFile } from "child_process";
 import { join } from "path";
 import { homedir } from "os";
@@ -32,6 +33,7 @@ interface ComputeTabProps extends StoreData {
 }
 
 export function ComputeTab({ computes, sessions, refresh, pane, snapshots, computeLogs, addComputeLog, asyncState, onShowForm, formOverlay }: ComputeTabProps) {
+  const theme = getTheme();
   const confirmation = useConfirmation();
   const focus = useFocus();
 
@@ -146,7 +148,7 @@ export function ComputeTab({ computes, sessions, refresh, pane, snapshots, compu
       />
       {status.message && (
         <Box>
-          <Text color={confirmation.pending === "delete" ? "red" : "cyan"}>{` ${status.message}`}</Text>
+          <Text color={confirmation.pending === "delete" ? "red" : theme.accent}>{` ${status.message}`}</Text>
         </Box>
       )}
     </Box>

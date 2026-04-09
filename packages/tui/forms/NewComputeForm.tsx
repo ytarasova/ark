@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useArkClient } from "../hooks/useArkClient.js";
 import { generateName, getAwsProfiles } from "../helpers.js";
@@ -53,6 +54,7 @@ const PROVIDER_OPTIONS = [
 ];
 
 export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState(generateName());
@@ -133,14 +135,14 @@ export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Text bold color="cyan">{" New Compute "}</Text>
+      <Text bold color={theme.accent}>{" New Compute "}</Text>
       <Text> </Text>
 
       {step === "name" && (
         <Box flexDirection="column">
           <Text>{"Compute name:"}</Text>
           <Box>
-            <Text color="cyan">{"> "}</Text>
+            <Text color={theme.accent}>{"> "}</Text>
             <TextInputEnhanced
               value={name}
               onChange={setName}
@@ -165,7 +167,7 @@ export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
           <Text>{""}</Text>
           <Text>{"Docker image:"}</Text>
           <Box>
-            <Text color="cyan">{"> "}</Text>
+            <Text color={theme.accent}>{"> "}</Text>
             <TextInputEnhanced
               value={image}
               onChange={setImage}

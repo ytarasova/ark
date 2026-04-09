@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { saveAgent } from "../../core/index.js";
 import type { AgentDefinition } from "../../core/index.js";
 import { useFormNavigation } from "../components/form/useFormNavigation.js";
@@ -41,6 +42,7 @@ const SCOPE_CHOICES = [
 const TOOL_OPTIONS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch"];
 
 export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormProps) {
+  const theme = getTheme();
   const isEdit = !!agent;
 
   const [name, setName] = useState(agent?.name ?? "");
@@ -125,7 +127,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
 
   return (
     <Box flexDirection="column" flexGrow={1} paddingLeft={1}>
-      <Text bold color="cyan">{isEdit ? `Edit: ${agent!.name}` : "New Agent"}</Text>
+      <Text bold color={theme.accent}>{isEdit ? `Edit: ${agent!.name}` : "New Agent"}</Text>
       <Text> </Text>
 
       {!isEdit && (
@@ -142,7 +144,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
 
       {/* Tools checkbox list */}
       <Box>
-        <Text color={active === "tools" ? "cyan" : "gray"}>
+        <Text color={active === "tools" ? theme.accent : "gray"}>
           {active === "tools" ? "> " : "  "}
         </Text>
         <Text color={active === "tools" ? "white" : "gray"} bold={active === "tools"}>
@@ -152,7 +154,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
           <Box flexDirection="column">
             {TOOL_OPTIONS.map((t, i) => (
               <Text key={t}>
-                <Text color={i === toolCursor ? "cyan" : "white"}>
+                <Text color={i === toolCursor ? theme.accent : "white"}>
                   {tools.includes(t) ? "[x] " : "[ ] "}
                   {t}
                 </Text>
@@ -173,7 +175,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
 
       {/* System prompt */}
       <Box>
-        <Text color={active === "prompt" ? "cyan" : "gray"}>
+        <Text color={active === "prompt" ? theme.accent : "gray"}>
           {active === "prompt" ? "> " : "  "}
         </Text>
         <Text color={active === "prompt" ? "white" : "gray"} bold={active === "prompt"}>

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { useArkClient } from "../hooks/useArkClient.js";
 import type { Session } from "../../core/index.js";
 import { EXTENSION_CATALOG } from "../../core/extension-catalog.js";
@@ -16,6 +17,7 @@ const MCP_CATALOG: Record<string, { command: string; args: string[]; env?: Recor
 );
 
 export function McpManager({ session, onClose, onApply }: McpManagerProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const projectDir = session.workdir ?? ".";
 
@@ -95,9 +97,9 @@ export function McpManager({ session, onClose, onApply }: McpManagerProps) {
   });
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor={theme.accent} paddingX={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">MCP Manager</Text>
+        <Text bold color={theme.accent}>MCP Manager</Text>
         <Text color="gray"> — {projectDir}</Text>
       </Box>
 
@@ -109,7 +111,7 @@ export function McpManager({ session, onClose, onApply }: McpManagerProps) {
 
         return (
           <Box key={name}>
-            <Text color={isCursor ? "cyan" : undefined} bold={isCursor}>
+            <Text color={isCursor ? theme.accent : undefined} bold={isCursor}>
               {isCursor ? ">" : " "} {enabled ? "[x]" : "[ ]"} {name}
             </Text>
             <Text color="gray"> — {info.description}</Text>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { Session } from "../../core/index.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
@@ -11,6 +12,7 @@ export interface MoveToGroupProps {
 }
 
 export function MoveToGroup({ session, onDone }: MoveToGroupProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const [newGroup, setNewGroup] = useState("");
   const [mode, setMode] = useState<"pick" | "new">("pick");
@@ -30,13 +32,13 @@ export function MoveToGroup({ session, onDone }: MoveToGroupProps) {
   if (mode === "new") {
     return (
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold color="cyan">{" Move to Group "}</Text>
+        <Text bold color={theme.accent}>{" Move to Group "}</Text>
         <Text> </Text>
         <Text>{`Session: ${session?.summary ?? session?.id}`}</Text>
         <Text> </Text>
         <Text>{"New group name:"}</Text>
         <Box>
-          <Text color="cyan">{"> "}</Text>
+          <Text color={theme.accent}>{"> "}</Text>
           <TextInputEnhanced
             value={newGroup}
             onChange={setNewGroup}
@@ -51,7 +53,7 @@ export function MoveToGroup({ session, onDone }: MoveToGroupProps) {
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Text bold color="cyan">{" Move to Group "}</Text>
+      <Text bold color={theme.accent}>{" Move to Group "}</Text>
       <Text> </Text>
       <Text>{`Session: ${session?.summary ?? session?.id}`}</Text>
       <Text> </Text>

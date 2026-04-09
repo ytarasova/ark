@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { saveFlow, listAgents, findProjectRoot } from "../../core/index.js";
 import type { FlowDefinition, StageDefinition } from "../../core/index.js";
 import { useFormNavigation } from "../components/form/useFormNavigation.js";
@@ -27,6 +28,7 @@ const SCOPE_CHOICES = [
 ];
 
 export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
+  const theme = getTheme();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [scope, setScope] = useState<"global" | "project">(projectRoot ? "project" : "global");
@@ -153,7 +155,7 @@ export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
 
   return (
     <Box flexDirection="column" flexGrow={1} paddingLeft={1}>
-      <Text bold color="cyan">New Flow</Text>
+      <Text bold color={theme.accent}>New Flow</Text>
       <Text> </Text>
 
       <FormTextField
@@ -176,7 +178,7 @@ export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
 
       {/* Stages list */}
       <Box>
-        <Text color={active === "stages" ? "cyan" : "gray"}>
+        <Text color={active === "stages" ? theme.accent : "gray"}>
           {active === "stages" ? "> " : "  "}
         </Text>
         <Text color={active === "stages" ? "white" : "gray"} bold={active === "stages"}>
@@ -188,7 +190,7 @@ export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
               const isCurrent = i === stageCursor;
               return (
                 <Text key={i}>
-                  <Text color={isCurrent ? "cyan" : "white"}>
+                  <Text color={isCurrent ? theme.accent : "white"}>
                     {isCurrent ? "> " : "  "}
                     {`${(i + 1)}. `}
                   </Text>
