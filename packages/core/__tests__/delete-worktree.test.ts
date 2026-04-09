@@ -33,7 +33,7 @@ describe("deleteSessionAsync worktree cleanup", () => {
     writeFileSync(join(wtPath, "dummy.txt"), "test");
     expect(existsSync(wtPath)).toBe(true);
 
-    await deleteSessionAsync(session.id);
+    await deleteSessionAsync(app, session.id);
 
     expect(existsSync(wtPath)).toBe(false);
     // Soft-delete: session still exists in DB with status "deleting"
@@ -48,7 +48,7 @@ describe("deleteSessionAsync worktree cleanup", () => {
 
     expect(existsSync(wtPath)).toBe(false);
 
-    const result = await deleteSessionAsync(session.id);
+    const result = await deleteSessionAsync(app, session.id);
     expect(result.ok).toBe(true);
     // Soft-delete: session still exists in DB with status "deleting"
     const after = getApp().sessions.get(session.id);
@@ -63,7 +63,7 @@ describe("deleteSessionAsync worktree cleanup", () => {
     // Create a worktree dir but session has no repo — should still delete
     mkdirSync(wtPath, { recursive: true });
 
-    const result = await deleteSessionAsync(session.id);
+    const result = await deleteSessionAsync(app, session.id);
     expect(result.ok).toBe(true);
     // Soft-delete: session still exists in DB with status "deleting"
     const after = getApp().sessions.get(session.id);

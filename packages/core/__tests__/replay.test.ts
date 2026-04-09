@@ -14,7 +14,7 @@ describe("buildReplay", () => {
   });
 
   it("returns steps in chronological order", () => {
-    const session = startSession({ summary: "test replay", flow: "default" });
+    const session = startSession(getApp(), { summary: "test replay", flow: "default" });
     getApp().events.log(session.id, "stage_ready", { stage: "plan", data: { stage: "plan" } });
     getApp().events.log(session.id, "stage_started", { stage: "plan", actor: "planner", data: { stage: "plan", agent: "planner" } });
 
@@ -39,7 +39,7 @@ describe("buildReplay", () => {
   });
 
   it("steps have elapsed time formatted as HH:MM:SS", () => {
-    const session = startSession({ summary: "elapsed test" });
+    const session = startSession(getApp(), { summary: "elapsed test" });
     const steps = buildReplay(session.id);
     expect(steps.length).toBeGreaterThan(0);
     // First step should be near 00:00:00

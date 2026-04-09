@@ -76,8 +76,9 @@ export const claudeCodeExecutor: Executor = {
     // Remote compute (providers that don't support local worktrees)
     if (compute && provider && !provider.supportsWorktree) {
       const { prepareRemoteEnvironment } = await import("../services/session-orchestration.js");
+      const { getApp } = await import("../app.js");
       const { finalLaunchContent, ports } = await prepareRemoteEnvironment(
-        session, compute, provider, effectiveWorkdir,
+        getApp(), session, compute, provider, effectiveWorkdir,
         { launchContent, onLog: log },
       );
 

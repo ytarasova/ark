@@ -16,7 +16,7 @@ describe("recipe use", () => {
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test fix" });
-    const session = startSession({
+    const session = startSession(getApp(), {
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -35,7 +35,7 @@ describe("recipe use", () => {
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/myrepo", summary: "Custom review task" });
-    const session = startSession({
+    const session = startSession(getApp(), {
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -50,7 +50,7 @@ describe("recipe use", () => {
   it("falls back to recipe description when no summary provided", () => {
     const recipe = loadRecipe("quick-fix")!;
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test" });
-    const session = startSession({
+    const session = startSession(getApp(), {
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -64,7 +64,7 @@ describe("recipe use", () => {
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test agent" });
-    const session = startSession({
+    const session = startSession(getApp(), {
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -83,7 +83,7 @@ describe("recipe use", () => {
   });
 
   it("startSession with explicit agent sets it on the session", () => {
-    const session = startSession({
+    const session = startSession(getApp(), {
       summary: "test-agent-param",
       repo: "/tmp/test",
       flow: "bare",
@@ -95,7 +95,7 @@ describe("recipe use", () => {
   });
 
   it("startSession without agent leaves it null", () => {
-    const session = startSession({
+    const session = startSession(getApp(), {
       summary: "test-no-agent",
       repo: "/tmp/test",
       flow: "bare",

@@ -14,7 +14,7 @@ describe("fan-out E2E", () => {
     app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
     // 2. Fan out into 3 children
-    const result = fanOut(parent.id, {
+    const result = fanOut(app, parent.id, {
       tasks: [{ summary: "Task A" }, { summary: "Task B" }, { summary: "Task C" }],
     });
     expect(result.ok).toBe(true);
@@ -33,15 +33,15 @@ describe("fan-out E2E", () => {
 
     // 5. Complete children one by one -- auto-join only when ALL done
     app.sessions.update(result.childIds![0], { status: "completed" });
-    let joined = await checkAutoJoin(result.childIds![0]);
+    let joined = await checkAutoJoin(app, result.childIds![0]);
     expect(joined).toBe(false);
 
     app.sessions.update(result.childIds![1], { status: "completed" });
-    joined = await checkAutoJoin(result.childIds![1]);
+    joined = await checkAutoJoin(app, result.childIds![1]);
     expect(joined).toBe(false);
 
     app.sessions.update(result.childIds![2], { status: "completed" });
-    joined = await checkAutoJoin(result.childIds![2]);
+    joined = await checkAutoJoin(app, result.childIds![2]);
     expect(joined).toBe(true);
 
     // 6. Verify parent advanced
@@ -53,7 +53,7 @@ describe("fan-out E2E", () => {
     const parent = app.sessions.create({ summary: "Spawn test", flow: "bare" });
     app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = spawnSubagent(parent.id, { task: "Child task" });
+    const result = spawnSubagent(app, parent.id, { task: "Child task" });
     expect(result.ok).toBe(true);
 
     const child = app.sessions.get(result.sessionId!);
@@ -101,14 +101,14 @@ describe("fan-out E2E", () => {
     const parent = app.sessions.create({ summary: "Partial fail", flow: "bare" });
     app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = fanOut(parent.id, {
+    const result = fanOut(app, parent.id, {
       tasks: [{ summary: "Will pass" }, { summary: "Will fail" }],
     });
 
     app.sessions.update(result.childIds![0], { status: "completed" });
     app.sessions.update(result.childIds![1], { status: "failed" });
 
-    const joined = await checkAutoJoin(result.childIds![0]);
+    const joined = await checkAutoJoin(app, result.childIds![0]);
     expect(joined).toBe(true);
 
     // Check that partial failure event was logged

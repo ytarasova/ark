@@ -27,7 +27,7 @@ export async function handleAcpRequest(req: AcpRequest): Promise<AcpResponse> {
     switch (req.method) {
       case "session/create": {
         const p = req.params ?? {};
-        const session = startSession({
+        const session = startSession(getApp(), {
           summary: p.summary as string,
           repo: p.repo as string,
           flow: p.flow as string,
@@ -38,25 +38,25 @@ export async function handleAcpRequest(req: AcpRequest): Promise<AcpResponse> {
 
       case "session/dispatch": {
         const sessionId = req.params?.sessionId as string;
-        await dispatch(sessionId);
+        await dispatch(getApp(), sessionId);
         return { jsonrpc: "2.0", result: { ok: true }, id };
       }
 
       case "session/stop": {
         const sessionId = req.params?.sessionId as string;
-        await stop(sessionId);
+        await stop(getApp(), sessionId);
         return { jsonrpc: "2.0", result: { ok: true }, id };
       }
 
       case "session/restart": {
         const sessionId = req.params?.sessionId as string;
-        await resume(sessionId);
+        await resume(getApp(), sessionId);
         return { jsonrpc: "2.0", result: { ok: true }, id };
       }
 
       case "session/delete": {
         const sessionId = req.params?.sessionId as string;
-        const result = await deleteSessionAsync(sessionId);
+        const result = await deleteSessionAsync(getApp(), sessionId);
         return { jsonrpc: "2.0", result, id };
       }
 
@@ -73,14 +73,14 @@ export async function handleAcpRequest(req: AcpRequest): Promise<AcpResponse> {
 
       case "session/output": {
         const sessionId = req.params?.sessionId as string;
-        const output = await getOutput(sessionId, { lines: req.params?.lines as number });
+        const output = await getOutput(getApp(), sessionId, { lines: req.params?.lines as number });
         return { jsonrpc: "2.0", result: { output }, id };
       }
 
       case "session/send": {
         const sessionId = req.params?.sessionId as string;
         const message = req.params?.message as string;
-        const result = await send(sessionId, message);
+        const result = await send(getApp(), sessionId, message);
         return { jsonrpc: "2.0", result, id };
       }
 

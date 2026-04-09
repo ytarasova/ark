@@ -14,7 +14,7 @@ describe("forkSession (shallow)", () => {
     const original = getApp().sessions.create({ summary: "original", repo: "my-repo" });
     getApp().sessions.update(original.id, { flow: "bare", stage: "work", compute_name: "my-compute", group_name: "my-group" });
 
-    const result = forkSession(original.id);
+    const result = forkSession(getApp(), original.id);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -32,7 +32,7 @@ describe("forkSession (shallow)", () => {
     const original = getApp().sessions.create({ summary: "has-claude" });
     getApp().sessions.update(original.id, { claude_session_id: "claude-abc-123" });
 
-    const result = forkSession(original.id);
+    const result = forkSession(getApp(), original.id);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -42,20 +42,20 @@ describe("forkSession (shallow)", () => {
 
   it("auto-generates unique name when no new name given", () => {
     const original = getApp().sessions.create({ summary: "my-task" });
-    const result = forkSession(original.id);
+    const result = forkSession(getApp(), original.id);
     if (!result.ok) return;
     expect(getApp().sessions.get(result.sessionId)!.summary).toBe("my-task (fork)");
   });
 
   it("uses provided name", () => {
     const original = getApp().sessions.create({ summary: "my-task" });
-    const result = forkSession(original.id, "new-name");
+    const result = forkSession(getApp(), original.id, "new-name");
     if (!result.ok) return;
     expect(getApp().sessions.get(result.sessionId)!.summary).toBe("new-name");
   });
 
   it("returns ok: false for nonexistent session", () => {
-    const result = forkSession("s-nonexistent");
+    const result = forkSession(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
   });
 });
@@ -65,7 +65,7 @@ describe("cloneSession (deep)", () => {
     const original = getApp().sessions.create({ summary: "original", repo: "my-repo" });
     getApp().sessions.update(original.id, { flow: "bare", stage: "work", compute_name: "my-compute", group_name: "my-group" });
 
-    const result = cloneSession(original.id);
+    const result = cloneSession(getApp(), original.id);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -82,7 +82,7 @@ describe("cloneSession (deep)", () => {
     const original = getApp().sessions.create({ summary: "has-claude" });
     getApp().sessions.update(original.id, { claude_session_id: "claude-abc-123" });
 
-    const result = cloneSession(original.id);
+    const result = cloneSession(getApp(), original.id);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -91,7 +91,7 @@ describe("cloneSession (deep)", () => {
   });
 
   it("returns ok: false for nonexistent session", () => {
-    const result = cloneSession("s-nonexistent");
+    const result = cloneSession(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
   });
 });

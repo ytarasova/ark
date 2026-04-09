@@ -19,7 +19,7 @@ withTestContext();
 describe("applyReport", () => {
   test("returns empty result for nonexistent sessionId (no crash)", () => {
     const report = { type: "completed", stage: "plan", summary: "done" } as unknown as OutboundMessage;
-    const result = applyReport("s-nonexistent", report);
+    const result = applyReport(getApp(), "s-nonexistent", report);
     expect(result.updates).toEqual({});
     expect(result.logEvents).toEqual([]);
     expect(result.busEvents).toEqual([]);
@@ -29,7 +29,7 @@ describe("applyReport", () => {
     const session = getApp().sessions.create({ summary: "test session" });
     getApp().sessions.update(session.id, { status: "running", stage: "plan" });
     const report = { type: "progress", stage: "plan", message: "working..." } as unknown as OutboundMessage;
-    const result = applyReport(session.id, report);
+    const result = applyReport(getApp(), session.id, report);
     // Should have log events and bus events
     expect(result.logEvents!.length).toBeGreaterThan(0);
     expect(result.busEvents!.length).toBeGreaterThan(0);

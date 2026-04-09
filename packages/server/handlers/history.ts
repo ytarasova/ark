@@ -17,7 +17,7 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
 
   router.handle("history/import", async (p) => {
     const { claudeSessionId, name, repo } = extract<HistoryImportParams>(p, []);
-    const session = core.startSession({
+    const session = core.startSession(core.getApp(), {
       summary: name ?? "import",
       repo: repo ?? ".",
       flow: "bare",

@@ -1,6 +1,6 @@
 /**
  * Tests for session stop/resume lifecycle.
- * Verifies that stop() sets correct status/fields and resume() re-dispatches.
+ * Verifies that stop(app) sets correct status/fields and resume(app) re-dispatches.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
@@ -25,7 +25,7 @@ describe("session stop", () => {
     const session = getApp().sessions.create({ summary: "stop-test" });
     getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
-    const result = await stop(session.id);
+    const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
 
     const updated = getApp().sessions.get(session.id)!;
@@ -41,7 +41,7 @@ describe("session stop", () => {
       claude_session_id: "uuid-to-preserve",
     });
 
-    await stop(session.id);
+    await stop(app, session.id);
 
     const updated = getApp().sessions.get(session.id)!;
     expect(updated.claude_session_id).toBe("uuid-to-preserve");
@@ -55,7 +55,7 @@ describe("session stop", () => {
       session_id: "ark-s-abc123",
     });
 
-    await stop(session.id);
+    await stop(app, session.id);
 
     const updated = getApp().sessions.get(session.id)!;
     expect(updated.session_id).toBeNull();
@@ -69,7 +69,7 @@ describe("session stop", () => {
       error: "some previous error",
     });
 
-    await stop(session.id);
+    await stop(app, session.id);
 
     const updated = getApp().sessions.get(session.id)!;
     expect(updated.error).toBeNull();
@@ -79,13 +79,13 @@ describe("session stop", () => {
     const session = getApp().sessions.create({ summary: "stop-msg" });
     getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
-    const result = await stop(session.id);
+    const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session stopped");
   });
 
   it("returns ok: false for nonexistent session", async () => {
-    const result = await stop("s-nonexistent");
+    const result = await stop(app, "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -94,7 +94,7 @@ describe("session stop", () => {
     const session = getApp().sessions.create({ summary: "stop-ready" });
     getApp().sessions.update(session.id, { status: "ready", stage: "work" });
 
-    const result = await stop(session.id);
+    const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
 
     const updated = getApp().sessions.get(session.id)!;
@@ -105,7 +105,7 @@ describe("session stop", () => {
     const session = getApp().sessions.create({ summary: "stop-blocked" });
     getApp().sessions.update(session.id, { status: "blocked", stage: "work" });
 
-    const result = await stop(session.id);
+    const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
 
     const updated = getApp().sessions.get(session.id)!;
@@ -121,7 +121,7 @@ describe("session stop", () => {
       workdir: "/tmp/worktree",
     });
 
-    await stop(session.id);
+    await stop(app, session.id);
 
     const updated = getApp().sessions.get(session.id)!;
     expect(updated.summary).toBe("preserve-fields");
@@ -141,7 +141,7 @@ describe("session stop", () => {
       error: "old error",
     });
 
-    await stop(session.id);
+    await stop(app, session.id);
 
     const updated = getApp().sessions.get(session.id)!;
     expect(updated.status).toBe("stopped");
@@ -152,17 +152,17 @@ describe("session stop", () => {
 });
 
 describe("session resume", () => {
-  // Note: resume() calls dispatch() which requires tmux and claude CLI,
+  // Note: resume(app) calls dispatch(app) which requires tmux and claude CLI,
   // so we test the status changes and guard clauses rather than full dispatch.
 
-  it("resume() is exported as a function", async () => {
+  it("resume(app) is exported as a function", async () => {
     const { resume } = await import("../services/session-orchestration.js");
     expect(typeof resume).toBe("function");
   });
 
   it("resume returns ok: false for nonexistent session", async () => {
     const { resume } = await import("../services/session-orchestration.js");
-    const result = await resume("s-nonexistent");
+    const result = await resume(app, "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -172,7 +172,7 @@ describe("session resume", () => {
     const session = getApp().sessions.create({ summary: "completed-test" });
     getApp().sessions.update(session.id, { status: "completed", stage: "work" });
 
-    const result = await resume(session.id);
+    const result = await resume(app, session.id);
     // Completed sessions can now be resumed (dispatches again)
     // It may fail for other reasons (no flow stage) but not because of "completed" status
     expect(result.message).not.toContain("completed");
@@ -181,7 +181,7 @@ describe("session resume", () => {
   it("stopped session can transition to ready via updateSession", async () => {
     const session = getApp().sessions.create({ summary: "resume-ready" });
     getApp().sessions.update(session.id, { status: "running", stage: "work" });
-    await stop(session.id);
+    await stop(app, session.id);
 
     // Simulate what resume does (without dispatch)
     getApp().sessions.update(session.id, {
@@ -201,7 +201,7 @@ describe("session resume", () => {
   it("stop then ready transition preserves stage", async () => {
     const session = getApp().sessions.create({ summary: "stage-preserve" });
     getApp().sessions.update(session.id, { status: "running", stage: "deploy" });
-    await stop(session.id);
+    await stop(app, session.id);
 
     getApp().sessions.update(session.id, { status: "ready" });
 

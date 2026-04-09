@@ -35,7 +35,7 @@ describe("isChannelPortAvailable", () => {
   });
 
   it("returns false when a running session uses the port", () => {
-    const session = startSession({ summary: "port-test", repo: "test", flow: "bare", workdir: "/tmp" });
+    const session = startSession(getApp(), { summary: "port-test", repo: "test", flow: "bare", workdir: "/tmp" });
     const port = getApp().sessions.channelPort(session.id);
     // startSession creates a session with status 'pending', update to 'running'
 
@@ -44,7 +44,7 @@ describe("isChannelPortAvailable", () => {
   });
 
   it("returns true when excludeSessionId matches the running session", () => {
-    const session = startSession({ summary: "port-exclude", repo: "test", flow: "bare", workdir: "/tmp" });
+    const session = startSession(getApp(), { summary: "port-exclude", repo: "test", flow: "bare", workdir: "/tmp" });
     const port = getApp().sessions.channelPort(session.id);
 
     getApp().sessions.update(session.id, { status: "running" });

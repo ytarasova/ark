@@ -10,7 +10,7 @@ describe("fail-loopback", () => {
     const s = getApp().sessions.create({ summary: "test", flow: "bare" });
     getApp().sessions.update(s.id, { status: "failed", error: "Test failed: expected 3 got 4", stage: "work" });
 
-    const result = session.retryWithContext(s.id);
+    const result = session.retryWithContext(getApp(), s.id);
     expect(result.ok).toBe(true);
 
     const updated = getApp().sessions.get(s.id)!;
@@ -21,7 +21,7 @@ describe("fail-loopback", () => {
     const s = getApp().sessions.create({ summary: "test", flow: "bare" });
     getApp().sessions.update(s.id, { status: "failed", error: "Something broke", stage: "work" });
 
-    session.retryWithContext(s.id);
+    session.retryWithContext(getApp(), s.id);
 
     const events = getApp().events.list(s.id);
     const retryEvent = events.find(e => e.type === "retry_with_context");
@@ -39,7 +39,7 @@ describe("fail-loopback", () => {
     }
     getApp().sessions.update(s.id, { status: "failed", error: "still broken" });
 
-    const result = session.retryWithContext(s.id, { maxRetries: 3 });
+    const result = session.retryWithContext(getApp(), s.id, { maxRetries: 3 });
     expect(result.ok).toBe(false);
     expect(result.message).toContain("Max retries");
   });
@@ -48,7 +48,7 @@ describe("fail-loopback", () => {
     const s = getApp().sessions.create({ summary: "test", flow: "bare" });
     getApp().sessions.update(s.id, { status: "running" });
 
-    const result = session.retryWithContext(s.id);
+    const result = session.retryWithContext(getApp(), s.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not in failed state");
   });

@@ -2,8 +2,8 @@
  * E2E tests for session stop behavior — preserving claude_session_id.
  *
  * Validates that:
- * - stop() sets status to "stopped"
- * - stop() preserves claude_session_id (does NOT null it out)
+ * - stop(app) sets status to "stopped"
+ * - stop(app) preserves claude_session_id (does NOT null it out)
  * - After stop + restart, the session can resume with the same claude_session_id
  */
 
@@ -25,18 +25,18 @@ afterAll(async () => {
 });
 
 describe("session stop preserves claude_session_id", () => {
-  it("stop() sets status to stopped", async () => {
+  it("stop(app) sets status to stopped", async () => {
     const session = getApp().sessions.create({ summary: "stop-status-test" });
     getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
-    const result = await stop(session.id);
+    const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
 
     const updated = getApp().sessions.get(session.id)!;
     expect(updated.status).toBe("stopped");
   });
 
-  it("stop() preserves claude_session_id (does NOT null it out)", async () => {
+  it("stop(app) preserves claude_session_id (does NOT null it out)", async () => {
     const session = getApp().sessions.create({ summary: "stop-preserve-id" });
     getApp().sessions.update(session.id, {
       status: "running",
@@ -45,7 +45,7 @@ describe("session stop preserves claude_session_id", () => {
       session_id: "ark-s-test",
     });
 
-    await stop(session.id);
+    await stop(app, session.id);
 
     const updated = getApp().sessions.get(session.id)!;
     expect(updated.status).toBe("stopped");
@@ -65,12 +65,12 @@ describe("session stop preserves claude_session_id", () => {
     });
 
     // Stop the session
-    await stop(session.id);
+    await stop(app, session.id);
     const stopped = getApp().sessions.get(session.id)!;
     expect(stopped.status).toBe("stopped");
     expect(stopped.claude_session_id).toBe(claudeId);
 
-    // Simulate resume preparation (what resume() does before dispatch)
+    // Simulate resume preparation (what resume(app) does before dispatch)
     getApp().sessions.update(session.id, {
       status: "ready",
       error: null,
@@ -95,23 +95,23 @@ describe("session stop preserves claude_session_id", () => {
     });
 
     // First stop
-    await stop(session.id);
+    await stop(app, session.id);
     expect(getApp().sessions.get(session.id)!.claude_session_id).toBe(claudeId);
 
     // Simulate restart
     getApp().sessions.update(session.id, { status: "running", session_id: "ark-tmux-2" });
 
     // Second stop
-    await stop(session.id);
+    await stop(app, session.id);
     expect(getApp().sessions.get(session.id)!.claude_session_id).toBe(claudeId);
 
     // Third cycle
     getApp().sessions.update(session.id, { status: "running", session_id: "ark-tmux-3" });
-    await stop(session.id);
+    await stop(app, session.id);
     expect(getApp().sessions.get(session.id)!.claude_session_id).toBe(claudeId);
   });
 
-  it("stop() nulls error field", async () => {
+  it("stop(app) nulls error field", async () => {
     const session = getApp().sessions.create({ summary: "stop-clears-error" });
     getApp().sessions.update(session.id, {
       status: "running",
@@ -119,13 +119,13 @@ describe("session stop preserves claude_session_id", () => {
       error: "some transient error",
     });
 
-    await stop(session.id);
+    await stop(app, session.id);
 
     const updated = getApp().sessions.get(session.id)!;
     expect(updated.error).toBeNull();
   });
 
-  it("stop() preserves stage and agent fields", async () => {
+  it("stop(app) preserves stage and agent fields", async () => {
     const session = getApp().sessions.create({ summary: "stop-preserves-agent" });
     getApp().sessions.update(session.id, {
       status: "running",
@@ -134,7 +134,7 @@ describe("session stop preserves claude_session_id", () => {
       workdir: "/tmp/work",
     });
 
-    await stop(session.id);
+    await stop(app, session.id);
 
     const updated = getApp().sessions.get(session.id)!;
     expect(updated.stage).toBe("review");

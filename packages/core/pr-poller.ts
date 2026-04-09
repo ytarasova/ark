@@ -113,7 +113,8 @@ export async function processReviewFeedback(
     // Advance the review gate
     try {
       const { approveReviewGate } = await import("./services/session-orchestration.js");
-      await approveReviewGate(session.id);
+      const { getApp } = await import("./app.js");
+      await approveReviewGate(getApp(), session.id);
     } catch {}
     return;
   }

@@ -34,7 +34,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Create session
   log(`Creating session: ${summary}`);
-  const session = core.startSession({
+  const session = core.startSession(core.getApp(), {
     ticket: opts.ticket,
     summary,
     repo,
@@ -46,7 +46,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Dispatch
   log(`Dispatching ${session.id}...`);
-  const result = await core.dispatch(session.id);
+  const result = await core.dispatch(core.getApp(), session.id);
   if (!result.ok) {
     if (output === "json") {
       console.log(JSON.stringify({ status: "error", message: result.message, sessionId: session.id }));
@@ -59,7 +59,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Wait
   const timeoutMs = (opts.timeout ?? 0) * 1000;
-  const { session: final, timedOut } = await core.waitForCompletion(session.id, {
+  const { session: final, timedOut } = await core.waitForCompletion(core.getApp(), session.id, {
     timeoutMs,
     pollMs: 5000,
     onStatus: (status) => log(`  Status: ${status}`),

@@ -14,11 +14,11 @@ import { getApp } from "../app.js";
 
 withTestContext();
 
-// ── Test 1: interrupt() ───────────────────────────────────────────────────────
+// ── Test 1: interrupt(getApp()) ───────────────────────────────────────────────────────
 
-describe("interrupt()", () => {
+describe("interrupt(getApp())", () => {
   it("returns error for non-existent session", async () => {
-    const result = await interrupt("s-nonexistent");
+    const result = await interrupt(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -27,7 +27,7 @@ describe("interrupt()", () => {
     const session = getApp().sessions.create({ summary: "interrupt-not-running" });
     getApp().sessions.update(session.id, { status: "pending" });
 
-    const result = await interrupt(session.id);
+    const result = await interrupt(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not running");
   });
@@ -36,7 +36,7 @@ describe("interrupt()", () => {
     const session = getApp().sessions.create({ summary: "interrupt-no-tmux" });
     getApp().sessions.update(session.id, { status: "running", session_id: null });
 
-    const result = await interrupt(session.id);
+    const result = await interrupt(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("No tmux session");
   });
@@ -46,11 +46,11 @@ describe("interrupt()", () => {
   });
 });
 
-// ── Test 2: worktreeDiff() ────────────────────────────────────────────────────
+// ── Test 2: worktreeDiff(getApp()) ────────────────────────────────────────────────────
 
-describe("worktreeDiff()", () => {
+describe("worktreeDiff(getApp())", () => {
   it("returns error for non-existent session", async () => {
-    const result = await worktreeDiff("s-nonexistent");
+    const result = await worktreeDiff(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -59,7 +59,7 @@ describe("worktreeDiff()", () => {
     const session = getApp().sessions.create({ summary: "diff-no-workdir" });
     // No workdir or repo set
 
-    const result = await worktreeDiff(session.id);
+    const result = await worktreeDiff(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("No workdir or repo");
   });
@@ -71,7 +71,7 @@ describe("worktreeDiff()", () => {
       repo: "/tmp/nonexistent-repo",
     });
 
-    const result = await worktreeDiff(session.id);
+    const result = await worktreeDiff(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("Cannot determine branch");
   });
@@ -81,22 +81,22 @@ describe("worktreeDiff()", () => {
 
 describe("worktreeDiff re-review flagging", () => {
   it("returns empty modifiedSinceReview for non-existent session", async () => {
-    const result = await worktreeDiff("s-nonexistent");
+    const result = await worktreeDiff(getApp(), "s-nonexistent");
     expect(result.modifiedSinceReview).toEqual([]);
   });
 
   it("returns modifiedSinceReview in the result shape", async () => {
     const session = getApp().sessions.create({ summary: "re-review-test" });
-    const result = await worktreeDiff(session.id);
+    const result = await worktreeDiff(getApp(), session.id);
     expect(Array.isArray(result.modifiedSinceReview)).toBe(true);
   });
 });
 
-// ── Test 3: createWorktreePR() ────────────────────────────────────────────────
+// ── Test 3: createWorktreePR(getApp()) ────────────────────────────────────────────────
 
-describe("createWorktreePR()", () => {
+describe("createWorktreePR(getApp())", () => {
   it("returns error for non-existent session", async () => {
-    const result = await createWorktreePR("s-nonexistent");
+    const result = await createWorktreePR(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -105,7 +105,7 @@ describe("createWorktreePR()", () => {
     const session = getApp().sessions.create({ summary: "pr-no-repo" });
     // No repo set
 
-    const result = await createWorktreePR(session.id);
+    const result = await createWorktreePR(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("no repo");
   });
@@ -114,7 +114,7 @@ describe("createWorktreePR()", () => {
     const session = getApp().sessions.create({ summary: "pr-no-branch" });
     getApp().sessions.update(session.id, { repo: "/tmp/nonexistent-repo" });
 
-    const result = await createWorktreePR(session.id);
+    const result = await createWorktreePR(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("Cannot determine worktree branch");
   });
@@ -219,13 +219,13 @@ describe("TodoRepository", () => {
   });
 });
 
-// ── Test 5: runVerification() ─────────────────────────────────────────────────
+// ── Test 5: runVerification(getApp()) ─────────────────────────────────────────────────
 
-describe("runVerification()", () => {
+describe("runVerification(getApp())", () => {
   it("returns ok when no todos and no verify scripts", async () => {
     const session = getApp().sessions.create({ summary: "verify-clean" });
 
-    const result = await runVerification(session.id);
+    const result = await runVerification(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.todosResolved).toBe(true);
     expect(result.pendingTodos).toHaveLength(0);
@@ -237,7 +237,7 @@ describe("runVerification()", () => {
     const session = getApp().sessions.create({ summary: "verify-todos" });
     getApp().todos.add(session.id, "Must do this");
 
-    const result = await runVerification(session.id);
+    const result = await runVerification(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.todosResolved).toBe(false);
     expect(result.pendingTodos).toHaveLength(1);
@@ -248,7 +248,7 @@ describe("runVerification()", () => {
     getApp().todos.add(session.id, "Fix the bug");
     getApp().todos.add(session.id, "Add tests");
 
-    const result = await runVerification(session.id);
+    const result = await runVerification(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("Fix the bug");
     expect(result.message).toContain("Add tests");
@@ -256,7 +256,7 @@ describe("runVerification()", () => {
   });
 
   it("returns error for non-existent session", async () => {
-    const result = await runVerification("s-nonexistent");
+    const result = await runVerification(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -266,7 +266,7 @@ describe("runVerification()", () => {
     const t1 = getApp().todos.add(session.id, "Already done");
     getApp().todos.toggle(t1.id);
 
-    const result = await runVerification(session.id);
+    const result = await runVerification(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.todosResolved).toBe(true);
     expect(result.pendingTodos).toHaveLength(0);
@@ -332,15 +332,15 @@ describe("RepoConfig verify field", () => {
   });
 });
 
-// ── Test 8: archive() and restore() ──────────────────────────────────────────
+// ── Test 8: archive(getApp()) and restore(getApp()) ──────────────────────────────────────────
 
-describe("archive() and restore()", () => {
+describe("archive(getApp()) and restore(getApp())", () => {
   it("archive sets status to archived", () => {
     const { archive } = require("../services/session-orchestration.js");
     const session = getApp().sessions.create({ summary: "archive-test" });
     getApp().sessions.update(session.id, { status: "completed" });
 
-    const result = archive(session.id);
+    const result = archive(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session archived");
 
@@ -350,7 +350,7 @@ describe("archive() and restore()", () => {
 
   it("archive returns error for non-existent session", () => {
     const { archive } = require("../services/session-orchestration.js");
-    const result = archive("s-nonexistent");
+    const result = archive(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -359,9 +359,9 @@ describe("archive() and restore()", () => {
     const { archive, restore } = require("../services/session-orchestration.js");
     const session = getApp().sessions.create({ summary: "restore-test" });
     getApp().sessions.update(session.id, { status: "completed" });
-    archive(session.id);
+    archive(getApp(), session.id);
 
-    const result = restore(session.id);
+    const result = restore(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session restored");
 
@@ -374,7 +374,7 @@ describe("archive() and restore()", () => {
     const session = getApp().sessions.create({ summary: "restore-not-archived" });
     getApp().sessions.update(session.id, { status: "completed" });
 
-    const result = restore(session.id);
+    const result = restore(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not archived");
   });
@@ -383,7 +383,7 @@ describe("archive() and restore()", () => {
     const { archive } = require("../services/session-orchestration.js");
     const session = getApp().sessions.create({ summary: "archive-list-test" });
     getApp().sessions.update(session.id, { status: "completed" });
-    archive(session.id);
+    archive(getApp(), session.id);
 
     // Default list should not include archived
     const defaultList = getApp().sessions.list();

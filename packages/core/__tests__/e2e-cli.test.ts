@@ -106,7 +106,7 @@ describe("CLI: compute lifecycle", () => {
 
 describe("CLI: session lifecycle", () => {
   it("creates a session with --repo and --summary", () => {
-    const session = core.startSession({
+    const session = core.startSession(core.getApp(), {
       repo: ".",
       summary: "test-e2e-session",
       flow: "bare",
@@ -117,14 +117,14 @@ describe("CLI: session lifecycle", () => {
   });
 
   it("lists sessions", () => {
-    const session = core.startSession({ repo: ".", summary: "list-test", flow: "bare" });
+    const session = core.startSession(core.getApp(), { repo: ".", summary: "list-test", flow: "bare" });
     testSessionIds.push(session.id);
     const sessions = core.listSessions();
     expect(sessions.some(s => s.summary === "list-test")).toBe(true);
   });
 
   it("shows session details", () => {
-    const session = core.startSession({ repo: ".", summary: "show-test", flow: "bare" });
+    const session = core.startSession(core.getApp(), { repo: ".", summary: "show-test", flow: "bare" });
     testSessionIds.push(session.id);
     const fetched = core.getSession(session.id);
     expect(fetched).not.toBeNull();
@@ -134,7 +134,7 @@ describe("CLI: session lifecycle", () => {
   });
 
   it("deletes a session (soft-delete)", () => {
-    const session = core.startSession({ repo: ".", summary: "delete-test", flow: "bare" });
+    const session = core.startSession(core.getApp(), { repo: ".", summary: "delete-test", flow: "bare" });
     core.softDeleteSession(session.id);
     const after = core.getSession(session.id);
     expect(after).not.toBeNull();
@@ -142,7 +142,7 @@ describe("CLI: session lifecycle", () => {
   });
 
   it("undeletes a soft-deleted session", () => {
-    const session = core.startSession({ repo: ".", summary: "undelete-test", flow: "bare" });
+    const session = core.startSession(core.getApp(), { repo: ".", summary: "undelete-test", flow: "bare" });
     core.softDeleteSession(session.id);
     const restored = core.undeleteSession(session.id);
     expect(restored).not.toBeNull();

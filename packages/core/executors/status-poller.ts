@@ -49,7 +49,8 @@ export function startStatusPoller(sessionId: string, handle: string, executorNam
         if (newStatus === "completed") {
           try {
             const { advance } = await import("../services/session-orchestration.js");
-            await advance(sessionId);
+            const { getApp } = await import("../app.js");
+            await advance(getApp(), sessionId);
           } catch { /* advance may fail if flow is done */ }
         }
 

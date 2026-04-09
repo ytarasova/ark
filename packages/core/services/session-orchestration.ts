@@ -14,7 +14,7 @@ import { homedir } from "os";
 
 const execFileAsync = promisify(execFile);
 
-import { getApp } from "../app.js";
+import type { AppContext } from "../app.js";
 import { TRACKS_DIR, WORKTREES_DIR } from "../paths.js";
 import { safeParseConfig } from "../util.js";
 import type { Session, Compute, MessageRole, MessageType } from "../../types/index.js";
@@ -88,7 +88,7 @@ function resolveGitHubUrl(dir?: string | null): string | null {
   }
 }
 
-export function startSession(opts: {
+export function startSession(app: AppContext, opts: {
   ticket?: string;
   summary?: string;
   repo?: string;
@@ -120,22 +120,22 @@ export function startSession(opts: {
     mergedOpts.config = { ...(mergedOpts.config ?? {}), github_url: repoUrl };
   }
 
-  const session = getApp().sessions.create(mergedOpts);
+  const session = app.sessions.create(mergedOpts);
 
   // Telemetry: track session creation
   track("session_created", { flow: mergedOpts.flow ?? "default" });
 
   // Apply agent override if specified
   if (opts.agent) {
-    getApp().sessions.update(session.id, { agent: opts.agent });
+    app.sessions.update(session.id, { agent: opts.agent });
   }
 
   // Set first stage
   const firstStage = flow.getFirstStage(mergedOpts.flow ?? "default");
   if (firstStage) {
     const action = flow.getStageAction(mergedOpts.flow ?? "default", firstStage);
-    getApp().sessions.update(session.id, { stage: firstStage, status: "ready" });
-    getApp().events.log(session.id, "stage_ready", {
+    app.sessions.update(session.id, { stage: firstStage, status: "ready" });
+    app.events.log(session.id, "stage_ready", {
       stage: firstStage, actor: "system",
       data: { stage: firstStage, gate: "auto", stage_type: action.type, stage_agent: action.agent },
     });
@@ -150,12 +150,12 @@ export function startSession(opts: {
       emitStageSpanStart(session.id, { stage: firstStage, agent: stageAction.agent, gate: "auto" });
     }
   }
-  return getApp().sessions.get(session.id)!;
+  return app.sessions.get(session.id)!;
 }
 
-export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<{ ok: boolean; message: string }> {
+export async function dispatch(app: AppContext, sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<{ ok: boolean; message: string }> {
   const log = opts?.onLog ?? (() => {});
-  const session = getApp().sessions.get(sessionId);
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   if (session.status === "running" && session.session_id) {
@@ -169,7 +169,7 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   if (!stage) return { ok: false, message: "No current stage. The session may have completed its flow." };
 
   // Validate compute exists if specified
-  if (session.compute_name && !getApp().computes.get(session.compute_name)) {
+  if (session.compute_name && !app.computes.get(session.compute_name)) {
     return { ok: false, message: `Compute '${session.compute_name}' not found. Delete and recreate the session.` };
   }
 
@@ -177,13 +177,13 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   try {
     const injection = detectInjection(session.summary ?? "");
     if (injection.severity === "high") {
-      getApp().events.log(sessionId, "prompt_injection_blocked", {
+      app.events.log(sessionId, "prompt_injection_blocked", {
         actor: "system", data: { patterns: injection.patterns, context: "dispatch" },
       });
       return { ok: false, message: "Dispatch blocked: potential prompt injection in task summary" };
     }
     if (injection.detected) {
-      getApp().events.log(sessionId, "prompt_injection_warning", {
+      app.events.log(sessionId, "prompt_injection_warning", {
         actor: "system", data: { patterns: injection.patterns, severity: injection.severity, context: "dispatch" },
       });
     }
@@ -192,11 +192,11 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   // Check if fork stage
   const stageDef = flow.getStage(session.flow, stage);
   if (stageDef?.type === "fork") {
-    return dispatchFork(sessionId, stageDef);
+    return dispatchFork(app, sessionId, stageDef);
   }
 
   if (stageDef?.type === "fan_out") {
-    return dispatchFanOut(sessionId, stageDef);
+    return dispatchFanOut(app, sessionId, stageDef);
   }
 
   const action = flow.getStageAction(session.flow, stage);
@@ -221,7 +221,7 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
 
   // Build task with handoff context
   log("Building task...");
-  let task = await buildTaskWithHandoff(session, stage, agentName);
+  let task = await buildTaskWithHandoff(app, session, stage, agentName);
 
   // Inject relevant memories into agent context
   try {
@@ -264,14 +264,14 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
     onLog: log,
     prevClaudeSessionId: session.claude_session_id,
     sessionName: session.summary ?? session.id,
-    compute: session.compute_name ? (getApp().computes.get(session.compute_name) as unknown as { name: string; provider: string; [k: string]: unknown } | null) ?? undefined : undefined,
+    compute: session.compute_name ? (app.computes.get(session.compute_name) as unknown as { name: string; provider: string; [k: string]: unknown } | null) ?? undefined : undefined,
   });
 
   if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
   const tmuxName = launchResult.handle;
 
-  getApp().sessions.update(sessionId, { status: "running", agent: agentName, session_id: tmuxName });
-  getApp().events.log(sessionId, "stage_started", {
+  app.sessions.update(sessionId, { status: "running", agent: agentName, session_id: tmuxName });
+  app.events.log(sessionId, "stage_started", {
     stage, actor: "user",
     data: {
       agent: agentName, session_id: tmuxName, model: agent.model,
@@ -301,8 +301,8 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
   return { ok: true, message: tmuxName };
 }
 
-export async function advance(sessionId: string, force = false): Promise<{ ok: boolean; message: string }> {
-  const session = getApp().sessions.get(sessionId);
+export async function advance(app: AppContext, sessionId: string, force = false): Promise<{ ok: boolean; message: string }> {
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const { flow: flowName, stage } = session;
@@ -330,8 +330,8 @@ export async function advance(sessionId: string, force = false): Promise<{ ok: b
         // Persist flow state before advancing
         try { markStageCompleted(sessionId, stage); } catch { /* skip */ }
         try { setCurrentStage(sessionId, graphNextStage, flowName); } catch { /* skip */ }
-        getApp().sessions.update(sessionId, { stage: graphNextStage, status: "ready" });
-        getApp().events.log(sessionId, "stage_advanced", { actor: "system", stage: graphNextStage, data: { via: "graph-flow", successors } });
+        app.sessions.update(sessionId, { stage: graphNextStage, status: "ready" });
+        app.events.log(sessionId, "stage_advanced", { actor: "system", stage: graphNextStage, data: { via: "graph-flow", successors } });
         emitStageSpanEnd(sessionId, { status: "completed" });
         const graphAction = flow.getStageAction(flowName, graphNextStage);
         const graphStageDef = flow.getStage(flowName, graphNextStage);
@@ -346,16 +346,16 @@ export async function advance(sessionId: string, force = false): Promise<{ ok: b
   if (!nextStage) {
     // Flow complete -- persist final stage completion
     try { markStageCompleted(sessionId, stage); } catch { /* skip */ }
-    getApp().sessions.update(sessionId, { status: "completed" });
-    getApp().events.log(sessionId, "session_completed", {
+    app.sessions.update(sessionId, { status: "completed" });
+    app.events.log(sessionId, "session_completed", {
       stage, actor: "system",
       data: { final_stage: stage, flow: flowName },
     });
     // Auto-clear unread badge so completed sessions don't show stale notifications
-    getApp().messages.markRead(sessionId);
+    app.messages.markRead(sessionId);
 
     emitStageSpanEnd(sessionId, { status: "completed" });
-    const s = getApp().sessions.get(sessionId);
+    const s = app.sessions.get(sessionId);
     const usage = s?.config?.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; total_cost?: number } | undefined;
     emitSessionSpanEnd(sessionId, {
       status: "completed",
@@ -383,8 +383,8 @@ export async function advance(sessionId: string, force = false): Promise<{ ok: b
   try { setCurrentStage(sessionId, nextStage, flowName); } catch { /* skip */ }
 
   const nextAction = flow.getStageAction(flowName, nextStage);
-  getApp().sessions.update(sessionId, { stage: nextStage, status: "ready", error: null });
-  getApp().events.log(sessionId, "stage_ready", {
+  app.sessions.update(sessionId, { stage: nextStage, status: "ready", error: null });
+  app.events.log(sessionId, "stage_ready", {
     stage: nextStage, actor: "system",
     data: {
       from_stage: stage, to_stage: nextStage,
@@ -403,8 +403,8 @@ export async function advance(sessionId: string, force = false): Promise<{ ok: b
   return { ok: true, message: `Advanced to ${nextStage}` };
 }
 
-export async function stop(sessionId: string): Promise<{ ok: boolean; message: string }> {
-  const session = getApp().sessions.get(sessionId);
+export async function stop(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   // Checkpoint before stopping (preserve state for potential recovery)
@@ -434,8 +434,8 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
   }
 
   // Preserve claude_session_id so restart can --resume the conversation
-  getApp().sessions.update(sessionId, { status: "stopped", error: null, session_id: null });
-  getApp().events.log(sessionId, "session_stopped", {
+  app.sessions.update(sessionId, { status: "stopped", error: null, session_id: null });
+  app.events.log(sessionId, "session_stopped", {
     stage: session.stage, actor: "user",
     data: { session_id: session.session_id, agent: session.agent },
   });
@@ -450,42 +450,42 @@ export async function stop(sessionId: string): Promise<{ ok: boolean; message: s
   return { ok: true, message: "Session stopped" };
 }
 
-export async function resume(sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<{ ok: boolean; message: string }> {
-  const session = getApp().sessions.get(sessionId);
+export async function resume(app: AppContext, sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<{ ok: boolean; message: string }> {
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status === "running" && session.session_id) return { ok: false, message: "Already running" };
 
   if (session.session_id) await tmux.killSessionAsync(session.session_id);
 
-  getApp().sessions.update(sessionId, {
+  app.sessions.update(sessionId, {
     status: "ready", error: null, breakpoint_reason: null,
     attached_by: null, session_id: null,
   });
-  getApp().events.log(sessionId, "session_resumed", {
+  app.events.log(sessionId, "session_resumed", {
     stage: session.stage, actor: "user",
     data: { from_status: session.status },
   });
 
   // Auto re-dispatch
-  return await dispatch(sessionId, opts);
+  return await dispatch(app, sessionId, opts);
 }
 
 /**
  * Run verification for a session: check todos are resolved and verify scripts pass.
  * Returns structured results for display and enforcement.
  */
-export async function runVerification(sessionId: string): Promise<{
+export async function runVerification(app: AppContext, sessionId: string): Promise<{
   ok: boolean;
   todosResolved: boolean;
   pendingTodos: string[];
   scriptResults: Array<{ script: string; passed: boolean; output: string }>;
   message: string;
 }> {
-  const session = getApp().sessions.get(sessionId);
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, todosResolved: true, pendingTodos: [], scriptResults: [], message: "Session not found" };
 
   // Check todos
-  const todos = getApp().todos.list(sessionId);
+  const todos = app.todos.list(sessionId);
   const pending = todos.filter(t => !t.done);
   const todosResolved = pending.length === 0;
 
@@ -536,48 +536,48 @@ export async function runVerification(sessionId: string): Promise<{
  * Execute an action stage (create_pr, merge, close, etc.).
  * Called by the conductor when auto-advancing into an action stage.
  */
-export async function executeAction(sessionId: string, action: string): Promise<{ ok: boolean; message: string }> {
-  const s = getApp().sessions.get(sessionId);
+export async function executeAction(app: AppContext, sessionId: string, action: string): Promise<{ ok: boolean; message: string }> {
+  const s = app.sessions.get(sessionId);
   if (!s) return { ok: false, message: "Session not found" };
 
   switch (action) {
     case "create_pr": {
-      const result = await createWorktreePR(sessionId, { title: s.summary ?? undefined });
+      const result = await createWorktreePR(app, sessionId, { title: s.summary ?? undefined });
       if (result.ok) {
-        getApp().events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: result.pr_url } });
+        app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: result.pr_url } });
         // Auto-advance past this action stage
-        return await advance(sessionId, true);
+        return await advance(app, sessionId, true);
       }
       return result;
     }
     case "merge_pr":
     case "merge": {
-      const result = await finishWorktree(sessionId, { force: true });
+      const result = await finishWorktree(app, sessionId, { force: true });
       if (result.ok) {
-        getApp().events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action } });
+        app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action } });
       }
       return result;
     }
     case "close_ticket":
     case "close": {
-      getApp().events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action } });
-      return await advance(sessionId, true);
+      app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action } });
+      return await advance(app, sessionId, true);
     }
     default: {
-      getApp().events.log(sessionId, "action_skipped", { stage: s.stage ?? undefined, actor: "system", data: { action, reason: "unknown action type" } });
-      return await advance(sessionId, true);
+      app.events.log(sessionId, "action_skipped", { stage: s.stage ?? undefined, actor: "system", data: { action, reason: "unknown action type" } });
+      return await advance(app, sessionId, true);
     }
   }
 }
 
-export async function complete(sessionId: string, opts?: { force?: boolean }): Promise<{ ok: boolean; message: string }> {
-  const session = getApp().sessions.get(sessionId);
+export async function complete(app: AppContext, sessionId: string, opts?: { force?: boolean }): Promise<{ ok: boolean; message: string }> {
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   // Run verification unless --force.
   // Quick sync check: only call async runVerification if there are todos or verify scripts.
   if (!opts?.force) {
-    const hasTodos = getApp().todos.list(sessionId).length > 0;
+    const hasTodos = app.todos.list(sessionId).length > 0;
     const stageVerify = session.stage && session.flow
       ? flow.getStage(session.flow, session.stage)?.verify
       : undefined;
@@ -585,36 +585,36 @@ export async function complete(sessionId: string, opts?: { force?: boolean }): P
     const hasScripts = (stageVerify ?? repoVerify ?? []).length > 0;
 
     if (hasTodos || hasScripts) {
-      const verify = await runVerification(sessionId);
+      const verify = await runVerification(app, sessionId);
       if (!verify.ok) {
         return { ok: false, message: `Verification failed:\n${verify.message}` };
       }
     }
   }
 
-  getApp().events.log(sessionId, "stage_completed", {
+  app.events.log(sessionId, "stage_completed", {
     stage: session.stage, actor: "user",
     data: { note: "Manually completed" },
   });
-  getApp().messages.markRead(sessionId);
-  getApp().sessions.update(sessionId, { status: "ready", session_id: null });
-  return await advance(sessionId, true);
+  app.messages.markRead(sessionId);
+  app.sessions.update(sessionId, { status: "ready", session_id: null });
+  return await advance(app, sessionId, true);
 }
 
-export function pause(sessionId: string, reason?: string): { ok: boolean; message: string } {
-  const session = getApp().sessions.get(sessionId);
+export function pause(app: AppContext, sessionId: string, reason?: string): { ok: boolean; message: string } {
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  getApp().sessions.update(sessionId, { status: "blocked", breakpoint_reason: reason ?? "User paused" });
-  getApp().events.log(sessionId, "session_paused", {
+  app.sessions.update(sessionId, { status: "blocked", breakpoint_reason: reason ?? "User paused" });
+  app.events.log(sessionId, "session_paused", {
     stage: session.stage, actor: "user",
     data: { reason, was_status: session.status },
   });
   return { ok: true, message: "Paused" };
 }
 
-export function archive(sessionId: string): { ok: boolean; message: string } {
-  const session = getApp().sessions.get(sessionId);
+export function archive(app: AppContext, sessionId: string): { ok: boolean; message: string } {
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   // Stop if running
@@ -622,29 +622,29 @@ export function archive(sessionId: string): { ok: boolean; message: string } {
     tmux.killSession(session.session_id);
   }
 
-  getApp().sessions.update(sessionId, { status: "archived", session_id: null });
-  getApp().events.log(sessionId, "session_archived", {
+  app.sessions.update(sessionId, { status: "archived", session_id: null });
+  app.events.log(sessionId, "session_archived", {
     stage: session.stage, actor: "user",
     data: { from_status: session.status },
   });
   return { ok: true, message: "Session archived" };
 }
 
-export function restore(sessionId: string): { ok: boolean; message: string } {
-  const session = getApp().sessions.get(sessionId);
+export function restore(app: AppContext, sessionId: string): { ok: boolean; message: string } {
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status !== "archived") return { ok: false, message: `Session is ${session.status}, not archived` };
 
-  getApp().sessions.update(sessionId, { status: "stopped" });
-  getApp().events.log(sessionId, "session_restored", {
+  app.sessions.update(sessionId, { status: "stopped" });
+  app.events.log(sessionId, "session_restored", {
     stage: session.stage, actor: "user",
     data: {},
   });
   return { ok: true, message: "Session restored" };
 }
 
-export async function interrupt(sessionId: string): Promise<{ ok: boolean; message: string }> {
-  const session = getApp().sessions.get(sessionId);
+export async function interrupt(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status !== "running" && session.status !== "waiting") {
     return { ok: false, message: `Session is ${session.status}, not running` };
@@ -654,8 +654,8 @@ export async function interrupt(sessionId: string): Promise<{ ok: boolean; messa
   // Send Ctrl+C to interrupt the agent without killing the tmux session
   await tmux.sendKeysAsync(session.session_id, "C-c");
 
-  getApp().sessions.update(sessionId, { status: "waiting" });
-  getApp().events.log(sessionId, "session_interrupted", {
+  app.sessions.update(sessionId, { status: "waiting" });
+  app.events.log(sessionId, "session_interrupted", {
     stage: session.stage, actor: "user",
     data: { session_id: session.session_id },
   });
@@ -666,16 +666,16 @@ export async function interrupt(sessionId: string): Promise<{ ok: boolean; messa
 // ── Review gate ─────────────────────────────────────────────────────────────
 
 /** Open a review gate -- called when PR is approved via webhook. */
-export async function approveReviewGate(sessionId: string): Promise<{ ok: boolean; message: string }> {
-  const s = getApp().sessions.get(sessionId);
+export async function approveReviewGate(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
+  const s = app.sessions.get(sessionId);
   if (!s) return { ok: false, message: "Session not found" };
 
-  getApp().events.log(sessionId, "review_approved", {
+  app.events.log(sessionId, "review_approved", {
     stage: s.stage ?? undefined, actor: "github",
   });
 
   // Force-advance past the review gate
-  return await advance(sessionId, true);
+  return await advance(app, sessionId, true);
 }
 
 // ── Clone & Handoff ─────────────────────────────────────────────────────────
@@ -683,12 +683,12 @@ export async function approveReviewGate(sessionId: string): Promise<{ ok: boolea
 /**
  * Fork: shallow copy - same compute, repo, flow, group. Fresh session, no resume.
  */
-export function forkSession(sessionId: string, newName?: string): SessionOpResult {
-  const original = getApp().sessions.get(sessionId);
+export function forkSession(app: AppContext, sessionId: string, newName?: string): SessionOpResult {
+  const original = app.sessions.get(sessionId);
   if (!original) return { ok: false, message: `Session ${sessionId} not found` };
 
   const baseName = original.summary || sessionId;
-  const fork = getApp().sessions.create({
+  const fork = app.sessions.create({
     ticket: original.ticket || undefined,
     summary: newName ?? `${baseName} (fork)`,
     repo: original.repo || undefined,
@@ -697,13 +697,13 @@ export function forkSession(sessionId: string, newName?: string): SessionOpResul
     workdir: original.workdir || undefined,
   });
 
-  getApp().sessions.update(fork.id, {
+  app.sessions.update(fork.id, {
     stage: original.stage,
     status: "ready",
     group_name: original.group_name,
   });
 
-  getApp().events.log(fork.id, "session_forked", {
+  app.events.log(fork.id, "session_forked", {
     stage: original.stage, actor: "user",
     data: { forked_from: sessionId },
   });
@@ -715,12 +715,12 @@ export function forkSession(sessionId: string, newName?: string): SessionOpResul
  * Clone: deep copy - same as fork PLUS claude_session_id for --resume.
  * The new session will resume the same Claude conversation.
  */
-export function cloneSession(sessionId: string, newName?: string): SessionOpResult {
-  const original = getApp().sessions.get(sessionId);
+export function cloneSession(app: AppContext, sessionId: string, newName?: string): SessionOpResult {
+  const original = app.sessions.get(sessionId);
   if (!original) return { ok: false, message: `Session ${sessionId} not found` };
 
   const baseName = original.summary || sessionId;
-  const clone = getApp().sessions.create({
+  const clone = app.sessions.create({
     ticket: original.ticket || undefined,
     summary: newName ?? `${baseName} (clone)`,
     repo: original.repo || undefined,
@@ -729,14 +729,14 @@ export function cloneSession(sessionId: string, newName?: string): SessionOpResu
     workdir: original.workdir || undefined,
   });
 
-  getApp().sessions.update(clone.id, {
+  app.sessions.update(clone.id, {
     stage: original.stage,
     status: "ready",
     group_name: original.group_name,
     claude_session_id: original.claude_session_id, // --resume handoff
   });
 
-  getApp().events.log(clone.id, "session_cloned", {
+  app.events.log(clone.id, "session_cloned", {
     stage: original.stage, actor: "user",
     data: { cloned_from: sessionId, claude_session_id: original.claude_session_id },
   });
@@ -744,31 +744,31 @@ export function cloneSession(sessionId: string, newName?: string): SessionOpResu
   return { ok: true, sessionId: clone.id };
 }
 
-export async function handoff(sessionId: string, toAgent: string, instructions?: string): Promise<{ ok: boolean; message: string }> {
-  const result = cloneSession(sessionId, instructions);
+export async function handoff(app: AppContext, sessionId: string, toAgent: string, instructions?: string): Promise<{ ok: boolean; message: string }> {
+  const result = cloneSession(app, sessionId, instructions);
   if (!result.ok) return { ok: false, message: (result as { ok: false; message: string }).message };
 
-  getApp().events.log(result.sessionId, "session_handoff", {
+  app.events.log(result.sessionId, "session_handoff", {
     actor: "user",
     data: { from_session: sessionId, to_agent: toAgent, instructions },
   });
 
-  return await dispatch(result.sessionId);
+  return await dispatch(app, result.sessionId);
 }
 
 // ── Fork/Join ───────────────────────────────────────────────────────────────
 
-export function fork(parentId: string, task: string, opts?: {
+export function fork(app: AppContext, parentId: string, task: string, opts?: {
   agent?: string;
   dispatch?: boolean;
 }): SessionOpResult {
-  const parent = getApp().sessions.get(parentId);
+  const parent = app.sessions.get(parentId);
   if (!parent) return { ok: false, message: "Parent not found" };
 
   const forkGroup = parent.fork_group ?? randomUUID().slice(0, 8);
-  if (!parent.fork_group) getApp().sessions.update(parentId, { fork_group: forkGroup });
+  if (!parent.fork_group) app.sessions.update(parentId, { fork_group: forkGroup });
 
-  const child = getApp().sessions.create({
+  const child = app.sessions.create({
     ticket: parent.ticket || undefined,
     summary: task,
     repo: parent.repo || undefined,
@@ -777,34 +777,34 @@ export function fork(parentId: string, task: string, opts?: {
     workdir: parent.workdir || undefined,
   });
 
-  getApp().sessions.update(child.id, {
+  app.sessions.update(child.id, {
     parent_id: parentId, fork_group: forkGroup,
     stage: parent.stage, status: "ready",
   });
-  getApp().events.log(child.id, "session_forked", {
+  app.events.log(child.id, "session_forked", {
     stage: parent.stage, actor: "user",
     data: { parent_id: parentId, fork_group: forkGroup, task },
   });
 
   if (opts?.dispatch !== false) {
-    void dispatch(child.id);
+    void dispatch(app, child.id);
   }
   return { ok: true, sessionId: child.id };
 }
 
-function dispatchFork(sessionId: string, stageDef: flow.StageDefinition): { ok: boolean; message: string } {
+function dispatchFork(app: AppContext, sessionId: string, stageDef: flow.StageDefinition): { ok: boolean; message: string } {
   // Read PLAN.md or use default subtasks
-  const session = getApp().sessions.get(sessionId)!;
+  const session = app.sessions.get(sessionId)!;
   const subtasks = extractSubtasks(session);
 
   const children: string[] = [];
   for (const sub of subtasks.slice(0, stageDef.max_parallel ?? 4)) {
-    const result = fork(sessionId, sub.task, { dispatch: true });
+    const result = fork(app, sessionId, sub.task, { dispatch: true });
     if (result.ok) children.push(result.sessionId);
   }
 
-  getApp().sessions.update(sessionId, { status: "running" });
-  getApp().events.log(sessionId, "fork_started", {
+  app.sessions.update(sessionId, { status: "running" });
+  app.events.log(sessionId, "fork_started", {
     stage: session.stage, actor: "system",
     data: { children_count: children.length, children },
   });
@@ -812,12 +812,12 @@ function dispatchFork(sessionId: string, stageDef: flow.StageDefinition): { ok: 
   return { ok: true, message: `Forked into ${children.length} sessions` };
 }
 
-function dispatchFanOut(sessionId: string, stageDef: flow.StageDefinition): { ok: boolean; message: string } {
-  const session = getApp().sessions.get(sessionId)!;
+function dispatchFanOut(app: AppContext, sessionId: string, stageDef: flow.StageDefinition): { ok: boolean; message: string } {
+  const session = app.sessions.get(sessionId)!;
   const subtasks = extractSubtasks(session);
 
   const maxParallel = stageDef.max_parallel ?? 8;
-  const result = fanOut(sessionId, {
+  const result = fanOut(app, sessionId, {
     tasks: subtasks.slice(0, maxParallel).map((s) => ({
       summary: s.task,
       agent: stageDef.agent ?? session.agent ?? "implementer",
@@ -828,14 +828,14 @@ function dispatchFanOut(sessionId: string, stageDef: flow.StageDefinition): { ok
 
   // Auto-dispatch all children
   for (const childId of result.childIds ?? []) {
-    void dispatch(childId);
+    void dispatch(app, childId);
   }
 
   return { ok: true, message: `Fan-out: ${result.childIds?.length ?? 0} children dispatched` };
 }
 
-export async function joinFork(parentId: string, force = false): Promise<{ ok: boolean; message: string }> {
-  const children = getApp().sessions.getChildren(parentId);
+export async function joinFork(app: AppContext, parentId: string, force = false): Promise<{ ok: boolean; message: string }> {
+  const children = app.sessions.getChildren(parentId);
   if (!children.length) return { ok: false, message: "No children" };
 
   const notDone = children.filter((c) => c.status !== "completed");
@@ -843,41 +843,41 @@ export async function joinFork(parentId: string, force = false): Promise<{ ok: b
     return { ok: false, message: `${notDone.length} children not done` };
   }
 
-  getApp().events.log(parentId, "fork_joined", { actor: "user", data: { children: children.length } });
-  getApp().sessions.update(parentId, { status: "ready", fork_group: null });
-  return await advance(parentId, true);
+  app.events.log(parentId, "fork_joined", { actor: "user", data: { children: children.length } });
+  app.sessions.update(parentId, { status: "ready", fork_group: null });
+  return await advance(app, parentId, true);
 }
 
 /**
  * Check if a parent session can auto-join after a child completes or fails.
  * Returns true if the parent was advanced (all children are done).
  */
-export async function checkAutoJoin(childSessionId: string): Promise<boolean> {
-  const child = getApp().sessions.get(childSessionId);
+export async function checkAutoJoin(app: AppContext, childSessionId: string): Promise<boolean> {
+  const child = app.sessions.get(childSessionId);
   if (!child?.parent_id) return false;
 
-  const parent = getApp().sessions.get(child.parent_id);
+  const parent = app.sessions.get(child.parent_id);
   if (!parent) return false;
   if (parent.status !== "waiting") return false;
 
-  const children = getApp().sessions.getChildren(parent.id);
+  const children = app.sessions.getChildren(parent.id);
   const allDone = children.every((c) => c.status === "completed" || c.status === "failed");
   if (!allDone) return false;
 
   const failed = children.filter((c) => c.status === "failed");
   if (failed.length > 0) {
-    getApp().events.log(parent.id, "fan_out_partial_failure", {
+    app.events.log(parent.id, "fan_out_partial_failure", {
       actor: "system",
       data: { failed: failed.map((f) => f.id), total: children.length },
     });
   }
 
-  getApp().events.log(parent.id, "auto_join", {
+  app.events.log(parent.id, "auto_join", {
     actor: "system",
     data: { children: children.length, failed: failed.length },
   });
-  getApp().sessions.update(parent.id, { status: "ready", fork_group: null });
-  await advance(parent.id, true);
+  app.sessions.update(parent.id, { status: "ready", fork_group: null });
+  await advance(app, parent.id, true);
   return true;
 }
 
@@ -887,8 +887,8 @@ export async function checkAutoJoin(childSessionId: string): Promise<boolean> {
  * Fully delete a session: kill agent, clean up provider resources, clean
  * hooks, delete DB rows. All provider-specific logic delegated to the provider.
  */
-export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boolean; message: string }> {
-  const session = getApp().sessions.get(sessionId);
+export async function deleteSessionAsync(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   // 1. Kill agent + clean up provider resources
@@ -908,18 +908,18 @@ export async function deleteSessionAsync(sessionId: string): Promise<{ ok: boole
   }
 
   // 3. Soft-delete (keeps DB row for 90s undo window)
-  getApp().sessions.softDelete(sessionId);
+  app.sessions.softDelete(sessionId);
 
-  getApp().events.log(sessionId, "session_deleted", { actor: "user" });
+  app.events.log(sessionId, "session_deleted", { actor: "user" });
 
   return { ok: true, message: "Session deleted (undo available for 90s)" };
 }
 
-export async function undeleteSessionAsync(sessionId: string): Promise<{ ok: boolean; message: string }> {
-  const restored = getApp().sessions.undelete(sessionId);
+export async function undeleteSessionAsync(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
+  const restored = app.sessions.undelete(sessionId);
   if (!restored) return { ok: false, message: `Session ${sessionId} not found or not deleted` };
 
-  getApp().events.log(sessionId, "session_undeleted", { actor: "user" });
+  app.events.log(sessionId, "session_undeleted", { actor: "user" });
 
   return { ok: true, message: `Session restored (status: ${restored.status})` };
 }
@@ -938,8 +938,8 @@ async function withProvider(
 }
 
 /** Clean up provider resources when a session reaches a terminal state (completed/failed). */
-export async function cleanupOnTerminal(sessionId: string): Promise<void> {
-  const session = getApp().sessions.get(sessionId);
+export async function cleanupOnTerminal(app: AppContext, sessionId: string): Promise<void> {
+  const session = app.sessions.get(sessionId);
   if (!session) return;
   await withProvider(session, `cleanup ${sessionId}`, (p, c) => p.cleanupSession(c, session));
 }
@@ -1002,7 +1002,7 @@ async function applyContainerSetup(
 }
 
 /** Prepare remote compute: connectivity check, env sync, docker/devcontainer setup. */
-export async function prepareRemoteEnvironment(
+export async function prepareRemoteEnvironment(app: AppContext, 
   session: Session,
   compute: Compute,
   provider: ComputeProvider,
@@ -1033,7 +1033,7 @@ export async function prepareRemoteEnvironment(
 
   // Store ports on session config
   if (ports.length > 0) {
-    getApp().sessions.update(session.id, {
+    app.sessions.update(session.id, {
       config: { ...session.config, ports },
     });
   }
@@ -1056,7 +1056,7 @@ export async function prepareRemoteEnvironment(
   return { finalLaunchContent, ports };
 }
 
-async function launchAgentTmux(
+async function launchAgentTmux(app: AppContext, 
   session: Session, stage: string,
   claudeArgs: string[], task: string, agent: agentRegistry.AgentDefinition,
   opts?: { autonomy?: string; onLog?: (msg: string) => void },
@@ -1065,7 +1065,7 @@ async function launchAgentTmux(
   const tmuxName = `ark-${session.id}`;
 
   // Resolve compute + provider
-  const compute = session.compute_name ? getApp().computes.get(session.compute_name) : null;
+  const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
   const provider = getProvider(compute?.provider ?? "local");
 
   // Setup worktree + trust
@@ -1080,7 +1080,7 @@ async function launchAgentTmux(
     : DEFAULT_CONDUCTOR_URL;
 
   // Channel config + launcher
-  const channelPort = getApp().sessions.channelPort(session.id);
+  const channelPort = app.sessions.channelPort(session.id);
   const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
   const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig });
 
@@ -1108,7 +1108,7 @@ async function launchAgentTmux(
 
   // Remote compute (providers that don't support local worktrees)
   if (compute && provider && !provider.supportsWorktree) {
-    const { finalLaunchContent, ports } = await prepareRemoteEnvironment(
+    const { finalLaunchContent, ports } = await prepareRemoteEnvironment(app, 
       session, compute, provider, effectiveWorkdir,
       { launchContent, onLog: log },
     );
@@ -1122,7 +1122,7 @@ async function launchAgentTmux(
       ports,
     });
 
-    getApp().sessions.update(session.id, { claude_session_id: claudeSessionId });
+    app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
     // Deliver task via channel (tunnels are now up, channel port is accessible locally)
     log("Delivering task...");
@@ -1137,7 +1137,7 @@ async function launchAgentTmux(
   claude.autoAcceptChannelPrompt(tmuxName);
   log("Delivering task...");
   claude.deliverTask(session.id, channelPort, task, stage);
-  getApp().sessions.update(session.id, { claude_session_id: claudeSessionId });
+  app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
   return tmuxName;
 }
@@ -1174,11 +1174,11 @@ function formatTaskHeader(session: Session, stage: string, agentName: string): s
 }
 
 /** Append previous stage context: completed stages, PLAN.md, and recent git log. */
-async function appendPreviousStageContext(session: Session): Promise<string[]> {
+async function appendPreviousStageContext(app: AppContext, session: Session): Promise<string[]> {
   const parts: string[] = [];
 
   // Previous stage context
-  const events = getApp().events.list(session.id);
+  const events = app.events.list(session.id);
   const completed = events.filter((e) => e.type === "stage_completed");
   if (completed.length) {
     parts.push("\n## Previous stages:");
@@ -1212,9 +1212,9 @@ async function appendPreviousStageContext(session: Session): Promise<string[]> {
   return parts;
 }
 
-async function buildTaskWithHandoff(session: Session, stage: string, agentName: string): Promise<string> {
+async function buildTaskWithHandoff(app: AppContext, session: Session, stage: string, agentName: string): Promise<string> {
   const header = formatTaskHeader(session, stage, agentName);
-  const context = await appendPreviousStageContext(session);
+  const context = await appendPreviousStageContext(app, session);
 
   // Apply message filter if agent config specifies one
   try {
@@ -1223,7 +1223,7 @@ async function buildTaskWithHandoff(session: Session, stage: string, agentName: 
     if (agent) {
       const mFilter = parseMessageFilter(agent);
       if (mFilter) {
-        const messages = getApp().messages.list(session.id).map(m => ({
+        const messages = app.messages.list(session.id).map(m => ({
           role: m.role, content: m.content, timestamp: m.created_at,
         }));
         const filtered = filterMessages(messages, mFilter);
@@ -1306,7 +1306,7 @@ async function setupWorktree(repoPath: string, sessionId: string, branch?: strin
  * Get a diff summary for a session's worktree branch vs its base branch.
  * Used for previewing changes before merge or PR creation.
  */
-export async function worktreeDiff(sessionId: string, opts?: {
+export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
   base?: string;
 }): Promise<{
   ok: boolean;
@@ -1320,7 +1320,7 @@ export async function worktreeDiff(sessionId: string, opts?: {
   modifiedSinceReview: string[];
   message?: string;
 }> {
-  const session = getApp().sessions.get(sessionId);
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, stat: "", diff: "", branch: "", baseBranch: "", filesChanged: 0, insertions: 0, deletions: 0, modifiedSinceReview: [], message: "Session not found" };
 
   const workdir = session.workdir;
@@ -1369,7 +1369,7 @@ export async function worktreeDiff(sessionId: string, opts?: {
       }
 
       // Compare against previously reviewed hashes
-      const prevReviewed = getApp().sessions.get(sessionId)?.config?.reviewed_files as Record<string, string> | undefined;
+      const prevReviewed = app.sessions.get(sessionId)?.config?.reviewed_files as Record<string, string> | undefined;
       if (prevReviewed) {
         for (const file of files) {
           if (prevReviewed[file] && prevReviewed[file] !== fileHashes[file]) {
@@ -1379,7 +1379,7 @@ export async function worktreeDiff(sessionId: string, opts?: {
       }
 
       // Save current hashes as reviewed
-      getApp().sessions.mergeConfig(sessionId, { reviewed_files: fileHashes });
+      app.sessions.mergeConfig(sessionId, { reviewed_files: fileHashes });
     } catch { /* re-review tracking is best-effort */ }
 
     return {
@@ -1404,13 +1404,13 @@ export async function worktreeDiff(sessionId: string, opts?: {
  * Create a GitHub PR from a session's worktree branch.
  * Pushes the branch and creates the PR via gh CLI.
  */
-export async function createWorktreePR(sessionId: string, opts?: {
+export async function createWorktreePR(app: AppContext, sessionId: string, opts?: {
   title?: string;
   body?: string;
   base?: string;
   draft?: boolean;
 }): Promise<{ ok: boolean; message: string; pr_url?: string }> {
-  const session = getApp().sessions.get(sessionId);
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const repo = session.repo;
@@ -1443,8 +1443,8 @@ export async function createWorktreePR(sessionId: string, opts?: {
     const prUrl = stdout.trim();
 
     // 3. Store PR URL on session
-    getApp().sessions.update(sessionId, { pr_url: prUrl });
-    getApp().events.log(sessionId, "pr_created", {
+    app.sessions.update(sessionId, { pr_url: prUrl });
+    app.events.log(sessionId, "pr_created", {
       stage: session.stage ?? undefined,
       actor: "user",
       data: { pr_url: prUrl, branch, base, draft: opts?.draft ?? false },
@@ -1462,14 +1462,14 @@ export async function createWorktreePR(sessionId: string, opts?: {
  * Finish a worktree session: merge branch into target, remove worktree, delete session.
  * Aborts safely on merge conflict without losing work.
  */
-export async function finishWorktree(sessionId: string, opts?: {
+export async function finishWorktree(app: AppContext, sessionId: string, opts?: {
   into?: string;  // target branch (default: "main")
   noMerge?: boolean;  // skip merge, just cleanup
   keepBranch?: boolean;  // don't delete the branch after merge
   createPR?: boolean;  // create a PR instead of merging locally
   force?: boolean;  // skip verification
 }): Promise<{ ok: boolean; message: string }> {
-  const session = getApp().sessions.get(sessionId);
+  const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const workdir = session.workdir;
@@ -1478,7 +1478,7 @@ export async function finishWorktree(sessionId: string, opts?: {
 
   // Verify before finishing (unless force)
   if (!opts?.force) {
-    const verify = await runVerification(sessionId);
+    const verify = await runVerification(app, sessionId);
     if (!verify.ok) {
       return { ok: false, message: `Cannot finish: verification failed:\n${verify.message}` };
     }
@@ -1503,12 +1503,12 @@ export async function finishWorktree(sessionId: string, opts?: {
 
   // 1. Stop the session if running
   if (!["completed", "failed", "stopped", "pending"].includes(session.status)) {
-    await stop(sessionId);
+    await stop(app, sessionId);
   }
 
   // 1b. Create PR instead of merging locally if requested
   if (opts?.createPR) {
-    const prResult = await createWorktreePR(sessionId, { base: targetBranch, title: session.summary ?? undefined });
+    const prResult = await createWorktreePR(app, sessionId, { base: targetBranch, title: session.summary ?? undefined });
     if (!prResult.ok) return prResult;
     // Still cleanup worktree after PR creation
     if (isWorktree) {
@@ -1518,8 +1518,8 @@ export async function finishWorktree(sessionId: string, opts?: {
         logError("session", `finishWorktree: remove worktree failed: ${e?.message ?? e}`);
       }
     }
-    await deleteSessionAsync(sessionId);
-    getApp().events.log(sessionId, "worktree_finished", { actor: "user", data: { branch, targetBranch, merged: false, pr: true } });
+    await deleteSessionAsync(app, sessionId);
+    app.events.log(sessionId, "worktree_finished", { actor: "user", data: { branch, targetBranch, merged: false, pr: true } });
     return { ok: true, message: `PR created and worktree cleaned up. ${prResult.pr_url ?? ""}`.trim() };
   }
 
@@ -1557,10 +1557,10 @@ export async function finishWorktree(sessionId: string, opts?: {
   }
 
   // 5. Delete the session
-  await deleteSessionAsync(sessionId);
+  await deleteSessionAsync(app, sessionId);
 
   const mergeMsg = opts?.noMerge ? "skipped merge" : `merged ${branch} → ${targetBranch}`;
-  getApp().events.log(sessionId, "worktree_finished", { actor: "user", data: { branch, targetBranch, merged: !opts?.noMerge } });
+  app.events.log(sessionId, "worktree_finished", { actor: "user", data: { branch, targetBranch, merged: !opts?.noMerge } });
 
   return { ok: true, message: `Finished: ${mergeMsg}, worktree removed, session deleted` };
 }
@@ -1568,7 +1568,7 @@ export async function finishWorktree(sessionId: string, opts?: {
 // ── Wait ────────────────────────────────────────────────────────────────
 
 /** Wait for a session to reach a terminal state. Returns the final session. */
-export async function waitForCompletion(
+export async function waitForCompletion(app: AppContext, 
   sessionId: string,
   opts?: { timeoutMs?: number; pollMs?: number; onStatus?: (status: string) => void },
 ): Promise<{ session: Session | null; timedOut: boolean }> {
@@ -1577,7 +1577,7 @@ export async function waitForCompletion(
   const start = Date.now();
 
   while (true) {
-    const session = getApp().sessions.get(sessionId);
+    const session = app.sessions.get(sessionId);
     if (!session) return { session: null, timedOut: false };
 
     const terminal = ["completed", "failed", "stopped"].includes(session.status);
@@ -1595,8 +1595,8 @@ export async function waitForCompletion(
 
 // ── Output ──────────────────────────────────────────────────────────────────
 
-export async function getOutput(sessionId: string, opts?: { lines?: number; ansi?: boolean }): Promise<string> {
-  const session = getApp().sessions.get(sessionId);
+export async function getOutput(app: AppContext, sessionId: string, opts?: { lines?: number; ansi?: boolean }): Promise<string> {
+  const session = app.sessions.get(sessionId);
   if (!session?.session_id) return "";
 
   const { provider, compute } = resolveProvider(session);
@@ -1606,19 +1606,19 @@ export async function getOutput(sessionId: string, opts?: { lines?: number; ansi
   return "";
 }
 
-export async function send(sessionId: string, message: string): Promise<{ ok: boolean; message: string }> {
-  const session = getApp().sessions.get(sessionId);
+export async function send(app: AppContext, sessionId: string, message: string): Promise<{ ok: boolean; message: string }> {
+  const session = app.sessions.get(sessionId);
   if (!session?.session_id) return { ok: false, message: "No active session" };
 
   // Check for prompt injection in user messages
   try {
     const injection = detectInjection(message);
     if (injection.severity === "high") {
-      getApp().events.log(sessionId, "prompt_injection_blocked", { actor: "system", data: { patterns: injection.patterns } });
+      app.events.log(sessionId, "prompt_injection_blocked", { actor: "system", data: { patterns: injection.patterns } });
       return { ok: false, message: "Message blocked: potential prompt injection detected" };
     }
     if (injection.detected) {
-      getApp().events.log(sessionId, "prompt_injection_warning", { actor: "system", data: { patterns: injection.patterns, severity: injection.severity } });
+      app.events.log(sessionId, "prompt_injection_warning", { actor: "system", data: { patterns: injection.patterns, severity: injection.severity } });
     }
   } catch { /* skip prompt guard on error */ }
 
@@ -1628,8 +1628,8 @@ export async function send(sessionId: string, message: string): Promise<{ ok: bo
 }
 
 /** Detect session status from tmux content (fallback when hooks don't fire). */
-export async function detectStatus(sessionId: string): Promise<string | null> {
-  const session = getApp().sessions.get(sessionId);
+export async function detectStatus(app: AppContext, sessionId: string): Promise<string | null> {
+  const session = app.sessions.get(sessionId);
   if (!session?.session_id) return null;
   const { detectSessionStatus } = await import("../status-detect.js");
   const detected = await detectSessionStatus(session.session_id);
@@ -1658,10 +1658,10 @@ export interface HookStatusResult {
  *
  * NOTE: This function is *mostly* pure, but has one fire-and-forget side effect:
  * on SessionEnd/Stop, it runs handoff detection asynchronously (lines below),
- * which writes events and config to the store via getApp(). This is intentional --
+ * which writes events and config to the store via app. This is intentional --
  * handoff detection is best-effort and should not block the hook response.
  */
-export function applyHookStatus(
+export function applyHookStatus(app: AppContext, 
   session: Session,
   hookEvent: string,
   payload: Record<string, unknown>,
@@ -1773,14 +1773,14 @@ export function applyHookStatus(
 
   // Check for agent-initiated handoff on session end (fire-and-forget async)
   if (hookEvent === "SessionEnd" || hookEvent === "Stop") {
-    getOutput(session.id, { lines: 50 }).then(output => {
+    getOutput(app, session.id, { lines: 50 }).then(output => {
       try {
         const handoff = detectHandoff(output);
         if (handoff) {
-          getApp().events.log(session.id, "handoff_detected", {
+          app.events.log(session.id, "handoff_detected", {
             actor: "system", data: { targetAgent: handoff.targetAgent, reason: handoff.reason },
           });
-          getApp().sessions.mergeConfig(session.id, { _pending_handoff: { agent: handoff.targetAgent, instructions: handoff.reason } });
+          app.sessions.mergeConfig(session.id, { _pending_handoff: { agent: handoff.targetAgent, instructions: handoff.reason } });
         }
       } catch { /* skip handoff detection on error */ }
     }).catch(() => { /* skip if output unavailable */ });
@@ -1813,8 +1813,8 @@ export interface ReportResult {
  * Determines state transitions, messages, and events without
  * touching the store, event bus, or session lifecycle directly.
  */
-export function applyReport(sessionId: string, report: OutboundMessage): ReportResult {
-  const session = getApp().sessions.get(sessionId);
+export function applyReport(app: AppContext, sessionId: string, report: OutboundMessage): ReportResult {
+  const session = app.sessions.get(sessionId);
   if (!session) {
     return { updates: {}, logEvents: [], busEvents: [] };
   }
@@ -1929,22 +1929,22 @@ export function applyReport(sessionId: string, report: OutboundMessage): ReportR
 
 // ── Fail-Loopback ──────────────────────────────────────────────────────────
 
-export function retryWithContext(
+export function retryWithContext(app: AppContext, 
   sessionId: string,
   opts?: { maxRetries?: number }
 ): { ok: boolean; message: string } {
-  const s = getApp().sessions.get(sessionId);
+  const s = app.sessions.get(sessionId);
   if (!s) return { ok: false, message: "Session not found" };
   if (s.status !== "failed") return { ok: false, message: "Session is not in failed state" };
 
   const maxRetries = opts?.maxRetries ?? 3;
-  const priorRetries = getApp().events.list(sessionId).filter(e => e.type === "retry_with_context").length;
+  const priorRetries = app.events.list(sessionId).filter(e => e.type === "retry_with_context").length;
   if (priorRetries >= maxRetries) {
     return { ok: false, message: `Max retries (${maxRetries}) reached` };
   }
 
   // Log the retry event with error context
-  getApp().events.log(sessionId, "retry_with_context", {
+  app.events.log(sessionId, "retry_with_context", {
     actor: "system",
     data: {
       attempt: priorRetries + 1,
@@ -1954,7 +1954,7 @@ export function retryWithContext(
   });
 
   // Reset to ready for re-dispatch
-  getApp().sessions.update(sessionId, { status: "ready", error: null });
+  app.sessions.update(sessionId, { status: "ready", error: null });
 
   return { ok: true, message: `Retry ${priorRetries + 1}/${maxRetries} queued` };
 }
@@ -1967,11 +1967,11 @@ interface FanOutTask {
   flow?: string;
 }
 
-export function fanOut(
+export function fanOut(app: AppContext, 
   parentId: string,
   opts: { tasks: FanOutTask[] }
 ): { ok: boolean; childIds?: string[]; message?: string } {
-  const parent = getApp().sessions.get(parentId);
+  const parent = app.sessions.get(parentId);
   if (!parent) return { ok: false, message: "Parent session not found" };
   if (opts.tasks.length === 0) return { ok: false, message: "No tasks provided" };
 
@@ -1979,7 +1979,7 @@ export function fanOut(
   const childIds: string[] = [];
 
   for (const task of opts.tasks) {
-    const child = getApp().sessions.create({
+    const child = app.sessions.create({
       summary: task.summary,
       repo: parent.repo || undefined,
       flow: task.flow ?? "bare",
@@ -1990,7 +1990,7 @@ export function fanOut(
     // Set first stage so child is dispatchable
     const childFlow = task.flow ?? "bare";
     const firstStage = flow.getFirstStage(childFlow);
-    getApp().sessions.update(child.id, {
+    app.sessions.update(child.id, {
       parent_id: parentId,
       fork_group: forkGroup,
       agent: task.agent ?? null,
@@ -2001,8 +2001,8 @@ export function fanOut(
   }
 
   // Parent waits for children
-  getApp().sessions.update(parentId, { status: "waiting", fork_group: forkGroup });
-  getApp().events.log(parentId, "fan_out", {
+  app.sessions.update(parentId, { status: "waiting", fork_group: forkGroup });
+  app.events.log(parentId, "fan_out", {
     actor: "system",
     data: { childCount: childIds.length, forkGroup },
   });
@@ -2017,17 +2017,17 @@ export function fanOut(
  * Unlike fork (which copies the parent's config), subagents can use different
  * models and agents for cost optimization or specialization.
  */
-export function spawnSubagent(parentId: string, opts: {
+export function spawnSubagent(app: AppContext, parentId: string, opts: {
   task: string;
   agent?: string;       // override agent (default: parent's agent)
   model?: string;       // override model (e.g., "haiku" for cheap tasks)
   group_name?: string;
   extensions?: string[]; // MCP extensions to enable
 }): { ok: boolean; sessionId?: string; message: string } {
-  const parent = getApp().sessions.get(parentId);
+  const parent = app.sessions.get(parentId);
   if (!parent) return { ok: false, message: "Parent session not found" };
 
-  const session = getApp().sessions.create({
+  const session = app.sessions.create({
     summary: opts.task,
     repo: parent.repo || undefined,
     flow: "quick",  // subagents use single-stage flow
@@ -2043,15 +2043,15 @@ export function spawnSubagent(parentId: string, opts: {
   });
 
   const agentName = opts.agent ?? parent.agent;
-  getApp().sessions.update(session.id, { agent: agentName, parent_id: parentId });
+  app.sessions.update(session.id, { agent: agentName, parent_id: parentId });
 
   // Set first stage so the subagent is dispatchable
   const firstStage = flow.getFirstStage("quick");
   if (firstStage) {
-    getApp().sessions.update(session.id, { stage: firstStage, status: "ready" });
+    app.sessions.update(session.id, { stage: firstStage, status: "ready" });
   }
 
-  getApp().events.log(session.id, "subagent_spawned", {
+  app.events.log(session.id, "subagent_spawned", {
     actor: "system",
     data: { parent_id: parentId, task: opts.task, agent: agentName, model: opts.model },
   });
@@ -2062,21 +2062,21 @@ export function spawnSubagent(parentId: string, opts: {
 /**
  * Spawn multiple subagents in parallel and optionally wait for all to complete.
  */
-export async function spawnParallelSubagents(parentId: string, tasks: Array<{
+export async function spawnParallelSubagents(app: AppContext, parentId: string, tasks: Array<{
   task: string;
   agent?: string;
   model?: string;
 }>): Promise<{ ok: boolean; sessionIds: string[]; message: string }> {
   const ids: string[] = [];
   for (const t of tasks) {
-    const result = spawnSubagent(parentId, t);
+    const result = spawnSubagent(app, parentId, t);
     if (result.ok && result.sessionId) {
       ids.push(result.sessionId);
     }
   }
 
   // Dispatch all in parallel
-  await Promise.allSettled(ids.map(id => dispatch(id).catch(() => {})));
+  await Promise.allSettled(ids.map(id => dispatch(app, id).catch(() => {})));
 
   return { ok: true, sessionIds: ids, message: `${ids.length} subagents spawned and dispatched` };
 }
@@ -2084,11 +2084,11 @@ export async function spawnParallelSubagents(parentId: string, tasks: Array<{
 // ── Worktree cleanup ──────────────────────────────────────────────────────
 
 /** Find orphaned worktrees -- worktree dirs with no matching session. */
-export function findOrphanedWorktrees(): string[] {
+export function findOrphanedWorktrees(app: AppContext): string[] {
   const wtDir = WORKTREES_DIR();
   if (!existsSync(wtDir)) return [];
 
-  const sessionIds = new Set(getApp().sessions.list({ limit: 1000 }).map(s => s.id));
+  const sessionIds = new Set(app.sessions.list({ limit: 1000 }).map(s => s.id));
   const orphans: string[] = [];
 
   try {
@@ -2103,8 +2103,8 @@ export function findOrphanedWorktrees(): string[] {
 }
 
 /** Remove orphaned worktrees. Returns count of removed. */
-export async function cleanupWorktrees(): Promise<{ removed: number; errors: string[] }> {
-  const orphans = findOrphanedWorktrees();
+export async function cleanupWorktrees(app: AppContext): Promise<{ removed: number; errors: string[] }> {
+  const orphans = findOrphanedWorktrees(app);
   let removed = 0;
   const errors: string[] = [];
 

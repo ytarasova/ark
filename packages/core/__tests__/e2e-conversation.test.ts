@@ -19,7 +19,7 @@ import { getSessionConversation, searchSessionConversation, searchTranscripts } 
 
 const TEST_PORT = 19197;
 let app: AppContext;
-let server: { stop(): void };
+let server: { stop(app): void };
 
 beforeEach(async () => {
   if (app) { await app.shutdown(); clearApp(); }

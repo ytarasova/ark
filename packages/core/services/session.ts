@@ -18,6 +18,7 @@ import type {
 import type { SessionRepository } from "../repositories/session.js";
 import type { EventRepository } from "../repositories/event.js";
 import type { MessageRepository } from "../repositories/message.js";
+import { getApp } from "../app.js";
 
 // ── SessionService ───────────────────────────────────────────────────────────
 
@@ -170,7 +171,7 @@ export class SessionService {
    */
   async interrupt(id: string): Promise<SessionOpResult> {
     const { interrupt: legacyInterrupt } = await import("./session-orchestration.js");
-    return legacyInterrupt(id);
+    return legacyInterrupt(getApp(), id);
   }
 
   /**
@@ -179,7 +180,7 @@ export class SessionService {
    */
   async archive(id: string): Promise<SessionOpResult> {
     const { archive: legacyArchive } = await import("./session-orchestration.js");
-    return legacyArchive(id);
+    return legacyArchive(getApp(), id);
   }
 
   /**
@@ -188,7 +189,7 @@ export class SessionService {
    */
   async restore(id: string): Promise<SessionOpResult> {
     const { restore: legacyRestore } = await import("./session-orchestration.js");
-    return legacyRestore(id);
+    return legacyRestore(getApp(), id);
   }
 
   /**
@@ -228,7 +229,7 @@ export class SessionService {
    */
   async dispatch(id: string, opts?: { onLog?: (msg: string) => void }): Promise<SessionOpResult> {
     const { dispatch: legacyDispatch } = await import("./session-orchestration.js");
-    return legacyDispatch(id, opts);
+    return legacyDispatch(getApp(), id, opts);
   }
 
   /**
@@ -237,7 +238,7 @@ export class SessionService {
    */
   async advance(id: string, force?: boolean): Promise<SessionOpResult> {
     const { advance: legacyAdvance } = await import("./session-orchestration.js");
-    return legacyAdvance(id, force);
+    return legacyAdvance(getApp(), id, force);
   }
 
   /**
@@ -245,7 +246,7 @@ export class SessionService {
    */
   async getOutput(id: string, opts?: { lines?: number; ansi?: boolean }): Promise<string> {
     const { getOutput: legacyGetOutput } = await import("./session-orchestration.js");
-    return legacyGetOutput(id, opts);
+    return legacyGetOutput(getApp(), id, opts);
   }
 
   /**
@@ -253,7 +254,7 @@ export class SessionService {
    */
   async send(id: string, message: string): Promise<SessionOpResult> {
     const { send: legacySend } = await import("./session-orchestration.js");
-    return legacySend(id, message);
+    return legacySend(getApp(), id, message);
   }
 
   /**
@@ -264,7 +265,7 @@ export class SessionService {
     opts?: { timeoutMs?: number; pollMs?: number; onStatus?: (status: string) => void },
   ): Promise<{ session: Session | null; timedOut: boolean }> {
     const { waitForCompletion: legacyWait } = await import("./session-orchestration.js");
-    return legacyWait(id, opts);
+    return legacyWait(getApp(), id, opts);
   }
 
   /**
@@ -273,7 +274,7 @@ export class SessionService {
   async fork(id: string, name?: string): Promise<SessionOpResult> {
     const { forkSession } = await import("./session-orchestration.js");
     // session.ts has a narrower local SessionOpResult (no `message` on success)
-    return forkSession(id, name) as unknown as SessionOpResult;
+    return forkSession(getApp(), id, name) as unknown as SessionOpResult;
   }
 
   /**
@@ -281,7 +282,7 @@ export class SessionService {
    */
   async clone(id: string, name?: string): Promise<SessionOpResult> {
     const { cloneSession } = await import("./session-orchestration.js");
-    return cloneSession(id, name) as unknown as SessionOpResult;
+    return cloneSession(getApp(), id, name) as unknown as SessionOpResult;
   }
 
   /**
@@ -295,7 +296,7 @@ export class SessionService {
     extensions?: string[];
   }): Promise<SessionOpResult> {
     const { spawnSubagent } = await import("./session-orchestration.js");
-    return spawnSubagent(parentId, opts);
+    return spawnSubagent(getApp(), parentId, opts);
   }
 
   /**
@@ -303,7 +304,7 @@ export class SessionService {
    */
   async fanOut(sessionId: string, opts: { tasks: Array<{ summary: string; agent?: string; flow?: string }> }) {
     const { fanOut } = await import("./session-orchestration.js");
-    return fanOut(sessionId, opts);
+    return fanOut(getApp(), sessionId, opts);
   }
 
   /**
@@ -311,7 +312,7 @@ export class SessionService {
    */
   async handoff(id: string, agent: string, instructions?: string): Promise<SessionOpResult> {
     const { handoff: legacyHandoff } = await import("./session-orchestration.js");
-    return legacyHandoff(id, agent, instructions);
+    return legacyHandoff(getApp(), id, agent, instructions);
   }
 
   /**
@@ -319,7 +320,7 @@ export class SessionService {
    */
   async worktreeDiff(id: string, opts?: { base?: string }): Promise<any> {
     const { worktreeDiff: legacyDiff } = await import("./session-orchestration.js");
-    return legacyDiff(id, opts);
+    return legacyDiff(getApp(), id, opts);
   }
 
   /**
@@ -332,7 +333,7 @@ export class SessionService {
     createPR?: boolean;
   }): Promise<SessionOpResult> {
     const { finishWorktree: legacyFinish } = await import("./session-orchestration.js");
-    return legacyFinish(id, opts);
+    return legacyFinish(getApp(), id, opts);
   }
 
   /**
@@ -340,7 +341,7 @@ export class SessionService {
    */
   async createWorktreePR(id: string, opts?: { title?: string; body?: string; base?: string; draft?: boolean }): Promise<SessionOpResult & { pr_url?: string }> {
     const { createWorktreePR: legacyCreatePR } = await import("./session-orchestration.js");
-    return legacyCreatePR(id, opts);
+    return legacyCreatePR(getApp(), id, opts);
   }
 
   /**
@@ -348,7 +349,7 @@ export class SessionService {
    */
   async join(parentId: string, force?: boolean): Promise<SessionOpResult> {
     const { joinFork } = await import("./session-orchestration.js");
-    return joinFork(parentId, force);
+    return joinFork(getApp(), parentId, force);
   }
 
   /**
@@ -356,7 +357,7 @@ export class SessionService {
    */
   async approveReviewGate(id: string): Promise<SessionOpResult> {
     const { approveReviewGate: legacyApprove } = await import("./session-orchestration.js");
-    return legacyApprove(id);
+    return legacyApprove(getApp(), id);
   }
 
   // ── Query helpers ─────────────────────────────────────────────────────────

@@ -72,7 +72,7 @@ export async function handleIssueWebhook(
   // Auto-dispatch if configured
   if (config.autoDispatch) {
     try {
-      await dispatch(session.id);
+      await dispatch(getApp(), session.id);
     } catch (e: any) {
       return { ok: true, sessionId: session.id, message: `Session created but dispatch failed: ${e.message}` };
     }

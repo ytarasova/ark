@@ -108,7 +108,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   }
 
   // Delegate business logic to session.ts
-  const result = session.applyHookStatus(s, event, payload);
+  const result = session.applyHookStatus(_app, s, event, payload);
 
   // Apply events
   for (const evt of result.events ?? []) {
@@ -128,7 +128,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
     // Clean up provider resources on terminal states (stop container, remove worktree, etc.)
     if (result.newStatus === "completed" || result.newStatus === "failed") {
-      session.cleanupOnTerminal(sessionId);
+      session.cleanupOnTerminal(_app, sessionId);
       // Close OTLP spans for terminal states
       emitStageSpanEnd(sessionId, { status: result.newStatus });
       emitSessionSpanEnd(sessionId, { status: result.newStatus });
@@ -255,7 +255,7 @@ async function handlePRMergeWebhook(req: Request): Promise<Response> {
     repo: repo.name, prNumber: pr.number, prTitle: pr.title,
     branch: pr.head.ref, baseBranch: pr.base.ref,
     config, fetcher, healthFetcher, onRevert,
-    onStop: async (id) => { await session.stop(id); },
+    onStop: async (id) => { await session.stop(_app, id); },
   }).catch(e => logError("conductor", `rollback watcher error: ${e}`));
 
   return Response.json({ status: "watching" });
@@ -322,7 +322,7 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
             lastRun.getDate() === now.getDate()) continue;
       }
       await safeAsync(`scheduled dispatch for ${sched.id}`, async () => {
-        const s = session.startSession({
+        const s = session.startSession(_app, {
           summary: sched.summary ?? `Scheduled: ${sched.id}`,
           repo: sched.repo ?? undefined,
           workdir: sched.workdir ?? undefined,
@@ -330,7 +330,7 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
           compute_name: sched.compute_name ?? undefined,
           group_name: sched.group_name ?? undefined,
         });
-        await session.dispatch(s.id);
+        await session.dispatch(_app, s.id);
         updateScheduleLastRun(sched.id);
         _app.events.log(s.id, "scheduled_dispatch", {
           actor: "scheduler",
@@ -400,7 +400,7 @@ export async function deliverToChannel(
 
 async function handleReport(sessionId: string, report: OutboundMessage): Promise<void> {
   // Delegate business logic to session.ts
-  const result = session.applyReport(sessionId, report);
+  const result = session.applyReport(_app, sessionId, report);
 
   // Log events
   for (const evt of result.logEvents ?? []) {
@@ -424,18 +424,18 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
   // Handle advance + auto-dispatch for completed reports
   if (result.shouldAdvance) {
-    const advResult = await session.advance(sessionId);
+    const advResult = await session.advance(_app, sessionId);
     const updated = (result.shouldAutoDispatch && advResult.ok) ? _app.sessions.get(sessionId) : null;
     if (updated?.status === "ready" && updated.stage) {
       const nextAction = flow.getStageAction(updated.flow, updated.stage);
       if (nextAction.type === "agent" || nextAction.type === "fork") {
-        session.dispatch(sessionId).catch(err => {
+        session.dispatch(_app, sessionId).catch(err => {
           logError("conductor", `auto-dispatch failed for ${sessionId}: ${err?.message ?? err}`);
         });
       } else if (nextAction.type === "action") {
         // Auto-execute action stages with verification enforcement
         safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
-          const verify = await session.runVerification(sessionId);
+          const verify = await session.runVerification(_app, sessionId);
           if (!verify.ok) {
             logWarn("conductor", `action stage blocked by verification for ${sessionId}: ${verify.message}`);
             _app.sessions.update(sessionId, {
@@ -445,7 +445,7 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
             sendOSNotification("Ark: Verification failed", `${updated.summary ?? sessionId} - ${verify.message.slice(0, 100)}`);
             return;
           }
-          await session.executeAction(sessionId, nextAction.action ?? "");
+          await session.executeAction(_app, sessionId, nextAction.action ?? "");
         });
       }
     }
@@ -479,7 +479,7 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
       if (autoPR) {
         safeAsync(`auto-pr: ${sessionId}`, async () => {
-          const prResult = await session.createWorktreePR(sessionId, {
+          const prResult = await session.createWorktreePR(_app, sessionId, {
             title: s.summary ?? undefined,
           });
           if (prResult.ok && prResult.pr_url) {

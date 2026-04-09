@@ -16,7 +16,7 @@ describe("dispatch fan_out stage", () => {
     const parent = app.sessions.create({ summary: "Test fan-out", flow: "fan-out" });
     app.sessions.update(parent.id, { stage: "execute", status: "ready" });
 
-    const result = await dispatch(parent.id);
+    const result = await dispatch(app, parent.id);
     expect(result.ok).toBe(true);
 
     const updated = app.sessions.get(parent.id);

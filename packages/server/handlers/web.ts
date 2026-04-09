@@ -112,7 +112,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("worktree/cleanup", async () => {
-    const result = await cleanupWorktrees();
+    const result = await cleanupWorktrees(app);
     return { ok: true, ...result };
   });
 

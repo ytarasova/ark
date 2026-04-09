@@ -4,6 +4,7 @@
 
 import { loadRecipe, instantiateRecipe } from "./recipe.js";
 import { startSession } from "./services/session-orchestration.js";
+import { getApp } from "./app.js";
 import type { Session } from "../types/index.js";
 import { getSessionCost } from "./costs.js";
 
@@ -43,7 +44,7 @@ export function evaluateRecipeSetup(recipeName: string, iterations: number, vari
     const start = Date.now();
     try {
       const instance = instantiateRecipe(recipe, variables ?? {});
-      const session = startSession({
+      const session = startSession(getApp(), {
         summary: `[eval] ${recipeName} #${i + 1}`,
         repo: instance.repo ?? ".",
         flow: instance.flow ?? recipe.flow ?? "quick",

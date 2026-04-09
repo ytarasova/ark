@@ -11,7 +11,7 @@ describe("fan-out compute inheritance", () => {
     const parent = app.sessions.create({ summary: "Parent on EC2", flow: "bare" });
     app.sessions.update(parent.id, { status: "running", stage: "implement", compute_name: "my-ec2" });
 
-    const result = fanOut(parent.id, {
+    const result = fanOut(app, parent.id, {
       tasks: [{ summary: "Child A" }, { summary: "Child B" }],
     });
 
@@ -29,7 +29,7 @@ describe("fan-out compute inheritance", () => {
       compute_name: "fc-host", workdir: "/home/ubuntu/myrepo", repo: "myrepo",
     });
 
-    const result = fanOut(parent.id, { tasks: [{ summary: "Child" }] });
+    const result = fanOut(app, parent.id, { tasks: [{ summary: "Child" }] });
     expect(result.ok).toBe(true);
 
     const child = app.sessions.get(result.childIds![0]);

@@ -228,7 +228,7 @@ export function registerSessionCommands(program: Command) {
     .action(async (id, opts) => {
       if (!opts.force) {
         // Run verification first
-        const result = await core.runVerification(id);
+        const result = await core.runVerification(core.getApp(), id);
         if (!result.ok) {
           console.log(chalk.red("Verification failed:"));
           console.log(chalk.red(result.message));
@@ -404,7 +404,7 @@ export function registerSessionCommands(program: Command) {
     .argument("<id>", "Session ID")
     .action(async (id) => {
       console.log(chalk.dim("Running verification..."));
-      const result = await core.runVerification(id);
+      const result = await core.runVerification(core.getApp(), id);
       if (result.ok) {
         console.log(chalk.green("Verification passed"));
       } else {

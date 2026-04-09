@@ -308,7 +308,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("verify/run", async (params) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const { runVerification } = await import("../../core/services/session-orchestration.js");
-    return runVerification(sessionId);
+    return runVerification(app, sessionId);
   });
 
   // ── Export ─────────────────────────────────────────────────────────────
