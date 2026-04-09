@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Lint
+        run: npx eslint packages/ --max-warnings 50
+
       - name: Unit tests (excludes E2E and integration)
         run: |
           bun test --concurrency 1 --timeout 30000 \

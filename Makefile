@@ -96,8 +96,11 @@ test-e2e-tui: ## Run TUI E2E tests only (tmux)
 test-watch: ## Run unit tests in watch mode
 	$(BUN) test --watch
 
-lint: ## Lint the codebase
-	$(BUN) run lint
+lint: ## Lint the codebase (ESLint + TypeScript)
+	npx eslint packages/ --max-warnings 50
+
+lint-fix: ## Auto-fix lint issues
+	npx eslint packages/ --fix
 
 # ── Building ─────────────────────────────────────────────────────────────────
 
