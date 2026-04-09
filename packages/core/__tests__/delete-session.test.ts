@@ -1,5 +1,5 @@
 /**
- * Comprehensive tests for deleteSessionAsync — full session cleanup.
+ * Comprehensive tests for deleteSessionAsync -- full session cleanup.
  *
  * Tests DB deletion, event cleanup, worktree removal, hook config removal,
  * and graceful handling of missing tmux/compute.
@@ -9,11 +9,11 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
-import * as core from "../index.js";
-import { getApp } from "../app.js";
-import { deleteSessionAsync } from "../services/session-orchestration.js";
-import { writeHooksConfig } from "../claude.js";
 import { AppContext, setApp, clearApp } from "../app.js";
+import { startSession, deleteSessionAsync } from "../services/session-orchestration.js";
+import { WORKTREES_DIR } from "../paths.js";
+import { writeHooksConfig } from "../claude.js";
+
 let app: AppContext;
 
 beforeEach(async () => {
@@ -31,44 +31,44 @@ afterEach(async () => {
 
 describe("deleteSessionAsync", () => {
   it("soft-deletes session from database", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: "/tmp/fake-repo",
       summary: "delete-db-test",
       flow: "bare",
     });
 
     // Verify it exists
-    expect(core.getSession(session.id)).not.toBeNull();
+    expect(app.sessions.get(session.id)).not.toBeNull();
 
     const result = await deleteSessionAsync(app, session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session deleted (undo available for 90s)");
 
     // Soft-delete: session still exists in DB with status "deleting"
-    const after = core.getSession(session.id);
+    const after = app.sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
   });
 
   it("preserves events after soft-delete", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: "/tmp/fake-repo",
       summary: "delete-events-test",
       flow: "bare",
     });
 
     // Log some extra events
-    core.logEvent(session.id, "test_event_1", { actor: "test", data: { foo: 1 } });
-    core.logEvent(session.id, "test_event_2", { actor: "test", data: { bar: 2 } });
+    app.events.log(session.id, "test_event_1", { actor: "test", data: { foo: 1 } });
+    app.events.log(session.id, "test_event_2", { actor: "test", data: { bar: 2 } });
 
     // Verify events exist (session_created + stage_ready + 2 custom)
-    const eventsBefore = core.getEvents(session.id);
+    const eventsBefore = app.events.list(session.id);
     expect(eventsBefore.length).toBeGreaterThanOrEqual(3);
 
     await deleteSessionAsync(app, session.id);
 
     // Soft-delete preserves events (plus session_deleted event)
-    const eventsAfter = core.getEvents(session.id);
+    const eventsAfter = app.events.list(session.id);
     expect(eventsAfter.length).toBeGreaterThan(eventsBefore.length);
   });
 
@@ -78,14 +78,14 @@ describe("deleteSessionAsync", () => {
     expect(result.message).toContain("not found");
   });
 
-  it("cleans up worktree directory if it exists (no repo — rmSync path)", async () => {
+  it("cleans up worktree directory if it exists (no repo -- rmSync path)", async () => {
     // Create session with no repo/workdir so cleanup uses direct rmSync
-    const session = getApp().sessions.create({
+    const session = app.sessions.create({
       summary: "delete-worktree-test",
     });
 
     // Create a fake worktree directory under WORKTREES_DIR
-    const wtPath = join(core.WORKTREES_DIR(), session.id);
+    const wtPath = join(WORKTREES_DIR(), session.id);
     mkdirSync(wtPath, { recursive: true });
     writeFileSync(join(wtPath, "dummy.txt"), "test content");
     expect(existsSync(wtPath)).toBe(true);
@@ -95,7 +95,7 @@ describe("deleteSessionAsync", () => {
     // Worktree directory should be gone (rmSync fallback)
     expect(existsSync(wtPath)).toBe(false);
     // Soft-delete: session still exists in DB with status "deleting"
-    const after = core.getSession(session.id);
+    const after = app.sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
   });
@@ -106,7 +106,7 @@ describe("deleteSessionAsync", () => {
     mkdirSync(repoDir, { recursive: true });
     writeFileSync(join(repoDir, "file.txt"), "important");
 
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: repoDir,
       workdir: repoDir,
       summary: "delete-no-worktree-test",
@@ -114,7 +114,7 @@ describe("deleteSessionAsync", () => {
     });
 
     // No worktree dir exists under WORKTREES_DIR
-    const wtPath = join(core.WORKTREES_DIR(), session.id);
+    const wtPath = join(WORKTREES_DIR(), session.id);
     expect(existsSync(wtPath)).toBe(false);
 
     await deleteSessionAsync(app, session.id);
@@ -123,7 +123,7 @@ describe("deleteSessionAsync", () => {
     expect(existsSync(repoDir)).toBe(true);
     expect(readFileSync(join(repoDir, "file.txt"), "utf-8")).toBe("important");
     // Soft-delete: session still exists in DB with status "deleting"
-    const after = core.getSession(session.id);
+    const after = app.sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
   });
@@ -133,7 +133,7 @@ describe("deleteSessionAsync", () => {
     const workdir = join(app.config.arkDir, "hook-test-workdir");
     mkdirSync(workdir, { recursive: true });
 
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: workdir,
       workdir,
       summary: "delete-hooks-test",
@@ -159,7 +159,7 @@ describe("deleteSessionAsync", () => {
       expect(afterSettings.hooks).toBeUndefined();
     }
     // Soft-delete: session still exists in DB with status "deleting"
-    const after = core.getSession(session.id);
+    const after = app.sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
   });
@@ -167,7 +167,7 @@ describe("deleteSessionAsync", () => {
   // ── Integration patterns ──────────────────────────────────────────────────
 
   it("works when session has no tmux session (session_id is null)", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: "/tmp/fake-repo",
       summary: "no-tmux-test",
       flow: "bare",
@@ -181,13 +181,13 @@ describe("deleteSessionAsync", () => {
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session deleted (undo available for 90s)");
     // Soft-delete: session still exists with status "deleting"
-    const after1 = core.getSession(session.id);
+    const after1 = app.sessions.get(session.id);
     expect(after1).not.toBeNull();
     expect(after1!.status).toBe("deleting");
   });
 
   it("works when session has no compute (compute_name is null)", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: "/tmp/fake-repo",
       summary: "no-compute-test",
       flow: "bare",
@@ -202,7 +202,7 @@ describe("deleteSessionAsync", () => {
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session deleted (undo available for 90s)");
     // Soft-delete: session still exists with status "deleting"
-    const after = core.getSession(session.id);
+    const after = app.sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
   });

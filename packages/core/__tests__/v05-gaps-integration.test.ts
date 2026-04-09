@@ -32,7 +32,7 @@ describe("v0.5 gaps integration", () => {
   });
 
   it("sessionToRecipe creates valid recipe from session", () => {
-    const session = core.createSession({ summary: "Integration test", flow: "default" });
+    const session = app.sessions.create({ summary: "Integration test", flow: "default" });
     const recipe = core.sessionToRecipe(session, "from-int-test");
     expect(recipe.name).toBe("from-int-test");
     expect(recipe.flow).toBe("default");

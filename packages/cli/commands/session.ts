@@ -4,6 +4,7 @@ import { resolve, basename } from "path";
 import { existsSync } from "fs";
 import { execSync } from "child_process";
 import * as core from "../../core/index.js";
+import { runVerification } from "../../core/services/session-orchestration.js";
 import { getArkClient } from "./_shared.js";
 import { sanitizeSummary } from "../helpers.js";
 
@@ -228,7 +229,7 @@ export function registerSessionCommands(program: Command) {
     .action(async (id, opts) => {
       if (!opts.force) {
         // Run verification first
-        const result = await core.runVerification(core.getApp(), id);
+        const result = await runVerification(core.getApp(), id);
         if (!result.ok) {
           console.log(chalk.red("Verification failed:"));
           console.log(chalk.red(result.message));
@@ -404,7 +405,7 @@ export function registerSessionCommands(program: Command) {
     .argument("<id>", "Session ID")
     .action(async (id) => {
       console.log(chalk.dim("Running verification..."));
-      const result = await core.runVerification(core.getApp(), id);
+      const result = await runVerification(core.getApp(), id);
       if (result.ok) {
         console.log(chalk.green("Verification passed"));
       } else {

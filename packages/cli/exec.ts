@@ -1,7 +1,8 @@
 import chalk from "chalk";
 import { resolve, basename } from "path";
 import { existsSync } from "fs";
-import * as core from "../core/index.js";
+import { getApp } from "../core/app.js";
+import { startSession, dispatch, waitForCompletion } from "../core/services/session-orchestration.js";
 
 export interface ExecOpts {
   repo?: string;
@@ -34,7 +35,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Create session
   log(`Creating session: ${summary}`);
-  const session = core.startSession(core.getApp(), {
+  const session = startSession(getApp(), {
     ticket: opts.ticket,
     summary,
     repo,
@@ -46,7 +47,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Dispatch
   log(`Dispatching ${session.id}...`);
-  const result = await core.dispatch(core.getApp(), session.id);
+  const result = await dispatch(getApp(), session.id);
   if (!result.ok) {
     if (output === "json") {
       console.log(JSON.stringify({ status: "error", message: result.message, sessionId: session.id }));
@@ -59,7 +60,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Wait
   const timeoutMs = (opts.timeout ?? 0) * 1000;
-  const { session: final, timedOut } = await core.waitForCompletion(core.getApp(), session.id, {
+  const { session: final, timedOut } = await waitForCompletion(getApp(), session.id, {
     timeoutMs,
     pollMs: 5000,
     onStatus: (status) => log(`  Status: ${status}`),

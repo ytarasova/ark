@@ -7,7 +7,8 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
-import * as core from "../../core/index.js";
+import { getApp } from "../../core/app.js";
+import { dispatch } from "../../core/services/session-orchestration.js";
 import { TuiDriver } from "../fixtures/tui-driver.js";
 import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "../../core/__tests__/test-helpers.js";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
@@ -33,12 +34,13 @@ describe("e2e TUI dispatch and interaction", () => {
       tui.press("enter");
 
       // Wait for dispatch to take effect via DB state
+      const app = getApp();
       await tui.waitUntil(() => {
-        const updated = core.getSession(s.id);
+        const updated = app.sessions.get(s.id);
         return updated?.status === "running" || updated?.status === "failed";
       }, 10_000, 500);
 
-      const updated = core.getSession(s.id)!;
+      const updated = app.sessions.get(s.id)!;
       expect(["running", "failed"]).toContain(updated.status);
     } finally {
       tui.stop();
@@ -53,7 +55,8 @@ describe("e2e TUI dispatch and interaction", () => {
         repo: process.cwd(),
         flow: "bare",
       });
-      await core.dispatch(s.id);
+      const app = getApp();
+      await dispatch(app, s.id);
 
       await tui.start();
       await tui.waitFor("dispatch-stop-test");
@@ -62,11 +65,11 @@ describe("e2e TUI dispatch and interaction", () => {
 
       // Wait for stop to propagate to DB
       await tui.waitUntil(() => {
-        const updated = core.getSession(s.id);
+        const updated = app.sessions.get(s.id);
         return updated?.status === "stopped";
       }, 8000, 500);
 
-      const updated = core.getSession(s.id)!;
+      const updated = app.sessions.get(s.id)!;
       expect(updated.status).toBe("stopped");
     } finally {
       tui.stop();
@@ -81,7 +84,8 @@ describe("e2e TUI dispatch and interaction", () => {
         repo: process.cwd(),
         flow: "bare",
       });
-      await core.dispatch(s.id);
+      const app = getApp();
+      await dispatch(app, s.id);
 
       await tui.start();
       await tui.waitFor("dispatch-interrupt-test");
@@ -91,7 +95,7 @@ describe("e2e TUI dispatch and interaction", () => {
       await new Promise(r => setTimeout(r, 1000));
 
       // The session should still exist -- interrupt doesn't kill it
-      const updated = core.getSession(s.id)!;
+      const updated = app.sessions.get(s.id)!;
       expect(updated).toBeTruthy();
       // Session may still be running or may have stopped/failed due to interrupt
       expect(["running", "stopped", "failed", "waiting"]).toContain(updated.status);
@@ -108,9 +112,10 @@ describe("e2e TUI dispatch and interaction", () => {
         repo: process.cwd(),
         flow: "bare",
       });
-      await core.dispatch(session.id);
+      const app = getApp();
+      await dispatch(app, session.id);
 
-      const dispatched = core.getSession(session.id)!;
+      const dispatched = app.sessions.get(session.id)!;
       expect(dispatched.status).toBe("running");
 
       await tui.start();
@@ -177,7 +182,8 @@ describe("e2e TUI dispatch and interaction", () => {
         repo: process.cwd(),
         flow: "bare",
       });
-      await core.dispatch(s.id);
+      const app = getApp();
+      await dispatch(app, s.id);
 
       await tui.start();
       const found = await tui.waitFor(/Live Output|dispatch-live-output/, 5000);
@@ -208,12 +214,12 @@ describe("e2e TUI dispatch and interaction", () => {
       expect(found).toBe(true);
 
       const sessionId = orphanName.replace("ark-", "");
-      expect(core.getSession(sessionId)).toBeNull();
+      expect(freshApp.sessions.get(sessionId)).toBeNull();
 
       let cleaned = 0;
       for (const ts of sessions) {
         const sid = ts.name.replace("ark-", "");
-        if (!core.getSession(sid)) {
+        if (!freshApp.sessions.get(sid)) {
           killSession(ts.name);
           cleaned++;
         }

@@ -6,7 +6,8 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import * as core from "../../core/index.js";
+import { getApp } from "../../core/app.js";
+import { complete, restore } from "../../core/services/session-orchestration.js";
 import { TuiDriver } from "../fixtures/tui-driver.js";
 import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "../../core/__tests__/test-helpers.js";
 
@@ -76,7 +77,8 @@ describe("e2e TUI session CRUD", () => {
       expect(gone).toBe(true);
 
       // Session should be soft-deleted (status "deleting")
-      const updated = core.getSession(s.id);
+      const app = getApp();
+      const updated = app.sessions.get(s.id);
       expect(updated?.status).toBe("deleting");
       tui.untrack(s.id);
     } finally {
@@ -108,7 +110,8 @@ describe("e2e TUI session CRUD", () => {
       expect(found).toBe(true);
 
       // There should now be at least 2 sessions
-      const sessions = core.listSessions({ limit: 50 });
+      const app = getApp();
+      const sessions = app.sessions.list({ limit: 50 });
       const matching = sessions.filter(s =>
         s.summary?.includes("crud-clone-source") || s.summary?.includes("clone")
       );
@@ -128,8 +131,9 @@ describe("e2e TUI session CRUD", () => {
       });
 
       // Complete the session first (archive requires completed/stopped/failed)
-      await core.complete(s.id, { force: true });
-      expect(core.getSession(s.id)!.status).toBe("completed");
+      const app = getApp();
+      await complete(app, s.id, { force: true });
+      expect(app.sessions.get(s.id)!.status).toBe("completed");
 
       await tui.start();
       await tui.waitFor("crud-archive-target");
@@ -140,17 +144,17 @@ describe("e2e TUI session CRUD", () => {
 
       // Verify the session is archived in DB
       await tui.waitUntil(() => {
-        const updated = core.getSession(s.id);
+        const updated = app.sessions.get(s.id);
         return updated?.status === "archived";
       }, 5000, 300);
 
-      const archived = core.getSession(s.id)!;
+      const archived = app.sessions.get(s.id)!;
       expect(archived.status).toBe("archived");
 
       // Restore with Z again (if session is still visible or we navigate to it)
       // Archived sessions may be hidden -- use core API to restore
-      core.restore(s.id);
-      const restored = core.getSession(s.id)!;
+      await restore(app, s.id);
+      const restored = app.sessions.get(s.id)!;
       expect(restored.status).toBe("completed");
     } finally {
       tui.stop();

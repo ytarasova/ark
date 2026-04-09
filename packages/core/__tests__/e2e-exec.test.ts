@@ -9,9 +9,8 @@
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
 import { join } from "path";
-import * as core from "../index.js";
-import { waitForCompletion } from "../services/session-orchestration.js";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { startSession, waitForCompletion } from "../services/session-orchestration.js";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
 const CLI = join(ROOT, "packages", "cli", "index.ts");
@@ -34,7 +33,7 @@ const sessionIds: string[] = [];
 
 afterEach(() => {
   for (const id of sessionIds) {
-    try { core.deleteSession(id); } catch { /* already gone */ }
+    try { app.sessions.delete(id); } catch { /* already gone */ }
   }
   sessionIds.length = 0;
 });
@@ -121,7 +120,7 @@ describe("waitForCompletion", () => {
 
 describe("exec session creation", () => {
   it("creates session with correct flow/summary/compute from opts", () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       summary: "exec-test-summary",
       repo: "my-repo",
       flow: "bare",

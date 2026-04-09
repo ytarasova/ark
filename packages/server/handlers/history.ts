@@ -2,6 +2,7 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
+import { startSession } from "../../core/services/session-orchestration.js";
 import type {
   HistoryListParams,
   HistoryImportParams,
@@ -17,13 +18,13 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
 
   router.handle("history/import", async (p) => {
     const { claudeSessionId, name, repo } = extract<HistoryImportParams>(p, []);
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       summary: name ?? "import",
       repo: repo ?? ".",
       flow: "bare",
     });
     if (claudeSessionId) {
-      core.getApp().sessions.update(session.id, { claude_session_id: claudeSessionId });
+      app.sessions.update(session.id, { claude_session_id: claudeSessionId });
     }
     return { session };
   });

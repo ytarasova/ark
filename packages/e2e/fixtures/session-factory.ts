@@ -1,4 +1,6 @@
-import * as core from "../../core/index.js";
+import { getApp } from "../../core/app.js";
+import { startSession } from "../../core/services/session-orchestration.js";
+import { killSession } from "../../core/tmux.js";
 import type { E2EEnv } from "./app.js";
 
 interface CreateOpts {
@@ -12,7 +14,8 @@ interface CreateOpts {
 }
 
 export function createTestSession(env: E2EEnv, opts: CreateOpts = {}) {
-  const session = core.startSession({
+  const app = getApp();
+  const session = startSession(app, {
     summary: opts.summary ?? `e2e-${Date.now()}`,
     repo: opts.repo ?? env.workdir,
     flow: opts.flow ?? "bare",
@@ -26,13 +29,14 @@ export function createTestSession(env: E2EEnv, opts: CreateOpts = {}) {
 }
 
 export function cleanupSessions(env: E2EEnv) {
+  const app = getApp();
   for (const id of env.sessionIds) {
     try {
-      const s = core.getSession(id);
+      const s = app.sessions.get(id);
       if (s?.session_id) {
-        try { core.killSession(s.session_id); } catch {}
+        try { killSession(s.session_id); } catch {}
       }
-      core.deleteSession(id);
+      app.sessions.delete(id);
     } catch {}
   }
   env.sessionIds.length = 0;

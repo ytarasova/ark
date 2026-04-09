@@ -10,11 +10,8 @@ import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
-import {
-  startSession, logEvent,
-  AppContext, setApp, clearApp,
-} from "../../core/index.js";
-import { getApp } from "../../core/app.js";
+import { AppContext, setApp, clearApp, getApp } from "../../core/app.js";
+import { startSession } from "../../core/services/session-orchestration.js";
 import { useEventLog, type EventLogEntry } from "../hooks/useEventLog.js";
 import { createMockArkClient, MockArkClientProvider } from "./test-helpers.js";
 import { withTestContext, waitFor } from "../../core/__tests__/test-helpers.js";
@@ -81,9 +78,9 @@ describe("useEventLog", () => {
   });
 
   it("returns formatted events when sessions have events", async () => {
-    const s = startSession({ summary: "event-test", repo: ".", flow: "bare" });
-    logEvent(s.id, "session_created", { data: { summary: "event-test" } });
-    logEvent(s.id, "stage_started", { data: { agent: "planner", stage: "plan" } });
+    const s = startSession(getApp(), { summary: "event-test", repo: ".", flow: "bare" });
+    getApp().events.log(s.id, "session_created", { data: { summary: "event-test" } });
+    getApp().events.log(s.id, "stage_started", { data: { agent: "planner", stage: "plan" } });
 
     const { unmount } = render(<WrappedEventCapture expanded={false} />);
     await waitFor(() => capturedEvents.length > 0, { timeout: 3000 });
@@ -102,10 +99,10 @@ describe("useEventLog", () => {
   });
 
   it("events include correct color for type", async () => {
-    const s = startSession({ summary: "color-test", repo: ".", flow: "bare" });
-    logEvent(s.id, "agent_error", { data: { error: "something broke" } });
-    logEvent(s.id, "session_completed");
-    logEvent(s.id, "stage_started", { data: { agent: "impl", stage: "implement" } });
+    const s = startSession(getApp(), { summary: "color-test", repo: ".", flow: "bare" });
+    getApp().events.log(s.id, "agent_error", { data: { error: "something broke" } });
+    getApp().events.log(s.id, "session_completed");
+    getApp().events.log(s.id, "stage_started", { data: { agent: "impl", stage: "implement" } });
 
     const { unmount } = render(<WrappedEventCapture expanded={true} />);
     await waitFor(() => capturedEvents.length >= 3, { timeout: 3000 });
@@ -126,10 +123,10 @@ describe("useEventLog", () => {
   });
 
   it("expanded mode returns more events than collapsed", async () => {
-    const s = startSession({ summary: "expand-test", repo: ".", flow: "bare" });
+    const s = startSession(getApp(), { summary: "expand-test", repo: ".", flow: "bare" });
     // Create many events
     for (let i = 0; i < 8; i++) {
-      logEvent(s.id, "stage_started", { data: { agent: `agent-${i}`, stage: `stage-${i}` } });
+      getApp().events.log(s.id, "stage_started", { data: { agent: `agent-${i}`, stage: `stage-${i}` } });
     }
 
     // Render collapsed
@@ -154,8 +151,8 @@ describe("useEventLog", () => {
 
   it("source field is truncated to 20 chars", async () => {
     const longSummary = "This is a very long session summary that exceeds twenty characters";
-    const s = startSession({ summary: longSummary, repo: ".", flow: "bare" });
-    logEvent(s.id, "session_created", { data: { summary: longSummary } });
+    const s = startSession(getApp(), { summary: longSummary, repo: ".", flow: "bare" });
+    getApp().events.log(s.id, "session_created", { data: { summary: longSummary } });
 
     const { unmount } = render(<WrappedEventCapture expanded={false} />);
     await waitFor(() => capturedEvents.length > 0, { timeout: 3000 });
@@ -167,11 +164,11 @@ describe("useEventLog", () => {
   });
 
   it("events are sorted by time descending (newest first)", async () => {
-    const s = startSession({ summary: "sort-test", repo: ".", flow: "bare" });
-    logEvent(s.id, "session_created");
+    const s = startSession(getApp(), { summary: "sort-test", repo: ".", flow: "bare" });
+    getApp().events.log(s.id, "session_created");
     // Small delay so times differ
     await new Promise(r => setTimeout(r, 50));
-    logEvent(s.id, "stage_started", { data: { stage: "plan" } });
+    getApp().events.log(s.id, "stage_started", { data: { stage: "plan" } });
 
     const { unmount } = render(<WrappedEventCapture expanded={true} />);
     await waitFor(() => capturedEvents.length >= 2, { timeout: 3000 });

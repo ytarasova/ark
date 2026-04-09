@@ -9,8 +9,9 @@
  */
 
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
-import * as core from "../index.js";
 import { AppContext, setApp, clearApp } from "../app.js";
+import { startSession, dispatch, stop, resume, complete, getOutput } from "../services/session-orchestration.js";
+import { sessionExists, killSession } from "../tmux.js";
 import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "./test-helpers.js";
 
 let app: AppContext;
@@ -33,11 +34,11 @@ const sessionIds: string[] = [];
 afterEach(async () => {
   for (const id of sessionIds) {
     try {
-      const s = core.getSession(id);
+      const s = app.sessions.get(id);
       if (s?.session_id) {
-        try { core.killSession(s.session_id); } catch { /* already gone */ }
+        try { killSession(s.session_id); } catch { /* already gone */ }
       }
-      core.deleteSession(id);
+      app.sessions.delete(id);
     } catch { /* already gone */ }
   }
   sessionIds.length = 0;
@@ -47,7 +48,7 @@ afterEach(async () => {
 
 describe("core lifecycle: startSession", () => {
   it("returns a valid session with correct defaults", () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-start-test",
       flow: "bare",
@@ -66,14 +67,14 @@ describe("core lifecycle: startSession", () => {
   });
 
   it("logs stage_ready event on creation", () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-event-test",
       flow: "bare",
     });
     sessionIds.push(session.id);
 
-    const events = core.getEvents(session.id);
+    const events = app.events.list(session.id);
     expect(events.length).toBeGreaterThanOrEqual(1);
     const ready = events.find((e) => e.type === "stage_ready");
     expect(ready).toBeTruthy();
@@ -86,7 +87,7 @@ describe("core lifecycle: startSession", () => {
 
 describe("core lifecycle: dispatch", () => {
   it("transitions session to running with tmux", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-dispatch-test",
       flow: "bare",
@@ -94,24 +95,24 @@ describe("core lifecycle: dispatch", () => {
     sessionIds.push(session.id);
     expect(session.status).toBe("ready");
 
-    const result = await core.dispatch(core.getApp(), session.id);
+    const result = await dispatch(app, session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toContain("ark-");
 
-    const dispatched = core.getSession(session.id)!;
+    const dispatched = app.sessions.get(session.id)!;
     expect(dispatched.status).toBe("running");
     expect(dispatched.session_id).toBeTruthy();
     expect(dispatched.agent).toBeTruthy();
 
     // Verify tmux session exists
-    expect(core.sessionExists(dispatched.session_id!)).toBe(true);
+    expect(sessionExists(dispatched.session_id!)).toBe(true);
 
     // Clean up tmux
-    await core.stop(core.getApp(), session.id);
+    await stop(app, session.id);
   }, 30_000);
 
   it("rejects dispatch on non-ready session", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-reject-test",
       flow: "bare",
@@ -119,19 +120,19 @@ describe("core lifecycle: dispatch", () => {
     sessionIds.push(session.id);
 
     // Dispatch once
-    await core.dispatch(core.getApp(), session.id);
-    const s = core.getSession(session.id)!;
+    await dispatch(app, session.id);
+    const s = app.sessions.get(session.id)!;
     if (s.session_id) {
       // Dispatch again - should say already running
-      const result2 = await core.dispatch(core.getApp(), session.id);
+      const result2 = await dispatch(app, session.id);
       expect(result2.message).toContain("Already running");
     }
 
-    await core.stop(core.getApp(), session.id);
+    await stop(app, session.id);
   }, 30_000);
 
   it("returns error for nonexistent session", async () => {
-    const result = await core.dispatch(core.getApp(), "s-nonexistent");
+    const result = await dispatch(app, "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -141,24 +142,24 @@ describe("core lifecycle: dispatch", () => {
 
 describe("core lifecycle: getOutput", () => {
   it("returns string for running session (may be empty initially)", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-output-test",
       flow: "bare",
     });
     sessionIds.push(session.id);
 
-    await core.dispatch(core.getApp(), session.id);
+    await dispatch(app, session.id);
 
     // getOutput should return a string (possibly empty right after dispatch)
-    const output = await core.getOutput(core.getApp(), session.id, { lines: 10 });
+    const output = await getOutput(app, session.id, { lines: 10 });
     expect(typeof output).toBe("string");
 
-    await core.stop(core.getApp(), session.id);
+    await stop(app, session.id);
   }, 30_000);
 
   it("returns empty string for session without tmux", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-no-output-test",
       flow: "bare",
@@ -166,7 +167,7 @@ describe("core lifecycle: getOutput", () => {
     sessionIds.push(session.id);
 
     // Not dispatched yet, so no tmux session
-    const output = await core.getOutput(core.getApp(), session.id);
+    const output = await getOutput(app, session.id);
     expect(output).toBe("");
   });
 });
@@ -175,30 +176,30 @@ describe("core lifecycle: getOutput", () => {
 
 describe("core lifecycle: stop", () => {
   it("transitions running session to stopped", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-stop-test",
       flow: "bare",
     });
     sessionIds.push(session.id);
 
-    await core.dispatch(core.getApp(), session.id);
-    const dispatched = core.getSession(session.id)!;
+    await dispatch(app, session.id);
+    const dispatched = app.sessions.get(session.id)!;
     expect(dispatched.status).toBe("running");
 
-    const result = await core.stop(core.getApp(), session.id);
+    const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
 
-    const stopped = core.getSession(session.id)!;
+    const stopped = app.sessions.get(session.id)!;
     expect(stopped.status).toBe("stopped");
     expect(stopped.error).toBeNull();
     expect(stopped.session_id).toBeNull();
 
     // Verify tmux is dead
-    expect(core.sessionExists(dispatched.session_id!)).toBe(false);
+    expect(sessionExists(dispatched.session_id!)).toBe(false);
 
     // Verify stop event logged
-    const events = core.getEvents(session.id, { type: "session_stopped" });
+    const events = app.events.list(session.id, { type: "session_stopped" });
     expect(events.length).toBeGreaterThanOrEqual(1);
   }, 30_000);
 });
@@ -207,7 +208,7 @@ describe("core lifecycle: stop", () => {
 
 describe("core lifecycle: resume", () => {
   it("re-dispatches a stopped session", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-resume-test",
       flow: "bare",
@@ -215,26 +216,26 @@ describe("core lifecycle: resume", () => {
     sessionIds.push(session.id);
 
     // Dispatch, then stop
-    await core.dispatch(core.getApp(), session.id);
-    await core.stop(core.getApp(), session.id);
+    await dispatch(app, session.id);
+    await stop(app, session.id);
 
-    const stopped = core.getSession(session.id)!;
+    const stopped = app.sessions.get(session.id)!;
     expect(stopped.status).toBe("stopped");
 
     // Resume
-    const result = await core.resume(core.getApp(), session.id);
+    const result = await resume(app, session.id);
     expect(result.ok).toBe(true);
 
-    const resumed = core.getSession(session.id)!;
+    const resumed = app.sessions.get(session.id)!;
     expect(resumed.status).toBe("running");
     expect(resumed.session_id).toBeTruthy();
 
     // Verify resume event
-    const events = core.getEvents(session.id, { type: "session_resumed" });
+    const events = app.events.list(session.id, { type: "session_resumed" });
     expect(events.length).toBeGreaterThanOrEqual(1);
 
     // Clean up
-    await core.stop(core.getApp(), session.id);
+    await stop(app, session.id);
   }, 30_000);
 });
 
@@ -242,7 +243,7 @@ describe("core lifecycle: resume", () => {
 
 describe("core lifecycle: complete", () => {
   it("advances flow when completing a stage", async () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-complete-test",
       flow: "bare",
@@ -250,19 +251,19 @@ describe("core lifecycle: complete", () => {
     sessionIds.push(session.id);
 
     // Dispatch so it's running
-    await core.dispatch(core.getApp(), session.id);
+    await dispatch(app, session.id);
 
     // Complete the current stage
-    const result = await core.complete(core.getApp(), session.id);
+    const result = await complete(app, session.id);
     expect(result.ok).toBe(true);
 
-    const completed = core.getSession(session.id)!;
+    const completed = app.sessions.get(session.id)!;
     // "bare" flow has only one stage ("work"), so completing it
     // should complete the entire flow
     expect(completed.status).toBe("completed");
 
     // Verify stage_completed event
-    const events = core.getEvents(session.id, { type: "stage_completed" });
+    const events = app.events.list(session.id, { type: "stage_completed" });
     expect(events.length).toBeGreaterThanOrEqual(1);
   }, 30_000);
 });
@@ -271,7 +272,7 @@ describe("core lifecycle: complete", () => {
 
 describe("core lifecycle: deleteSession", () => {
   it("removes session and its events from the database", () => {
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-delete-test",
       flow: "bare",
@@ -279,20 +280,20 @@ describe("core lifecycle: deleteSession", () => {
     // Don't add to sessionIds since we're deleting manually
 
     // Verify it exists
-    expect(core.getSession(session.id)).not.toBeNull();
-    expect(core.getEvents(session.id).length).toBeGreaterThan(0);
+    expect(app.sessions.get(session.id)).not.toBeNull();
+    expect(app.events.list(session.id).length).toBeGreaterThan(0);
 
     // Delete
-    const deleted = core.deleteSession(session.id);
+    const deleted = app.sessions.delete(session.id);
     expect(deleted).toBe(true);
 
     // Verify it's gone
-    expect(core.getSession(session.id)).toBeNull();
-    expect(core.getEvents(session.id).length).toBe(0);
+    expect(app.sessions.get(session.id)).toBeNull();
+    expect(app.events.list(session.id).length).toBe(0);
   });
 
   it("returns false for nonexistent session", () => {
-    const deleted = core.deleteSession("s-nonexistent");
+    const deleted = app.sessions.delete("s-nonexistent");
     expect(deleted).toBe(false);
   });
 });
@@ -302,7 +303,7 @@ describe("core lifecycle: deleteSession", () => {
 describe("core lifecycle: full round-trip", () => {
   it("start -> dispatch -> stop -> resume -> complete -> delete", async () => {
     // 1. Start
-    const session = core.startSession(core.getApp(), {
+    const session = startSession(app, {
       repo: process.cwd(),
       summary: "lifecycle-roundtrip",
       flow: "bare",
@@ -311,26 +312,26 @@ describe("core lifecycle: full round-trip", () => {
     expect(session.status).toBe("ready");
 
     // 2. Dispatch
-    await core.dispatch(core.getApp(), session.id);
-    expect(core.getSession(session.id)!.status).toBe("running");
+    await dispatch(app, session.id);
+    expect(app.sessions.get(session.id)!.status).toBe("running");
 
     // 3. Stop
-    await core.stop(core.getApp(), session.id);
-    expect(core.getSession(session.id)!.status).toBe("stopped");
+    await stop(app, session.id);
+    expect(app.sessions.get(session.id)!.status).toBe("stopped");
 
     // 4. Resume (re-dispatches)
-    await core.resume(core.getApp(), session.id);
-    expect(core.getSession(session.id)!.status).toBe("running");
+    await resume(app, session.id);
+    expect(app.sessions.get(session.id)!.status).toBe("running");
 
     // 5. Complete (advances flow)
-    core.complete(core.getApp(), session.id);
-    expect(core.getSession(session.id)!.status).toBe("completed");
+    complete(app, session.id);
+    expect(app.sessions.get(session.id)!.status).toBe("completed");
 
     // 6. Delete
     const idx = sessionIds.indexOf(session.id);
     if (idx >= 0) sessionIds.splice(idx, 1);
-    const deleted = core.deleteSession(session.id);
+    const deleted = app.sessions.delete(session.id);
     expect(deleted).toBe(true);
-    expect(core.getSession(session.id)).toBeNull();
+    expect(app.sessions.get(session.id)).toBeNull();
   }, 45_000);
 });

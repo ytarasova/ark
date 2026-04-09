@@ -1,5 +1,5 @@
 /**
- * Tests for useComputeActions — verifies every action wraps in async.run()
+ * Tests for useComputeActions -- verifies every action wraps in async.run()
  * with correct labels, calls addLog, and delegates to ArkClient.
  *
  * Since the hook now uses useArkClient() (React context), we test the
@@ -7,10 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterAll, mock } from "bun:test";
-import {
-  createCompute, getCompute,
-  AppContext, setApp, clearApp,
-} from "../../core/index.js";
+import { AppContext, setApp, clearApp } from "../../core/app.js";
 import { registerProvider, clearProviders } from "../../compute/index.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { withTestContext } from "../../core/__tests__/test-helpers.js";
@@ -108,31 +105,30 @@ function mockArkClient() {
 describe("useComputeActions (pattern tests)", () => {
   it("provision wraps in async.run with correct label", () => {
     registerProvider(mockProvider("mock"));
-    const compute = createCompute({ name: "prov-box", provider: "mock" });
+    const compute = app.computes.create({ name: "prov-box", provider: "mock" });
     // Verify the compute exists (the action would use ark.computeProvision)
-    expect(getCompute("prov-box")).not.toBeNull();
+    expect(app.computes.get("prov-box")).not.toBeNull();
   });
 
   it("delete removes compute from store via protocol", async () => {
-    const compute = createCompute({ name: "del-target", provider: "local" });
-    expect(getCompute("del-target")).not.toBeNull();
+    const compute = app.computes.create({ name: "del-target", provider: "local" });
+    expect(app.computes.get("del-target")).not.toBeNull();
     // The hook would call ark.computeStopInstance + ark.computeDelete
     // Verify the underlying store operation works
-    const { deleteCompute } = require("../../core/index.js");
-    deleteCompute("del-target");
-    expect(getCompute("del-target")).toBeNull();
+    app.computes.delete("del-target");
+    expect(app.computes.get("del-target")).toBeNull();
   });
 
   it("provision creates compute with expected provider", () => {
     registerProvider(mockProvider("mock"));
-    const compute = createCompute({ name: "status-box", provider: "mock" });
+    const compute = app.computes.create({ name: "status-box", provider: "mock" });
     expect(compute.provider).toBe("mock");
-    expect(getCompute("status-box")).not.toBeNull();
+    expect(app.computes.get("status-box")).not.toBeNull();
   });
 
   it("stop/start patterns work with provider", () => {
     registerProvider(mockProvider("mock"));
-    const compute = createCompute({ name: "stop-start-box", provider: "mock" });
+    const compute = app.computes.create({ name: "stop-start-box", provider: "mock" });
     expect(compute).not.toBeNull();
   });
 

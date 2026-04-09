@@ -16,7 +16,8 @@
 
 import { execFileSync } from "child_process";
 import { join } from "path";
-import * as core from "../../core/index.js";
+import { killSession } from "../../core/tmux.js";
+import { startSession } from "../../core/services/session-orchestration.js";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
 
 const ARK_BIN = join(import.meta.dir, "..", "..", "..", "ark");
@@ -232,11 +233,11 @@ export class TuiDriver {
     // Clean up sessions created via createSession()
     for (const id of this._sessionIds) {
       try {
-        const s = core.getSession(id);
+        const s = this._app?.sessions.get(id);
         if (s?.session_id) {
-          try { core.killSession(s.session_id); } catch { /* gone */ }
+          try { killSession(s.session_id); } catch { /* gone */ }
         }
-        core.deleteSession(id);
+        this._app?.sessions.delete(id);
       } catch { /* gone */ }
     }
     this._sessionIds.length = 0;
@@ -260,8 +261,9 @@ export class TuiDriver {
   // -- Session helpers (with automatic cleanup) ------------------------------
 
   /** Create a session via core API and track it for cleanup on stop(). */
-  createSession(opts: Parameters<typeof core.startSession>[0]): ReturnType<typeof core.startSession> {
-    const session = core.startSession(opts);
+  createSession(opts: Parameters<typeof startSession>[1]) {
+    if (!this._app) throw new Error("TuiDriver not started -- call start() first or boot app");
+    const session = startSession(this._app, opts);
     this._sessionIds.push(session.id);
     return session;
   }

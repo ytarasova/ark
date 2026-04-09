@@ -11,7 +11,9 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "bun:test";
 import { existsSync } from "fs";
 import { join } from "path";
 import { execFileSync } from "child_process";
-import * as core from "../../core/index.js";
+import { getApp } from "../../core/app.js";
+import { startSession, dispatch, stop } from "../../core/services/session-orchestration.js";
+import { killSession } from "../../core/tmux.js";
 import { TuiDriver } from "../fixtures/tui-driver.js";
 import { setupE2E, type E2EEnv } from "../fixtures/app.js";
 import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "../../core/__tests__/test-helpers.js";
@@ -30,20 +32,21 @@ afterAll(async () => {
 });
 
 afterEach(() => {
+  const app = getApp();
   // Kill any tmux sessions created during tests
   for (const name of env.tmuxSessions) {
-    try { core.killSession(name); } catch {}
+    try { killSession(name); } catch {}
   }
   env.tmuxSessions.length = 0;
 
   // Clean up sessions from DB
   for (const id of env.sessionIds) {
     try {
-      const s = core.getSession(id);
+      const s = app.sessions.get(id);
       if (s?.session_id) {
-        try { core.killSession(s.session_id); } catch {}
+        try { killSession(s.session_id); } catch {}
       }
-      core.deleteSession(id);
+      app.sessions.delete(id);
     } catch {}
   }
   env.sessionIds.length = 0;
@@ -52,7 +55,8 @@ afterEach(() => {
 describe("e2e TUI worktree", () => {
 
   it("dispatch with real git repo creates worktree", async () => {
-    const session = core.startSession({
+    const app = getApp();
+    const session = startSession(app, {
       repo: env.workdir,
       summary: "worktree-dispatch-test",
       flow: "bare",
@@ -60,15 +64,15 @@ describe("e2e TUI worktree", () => {
     });
     env.sessionIds.push(session.id);
 
-    const result = await core.dispatch(session.id);
+    const result = await dispatch(app, session.id);
     expect(result.ok).toBe(true);
 
-    const dispatched = core.getSession(session.id)!;
+    const dispatched = app.sessions.get(session.id)!;
     expect(dispatched.status).toBe("running");
     if (dispatched.session_id) env.tmuxSessions.push(dispatched.session_id);
 
     // Clean up: stop session so tmux dies
-    await core.stop(session.id);
+    await stop(app, session.id);
 
     // Clean up any worktree created in the isolated env
     const worktreePath = join(env.app.config.worktreesDir, session.id);

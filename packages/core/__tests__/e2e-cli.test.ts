@@ -8,7 +8,10 @@
 import { describe, it, expect, afterEach } from "bun:test";
 import { execFileSync } from "child_process";
 import { join } from "path";
-import * as core from "../index.js";
+import { getApp } from "../app.js";
+import { startSession } from "../services/session-orchestration.js";
+import { listAgents } from "../agent.js";
+import { listFlows } from "../flow.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -20,12 +23,13 @@ const testSessionIds: string[] = [];
 const testComputes: string[] = [];
 
 afterEach(() => {
+  const app = getApp();
   for (const id of testSessionIds) {
-    try { core.deleteSession(id); } catch { /* gone */ }
+    try { app.sessions.delete(id); } catch { /* gone */ }
   }
   testSessionIds.length = 0;
   for (const name of testComputes) {
-    try { core.deleteCompute(name); } catch { /* gone */ }
+    try { app.computes.delete(name); } catch { /* gone */ }
   }
   testComputes.length = 0;
 });
@@ -44,28 +48,31 @@ describe("CLI: version", () => {
 
 describe("CLI: compute lifecycle", () => {
   it("creates a compute with --provider ec2", () => {
+    const app = getApp();
     const name = `test-e2e-compute-${Date.now()}`;
     testComputes.push(name);
-    core.createCompute({ name, provider: "ec2" });
-    const compute = core.getCompute(name);
+    app.computes.create({ name, provider: "ec2" });
+    const compute = app.computes.get(name);
     expect(compute).not.toBeNull();
     expect(compute!.provider).toBe("ec2");
     expect(compute!.status).toBe("stopped");
   });
 
   it("lists computes and shows the created compute", () => {
+    const app = getApp();
     const name = `test-e2e-list-${Date.now()}`;
     testComputes.push(name);
-    core.createCompute({ name, provider: "ec2" });
-    const computes = core.listCompute();
+    app.computes.create({ name, provider: "ec2" });
+    const computes = app.computes.list();
     expect(computes.some(c => c.name === name)).toBe(true);
   });
 
   it("shows compute status as JSON", () => {
+    const app = getApp();
     const name = `test-e2e-status-${Date.now()}`;
     testComputes.push(name);
-    core.createCompute({ name, provider: "ec2" });
-    const compute = core.getCompute(name);
+    app.computes.create({ name, provider: "ec2" });
+    const compute = app.computes.get(name);
     expect(compute).not.toBeNull();
     expect(compute!.name).toBe(name);
     expect(compute!.provider).toBe("ec2");
@@ -73,32 +80,35 @@ describe("CLI: compute lifecycle", () => {
   });
 
   it("updates compute config with --set", () => {
+    const app = getApp();
     const name = `test-e2e-update-${Date.now()}`;
     testComputes.push(name);
-    core.createCompute({ name, provider: "ec2" });
-    core.mergeComputeConfig(name, { foo: "bar" });
-    const compute = core.getCompute(name);
+    app.computes.create({ name, provider: "ec2" });
+    app.computes.mergeConfig(name, { foo: "bar" });
+    const compute = app.computes.get(name);
     expect(compute!.config.foo).toBe("bar");
   });
 
   it("rejects deleting a running compute", () => {
+    const app = getApp();
     // The auto-created "local" compute is always running
     // createCompute for local should exist in a test context
     const name = `test-running-${Date.now()}`;
     testComputes.push(name);
-    core.createCompute({ name, provider: "local" });
-    core.updateCompute(name, { status: "running" });
+    app.computes.create({ name, provider: "local" });
+    app.computes.update(name, { status: "running" });
     // Attempting to delete a running compute should be rejected by the CLI
     // In core, deleteCompute doesn't check status, so we test the constraint here
-    const compute = core.getCompute(name);
+    const compute = app.computes.get(name);
     expect(compute!.status).toBe("running");
   });
 
   it("deletes a stopped compute", () => {
+    const app = getApp();
     const name = `test-e2e-del-${Date.now()}`;
-    core.createCompute({ name, provider: "ec2" });
-    core.deleteCompute(name);
-    expect(core.getCompute(name)).toBeNull();
+    app.computes.create({ name, provider: "ec2" });
+    app.computes.delete(name);
+    expect(app.computes.get(name)).toBeNull();
   });
 });
 
@@ -106,7 +116,8 @@ describe("CLI: compute lifecycle", () => {
 
 describe("CLI: session lifecycle", () => {
   it("creates a session with --repo and --summary", () => {
-    const session = core.startSession(core.getApp(), {
+    const app = getApp();
+    const session = startSession(app, {
       repo: ".",
       summary: "test-e2e-session",
       flow: "bare",
@@ -117,16 +128,18 @@ describe("CLI: session lifecycle", () => {
   });
 
   it("lists sessions", () => {
-    const session = core.startSession(core.getApp(), { repo: ".", summary: "list-test", flow: "bare" });
+    const app = getApp();
+    const session = startSession(app, { repo: ".", summary: "list-test", flow: "bare" });
     testSessionIds.push(session.id);
-    const sessions = core.listSessions();
+    const sessions = app.sessions.list();
     expect(sessions.some(s => s.summary === "list-test")).toBe(true);
   });
 
   it("shows session details", () => {
-    const session = core.startSession(core.getApp(), { repo: ".", summary: "show-test", flow: "bare" });
+    const app = getApp();
+    const session = startSession(app, { repo: ".", summary: "show-test", flow: "bare" });
     testSessionIds.push(session.id);
-    const fetched = core.getSession(session.id);
+    const fetched = app.sessions.get(session.id);
     expect(fetched).not.toBeNull();
     expect(fetched!.id).toBe(session.id);
     expect(fetched!.summary).toBe("show-test");
@@ -134,17 +147,19 @@ describe("CLI: session lifecycle", () => {
   });
 
   it("deletes a session (soft-delete)", () => {
-    const session = core.startSession(core.getApp(), { repo: ".", summary: "delete-test", flow: "bare" });
-    core.softDeleteSession(session.id);
-    const after = core.getSession(session.id);
+    const app = getApp();
+    const session = startSession(app, { repo: ".", summary: "delete-test", flow: "bare" });
+    app.sessions.softDelete(session.id);
+    const after = app.sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
   });
 
   it("undeletes a soft-deleted session", () => {
-    const session = core.startSession(core.getApp(), { repo: ".", summary: "undelete-test", flow: "bare" });
-    core.softDeleteSession(session.id);
-    const restored = core.undeleteSession(session.id);
+    const app = getApp();
+    const session = startSession(app, { repo: ".", summary: "undelete-test", flow: "bare" });
+    app.sessions.softDelete(session.id);
+    const restored = app.sessions.undelete(session.id);
     expect(restored).not.toBeNull();
     // startSession sets initial status, which gets restored after undelete
     expect(["pending", "ready"].includes(restored!.status)).toBe(true);
@@ -155,14 +170,14 @@ describe("CLI: session lifecycle", () => {
 
 describe("CLI: agent list", () => {
   it("lists available agents", () => {
-    const agents = core.listAgents();
+    const agents = listAgents();
     expect(agents.length).toBeGreaterThan(0);
   });
 });
 
 describe("CLI: flow list", () => {
   it("lists available flows", () => {
-    const flows = core.listFlows();
+    const flows = listFlows();
     expect(flows.length).toBeGreaterThan(0);
   });
 });

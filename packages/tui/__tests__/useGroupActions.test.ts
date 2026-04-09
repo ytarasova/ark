@@ -1,5 +1,5 @@
 /**
- * Tests for useGroupActions — verifies the underlying group operations
+ * Tests for useGroupActions -- verifies the underlying group operations
  * that the hook delegates to via ArkClient protocol.
  *
  * Since the hook now uses useArkClient() (React context), we test the
@@ -8,11 +8,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
-import {
-  createGroup, deleteGroup, getGroups,
-  startSession, getSession, updateSession, listSessions, deleteSession,
-  AppContext, setApp, clearApp,
-} from "../../core/index.js";
+import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { startSession } from "../../core/services/session-orchestration.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { withTestContext } from "../../core/__tests__/test-helpers.js";
 
@@ -59,46 +56,46 @@ afterAll(async () => {
 
 describe("useGroupActions (core operations)", () => {
   it("createGroup adds group to store", () => {
-    createGroup("my-group");
-    expect(getGroups()).toContain("my-group");
+    app.sessions.createGroup("my-group");
+    expect(app.sessions.getGroups().map(g => g.name)).toContain("my-group");
   });
 
   it("deleteGroup removes the group from the store", () => {
-    createGroup("doomed-group");
-    expect(getGroups()).toContain("doomed-group");
-    deleteGroup("doomed-group");
-    expect(getGroups()).not.toContain("doomed-group");
+    app.sessions.createGroup("doomed-group");
+    expect(app.sessions.getGroups().map(g => g.name)).toContain("doomed-group");
+    app.sessions.deleteGroup("doomed-group");
+    expect(app.sessions.getGroups().map(g => g.name)).not.toContain("doomed-group");
   });
 
   it("delete sessions in a group then delete the group", () => {
-    createGroup("busy-group");
-    const s1 = startSession({ summary: "task-1", repo: ".", flow: "bare" });
-    const s2 = startSession({ summary: "task-2", repo: ".", flow: "bare" });
-    updateSession(s1.id, { group_name: "busy-group" });
-    updateSession(s2.id, { group_name: "busy-group" });
+    app.sessions.createGroup("busy-group");
+    const s1 = startSession(app, { summary: "task-1", repo: ".", flow: "bare" });
+    const s2 = startSession(app, { summary: "task-2", repo: ".", flow: "bare" });
+    app.sessions.update(s1.id, { group_name: "busy-group" });
+    app.sessions.update(s2.id, { group_name: "busy-group" });
 
     // Simulate what the hook does: delete sessions then delete group
-    const sessions = listSessions().filter(s => s.group_name === "busy-group");
+    const sessions = app.sessions.list().filter(s => s.group_name === "busy-group");
     for (const s of sessions) {
-      deleteSession(s.id);
+      app.sessions.delete(s.id);
     }
-    deleteGroup("busy-group");
+    app.sessions.deleteGroup("busy-group");
 
-    expect(getSession(s1.id)).toBeNull();
-    expect(getSession(s2.id)).toBeNull();
-    expect(getGroups()).not.toContain("busy-group");
+    expect(app.sessions.get(s1.id)).toBeNull();
+    expect(app.sessions.get(s2.id)).toBeNull();
+    expect(app.sessions.getGroups().map(g => g.name)).not.toContain("busy-group");
   });
 
   it("deleteGroup with no sessions in group still deletes the group", () => {
-    createGroup("empty-group");
-    const s1 = startSession({ summary: "other", repo: ".", flow: "bare" });
-    updateSession(s1.id, { group_name: "other-group" });
+    app.sessions.createGroup("empty-group");
+    const s1 = startSession(app, { summary: "other", repo: ".", flow: "bare" });
+    app.sessions.update(s1.id, { group_name: "other-group" });
 
-    deleteGroup("empty-group");
+    app.sessions.deleteGroup("empty-group");
 
-    expect(getGroups()).not.toContain("empty-group");
+    expect(app.sessions.getGroups().map(g => g.name)).not.toContain("empty-group");
     // Unrelated session should still exist
-    expect(getSession(s1.id)).not.toBeNull();
+    expect(app.sessions.get(s1.id)).not.toBeNull();
   });
 
   it("async state wraps with correct labels", () => {
@@ -106,10 +103,10 @@ describe("useGroupActions (core operations)", () => {
 
     // Simulate the hook's pattern
     asyncState.run("Creating group...", async () => {
-      createGroup("label-test");
+      app.sessions.createGroup("label-test");
     });
     asyncState.run("Deleting group...", async () => {
-      deleteGroup("label-test");
+      app.sessions.deleteGroup("label-test");
     });
 
     expect(asyncState.ran.length).toBe(2);
