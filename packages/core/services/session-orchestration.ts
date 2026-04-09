@@ -265,6 +265,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     prevClaudeSessionId: session.claude_session_id,
     sessionName: session.summary ?? session.id,
     compute: session.compute_name ? (app.computes.get(session.compute_name) as unknown as { name: string; provider: string; [k: string]: unknown } | null) ?? undefined : undefined,
+    app,
   });
 
   if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
@@ -290,7 +291,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   if (runtime !== "claude-code") {
     try {
       const { startStatusPoller } = await import("../executors/status-poller.js");
-      startStatusPoller(sessionId, tmuxName, runtime);
+      startStatusPoller(app, sessionId, tmuxName, runtime);
     } catch { /* ignore */ }
   }
 

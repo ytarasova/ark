@@ -29,6 +29,8 @@ export interface LaunchOpts {
   onLog?: (msg: string) => void;
   prevClaudeSessionId?: string | null;
   sessionName?: string;
+  /** AppContext passed from dispatch -- avoids getApp() in executors. */
+  app?: import("./app.js").AppContext;
 }
 
 export interface LaunchResult {

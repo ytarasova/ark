@@ -12,15 +12,14 @@
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as tmux from "../tmux.js";
-import { getApp } from "../app.js";
 import { join } from "path";
 import { writeFileSync, mkdirSync } from "fs";
-import { TRACKS_DIR } from "../paths.js";
 
 export const cliAgentExecutor: Executor = {
   name: "cli-agent",
 
   async launch(opts: LaunchOpts): Promise<LaunchResult> {
+    const app = opts.app!;
     const { sessionId, workdir, agent, task, stage, onLog: log = () => {} } = opts;
 
     const command = agent.command;
@@ -32,7 +31,7 @@ export const cliAgentExecutor: Executor = {
     let effectiveWorkdir = workdir;
     try {
       const { setupSessionWorktree } = await import("../services/session-orchestration.js");
-      const session = getApp().sessions.get(sessionId);
+      const session = app.sessions.get(sessionId);
       if (session) {
         const result = await setupSessionWorktree(session, null, null, log);
         if (result) effectiveWorkdir = result;
@@ -46,7 +45,7 @@ export const cliAgentExecutor: Executor = {
     const taskDelivery = (agent as Record<string, unknown>).task_delivery as string ?? "stdin";
 
     // Save task to file for file-based delivery
-    const trackDir = join(TRACKS_DIR(), sessionId);
+    const trackDir = join(app.config.tracksDir, sessionId);
     mkdirSync(trackDir, { recursive: true });
     const taskFile = join(trackDir, "task.txt");
     writeFileSync(taskFile, task);

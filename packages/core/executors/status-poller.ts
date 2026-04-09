@@ -6,13 +6,13 @@
  * session status when the process exits.
  */
 
-import { getApp } from "../app.js";
+import type { AppContext } from "../app.js";
 import { getExecutor } from "../executor.js";
 import { logInfo } from "../structured-log.js";
 
 const activePollers = new Map<string, ReturnType<typeof setInterval>>();
 
-export function startStatusPoller(sessionId: string, handle: string, executorName: string): void {
+export function startStatusPoller(app: AppContext, sessionId: string, handle: string, executorName: string): void {
   // Don't double-poll
   if (activePollers.has(sessionId)) return;
 
@@ -26,19 +26,19 @@ export function startStatusPoller(sessionId: string, handle: string, executorNam
       if (status.state === "completed" || status.state === "failed") {
         stopStatusPoller(sessionId);
 
-        const session = getApp().sessions.get(sessionId);
+        const session = app.sessions.get(sessionId);
         if (!session || session.status !== "running") return;
 
         const newStatus = status.state === "completed" ? "completed" : "failed";
         const error = status.state === "failed" ? (status as { error?: string }).error : null;
 
-        getApp().sessions.update(sessionId, {
+        app.sessions.update(sessionId, {
           status: newStatus,
           error: error ?? null,
           session_id: null,
         });
 
-        getApp().events.log(sessionId, `session_${newStatus}`, {
+        app.events.log(sessionId, `session_${newStatus}`, {
           stage: session.stage, actor: "system",
           data: { reason: "agent process exited", exitCode: (status as { exitCode?: number }).exitCode },
         });
@@ -49,8 +49,7 @@ export function startStatusPoller(sessionId: string, handle: string, executorNam
         if (newStatus === "completed") {
           try {
             const { advance } = await import("../services/session-orchestration.js");
-            const { getApp } = await import("../app.js");
-            await advance(getApp(), sessionId);
+            await advance(app, sessionId);
           } catch { /* advance may fail if flow is done */ }
         }
 

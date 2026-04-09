@@ -11,8 +11,6 @@ import { join } from "path";
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as claude from "../claude.js";
 import * as tmux from "../tmux.js";
-import { TRACKS_DIR } from "../paths.js";
-import { getApp } from "../app.js";
 import { parseArcJson } from "../../compute/arc-json.js";
 import { getProvider } from "../../compute/index.js";
 
@@ -20,8 +18,9 @@ export const claudeCodeExecutor: Executor = {
   name: "claude-code",
 
   async launch(opts: LaunchOpts): Promise<LaunchResult> {
+    const app = opts.app!;
     const log = opts.onLog ?? (() => {});
-    const session = getApp().sessions.get(opts.sessionId);
+    const session = app.sessions.get(opts.sessionId);
     if (!session) {
       return { ok: false, handle: "", message: `Session ${opts.sessionId} not found` };
     }
@@ -30,7 +29,7 @@ export const claudeCodeExecutor: Executor = {
     const stage = opts.stage ?? "work";
 
     // Resolve compute + provider
-    const compute = session.compute_name ? getApp().computes.get(session.compute_name) : null;
+    const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
     const provider = getProvider(compute?.provider ?? "local");
 
     // Setup worktree + trust (dynamic import to avoid circular dependency)
@@ -46,7 +45,7 @@ export const claudeCodeExecutor: Executor = {
       : DEFAULT_CONDUCTOR_URL;
 
     // Channel config + launcher
-    const channelPort = getApp().sessions.channelPort(session.id);
+    const channelPort = app.sessions.channelPort(session.id);
     const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
     const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig });
 
@@ -69,16 +68,15 @@ export const claudeCodeExecutor: Executor = {
     const launcher = tmux.writeLauncher(session.id, launchContent);
 
     // Save task for reference
-    const sessionDir = join(TRACKS_DIR(), session.id);
+    const sessionDir = join(app.config.tracksDir, session.id);
     mkdirSync(sessionDir, { recursive: true });
     writeFileSync(join(sessionDir, "task.txt"), opts.task);
 
     // Remote compute (providers that don't support local worktrees)
     if (compute && provider && !provider.supportsWorktree) {
       const { prepareRemoteEnvironment } = await import("../services/session-orchestration.js");
-      const { getApp } = await import("../app.js");
       const { finalLaunchContent, ports } = await prepareRemoteEnvironment(
-        getApp(), session, compute, provider, effectiveWorkdir,
+        app, session, compute, provider, effectiveWorkdir,
         { launchContent, onLog: log },
       );
 
@@ -91,7 +89,7 @@ export const claudeCodeExecutor: Executor = {
         ports,
       });
 
-      getApp().sessions.update(session.id, { claude_session_id: claudeSessionId });
+      app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
       // Deliver task via channel
       log("Delivering task...");
@@ -106,7 +104,7 @@ export const claudeCodeExecutor: Executor = {
     claude.autoAcceptChannelPrompt(tmuxName);
     log("Delivering task...");
     claude.deliverTask(session.id, channelPort, opts.task, stage);
-    getApp().sessions.update(session.id, { claude_session_id: claudeSessionId });
+    app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
     return { ok: true, handle: tmuxName, claudeSessionId };
   },
