@@ -195,6 +195,10 @@ export async function dispatch(sessionId: string, opts?: { onLog?: (msg: string)
     return dispatchFork(sessionId, stageDef);
   }
 
+  if (stageDef?.type === "fan_out") {
+    return dispatchFanOut(sessionId, stageDef);
+  }
+
   const action = flow.getStageAction(session.flow, stage);
   if (action.type !== "agent") {
     return { ok: false, message: `Stage '${stage}' is ${action.type}, not agent` };
@@ -806,6 +810,28 @@ function dispatchFork(sessionId: string, stageDef: flow.StageDefinition): { ok: 
   });
 
   return { ok: true, message: `Forked into ${children.length} sessions` };
+}
+
+function dispatchFanOut(sessionId: string, stageDef: flow.StageDefinition): { ok: boolean; message: string } {
+  const session = getApp().sessions.get(sessionId)!;
+  const subtasks = extractSubtasks(session);
+
+  const maxParallel = stageDef.max_parallel ?? 8;
+  const result = fanOut(sessionId, {
+    tasks: subtasks.slice(0, maxParallel).map((s) => ({
+      summary: s.task,
+      agent: stageDef.agent ?? session.agent ?? "implementer",
+    })),
+  });
+
+  if (!result.ok) return { ok: false, message: result.message ?? "Fan-out failed" };
+
+  // Auto-dispatch all children
+  for (const childId of result.childIds ?? []) {
+    void dispatch(childId);
+  }
+
+  return { ok: true, message: `Fan-out: ${result.childIds?.length ?? 0} children dispatched` };
 }
 
 export async function joinFork(parentId: string, force = false): Promise<{ ok: boolean; message: string }> {
