@@ -407,6 +407,12 @@ export class AppContext {
 
     // Reverse order of boot
 
+    // 0. In test mode, stop all running sessions to prevent process leaks.
+    // In production, sessions keep running independently of the TUI/CLI lifecycle.
+    if (this.opts?.cleanupOnShutdown && this._sessionService) {
+      try { await this._sessionService.stopAll(); } catch {}
+    }
+
     // 1. Remove signal handlers
     this._removeSignalHandlers();
 
