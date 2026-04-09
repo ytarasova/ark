@@ -419,7 +419,7 @@ When a budget limit is approached or exceeded, Ark warns before dispatching.
 
 ### TUI Costs Tab
 
-Press `7` in the TUI to view the Costs tab, which shows per-session cost breakdown and aggregate totals.
+Press `9` in the TUI to view the Costs tab, which shows per-session cost breakdown and aggregate totals.
 
 ---
 
@@ -1347,19 +1347,20 @@ make test-file F=packages/core/__tests__/session.test.ts   # single file
 
 ### Test isolation
 
-Every test must create and clean up its own context to avoid leaking state:
+Every test must create and clean up its own context to avoid leaking state. Use `AppContext.forTest()` (preferred):
 
 ```ts
-const ctx = withTestContext();  // handles setup + teardown automatically
+import { AppContext, setApp, clearApp } from "../app.js";
+
+let app: AppContext;
+beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
+afterAll(async () => { await app?.shutdown(); clearApp(); });
 ```
 
-Or manually:
+Access repos directly: `app.sessions.create(...)`, `app.events.log(...)`.
+Call orchestration functions with `app` as first argument: `dispatch(app, sessionId)`, `fanOut(app, parentId, opts)`.
 
-```ts
-let ctx: TestContext;
-beforeEach(() => { ctx = createTestContext(); setContext(ctx); });
-afterEach(() => { ctx.cleanup(); });
-```
+The legacy `withTestContext()` helper still works in existing tests but is being phased out.
 
 ### E2E tests
 

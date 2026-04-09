@@ -12,11 +12,13 @@ These work in any tab when no overlay is open.
 |-----|--------|
 | `1` | Switch to Sessions tab |
 | `2` | Switch to Agents tab |
-| `3` | Switch to Tools tab |
-| `4` | Switch to Flows tab |
+| `3` | Switch to Flows tab |
+| `4` | Switch to Compute tab |
 | `5` | Switch to History tab |
-| `6` | Switch to Compute tab |
-| `7` | Switch to Costs tab |
+| `6` | Switch to Memory tab |
+| `7` | Switch to Tools tab |
+| `8` | Switch to Schedules tab |
+| `9` | Switch to Costs tab |
 | `Tab` | Toggle focus between left and right pane |
 | `e` | Expand event log |
 | `q` | Quit |
@@ -90,24 +92,27 @@ These work in any tab when no overlay is open.
 | `c` | Copy agent for customization |
 | `x` | Delete agent (custom only) |
 
-## Tools Tab (3)
-
-Browse and manage tools across 6 categories: MCP Servers, Commands, Claude Skills, Ark Skills, Recipes, Context.
-
-| Key | Action |
-|-----|--------|
-| `j` / `k` | Navigate items |
-| `g` / `G` | Jump to top / bottom |
-| `Enter` | View / use tool |
-| `x` | Delete tool |
-
-## Flows Tab (4)
+## Flows Tab (3)
 
 | Key | Action |
 |-----|--------|
 | `j` / `k` | Navigate flows |
 | `g` / `G` | Jump to top / bottom |
 | `Tab` | Toggle to detail pane |
+
+## Compute Tab (4)
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Navigate compute resources |
+| `g` / `G` | Jump to top / bottom |
+| `Enter` | Provision compute |
+| `s` | Start / stop compute |
+| `R` | Reboot compute |
+| `t` | Test connectivity |
+| `x` | Delete compute |
+| `c` | Clean compute |
+| `n` | Create new compute |
 
 ## History Tab (5)
 
@@ -122,21 +127,36 @@ Browse and import Claude Code sessions found on disk.
 | `R` | Rebuild search index |
 | `s` | Search sessions |
 
-## Compute Tab (6)
+## Memory Tab (6)
 
 | Key | Action |
 |-----|--------|
-| `j` / `k` | Navigate compute resources |
-| `g` / `G` | Jump to top / bottom |
-| `Enter` | Provision compute |
-| `s` | Start / stop compute |
-| `R` | Reboot compute |
-| `t` | Test connectivity |
-| `x` | Delete compute |
-| `c` | Clean compute |
-| `n` | Create new compute |
+| `j` / `k` | Navigate memories |
+| `n` | Add new memory |
+| `x` | Delete selected memory |
 
-## Costs Tab (7)
+## Tools Tab (7)
+
+Browse and manage tools across 6 categories: MCP Servers, Commands, Claude Skills, Ark Skills, Recipes, Context.
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Navigate items |
+| `g` / `G` | Jump to top / bottom |
+| `Enter` | View / use tool |
+| `x` | Delete tool |
+
+## Schedules Tab (8)
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Navigate schedules |
+| `g` / `G` | Jump to top / bottom |
+| `Enter` | View schedule details |
+| `n` | Create new schedule |
+| `x` | Delete schedule |
+
+## Costs Tab (9)
 
 | Key | Action |
 |-----|--------|

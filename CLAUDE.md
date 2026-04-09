@@ -28,8 +28,13 @@ ark arkd              # start the arkd daemon (--port 19300, --conductor-url htt
 packages/
   cli/       → Commander.js CLI entry (ark command)
   core/      → Sessions, store (SQLite), flows, agents, channels, conductor, search (FTS5), claude-sessions, app context, config
+    repositories/  → SQL CRUD (SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository)
+    services/      → Business logic (SessionService, ComputeService, HistoryService) + orchestration
+    stores/        → Resource stores (FlowStore, SkillStore, AgentStore, RecipeStore) -- file-backed, three-tier resolution
   compute/   → Providers: local (worktree/docker/devcontainer/firecracker), remote EC2 (worktree/docker/devcontainer/firecracker)
   arkd/      → Universal agent daemon - HTTP server on every compute target (agent lifecycle, file ops, metrics, channel relay)
+  server/    → JSON-RPC handlers (delegate to services + stores via AppContext)
+  protocol/  → ArkClient (typed JSON-RPC client)
   tui/       → React + Ink terminal dashboard
 agents/      → Agent YAML definitions (planner, implementer, reviewer, documenter, worker)
 flows/       → Flow YAML definitions (default, quick, bare, parallel)
@@ -41,28 +46,28 @@ No workspaces config - packages are coordinated manually via relative imports.
 
 **Core module layers** (from bottom to top):
 ```
-packages/types/          → Domain interfaces (Session, Compute, Event, Message, etc.)
+packages/types/                         → Domain interfaces (Session, Compute, Event, Message, etc.)
 packages/core/
-  repositories/          → SQL CRUD (SessionRepository, ComputeRepository, etc.)
-  services/              → Business logic (SessionService, ComputeService, HistoryService)
-  app.ts                 → AppContext wires repos + services, boot/shutdown lifecycle
-  session.ts             → Legacy orchestration (dispatch, advance, fork — being migrated to SessionService)
-  store.ts               → Legacy SQL (being migrated to repositories)
-  conductor.ts           → HTTP server (:19100), hook status, channel relay
-packages/server/         → JSON-RPC handlers (delegate to services via AppContext)
-packages/protocol/       → ArkClient (typed JSON-RPC client)
+  repositories/                         → SQL CRUD (SessionRepository, ComputeRepository, etc.)
+  stores/                               → Resource stores (FlowStore, SkillStore, AgentStore, RecipeStore)
+  services/session.ts                   → SessionService -- lifecycle facade, delegates complex ops to orchestration
+  services/session-orchestration.ts     → All orchestration (dispatch, advance, fork, clone, spawn, fan-out, etc.)
+  app.ts                                → AppContext wires repos + services + stores, boot/shutdown lifecycle
+  conductor.ts                          → HTTP server (:19100), hook status, channel relay
+packages/server/                        → JSON-RPC handlers (delegate to services + stores via AppContext)
+packages/protocol/                      → ArkClient (typed JSON-RPC client)
 ```
 
 **Key entry points:**
-- `AppContext` (`app.ts`) — access repos via `app.sessions`, `app.computes`, services via `app.sessionService`
-- `SessionService` (`services/session.ts`) — lifecycle: start, stop, resume, complete, pause, delete, applyHookStatus, applyReport
-- `session.ts` (legacy) — complex ops not yet ported: dispatch, advance, fork, clone, spawn, handoff
+- `AppContext` (`app.ts`) -- access repos via `app.sessions`, `app.computes`; services via `app.sessionService`; stores via `app.flows`, `app.skills`, `app.agents`, `app.recipes`
+- `SessionService` (`services/session.ts`) -- lifecycle facade: start, stop, resume, complete, pause, delete. Delegates complex ops (dispatch, advance, fork) to `session-orchestration.ts`
+- `session-orchestration.ts` (`services/session-orchestration.ts`) -- all orchestration functions. Every function takes `app: AppContext` as first argument (no `getApp()` calls)
 
 ## Key Gotchas
 
 **FTS5 table needs manual creation on existing DBs.** The `transcript_index` FTS5 virtual table is in `initSchema()` but `CREATE VIRTUAL TABLE IF NOT EXISTS` only runs when the DB is first created. If you add new tables, existing `~/.ark/ark.db` files won't get them - run the SQL manually or delete the DB.
 
-**ARK_DIR resolved at call time.** `store.ts` ARK_DIR() is a function that reads from AppContext config. Use `AppContext.forTest()` for test isolation — it creates a temp directory and sets up an isolated DB. Legacy `createTestContext()` + `setContext()` still works but `AppContext.forTest()` is preferred.
+**ARK_DIR resolved at call time.** `paths.ts` `ARK_DIR()` is a function that reads from AppContext config via `getApp()`. Use `AppContext.forTest()` for test isolation -- it creates a temp directory and sets up an isolated DB.
 
 **Bun-only.** Uses `bun:sqlite`, `Bun.serve()`, `Bun.sleep()`, Bun FFI. Will not run under Node.
 
@@ -101,7 +106,7 @@ If you see tests that pass individually but fail in the full suite, it's a paral
 
 **E2E tests need `dist/` built.** CLI E2E tests (`e2e-cli.test.ts`) and TUI real tests (`e2e-tui-real.test.ts`) import from `dist/` - run `make dev` or `tsc` first. Unit tests run from source.
 
-**Test isolation pattern** — use `AppContext.forTest()` (preferred):
+**Test isolation pattern** -- use `AppContext.forTest()` (preferred):
 ```ts
 import { AppContext, setApp, clearApp } from "../app.js";
 
@@ -111,11 +116,9 @@ afterAll(async () => { await app?.shutdown(); clearApp(); });
 ```
 
 Access repos directly: `app.sessions.create(...)`, `app.events.log(...)`.
+Call orchestration functions with `app` as first argument: `dispatch(app, sessionId)`, `fanOut(app, parentId, opts)`.
 
-**Legacy `withTestContext()` helper** still works for existing tests:
-```ts
-const ctx = withTestContext();  // handles createTestContext + setContext + cleanup
-```
+**Legacy `withTestContext()` helper** is being phased out. New tests should use `AppContext.forTest()` as shown above.
 
 **`waitFor()` polling utility** - async helper that polls a condition until it returns true (or times out). Useful for testing async state transitions:
 ```ts
@@ -144,8 +147,10 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 | `~/.ark/ark.db` | SQLite database (WAL mode, 5s busy timeout) |
 | `~/.ark/tracks/<sessionId>/` | Launcher scripts, channel configs |
 | `~/.ark/worktrees/<sessionId>/` | Git worktrees for isolated sessions |
-| `~/.ark/skills/` | Global skill definitions |
-| `~/.ark/recipes/` | Global recipe definitions |
+| `~/.ark/skills/` | Global skill definitions (user tier for SkillStore) |
+| `~/.ark/recipes/` | Global recipe definitions (user tier for RecipeStore) |
+| `~/.ark/flows/` | Global flow definitions (user tier for FlowStore) |
+| `~/.ark/agents/` | Global agent definitions (user tier for AgentStore) |
 | `~/.claude/projects/` | Claude Code session transcripts (JSONL) - read by search and import |
 | `.claude/settings.local.json` | Per-session hook config (written at dispatch, cleaned on stop) |
 
@@ -274,13 +279,13 @@ At dispatch to remote compute, Ark syncs `.claude/commands/`, `.claude/skills/`,
 | `i` | Inbox/threads | `g` | Group manager |
 | `Tab` | Focus detail pane | `e` | Expand events |
 
-**Tools tab (3):** `Enter`:view/use `x`:delete (6 categories: MCP Servers, Commands, Claude Skills, Ark Skills, Recipes, Context)
+**Tools tab (7):** `Enter`:view/use `x`:delete (6 categories: MCP Servers, Commands, Claude Skills, Ark Skills, Recipes, Context)
 
 **History tab (5):** `Enter`:import `r`:refresh+reindex `s`:search
 
-**Compute tab (6):** `Enter`:provision `s`:start/stop `c`:clean `n`:new `x`:delete
+**Compute tab (4):** `Enter`:provision `s`:start/stop `c`:clean `n`:new `x`:delete
 
-**Global:** `1-6`:switch tabs `Tab`:toggle pane `e`:events `q`:quit
+**Global:** `1-9`:switch tabs `Tab`:toggle pane `e`:events `q`:quit
 
 ## TUI Design System
 
@@ -302,7 +307,7 @@ At dispatch to remote compute, Ark syncs `.claude/commands/`, `.claude/skills/`,
 
 ## App Boot System
 
-`app.ts` provides `AppContext` - initializes conductor, metrics polling, and config. CLI creates it with `skipConductor: true` (only TUI runs the conductor). `config.ts` loads `~/.ark/config.yaml` for user preferences.
+`app.ts` provides `AppContext` -- initializes repositories, services, resource stores, conductor, metrics polling, and config. CLI creates it with `skipConductor: true` (only TUI runs the conductor). `config.ts` loads `~/.ark/config.yaml` for user preferences.
 
 ```ts
 const app = new AppContext(loadConfig());
@@ -344,7 +349,7 @@ Ark uses Claude Code hooks for agent status detection. At dispatch time, `claude
 
 **Hooks are ONLY for status detection** (busy/idle/error/done). They are NOT part of the channel/conductor communication system. Channels handle agent↔human messaging via MCP.
 
-Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/hooks/status endpoint), `session.ts` (wiring).
+Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/hooks/status endpoint), `session-orchestration.ts` (applyHookStatus wiring).
 
 ## Code Style
 
@@ -359,13 +364,15 @@ Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/h
 
 - **`packages/types/`** - All domain interfaces. Single source of truth. No logic, no dependencies. Imported by every other package.
 - **`repositories/`** - SQL CRUD behind typed classes. Column whitelists prevent injection. `SessionRepository`, `ComputeRepository`, `EventRepository`, `MessageRepository`, `TodoRepository`. Access via `app.sessions`, `app.computes`, `app.todos`, etc.
-- **`services/`** - Business logic. `SessionService` owns lifecycle (start, stop, resume, complete, interrupt, archive, delete, applyHookStatus, applyReport). `ComputeService` owns compute CRUD. Access via `app.sessionService`, `app.computeService`.
+- **`stores/`** - File-backed resource stores with three-tier resolution (builtin > global/user > project). `FlowStore`, `SkillStore`, `AgentStore`, `RecipeStore`. Access via `app.flows`, `app.skills`, `app.agents`, `app.recipes`. Each store has `list()`, `get()`, `save()`, `delete()` methods.
+- **`services/session.ts`** - `SessionService` facade. Owns simple lifecycle (start, stop, resume, complete, pause, delete). Delegates complex ops to `session-orchestration.ts` via dynamic import.
+- **`services/session-orchestration.ts`** - All orchestration: dispatch, advance, fork, clone, spawn, fan-out, handoff, worktree ops, hook status, report handling. Every exported function takes `app: AppContext` as its first argument -- no `getApp()` calls.
 - **`provider-registry.ts`** - Provider resolver plumbing between `app.ts` and `session-orchestration.ts`. Breaks what was a circular import.
 - **`packages/server/validate.ts`** - `extract<T>()` validates RPC params at the boundary. All handlers use it.
 - **`constants.ts`** - Shared URL/port defaults (`DEFAULT_CONDUCTOR_URL`, `DEFAULT_ARKD_URL`, `DOCKER_CONDUCTOR_URL`). All providers and executors use these.
 - **`claude.ts`** - ALL Claude Code knowledge (model mapping, args, hooks config, launcher, trust, transcript parsing).
-- **`conductor.ts`** - HTTP server (:19100). Channel reports + hook status. Delegates to SessionService for applyHookStatus/applyReport.
+- **`conductor.ts`** - HTTP server (:19100). Channel reports + hook status. Receives `app: AppContext` via `startConductor(app, port)` -- no `getApp()` calls. Delegates to `session-orchestration.ts` for applyHookStatus/applyReport.
 - **`arkd/`** - Stateless HTTP daemon (:19300) on every compute target. Agent lifecycle, file ops, metrics, channel relay.
 - **`search.ts`** - Search + FTS5. Uses FTS5 when index exists, falls back to file scanning only when FTS table is absent.
-- **`app.ts`** - Boot/shutdown. Creates repos, services, providers. CLI skips conductor; TUI runs it.
+- **`app.ts`** - Boot/shutdown. Creates repos, services, stores, providers. CLI skips conductor; TUI runs it.
 - **`packages/tui/hooks/useFocus.ts`** - Focus stack for TUI keyboard input ownership.
