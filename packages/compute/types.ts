@@ -151,6 +151,11 @@ export interface PortStatus extends PortDecl {
   listening: boolean;
 }
 
+// ── Provider config types ───────────────────────────────────────────────────
+
+export type { E2BConfig } from "./providers/e2b.js";
+export type { K8sConfig } from "./providers/k8s.js";
+
 // ── arc.json types ──────────────────────────────────────────────────────────
 
 export interface ArcJson {

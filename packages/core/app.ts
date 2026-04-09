@@ -248,6 +248,25 @@ export class AppContext {
         p.setApp?.(this);
         this.registerProvider(p);
       }
+
+      // E2B provider (optional -- only if e2b SDK is available)
+      try {
+        const { E2BProvider } = await import("../compute/providers/e2b.js");
+        const e2b = new E2BProvider();
+        e2b.setApp(this);
+        this.registerProvider(e2b);
+      } catch {} // e2b SDK not installed
+
+      // Kubernetes providers (optional -- only if @kubernetes/client-node is available)
+      try {
+        const { K8sProvider, KataProvider } = await import("../compute/providers/k8s.js");
+        const k8s = new K8sProvider();
+        k8s.setApp(this);
+        this.registerProvider(k8s);
+        const kata = new KataProvider();
+        kata.setApp(this);
+        this.registerProvider(kata);
+      } catch {} // @kubernetes/client-node not installed
     });
 
     // 4b. Wire SessionService with AppContext

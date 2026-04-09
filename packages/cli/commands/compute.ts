@@ -14,7 +14,7 @@ export function registerComputeCommands(program: Command) {
   computeCmd.command("create")
     .description("Create a new compute resource")
     .argument("<name>", "Compute name")
-    .option("--provider <type>", "Provider type", "local")
+    .option("--provider <type>", "Provider type (local, docker, ec2, e2b, k8s, k8s-kata)", "local")
     // EC2-specific options
     .option("--size <size>", "Instance size: xs (2vCPU/8GB), s (4/16), m (8/32), l (16/64), xl (32/128), xxl (48/192), xxxl (64/256)", "m")
     .option("--arch <arch>", "Architecture: x64, arm", "x64")
@@ -26,6 +26,12 @@ export function registerComputeCommands(program: Command) {
     .option("--image <image>", "Docker image (default: ubuntu:22.04)")
     .option("--devcontainer", "Use devcontainer.json from project")
     .option("--volume <mount>", "Extra volume mount (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+    // E2B-specific options
+    .option("--template <template>", "E2B sandbox template (e2b provider)")
+    // K8s-specific options
+    .option("--namespace <ns>", "K8s namespace (k8s/k8s-kata provider)", "ark")
+    .option("--kubeconfig <path>", "Path to kubeconfig (k8s/k8s-kata provider)")
+    .option("--runtime-class <class>", "K8s runtime class (kata-fc for Firecracker)")
     .action(async (name, opts) => {
       if (opts.provider === "local") {
         console.log(chalk.red("Local compute is auto-created. Use 'ec2' or 'docker' provider."));
@@ -54,6 +60,17 @@ export function registerComputeCommands(program: Command) {
             ...(opts.profile ? { aws_profile: opts.profile } : {}),
             ...(opts.subnetId ? { subnet_id: opts.subnetId } : {}),
             ...(Object.keys(tags).length ? { tags } : {}),
+          };
+        } else if (opts.provider === "e2b") {
+          config = {
+            ...(opts.template ? { template: opts.template } : {}),
+          };
+        } else if (opts.provider === "k8s" || opts.provider === "k8s-kata") {
+          config = {
+            ...(opts.namespace ? { namespace: opts.namespace } : {}),
+            ...(opts.image ? { image: opts.image } : {}),
+            ...(opts.kubeconfig ? { kubeconfig: opts.kubeconfig } : {}),
+            ...(opts.runtimeClass ? { runtimeClassName: opts.runtimeClass } : {}),
           };
         } else {
           config = {};
@@ -85,6 +102,13 @@ export function registerComputeCommands(program: Command) {
           console.log(`  Size:     ${sizeLabel}`);
           console.log(`  Arch:     ${opts.arch}`);
           console.log(`  Region:   ${opts.region}`);
+        } else if (opts.provider === "e2b") {
+          console.log(`  Template: ${(config.template as string) ?? "base"}`);
+        } else if (opts.provider === "k8s" || opts.provider === "k8s-kata") {
+          console.log(`  Namespace:  ${(config.namespace as string) ?? "ark"}`);
+          console.log(`  Image:      ${(config.image as string) ?? "ubuntu:22.04"}`);
+          if (config.runtimeClassName) console.log(`  Runtime:    ${config.runtimeClassName}`);
+          if (config.kubeconfig) console.log(`  Kubeconfig: ${config.kubeconfig}`);
         }
       } catch (e: any) {
         console.log(chalk.red(`Failed to create compute: ${e.message}`));

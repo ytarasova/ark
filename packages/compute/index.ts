@@ -76,5 +76,13 @@ import {
 } from "./providers/remote-arkd.js";
 export { RemoteWorktreeProvider, RemoteDockerProvider, RemoteDevcontainerProvider, RemoteFirecrackerProvider };
 
+// E2B managed sandbox provider
+import { E2BProvider } from "./providers/e2b.js";
+export { E2BProvider };
+
+// Kubernetes providers (vanilla + Kata/Firecracker)
+import { K8sProvider, KataProvider } from "./providers/k8s.js";
+export { K8sProvider, KataProvider };
+
 // arc.json
 export { parseArcJson, resolvePortDecls, hasDevcontainer, hasComposeFile } from "./arc-json.js";
