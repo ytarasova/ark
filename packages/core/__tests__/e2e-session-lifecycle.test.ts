@@ -23,6 +23,7 @@ beforeAll(async () => {
   await app.boot();
 });
 afterAll(async () => {
+  if (app?.sessionService) await app.sessionService.stopAll();
   killNewArkTmuxSessions(tmuxSnapshot);
   await app?.shutdown();
   clearApp();

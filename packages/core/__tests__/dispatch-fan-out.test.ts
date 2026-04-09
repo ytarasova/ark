@@ -24,5 +24,8 @@ describe("dispatch fan_out stage", () => {
 
     const children = app.sessions.getChildren(parent.id);
     expect(children.length).toBeGreaterThan(0);
+
+    // Clean up dispatched agents before test exits
+    await app.sessionService.stopAll();
   });
 });
