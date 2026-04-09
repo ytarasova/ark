@@ -10,7 +10,8 @@ export function registerConductorCommands(program: Command) {
     .option("-p, --port <port>", "Port", "19100")
     .action(async (opts) => {
       const { startConductor } = await import("../../core/conductor.js");
-      startConductor(parseInt(opts.port));
+      const { getApp } = await import("../../core/app.js");
+      startConductor(getApp(), parseInt(opts.port));
       // Keep alive
       setInterval(() => {}, 60_000);
     });

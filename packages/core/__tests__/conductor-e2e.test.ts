@@ -20,7 +20,7 @@ beforeEach(async () => {
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
-  server = startConductor(TEST_PORT, { quiet: true });
+  server = startConductor(app, TEST_PORT, { quiet: true });
 });
 
 afterEach(() => {
@@ -268,7 +268,7 @@ describe("Conductor cleanup", () => {
       return id;
     }) as typeof setInterval;
 
-    const testServer = startConductor(TEST_PORT + 50, { quiet: true });
+    const testServer = startConductor(app, TEST_PORT + 50, { quiet: true });
 
     // Should have created at least 2 timers (schedule + PR poller)
     expect(trackedTimers.length).toBeGreaterThanOrEqual(2);

@@ -17,7 +17,7 @@ const { getCtx } = withTestContext();
 let server: { stop(): void };
 
 beforeEach(() => {
-  server = startConductor(TEST_PORT, { quiet: true });
+  server = startConductor(getApp(), TEST_PORT, { quiet: true });
 });
 
 afterEach(() => {

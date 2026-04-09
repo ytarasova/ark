@@ -302,7 +302,7 @@ export class AppContext {
     if (!this.options.skipConductor) {
       await safeAsync("boot: start conductor", async () => {
         const { startConductor } = await import("./conductor.js");
-        this.conductor = startConductor(this.config.conductorPort, { quiet: true });
+        this.conductor = startConductor(this, this.config.conductorPort, { quiet: true });
       });
     }
 

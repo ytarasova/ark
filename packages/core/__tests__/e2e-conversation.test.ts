@@ -25,7 +25,7 @@ beforeEach(async () => {
   if (app) { await app.shutdown(); clearApp(); }
   app = AppContext.forTest(); setApp(app); await app.boot();
 
-  server = startConductor(TEST_PORT, { quiet: true });
+  server = startConductor(app, TEST_PORT, { quiet: true });
 });
 
 afterEach(() => {
