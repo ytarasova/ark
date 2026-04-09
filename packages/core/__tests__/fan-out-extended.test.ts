@@ -25,11 +25,11 @@ afterAll(async () => { await app?.shutdown(); clearApp(); });
 // ── fork() ──────────────────────────────────────────────────────────────────
 
 describe("fork()", () => {
-  test("creates child linked to parent with fork_group", () => {
+  test("creates child linked to parent with fork_group", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = fork(app, parent.id, "Subtask A", { dispatch: false });
+    const result = await fork(app, parent.id, "Subtask A", { dispatch: false });
     expect(result.ok).toBe(true);
     expect(result.sessionId).toBeTruthy();
 
@@ -40,7 +40,7 @@ describe("fork()", () => {
     expect(child.status).toBe("ready");
   });
 
-  test("inherits parent ticket, repo, compute_name, workdir", () => {
+  test("inherits parent ticket, repo, compute_name, workdir", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, {
       stage: "implement", status: "running",
@@ -49,7 +49,7 @@ describe("fork()", () => {
     // Set ticket via update (ticket is a DB field)
     app.sessions.update(parent.id, { ticket: "PROJ-123" });
 
-    const result = fork(app, parent.id, "child task", { dispatch: false });
+    const result = await fork(app, parent.id, "child task", { dispatch: false });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.repo).toBe("myrepo");
     expect(child.workdir).toBe("/tmp/repo");
@@ -57,34 +57,34 @@ describe("fork()", () => {
     expect(child.ticket).toBe("PROJ-123");
   });
 
-  test("parent and child share fork_group", () => {
+  test("parent and child share fork_group", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = fork(app, parent.id, "task", { dispatch: false });
+    const result = await fork(app, parent.id, "task", { dispatch: false });
     const updatedParent = app.sessions.get(parent.id)!;
     const child = app.sessions.get(result.sessionId!)!;
     expect(updatedParent.fork_group).toBeTruthy();
     expect(child.fork_group).toBe(updatedParent.fork_group);
   });
 
-  test("multiple forks reuse same fork_group", () => {
+  test("multiple forks reuse same fork_group", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const r1 = fork(app, parent.id, "task A", { dispatch: false });
-    const r2 = fork(app, parent.id, "task B", { dispatch: false });
+    const r1 = await fork(app, parent.id, "task A", { dispatch: false });
+    const r2 = await fork(app, parent.id, "task B", { dispatch: false });
 
     const c1 = app.sessions.get(r1.sessionId!)!;
     const c2 = app.sessions.get(r2.sessionId!)!;
     expect(c1.fork_group).toBe(c2.fork_group);
   });
 
-  test("logs session_forked event on child", () => {
+  test("logs session_forked event on child", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = fork(app, parent.id, "logged task", { dispatch: false });
+    const result = await fork(app, parent.id, "logged task", { dispatch: false });
     const events = app.events.list(result.sessionId!);
     const forkEvent = events.find((e) => e.type === "session_forked");
     expect(forkEvent).toBeTruthy();
@@ -92,26 +92,26 @@ describe("fork()", () => {
     expect(forkEvent!.data?.task).toBe("logged task");
   });
 
-  test("child inherits parent stage", () => {
+  test("child inherits parent stage", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "review", status: "running" });
 
-    const result = fork(app, parent.id, "review subtask", { dispatch: false });
+    const result = await fork(app, parent.id, "review subtask", { dispatch: false });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.stage).toBe("review");
   });
 
-  test("uses custom agent when specified", () => {
+  test("uses custom agent when specified", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = fork(app, parent.id, "review subtask", { agent: "reviewer", dispatch: false });
+    const result = await fork(app, parent.id, "review subtask", { agent: "reviewer", dispatch: false });
     // fork() doesn't set agent directly -- it's set by dispatch. Check the child exists.
     expect(result.ok).toBe(true);
   });
 
-  test("nonexistent parent returns error", () => {
-    const result = fork(app, "s-does-not-exist", "task", { dispatch: false });
+  test("nonexistent parent returns error", async () => {
+    const result = await fork(app, "s-does-not-exist", "task", { dispatch: false });
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -540,7 +540,7 @@ describe("fan-out integration scenarios", () => {
     expect(events.some((e) => e.type === "fan_out_partial_failure")).toBe(true);
   });
 
-  test("getChildren returns children from both fanOut and fork", () => {
+  test("getChildren returns children from both fanOut and fork", async () => {
     const parent = app.sessions.create({ summary: "mixed children", flow: "bare" });
     app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
@@ -550,7 +550,7 @@ describe("fan-out integration scenarios", () => {
     });
 
     // Create via fork (uses same parent)
-    const forkResult = fork(app, parent.id, "fork child", { dispatch: false });
+    const forkResult = await fork(app, parent.id, "fork child", { dispatch: false });
 
     const children = app.sessions.getChildren(parent.id);
     const childIds = children.map((c) => c.id);

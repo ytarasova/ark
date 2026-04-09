@@ -461,11 +461,11 @@ describe("checkAutoJoin concurrent-like calls", () => {
 // -- fork() group_name behavior ------------------------------------------------
 
 describe("fork group_name behavior", () => {
-  test("fork does not inherit parent group_name (unlike fanOut)", () => {
+  test("fork does not inherit parent group_name (unlike fanOut)", async () => {
     const parent = app.sessions.create({ summary: "grouped parent", flow: "bare", group_name: "release-v2" });
     app.sessions.update(parent.id, { stage: "work", status: "running" });
 
-    const result = fork(app, parent.id, "child task", { dispatch: false });
+    const result = await fork(app, parent.id, "child task", { dispatch: false });
     const child = app.sessions.get(result.sessionId!)!;
     // fork() does not pass group_name to child (different from fanOut which does)
     expect(child.group_name).toBeNull();

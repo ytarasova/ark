@@ -260,7 +260,7 @@ describe("full lifecycle with retry in fan-out", () => {
 // -- fanOut ticket inheritance vs fork ticket inheritance ----------------------
 
 describe("fanOut vs fork ticket inheritance", () => {
-  test("fanOut children do NOT inherit ticket, fork children DO", () => {
+  test("fanOut children do NOT inherit ticket, fork children DO", async () => {
     const parent = app.sessions.create({ summary: "ticket test", flow: "bare" });
     app.sessions.update(parent.id, {
       stage: "work", status: "running", ticket: "PROJ-100",
@@ -269,7 +269,7 @@ describe("fanOut vs fork ticket inheritance", () => {
     const fanResult = fanOut(app, parent.id, {
       tasks: [{ summary: "fan child" }],
     });
-    const forkResult = fork(app, parent.id, "fork child", { dispatch: false });
+    const forkResult = await fork(app, parent.id, "fork child", { dispatch: false });
 
     const fanChild = app.sessions.get(fanResult.childIds![0])!;
     const forkChild = app.sessions.get(forkResult.sessionId!)!;
@@ -354,12 +354,12 @@ describe("checkAutoJoin with mixed child types", () => {
 // -- fanOut on parent with pre-existing fork_group from fork() ----------------
 
 describe("fanOut on parent with pre-existing fork_group from fork()", () => {
-  test("fanOut overwrites the fork_group set by a prior fork()", () => {
+  test("fanOut overwrites the fork_group set by a prior fork()", async () => {
     const parent = app.sessions.create({ summary: "fork then fan", flow: "bare" });
     app.sessions.update(parent.id, { stage: "work", status: "running" });
 
     // fork() sets a fork_group on parent
-    fork(app, parent.id, "fork child", { dispatch: false });
+    await fork(app, parent.id, "fork child", { dispatch: false });
     const forkGroupFromFork = app.sessions.get(parent.id)!.fork_group;
     expect(forkGroupFromFork).toBeTruthy();
 
@@ -425,11 +425,11 @@ describe("spawnParallelSubagents order", () => {
 // -- fork() agent option event recording --------------------------------------
 
 describe("fork() agent option behavior", () => {
-  test("fork with agent option -- agent is NOT set on child (handled by dispatch)", () => {
+  test("fork with agent option -- agent is NOT set on child (handled by dispatch)", async () => {
     const parent = app.sessions.create({ summary: "fork agent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "work", status: "running" });
 
-    const result = fork(app, parent.id, "review task", { agent: "reviewer", dispatch: false });
+    const result = await fork(app, parent.id, "review task", { agent: "reviewer", dispatch: false });
     const child = app.sessions.get(result.sessionId!)!;
 
     // fork() does not set agent directly -- it passes to dispatch

@@ -309,22 +309,22 @@ describe("spawnSubagent with no parent agent", () => {
 // -- fork() inherits compute_name --
 
 describe("fork() compute_name inheritance", () => {
-  test("fork inherits parent compute_name", () => {
+  test("fork inherits parent compute_name", async () => {
     const parent = app.sessions.create({ summary: "ec2 parent", flow: "bare" });
     app.sessions.update(parent.id, {
       stage: "work", status: "running", compute_name: "my-ec2",
     });
 
-    const result = fork(app, parent.id, "child task", { dispatch: false });
+    const result = await fork(app, parent.id, "child task", { dispatch: false });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.compute_name).toBe("my-ec2");
   });
 
-  test("fork with null compute_name on parent creates child with null compute", () => {
+  test("fork with null compute_name on parent creates child with null compute", async () => {
     const parent = app.sessions.create({ summary: "local parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "work", status: "running" });
 
-    const result = fork(app, parent.id, "child", { dispatch: false });
+    const result = await fork(app, parent.id, "child", { dispatch: false });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.compute_name).toBeFalsy();
   });
@@ -420,11 +420,11 @@ describe("checkAutoJoin with archived child", () => {
 // -- fork() without dispatch creates dispatchable child --
 
 describe("fork() creates dispatchable child", () => {
-  test("child from fork has stage and ready status", () => {
+  test("child from fork has stage and ready status", async () => {
     const parent = app.sessions.create({ summary: "dispatchable", flow: "bare" });
     app.sessions.update(parent.id, { stage: "work", status: "running" });
 
-    const result = fork(app, parent.id, "child task", { dispatch: false });
+    const result = await fork(app, parent.id, "child task", { dispatch: false });
     const child = app.sessions.get(result.sessionId!)!;
 
     expect(child.status).toBe("ready");

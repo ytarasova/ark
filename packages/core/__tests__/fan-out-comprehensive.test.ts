@@ -167,22 +167,22 @@ describe("fanOut ticket inheritance", () => {
 // ── fork() ticket and field inheritance ───────────────────────────────────
 
 describe("fork() ticket inheritance", () => {
-  test("fork inherits parent ticket", () => {
+  test("fork inherits parent ticket", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, {
       stage: "work", status: "running", ticket: "PROJ-789",
     });
 
-    const result = fork(app, parent.id, "child task", { dispatch: false });
+    const result = await fork(app, parent.id, "child task", { dispatch: false });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.ticket).toBe("PROJ-789");
   });
 
-  test("fork with no parent ticket produces child with no ticket", () => {
+  test("fork with no parent ticket produces child with no ticket", async () => {
     const parent = app.sessions.create({ summary: "no ticket parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "work", status: "running" });
 
-    const result = fork(app, parent.id, "child task", { dispatch: false });
+    const result = await fork(app, parent.id, "child task", { dispatch: false });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.ticket).toBeFalsy();
   });
@@ -319,13 +319,13 @@ describe("joinFork advances parent", () => {
 // ── fork() fork_group reuse ───────────────────────────────────────────────
 
 describe("fork() fork_group consistency", () => {
-  test("many forks all share the same fork_group", () => {
+  test("many forks all share the same fork_group", async () => {
     const parent = app.sessions.create({ summary: "many forks", flow: "bare" });
     app.sessions.update(parent.id, { stage: "work", status: "running" });
 
     const results = [];
     for (let i = 0; i < 5; i++) {
-      results.push(fork(app, parent.id, `task ${i}`, { dispatch: false }));
+      results.push(await fork(app, parent.id, `task ${i}`, { dispatch: false }));
     }
 
     const forkGroups = results.map((r) =>
@@ -338,11 +338,11 @@ describe("fork() fork_group consistency", () => {
     expect(app.sessions.get(parent.id)!.fork_group).toBe(forkGroups[0]);
   });
 
-  test("fork on parent with existing fork_group reuses it", () => {
+  test("fork on parent with existing fork_group reuses it", async () => {
     const parent = app.sessions.create({ summary: "pre-set fg", flow: "bare" });
     app.sessions.update(parent.id, { stage: "work", status: "running", fork_group: "existing-fg" });
 
-    const result = fork(app, parent.id, "task", { dispatch: false });
+    const result = await fork(app, parent.id, "task", { dispatch: false });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.fork_group).toBe("existing-fg");
   });
@@ -501,12 +501,12 @@ describe("fanOut with various parent states", () => {
 // ── spawnSubagent and fork differences ────────────────────────────────────
 
 describe("spawnSubagent vs fork differences", () => {
-  test("spawnSubagent uses quick flow, fork uses bare flow", () => {
+  test("spawnSubagent uses quick flow, fork uses bare flow", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "work", status: "running" });
 
     const subResult = spawnSubagent(app, parent.id, { task: "sub task" });
-    const forkResult = fork(app, parent.id, "fork task", { dispatch: false });
+    const forkResult = await fork(app, parent.id, "fork task", { dispatch: false });
 
     const sub = app.sessions.get(subResult.sessionId!)!;
     const forked = app.sessions.get(forkResult.sessionId!)!;
@@ -515,12 +515,12 @@ describe("spawnSubagent vs fork differences", () => {
     expect(forked.flow).toBe("bare");
   });
 
-  test("spawnSubagent sets config.subagent, fork does not", () => {
+  test("spawnSubagent sets config.subagent, fork does not", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "work", status: "running" });
 
     const subResult = spawnSubagent(app, parent.id, { task: "sub" });
-    const forkResult = fork(app, parent.id, "fork", { dispatch: false });
+    const forkResult = await fork(app, parent.id, "fork", { dispatch: false });
 
     const sub = app.sessions.get(subResult.sessionId!)!;
     const forked = app.sessions.get(forkResult.sessionId!)!;
@@ -529,12 +529,12 @@ describe("spawnSubagent vs fork differences", () => {
     expect(forked.config?.subagent).toBeFalsy();
   });
 
-  test("spawnSubagent does not set fork_group, fork does", () => {
+  test("spawnSubagent does not set fork_group, fork does", async () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "work", status: "running" });
 
     const subResult = spawnSubagent(app, parent.id, { task: "sub" });
-    const forkResult = fork(app, parent.id, "fork", { dispatch: false });
+    const forkResult = await fork(app, parent.id, "fork", { dispatch: false });
 
     const sub = app.sessions.get(subResult.sessionId!)!;
     const forked = app.sessions.get(forkResult.sessionId!)!;
