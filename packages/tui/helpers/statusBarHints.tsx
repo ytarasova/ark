@@ -14,6 +14,20 @@ export function KeyHint({ k, label }: { k: string; label: string }) {
 
 const sep = (id: number) => <Text key={`sep-${id}`} dimColor>{" | "}</Text>;
 
+/** Convert JSX hint elements to a plain text string for solid-background rendering */
+export function flattenHints(hints: React.ReactNode[]): string {
+  const parts: string[] = [];
+  for (const h of hints) {
+    if (React.isValidElement(h)) {
+      const props = h.props as Record<string, unknown>;
+      if (props.k && props.label) {
+        parts.push(`${props.k}:${props.label}`);
+      }
+    }
+  }
+  return parts.join("  ");
+}
+
 /** Navigation hints shared by all left panes */
 const NAV_HINTS = [
   <KeyHint key="jk" k="j/k" label="move" />,

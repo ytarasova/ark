@@ -17,6 +17,7 @@ import {
   getSchedulesHints,
   getMemoryHints,
   getGenericHints,
+  flattenHints,
 } from "../helpers/statusBarHints.js";
 
 interface StatusBarProps {
@@ -63,29 +64,17 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
     : getGenericHints(),
   [tab, pane, overlay, selectedSession]);
 
-  const [primaryHints, secondaryHints] = useMemo(() => {
-    if (!hints.length) return [[], []];
-    // Split at the last separator -- everything after it goes to line 2
+  // Split hints into primary (line 1, JSX) and secondary (line 2, flat text)
+  const [primaryHints, secondaryLine] = useMemo(() => {
+    if (!hints.length) return [[], ""];
     const sepIdx = hints.reduce((last, h, i) =>
       React.isValidElement(h) && h.key?.toString().startsWith("sep-") ? i : last, -1);
     if (sepIdx > 0) {
-      return [hints.slice(0, sepIdx), hints.slice(sepIdx + 1)];
+      const secondary = flattenHints(hints.slice(sepIdx + 1));
+      return [hints.slice(0, sepIdx), secondary];
     }
-    return [hints, []];
+    return [hints, ""];
   }, [hints]);
-
-  // Build the secondary bar text for padding calculation
-  const secondaryText = useMemo(() => {
-    if (!secondaryHints.length) return "";
-    // Rough character count for padding
-    let len = 1; // leading space
-    for (const h of secondaryHints) {
-      if (React.isValidElement(h) && h.props?.k && h.props?.label) {
-        len += h.props.k.length + 1 + h.props.label.length + 2; // "k:label  "
-      }
-    }
-    return len;
-  }, [secondaryHints]);
 
   return (
     <Box flexDirection="column">
@@ -107,26 +96,10 @@ export function StatusBar({ tab, sessions, selectedSession, loading, error, labe
           {primaryHints}
         </Box>
       </Box>
-      {secondaryHints.length > 0 && (
+      {secondaryLine && (
         <Box>
-          <Text backgroundColor={theme.surface}>
-            {" "}
-          </Text>
-          {secondaryHints.map((hint, i) =>
-            React.isValidElement(hint)
-              ? React.cloneElement(hint as React.ReactElement, {
-                  key: hint.key ?? `sh-${i}`,
-                  children: React.Children.map(
-                    (hint as React.ReactElement).props.children,
-                    (child) => React.isValidElement(child)
-                      ? React.cloneElement(child as React.ReactElement, { backgroundColor: theme.surface })
-                      : child,
-                  ),
-                })
-              : hint,
-          )}
-          <Text backgroundColor={theme.surface}>
-            {" ".repeat(Math.max(0, columns - (secondaryText as number) - 1))}
+          <Text backgroundColor="cyan" color="white">
+            {` ${secondaryLine}`.padEnd(columns)}
           </Text>
         </Box>
       )}
