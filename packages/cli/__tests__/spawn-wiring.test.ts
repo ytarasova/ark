@@ -4,7 +4,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const cliDir = join(dirname(fileURLToPath(import.meta.url)), "..");
-const source = readFileSync(join(cliDir, "index.ts"), "utf-8");
+const source = readFileSync(join(cliDir, "commands", "session.ts"), "utf-8");
 
 describe("spawn command wiring", () => {
   test("spawn command calls sessionSpawn, not sessionFork", () => {
