@@ -77,7 +77,7 @@ test: build-web ## Run all unit tests (sequential -- never parallel)
 	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/tui packages/arkd packages/web --concurrency 1
 
 test-file: ## Run a single test: make test-file F=packages/core/__tests__/foo.test.ts
-	$(BUN) test $(F)
+	$(BUN) test $(F) --concurrency 1
 
 test-e2e: build-web ## Run all E2E tests (web + TUI, sequential)
 	cd packages/e2e && npx playwright install chromium --with-deps 2>/dev/null; npx playwright test

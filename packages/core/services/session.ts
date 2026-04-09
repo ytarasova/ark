@@ -71,24 +71,22 @@ export class SessionService {
       return { ok: true, message: "OK", sessionId: id };
     }
 
-    // Transition to stopped — preserve claude_session_id for resume
-    this.sessions.update(id, {
-      status: "stopped" as SessionStatus,
-      error: null,
-      session_id: null,
-    } as Partial<Session>);
+    // Delegate to orchestration stop() which kills processes via the compute provider,
+    // cleans up hooks, and handles the full shutdown sequence
+    const { stop: orchStop } = await import("./session-orchestration.js");
+    return orchStop(getApp(), id);
+  }
 
-    this.events.log(id, "session_stopped", {
-      stage: session.stage ?? undefined,
-      actor: "user",
-      data: {
-        session_id: session.session_id,
-        agent: session.agent,
-        from_status: session.status,
-      },
-    });
-
-    return { ok: true, message: "OK", sessionId: id };
+  /**
+   * Stop all running sessions. Used during test teardown and hosted shutdown.
+   * Goes through the proper stop sequence for each (provider kill + cleanup).
+   */
+  async stopAll(): Promise<void> {
+    const running = this.sessions.list({ status: "running" as SessionStatus });
+    const waiting = this.sessions.list({ status: "waiting" as SessionStatus });
+    for (const s of [...running, ...waiting]) {
+      await this.stop(s.id);
+    }
   }
 
   /**

@@ -34,6 +34,8 @@ export function snapshotArkTmuxSessions(): Set<string> {
 
 /**
  * Kill ark-* tmux sessions that were NOT in the pre-test snapshot.
+ * Also kills child processes (claude, bun) inside each session before
+ * destroying it, preventing orphaned claude instances.
  * Safe to call in afterAll - won't destroy the user's real sessions.
  */
 export function killNewArkTmuxSessions(preExisting: Set<string>): void {
@@ -45,7 +47,18 @@ export function killNewArkTmuxSessions(preExisting: Set<string>): void {
     const current = result.split("\n").filter((s) => s.startsWith("ark-s-"));
     for (const name of current) {
       if (!preExisting.has(name)) {
-        try { execFileSync("tmux", ["kill-session", "-t", name], { stdio: "pipe" }); } catch { /* already gone */ }
+        // Kill child processes inside the tmux session first
+        try {
+          const panes = execFileSync("tmux", ["list-panes", "-t", name, "-F", "#{pane_pid}"], {
+            encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+          });
+          for (const pid of panes.split("\n").filter(Boolean)) {
+            try { execFileSync("pkill", ["-9", "-P", pid], { stdio: "pipe" }); } catch {}
+            try { process.kill(parseInt(pid), 9); } catch {}
+          }
+        } catch {}
+        // Then kill the tmux session
+        try { execFileSync("tmux", ["kill-session", "-t", name], { stdio: "pipe" }); } catch {}
       }
     }
   } catch {
@@ -56,22 +69,49 @@ export function killNewArkTmuxSessions(preExisting: Set<string>): void {
 /**
  * Sets up beforeEach/afterAll hooks for test context isolation.
  * Each test gets a fresh AppContext.forTest() with an isolated temp DB.
+ * Automatically cleans up sessions and their processes on teardown.
  */
 export function withTestContext(): { getCtx: () => AppContext } {
   let app: AppContext;
+  let tmuxSnapshot: Set<string>;
 
   beforeEach(async () => {
-    if (app) { await app.shutdown(); clearApp(); }
+    if (app) {
+      await cleanupTestSessions(app);
+      await app.shutdown();
+      clearApp();
+    }
+    tmuxSnapshot = snapshotArkTmuxSessions();
     app = AppContext.forTest();
     setApp(app);
     await app.boot();
   });
 
   afterAll(async () => {
-    if (app) { await app.shutdown(); clearApp(); }
+    if (app) {
+      await cleanupTestSessions(app);
+      await app.shutdown();
+      clearApp();
+    }
+    // Safety net: also kill any tmux sessions created during this test
+    // that might not be tracked in the DB (e.g. if dispatch failed mid-way)
+    if (tmuxSnapshot) killNewArkTmuxSessions(tmuxSnapshot);
   });
 
   return { getCtx: () => app };
+}
+
+/**
+ * Clean up all sessions owned by this AppContext through the proper service layer.
+ * Uses SessionService.stopAll() which delegates to the compute provider for each
+ * session -- the provider knows how to kill tmux, Docker, EC2, etc.
+ */
+export async function cleanupTestSessions(app: AppContext): Promise<void> {
+  try {
+    await app.sessionService.stopAll();
+  } catch {
+    // DB may already be closed or service not booted
+  }
 }
 
 /**
