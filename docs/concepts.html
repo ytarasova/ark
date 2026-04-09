@@ -17,9 +17,13 @@
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
       <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
       <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
       <div class="section-title">Links</div>
       <a href="https://github.com/ytarasova/ark">GitHub</a>
       <a href="https://github.com/ytarasova/ark/releases">Releases</a>
@@ -71,6 +75,15 @@
       </ul>
       <p>Agents are resolved with a 3-tier lookup: <strong>builtin</strong> (shipped with Ark), <strong>project</strong> (in your repo's <code>agents/</code> directory), and <strong>global</strong> (in <code>~/.ark/agents/</code>). Project agents override builtins of the same name, and global agents override both. You can create, edit, copy, and delete custom agents from the TUI Agents tab.</p>
       <p>Built-in agents: <code>planner</code>, <code>implementer</code>, <code>reviewer</code>, <code>documenter</code>, <code>worker</code>.</p>
+
+      <h2>Executors</h2>
+      <p>Agents dispatch through pluggable executors. The <code>runtime</code> field in agent YAML selects which executor launches the agent:</p>
+      <ul>
+        <li><strong>claude-code</strong> (default) -- Claude Code in tmux with hooks + MCP channel</li>
+        <li><strong>subprocess</strong> -- spawns any command as a child process</li>
+        <li><strong>cli-agent</strong> -- any CLI tool (Codex, Gemini CLI, Aider) in tmux with worktree isolation</li>
+      </ul>
+      <p>CLI agents get the same session tracking, worktree isolation, and lifecycle management as Claude Code agents. See <a href="workflows.html">Workflows</a> for details.</p>
 
       <h2>Autonomy Levels</h2>
       <p>Each stage can set an autonomy level:</p>
@@ -127,13 +140,16 @@
       <p>Ark includes several intelligence features that enhance agent autonomy:</p>
       <ul>
         <li><strong>Fail-loopback</strong>: when a stage fails, Ark retries it with error context injected into the agent prompt (up to 3 retries). Configured via <code>on_failure: "retry(3)"</code> in flow stage definitions.</li>
-        <li><strong>Sub-agent fan-out</strong>: decompose a task into N parallel child sessions. The parent waits for all children to complete before advancing. Use <code>ark session fork</code> and <code>ark session join</code>.</li>
+        <li><strong>Fan-out / DAG flows</strong>: decompose a task into N parallel child sessions. Children inherit compute, worktree, and context from the parent. The parent auto-joins when all children complete. Supports DAG-based stage dependencies for complex pipelines. Use <code>ark session spawn</code> and <code>ark session join</code>.</li>
         <li><strong>Skill extraction</strong>: analyze agent conversations for reusable procedures and save them as skills for future sessions.</li>
-        <li><strong>Structured review output</strong>: the reviewer agent produces machine-parseable JSON with P0&ndash;P3 severity levels for each finding.</li>
+        <li><strong>Structured review output</strong>: the reviewer agent produces machine-parseable JSON with P0-P3 severity levels for each finding.</li>
       </ul>
 
       <h2>Guardrails</h2>
       <p>Guardrails are pattern-based tool authorization rules that restrict what agents can do. They block dangerous commands (e.g. <code>rm -rf /</code>, <code>git push --force</code>) before the agent executes them. Guardrails are evaluated at the tool-call level and apply regardless of the agent's permission mode.</p>
+
+      <h2>Web Dashboard</h2>
+      <p>Ark includes a browser-based dashboard (<code>ark web</code>) with the same capabilities as the TUI. It uses Server-Sent Events (SSE) for real-time updates without polling. The dashboard supports token auth (<code>--token</code>) and read-only mode (<code>--read-only</code>). An Electron desktop app (<code>make desktop</code>) wraps the web UI in a native window. See <a href="web.html">Web Dashboard</a> for details.</p>
 
       <h2>Remote Sync</h2>
       <p>When dispatching to remote compute targets, Ark syncs project-local configuration to the remote environment. The following paths are pushed at dispatch time:</p>

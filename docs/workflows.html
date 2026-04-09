@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workflows - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Workflows</h1>
+      <p class="subtitle">Flows, agents, skills, recipes, and the executor system.</p>
+
+      <h2>Flows</h2>
+      <p>A flow is a YAML-defined pipeline of stages. Each stage specifies an agent, a gate that controls advancement, and optional failure handling and verification scripts.</p>
+
+      <h3>Flow Schema</h3>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">my-flow</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"Custom workflow"</span>
+<span class="yaml-key">stages</span>:
+  - <span class="yaml-key">name</span>: <span class="yaml-value">plan</span>
+    <span class="yaml-key">agent</span>: <span class="yaml-value">planner</span>
+    <span class="yaml-key">gate</span>: <span class="yaml-value">manual</span>          <span class="yaml-comment"># auto | manual | review | condition</span>
+    <span class="yaml-key">on_failure</span>: <span class="yaml-value">notify</span>    <span class="yaml-comment"># notify | retry(N)</span>
+    <span class="yaml-key">artifacts</span>: <span class="yaml-value">[PLAN.md]</span>   <span class="yaml-comment"># files passed to next stage</span>
+
+  - <span class="yaml-key">name</span>: <span class="yaml-value">implement</span>
+    <span class="yaml-key">agent</span>: <span class="yaml-value">implementer</span>
+    <span class="yaml-key">gate</span>: <span class="yaml-value">auto</span>
+    <span class="yaml-key">on_failure</span>: <span class="yaml-value">"retry(3)"</span>   <span class="yaml-comment"># retry up to 3 times</span>
+    <span class="yaml-key">verify</span>:
+      - <span class="yaml-value">"npm test"</span>
+      - <span class="yaml-value">"npm run lint"</span>
+
+  - <span class="yaml-key">name</span>: <span class="yaml-value">review</span>
+    <span class="yaml-key">agent</span>: <span class="yaml-value">reviewer</span>
+    <span class="yaml-key">gate</span>: <span class="yaml-value">review</span>           <span class="yaml-comment"># waits for GitHub PR approval</span></code></pre>
+
+      <h3>Gate Types</h3>
+      <p>The <code>gate</code> field controls how a stage advances to the next:</p>
+      <table>
+        <thead>
+          <tr><th>Gate</th><th>Behavior</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>auto</code></td><td>Advances automatically when the agent completes without errors</td></tr>
+          <tr><td><code>manual</code></td><td>Waits for human approval -- press <kbd>Enter</kbd> in the TUI or run <code>ark session advance</code></td></tr>
+          <tr><td><code>review</code></td><td>Waits for a GitHub PR approval via webhook</td></tr>
+          <tr><td><code>condition</code></td><td>Evaluates an expression before advancing</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Verification Gates</h3>
+      <p>Stages can require scripts to pass before completion. Add a <code>verify</code> list to any stage:</p>
+      <pre><code><span class="yaml-key">stages</span>:
+  - <span class="yaml-key">name</span>: <span class="yaml-value">implement</span>
+    <span class="yaml-key">agent</span>: <span class="yaml-value">implementer</span>
+    <span class="yaml-key">gate</span>: <span class="yaml-value">auto</span>
+    <span class="yaml-key">verify</span>:
+      - <span class="yaml-value">"npm test"</span>
+      - <span class="yaml-value">"npm run lint"</span></code></pre>
+      <p>If any script fails, the stage is blocked and the agent is steered to fix the issue. Verification can also be set in <code>.ark.yaml</code> as a default for all stages in a repo.</p>
+      <p>Manage verification and todos from the CLI:</p>
+      <pre><code><span class="prompt">$</span> ark session verify s-a1b2c3          <span class="yaml-comment"># run verification manually</span>
+<span class="prompt">$</span> ark session todo add s-a1b2c3 "Write migration docs"
+<span class="prompt">$</span> ark session todo list s-a1b2c3
+<span class="prompt">$</span> ark session todo done s-a1b2c3 1      <span class="yaml-comment"># toggle todo #1</span>
+<span class="prompt">$</span> ark session complete s-a1b2c3         <span class="yaml-comment"># blocked if todos/scripts fail</span>
+<span class="prompt">$</span> ark session complete s-a1b2c3 --force <span class="yaml-comment"># override verification</span></code></pre>
+      <div class="callout info">
+        <p>Todos are shown in the TUI detail panel. Press <kbd>V</kbd> to run verification from the TUI.</p>
+      </div>
+
+      <h3>Fail-Loopback</h3>
+      <p>When a stage fails, Ark can retry it automatically with the error context injected into the agent's prompt. Configure with <code>on_failure: "retry(3)"</code> (up to 3 retries). After exhausting retries, the session moves to <code>failed</code> status.</p>
+
+      <h3>Builtin Flows</h3>
+      <table>
+        <thead>
+          <tr><th>Flow</th><th>Stages</th><th>Use Case</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>default</code></td><td>plan &gt; implement &gt; pr &gt; review &gt; build &gt; merge &gt; close &gt; docs</td><td>Full SDLC pipeline</td></tr>
+          <tr><td><code>quick</code></td><td>implement &gt; pr</td><td>Fast implementation with PR</td></tr>
+          <tr><td><code>bare</code></td><td>implement</td><td>Single-agent, no gates</td></tr>
+          <tr><td><code>parallel</code></td><td>Fork/join pattern</td><td>Parallel workstreams</td></tr>
+          <tr><td><code>fan-out</code></td><td>Multiple parallel children</td><td>Task decomposition</td></tr>
+          <tr><td><code>pr-review</code></td><td>Review-focused</td><td>PR review workflow</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Managing Flows</h3>
+      <pre><code><span class="prompt">$</span> ark flow list              <span class="yaml-comment"># list all flows (builtin + custom)</span>
+<span class="prompt">$</span> ark flow show default      <span class="yaml-comment"># show flow stages and gates</span></code></pre>
+      <p>Custom flows go in <code>flows/definitions/&lt;name&gt;.yaml</code> (project) or <code>~/.ark/flows/&lt;name&gt;.yaml</code> (global).</p>
+
+      <h2>Agents</h2>
+      <p>Agents are YAML-defined Claude Code configurations. They specify the model, system prompt, tools, and permission mode. At dispatch, template variables in the system prompt are substituted with live session values.</p>
+
+      <h3>Three-Tier Resolution</h3>
+      <p>Ark resolves agent definitions in priority order (highest first):</p>
+      <ol>
+        <li><strong>Project</strong>: <code>.ark/agents/&lt;name&gt;.yaml</code> in the repo</li>
+        <li><strong>Global</strong>: <code>~/.ark/agents/&lt;name&gt;.yaml</code></li>
+        <li><strong>Builtin</strong>: <code>agents/&lt;name&gt;.yaml</code> shipped with Ark</li>
+      </ol>
+      <p>Project agents override builtins of the same name, and global agents override both.</p>
+
+      <h3>Agent Schema</h3>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">my-agent</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"What this agent does"</span>
+<span class="yaml-key">model</span>: <span class="yaml-value">opus</span>              <span class="yaml-comment"># opus | sonnet | haiku</span>
+<span class="yaml-key">max_turns</span>: <span class="yaml-value">200</span>
+<span class="yaml-key">system_prompt</span>: <span class="yaml-value">|</span>
+  <span class="yaml-value">Working on {repo}. Task: {summary}. Ticket: {ticket}.</span>
+  <span class="yaml-value">Branch: {branch}. Workdir: {workdir}.</span>
+<span class="yaml-key">tools</span>:
+  - <span class="yaml-value">Bash</span>
+  - <span class="yaml-value">Read</span>
+  - <span class="yaml-value">Write</span>
+  - <span class="yaml-value">Edit</span>
+  - <span class="yaml-value">Glob</span>
+  - <span class="yaml-value">Grep</span>
+  - <span class="yaml-value">WebSearch</span>
+<span class="yaml-key">permission_mode</span>: <span class="yaml-value">bypassPermissions</span>
+<span class="yaml-key">mcp_servers</span>: <span class="yaml-value">[]</span>          <span class="yaml-comment"># MCP server names to attach</span>
+<span class="yaml-key">skills</span>: <span class="yaml-value">[code-review]</span>    <span class="yaml-comment"># skills to inject at dispatch</span>
+<span class="yaml-key">memories</span>: <span class="yaml-value">[]</span>             <span class="yaml-comment"># memory file paths</span>
+<span class="yaml-key">env</span>:
+  <span class="yaml-key">CLAUDE_AUTOCOMPACT_PCT_OVERRIDE</span>: <span class="yaml-value">"80"</span></code></pre>
+      <p>Template variables substituted at dispatch: <code>{ticket}</code>, <code>{summary}</code>, <code>{workdir}</code>, <code>{repo}</code>, <code>{branch}</code>.</p>
+
+      <h3>Builtin Agents</h3>
+      <table>
+        <thead>
+          <tr><th>Agent</th><th>Model</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>planner</code></td><td>Sonnet</td><td>Creates PLAN.md with architecture and implementation strategy</td></tr>
+          <tr><td><code>implementer</code></td><td>Opus</td><td>Writes code, tests, and commits</td></tr>
+          <tr><td><code>reviewer</code></td><td>Sonnet</td><td>Reviews PRs and produces structured JSON feedback (P0-P3)</td></tr>
+          <tr><td><code>documenter</code></td><td>Sonnet</td><td>Generates project documentation</td></tr>
+          <tr><td><code>worker</code></td><td>Opus</td><td>General-purpose lightweight agent</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Managing Agents</h3>
+      <pre><code><span class="prompt">$</span> ark agent list                    <span class="yaml-comment"># list all agents (builtin + custom)</span>
+<span class="prompt">$</span> ark agent show implementer        <span class="yaml-comment"># show agent details</span>
+<span class="prompt">$</span> ark agent create my-agent         <span class="yaml-comment"># create new agent (opens editor)</span>
+<span class="prompt">$</span> ark agent edit my-agent           <span class="yaml-comment"># edit agent definition</span>
+<span class="prompt">$</span> ark agent copy implementer fast   <span class="yaml-comment"># copy agent for customization</span>
+<span class="prompt">$</span> ark agent delete my-agent         <span class="yaml-comment"># delete a custom agent</span></code></pre>
+
+      <h2>Executor System</h2>
+      <p>Agents dispatch through pluggable executors. The <code>runtime</code> field in agent YAML selects which executor launches the agent. This lets you orchestrate Claude Code, custom subprocess tools, or any CLI coding tool through the same session and lifecycle system.</p>
+
+      <h3>Built-in Executors</h3>
+      <table>
+        <thead>
+          <tr><th>Runtime</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>claude-code</code></td><td>Default. Launches Claude Code in a tmux session with hooks and an MCP channel for bidirectional messaging.</td></tr>
+          <tr><td><code>subprocess</code></td><td>Spawns any command as a child process. Suitable for scripts, linters, and build tools.</td></tr>
+          <tr><td><code>cli-agent</code></td><td>Runs any CLI coding tool (codex, gemini, aider, etc.) in tmux with worktree isolation, the same way Claude Code agents run.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Subprocess Agent</h3>
+      <p>Use the <code>subprocess</code> runtime to wrap any script or tool as an agent:</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">my-linter</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"Run project lint checks"</span>
+<span class="yaml-key">runtime</span>: <span class="yaml-value">subprocess</span>
+<span class="yaml-key">command</span>: <span class="yaml-value">["node", "scripts/lint.js"]</span>
+<span class="yaml-key">env</span>:
+  <span class="yaml-key">TARGET</span>: <span class="yaml-value">"{workdir}"</span></code></pre>
+
+      <h3>CLI Agents</h3>
+      <p>The <code>cli-agent</code> runtime lets Ark orchestrate any CLI coding tool. CLI agents get the same worktree isolation, session tracking, and lifecycle management as Claude Code agents -- the only difference is which tool is launched.</p>
+
+      <h4>Builtin CLI Agents</h4>
+      <table>
+        <thead>
+          <tr><th>Agent</th><th>Tool</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>codex-worker</code></td><td>OpenAI Codex CLI</td><td>Full-auto Codex coding agent</td></tr>
+          <tr><td><code>gemini-worker</code></td><td>Google Gemini CLI</td><td>Gemini coding agent</td></tr>
+          <tr><td><code>aider-worker</code></td><td>Aider</td><td>Aider chat-based coding</td></tr>
+          <tr><td><code>generic-cli</code></td><td>Any CLI</td><td>Generic wrapper for custom tools</td></tr>
+        </tbody>
+      </table>
+
+      <h4>CLI Agent Schema</h4>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">codex-worker</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">OpenAI Codex CLI coding agent</span>
+<span class="yaml-key">runtime</span>: <span class="yaml-value">cli-agent</span>
+<span class="yaml-key">command</span>: <span class="yaml-value">["codex", "--approval-mode", "full-auto"]</span>
+<span class="yaml-key">task_delivery</span>: <span class="yaml-value">arg</span>       <span class="yaml-comment"># stdin | file | arg (default)</span>
+<span class="yaml-key">model</span>: <span class="yaml-value">o4-mini</span>
+<span class="yaml-key">max_turns</span>: <span class="yaml-value">200</span>
+<span class="yaml-key">system_prompt</span>: <span class="yaml-value">""</span>
+<span class="yaml-key">tools</span>: <span class="yaml-value">[]</span>
+<span class="yaml-key">permission_mode</span>: <span class="yaml-value">bypassPermissions</span>
+<span class="yaml-key">env</span>: <span class="yaml-value">{}</span></code></pre>
+
+      <h4>Task Delivery Modes</h4>
+      <p>The <code>task_delivery</code> field controls how the task is passed to the CLI tool:</p>
+      <table>
+        <thead>
+          <tr><th>Mode</th><th>Behavior</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>stdin</code></td><td>Pipes the task to stdin</td><td><code>echo "task" | codex</code></td></tr>
+          <tr><td><code>file</code></td><td>Writes task to a temp file and passes the path</td><td><code>codex --task /tmp/task.txt</code></td></tr>
+          <tr><td><code>arg</code></td><td>Appends the task as the last CLI argument (default)</td><td><code>codex "Fix the login bug"</code></td></tr>
+        </tbody>
+      </table>
+
+      <h4>Usage</h4>
+      <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Fix the bug" --agent codex-worker --dispatch
+<span class="prompt">$</span> ark agent create my-tool   <span class="yaml-comment"># set runtime: cli-agent in the YAML</span></code></pre>
+
+      <h2>Skills</h2>
+      <p>Skills are reusable prompt fragments injected into agent system prompts at dispatch time. They encapsulate domain knowledge, coding patterns, and procedural instructions that agents carry across sessions.</p>
+
+      <h3>Three-Tier Resolution</h3>
+      <p>Skills are resolved in priority order (highest first):</p>
+      <table>
+        <thead>
+          <tr><th>Location</th><th>Scope</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.ark/skills/&lt;name&gt;.md</code></td><td>Project-local (committed to repo)</td></tr>
+          <tr><td><code>~/.ark/skills/&lt;name&gt;.md</code></td><td>Global (user-wide)</td></tr>
+          <tr><td><code>skills/&lt;name&gt;.md</code></td><td>Builtin (shipped with Ark)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Attaching Skills to Agents</h3>
+      <p>Add skill names to the <code>skills</code> field in agent YAML. At dispatch, Ark automatically injects the content of each listed skill into the agent's system prompt:</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">my-agent</span>
+<span class="yaml-key">skills</span>:
+  - <span class="yaml-value">code-review</span>
+  - <span class="yaml-value">test-writing</span></code></pre>
+
+      <h3>Managing Skills</h3>
+      <pre><code><span class="prompt">$</span> ark skill list                   <span class="yaml-comment"># list all skills (builtin + custom)</span>
+<span class="prompt">$</span> ark skill show code-review       <span class="yaml-comment"># show skill content</span>
+
+<span class="prompt">$</span> ark skill create my-skill -d "Review checklist" -p "Always check for..."
+<span class="prompt">$</span> ark skill create --from my-skill.yaml
+<span class="prompt">$</span> ark skill create my-skill -d "..." -p "..." --scope project --tags "review,quality"
+
+<span class="prompt">$</span> ark skill delete my-skill
+<span class="prompt">$</span> ark skill delete my-skill --scope project</code></pre>
+      <div class="callout tip">
+        <p>Project-scoped skills are saved to <code>.ark/skills/</code> and committed with the repo, making them available to all sessions started from that project.</p>
+      </div>
+
+      <h3>Skill Extraction</h3>
+      <p>When a session completes, Ark automatically analyzes the conversation transcript for reusable patterns -- multi-step procedures, repeated methodology, and structured approaches. High-confidence candidates are saved as global skills with names like <code>extracted-&lt;sessionId&gt;-0</code>. Extraction runs silently and never blocks session completion.</p>
+
+      <h2>Recipes</h2>
+      <p>Recipes are session templates with variables. They let you quick-launch sessions from presets without manually configuring flow, agent, summary, and compute each time.</p>
+
+      <h3>Three-Tier Resolution</h3>
+      <p>Recipes use the same three-tier resolution as skills (highest priority first):</p>
+      <table>
+        <thead>
+          <tr><th>Location</th><th>Scope</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.ark/recipes/&lt;name&gt;.yaml</code></td><td>Project-local</td></tr>
+          <tr><td><code>~/.ark/recipes/&lt;name&gt;.yaml</code></td><td>Global</td></tr>
+          <tr><td><code>recipes/&lt;name&gt;.yaml</code></td><td>Builtin</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Recipe Schema</h3>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">quick-fix</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"Fast bugfix with bare flow"</span>
+<span class="yaml-key">repo</span>: <span class="yaml-value">.</span>
+<span class="yaml-key">flow</span>: <span class="yaml-value">bare</span>
+<span class="yaml-key">summary</span>: <span class="yaml-value">"Fix: {issue}"</span>
+<span class="yaml-key">variables</span>:
+  - <span class="yaml-key">name</span>: <span class="yaml-value">issue</span>
+    <span class="yaml-key">prompt</span>: <span class="yaml-value">"Describe the issue"</span></code></pre>
+
+      <h3>Using Recipes</h3>
+      <pre><code><span class="prompt">$</span> ark recipe list
+<span class="prompt">$</span> ark recipe show quick-fix
+<span class="prompt">$</span> ark session start --recipe quick-fix --repo . --dispatch</code></pre>
+
+      <h3>Builtin Recipes</h3>
+      <table>
+        <thead>
+          <tr><th>Recipe</th><th>Flow</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>quick-fix</code></td><td>bare</td><td>Fast single-agent bugfix</td></tr>
+          <tr><td><code>feature-build</code></td><td>quick</td><td>Implement and open a PR</td></tr>
+          <tr><td><code>code-review</code></td><td>pr-review</td><td>Review an existing PR</td></tr>
+          <tr><td><code>fix-bug</code></td><td>default</td><td>Full pipeline bugfix</td></tr>
+          <tr><td><code>new-feature</code></td><td>default</td><td>Full SDLC for a new feature</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Creating Recipes</h3>
+      <pre><code><span class="prompt">$</span> ark recipe create --from my-recipe.yaml
+<span class="prompt">$</span> ark recipe create --from-session s-a1b2c3 --name my-recipe
+<span class="prompt">$</span> ark recipe create --from my-recipe.yaml --scope project
+
+<span class="prompt">$</span> ark recipe delete my-recipe
+<span class="prompt">$</span> ark recipe delete my-recipe --scope project</code></pre>
+      <div class="callout info">
+        <p>You cannot delete builtin recipes. Use <code>--scope project</code> or <code>--scope global</code> to target a specific tier when names conflict.</p>
+      </div>
+
+      <div class="doc-footer">
+        <a href="compute.html">&larr; Compute Providers</a>
+        <a href="advanced.html">Advanced &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

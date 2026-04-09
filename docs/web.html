@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web Dashboard - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Web Dashboard</h1>
+      <p class="subtitle">Browser-based UI and native desktop app for managing Ark sessions.</p>
+
+      <h2>Starting the Web Dashboard</h2>
+      <p>Run <code>ark web</code> to start the HTTP server. By default it listens on port 8420.</p>
+      <pre><code><span class="prompt">$</span> ark web                           # http://localhost:8420
+<span class="prompt">$</span> ark web --port 9000               # custom port
+<span class="prompt">$</span> ark web --read-only               # no mutations allowed
+<span class="prompt">$</span> ark web --token my-secret-token   # require Bearer token auth</code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--port</code></td><td><code>8420</code></td><td>Port for the web server</td></tr>
+          <tr><td><code>--read-only</code></td><td>—</td><td>Disable all mutation endpoints</td></tr>
+          <tr><td><code>--token</code></td><td>—</td><td>Require <code>Authorization: Bearer &lt;token&gt;</code> on every request</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Views</h2>
+      <p>All views are accessible from the sidebar. Each view mirrors the equivalent tab in the TUI.</p>
+      <table>
+        <thead>
+          <tr><th>View</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Sessions</strong></td><td>Session list with status indicators, detail panel, and all lifecycle actions</td></tr>
+          <tr><td><strong>Agents</strong></td><td>Browse agent definitions, view configs, manage custom agents</td></tr>
+          <tr><td><strong>Tools</strong></td><td>MCP servers, commands, skills, recipes, and context management</td></tr>
+          <tr><td><strong>Flows</strong></td><td>Flow definitions with stage visualization and gate configuration</td></tr>
+          <tr><td><strong>History</strong></td><td>Claude Code session discovery, search, and import into Ark</td></tr>
+          <tr><td><strong>Compute</strong></td><td>Compute resource provisioning and lifecycle (local, Docker, EC2)</td></tr>
+          <tr><td><strong>Costs</strong></td><td>Per-session and aggregate token usage with budget tracking</td></tr>
+          <tr><td><strong>Schedules</strong></td><td>Cron-based recurring session management -- create, enable/disable, delete</td></tr>
+          <tr><td><strong>Memory</strong></td><td>Cross-session persistent memory -- add, search, delete memories</td></tr>
+          <tr><td><strong>Settings</strong></td><td>Dashboard and system configuration</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Session Interactions</h2>
+      <p>The Sessions view provides the full session lifecycle from the browser. Available actions from the session list and detail panel:</p>
+      <ul>
+        <li><strong>Create</strong> -- New Session modal with repo, flow, summary, compute, and group fields</li>
+        <li><strong>Dispatch / Stop / Restart</strong> -- lifecycle controls available from the detail panel</li>
+        <li><strong>Send messages</strong> -- inline chat input for talking to a running agent via the MCP channel</li>
+        <li><strong>Interrupt</strong> -- sends Ctrl+C to the agent without killing the tmux session</li>
+        <li><strong>Pause / Advance / Complete</strong> -- gate controls for manual-gate flow stages</li>
+        <li><strong>Fork</strong> -- decompose the session into parallel child sessions</li>
+        <li><strong>Archive / Restore</strong> -- hide completed sessions without deleting them</li>
+      </ul>
+
+      <h2>Diff Preview and PR Creation</h2>
+      <p>The session detail panel includes a diff preview section that shows a <code>git diff --stat</code> of the worktree branch. From this panel you can:</p>
+      <ul>
+        <li>Browse the list of changed files and track which ones you have reviewed</li>
+        <li>See files modified since your last review, flagged with a change indicator</li>
+        <li>Create a GitHub PR via <code>gh pr create</code> directly from the browser</li>
+        <li>Merge the worktree branch into the base branch</li>
+      </ul>
+
+      <div class="callout info">
+        <strong>Note:</strong> PR creation requires <code>gh</code> (GitHub CLI) to be installed and authenticated on the machine running <code>ark web</code>.
+      </div>
+
+      <h2>Cost Tracking</h2>
+      <p>The Costs view provides a breakdown of token usage across all sessions:</p>
+      <ul>
+        <li>Per-session token breakdown: input tokens, output tokens, cache reads, and cache writes</li>
+        <li>Cost per session calculated from per-model pricing</li>
+        <li>Aggregate totals across all sessions and date ranges</li>
+        <li>Budget usage shown against daily, weekly, and monthly limits configured in settings</li>
+      </ul>
+
+      <h2>Memory</h2>
+      <p>The Memory view manages cross-session persistent memories that agents can read at dispatch time:</p>
+      <ul>
+        <li>Add new memories with optional tags, scope, and importance level</li>
+        <li>Search memories by keyword</li>
+        <li>Delete individual memories or clear all memories within a scope</li>
+      </ul>
+
+      <h2>Live Updates</h2>
+      <p>The web dashboard uses Server-Sent Events (SSE) for real-time updates. There is no polling -- the server pushes status changes, new events, and agent progress directly to the browser as they happen. Session status badges, event logs, and agent output all update automatically.</p>
+
+      <h2>Access Control</h2>
+      <p>Two access control mechanisms are available for deployments that need protection:</p>
+
+      <h3>Token Authentication</h3>
+      <p>Start the server with <code>--token &lt;secret&gt;</code>. All requests must include the header:</p>
+      <pre><code>Authorization: Bearer &lt;your-token&gt;</code></pre>
+      <p>Requests without a valid token receive a <code>401 Unauthorized</code> response. The token is set once at startup and does not rotate.</p>
+
+      <h3>Read-Only Mode</h3>
+      <p>Start with <code>--read-only</code> to disable all mutation endpoints. GET requests and SSE streams remain available. Any POST, PUT, PATCH, or DELETE request returns <code>403 Forbidden</code>. Useful for sharing a dashboard with observers who should not be able to control sessions.</p>
+
+      <div class="callout warn">
+        <strong>Warning:</strong> <code>ark web</code> binds to <code>0.0.0.0</code> by default, making it reachable on all network interfaces. Use <code>--token</code> or a firewall rule when running on a shared or remote machine.
+      </div>
+
+      <h2>Desktop App</h2>
+      <p>Ark includes an Electron app that wraps the web UI in a native window. It provides a dedicated macOS/Windows/Linux application without requiring a separate browser tab.</p>
+
+      <h3>Running the Desktop App</h3>
+      <pre><code><span class="prompt">$</span> make desktop</code></pre>
+      <p>This launches the Electron app in development mode. On startup it boots <code>ark web</code> as a child process on a free port, then opens a <code>BrowserWindow</code> pointing at that port. Closing the window shuts down the web server.</p>
+
+      <h3>Prerequisites</h3>
+      <p>Before running for the first time, install Electron and electron-builder:</p>
+      <pre><code><span class="prompt">$</span> make desktop-install</code></pre>
+      <p>The desktop app also requires Bun, Git, and <code>ark</code> to be available on <code>PATH</code>.</p>
+
+      <h3>Building for Distribution</h3>
+      <pre><code><span class="prompt">$</span> make desktop-build</code></pre>
+      <p>Packages the app for distribution using electron-builder. Output is written to <code>packages/desktop/out/</code>:</p>
+      <table>
+        <thead>
+          <tr><th>Platform</th><th>Output format</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>macOS</td><td><code>.dmg</code> and <code>.zip</code></td></tr>
+          <tr><td>Windows</td><td><code>.exe</code> (NSIS installer)</td></tr>
+          <tr><td>Linux</td><td><code>.AppImage</code> and <code>.deb</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Native Features</h3>
+      <ul>
+        <li>macOS traffic light buttons (close, minimize, zoom) with native window chrome</li>
+        <li>Native menu bar with standard application menus</li>
+        <li>External links open in the system browser rather than inside the app window</li>
+        <li>Dark background matches the web dashboard theme</li>
+      </ul>
+
+      <div class="callout tip">
+        <p>The desktop app and the web dashboard share the same codebase. Any feature available at <code>http://localhost:8420</code> is also available in the desktop app.</p>
+      </div>
+
+      <div class="doc-footer">
+        <a href="tui.html">&larr; TUI Dashboard</a>
+        <a href="cli.html">CLI Reference &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

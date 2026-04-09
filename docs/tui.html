@@ -17,9 +17,13 @@
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
       <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
       <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
       <div class="section-title">Links</div>
       <a href="https://github.com/ytarasova/ark">GitHub</a>
       <a href="https://github.com/ytarasova/ark/releases">Releases</a>
@@ -31,14 +35,15 @@
       <p class="subtitle">Keyboard-driven terminal interface for managing agents.</p>
 
       <h2>Layout</h2>
-      <p>The TUI has 6 tabs accessible via number keys <kbd>1</kbd>&ndash;<kbd>6</kbd>:</p>
+      <p>The TUI has 7 tabs accessible via number keys <kbd>1</kbd>-<kbd>7</kbd>:</p>
       <ol>
-        <li><strong>Sessions</strong> &mdash; manage agent sessions</li>
-        <li><strong>Agents</strong> &mdash; create, edit, copy, delete agent definitions</li>
-        <li><strong>Tools</strong> &mdash; browse and manage tools available to agents</li>
-        <li><strong>Flows</strong> &mdash; view flow definitions</li>
-        <li><strong>History</strong> &mdash; browse and import Claude Code sessions</li>
-        <li><strong>Compute</strong> &mdash; manage compute resources</li>
+        <li><strong>Sessions</strong> - manage agent sessions</li>
+        <li><strong>Agents</strong> - create, edit, copy, delete agent definitions</li>
+        <li><strong>Tools</strong> - browse and manage tools available to agents</li>
+        <li><strong>Flows</strong> - view flow definitions</li>
+        <li><strong>History</strong> - browse and import Claude Code sessions</li>
+        <li><strong>Compute</strong> - manage compute resources</li>
+        <li><strong>Costs</strong> - per-session token usage and cost tracking</li>
       </ol>
       <p>Each tab has a split pane: left (list) and right (detail). Press <kbd>Tab</kbd> to switch focus between panes.</p>
 
@@ -49,7 +54,7 @@
           <tr><th>Key</th><th>Action</th></tr>
         </thead>
         <tbody>
-          <tr><td><kbd>1</kbd>&ndash;<kbd>6</kbd></td><td>Switch to tab</td></tr>
+          <tr><td><kbd>1</kbd>-<kbd>7</kbd></td><td>Switch to tab</td></tr>
           <tr><td><kbd>Tab</kbd></td><td>Toggle pane focus (list / detail)</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Back to list pane</td></tr>
           <tr><td><kbd>e</kbd></td><td>Toggle event log</td></tr>
@@ -95,6 +100,15 @@
           <tr><td><kbd>t</kbd></td><td>Talk (1:1 chat with selected session)</td><td>Running</td></tr>
           <tr><td><kbd>s</kbd></td><td>Stop session</td><td>Running</td></tr>
           <tr><td><kbd>d</kbd></td><td>Mark done (press twice)</td><td>Running</td></tr>
+          <tr><td><kbd>I</kbd></td><td>Interrupt agent (sends Ctrl+C)</td><td>Running</td></tr>
+          <tr><td><kbd>V</kbd></td><td>Run verification scripts</td><td>Any</td></tr>
+          <tr><td><kbd>W</kbd></td><td>Worktree finish (merge/PR with diff preview)</td><td>Stopped / Completed</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>Archive / restore session</td><td>Any</td></tr>
+          <tr><td><kbd>A</kbd></td><td>Advance to next flow stage</td><td>Waiting / Blocked</td></tr>
+          <tr><td><kbd>M</kbd></td><td>MCP server manager</td><td>Any</td></tr>
+          <tr><td><kbd>Y</kbd></td><td>Memory manager</td><td>Any</td></tr>
+          <tr><td><kbd>K</kbd></td><td>Skills manager</td><td>Any</td></tr>
+          <tr><td><kbd>u</kbd></td><td>Mark unread</td><td>Any</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Restart session</td><td>Stopped / Failed / Completed</td></tr>
           <tr><td><kbd>S</kbd></td><td>Stop group</td><td>Group</td></tr>
           <tr><td><kbd>R</kbd></td><td>Resume group</td><td>Group</td></tr>
@@ -102,8 +116,26 @@
         </tbody>
       </table>
 
+      <h3>Status Filters</h3>
+      <p>Quickly filter the session list by status:</p>
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Filter</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>!</kbd></td><td>Running sessions only</td></tr>
+          <tr><td><kbd>@</kbd></td><td>Waiting sessions only</td></tr>
+          <tr><td><kbd>#</kbd></td><td>Stopped sessions only</td></tr>
+          <tr><td><kbd>$</kbd></td><td>Failed sessions only</td></tr>
+          <tr><td><kbd>0</kbd></td><td>Clear filter (show all)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Fuzzy Search</h3>
+      <p>Press <kbd>/</kbd> to open fuzzy search. Type to filter sessions by name, summary, or ID. Use <kbd>Ctrl+j</kbd> / <kbd>Ctrl+k</kbd> to navigate results, <kbd>Enter</kbd> to select, <kbd>Esc</kbd> to cancel.</p>
+
       <h3>Detail Pane</h3>
-      <p>The detail pane shows session metadata, token usage, channel status, and a live view of agent output. Press <kbd>/</kbd> to search within the conversation history. Use the scroll box to navigate long content.</p>
+      <p>The detail pane shows session metadata, token usage, channel status, and a live view of agent output. Use the scroll box to navigate long content.</p>
 
       <h2>Agents Tab (2)</h2>
       <p>Manage agent definitions across all three tiers (builtin, project, global).</p>
@@ -122,12 +154,12 @@
       <h2>Tools Tab (3)</h2>
       <p>Browse all tools available to agents in the current project. Tools are organized into 6 categories:</p>
       <ul>
-        <li><strong>MCP Servers</strong> &mdash; from <code>.mcp.json</code></li>
-        <li><strong>Commands</strong> &mdash; from <code>.claude/commands/</code></li>
-        <li><strong>Claude Skills</strong> &mdash; from <code>.claude/skills/</code></li>
-        <li><strong>Ark Skills</strong> &mdash; from <code>skills/</code> (builtin, global, project)</li>
-        <li><strong>Recipes</strong> &mdash; from <code>recipes/</code> (builtin, global, project)</li>
-        <li><strong>Context</strong> &mdash; from <code>CLAUDE.md</code></li>
+        <li><strong>MCP Servers</strong> -- from <code>.mcp.json</code></li>
+        <li><strong>Commands</strong> -- from <code>.claude/commands/</code></li>
+        <li><strong>Claude Skills</strong> -- from <code>.claude/skills/</code></li>
+        <li><strong>Ark Skills</strong> -- from <code>skills/</code> (builtin, global, project)</li>
+        <li><strong>Recipes</strong> -- from <code>recipes/</code> (builtin, global, project)</li>
+        <li><strong>Context</strong> -- from <code>CLAUDE.md</code></li>
       </ul>
       <table>
         <thead>
@@ -139,6 +171,9 @@
           <tr><td><kbd>x</kbd></td><td>Delete tool (with confirmation)</td></tr>
         </tbody>
       </table>
+
+      <h2>Flows Tab (4)</h2>
+      <p>Browse flow definitions and visualize stage pipelines. Select a flow to see its stages, gates, and agent assignments.</p>
 
       <h2>History Tab (5)</h2>
       <p>Shows both Ark sessions and native Claude Code sessions from <code>~/.claude/projects/</code>.</p>
@@ -168,6 +203,9 @@
         </tbody>
       </table>
 
+      <h2>Costs Tab (7)</h2>
+      <p>View per-session token usage and cost breakdown. Shows input, output, cache read, and cache write tokens with calculated costs using per-model pricing. Aggregate totals and budget usage (daily/weekly/monthly) are displayed at the top.</p>
+
       <h2>Status Bar</h2>
       <p>The status bar at the bottom is the single source of truth for available actions. It shows context-sensitive shortcuts that update based on the active tab, pane, and overlay state. Shortcuts are organized with <code>|</code> separators: navigation | session actions | quit. When a form or overlay is open, the status bar switches to show form controls (<kbd>Enter</kbd> confirm, <kbd>Esc</kbd> cancel) instead of tab shortcuts.</p>
 
@@ -176,7 +214,7 @@
 
       <h2>Tips</h2>
       <div class="callout tip">
-        <p>All I/O operations are async &mdash; the UI never freezes. A spinner in the status bar indicates background activity.</p>
+        <p>All I/O operations are async -- the UI never freezes. A spinner in the status bar indicates background activity.</p>
       </div>
       <div class="callout tip">
         <p>Sessions display live tmux output in the detail pane. Press <kbd>a</kbd> to attach directly to the tmux session for full terminal access.</p>
@@ -188,7 +226,7 @@
         <p>In chat (<kbd>t</kbd>) or threads (<kbd>T</kbd>), press <kbd>Tab</kbd> to switch focus between the message scroll area (<kbd>j</kbd>/<kbd>k</kbd> to navigate) and the text input.</p>
       </div>
       <div class="callout tip">
-        <p>Bare flow sessions use a manual gate &mdash; the agent can complete tasks but the session stays running until you press <kbd>d</kbd> (done) twice to mark it complete.</p>
+        <p>Bare flow sessions use a manual gate -- the agent can complete tasks but the session stays running until you press <kbd>d</kbd> (done) twice to mark it complete.</p>
       </div>
       <div class="callout tip">
         <p>The detail pane uses a scroll box for long content. Switch focus with <kbd>Tab</kbd>, then use <kbd>j</kbd>/<kbd>k</kbd> to scroll.</p>

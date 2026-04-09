@@ -17,9 +17,13 @@
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
       <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
       <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
       <div class="section-title">Links</div>
       <a href="https://github.com/ytarasova/ark">GitHub</a>
       <a href="https://github.com/ytarasova/ark/releases">Releases</a>
@@ -455,7 +459,7 @@
 
       <!-- ── ark auth ─────────────────────────────────────────────────────── -->
       <h2>ark auth</h2>
-      <p>Set up Claude authentication for remote compute. Runs <code>claude setup-token</code> to create a persistent OAuth token, then saves it to <code>~/.ark/claude-oauth-token</code>. The TUI and dispatch read this token automatically &mdash; no environment variables needed.</p>
+      <p>Set up Claude authentication for remote compute. Runs <code>claude setup-token</code> to create a persistent OAuth token, then saves it to <code>~/.ark/claude-oauth-token</code>. The TUI and dispatch read this token automatically -- no environment variables needed.</p>
       <pre><code><span class="prompt">$</span> ark auth
 <span class="prompt">$</span> ark auth --host my-ec2</code></pre>
 
@@ -474,7 +478,7 @@
 
       <!-- ── ark channel ───────────────────────────────────────────────────── -->
       <h2>ark channel</h2>
-      <p>Run the MCP channel server. This is an internal command used by remote agents to communicate with the conductor via stdio. It is normally launched automatically by the remote launcher &mdash; you do not need to run it manually.</p>
+      <p>Run the MCP channel server. This is an internal command used by remote agents to communicate with the conductor via stdio. It is normally launched automatically by the remote launcher -- you do not need to run it manually.</p>
       <pre><code><span class="prompt">$</span> ark channel</code></pre>
 
       <!-- ── ark claude ───────────────────────────────────────────────────── -->

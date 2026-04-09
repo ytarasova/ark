@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Advanced Features - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Advanced Features</h1>
+      <p class="subtitle">Git worktrees, memory, search, scheduling, integrations, guardrails, observability, and more.</p>
+
+      <!-- ── Git Worktrees ────────────────────────────────────────────────── -->
+      <h2>Git Worktrees</h2>
+      <p>When a session is dispatched, Ark automatically creates a git worktree at <code>~/.ark/worktrees/&lt;sessionId&gt;/</code>. The agent works in this isolated copy of the repo, so your main checkout is never modified by a running session.</p>
+
+      <h3>Worktree Commands</h3>
+      <pre><code><span class="prompt">$</span> ark worktree list                          <span class="yaml-comment"># list all active worktrees</span>
+<span class="prompt">$</span> ark worktree diff s-1a2b                    <span class="yaml-comment"># preview changes (--base to set base branch)</span>
+<span class="prompt">$</span> ark worktree finish s-1a2b                  <span class="yaml-comment"># merge or create PR</span>
+<span class="prompt">$</span> ark worktree pr s-1a2b                      <span class="yaml-comment"># create PR without merging</span>
+<span class="prompt">$</span> ark worktree cleanup s-1a2b                 <span class="yaml-comment"># remove worktree (--dry-run to preview)</span></code></pre>
+
+      <h3>ark worktree finish</h3>
+      <p>Merges the session branch into the base branch, or creates a PR if the repo has a remote. Options:</p>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--into &lt;branch&gt;</code></td><td>Target branch to merge into (default: main)</td></tr>
+          <tr><td><code>--no-merge</code></td><td>Push the branch but skip the local merge</td></tr>
+          <tr><td><code>--keep-branch</code></td><td>Do not delete the session branch after merging</td></tr>
+          <tr><td><code>--pr</code></td><td>Force PR creation even when a local merge is possible</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ark worktree pr</h3>
+      <p>Push the session branch and open a GitHub pull request.</p>
+      <pre><code><span class="prompt">$</span> ark worktree pr s-1a2b --title "Add OAuth support" --draft</code></pre>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--title &lt;text&gt;</code></td><td>PR title (default: session summary)</td></tr>
+          <tr><td><code>--base &lt;branch&gt;</code></td><td>Base branch for the PR</td></tr>
+          <tr><td><code>--draft</code></td><td>Create a draft PR</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Auto-PR</h3>
+      <p>When an agent completes and the repo has a git remote, Ark automatically pushes the session branch and creates a GitHub PR via <code>gh pr create</code>. No manual steps required.</p>
+      <p>To disable auto-PR for a specific repo, add the following to your <code>.ark.yaml</code>:</p>
+      <pre><code><span class="yaml-key">auto_pr</span>: <span class="yaml-value">false</span></code></pre>
+
+      <h3>TUI Workflow</h3>
+      <p>In the TUI Sessions tab, press <kbd>W</kbd> to open the worktree finish overlay. It shows a diff preview and lets you choose between merge and PR creation without leaving the TUI.</p>
+
+      <!-- ── Memory ───────────────────────────────────────────────────────── -->
+      <h2>Memory</h2>
+      <p>Ark maintains a persistent memory store at <code>~/.ark/memories.json</code>. Memories are tagged notes with a scope and importance level that survive across sessions.</p>
+
+      <h3>How It Works</h3>
+      <p>At dispatch time, Ark scores all stored memories against the session summary using keyword overlap. Relevant memories are injected into the agent's task prompt automatically, giving the agent context from prior sessions without any manual copy-paste.</p>
+
+      <h3>Memory Commands</h3>
+      <pre><code><span class="prompt">$</span> ark memory list                            <span class="yaml-comment"># list all memories (--scope to filter)</span>
+<span class="prompt">$</span> ark memory add "Always use transactions for DB writes" --tags db,safety --importance high
+<span class="prompt">$</span> ark memory recall "database"               <span class="yaml-comment"># find memories matching a keyword</span>
+<span class="prompt">$</span> ark memory forget mem-3a4b                 <span class="yaml-comment"># delete a single memory by ID</span>
+<span class="prompt">$</span> ark memory clear --scope project --force   <span class="yaml-comment"># delete all memories in a scope</span></code></pre>
+
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--tags &lt;list&gt;</code></td><td>Comma-separated tags for retrieval filtering</td></tr>
+          <tr><td><code>--scope &lt;name&gt;</code></td><td>Logical scope (e.g. <code>project</code>, <code>global</code>, a repo name)</td></tr>
+          <tr><td><code>--importance &lt;level&gt;</code></td><td><code>low</code>, <code>medium</code>, or <code>high</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>TUI and Web</h3>
+      <p>In the TUI, press <kbd>Y</kbd> to open the Memory Manager overlay. Use <kbd>j</kbd>/<kbd>k</kbd> to navigate, <kbd>n</kbd> to add a new memory, and <kbd>x</kbd> to delete. The Web dashboard also has a dedicated Memory view.</p>
+
+      <!-- ── Search ───────────────────────────────────────────────────────── -->
+      <h2>Search</h2>
+      <p>Ark provides three layers of search: session metadata, Claude Code transcripts, and hybrid search with LLM re-ranking.</p>
+
+      <h3>Session Search</h3>
+      <pre><code><span class="prompt">$</span> ark search "authentication bug"
+<span class="prompt">$</span> ark search "OAuth" --transcripts --limit 50
+<span class="prompt">$</span> ark search "login" --index</code></pre>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--transcripts</code></td><td>off</td><td>Also search Claude Code JSONL transcripts</td></tr>
+          <tr><td><code>--index</code></td><td>off</td><td>Rebuild the FTS5 index before searching</td></tr>
+          <tr><td><code>--limit</code></td><td><code>20</code></td><td>Maximum number of results to return</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Global Conversation Search</h3>
+      <p>Search across all Claude Code conversations on disk, not just Ark-managed sessions:</p>
+      <pre><code><span class="prompt">$</span> ark search-all "migration strategy"
+<span class="prompt">$</span> ark search-all "deploy" --days 7 --limit 100</code></pre>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--days &lt;n&gt;</code></td><td>Limit to conversations from the last N days</td></tr>
+          <tr><td><code>--limit &lt;n&gt;</code></td><td>Maximum number of results</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Hybrid Search</h3>
+      <p>Combines memory recall, knowledge base lookup, and transcript search, then re-ranks results with an LLM for relevance. Requires <code>ANTHROPIC_API_KEY</code>.</p>
+      <pre><code><span class="prompt">$</span> ark search "rate limiting approach" --hybrid</code></pre>
+
+      <h3>FTS5 Index</h3>
+      <p>Build or rebuild the full-text search index over all transcripts in <code>~/.claude/projects/</code>:</p>
+      <pre><code><span class="prompt">$</span> ark index</code></pre>
+      <div class="callout info">
+        <strong>Note:</strong> The FTS5 index is stored inside <code>~/.ark/ark.db</code>. Run <code>ark index</code> after importing many sessions or when search results appear stale. Search falls back to file scanning if the index does not exist.
+      </div>
+
+      <!-- ── Scheduled Sessions ───────────────────────────────────────────── -->
+      <h2>Scheduled Sessions</h2>
+      <p>Ark can automatically create and dispatch sessions on a cron schedule. This is useful for nightly checks, recurring reports, or any periodic task you want an agent to handle.</p>
+      <pre><code><span class="prompt">$</span> ark schedule add --cron "0 2 * * *" --summary "Nightly dependency audit" --repo . --flow bare
+<span class="prompt">$</span> ark schedule list
+<span class="prompt">$</span> ark schedule enable sch-1a2b
+<span class="prompt">$</span> ark schedule disable sch-1a2b
+<span class="prompt">$</span> ark schedule delete sch-1a2b</code></pre>
+      <p>Cron format: <code>minute hour day-of-month month day-of-week</code>. Supports wildcards (<code>*</code>), ranges (<code>1-5</code>), steps (<code>*/5</code>), and comma lists (<code>1,3,5</code>).</p>
+      <div class="callout tip">
+        <strong>Tip:</strong> Combine schedules with the <code>bare</code> flow and a focused summary to create lightweight autonomous monitors that run in the background without human gates.
+      </div>
+
+      <!-- ── Messaging Bridges ────────────────────────────────────────────── -->
+      <h2>Messaging Bridges</h2>
+      <p>Connect Ark to external chat platforms so you can receive notifications and issue commands from Telegram, Slack, or Discord.</p>
+
+      <h3>Configuration</h3>
+      <p>Add a <code>~/.ark/bridge.json</code> file with your platform credentials:</p>
+      <pre><code>{
+  <span class="yaml-key">"telegram"</span>: {
+    <span class="yaml-key">"botToken"</span>: <span class="yaml-value">"123456:ABC-DEF..."</span>,
+    <span class="yaml-key">"chatId"</span>: <span class="yaml-value">"987654321"</span>
+  },
+  <span class="yaml-key">"slack"</span>: {
+    <span class="yaml-key">"webhookUrl"</span>: <span class="yaml-value">"https://hooks.slack.com/services/..."</span>
+  },
+  <span class="yaml-key">"discord"</span>: {
+    <span class="yaml-key">"webhookUrl"</span>: <span class="yaml-value">"https://discord.com/api/webhooks/..."</span>
+  }
+}</code></pre>
+
+      <h3>Platform Setup</h3>
+      <table>
+        <thead>
+          <tr><th>Platform</th><th>How to obtain credentials</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Telegram</td><td>Create a bot via <code>@BotFather</code>, copy the token. Get your chat ID by messaging <code>@userinfobot</code>.</td></tr>
+          <tr><td>Slack</td><td>Create an Incoming Webhook in your Slack app settings and copy the webhook URL.</td></tr>
+          <tr><td>Discord</td><td>In your Discord server settings, go to Integrations &gt; Webhooks and create a new webhook.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Bridge Commands</h3>
+      <pre><code><span class="prompt">$</span> ark conductor bridge      <span class="yaml-comment"># start listening for incoming chat commands</span>
+<span class="prompt">$</span> ark conductor notify "Deployment session completed"   <span class="yaml-comment"># send a one-off message</span></code></pre>
+
+      <p>Supported chat commands (send to your bot):</p>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/status</code></td><td>Show overall Ark status and running session count</td></tr>
+          <tr><td><code>/sessions</code></td><td>List active sessions with their current stage and status</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ── Profiles ─────────────────────────────────────────────────────── -->
+      <h2>Profiles</h2>
+      <p>Profiles provide isolated session namespaces. Use them to keep work, personal, and team sessions separate without managing multiple Ark installations.</p>
+      <pre><code><span class="prompt">$</span> ark profile list
+<span class="prompt">$</span> ark profile create work
+<span class="prompt">$</span> ark profile delete work</code></pre>
+      <p>Scope commands to a profile with the <code>-p</code> flag:</p>
+      <pre><code><span class="prompt">$</span> ark -p work session list
+<span class="prompt">$</span> ark -p work session start --repo . --summary "Add payment flow" --dispatch</code></pre>
+      <p>Sessions created under a profile are scoped via a group name prefix, keeping them hidden from the default unscoped view.</p>
+
+      <!-- ── Guardrails ────────────────────────────────────────────────────── -->
+      <h2>Guardrails</h2>
+      <p>Guardrails are pattern-based tool authorization rules that block or warn on dangerous commands before an agent can execute them. They are enforced via the <code>PreToolUse</code> hook in <code>.claude/settings.local.json</code> -- regardless of the agent's permission mode.</p>
+
+      <h3>Default Rules</h3>
+      <table>
+        <thead>
+          <tr><th>Pattern</th><th>Action</th><th>Reason</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>rm -rf /</code></td><td>Block</td><td>Recursive root deletion</td></tr>
+          <tr><td><code>DROP TABLE</code> / <code>DROP DATABASE</code></td><td>Block</td><td>Destructive SQL</td></tr>
+          <tr><td><code>:(){ :|:&amp; };:</code></td><td>Block</td><td>Fork bomb</td></tr>
+          <tr><td><code>mkfs</code> / <code>fdisk</code> / <code>dd if=</code></td><td>Block</td><td>Disk format commands</td></tr>
+          <tr><td><code>git push --force</code></td><td>Block</td><td>Force push to remote</td></tr>
+          <tr><td><code>.env</code> file access</td><td>Warn</td><td>Potential secrets exposure</td></tr>
+          <tr><td>Credentials file access</td><td>Warn</td><td>Potential secrets exposure</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Custom Rules</h3>
+      <p>Add custom rules in your agent YAML or flow configuration. Each rule specifies a tool name, a regex pattern, and an action:</p>
+      <pre><code>{
+  <span class="yaml-key">"tool"</span>: <span class="yaml-value">"Bash"</span>,
+  <span class="yaml-key">"pattern"</span>: <span class="yaml-value">"curl.*\\|.*sh"</span>,
+  <span class="yaml-key">"action"</span>: <span class="yaml-value">"block"</span>
+}</code></pre>
+      <p>Supported actions: <code>block</code> (abort the tool call), <code>warn</code> (log and continue).</p>
+
+      <!-- ── Prompt Injection Guard ───────────────────────────────────────── -->
+      <h2>Prompt Injection Guard</h2>
+      <p>Ark scans task summaries and inbound messages for common prompt injection patterns before they reach the agent.</p>
+
+      <h3>How It Works</h3>
+      <ul>
+        <li><strong>At dispatch:</strong> if the summary contains a high-severity pattern, the dispatch is blocked entirely.</li>
+        <li><strong>At send:</strong> if a message contains a high-severity pattern, it is blocked. Lower-severity matches are logged as warnings and allowed through.</li>
+      </ul>
+
+      <h3>Detection Patterns</h3>
+      <table>
+        <thead>
+          <tr><th>Pattern</th><th>Severity</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>"ignore previous instructions"</td><td>High</td></tr>
+          <tr><td>"you are now a different"</td><td>High</td></tr>
+          <tr><td>Fake <code>&lt;system&gt;</code> / <code>&lt;prompt&gt;</code> tags</td><td>Medium - High</td></tr>
+          <tr><td>"pretend you are"</td><td>Medium</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <strong>Important:</strong> The injection guard is a lightweight heuristic layer. It catches common patterns but is not a security boundary. Do not rely on it to safely process untrusted user input in production pipelines.
+      </div>
+
+      <!-- ── OTLP Observability ────────────────────────────────────────────── -->
+      <h2>OTLP Observability</h2>
+      <p>Ark can export session and stage lifecycle events as OpenTelemetry traces to any OTLP HTTP collector (Jaeger, Tempo, Honeycomb, Datadog, etc.).</p>
+
+      <h3>Configuration</h3>
+      <p>Add the following to <code>~/.ark/config.yaml</code>:</p>
+      <pre><code><span class="yaml-key">otlp</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">endpoint</span>: <span class="yaml-value">"http://localhost:4318/v1/traces"</span>
+  <span class="yaml-key">headers</span>:
+    <span class="yaml-key">x-honeycomb-team</span>: <span class="yaml-value">"your-api-key"</span></code></pre>
+
+      <h3>Trace Structure</h3>
+      <p>Each session produces a root span. Each flow stage is a child span nested under the session span. Spans carry the following tags:</p>
+      <ul>
+        <li><code>session.id</code>, <code>session.flow</code>, <code>session.repo</code></li>
+        <li><code>stage.name</code>, <code>stage.agent</code></li>
+        <li><code>tokens.input</code>, <code>tokens.output</code>, <code>cost.usd</code></li>
+      </ul>
+      <p>Spans are buffered in memory and flushed to the collector every 30 seconds. Flush failures are silent -- trace export is fire-and-forget and will not affect session execution.</p>
+
+      <!-- ── Auto-Rollback ─────────────────────────────────────────────────── -->
+      <h2>Auto-Rollback</h2>
+      <p>Ark can monitor merged PRs for CI failures and automatically create revert PRs if the build breaks after merging.</p>
+
+      <h3>Configuration</h3>
+      <pre><code><span class="yaml-key">rollback</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">timeout</span>: <span class="yaml-value">600</span>          <span class="yaml-comment"># seconds to wait for CI (default: 600)</span>
+  <span class="yaml-key">on_timeout</span>: <span class="yaml-value">rollback</span>   <span class="yaml-comment"># rollback | ignore</span>
+  <span class="yaml-key">auto_merge</span>: <span class="yaml-value">false</span>      <span class="yaml-comment"># auto-merge the revert PR (default: false)</span>
+  <span class="yaml-key">health_url</span>: <span class="yaml-value">null</span>        <span class="yaml-comment"># optional URL to probe after CI passes</span></code></pre>
+
+      <h3>How It Works</h3>
+      <ol>
+        <li>After a PR merges, Ark records the merge commit SHA.</li>
+        <li>GitHub check suites are polled every 30 seconds on that SHA.</li>
+        <li>If any check fails (or <code>timeout</code> is exceeded and <code>on_timeout</code> is <code>rollback</code>), Ark creates a <code>revert-&lt;branch&gt;</code> PR automatically.</li>
+        <li>If <code>health_url</code> is set, Ark also probes that URL after CI passes and triggers rollback if it returns a non-2xx response.</li>
+        <li>If <code>auto_merge</code> is <code>true</code>, the revert PR is merged without human approval.</li>
+      </ol>
+
+      <div class="callout warn">
+        <strong>Caution:</strong> Setting <code>auto_merge: true</code> means broken CI will result in automatic code changes to your main branch. Use only in pipelines you trust fully.
+      </div>
+
+      <!-- ── Issue Watching ────────────────────────────────────────────────── -->
+      <h2>Issue Watching</h2>
+      <p>Ark can watch a GitHub repository for newly opened issues with a specific label and automatically create and dispatch a session for each one.</p>
+      <pre><code><span class="prompt">$</span> ark watch --label ark --dispatch
+<span class="prompt">$</span> ark watch --label ark --dispatch --interval 30000   <span class="yaml-comment"># poll every 30s</span></code></pre>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--label &lt;name&gt;</code></td><td>—</td><td>GitHub issue label to watch for</td></tr>
+          <tr><td><code>--dispatch</code></td><td>off</td><td>Automatically dispatch the created session</td></tr>
+          <tr><td><code>--interval &lt;ms&gt;</code></td><td><code>60000</code></td><td>Polling interval in milliseconds</td></tr>
+        </tbody>
+      </table>
+      <div class="callout tip">
+        <strong>Tip:</strong> Label your GitHub issues with <code>ark</code> to route them directly into your agent pipeline. Combine with a <code>quick-fix</code> recipe for a zero-click triage workflow.
+      </div>
+
+      <!-- ── Authentication ────────────────────────────────────────────────── -->
+      <h2>Authentication</h2>
+      <p>For local sessions, Claude Code uses your existing login. For remote sessions on EC2 or Docker compute, Ark needs a persistent OAuth token that can be synced to the remote host.</p>
+      <pre><code><span class="prompt">$</span> ark auth                   <span class="yaml-comment"># set up credentials locally</span>
+<span class="prompt">$</span> ark auth --host my-ec2     <span class="yaml-comment"># set up credentials on a remote compute host</span></code></pre>
+      <p>Running <code>ark auth</code> invokes <code>claude setup-token</code> and saves the resulting OAuth token to <code>~/.ark/claude-oauth-token</code>. The token is automatically synced to remote hosts during <code>ark compute provision</code> and <code>ark compute sync</code>.</p>
+      <div class="callout info">
+        <strong>Note:</strong> Run <code>ark auth</code> once before dispatching your first remote session. The token persists across reboots -- you do not need to re-run it unless you revoke your Claude credentials.
+      </div>
+
+      <div class="doc-footer">
+        <a href="workflows.html">&larr; Workflows</a>
+        <a href="./">Home &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>
