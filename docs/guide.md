@@ -450,17 +450,23 @@ env:
   CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80"
 ```
 
-Template variables `{ticket}`, `{summary}`, `{workdir}`, `{repo}`, and `{branch}` are substituted at dispatch time.
+Template variables `{ticket}`, `{summary}`, `{workdir}`, `{repo}`, and `{branch}` are substituted at dispatch time. See the [Agents Reference](agents-reference.md) for complete field documentation.
 
 ### Builtin Agents
 
-| Agent | Model | Purpose |
-|-------|-------|---------|
-| `planner` | Sonnet | Creates PLAN.md with architecture and implementation strategy |
-| `implementer` | Opus | Writes code, tests, and commits |
-| `reviewer` | Sonnet | Reviews PRs and produces structured JSON feedback (P0-P3) |
-| `documenter` | Sonnet | Generates project documentation |
-| `worker` | Opus | General-purpose lightweight agent |
+| Agent | Model | Runtime | Purpose |
+|-------|-------|---------|---------|
+| `planner` | Sonnet | claude-code | Creates PLAN.md with architecture and implementation strategy |
+| `implementer` | Opus | claude-code | Writes code, tests, and commits |
+| `reviewer` | Sonnet | claude-code | Reviews code changes for quality, correctness, and security |
+| `documenter` | Sonnet | claude-code | Updates documentation based on code changes |
+| `worker` | Opus | claude-code | General-purpose agent with no predefined system prompt |
+| `codex-worker` | o4-mini | cli-agent | OpenAI Codex CLI coding agent |
+| `gemini-worker` | gemini | cli-agent | Google Gemini CLI coding agent |
+| `aider-worker` | aider | cli-agent | Aider AI pair programming agent |
+| `generic-cli` | custom | cli-agent | Template for wrapping any CLI tool |
+
+See the [Agents Reference](agents-reference.md) for full details on each agent.
 
 ### Managing Agents
 
@@ -478,6 +484,7 @@ ark agent delete my-agent         # Delete a custom agent
 Agents dispatch through pluggable executors. The `runtime` field selects which executor launches the agent:
 
 - `claude-code` (default) -- launches Claude Code in tmux with hooks + MCP channel
+- `cli-agent` -- runs any CLI tool (Codex, Gemini, Aider, etc.) in tmux with worktree isolation
 - `subprocess` -- spawns any command as a child process
 
 ```yaml
@@ -597,11 +604,14 @@ Todos are shown in the TUI detail panel. Press `V` to run verification.
 | Flow | Stages | Use Case |
 |------|--------|----------|
 | `default` | plan > implement > pr > review > build > merge > close > docs | Full SDLC pipeline |
-| `quick` | implement > pr | Fast implementation |
-| `bare` | implement | Single-agent, no gates |
-| `parallel` | Fork/join pattern | Parallel workstreams |
-| `fan-out` | Multiple parallel children | Task decomposition |
-| `pr-review` | Review-focused | PR review workflow |
+| `quick` | implement > pr > build > merge | Fast implementation |
+| `bare` | work | Single-agent, no gates |
+| `parallel` | plan > implement[fork] > review > pr > merge | Parallel workstreams |
+| `fan-out` | plan > execute[fan_out] > review | Task decomposition |
+| `pr-review` | plan > implement > review[PR] > merge | PR review workflow |
+| `dag-parallel` | plan > implement + test > integrate > review > pr | DAG-based parallel execution |
+
+See the [Flows Reference](flows-reference.md) for detailed stage definitions, gate types, and YAML field documentation.
 
 ### Managing Flows
 
@@ -983,6 +993,18 @@ Press `Y` in the Sessions tab to open the Memory Manager. Use `j/k` to navigate,
 ### Web Dashboard
 
 The web dashboard includes a Memory view accessible from the sidebar. Add, search, and delete memories from the browser.
+
+### Knowledge Ingestion
+
+Pre-populate the knowledge base from files or directories:
+
+```bash
+ark knowledge ingest README.md                                    # Single file
+ark knowledge ingest docs/ --scope project --tag docs             # Whole directory
+ark knowledge ingest src/api/ --tag api --tag endpoints            # Multiple tags
+```
+
+Ingested knowledge is available to hybrid search (`ark search --hybrid`), giving agents deeper context about your codebase and documentation.
 
 ### How memories work
 

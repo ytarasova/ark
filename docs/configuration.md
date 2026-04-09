@@ -87,6 +87,10 @@ rollback:
   auto_merge: false   # auto-merge revert PR
   health_url: null    # optional custom health endpoint
 
+# ── Notifications ─────────────────────────────────────────────────
+# Enable/disable notifications for session events.
+notifications: true
+
 # ── Telemetry ─────────────────────────────────────────────────────
 # Optional usage telemetry. Also enabled via ARK_TELEMETRY=1.
 telemetry:
@@ -230,6 +234,16 @@ default_compute: my-ec2
 | `default_compute` | string \| null | `null` | Name of the compute resource to use by default |
 
 Can also be set via the `ARK_DEFAULT_COMPUTE` environment variable. CLI flags and per-repo `.ark.yaml` `compute` field override this value.
+
+### Notifications
+
+```yaml
+notifications: true    # Enable/disable desktop notifications (default: not set)
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `notifications` | boolean | -- | Enable or disable notifications for session events |
 
 ### Theme Configuration
 
@@ -435,14 +449,21 @@ runtime:               # optional - executor system configuration
 |-------|------|-------------|
 | `name` | string | Agent identifier (matches filename) |
 | `description` | string | Short description shown in `ark agent list` |
-| `model` | string | Model alias: `opus`, `sonnet`, or `haiku` |
+| `model` | string | Model alias: `opus`, `sonnet`, `haiku`, or tool-specific (e.g., `o4-mini`) |
 | `max_turns` | number | Maximum conversation turns before stopping |
 | `system_prompt` | string | System prompt. Supports `{ticket}`, `{summary}`, `{workdir}`, `{repo}`, `{branch}` template variables |
 | `tools` | string[] | Allowed Claude tools |
 | `permission_mode` | string | Claude permission mode (e.g. `bypassPermissions`) |
+| `mcp_servers` | string[] | MCP server names to attach to the agent |
 | `skills` | string[] | Skill names to inject into the system prompt |
+| `memories` | string[] | Memory categories recalled and injected at dispatch |
+| `context` | string[] | Files included as context at dispatch (e.g., `CLAUDE.md`, `PLAN.md`) |
 | `env` | object | Environment variables exported before agent launch |
 | `runtime` | object | Executor system configuration (see below) |
+| `command` | string[] | Command for `cli-agent` and `subprocess` runtimes |
+| `task_delivery` | string | How task is sent to CLI agents: `stdin`, `file`, or `arg` (default) |
+
+See the [Agents Reference](agents-reference.md) for detailed documentation of all builtin agents.
 
 ### runtime Field
 
@@ -478,6 +499,7 @@ When `runtime` is omitted the agent runs in the local environment (same machine,
 | `~/.ark/skills/` | Global skill definitions |
 | `~/.ark/recipes/` | Global recipe definitions |
 | `~/.ark/agents/` | Global agent definitions |
+| `~/.ark/flows/` | Global flow definitions |
 | `~/.ark/logs/` | Log files |
 | `~/.ark/conductor/` | Conductor learnings and policies |
 | `~/.claude/projects/` | Claude Code session transcripts (read by search/import) |

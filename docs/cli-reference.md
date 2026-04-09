@@ -1678,3 +1678,30 @@ ark memory clear [options]
 |--------|-------------|
 | `-s, --scope <scope>` | Scope to clear (omit for ALL) |
 | `--force` | Skip confirmation prompt |
+
+---
+
+## ark knowledge
+
+Knowledge base ingestion.
+
+### ark knowledge ingest
+
+Ingest files or directories into the knowledge base. Files are chunked and stored as searchable knowledge entries, available to hybrid search (`ark search --hybrid`).
+
+```
+ark knowledge ingest <path> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-s, --scope <scope>` | Scope for ingested knowledge | `knowledge` |
+| `-t, --tag <tag>` | Tag (repeatable) | -- |
+
+```bash
+ark knowledge ingest README.md
+ark knowledge ingest docs/ --scope project --tag docs --tag architecture
+ark knowledge ingest src/api/ --tag api
+```
+
+When given a directory, all supported files are ingested recursively. Output shows the number of files processed and chunks created.
