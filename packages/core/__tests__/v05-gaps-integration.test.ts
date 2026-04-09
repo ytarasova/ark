@@ -9,26 +9,26 @@ beforeEach(async () => { if (app) { await app.shutdown(); clearApp(); } app = Ap
 afterEach(async () => { if (app) { await app.shutdown(); clearApp(); } });
 
 describe("v0.5 gaps integration", () => {
-  it("skill create → list → delete round-trip", () => {
-    core.saveSkill({ name: "int-test", description: "Integration", prompt: "test prompt" }, "global");
-    const found = core.listSkills().find(s => s.name === "int-test");
+  it("skill create -> list -> delete round-trip", () => {
+    getApp().skills.save("int-test", { name: "int-test", description: "Integration", prompt: "test prompt" }, "global");
+    const found = getApp().skills.list().find(s => s.name === "int-test");
     expect(found).toBeDefined();
     expect(found!._source).toBe("global");
 
-    core.deleteSkill("int-test", "global");
-    expect(core.loadSkill("int-test")).toBeNull();
+    getApp().skills.delete("int-test", "global");
+    expect(getApp().skills.get("int-test")).toBeNull();
   });
 
-  it("recipe create → list → delete round-trip", () => {
-    core.saveRecipe({
+  it("recipe create -> list -> delete round-trip", () => {
+    getApp().recipes.save("int-recipe", {
       name: "int-recipe", description: "Integration recipe",
       flow: "bare", variables: [],
     } as RecipeDefinition, "global");
-    const found = core.listRecipes().find(r => r.name === "int-recipe");
+    const found = getApp().recipes.list().find(r => r.name === "int-recipe");
     expect(found).toBeDefined();
 
-    core.deleteRecipe("int-recipe", "global");
-    expect(core.loadRecipe("int-recipe")).toBeNull();
+    getApp().recipes.delete("int-recipe", "global");
+    expect(getApp().recipes.get("int-recipe")).toBeNull();
   });
 
   it("sessionToRecipe creates valid recipe from session", () => {
@@ -37,8 +37,8 @@ describe("v0.5 gaps integration", () => {
     expect(recipe.name).toBe("from-int-test");
     expect(recipe.flow).toBe("default");
 
-    core.saveRecipe(recipe, "global");
-    const loaded = core.loadRecipe("from-int-test");
+    getApp().recipes.save(recipe.name, recipe, "global");
+    const loaded = getApp().recipes.get("from-int-test");
     expect(loaded!.description).toContain("Integration test");
   });
 

@@ -26,7 +26,7 @@ export { resolveAgent, buildClaudeArgs, findProjectRoot, type AgentDefinition } 
 export { type SkillDefinition } from "./skill.js";
 
 // Recipe
-export { listRecipes, loadRecipe, instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecipes, saveRecipe, deleteRecipe, sessionToRecipe, type RecipeDefinition, type RecipeVariable, type RecipeParameter, type RecipeInstance, type SubRecipeRef } from "./recipe.js";
+export { instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecipes, sessionToRecipe, type RecipeDefinition, type RecipeVariable, type RecipeParameter, type RecipeInstance, type SubRecipeRef } from "./recipe.js";
 
 // Executor
 export type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "./executor.js";

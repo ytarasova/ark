@@ -2,7 +2,7 @@
  * Recipe evaluation — run a recipe N times and measure performance.
  */
 
-import { loadRecipe, instantiateRecipe } from "./recipe.js";
+import { instantiateRecipe } from "./recipe.js";
 import { startSession } from "./services/session-orchestration.js";
 import type { AppContext } from "./app.js";
 import type { Session } from "../types/index.js";
@@ -28,7 +28,7 @@ export interface RecipeEvalResult {
 
 /** Run a recipe evaluation (creates sessions but does NOT dispatch -- that requires real agents). */
 export function evaluateRecipeSetup(app: AppContext, recipeName: string, iterations: number, variables?: Record<string, string>): RecipeEvalResult {
-  const recipe = loadRecipe(recipeName);
+  const recipe = app.recipes.get(recipeName);
   if (!recipe) {
     return {
       recipeName,

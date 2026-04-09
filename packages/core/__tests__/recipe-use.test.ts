@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
-import { loadRecipe, instantiateRecipe } from "../recipe.js";
+import { instantiateRecipe } from "../recipe.js";
 import { startSession } from "../services/session-orchestration.js";
 import { getApp } from "../app.js";
 
@@ -12,7 +12,7 @@ const { getCtx } = withTestContext();
 
 describe("recipe use", () => {
   it("creates a session from a recipe with defaults", () => {
-    const recipe = loadRecipe("quick-fix")!;
+    const recipe = getApp().recipes.get("quick-fix")!;
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test fix" });
@@ -31,7 +31,7 @@ describe("recipe use", () => {
   });
 
   it("creates a session with overridden values", () => {
-    const recipe = loadRecipe("code-review")!;
+    const recipe = getApp().recipes.get("code-review")!;
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/myrepo", summary: "Custom review task" });
@@ -48,7 +48,7 @@ describe("recipe use", () => {
   });
 
   it("falls back to recipe description when no summary provided", () => {
-    const recipe = loadRecipe("quick-fix")!;
+    const recipe = getApp().recipes.get("quick-fix")!;
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test" });
     const session = startSession(getApp(), {
       summary: instance.summary ?? recipe.description,
@@ -60,7 +60,7 @@ describe("recipe use", () => {
   });
 
   it("passes agent from recipe instance to startSession", () => {
-    const recipe = loadRecipe("quick-fix")!;
+    const recipe = getApp().recipes.get("quick-fix")!;
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test agent" });

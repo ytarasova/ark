@@ -49,11 +49,11 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
       return { content };
     }
     if (kind === "ark-skill") {
-      const skill = core.loadSkill(name, projectRoot);
+      const skill = app.skills.get(name, projectRoot);
       return { skill };
     }
     if (kind === "ark-recipe") {
-      const recipe = core.loadRecipe(name, projectRoot);
+      const recipe = app.recipes.get(name, projectRoot);
       return { recipe };
     }
     return { content: null };

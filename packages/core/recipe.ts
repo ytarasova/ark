@@ -1,13 +1,13 @@
 /**
- * Recipe registry - CRUD for parameterized flow templates.
+ * Recipe registry - types and utility functions for parameterized flow templates.
  *
  * Recipes are YAML files with: name, description, flow, agent, compute, variables, defaults.
  * Three-tier resolution: builtin (recipes/), global (~/.ark/recipes/), project (.ark/recipes/).
+ *
+ * CRUD operations are on the RecipeStore (app.recipes). This module provides
+ * instantiation, validation, and sub-recipe resolution.
  */
 
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "fs";
-import { join, basename } from "path";
-import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { getApp } from "./app.js";
 import type { Session } from "../types/index.js";
 
@@ -60,57 +60,7 @@ export interface RecipeInstance {
   group?: string;
 }
 
-// ── Paths ───────────────────────────────────────────────────────────────────
-
-import { fileURLToPath } from "url";
-import { dirname } from "path";
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const BUILTIN_DIR = join(__dirname, "..", "..", "recipes");
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function loadFromDir(dir: string, source: RecipeDefinition["_source"]): RecipeDefinition[] {
-  if (!existsSync(dir)) return [];
-  const recipes: RecipeDefinition[] = [];
-  for (const file of readdirSync(dir)) {
-    if (!file.endsWith(".yaml") && !file.endsWith(".yml")) continue;
-    try {
-      const content = readFileSync(join(dir, file), "utf-8");
-      const parsed = parseYaml(content) as RecipeDefinition;
-      parsed._source = source;
-      if (!parsed.name) parsed.name = basename(file, file.endsWith(".yaml") ? ".yaml" : ".yml");
-      if (!parsed.variables) parsed.variables = [];
-      recipes.push(parsed);
-    } catch (e: any) {
-      console.error(`[recipe] failed to load ${file}:`, e?.message ?? e);
-    }
-  }
-  return recipes;
-}
-
-// ── Public API (backward-compat wrappers delegating to AppContext stores) ───
-
-/** @deprecated Use app.recipes.list(projectRoot) instead */
-export function listRecipes(projectRoot?: string): RecipeDefinition[] {
-  try { return getApp().recipes.list(projectRoot); } catch {
-    // Fallback for cases where AppContext is not booted
-    const builtin = loadFromDir(BUILTIN_DIR, "builtin");
-    const global = loadFromDir(join(getApp().config.arkDir, "recipes"), "global");
-    const project = projectRoot ? loadFromDir(join(projectRoot, ".ark", "recipes"), "project") : [];
-    const byName = new Map<string, RecipeDefinition>();
-    for (const r of builtin) byName.set(r.name, r);
-    for (const r of global) byName.set(r.name, r);
-    for (const r of project) byName.set(r.name, r);
-    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }
-}
-
-/** @deprecated Use app.recipes.get(name, projectRoot) instead */
-export function loadRecipe(name: string, projectRoot?: string): RecipeDefinition | null {
-  try { return getApp().recipes.get(name, projectRoot); } catch {
-    return listRecipes(projectRoot).find(r => r.name === name) ?? null;
-  }
-}
+// ── Instantiation ──────────────────────────────────────────────────────────
 
 export function instantiateRecipe(recipe: RecipeDefinition, values: Record<string, string>): RecipeInstance {
   const merged = { ...recipe.defaults, ...values };
@@ -125,41 +75,14 @@ export function instantiateRecipe(recipe: RecipeDefinition, values: Record<strin
   };
 }
 
-/** @deprecated Use app.recipes.save(name, recipe, scope, projectRoot) instead */
-export function saveRecipe(recipe: RecipeDefinition, scope: "project" | "global", projectRoot?: string): void {
-  try {
-    getApp().recipes.save(recipe.name, recipe, scope, projectRoot);
-    return;
-  } catch { /* fallback */ }
-  const dir = scope === "project" && projectRoot
-    ? join(projectRoot, ".ark", "recipes")
-    : join(getApp().config.arkDir, "recipes");
-  mkdirSync(dir, { recursive: true });
-  const { _source, ...data } = recipe;
-  writeFileSync(join(dir, `${recipe.name}.yaml`), stringifyYaml(data));
-}
-
-/** @deprecated Use app.recipes.delete(name, scope, projectRoot) instead */
-export function deleteRecipe(name: string, scope: "project" | "global", projectRoot?: string): void {
-  try {
-    getApp().recipes.delete(name, scope, projectRoot);
-    return;
-  } catch { /* fallback */ }
-  const dir = scope === "project" && projectRoot
-    ? join(projectRoot, ".ark", "recipes")
-    : join(getApp().config.arkDir, "recipes");
-  for (const ext of [".yaml", ".yml"]) {
-    const path = join(dir, `${name}${ext}`);
-    if (existsSync(path)) { unlinkSync(path); return; }
-  }
-}
+// ── Sub-recipe resolution ─────────────────────────────────────────────────
 
 /** Resolve a sub-recipe reference into a full recipe instance. */
 export function resolveSubRecipe(ref: SubRecipeRef, parentVars?: Record<string, string>): {
   recipe: RecipeDefinition | null;
   instance: RecipeInstance | null;
 } {
-  const recipe = loadRecipe(ref.recipe);
+  const recipe = getApp().recipes.get(ref.recipe);
   if (!recipe) return { recipe: null, instance: null };
 
   const mergedValues = { ...parentVars, ...ref.values };
@@ -169,9 +92,11 @@ export function resolveSubRecipe(ref: SubRecipeRef, parentVars?: Record<string, 
 
 /** List sub-recipes available in a recipe. */
 export function listSubRecipes(recipeName: string): SubRecipeRef[] {
-  const recipe = loadRecipe(recipeName);
+  const recipe = getApp().recipes.get(recipeName);
   return recipe?.sub_recipes ?? [];
 }
+
+// ── Validation ──────────────────────────────────────────────────────────────
 
 /** Validate parameter values against recipe parameter definitions. */
 export function validateRecipeParams(recipe: RecipeDefinition, values: Record<string, string>): { ok: boolean; errors: string[] } {
@@ -193,6 +118,8 @@ export function validateRecipeParams(recipe: RecipeDefinition, values: Record<st
   }
   return { ok: errors.length === 0, errors };
 }
+
+// ── Session to recipe ──────────────────────────────────────────────────────
 
 /** Create a recipe from an existing session's config */
 export function sessionToRecipe(session: Session, name: string): RecipeDefinition {
