@@ -97,46 +97,6 @@
       <h3>Fail-Loopback</h3>
       <p>When a stage fails, Ark can retry it automatically with the error context injected into the agent's prompt. Configure with <code>on_failure: "retry(3)"</code> (up to 3 retries). After exhausting retries, the session moves to <code>failed</code> status.</p>
 
-      <h3>DAG Flows (depends_on)</h3>
-      <p>Stages can declare dependencies on other stages using the <code>depends_on</code> field. This creates a directed acyclic graph (DAG) instead of a linear pipeline. Stages with satisfied dependencies run in parallel.</p>
-      <pre><code><span class="yaml-key">stages</span>:
-  - <span class="yaml-key">name</span>: <span class="yaml-value">plan</span>
-    <span class="yaml-key">agent</span>: <span class="yaml-value">planner</span>
-    <span class="yaml-key">gate</span>: <span class="yaml-value">manual</span>
-
-  - <span class="yaml-key">name</span>: <span class="yaml-value">implement</span>
-    <span class="yaml-key">agent</span>: <span class="yaml-value">implementer</span>
-    <span class="yaml-key">gate</span>: <span class="yaml-value">auto</span>
-    <span class="yaml-key">depends_on</span>: <span class="yaml-value">[plan]</span>        <span class="yaml-comment"># runs after plan completes</span>
-
-  - <span class="yaml-key">name</span>: <span class="yaml-value">test</span>
-    <span class="yaml-key">agent</span>: <span class="yaml-value">implementer</span>
-    <span class="yaml-key">gate</span>: <span class="yaml-value">auto</span>
-    <span class="yaml-key">depends_on</span>: <span class="yaml-value">[plan]</span>        <span class="yaml-comment"># runs in parallel with implement</span>
-
-  - <span class="yaml-key">name</span>: <span class="yaml-value">integrate</span>
-    <span class="yaml-key">agent</span>: <span class="yaml-value">implementer</span>
-    <span class="yaml-key">gate</span>: <span class="yaml-value">auto</span>
-    <span class="yaml-key">depends_on</span>: <span class="yaml-value">[implement, test]</span>  <span class="yaml-comment"># waits for both</span></code></pre>
-      <p>In this example, <code>implement</code> and <code>test</code> both depend on <code>plan</code> and run in parallel once the plan gate is passed. The <code>integrate</code> stage waits for both to complete before starting.</p>
-
-      <h3>Fan-Out Stages</h3>
-      <p>A stage with <code>type: fan_out</code> decomposes work into N parallel child sessions. The planner agent outputs a JSON array of tasks, and Ark spawns one child session per task. The parent waits for all children to complete before advancing.</p>
-      <pre><code><span class="yaml-key">stages</span>:
-  - <span class="yaml-key">name</span>: <span class="yaml-value">plan</span>
-    <span class="yaml-key">agent</span>: <span class="yaml-value">planner</span>
-    <span class="yaml-key">gate</span>: <span class="yaml-value">manual</span>
-    <span class="yaml-key">task</span>: <span class="yaml-value">|</span>
-      <span class="yaml-value">Decompose into independent sub-tasks.</span>
-      <span class="yaml-value">Output a JSON array: [{"summary": "...", "agent": "implementer"}, ...]</span>
-  - <span class="yaml-key">name</span>: <span class="yaml-value">execute</span>
-    <span class="yaml-key">type</span>: <span class="yaml-value">fan_out</span>            <span class="yaml-comment"># spawns parallel children</span>
-    <span class="yaml-key">gate</span>: <span class="yaml-value">auto</span>
-  - <span class="yaml-key">name</span>: <span class="yaml-value">review</span>
-    <span class="yaml-key">agent</span>: <span class="yaml-value">reviewer</span>
-    <span class="yaml-key">gate</span>: <span class="yaml-value">auto</span></code></pre>
-      <p>Children inherit compute, worktree, and context from the parent. Use <code>ark session spawn</code> to manually create child sessions, or <code>ark session join</code> to manually join them. The conductor auto-joins children when all complete.</p>
-
       <h3>Builtin Flows</h3>
       <table>
         <thead>
