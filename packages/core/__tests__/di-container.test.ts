@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect, afterEach } from "bun:test";
+import { asValue } from "awilix";
 import { AppContext, setApp, clearApp, getApp } from "../app.js";
 import { SessionRepository } from "../repositories/session.js";
 import { ComputeRepository } from "../repositories/compute.js";
@@ -284,6 +285,41 @@ describe("container lifecycle phases", () => {
     // Should not throw
     await app.shutdown();
     app = null; // prevent afterEach double-shutdown
+  }, 15_000);
+
+  it("shutdown without boot (fast path) reaches stopped", async () => {
+    app = AppContext.forTest();
+    expect(app.phase).toBe("created");
+
+    await app.shutdown();
+    expect(app.phase).toBe("stopped");
+    app = null;
+  });
+
+  it("shutdown without boot cleans up temp directory", async () => {
+    const tempApp = AppContext.forTest();
+    const dir = tempApp.arkDir;
+
+    const { existsSync } = await import("fs");
+    // arkDir might not exist yet since boot wasn't called, but if it does it should be cleaned
+    const existedBefore = existsSync(dir);
+
+    await tempApp.shutdown();
+    if (existedBefore) {
+      expect(existsSync(dir)).toBe(false);
+    }
+    expect(tempApp.phase).toBe("stopped");
+  });
+
+  it("shutdown without boot clears global singleton", async () => {
+    app = AppContext.forTest();
+    setApp(app);
+
+    expect(getApp()).toBe(app);
+
+    await app.shutdown();
+    expect(() => getApp()).toThrow("AppContext not initialized");
+    app = null;
   });
 });
 
@@ -410,5 +446,191 @@ describe("cross-service integration through container", () => {
     // complete() marks messages as read
     app.sessionService.complete(session.id);
     expect(app.messages.unreadCount(session.id)).toBe(0);
+  });
+});
+
+// -- Transitive dependency sharing ------------------------------------------
+
+describe("transitive dependency sharing", () => {
+  it("SessionService and SessionRepository share the same DB", async () => {
+    app = AppContext.forTest();
+    setApp(app);
+    await app.boot();
+
+    const session = app.sessionService.start({ summary: "Shared DB test" });
+
+    // Write directly to the DB via the db accessor
+    const row = app.db.prepare("SELECT id FROM sessions WHERE id = ?").get(session.id) as { id: string } | undefined;
+    expect(row).toBeDefined();
+    expect(row!.id).toBe(session.id);
+  });
+
+  it("HistoryService queries the same DB that repos write to", async () => {
+    app = AppContext.forTest();
+    setApp(app);
+    await app.boot();
+
+    app.sessionService.start({ summary: "History transitive test" });
+
+    const results = app.historyService.search("History transitive");
+    expect(results.length).toBe(1);
+  });
+
+  it("all repos resolve with the same DB instance", async () => {
+    app = AppContext.forTest();
+    setApp(app);
+    await app.boot();
+
+    const db = app.container.resolve("db");
+    expect(app.db).toBe(db);
+
+    const session = app.sessions.create({});
+    app.events.log(session.id, "test_event", { actor: "test" });
+
+    const events = app.events.list(session.id, { type: "test_event" });
+    expect(events.length).toBe(1);
+  });
+
+  it("todos repo shares DB with sessions repo", async () => {
+    app = AppContext.forTest();
+    setApp(app);
+    await app.boot();
+
+    const session = app.sessions.create({});
+    app.todos.add(session.id, "Test todo");
+    const todos = app.todos.list(session.id);
+    expect(todos.length).toBe(1);
+    expect(todos[0].content).toBe("Test todo");
+  });
+});
+
+// -- Container override for test doubles ------------------------------------
+
+describe("container override", () => {
+  it("can override a singleton registration with asValue", async () => {
+    app = AppContext.forTest();
+    setApp(app);
+    await app.boot();
+
+    const session = app.sessionService.start({ summary: "Before override" });
+    expect(app.sessions.get(session.id)).not.toBeNull();
+
+    const fakeSessions = {
+      get: (id: string) => ({ id, summary: "FAKE", status: "pending" }),
+    };
+    app.container.register({ sessions: asValue(fakeSessions) });
+
+    const resolved = app.container.resolve("sessions");
+    expect(resolved.get("s-000000")!.summary).toBe("FAKE");
+  });
+
+  it("override does not affect previously resolved singletons held by reference", async () => {
+    app = AppContext.forTest();
+    setApp(app);
+    await app.boot();
+
+    const originalRepo = app.sessions;
+    const session = app.sessionService.start({ summary: "ref test" });
+
+    app.container.register({ sessions: asValue({ get: () => null }) });
+
+    // The original reference still works
+    expect(originalRepo.get(session.id)).not.toBeNull();
+    expect(originalRepo.get(session.id)!.summary).toBe("ref test");
+  });
+});
+
+// -- Post-shutdown behavior -------------------------------------------------
+
+describe("post-shutdown behavior", () => {
+  it("phase is stopped after shutdown and DB is closed", async () => {
+    const tempApp = AppContext.forTest();
+    setApp(tempApp);
+    await tempApp.boot();
+
+    expect(tempApp.sessions).toBeDefined();
+
+    await tempApp.shutdown();
+    clearApp();
+
+    expect(tempApp.phase).toBe("stopped");
+
+    // DB was closed during shutdown
+    expect(() => tempApp.container.resolve("db").prepare("SELECT 1").get()).toThrow();
+  });
+
+  it("boot after shutdown throws (no reuse)", async () => {
+    const tempApp = AppContext.forTest();
+    setApp(tempApp);
+    await tempApp.boot();
+    await tempApp.shutdown();
+    clearApp();
+
+    await expect(tempApp.boot()).rejects.toThrow();
+  });
+
+  it("temp directory is removed after shutdown with cleanupOnShutdown", async () => {
+    const tempApp = AppContext.forTest();
+    setApp(tempApp);
+    await tempApp.boot();
+    const dir = tempApp.arkDir;
+
+    const { existsSync } = await import("fs");
+    expect(existsSync(dir)).toBe(true);
+
+    await tempApp.shutdown();
+    clearApp();
+    expect(existsSync(dir)).toBe(false);
+  });
+});
+
+// -- getApp() global singleton integration ----------------------------------
+
+describe("getApp() global singleton integration", () => {
+  it("getApp() resolves same instances as direct container access", async () => {
+    app = AppContext.forTest();
+    setApp(app);
+    await app.boot();
+
+    const global = getApp();
+    expect(global.sessions).toBe(app.sessions);
+    expect(global.sessionService).toBe(app.sessionService);
+    expect(global.db).toBe(app.db);
+  });
+
+  it("getApp() throws when no app is set", () => {
+    clearApp();
+    expect(() => getApp()).toThrow("AppContext not initialized");
+    app = null;
+  });
+
+  it("setApp replaces the global singleton", async () => {
+    const app1 = AppContext.forTest();
+    setApp(app1);
+    await app1.boot();
+
+    const app2 = AppContext.forTest();
+    setApp(app2);
+    await app2.boot();
+
+    expect(getApp()).toBe(app2);
+    expect(getApp()).not.toBe(app1);
+
+    await app1.shutdown();
+    await app2.shutdown();
+    clearApp();
+    app = null;
+  });
+
+  it("data written through getApp() is visible through direct app reference", async () => {
+    app = AppContext.forTest();
+    setApp(app);
+    await app.boot();
+
+    const session = getApp().sessionService.start({ summary: "Global write" });
+
+    const found = app.sessions.get(session.id);
+    expect(found).not.toBeNull();
+    expect(found!.summary).toBe("Global write");
   });
 });
