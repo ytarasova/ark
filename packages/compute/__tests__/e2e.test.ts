@@ -292,15 +292,14 @@ describe("E2E: Compute to provider resolution flow", () => {
     expect(localProvider).not.toBeNull();
     expect(localProvider!.name).toBe("local");
 
-    // Verify getProvider("ec2") returns the EC2 provider (now registered)
-    const ec2Provider = getProvider("ec2");
-    expect(ec2Provider).not.toBeNull();
-    expect(ec2Provider!.name).toBe("ec2");
+    // Verify getProvider("docker") returns the Docker provider
+    const dockerProvider = getProvider("docker");
+    expect(dockerProvider).not.toBeNull();
 
-    // Verify listProviders() contains both
+    // Verify listProviders() contains core providers
     const providerNames = listProviders();
     expect(providerNames).toContain("local");
-    expect(providerNames).toContain("ec2");
+    expect(providerNames).toContain("docker");
 
     // Verify computes can be listed
     const computes = getApp().computes.list();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { shellEscape } from "../providers/ec2/index.js";
+import { shellEscape } from "../providers/ec2/shell-escape.js";
 
 describe("shellEscape", () => {
   it("passes basic strings through wrapped in single quotes", () => {
