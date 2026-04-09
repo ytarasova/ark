@@ -26,7 +26,8 @@ import { setProviderResolver, clearProviderResolver } from "./provider-registry.
 import { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
 import { startNotifyDaemon } from "./notify-daemon.js";
 import { track, configureTelemetry } from "./telemetry.js";
-import { logError, logWarn, logInfo } from "./structured-log.js";
+import { logError, logWarn, logInfo, setLogArkDir } from "./structured-log.js";
+import { setProfilesArkDir } from "./profiles.js";
 import { registerExecutor } from "./executor.js";
 import { claudeCodeExecutor } from "./executors/claude-code.js";
 import { subprocessExecutor } from "./executors/subprocess.js";
@@ -176,6 +177,10 @@ export class AppContext {
     ]) {
       mkdirSync(dir, { recursive: true });
     }
+
+    // 1b. Configure module-level state with the resolved arkDir
+    setLogArkDir(this.config.arkDir);
+    setProfilesArkDir(this.config.arkDir);
 
     // 2. Open database with pragmas
     const db = new Database(this.config.dbPath);

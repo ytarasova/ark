@@ -14,7 +14,6 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 
 import * as tmux from "./tmux.js";
-import { getApp } from "./app.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -124,7 +123,7 @@ export function channelMcpConfig(
 export function writeChannelConfig(
   sessionId: string, stage: string, channelPort: number,
   workdir: string,
-  opts?: { conductorUrl?: string; channelConfig?: Record<string, unknown> },
+  opts?: { conductorUrl?: string; channelConfig?: Record<string, unknown>; tracksDir?: string },
 ): string {
   const config = opts?.channelConfig ?? channelMcpConfig(sessionId, stage, channelPort, { conductorUrl: opts?.conductorUrl });
 
@@ -140,9 +139,11 @@ export function writeChannelConfig(
   writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));
 
   // Also write a copy to tracks dir for reference
-  const sessionDir = join(getApp().config.tracksDir, sessionId);
-  mkdirSync(sessionDir, { recursive: true });
-  writeFileSync(join(sessionDir, "mcp.json"), JSON.stringify({ mcpServers: { "ark-channel": config } }, null, 2));
+  if (opts?.tracksDir) {
+    const sessionDir = join(opts.tracksDir, sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(join(sessionDir, "mcp.json"), JSON.stringify({ mcpServers: { "ark-channel": config } }, null, 2));
+  }
 
   return mcpConfigPath;
 }

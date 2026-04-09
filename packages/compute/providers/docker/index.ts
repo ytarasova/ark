@@ -191,15 +191,15 @@ export class DockerProvider implements ComputeProvider {
     if (useDevcontainer) {
       const workdir = (cfg.workdir as string) || opts.workdir;
       // Write launcher locally, then exec via devcontainer
-      const launcherPath = writeLauncher(opts.tmuxName, opts.launcherContent);
+      const launcherPath = writeLauncher(opts.tmuxName, opts.launcherContent, this.app.config.tracksDir);
       shellCmd = `devcontainer exec --workspace-folder '${workdir}' -- bash ${launcherPath}`;
     } else {
       // Write launcher locally, then docker exec it
-      const launcherPath = writeLauncher(opts.tmuxName, opts.launcherContent);
+      const launcherPath = writeLauncher(opts.tmuxName, opts.launcherContent, this.app.config.tracksDir);
       shellCmd = `docker exec -it ${name} bash ${launcherPath}`;
     }
 
-    await createSessionAsync(opts.tmuxName, shellCmd);
+    await createSessionAsync(opts.tmuxName, shellCmd, { arkDir: this.app.config.arkDir });
     return opts.tmuxName;
   }
 

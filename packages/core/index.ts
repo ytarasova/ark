@@ -131,7 +131,7 @@ export { checkForUpdate, getCurrentVersion } from "./update-check.js";
 export { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
 
 // Profiles
-export { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix, type Profile } from "./profiles.js";
+export { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix, setProfilesArkDir, type Profile } from "./profiles.js";
 
 // Notification daemon
 export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./notify-daemon.js";
@@ -179,7 +179,7 @@ export { configureOtlp, resetOtlp, flushSpans, startSpan, endSpan, getSpanBuffer
 export { watchMergedPR, shouldRollback, allCompleted, createRevertPayload, pollCheckSuites, type RollbackConfig, type CheckSuiteResult, type RevertPayload } from "./rollback.js";
 
 // Structured JSONL logging
-export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponents, type LogComponent, type LogLevel } from "./structured-log.js";
+export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponents, setLogArkDir, type LogComponent, type LogLevel } from "./structured-log.js";
 
 // Extension catalog
 export { EXTENSION_CATALOG, searchCatalog, getCatalogByCategory, getCatalogEntry, type ExtensionEntry } from "./extension-catalog.js";

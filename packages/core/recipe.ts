@@ -8,7 +8,7 @@
  * instantiation, validation, and sub-recipe resolution.
  */
 
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 import type { Session } from "../types/index.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -78,11 +78,11 @@ export function instantiateRecipe(recipe: RecipeDefinition, values: Record<strin
 // ── Sub-recipe resolution ─────────────────────────────────────────────────
 
 /** Resolve a sub-recipe reference into a full recipe instance. */
-export function resolveSubRecipe(ref: SubRecipeRef, parentVars?: Record<string, string>): {
+export function resolveSubRecipe(app: AppContext, ref: SubRecipeRef, parentVars?: Record<string, string>): {
   recipe: RecipeDefinition | null;
   instance: RecipeInstance | null;
 } {
-  const recipe = getApp().recipes.get(ref.recipe);
+  const recipe = app.recipes.get(ref.recipe);
   if (!recipe) return { recipe: null, instance: null };
 
   const mergedValues = { ...parentVars, ...ref.values };
@@ -91,8 +91,8 @@ export function resolveSubRecipe(ref: SubRecipeRef, parentVars?: Record<string, 
 }
 
 /** List sub-recipes available in a recipe. */
-export function listSubRecipes(recipeName: string): SubRecipeRef[] {
-  const recipe = getApp().recipes.get(recipeName);
+export function listSubRecipes(app: AppContext, recipeName: string): SubRecipeRef[] {
+  const recipe = app.recipes.get(recipeName);
   return recipe?.sub_recipes ?? [];
 }
 

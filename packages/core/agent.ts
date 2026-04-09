@@ -11,7 +11,7 @@
 import { existsSync } from "fs";
 import { join, dirname } from "path";
 import { substituteVars, buildSessionVars } from "./template.js";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -48,8 +48,8 @@ export function findProjectRoot(cwd?: string): string | null {
 
 // ── Template substitution ───────────────────────────────────────────────────
 
-export function resolveAgent(name: string, session: Record<string, unknown>, projectRoot?: string): AgentDefinition | null {
-  const agent = getApp().agents.get(name, projectRoot);
+export function resolveAgent(app: AppContext, name: string, session: Record<string, unknown>, projectRoot?: string): AgentDefinition | null {
+  const agent = app.agents.get(name, projectRoot);
   if (!agent) return null;
 
   const vars = buildSessionVars(session);
@@ -69,13 +69,14 @@ export function buildClaudeArgs(agent: AgentDefinition, opts?: {
   headless?: boolean;
   autonomy?: string;
   projectRoot?: string;
+  app?: AppContext;
 }): string[] {
   let systemPrompt = agent.system_prompt;
 
   // Inject skill prompts into system prompt
-  if (agent.skills?.length) {
+  if (agent.skills?.length && opts?.app) {
     const skillPrompts = agent.skills
-      .map((name: string) => getApp().skills.get(name, opts?.projectRoot))
+      .map((name: string) => opts.app!.skills.get(name, opts?.projectRoot))
       .filter(Boolean)
       .map((s: any) => `## Skill: ${s.name}\n${s.prompt}`);
     if (skillPrompts.length) {

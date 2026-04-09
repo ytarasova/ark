@@ -6,7 +6,7 @@
  * Returns candidate skills with confidence scores.
  */
 
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 export interface ConversationTurn {
   role: string;
@@ -64,7 +64,8 @@ export function extractSkillCandidates(conversation: ConversationTurn[]): SkillC
 const MIN_CONFIDENCE = 0.6;
 
 /** Extract skill candidates from conversation and save high-confidence ones. */
-export function extractAndSaveSkills(sessionId: string, conversation: ConversationTurn[]): number {
+export function extractAndSaveSkills(sessionId: string, conversation: ConversationTurn[], app?: AppContext): number {
+  if (!app) return 0;
   const candidates = extractSkillCandidates(conversation);
   let saved = 0;
 
@@ -72,7 +73,7 @@ export function extractAndSaveSkills(sessionId: string, conversation: Conversati
     if (candidate.confidence < MIN_CONFIDENCE) continue;
     try {
       const skillName = `extracted-${sessionId}-${saved}`;
-      getApp().skills.save(skillName, {
+      app.skills.save(skillName, {
         name: skillName,
         description: candidate.description,
         prompt: candidate.prompt,

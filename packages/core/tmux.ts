@@ -12,7 +12,7 @@ import { execFile, execFileSync, spawn } from "child_process";
 import { promisify } from "util";
 import { existsSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
-import { getApp } from "./app.js";
+import { tmpdir } from "os";
 
 const execFileAsync = promisify(execFile);
 
@@ -30,8 +30,9 @@ bind -n C-q detach-client
 `.trim();
 
 /** Ensure ~/.ark/tmux.conf exists, return its path */
-function ensureTmuxConf(): string {
-  const confPath = join(getApp().config.arkDir, "tmux.conf");
+function ensureTmuxConf(arkDir: string): string {
+  mkdirSync(arkDir, { recursive: true });
+  const confPath = join(arkDir, "tmux.conf");
   writeFileSync(confPath, ARK_TMUX_CONF + "\n");
   return confPath;
 }
@@ -94,9 +95,10 @@ export function killSessionAsync(name: string): Promise<boolean> {
 export async function createSessionAsync(name: string, command: string, opts?: {
   width?: number;
   height?: number;
+  arkDir?: string;
 }): Promise<void> {
   await killSessionAsync(name);
-  const conf = ensureTmuxConf();
+  const conf = ensureTmuxConf(opts?.arkDir ?? join(tmpdir(), "ark"));
   await execFileAsync("tmux", [
     "-f", conf,
     "new-session", "-d", "-s", name,
@@ -110,9 +112,10 @@ export async function createSessionAsync(name: string, command: string, opts?: {
 export async function createSessionWithSendKeysAsync(name: string, command: string, opts?: {
   width?: number;
   height?: number;
+  arkDir?: string;
 }): Promise<void> {
   await killSessionAsync(name);
-  const conf = ensureTmuxConf();
+  const conf = ensureTmuxConf(opts?.arkDir ?? join(tmpdir(), "ark"));
   await execFileAsync("tmux", [
     "-f", conf,
     "new-session", "-d", "-s", name,
@@ -139,7 +142,7 @@ export async function capturePaneAsync(name: string, opts?: {
 
 /** Send text to a tmux session via load-buffer (async) */
 export async function sendTextAsync(name: string, text: string): Promise<void> {
-  const tmpFile = join(getApp().config.tracksDir, `.msg-${Date.now()}.txt`);
+  const tmpFile = join(tmpdir(), `.ark-msg-${Date.now()}.txt`);
   writeFileSync(tmpFile, text);
   try {
     await execFileAsync("tmux", ["load-buffer", "-b", "ark-msg", tmpFile]);
@@ -184,8 +187,8 @@ export async function listArkSessionsAsync(): Promise<TmuxSession[]> {
 }
 
 /** Write a launcher script and return the path */
-export function writeLauncher(sessionId: string, content: string): string {
-  const dir = join(getApp().config.tracksDir, sessionId);
+export function writeLauncher(sessionId: string, content: string, tracksDir: string): string {
+  const dir = join(tracksDir, sessionId);
   mkdirSync(dir, { recursive: true });
   const path = join(dir, "launch.sh");
   writeFileSync(path, content);

@@ -5,7 +5,6 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { getApp } from "./app.js";
 
 export interface UiState {
   activeTab: number;
@@ -23,14 +22,15 @@ const DEFAULT_STATE: UiState = {
   previewMode: null,
 };
 
-function statePath(): string {
-  return join(getApp().config.arkDir, "ui-state.json");
+function statePath(arkDir: string): string {
+  return join(arkDir, "ui-state.json");
 }
 
 /** Load persisted UI state. Returns defaults if file missing or corrupt. */
-export function loadUiState(): UiState {
+export function loadUiState(arkDir?: string): UiState {
+  if (!arkDir) return { ...DEFAULT_STATE };
   try {
-    const path = statePath();
+    const path = statePath(arkDir);
     if (!existsSync(path)) return { ...DEFAULT_STATE };
     const raw = readFileSync(path, "utf-8");
     const parsed = JSON.parse(raw);
@@ -41,11 +41,12 @@ export function loadUiState(): UiState {
 }
 
 /** Save UI state to disk. Non-blocking (fire and forget). */
-export function saveUiState(state: Partial<UiState>): void {
+export function saveUiState(state: Partial<UiState>, arkDir?: string): void {
+  if (!arkDir) return;
   try {
-    const current = loadUiState();
+    const current = loadUiState(arkDir);
     const merged = { ...current, ...state };
-    writeFileSync(statePath(), JSON.stringify(merged, null, 2));
+    writeFileSync(statePath(arkDir), JSON.stringify(merged, null, 2));
   } catch (e: any) {
     // Don't crash on write failure
     console.error("ui-state: save failed:", e?.message ?? e);

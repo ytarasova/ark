@@ -7,7 +7,6 @@ const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { getApp } from "./app.js";
 
 interface UpdateState {
   lastCheck: string;
@@ -15,8 +14,8 @@ interface UpdateState {
   currentVersion: string;
 }
 
-function statePath(): string {
-  return join(getApp().config.arkDir, "update-check.json");
+function statePath(arkDir: string): string {
+  return join(arkDir, "update-check.json");
 }
 
 /** Get the current version from package.json. */
@@ -30,9 +29,10 @@ export function getCurrentVersion(): string {
 }
 
 /** Check if an update is available. Returns the latest version or null. */
-export async function checkForUpdate(): Promise<string | null> {
+export async function checkForUpdate(arkDir?: string): Promise<string | null> {
+  if (!arkDir) return null;
   try {
-    const path = statePath();
+    const path = statePath(arkDir);
     const current = getCurrentVersion();
 
     // Rate limit checks

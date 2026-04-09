@@ -67,7 +67,7 @@ registerMiscCommands(program, app);
 await program.parseAsync(process.argv);
 
 // Non-blocking update check
-core.checkForUpdate().then(latest => {
+core.checkForUpdate(app.config.arkDir).then(latest => {
   if (latest) console.error(chalk.yellow(`Update available: v${latest}`));
 }).catch(() => {});
 

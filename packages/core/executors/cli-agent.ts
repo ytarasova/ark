@@ -33,7 +33,7 @@ export const cliAgentExecutor: Executor = {
       const { setupSessionWorktree } = await import("../services/session-orchestration.js");
       const session = app.sessions.get(sessionId);
       if (session) {
-        const result = await setupSessionWorktree(session, null, null, log);
+        const result = await setupSessionWorktree(app, session, null, null, log);
         if (result) effectiveWorkdir = result;
       }
     } catch { /* worktree setup optional */ }
@@ -83,7 +83,7 @@ export const cliAgentExecutor: Executor = {
 
     // Launch in tmux
     log(`Launching ${command[0]} in tmux...`);
-    await tmux.createSessionAsync(tmuxName, cmdLine);
+    await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.arkDir });
 
     return { ok: true, handle: tmuxName };
   },

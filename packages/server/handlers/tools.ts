@@ -14,7 +14,7 @@ import type {
 export function registerToolsHandlers(router: Router, app: AppContext): void {
   router.handle("tools/list", async (p) => {
     const { projectRoot } = extract<ToolsListParams>(p, []);
-    const tools = core.discoverTools(projectRoot ?? undefined);
+    const tools = core.discoverTools(projectRoot ?? undefined, app);
     return { tools };
   });
 

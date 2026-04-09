@@ -5,7 +5,6 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
-import { getApp } from "./app.js";
 
 export interface Profile {
   name: string;
@@ -14,8 +13,14 @@ export interface Profile {
   createdAt: string;
 }
 
+let _arkDir: string | null = null;
+
+/** Set the ark directory for profile storage. Called during app boot. */
+export function setProfilesArkDir(arkDir: string): void { _arkDir = arkDir; }
+
 function profilesPath(): string {
-  return join(getApp().config.arkDir, "profiles.json");
+  if (!_arkDir) throw new Error("Profiles arkDir not set. Call setProfilesArkDir() first.");
+  return join(_arkDir, "profiles.json");
 }
 
 function loadProfiles(): Profile[] {

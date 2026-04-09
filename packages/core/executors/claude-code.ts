@@ -34,7 +34,7 @@ export const claudeCodeExecutor: Executor = {
 
     // Setup worktree + trust (dynamic import to avoid circular dependency)
     const { setupSessionWorktree } = await import("../services/session-orchestration.js");
-    const effectiveWorkdir = await setupSessionWorktree(session, compute, provider, log);
+    const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 
     // Determine conductor URL based on compute type
     const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
@@ -47,7 +47,7 @@ export const claudeCodeExecutor: Executor = {
     // Channel config + launcher
     const channelPort = app.sessions.channelPort(session.id);
     const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
-    const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig });
+    const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir });
 
     // Status hooks
     claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts.autonomy });
@@ -65,7 +65,7 @@ export const claudeCodeExecutor: Executor = {
       env: launchEnv,
     });
 
-    const launcher = tmux.writeLauncher(session.id, launchContent);
+    const launcher = tmux.writeLauncher(session.id, launchContent, app.config.tracksDir);
 
     // Save task for reference
     const sessionDir = join(app.config.tracksDir, session.id);
@@ -100,7 +100,7 @@ export const claudeCodeExecutor: Executor = {
 
     // Local launch
     log("Starting local tmux session...");
-    await tmux.createSessionAsync(tmuxName, `bash ${launcher}`);
+    await tmux.createSessionAsync(tmuxName, `bash ${launcher}`, { arkDir: app.config.arkDir });
     claude.autoAcceptChannelPrompt(tmuxName);
     log("Delivering task...");
     claude.deliverTask(session.id, channelPort, opts.task, stage);

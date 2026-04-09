@@ -4,7 +4,6 @@
 
 import { appendFileSync, existsSync, statSync, renameSync, mkdirSync } from "fs";
 import { join } from "path";
-import { getApp } from "./app.js";
 
 export type LogComponent = "session" | "conductor" | "mcp" | "status" | "web" | "bridge" | "pool" | "compute" | "general";
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -19,6 +18,7 @@ interface LogEntry {
 
 let _level: LogLevel = "info";
 let _components: Set<LogComponent> | null = null; // null = all
+let _arkDir: string | null = null;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_BACKUPS = 3;
 
@@ -26,11 +26,14 @@ export function setLogLevel(level: LogLevel): void { _level = level; }
 export function setLogComponents(components: LogComponent[] | null): void {
   _components = components ? new Set(components) : null;
 }
+/** Set the ark directory for log file output. Called during app boot. */
+export function setLogArkDir(arkDir: string): void { _arkDir = arkDir; }
 
 const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
-function logPath(): string {
-  return join(getApp().config.arkDir, "ark.jsonl");
+function logPath(): string | null {
+  if (!_arkDir) return null;
+  return join(_arkDir, "ark.jsonl");
 }
 
 function shouldLog(level: LogLevel, component: LogComponent): boolean {
@@ -41,7 +44,7 @@ function shouldLog(level: LogLevel, component: LogComponent): boolean {
 
 function rotate(): void {
   const path = logPath();
-  if (!existsSync(path)) return;
+  if (!path || !existsSync(path)) return;
   try {
     const stat = statSync(path);
     if (stat.size < MAX_FILE_SIZE) return;
@@ -68,10 +71,11 @@ export function log(level: LogLevel, component: LogComponent, message: string, d
   };
 
   try {
-    const dir = getApp().config.arkDir;
-    mkdirSync(dir, { recursive: true });
+    if (!_arkDir) return;
+    mkdirSync(_arkDir, { recursive: true });
     rotate();
-    appendFileSync(logPath(), JSON.stringify(entry) + "\n");
+    const path = logPath();
+    if (path) appendFileSync(path, JSON.stringify(entry) + "\n");
   } catch { /* don't crash on log failure */ }
 }
 

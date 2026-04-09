@@ -26,6 +26,7 @@ import { CostsTab, getCostsHints } from "./tabs/CostsTab.js";
 import { SchedulesTab, getSchedulesHints } from "./tabs/SchedulesTab.js";
 import { MemoryManager, getMemoryHints } from "./components/MemoryManager.js";
 import { loadUiState, saveUiState } from "../core/ui-state.js";
+import { useAppContext } from "./context/AppProvider.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
 import { HelpOverlay } from "./components/HelpOverlay.js";
@@ -50,8 +51,11 @@ function AppInner() {
   const historyAsync = useAsync(store.refresh);
   const computeAsync = useAsync(store.refresh);
 
+  const appCtx = useAppContext();
+  const arkDir = appCtx.config.arkDir;
+
   // Restore persisted tab on mount
-  const savedState = useMemo(() => loadUiState(), []);
+  const savedState = useMemo(() => loadUiState(arkDir), [arkDir]);
   const [tab, setTab] = useState<Tab>(() => {
     const saved = TABS[savedState.activeTab];
     return saved ?? "sessions";
@@ -60,7 +64,7 @@ function AppInner() {
   // Persist tab changes
   useEffect(() => {
     const tabIndex = TABS.indexOf(tab);
-    saveUiState({ activeTab: tabIndex >= 0 ? tabIndex : 0 });
+    saveUiState({ activeTab: tabIndex >= 0 ? tabIndex : 0 }, arkDir);
   }, [tab]);
 
   const [showForm, setShowForm] = useState<string | null>(null);

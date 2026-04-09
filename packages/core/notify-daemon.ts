@@ -99,7 +99,7 @@ export class NotifyDaemon {
 
 /** Create and start a notification daemon. Returns null if no bridge config. */
 export function startNotifyDaemon(app: AppContext, opts?: NotifyDaemonOptions): NotifyDaemon | null {
-  const config = loadBridgeConfig();
+  const config = loadBridgeConfig(app.config.arkDir);
   if (!config) return null;
   const bridge = new Bridge(config);
   const daemon = new NotifyDaemon(app, bridge, opts);

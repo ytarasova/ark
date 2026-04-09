@@ -65,7 +65,7 @@ export function registerConductorCommands(program: Command) {
   conductorCmd.command("bridge")
     .description("Start the messaging bridge (Telegram/Slack)")
     .action(async () => {
-      const bridge = core.createBridge();
+      const bridge = core.createBridge(getApp().config.arkDir);
       if (!bridge) {
         console.log(chalk.red("No bridge config found. Create ~/.ark/bridge.json with telegram/slack settings."));
         console.log(chalk.dim("\nExample ~/.ark/bridge.json:"));
@@ -80,9 +80,9 @@ export function registerConductorCommands(program: Command) {
       bridge.onMessage(async (msg) => {
         const text = msg.text.trim().toLowerCase();
         if (text === "/status" || text === "status") {
-          await bridge.notifyStatusSummary();
+          await bridge.notifyStatusSummary(getApp());
         } else if (text === "/sessions" || text === "sessions") {
-          const sessions = core.getApp().sessions.list({ limit: 20 });
+          const sessions = getApp().sessions.list({ limit: 20 });
           const lines = sessions.map(s => `\u2022 ${s.summary ?? s.id} (${s.status})`);
           await bridge.notify(lines.join("\n") || "No sessions");
         } else {
@@ -100,7 +100,7 @@ export function registerConductorCommands(program: Command) {
     .description("Send a test notification via bridge")
     .argument("<message>")
     .action(async (message) => {
-      const bridge = core.createBridge();
+      const bridge = core.createBridge(getApp().config.arkDir);
       if (!bridge) {
         console.log(chalk.red("No bridge config. Create ~/.ark/bridge.json"));
         return;

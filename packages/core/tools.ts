@@ -11,7 +11,7 @@
 import { existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync, unlinkSync } from "fs";
 import { join, basename } from "path";
 import stripJsonComments from "strip-json-comments";
-import { getApp } from "./app.js";
+import type { AppContext } from "./app.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -102,8 +102,8 @@ function discoverContext(projectDir: string): ToolEntry[] {
   }];
 }
 
-function discoverArkSkills(projectDir?: string): ToolEntry[] {
-  return getApp().skills.list(projectDir).map(s => ({
+function discoverArkSkills(app: AppContext, projectDir?: string): ToolEntry[] {
+  return app.skills.list(projectDir).map(s => ({
     kind: "ark-skill" as const,
     name: s.name,
     description: s.description ?? "",
@@ -111,8 +111,8 @@ function discoverArkSkills(projectDir?: string): ToolEntry[] {
   }));
 }
 
-function discoverArkRecipes(projectDir?: string): ToolEntry[] {
-  return getApp().recipes.list(projectDir).map(r => ({
+function discoverArkRecipes(app: AppContext, projectDir?: string): ToolEntry[] {
+  return app.recipes.list(projectDir).map(r => ({
     kind: "ark-recipe" as const,
     name: r.name,
     description: r.description ?? "",
@@ -126,7 +126,7 @@ function discoverArkRecipes(projectDir?: string): ToolEntry[] {
  * Discover ALL tool types from a project directory.
  * Returns a unified ToolEntry[] sorted by kind then name.
  */
-export function discoverTools(projectDir?: string): ToolEntry[] {
+export function discoverTools(projectDir?: string, app?: AppContext): ToolEntry[] {
   const entries: ToolEntry[] = [];
 
   if (projectDir) {
@@ -136,8 +136,10 @@ export function discoverTools(projectDir?: string): ToolEntry[] {
     entries.push(...discoverContext(projectDir));
   }
 
-  entries.push(...discoverArkSkills(projectDir));
-  entries.push(...discoverArkRecipes(projectDir));
+  if (app) {
+    entries.push(...discoverArkSkills(app, projectDir));
+    entries.push(...discoverArkRecipes(app, projectDir));
+  }
 
   // Sort by kind then name
   const kindOrder: Record<string, number> = {

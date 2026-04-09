@@ -15,7 +15,6 @@ import { homedir } from "os";
 const execFileAsync = promisify(execFile);
 
 import type { AppContext } from "../app.js";
-import { getApp } from "../app.js";
 import { safeParseConfig } from "../util.js";
 import type { Session, Compute, MessageRole, MessageType } from "../../types/index.js";
 import * as tmux from "../tmux.js";
@@ -207,7 +206,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   const agentName = action.agent!;
   log(`Resolving agent: ${agentName}`);
   const projectRoot = agentRegistry.findProjectRoot(session.workdir || session.repo) ?? undefined;
-  const agent = agentRegistry.resolveAgent(agentName, sessionAsVars(session), projectRoot);
+  const agent = agentRegistry.resolveAgent(app, agentName, sessionAsVars(session), projectRoot);
   if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
 
   // Resolve autonomy level from flow stage definition
@@ -249,7 +248,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
 
   // Build claude args (only for claude-code executor)
-  const claudeArgs = runtime === "claude-code" ? agentRegistry.buildClaudeArgs(agent, { autonomy, projectRoot }) : [];
+  const claudeArgs = runtime === "claude-code" ? agentRegistry.buildClaudeArgs(agent, { autonomy, projectRoot, app }) : [];
 
   // Launch via executor
   log(`Launching via ${runtime}...`);
@@ -372,7 +371,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
       const conv = getSessionConversation(app, sessionId);
       if (conv.length > 0) {
         const turns = conv.map((c) => ({ role: c.role === "message" ? "user" : "assistant", content: c.content }));
-        extractAndSaveSkills(sessionId, turns);
+        extractAndSaveSkills(sessionId, turns, app);
       }
     } catch { /* skill extraction is best-effort */ }
 
@@ -802,7 +801,7 @@ export async function fork(app: AppContext, parentId: string, task: string, opts
 async function dispatchFork(app: AppContext, sessionId: string, stageDef: flow.StageDefinition): Promise<{ ok: boolean; message: string }> {
   // Read PLAN.md or use default subtasks
   const session = app.sessions.get(sessionId)!;
-  const subtasks = extractSubtasks(session);
+  const subtasks = extractSubtasks(app, session);
 
   const children: string[] = [];
   for (const sub of subtasks.slice(0, stageDef.max_parallel ?? 4)) {
@@ -821,7 +820,7 @@ async function dispatchFork(app: AppContext, sessionId: string, stageDef: flow.S
 
 async function dispatchFanOut(app: AppContext, sessionId: string, stageDef: flow.StageDefinition): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId)!;
-  const subtasks = extractSubtasks(session);
+  const subtasks = extractSubtasks(app, session);
 
   const maxParallel = stageDef.max_parallel ?? 8;
   const result = fanOut(app, sessionId, {
@@ -955,6 +954,7 @@ export async function cleanupOnTerminal(app: AppContext, sessionId: string): Pro
 
 /** Setup git worktree + Claude trust for the session working directory. */
 export async function setupSessionWorktree(
+  app: AppContext,
   session: Session,
   compute: Compute | null,
   provider: ComputeProvider | undefined,
@@ -969,7 +969,7 @@ export async function setupSessionWorktree(
   const wantWorktree = provider?.supportsWorktree && session.config?.worktree !== false;
   if (wantWorktree && workdir !== "." && existsSync(join(workdir, ".git"))) {
     log("Setting up git worktree...");
-    const wt = await setupWorktree(workdir, session.id, session.branch ?? undefined);
+    const wt = await setupWorktree(app, workdir, session.id, session.branch ?? undefined);
     if (wt) effectiveWorkdir = wt;
   }
 
@@ -1076,7 +1076,7 @@ async function launchAgentTmux(app: AppContext,
   const provider = getProvider(compute?.provider ?? "local");
 
   // Setup worktree + trust
-  const effectiveWorkdir = await setupSessionWorktree(session, compute, provider, log);
+  const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 
   // Determine conductor URL based on compute type
   const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
@@ -1089,7 +1089,7 @@ async function launchAgentTmux(app: AppContext,
   // Channel config + launcher
   const channelPort = app.sessions.channelPort(session.id);
   const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
-  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig });
+  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir });
 
   // Status hooks -- write .claude/settings.local.json for agent status detection
   claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts?.autonomy });
@@ -1106,7 +1106,7 @@ async function launchAgentTmux(app: AppContext,
     env: launchEnv,
   });
 
-  const launcher = tmux.writeLauncher(session.id, launchContent);
+  const launcher = tmux.writeLauncher(session.id, launchContent, app.config.tracksDir);
 
   // Save task for reference
   const sessionDir = join(app.config.tracksDir, session.id);
@@ -1115,7 +1115,7 @@ async function launchAgentTmux(app: AppContext,
 
   // Remote compute (providers that don't support local worktrees)
   if (compute && provider && !provider.supportsWorktree) {
-    const { finalLaunchContent, ports } = await prepareRemoteEnvironment(app, 
+    const { finalLaunchContent, ports } = await prepareRemoteEnvironment(app,
       session, compute, provider, effectiveWorkdir,
       { launchContent, onLog: log },
     );
@@ -1140,7 +1140,7 @@ async function launchAgentTmux(app: AppContext,
 
   // Local launch
   log("Starting local tmux session...");
-  await tmux.createSessionAsync(tmuxName, `bash ${launcher}`);
+  await tmux.createSessionAsync(tmuxName, `bash ${launcher}`, { arkDir: app.config.arkDir });
   claude.autoAcceptChannelPrompt(tmuxName);
   log("Delivering task...");
   claude.deliverTask(session.id, channelPort, task, stage);
@@ -1247,8 +1247,8 @@ async function buildTaskWithHandoff(app: AppContext, session: Session, stage: st
   return [...header, ...context].join("\n");
 }
 
-function extractSubtasks(session: Session): { name: string; task: string }[] {
-  const wtDir = join(getApp().config.worktreesDir, session.id);
+function extractSubtasks(app: AppContext, session: Session): { name: string; task: string }[] {
+  const wtDir = join(app.config.worktreesDir, session.id);
   const planPath = join(wtDir, "PLAN.md");
 
   if (existsSync(planPath)) {
@@ -1269,8 +1269,8 @@ function extractSubtasks(session: Session): { name: string; task: string }[] {
   ];
 }
 
-async function setupWorktree(repoPath: string, sessionId: string, branch?: string): Promise<string | null> {
-  const wtPath = join(getApp().config.worktreesDir, sessionId);
+async function setupWorktree(app: AppContext, repoPath: string, sessionId: string, branch?: string): Promise<string | null> {
+  const wtPath = join(app.config.worktreesDir, sessionId);
   if (existsSync(wtPath)) return wtPath;
 
   const branchName = branch ?? `ark-${sessionId}`;
