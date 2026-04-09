@@ -180,6 +180,84 @@ export function getStageAction(flowName: string, stageName: string): StageAction
   return { type: "unknown" };
 }
 
+// ── DAG validation ──────────────────────────────────────────────────────────
+
+/** Validate that stages with depends_on form a valid DAG (no cycles, all refs exist). Throws on invalid. */
+export function validateDAG(stages: StageDefinition[]): void {
+  const names = new Set(stages.map(s => s.name));
+  for (const stage of stages) {
+    if (!stage.depends_on) continue;
+    for (const dep of stage.depends_on) {
+      if (!names.has(dep)) {
+        throw new Error(`Stage '${stage.name}' depends on unknown stage '${dep}'`);
+      }
+    }
+  }
+
+  // Topological sort cycle detection (Kahn's algorithm)
+  const inDegree = new Map<string, number>();
+  const adj = new Map<string, string[]>();
+  for (const s of stages) {
+    inDegree.set(s.name, 0);
+    adj.set(s.name, []);
+  }
+  for (const s of stages) {
+    if (!s.depends_on) continue;
+    for (const dep of s.depends_on) {
+      adj.get(dep)!.push(s.name);
+      inDegree.set(s.name, (inDegree.get(s.name) ?? 0) + 1);
+    }
+  }
+  const queue = [...inDegree.entries()].filter(([, d]) => d === 0).map(([n]) => n);
+  let visited = 0;
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    visited++;
+    for (const next of adj.get(node) ?? []) {
+      const d = (inDegree.get(next) ?? 1) - 1;
+      inDegree.set(next, d);
+      if (d === 0) queue.push(next);
+    }
+  }
+  if (visited !== stages.length) {
+    throw new Error("Flow stages contain a dependency cycle");
+  }
+}
+
+// ── DAG resolution ─────────────────────────────────────────────────────────
+
+/**
+ * Given a list of stages and which stages are completed,
+ * return the stages that are ready to execute (all dependencies met).
+ * Stages without depends_on default to depending on the previous stage (linear).
+ */
+export function getReadyStages(
+  stages: StageDefinition[],
+  completedStages: string[],
+): StageDefinition[] {
+  const completed = new Set(completedStages);
+  const ready: StageDefinition[] = [];
+
+  for (let i = 0; i < stages.length; i++) {
+    const stage = stages[i];
+    if (completed.has(stage.name)) continue;
+
+    let deps = stage.depends_on;
+
+    // If no depends_on, default to linear: depend on previous stage
+    if (!deps && i > 0) {
+      deps = [stages[i - 1].name];
+    }
+
+    // No deps (first stage) or all deps met
+    if (!deps || deps.length === 0 || deps.every((d) => completed.has(d))) {
+      ready.push(stage);
+    }
+  }
+
+  return ready;
+}
+
 // ── Template substitution ────────────────────────────────────────────────────
 
 /** Resolve a flow by substituting {variables} in stage fields. */
