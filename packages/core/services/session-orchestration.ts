@@ -848,6 +848,39 @@ export async function joinFork(parentId: string, force = false): Promise<{ ok: b
   return await advance(parentId, true);
 }
 
+/**
+ * Check if a parent session can auto-join after a child completes or fails.
+ * Returns true if the parent was advanced (all children are done).
+ */
+export async function checkAutoJoin(childSessionId: string): Promise<boolean> {
+  const child = getApp().sessions.get(childSessionId);
+  if (!child?.parent_id) return false;
+
+  const parent = getApp().sessions.get(child.parent_id);
+  if (!parent) return false;
+  if (parent.status !== "waiting") return false;
+
+  const children = getApp().sessions.getChildren(parent.id);
+  const allDone = children.every((c) => c.status === "completed" || c.status === "failed");
+  if (!allDone) return false;
+
+  const failed = children.filter((c) => c.status === "failed");
+  if (failed.length > 0) {
+    getApp().events.log(parent.id, "fan_out_partial_failure", {
+      actor: "system",
+      data: { failed: failed.map((f) => f.id), total: children.length },
+    });
+  }
+
+  getApp().events.log(parent.id, "auto_join", {
+    actor: "system",
+    data: { children: children.length, failed: failed.length },
+  });
+  getApp().sessions.update(parent.id, { status: "ready", fork_group: null });
+  await advance(parent.id, true);
+  return true;
+}
+
 // ── Delete ──────────────────────────────────────────────────────────────────
 
 /**
