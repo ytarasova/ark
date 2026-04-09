@@ -150,6 +150,6 @@ jobs:
       - name: Install dependencies
         run: bun install
       - name: Install Playwright browsers
-        run: cd packages/desktop && npm install && npx playwright install chromium
+        run: cd packages/e2e && npm install && npx playwright install chromium
       - name: Run Web UI E2E tests
-        run: cd packages/desktop && npx playwright test
+        run: cd packages/e2e && npx playwright test

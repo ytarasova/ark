@@ -2,6 +2,11 @@
   "name": "ark-desktop",
   "version": "0.10.0",
   "description": "Ark Desktop - AI Agent Orchestration",
+  "homepage": "https://github.com/ytarasova/ark",
+  "author": {
+    "name": "Ark Contributors",
+    "email": "ark@users.noreply.github.com"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",

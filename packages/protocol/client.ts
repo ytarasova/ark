@@ -465,6 +465,10 @@ export class ArkClient {
     return this.rpc<SessionOpResult & { sessionId?: string }>("session/spawn", { sessionId, ...opts });
   }
 
+  async sessionFanOut(sessionId: string, tasks: Array<{ summary: string; agent?: string; flow?: string }>): Promise<{ ok: boolean; childIds?: string[]; message?: string }> {
+    return this.rpc<{ ok: boolean; childIds?: string[]; message?: string }>("session/fan-out", { sessionId, tasks });
+  }
+
   async sessionResume(sessionId: string): Promise<SessionOpResult> {
     return this.rpc<SessionOpResult>("session/resume", { sessionId });
   }
@@ -483,6 +487,10 @@ export class ArkClient {
 
   async sessionRestore(sessionId: string): Promise<SessionOpResult> {
     return this.rpc<SessionOpResult>("session/restore", { sessionId });
+  }
+
+  async sessionExport(sessionId: string, filePath?: string): Promise<{ ok: boolean; filePath?: string; data?: any }> {
+    return this.rpc<{ ok: boolean; filePath?: string; data?: any }>("session/export", { sessionId, filePath });
   }
 
   // ── Memory ─────────────────────────────────────────────────────────────────
