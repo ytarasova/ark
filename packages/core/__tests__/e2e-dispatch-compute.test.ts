@@ -16,9 +16,6 @@ import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { execFileSync } from "child_process";
-import {
-  createCompute, getCompute,
-} from "../index.js";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import * as claude from "../claude.js";
 
@@ -48,7 +45,7 @@ describe("dispatch compute: worktree creation", () => {
 
     // Simulate what launchAgentTmux checks:
     // isLocal = no compute or compute.provider === "local"
-    const compute = session.compute_name ? getCompute(session.compute_name) : null;
+    const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
     const isLocal = !compute || compute.provider === "local";
     expect(isLocal).toBe(true);
 
@@ -63,10 +60,10 @@ describe("dispatch compute: worktree creation", () => {
 
   it("does NOT create worktree for EC2 compute", () => {
     // Register an EC2 compute in the store
-    createCompute({ name: "my-ec2", provider: "ec2", config: { ip: "1.2.3.4" } });
+    app.computes.create({ name: "my-ec2", provider: "ec2", config: { ip: "1.2.3.4" } });
     const session = getApp().sessions.create({ summary: "ec2-test", compute_name: "my-ec2" });
 
-    const compute = getCompute(session.compute_name!);
+    const compute = app.computes.get(session.compute_name!);
     expect(compute).not.toBeNull();
     expect(compute!.provider).toBe("ec2");
 
@@ -90,7 +87,7 @@ describe("dispatch compute: worktree creation", () => {
       config: { worktree: false },
     });
 
-    const compute = session.compute_name ? getCompute(session.compute_name) : null;
+    const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
     const isLocal = !compute || compute.provider === "local";
     expect(isLocal).toBe(true);
 
@@ -204,7 +201,7 @@ describe("dispatch compute: session creation defaults", () => {
   });
 
   it("session stores compute_name when specified", () => {
-    createCompute({ name: "test-compute", provider: "ec2" });
+    app.computes.create({ name: "test-compute", provider: "ec2" });
     const session = getApp().sessions.create({ summary: "compute-name-test", compute_name: "test-compute" });
     expect(session.compute_name).toBe("test-compute");
   });
