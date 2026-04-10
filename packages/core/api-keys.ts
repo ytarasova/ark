@@ -6,7 +6,7 @@
  */
 
 import { createHash, randomBytes } from "crypto";
-import type { IDatabase } from "./database.js";
+import type { IDatabase } from "./database/index.js";
 import type { TenantContext, ApiKey } from "../types/index.js";
 
 // ── Row type ─────────────────────────────────────────────────────────────────

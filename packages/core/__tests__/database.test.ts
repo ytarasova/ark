@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { Database } from "bun:sqlite";
-import { BunSqliteAdapter } from "../database-sqlite.js";
-import type { IDatabase, IStatement } from "../database.js";
+import { BunSqliteAdapter } from "../database/index.js";
+import type { IDatabase, IStatement } from "../database/index.js";
 
 describe("BunSqliteAdapter", () => {
   let adapter: BunSqliteAdapter;

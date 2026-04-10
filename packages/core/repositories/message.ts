@@ -1,4 +1,4 @@
-import type { IDatabase } from "../database.js";
+import type { IDatabase } from "../database/index.js";
 import type { Message, MessageRole, MessageType } from "../../types/index.js";
 
 // ── Row type (read stored as integer 0/1) ───────────────────────────────────

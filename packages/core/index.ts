@@ -3,8 +3,8 @@
  */
 
 // Database abstraction
-export type { IDatabase, IStatement } from "./database.js";
-export { BunSqliteAdapter } from "./database-sqlite.js";
+export type { IDatabase, IStatement } from "./database/index.js";
+export { BunSqliteAdapter } from "./database/index.js";
 
 // Re-exports
 export { getApp, setApp, clearApp, AppContext } from "./app.js";
@@ -191,8 +191,9 @@ export { TenantPolicyManager, type TenantComputePolicy, type ComputePoolRef } fr
 // Compute pools
 export { ComputePoolManager, type ComputePool, type ComputePoolStatus, initPoolSchema } from "./compute-pool.js";
 
-// Evals framework
-export { loadEvalSuite, scoreOutput, saveEvalResults, listEvalSuites, summarizeResults, type EvalScenario, type EvalResult, type EvalSuite } from "./evals.js";
+// Runtime evals (knowledge-backed agent performance tracking)
+export { evaluateSession, getAgentStats, detectDrift, listEvals } from "./knowledge/evals.js";
+export type { AgentEvalResult } from "./knowledge/evals.js";
 
 // Observability hooks
 export { configureObservability, getObservabilityConfig, recordEvent, flush as flushObservability, getEventBuffer, resetObservability, type ObservabilityConfig, type ObservabilityEvent } from "./observability.js";
@@ -237,8 +238,6 @@ export { filterMessages, parseMessageFilter, type MessageFilter, type FilteredMe
 // Task/progress ledger
 export { loadLedger, saveLedger, addEntry, updateEntry, detectStall, formatLedgerForPrompt, type Ledger, type LedgerEntry } from "./ledger.js";
 
-// Recipe evaluation
-export { evaluateRecipeSetup, type RecipeEvalResult } from "./recipe-eval.js";
 
 // Agent Client Protocol (headless JSON-RPC)
 export { handleAcpRequest, runAcpServer, type AcpRequest, type AcpResponse } from "./acp.js";

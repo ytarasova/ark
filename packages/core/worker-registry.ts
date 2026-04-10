@@ -6,7 +6,7 @@
  * State is persisted in a `workers` SQL table so it survives restarts.
  */
 
-import type { IDatabase } from "./database.js";
+import type { IDatabase } from "./database/index.js";
 
 export interface WorkerNode {
   id: string;

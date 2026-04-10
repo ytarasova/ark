@@ -8,7 +8,7 @@
  */
 
 import { Database } from "bun:sqlite";
-import type { IDatabase, IStatement } from "./database.js";
+import type { IDatabase, IStatement } from "./types.js";
 
 export class BunSqliteAdapter implements IDatabase {
   constructor(private db: Database) {}

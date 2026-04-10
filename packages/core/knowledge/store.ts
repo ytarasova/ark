@@ -1,4 +1,4 @@
-import type { IDatabase } from "../database.js";
+import type { IDatabase } from "../database/index.js";
 import type { KnowledgeNode, KnowledgeEdge, NodeType, EdgeRelation } from "./types.js";
 import { randomUUID } from "crypto";
 

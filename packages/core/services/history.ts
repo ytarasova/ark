@@ -5,7 +5,7 @@
  * Full transcript indexing integration will be added in a later pass.
  */
 
-import type { IDatabase } from "../database.js";
+import type { IDatabase } from "../database/index.js";
 
 export interface HistorySearchResult {
   sessionId: string;

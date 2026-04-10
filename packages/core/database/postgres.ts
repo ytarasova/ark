@@ -16,7 +16,7 @@
  *   - PRAGMA statements -> skipped (not applicable to Postgres)
  */
 
-import type { IDatabase, IStatement } from "./database.js";
+import type { IDatabase, IStatement } from "./types.js";
 
 // postgres.js uses `export =` in its type definitions. In Bun's ESM resolution
 // the default export is under .default. We use require + destructure for compat.

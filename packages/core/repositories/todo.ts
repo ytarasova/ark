@@ -1,4 +1,4 @@
-import type { IDatabase } from "../database.js";
+import type { IDatabase } from "../database/index.js";
 
 function now(): string { return new Date().toISOString(); }
 

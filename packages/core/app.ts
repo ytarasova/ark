@@ -8,8 +8,8 @@
 
 import { Database } from "bun:sqlite";
 import { mkdirSync, rmSync, existsSync, mkdtempSync, readFileSync } from "fs";
-import type { IDatabase } from "./database.js";
-import { BunSqliteAdapter } from "./database-sqlite.js";
+import type { IDatabase } from "./database/index.js";
+import { BunSqliteAdapter } from "./database/index.js";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { tmpdir } from "os";

@@ -8,7 +8,7 @@
  * Called from app.ts when a Postgres database URL is configured.
  */
 
-import type { IDatabase } from "../database.js";
+import type { IDatabase } from "../database/index.js";
 
 export function initPostgresSchema(db: IDatabase): void {
   // Sessions table

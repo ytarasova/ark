@@ -7,7 +7,7 @@
  * in SQLite and provides validation helpers used by the scheduler.
  */
 
-import type { IDatabase } from "./database.js";
+import type { IDatabase } from "./database/index.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
