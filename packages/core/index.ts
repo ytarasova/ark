@@ -174,6 +174,7 @@ export { generateOpenApiSpec } from "./openapi.js";
 
 // Web dashboard
 export { startWebServer, type WebServerOptions } from "./web.js";
+export { startWebProxy, type WebProxyOptions } from "./web-proxy.js";
 
 // SSE bus (pluggable broadcast for scaling)
 export { type SSEBus, InMemorySSEBus, createSSEBus } from "./sse-bus.js";

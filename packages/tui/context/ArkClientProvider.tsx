@@ -4,6 +4,7 @@ import { ArkClient } from "../../protocol/client.js";
 import { ArkServer } from "../../server/index.js";
 import { registerAllHandlers } from "../../server/register.js";
 import { getApp } from "../../core/app.js";
+import { createWebSocketTransport } from "../../protocol/transport.js";
 import type { Transport } from "../../protocol/transport.js";
 import type { JsonRpcMessage } from "../../protocol/types.js";
 
@@ -29,28 +30,52 @@ function createInMemoryPair(): { clientTransport: Transport; serverTransport: Tr
 interface Props {
   children: React.ReactNode;
   onReady?: () => void;
+  /** Remote control plane URL. When set, connects via WebSocket instead of in-process. */
+  serverUrl?: string;
+  /** Auth token for remote server. */
+  token?: string;
 }
 
-export function ArkClientProvider({ children, onReady }: Props) {
+export function ArkClientProvider({ children, onReady, serverUrl, token }: Props) {
   const [client, setClient] = useState<ArkClient | null>(null);
   const serverRef = useRef<ArkServer | null>(null);
 
   useEffect(() => {
-    const server = new ArkServer();
-    registerAllHandlers(server.router, getApp());
-    serverRef.current = server;
+    let ark: ArkClient;
 
-    const { clientTransport, serverTransport } = createInMemoryPair();
-    server.addConnection(serverTransport);
+    if (serverUrl) {
+      // Remote mode: connect to control plane via WebSocket
+      const wsUrl = serverUrl.replace(/^http/, "ws").replace(/\/$/, "") + "/ws";
+      const { transport, ready } = createWebSocketTransport(wsUrl, { token });
 
-    const ark = new ArkClient(clientTransport);
-    ark.initialize({ subscribe: ["**"] }).then(() => {
-      setClient(ark);
-      onReady?.();
-    });
+      ark = new ArkClient(transport);
+      ready
+        .then(() => ark.initialize({ subscribe: ["**"] }))
+        .then(() => {
+          setClient(ark);
+          onReady?.();
+        })
+        .catch((err) => {
+          console.error(`Failed to connect to remote server: ${err.message}`);
+        });
+    } else {
+      // Local mode: in-process server
+      const server = new ArkServer();
+      registerAllHandlers(server.router, getApp());
+      serverRef.current = server;
+
+      const { clientTransport, serverTransport } = createInMemoryPair();
+      server.addConnection(serverTransport);
+
+      ark = new ArkClient(clientTransport);
+      ark.initialize({ subscribe: ["**"] }).then(() => {
+        setClient(ark);
+        onReady?.();
+      });
+    }
 
     return () => { ark.close(); };
-  }, []);
+  }, [serverUrl]);
 
   if (!client) return null;
 

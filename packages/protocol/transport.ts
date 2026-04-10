@@ -34,6 +34,56 @@ export interface Transport {
   close(): void;
 }
 
+/**
+ * Create a WebSocket client transport that connects to a remote Ark server.
+ * Supports optional Bearer token for authentication.
+ */
+export function createWebSocketTransport(
+  url: string,
+  opts?: { token?: string },
+): { transport: Transport; ready: Promise<void> } {
+  const handlers: ((msg: JsonRpcMessage) => void)[] = [];
+  let ws: WebSocket;
+
+  // Append token as query param if provided
+  const connectUrl = opts?.token
+    ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(opts.token)}`
+    : url;
+
+  const ready = new Promise<void>((resolve, reject) => {
+    ws = new WebSocket(connectUrl);
+
+    ws.onopen = () => resolve();
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(typeof event.data === "string" ? event.data : new TextDecoder().decode(event.data));
+        for (const h of handlers) h(msg);
+      } catch {}
+    };
+
+    ws.onerror = (err) => {
+      reject(new Error(`WebSocket connection failed: ${connectUrl}`));
+    };
+
+    ws.onclose = () => {};
+  });
+
+  const transport: Transport = {
+    send(msg) {
+      ws.send(JSON.stringify(msg));
+    },
+    onMessage(handler) {
+      handlers.push(handler);
+    },
+    close() {
+      ws.close();
+    },
+  };
+
+  return { transport, ready };
+}
+
 export function createStdioTransport(
   input: ReadableStream<Uint8Array>,
   output: { write(data: string): void },

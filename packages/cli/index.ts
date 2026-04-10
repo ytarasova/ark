@@ -7,6 +7,10 @@
  * ark session dispatch s-abc123
  * ark session attach s-abc123
  * ark tui
+ *
+ * Remote mode:
+ *   ark --server https://ark.company.com --token xxx session list
+ *   ARK_SERVER=https://ark.company.com ARK_TOKEN=xxx ark session list
  */
 
 import { Command } from "commander";
@@ -14,7 +18,7 @@ import chalk from "chalk";
 import * as core from "../core/index.js";
 import { AppContext, setApp } from "../core/app.js";
 import { loadConfig } from "../core/config.js";
-import { closeArkClient } from "./client.js";
+import { closeArkClient, setRemoteServer, isRemoteMode } from "./client.js";
 
 import { registerSessionCommands } from "./commands/session.js";
 import { registerComputeCommands } from "./commands/compute.js";
@@ -33,20 +37,46 @@ import { registerAuthCommands } from "./commands/auth.js";
 import { registerTenantCommands } from "./commands/tenant.js";
 import { registerMiscCommands } from "./commands/misc.js";
 
-const app = new AppContext(loadConfig(), { skipConductor: true, skipMetrics: true });
-setApp(app);
-await app.boot();
+// ── Resolve remote mode early (before AppContext boot) ──────────────────────
+// Commander hasn't parsed yet, so peek at argv + env for --server / --token.
+function peekGlobalOpts(): { server?: string; token?: string } {
+  const args = process.argv;
+  let server = process.env.ARK_SERVER;
+  let token = process.env.ARK_TOKEN;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--server" && args[i + 1]) server = args[i + 1];
+    if (args[i] === "--token" && args[i + 1]) token = args[i + 1];
+  }
+  return { server, token };
+}
+
+const { server: remoteServer, token: remoteToken } = peekGlobalOpts();
+setRemoteServer(remoteServer, remoteToken);
+
+// Only boot a local AppContext when not in remote mode
+let app: AppContext | null = null;
+if (!isRemoteMode()) {
+  app = new AppContext(loadConfig(), { skipConductor: true, skipMetrics: true });
+  setApp(app);
+  await app.boot();
+}
 
 const program = new Command()
   .name("ark")
   .description("Ark - autonomous agent ecosystem")
   .version("0.1.0")
-  .option("-p, --profile <name>", "Use a specific profile");
+  .option("-p, --profile <name>", "Use a specific profile")
+  .option("--server <url>", "Connect to a remote Ark control plane (e.g. https://ark.company.com)")
+  .option("--token <key>", "API key for authentication with the remote server");
 
 program.hook("preAction", (thisCommand) => {
   const opts = thisCommand.opts();
-  if (opts.profile) {
+  if (opts.profile && !isRemoteMode()) {
     core.setActiveProfile(opts.profile);
+  }
+  // Update remote config from parsed opts (in case env vars were used for peek)
+  if (opts.server || opts.token) {
+    setRemoteServer(opts.server || remoteServer, opts.token || remoteToken);
   }
 });
 
@@ -72,10 +102,12 @@ registerMiscCommands(program, app);
 
 await program.parseAsync(process.argv);
 
-// Non-blocking update check
-core.checkForUpdate(app.config.arkDir).then(latest => {
-  if (latest) console.error(chalk.yellow(`Update available: v${latest}`));
-}).catch(() => {});
+// Non-blocking update check (only in local mode)
+if (app) {
+  core.checkForUpdate(app.config.arkDir).then(latest => {
+    if (latest) console.error(chalk.yellow(`Update available: v${latest}`));
+  }).catch(() => {});
+}
 
 closeArkClient();
-await app.shutdown();
+if (app) await app.shutdown();

@@ -10,7 +10,7 @@ import { getArkClient } from "./_shared.js";
 import { execSession } from "../exec.js";
 import { splitEditorCommand } from "../helpers.js";
 
-export function registerMiscCommands(program: Command, app: AppContext) {
+export function registerMiscCommands(program: Command, app: AppContext | null) {
   // ── PR commands ──────────────────────────────────────────────────────────────
 
   const pr = program.command("pr").description("Manage PR-bound sessions");
@@ -130,13 +130,24 @@ export function registerMiscCommands(program: Command, app: AppContext) {
   // ── TUI command ─────────────────────────────────────────────────────────────
 
   program.command("tui").description("Launch TUI dashboard").action(async () => {
-    const { checkPrereqs, hasRequiredPrereqs, formatPrereqCheck } = await import("../../core/prereqs.js");
-    const prereqs = checkPrereqs();
-    if (!hasRequiredPrereqs(prereqs)) {
-      console.log(chalk.red("Missing required tools:"));
-      console.log(formatPrereqCheck(prereqs));
-      process.exit(1);
+    const globalOpts = program.opts();
+    const serverUrl = globalOpts.server || process.env.ARK_SERVER;
+    const token = globalOpts.token || process.env.ARK_TOKEN;
+
+    // In remote mode, skip local prereq checks (tmux etc. not needed)
+    if (!serverUrl) {
+      const { checkPrereqs, hasRequiredPrereqs, formatPrereqCheck } = await import("../../core/prereqs.js");
+      const prereqs = checkPrereqs();
+      if (!hasRequiredPrereqs(prereqs)) {
+        console.log(chalk.red("Missing required tools:"));
+        console.log(formatPrereqCheck(prereqs));
+        process.exit(1);
+      }
     }
+
+    // Pass remote config to TUI via env vars (picked up by tui/index.tsx)
+    if (serverUrl) process.env.ARK_TUI_SERVER = serverUrl;
+    if (token) process.env.ARK_TUI_TOKEN = token;
 
     await import("../../tui/index.js");
   });
@@ -300,7 +311,7 @@ export function registerMiscCommands(program: Command, app: AppContext) {
     .action(async (opts) => {
       // ark exec needs the conductor running (for hooks)
       // Shut down the CLI app before replacing with exec app
-      await app.shutdown();
+      if (app) await app.shutdown();
       const execApp = new AppContext(loadConfig());
       await execApp.boot();
       setApp(execApp);
@@ -410,16 +421,37 @@ export function registerMiscCommands(program: Command, app: AppContext) {
     .option("--token <token>", "Bearer token for auth")
     .option("--api-only", "API only, skip static file serving (for dev with Vite)")
     .action(async (opts) => {
-      const server = core.startWebServer(core.getApp(), {
-        port: Number(opts.port),
-        readOnly: opts.readOnly,
-        token: opts.token,
-        apiOnly: opts.apiOnly,
-      });
-      console.log(chalk.green(`Ark web dashboard: ${server.url}`));
-      console.log(chalk.dim("Press Ctrl+C to stop"));
-      process.on("SIGINT", () => { server.stop(); process.exit(0); });
-      await new Promise(() => {});
+      const globalOpts = program.opts();
+      const remoteUrl = globalOpts.server || process.env.ARK_SERVER;
+      const remoteAuthToken = globalOpts.token || process.env.ARK_TOKEN;
+
+      if (remoteUrl) {
+        // Proxy mode: forward /api/* to remote control plane
+        const { startWebProxy } = await import("../../core/web-proxy.js");
+        const proxy = startWebProxy({
+          port: Number(opts.port),
+          remoteUrl,
+          token: remoteAuthToken,
+          readOnly: opts.readOnly,
+          apiOnly: opts.apiOnly,
+          localToken: opts.token,
+        });
+        console.log(chalk.green(`Ark web dashboard (proxying to ${remoteUrl}): ${proxy.url}`));
+        console.log(chalk.dim("Press Ctrl+C to stop"));
+        process.on("SIGINT", () => { proxy.stop(); process.exit(0); });
+        await new Promise(() => {});
+      } else {
+        const server = core.startWebServer(core.getApp(), {
+          port: Number(opts.port),
+          readOnly: opts.readOnly,
+          token: opts.token,
+          apiOnly: opts.apiOnly,
+        });
+        console.log(chalk.green(`Ark web dashboard: ${server.url}`));
+        console.log(chalk.dim("Press Ctrl+C to stop"));
+        process.on("SIGINT", () => { server.stop(); process.exit(0); });
+        await new Promise(() => {});
+      }
     });
 
   // ── OpenAPI spec ──────────────────────────────────────────────────────────────
