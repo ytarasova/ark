@@ -323,12 +323,34 @@ From deep analysis of builderz-labs/mission-control (32 panels):
 | Multi-turn warm handoff | Sticky sessions exist but no handoff with context summary | Need: conversation summarization on model switch |
 | Tool-call reliability matrix | Not tracked | Need: per-model tool success rate tracking |
 
-## Key Decisions Needed
+## Key Decisions Made
 
-1. **Temporal for control plane workflow engine?** Plan: start with local event-sourced engine, plan for Temporal hosted backend. Same WorkflowEngine interface.
-2. **Async Postgres repos?** Required for hosted scale. Big refactor. Should be Camp 9 priority.
-3. **Higress vs custom router?** Custom for dev/small. Higress for enterprise. Both behind same config.
-4. **Task board scope?** Tasks sit ABOVE sessions. Creating a task doesn't dispatch -- dispatching a task creates a session.
+1. **Temporal for control plane workflow engine.** Start with local event-sourced engine, plan for Temporal hosted backend. Same WorkflowEngine interface.
+2. **TensorZero replaces our hand-rolled LLM provider adapters.** Keep our routing intelligence (classifier, task-aware policies, tenant policies, sticky sessions). TensorZero handles API dispatch (format conversion, retries, streaming, A/B testing, feedback optimization). Runs as Rust sidecar. Apache 2.0.
+3. **Async Postgres repos** required for hosted scale. Camp 9 priority.
+4. **Task board:** Tasks sit ABOVE sessions. Creating a task doesn't dispatch -- dispatching a task creates a session.
+
+## TensorZero Integration Plan
+
+**What we keep (Ark routing layer):**
+- `classifier.ts` -- task complexity scoring with Ark-specific signals
+- `engine.ts` -- routing policies (quality/balanced/cost, per-tenant, per-agent)
+- Sticky sessions -- multi-turn conversation tracking
+- Cost attribution -- per-session/user/tenant/agent/model breakdown via UsageRecorder
+- Knowledge context injection -- codebase awareness before routing
+
+**What TensorZero replaces:**
+- `providers.ts` -- our untested Anthropic/OpenAI/Google adapters
+- `dispatch.ts` -- our fallback/circuit breaker logic
+- Streaming -- our SSE proxy
+- Feedback loop -- manual evaluateSession → TensorZero's native optimization
+
+**Architecture:**
+```
+Agent → Ark Routing Layer (classify, policy, context) → TensorZero (Rust sidecar) → LLM Provider
+```
+
+**Deployment:** TensorZero as Docker sidecar in Helm chart + docker-compose. Agents point to TensorZero endpoint. Ark routing layer makes model decision, forwards to TensorZero for dispatch.
 
 ---
 
