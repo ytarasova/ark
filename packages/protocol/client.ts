@@ -531,6 +531,29 @@ export class ArkClient {
     return count;
   }
 
+  // ── Knowledge ──────────────────────────────────────────────────────────────
+
+  async knowledgeSearch(query: string, opts?: { types?: string[]; limit?: number }): Promise<Array<{ id: string; type: string; label: string; content: string | null; score: number; metadata: Record<string, unknown> }>> {
+    const { results } = await this.rpc<{ results: any[] }>("knowledge/search", { query, ...opts });
+    return results;
+  }
+
+  async knowledgeStats(): Promise<{ nodes: number; edges: number; by_node_type: Record<string, number>; by_edge_type: Record<string, number> }> {
+    return this.rpc("knowledge/stats");
+  }
+
+  async knowledgeIndex(repo?: string): Promise<{ ok: boolean; files?: number; symbols?: number; edges?: number; duration_ms?: number; error?: string }> {
+    return this.rpc("knowledge/index", { repo });
+  }
+
+  async knowledgeExport(dir?: string): Promise<{ ok: boolean; exported?: number }> {
+    return this.rpc("knowledge/export", { dir });
+  }
+
+  async knowledgeImport(dir?: string): Promise<{ ok: boolean; imported?: number }> {
+    return this.rpc("knowledge/import", { dir });
+  }
+
   // ── Profile extended ───────────────────────────────────────────────────────
 
   async profileCreate(name: string, description?: string): Promise<Profile> {

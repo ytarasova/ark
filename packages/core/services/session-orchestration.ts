@@ -35,7 +35,7 @@ import { profileGroupPrefix } from "../profiles.js";
 import { parseGraphFlow, getSuccessors } from "../graph-flow.js";
 import { evaluateTermination, parseTermination, type TerminationContext } from "../termination.js";
 import { markStageCompleted, setCurrentStage } from "../flow-state.js";
-import { recall, formatMemoriesForPrompt } from "../memory.js";
+// memory.ts removed -- knowledge graph context injection handles memory/learning recall
 import { detectHandoff } from "../handoff.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
 import { logError, logWarn } from "../structured-log.js";
@@ -276,17 +276,8 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   log("Building task...");
   let task = await buildTaskWithHandoff(app, session, stage, agentName);
 
-  // Inject relevant memories into agent context
-  try {
-    const memories = recall(app, session.summary ?? "", { scope: session.repo ?? undefined, limit: 5 });
-    const memoryContext = formatMemoriesForPrompt(memories);
-    if (memoryContext) {
-      task = task + memoryContext;
-    }
-  } catch { /* skip memory recall on error */ }
-
-  // Inject knowledge graph context if available
-  if (app.knowledge && (session.workdir || session.repo)) {
+  // Inject knowledge graph context (memories, learnings, related sessions, files)
+  if (app.knowledge) {
     try {
       const { buildContext, formatContextAsMarkdown } = await import("../knowledge/context.js");
       const ctx = buildContext(app.knowledge, task, {

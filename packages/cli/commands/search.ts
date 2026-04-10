@@ -29,19 +29,22 @@ export function registerSearchCommands(program: Command) {
       }
 
       if (opts.hybrid) {
-        const hybridResults = await core.hybridSearch(core.getApp(), query, { limit, rerank: true });
-        if (hybridResults.length === 0) {
-          console.log(chalk.yellow("No hybrid search results found."));
+        const app = core.getApp();
+        const knowledgeResults = app.knowledge.search(query, { limit });
+        if (knowledgeResults.length === 0) {
+          console.log(chalk.yellow("No knowledge search results found."));
           return;
         }
-        console.log(chalk.bold(`Found ${hybridResults.length} result(s) via hybrid search for "${query}":\n`));
-        for (const r of hybridResults) {
-          const sourceColor = r.source === "memory" ? chalk.blue
-            : r.source === "knowledge" ? chalk.cyan
-            : chalk.magenta;
+        console.log(chalk.bold(`Found ${knowledgeResults.length} result(s) via knowledge search for "${query}":\n`));
+        for (const r of knowledgeResults) {
+          const sourceColor = r.type === "memory" ? chalk.blue
+            : r.type === "learning" ? chalk.cyan
+            : r.type === "session" ? chalk.magenta
+            : chalk.green;
           const score = chalk.dim(`(${r.score.toFixed(2)})`);
-          const content = r.content.length > 120 ? r.content.slice(0, 120) + "..." : r.content;
-          console.log(`  ${sourceColor(`[${r.source}]`)} ${score}  ${content}`);
+          const text = (r.content ?? r.label);
+          const content = text.length > 120 ? text.slice(0, 120) + "..." : text;
+          console.log(`  ${sourceColor(`[${r.type}]`)} ${score}  ${content}`);
         }
         return;
       }

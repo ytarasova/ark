@@ -70,7 +70,7 @@ const WRITE_METHODS = new Set([
   "schedule/create", "schedule/delete", "schedule/enable", "schedule/disable",
   "mcp/attach", "mcp/detach", "mcp/attach-by-dir", "mcp/detach-by-dir",
   "memory/add", "memory/forget", "memory/clear",
-  "knowledge/ingest",
+  "knowledge/ingest", "knowledge/index", "knowledge/import", "knowledge/export",
   "learning/add",
   "group/create", "group/delete",
   "profile/create", "profile/delete", "profile/set",

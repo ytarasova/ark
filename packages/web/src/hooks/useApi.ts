@@ -164,6 +164,11 @@ export const api = {
 
   // Knowledge
   ingestKnowledge: (path: string, opts?: any) => rpc<any>("knowledge/ingest", { path, ...opts }),
+  knowledgeSearch: (query: string, opts?: { types?: string[]; limit?: number }) => rpc<{ results: any[] }>("knowledge/search", { query, ...opts }).then(r => r.results),
+  knowledgeStats: () => rpc<any>("knowledge/stats"),
+  knowledgeIndex: (repo?: string) => rpc<any>("knowledge/index", { repo }),
+  knowledgeExport: (dir?: string) => rpc<any>("knowledge/export", { dir }),
+  knowledgeImport: (dir?: string) => rpc<any>("knowledge/import", { dir }),
 
   // Schedules
   getSchedules: () => rpc<{ schedules: any[] }>("schedule/list").then(r => r.schedules),

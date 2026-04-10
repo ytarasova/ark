@@ -18,31 +18,34 @@ export function registerConductorCommands(program: Command) {
     });
 
   conductorCmd.command("learnings")
-    .description("Show conductor learnings and policies")
+    .description("Show conductor learnings")
     .action(async () => {
-      const core = await import("../../core/index.js");
-      const dir = core.conductorLearningsDir(getApp().config.arkDir);
-      const learnings = core.getLearnings(dir);
-      const policies = core.getPolicies(dir);
-
-      if (policies.length > 0) {
-        console.log(chalk.bold("\nPolicies (promoted from learnings):\n"));
-        for (const p of policies) {
-          console.log(`  ${chalk.green("\u2713")} ${chalk.bold(p.title)}`);
-          if (p.description) console.log(`    ${chalk.dim(p.description.split("\n")[0])}`);
-        }
-      }
+      const app = getApp();
+      const learnings = app.knowledge.listNodes({ type: "learning" });
 
       if (learnings.length > 0) {
-        console.log(chalk.bold("\nActive learnings:\n"));
-        for (const l of learnings) {
-          const bar = "\u2588".repeat(l.recurrence) + "\u2591".repeat(3 - l.recurrence);
-          console.log(`  ${bar} ${chalk.bold(l.title)} (seen ${l.recurrence}x)`);
-          if (l.description) console.log(`    ${chalk.dim(l.description.split("\n")[0])}`);
-        }
-      }
+        // Split into "promoted" (recurrence >= 3) and active
+        const promoted = learnings.filter(l => ((l.metadata.recurrence as number) ?? 1) >= 3);
+        const active = learnings.filter(l => ((l.metadata.recurrence as number) ?? 1) < 3);
 
-      if (learnings.length === 0 && policies.length === 0) {
+        if (promoted.length > 0) {
+          console.log(chalk.bold("\nPolicies (promoted from learnings):\n"));
+          for (const p of promoted) {
+            console.log(`  ${chalk.green("\u2713")} ${chalk.bold(p.label)}`);
+            if (p.content) console.log(`    ${chalk.dim(p.content.split("\n")[0])}`);
+          }
+        }
+
+        if (active.length > 0) {
+          console.log(chalk.bold("\nActive learnings:\n"));
+          for (const l of active) {
+            const rec = (l.metadata.recurrence as number) ?? 1;
+            const bar = "\u2588".repeat(rec) + "\u2591".repeat(3 - rec);
+            console.log(`  ${bar} ${chalk.bold(l.label)} (seen ${rec}x)`);
+            if (l.content) console.log(`    ${chalk.dim(l.content.split("\n")[0])}`);
+          }
+        }
+      } else {
         console.log(chalk.dim("No learnings yet. The conductor records patterns during orchestration."));
       }
     });
@@ -52,13 +55,29 @@ export function registerConductorCommands(program: Command) {
     .argument("<title>")
     .argument("[description]")
     .action(async (title, description) => {
-      const core = await import("../../core/index.js");
-      const dir = core.conductorLearningsDir(getApp().config.arkDir);
-      const result = core.recordLearning(dir, title, description ?? "");
-      if (result.promoted) {
-        console.log(chalk.green(`Promoted to policy: ${title} (recurrence: ${result.learning.recurrence})`));
+      const app = getApp();
+      // Check for existing learning with same label and increment recurrence
+      const existing = app.knowledge.search(title, { types: ["learning"], limit: 5 });
+      const match = existing.find(n => n.label === title);
+      if (match) {
+        const recurrence = ((match.metadata.recurrence as number) ?? 1) + 1;
+        app.knowledge.updateNode(match.id, {
+          content: description || match.content,
+          metadata: { ...match.metadata, recurrence },
+        });
+        if (recurrence >= 3) {
+          console.log(chalk.green(`Promoted to policy: ${title} (recurrence: ${recurrence})`));
+        } else {
+          console.log(chalk.blue(`Recorded: ${title} (recurrence: ${recurrence}/3)`));
+        }
       } else {
-        console.log(chalk.blue(`Recorded: ${title} (recurrence: ${result.learning.recurrence}/3)`));
+        app.knowledge.addNode({
+          type: "learning",
+          label: title,
+          content: description ?? "",
+          metadata: { recurrence: 1 },
+        });
+        console.log(chalk.blue(`Recorded: ${title} (recurrence: 1/3)`));
       }
     });
 

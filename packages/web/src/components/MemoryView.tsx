@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import React, { useState, useEffect } from "react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
 import { useMemoriesQuery } from "../hooks/useMemoryQueries.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { Badge } from "./ui/badge.js";
-import { BookOpen, Search } from "lucide-react";
+import { BookOpen, Search, BarChart3 } from "lucide-react";
 import { selectClassName } from "./ui/styles.js";
 
 interface MemoryViewProps {
@@ -20,14 +20,23 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [selected, setSelected] = useState<any>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [newContent, setNewContent] = useState("");
   const [newTags, setNewTags] = useState("");
   const [newScope, setNewScope] = useState("global");
   const [_loading, setLoading] = useState(false);
 
+  // Knowledge stats query
+  const { data: stats } = useQuery({
+    queryKey: ["knowledge-stats"],
+    queryFn: () => api.knowledgeStats(),
+    enabled: showStats,
+  });
+
   useEffect(() => {
     if (addRequested > 0) {
       setShowAdd(true);
+      setShowStats(false);
       setSelected(null);
     }
   }, [addRequested]);
@@ -36,8 +45,16 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
     if (!search.trim()) { setSearchResults(null); return; }
     setLoading(true);
     try {
-      const results = await api.recallMemory(search.trim());
+      const results = await api.knowledgeSearch(search.trim(), { types: ["memory", "learning"], limit: 20 });
       setSearchResults(results || []);
+    } catch {
+      // Fallback to old recall
+      try {
+        const results = await api.recallMemory(search.trim());
+        setSearchResults(results || []);
+      } catch {
+        setSearchResults([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -62,6 +79,28 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
     if (selected?.id === id) setSelected(null);
   };
 
+  const handleExport = async () => {
+    try {
+      await api.knowledgeExport();
+      alert("Knowledge exported to ./knowledge-export");
+    } catch (e: any) {
+      alert(`Export failed: ${e.message}`);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const result = await api.knowledgeImport();
+      alert(`Imported ${result?.imported ?? 0} nodes`);
+      queryClient.invalidateQueries({ queryKey: ["memories"] });
+      queryClient.invalidateQueries({ queryKey: ["knowledge-stats"] });
+    } catch (e: any) {
+      alert(`Import failed: ${e.message}`);
+    }
+  };
+
+  const getContent = (m: any) => m.content ?? m.label ?? "(no content)";
+
   const displayList = searchResults ?? memories;
 
   return (
@@ -76,7 +115,7 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
                 <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="w-full h-7 pl-7 pr-2 text-[12px] bg-secondary"
-                  placeholder="Search..."
+                  placeholder="Search knowledge..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleSearch()}
@@ -97,12 +136,36 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
               </div>
             )}
           </div>
+          {/* Toolbar */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/30">
+            <button
+              className={cn(
+                "text-[10px] px-2 py-0.5 rounded transition-colors",
+                showStats ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => { setShowStats(!showStats); setShowAdd(false); setSelected(null); }}
+            >
+              <BarChart3 size={10} className="inline mr-0.5" /> Stats
+            </button>
+            <button
+              className="text-[10px] px-2 py-0.5 rounded text-muted-foreground hover:text-foreground"
+              onClick={handleExport}
+            >
+              Export
+            </button>
+            <button
+              className="text-[10px] px-2 py-0.5 rounded text-muted-foreground hover:text-foreground"
+              onClick={handleImport}
+            >
+              Import
+            </button>
+          </div>
           {/* Empty state in left panel */}
-          {!displayList.length && !showAdd && (
+          {!displayList.length && !showAdd && !showStats && (
             <div className="flex flex-col items-center justify-center py-12 px-4">
               <BookOpen size={20} className="text-muted-foreground/30 mb-2" />
               <p className="text-[11px] text-muted-foreground text-center">
-                {searchResults ? `No memories matching "${search}"` : "No memories yet"}
+                {searchResults ? `No results matching "${search}"` : "No memories yet"}
               </p>
             </div>
           )}
@@ -115,15 +178,23 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
                 "hover:bg-accent",
                 selected?.id === m.id && "bg-accent border-l-2 border-l-primary"
               )}
-              onClick={() => { setSelected(m); setShowAdd(false); }}
+              onClick={() => { setSelected(m); setShowAdd(false); setShowStats(false); }}
             >
               <span className="text-foreground truncate text-[12px] leading-snug">
-                {m.content?.length > 60 ? m.content.slice(0, 60) + "..." : m.content}
+                {(() => { const c = getContent(m); return c.length > 60 ? c.slice(0, 60) + "..." : c; })()}
               </span>
               <div className="flex items-center gap-1.5 mt-1">
+                {m.type && (
+                  <Badge variant="secondary" className="text-[9px] px-1 py-0">{m.type}</Badge>
+                )}
                 {m.tags?.length > 0 && (
                   <span className="text-[10px] text-muted-foreground truncate">
                     {m.tags.slice(0, 3).join(", ")}
+                  </span>
+                )}
+                {m.score !== undefined && (
+                  <span className="text-[9px] text-muted-foreground/60 font-mono">
+                    {m.score.toFixed(2)}
                   </span>
                 )}
                 <span className="flex-1" />
@@ -134,9 +205,55 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
             </div>
           ))}
         </div>
-        {/* Right: detail panel or add form */}
+        {/* Right: detail panel, add form, or stats */}
         <div className="overflow-y-auto bg-background">
-          {showAdd ? (
+          {showStats ? (
+            <div className="p-5">
+              <h2 className="text-base font-semibold text-foreground mb-4">Knowledge Graph Stats</h2>
+              {stats ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-black/40 border border-border rounded-lg p-3.5">
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.04em]">Total Nodes</div>
+                      <div className="text-2xl font-bold text-foreground mt-1">{stats.nodes ?? 0}</div>
+                    </div>
+                    <div className="bg-black/40 border border-border rounded-lg p-3.5">
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.04em]">Total Edges</div>
+                      <div className="text-2xl font-bold text-foreground mt-1">{stats.edges ?? 0}</div>
+                    </div>
+                  </div>
+                  {stats.by_node_type && Object.keys(stats.by_node_type).length > 0 && (
+                    <div>
+                      <h3 className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-[0.08em]">Nodes by Type</h3>
+                      <div className="grid grid-cols-[120px_1fr] gap-y-1 gap-x-3 text-[13px]">
+                        {Object.entries(stats.by_node_type).map(([type, count]) => (
+                          <React.Fragment key={type}>
+                            <span className="text-muted-foreground">{type}</span>
+                            <span className="text-foreground font-mono">{String(count)}</span>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {stats.by_edge_type && Object.keys(stats.by_edge_type).length > 0 && (
+                    <div>
+                      <h3 className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-[0.08em]">Edges by Relation</h3>
+                      <div className="grid grid-cols-[120px_1fr] gap-y-1 gap-x-3 text-[13px]">
+                        {Object.entries(stats.by_edge_type).map(([rel, count]) => (
+                          <React.Fragment key={rel}>
+                            <span className="text-muted-foreground">{rel}</span>
+                            <span className="text-foreground font-mono">{String(count)}</span>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Loading stats...</p>
+              )}
+            </div>
+          ) : showAdd ? (
             <div className="flex flex-col h-full p-5 overflow-y-auto">
               <h2 className="text-base font-semibold text-foreground mb-5">Add Memory</h2>
               <div className="mb-3.5">
@@ -177,11 +294,13 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
             </div>
           ) : selected ? (
             <div className="p-5">
-              <h2 className="text-lg font-semibold text-foreground mb-1">Memory</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-1">
+                {selected.type ? `${selected.type.charAt(0).toUpperCase() + selected.type.slice(1)}` : "Memory"}
+              </h2>
               <div className="mb-4">
                 <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Content</h3>
                 <div className="bg-black/40 border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
-                  {selected.content}
+                  {getContent(selected)}
                 </div>
               </div>
               <div className="mb-4">
@@ -189,18 +308,38 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
                 <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
                   <span className="text-muted-foreground">ID</span>
                   <span className="text-card-foreground font-mono">{selected.id}</span>
+                  {selected.type && (
+                    <>
+                      <span className="text-muted-foreground">Type</span>
+                      <span className="text-card-foreground">
+                        <Badge variant="secondary" className="text-[10px]">{selected.type}</Badge>
+                      </span>
+                    </>
+                  )}
                   <span className="text-muted-foreground">Scope</span>
                   <span className="text-card-foreground">
-                    <Badge variant="secondary" className="text-[10px]">{selected.scope || "global"}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">{selected.scope || selected.metadata?.scope || "global"}</Badge>
                   </span>
-                  {selected.tags?.length > 0 && (
+                  {(selected.tags?.length > 0 || (selected.metadata?.tags as any)?.length > 0) && (
                     <>
                       <span className="text-muted-foreground">Tags</span>
                       <span className="flex gap-1 flex-wrap">
-                        {selected.tags.map((t: string) => (
+                        {(selected.tags ?? selected.metadata?.tags ?? []).map((t: string) => (
                           <Badge key={t} variant="default" className="text-[11px]">{t}</Badge>
                         ))}
                       </span>
+                    </>
+                  )}
+                  {selected.score !== undefined && (
+                    <>
+                      <span className="text-muted-foreground">Score</span>
+                      <span className="text-card-foreground font-mono">{selected.score.toFixed(2)}</span>
+                    </>
+                  )}
+                  {selected.metadata?.recurrence !== undefined && (
+                    <>
+                      <span className="text-muted-foreground">Recurrence</span>
+                      <span className="text-card-foreground font-mono">{String(selected.metadata.recurrence)}</span>
                     </>
                   )}
                   {(selected.createdAt || selected.created_at) && (
@@ -221,7 +360,7 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-              Select a memory
+              Select a memory or learning
             </div>
           )}
         </div>

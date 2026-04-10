@@ -7,8 +7,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { searchSessions, searchTranscripts } from "../../core/search.js";
 import { searchAllConversations } from "../../core/global-search.js";
-import { getLearnings, recordLearning } from "../../core/learnings.js";
-import { ingestFile, ingestDirectory } from "../../core/knowledge.js";
+import type { KnowledgeNode } from "../../core/knowledge/types.js";
 import { generateRepoMap } from "../../core/repo-map.js";
 import { getHotkeys } from "../../core/hotkeys.js";
 import { getThemeMode } from "../../core/theme.js";
@@ -75,27 +74,62 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
 
   // ── Knowledge ingestion ──────────────────────────────────────────────────
   router.handle("knowledge/ingest", async (p) => {
-    const { path, directory, scope, tags, recursive } = extract<{
+    const { path: inputPath, directory } = extract<{
       path: string; directory?: boolean; scope?: string; tags?: string[]; recursive?: boolean;
     }>(p, ["path"]);
-    if (directory) {
-      const result = ingestDirectory(app, path, { scope, tags, recursive });
-      return { ok: true, ...result };
+    try {
+      const { indexCodebase } = await import("../../core/knowledge/indexer.js");
+      const target = directory ? inputPath : inputPath;
+      const result = await indexCodebase(target, app.knowledge, { incremental: true });
+      return { ok: true, files: result.files, chunks: result.symbols };
+    } catch (e: any) {
+      return { ok: false, error: e.message };
     }
-    const chunks = ingestFile(app, path, { scope, tags });
-    return { ok: true, chunks };
   });
 
   // ── Conductor learnings ──────────────────────────────────────────────────
-  router.handle("learning/list", async (p) => {
-    const { dir } = extract<{ dir?: string }>(p, []);
-    return { learnings: getLearnings(dir ?? ".") };
+  router.handle("learning/list", async (_p) => {
+    const nodes = app.knowledge.listNodes({ type: "learning" });
+    return {
+      learnings: nodes.map((n: KnowledgeNode) => ({
+        title: n.label,
+        description: n.content ?? "",
+        recurrence: (n.metadata.recurrence as number) ?? 1,
+        lastSeen: n.updated_at,
+      })),
+    };
   });
 
   router.handle("learning/add", async (p) => {
-    const { title, description, dir } = extract<{ title: string; description: string; dir?: string }>(p, ["title", "description"]);
-    const result = recordLearning(dir ?? ".", title, description);
-    return { ok: true, ...result };
+    const { title, description } = extract<{ title: string; description: string; dir?: string }>(p, ["title", "description"]);
+    // Check for existing learning with same label and increment recurrence
+    const existing = app.knowledge.search(title, { types: ["learning"], limit: 5 });
+    const match = existing.find(n => n.label === title);
+    if (match) {
+      const recurrence = ((match.metadata.recurrence as number) ?? 1) + 1;
+      app.knowledge.updateNode(match.id, {
+        content: description || match.content,
+        metadata: { ...match.metadata, recurrence },
+      });
+      const updated = app.knowledge.getNode(match.id)!;
+      return {
+        ok: true,
+        learning: { title: updated.label, description: updated.content, recurrence, lastSeen: updated.updated_at },
+        promoted: recurrence >= 3,
+      };
+    }
+    const id = app.knowledge.addNode({
+      type: "learning",
+      label: title,
+      content: description,
+      metadata: { recurrence: 1 },
+    });
+    const node = app.knowledge.getNode(id)!;
+    return {
+      ok: true,
+      learning: { title: node.label, description: node.content, recurrence: 1, lastSeen: node.updated_at },
+      promoted: false,
+    };
   });
 
   // ── Repo map ─────────────────────────────────────────────────────────────

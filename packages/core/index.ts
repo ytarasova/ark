@@ -112,8 +112,8 @@ export { getToolDriver, listToolDrivers, registerToolDriver } from "./tools/regi
 // Cost tracking
 export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, syncCosts, exportCostsCsv, type SessionCost, type BudgetConfig, type BudgetStatus } from "./costs.js";
 
-// Conductor learnings
-export { recordLearning, getLearnings, getPolicies, conductorLearningsDir, type Learning, type Policy } from "./learnings.js";
+// Conductor learnings (migrated to KnowledgeStore -- kept as type re-exports for backward compat)
+// recordLearning, getLearnings, getPolicies removed -- use app.knowledge directly
 
 // Reliable send
 export { sendReliable, hasPasteMarker, isReadyForInput, type SendOptions } from "./send-reliable.js";
@@ -218,11 +218,8 @@ export { evaluateTermination, parseTermination, maxTurns, maxTokens, timeout, te
 // Flow state persistence
 export { saveFlowState, loadFlowState, markStageCompleted, setCurrentStage, isStageCompleted, deleteFlowState, type FlowState } from "./flow-state.js";
 
-// Cross-session memory
-export { remember, recall, forget, listMemories, clearMemories, formatMemoriesForPrompt, type MemoryEntry } from "./memory.js";
-
-// Knowledge ingestion
-export { ingestFile, ingestDirectory, queryKnowledge, chunkText } from "./knowledge.js";
+// Cross-session memory (migrated to KnowledgeStore -- old file-based memory removed)
+// remember, recall, forget, listMemories, clearMemories, formatMemoriesForPrompt removed -- use app.knowledge directly
 
 // Knowledge graph store
 export { KnowledgeStore } from "./knowledge/index.js";
@@ -249,8 +246,8 @@ export { handleAcpRequest, runAcpServer, type AcpRequest, type AcpResponse } fro
 // Repository map generation
 export { generateRepoMap, extractExports, formatRepoMap, type RepoMap, type RepoMapEntry } from "./repo-map.js";
 
-// Hybrid search
-export { hybridSearch, mergeAndDeduplicate, type HybridSearchResult, type HybridSearchOpts } from "./hybrid-search.js";
+// Hybrid search (migrated to KnowledgeStore -- old hybrid-search removed)
+// hybridSearch, mergeAndDeduplicate removed -- use app.knowledge.search() directly
 
 // Types from packages/types — stricter domain types (aliased to avoid collision with store types)
 export type { Session as SessionDomain, SessionStatus, SessionConfig, CreateSessionOpts, SessionListFilters } from "../types/index.js";

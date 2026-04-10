@@ -12,7 +12,8 @@ import { KeyValue } from "./KeyValue.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
-type Mode = "list" | "add" | "search";
+type Mode = "list" | "add" | "search" | "stats";
+type ViewType = "memories" | "learnings";
 
 interface MemoryManagerProps {
   asyncState?: AsyncState;
@@ -26,9 +27,11 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
   const [memories, setMemories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>("list");
+  const [viewType, setViewType] = useState<ViewType>("memories");
   const [statusMsg, setStatusMsg] = useState("");
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [stats, setStats] = useState<any>(null);
 
   // Add mode state
   const [addContent, setAddContent] = useState("");
@@ -37,13 +40,31 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
 
   const loadMemories = useCallback(() => {
     setLoading(true);
-    ark.memoryList().then(list => {
-      setMemories(list);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    if (viewType === "memories") {
+      ark.memoryList().then(list => {
+        setMemories(list);
+        setLoading(false);
+      }).catch(() => setLoading(false));
+    } else {
+      // Load learnings via knowledge search
+      ark.knowledgeSearch("", { types: ["learning"], limit: 100 }).then(list => {
+        setMemories(list);
+        setLoading(false);
+      }).catch(() => {
+        // Fallback: try the learning/list RPC
+        (ark as any).rpc?.("learning/list")?.then?.((r: any) => {
+          setMemories(r?.learnings ?? []);
+          setLoading(false);
+        }) ?? setLoading(false);
+      });
+    }
+  }, [viewType]);
+
+  const loadStats = useCallback(() => {
+    ark.knowledgeStats().then(s => setStats(s)).catch(() => {});
   }, []);
 
-  useEffect(() => { loadMemories(); }, []);
+  useEffect(() => { loadMemories(); loadStats(); }, [viewType]);
 
   const displayList = searchResults ?? memories;
   const { sel } = useListNavigation(displayList.length, { active: pane === "left" && mode === "list" });
@@ -71,10 +92,11 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
     }
 
     if (input === "x" && selected) {
-      ark.memoryForget(selected.id).then((ok) => {
+      const id = selected.id;
+      ark.memoryForget(id).then((ok) => {
         if (ok) {
           setStatusMsg("Memory deleted");
-          if (searchResults) setSearchResults(prev => prev ? prev.filter(m => m.id !== selected.id) : null);
+          if (searchResults) setSearchResults(prev => prev ? prev.filter(m => m.id !== id) : null);
           loadMemories();
         }
       });
@@ -94,6 +116,18 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
       setSearchQuery("");
       return;
     }
+
+    if (input === "l") {
+      setViewType(v => v === "memories" ? "learnings" : "memories");
+      setSearchResults(null);
+      return;
+    }
+
+    if (input === "s") {
+      setMode("stats");
+      loadStats();
+      return;
+    }
   });
 
   // Add mode input
@@ -109,6 +143,12 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
     if (key.escape) { setMode("list"); return; }
   });
 
+  // Stats mode input
+  useInput((_input, key) => {
+    if (mode !== "stats") return;
+    if (key.escape) { setMode("list"); return; }
+  });
+
   const handleAddSubmit = useCallback(() => {
     if (!addContent.trim()) { setMode("list"); return; }
     const tags = addTags.trim() ? addTags.split(",").map(t => t.trim()).filter(Boolean) : undefined;
@@ -121,19 +161,38 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
 
   const handleSearchSubmit = useCallback((q: string) => {
     if (!q.trim()) { setMode("list"); return; }
-    ark.memoryRecall(q.trim(), { limit: 20 }).then(results => {
+    ark.knowledgeSearch(q.trim(), { types: ["memory", "learning"], limit: 20 }).then(results => {
       setSearchResults(results);
       setSearchQuery(q.trim());
       setMode("list");
       setStatusMsg(`${results.length} result${results.length !== 1 ? "s" : ""}`);
-    }).catch(() => { setStatusMsg("Search failed"); setMode("list"); });
+    }).catch(() => {
+      // Fallback to memory recall
+      ark.memoryRecall(q.trim(), { limit: 20 }).then(results => {
+        setSearchResults(results);
+        setSearchQuery(q.trim());
+        setMode("list");
+        setStatusMsg(`${results.length} result${results.length !== 1 ? "s" : ""}`);
+      }).catch(() => { setStatusMsg("Search failed"); setMode("list"); });
+    });
   }, []);
+
+  const getItemContent = (m: any) => {
+    return m.content ?? m.label ?? "(no content)";
+  };
+
+  const getItemLabel = (m: any) => {
+    const content = getItemContent(m);
+    return content.slice(0, 40);
+  };
+
+  const viewLabel = viewType === "memories" ? "Memories" : "Learnings";
 
   return (
     <SplitPane
       focus={pane}
-      leftTitle={searchResults ? `Memories - "${searchQuery}"` : `Memories (${memories.length})`}
-      rightTitle={mode === "add" ? "Add Memory" : "Details"}
+      leftTitle={searchResults ? `${viewLabel} - "${searchQuery}"` : `${viewLabel} (${memories.length})`}
+      rightTitle={mode === "add" ? "Add Memory" : mode === "stats" ? "Knowledge Stats" : "Details"}
       left={
         <Box flexDirection="column">
           {mode === "search" && (
@@ -144,7 +203,7 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
                 onChange={setSearchQuery}
                 onSubmit={handleSearchSubmit}
                 focus={true}
-                placeholder="Search memories..."
+                placeholder="Search knowledge..."
               />
             </Box>
           )}
@@ -153,26 +212,50 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
           ) : (
             <TreeList
               items={displayList}
-              renderRow={(m) => m.content.slice(0, 40)}
+              renderRow={(m) => getItemLabel(m)}
               renderColoredRow={(m) => (
                 <Box flexDirection="column">
-                  <Text wrap="truncate">{"  "}{m.content.slice(0, 36)}</Text>
+                  <Text wrap="truncate">{"  "}{getItemContent(m).slice(0, 36)}</Text>
                   <Text dimColor wrap="truncate">
                     {"  "}
+                    {m.type && <Text color={theme.accent}>[{m.type}] </Text>}
                     {m.tags?.length > 0 && <Text>{m.tags.join(", ")}  </Text>}
                     {m.scope && <Text>{m.scope}</Text>}
+                    {m.score !== undefined && <Text> ({m.score.toFixed(2)})</Text>}
                   </Text>
                 </Box>
               )}
               sel={sel}
-              emptyMessage="  No memories. Press n to add."
+              emptyMessage={`  No ${viewLabel.toLowerCase()}. Press n to add.`}
             />
           )}
           {statusMsg && <Text color={theme.running}>{`  ${statusMsg}`}</Text>}
         </Box>
       }
       right={
-        mode === "add" ? (
+        mode === "stats" ? (
+          <DetailPanel active={pane === "right"}>
+            <SectionHeader title="Knowledge Graph Stats" />
+            {stats ? (
+              <Box flexDirection="column">
+                <KeyValue label="Total Nodes">{String(stats.nodes ?? 0)}</KeyValue>
+                <KeyValue label="Total Edges">{String(stats.edges ?? 0)}</KeyValue>
+                <Text> </Text>
+                <SectionHeader title="Nodes by Type" />
+                {stats.by_node_type && Object.entries(stats.by_node_type).map(([t, c]) => (
+                  <KeyValue key={t} label={t}>{String(c)}</KeyValue>
+                ))}
+                <Text> </Text>
+                <SectionHeader title="Edges by Relation" />
+                {stats.by_edge_type && Object.entries(stats.by_edge_type).map(([r, c]) => (
+                  <KeyValue key={r} label={r}>{String(c)}</KeyValue>
+                ))}
+              </Box>
+            ) : (
+              <Text dimColor>  Loading stats...</Text>
+            )}
+          </DetailPanel>
+        ) : mode === "add" ? (
           <Box flexDirection="column" paddingX={1} paddingTop={1}>
             <Box>
               <Text color={addField === "content" ? theme.accent : theme.dimText}>
@@ -210,17 +293,26 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
         ) : selected ? (
           <DetailPanel active={pane === "right"}>
             <SectionHeader title="Content" />
-            <Text wrap="wrap">{`  ${selected.content}`}</Text>
+            <Text wrap="wrap">{`  ${getItemContent(selected)}`}</Text>
             <Text> </Text>
             <SectionHeader title="Info" />
             {selected.id && <KeyValue label="ID">{selected.id}</KeyValue>}
-            {selected.scope && <KeyValue label="Scope">{selected.scope}</KeyValue>}
-            {selected.tags?.length > 0 && <KeyValue label="Tags">{selected.tags.join(", ")}</KeyValue>}
-            {selected.created_at && <KeyValue label="Created">{selected.created_at.slice(0, 10)}</KeyValue>}
+            {selected.type && <KeyValue label="Type">{selected.type}</KeyValue>}
+            {(selected.scope || selected.metadata?.scope) && <KeyValue label="Scope">{selected.scope ?? selected.metadata?.scope}</KeyValue>}
+            {(selected.tags?.length > 0 || (selected.metadata?.tags as any)?.length > 0) && (
+              <KeyValue label="Tags">{(selected.tags ?? selected.metadata?.tags ?? []).join(", ")}</KeyValue>
+            )}
+            {selected.score !== undefined && <KeyValue label="Score">{selected.score.toFixed(2)}</KeyValue>}
+            {(selected.created_at || selected.createdAt) && (
+              <KeyValue label="Created">{(selected.created_at ?? selected.createdAt).slice(0, 10)}</KeyValue>
+            )}
+            {selected.metadata?.recurrence !== undefined && (
+              <KeyValue label="Recurrence">{String(selected.metadata.recurrence)}</KeyValue>
+            )}
           </DetailPanel>
         ) : (
           <Box flexGrow={1} alignItems="center" justifyContent="center">
-            <Text dimColor>Select a memory</Text>
+            <Text dimColor>Select an item</Text>
           </Box>
         )
       }
@@ -233,6 +325,8 @@ export function getMemoryHints(): React.ReactNode[] {
     ...NAV_HINTS, sep(0),
     <KeyHint key="n" k="n" label="add" />,
     <KeyHint key="/" k="/" label="search" />,
+    <KeyHint key="l" k="l" label="toggle memories/learnings" />,
+    <KeyHint key="s" k="s" label="stats" />,
     <KeyHint key="x" k="x" label="delete" />,
     ...GLOBAL_HINTS,
   ];

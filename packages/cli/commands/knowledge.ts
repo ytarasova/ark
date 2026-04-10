@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { resolve } from "path";
-import { existsSync, statSync } from "fs";
+import { existsSync } from "fs";
 import * as core from "../../core/index.js";
 
 export function registerKnowledgeCommands(program: Command) {
@@ -150,27 +150,27 @@ export function registerKnowledgeCommands(program: Command) {
       console.log(chalk.green(`Imported ${result.imported} nodes from ${inputDir}`));
     });
 
-  // Preserve the legacy ingest subcommand
+  // Ingest subcommand -- uses knowledge indexer
   cmd.command("ingest")
-    .description("Ingest files into the knowledge base (legacy)")
-    .argument("<path>", "File or directory to ingest")
-    .option("-s, --scope <scope>", "Scope for ingested knowledge", "knowledge")
-    .option("-t, --tag <tag>", "Tag (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
-    .action((path: string, opts) => {
+    .description("Ingest a directory into the knowledge graph (indexes files and symbols)")
+    .argument("<path>", "Directory to ingest")
+    .option("--incremental", "Only re-index changed files")
+    .action(async (path: string, opts) => {
       const resolved = resolve(path);
       if (!existsSync(resolved)) {
         console.log(chalk.red(`Path not found: ${resolved}`));
         return;
       }
-      const stat = statSync(resolved);
-      if (stat.isDirectory()) {
-        const result = core.ingestDirectory(core.getApp(), resolved, { scope: opts.scope, tags: opts.tag });
-        console.log(chalk.green(`Ingested ${result.files} files (${result.chunks} chunks) from ${resolved}`));
-      } else {
-        const chunks = core.ingestFile(core.getApp(), resolved, { scope: opts.scope, tags: opts.tag });
-        console.log(chunks > 0
-          ? chalk.green(`Ingested ${resolved} (${chunks} chunks)`)
-          : chalk.yellow(`Skipped ${resolved} (unsupported or empty)`));
+      const app = core.getApp();
+      console.log(`Ingesting ${resolved}...`);
+      try {
+        const { indexCodebase } = await import("../../core/knowledge/indexer.js");
+        const result = await indexCodebase(resolved, app.knowledge, {
+          incremental: opts.incremental,
+        });
+        console.log(chalk.green(`Indexed: ${result.files} files, ${result.symbols} symbols, ${result.edges} edges (${result.duration_ms}ms)`));
+      } catch (e: any) {
+        console.log(chalk.red(`Ingest failed: ${e.message}`));
       }
     });
 }

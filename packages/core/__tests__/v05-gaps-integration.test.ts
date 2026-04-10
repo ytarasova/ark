@@ -65,14 +65,17 @@ describe("v0.5 gaps integration", () => {
     expect(payload.body).toContain("#99");
   });
 
-  it("hybridSearch returns results without errors", async () => {
-    core.remember(getApp(), "Integration test memory for hybrid search", {
-      tags: ["integration"], scope: "global", importance: 0.8,
+  it("knowledge store search returns results without errors", () => {
+    getApp().knowledge.addNode({
+      type: "memory",
+      label: "Integration test memory for knowledge search",
+      content: "Integration test memory for knowledge search",
+      metadata: { tags: ["integration"], scope: "global", importance: 0.8 },
     });
-    const results = await core.hybridSearch(getApp(), "integration test", {
-      sources: ["memory"], rerank: false, limit: 5,
+    const results = getApp().knowledge.search("integration test", {
+      types: ["memory"], limit: 5,
     });
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0].source).toBe("memory");
+    expect(results[0].type).toBe("memory");
   });
 });

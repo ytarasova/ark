@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { getArkClient } from "./_shared.js";
 
 export function registerMemoryCommands(program: Command) {
-  const memoryCmd = program.command("memory").description("Manage cross-session memory");
+  const memoryCmd = program.command("memory").description("Manage cross-session memory (backed by knowledge graph)");
 
   memoryCmd.command("list")
     .description("List stored memories")
