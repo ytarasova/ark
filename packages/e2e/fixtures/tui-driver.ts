@@ -17,7 +17,7 @@
 import { execFileSync } from "child_process";
 import { writeFileSync } from "fs";
 import { join } from "path";
-import { killSession } from "../../core/tmux.js";
+import { killSession } from "../../core/infra/tmux.js";
 import { startSession } from "../../core/services/session-orchestration.js";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
 

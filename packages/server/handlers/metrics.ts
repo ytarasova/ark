@@ -2,7 +2,7 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { getProvider } from "../../compute/index.js";
-import { getAllSessionCosts } from "../../core/costs.js";
+import { getAllSessionCosts } from "../../core/observability/costs.js";
 import type { MetricsSnapshotParams } from "../../types/index.js";
 
 export function registerMetricsHandlers(router: Router, app: AppContext): void {

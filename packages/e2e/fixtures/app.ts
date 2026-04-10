@@ -19,7 +19,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { execFileSync } from "child_process";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
-import * as tmux from "../../core/tmux.js";
+import * as tmux from "../../core/infra/tmux.js";
 
 export interface E2EEnv {
   app: AppContext;

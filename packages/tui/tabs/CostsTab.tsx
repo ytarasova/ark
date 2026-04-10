@@ -5,7 +5,7 @@ import { useArkClient } from "../hooks/useArkClient.js";
 import { GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
-import { formatCost } from "../../core/costs.js";
+import { formatCost } from "../../core/observability/costs.js";
 
 interface CostsTabProps {
   pane: "left" | "right";

@@ -13,7 +13,7 @@ import { join } from "path";
 import { execFileSync } from "child_process";
 import { getApp } from "../../core/app.js";
 import { startSession, dispatch, stop } from "../../core/services/session-orchestration.js";
-import { killSession } from "../../core/tmux.js";
+import { killSession } from "../../core/infra/tmux.js";
 import { TuiDriver } from "../fixtures/tui-driver.js";
 import { setupE2E, type E2EEnv } from "../fixtures/app.js";
 import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "../../core/__tests__/test-helpers.js";

@@ -11,10 +11,10 @@ import type { KnowledgeNode } from "../../core/knowledge/types.js";
 import { generateRepoMap } from "../../core/repo-map.js";
 import { getHotkeys } from "../../core/hotkeys.js";
 import { getThemeMode } from "../../core/theme.js";
-import { getAllSessionCosts, exportCostsCsv } from "../../core/costs.js";
-import { getActiveProfile } from "../../core/profiles.js";
+import { getAllSessionCosts, exportCostsCsv } from "../../core/observability/costs.js";
+import { getActiveProfile } from "../../core/state/profiles.js";
 import { cleanupWorktrees } from "../../core/services/session-orchestration.js";
-import { exportSession } from "../../core/session-share.js";
+import { exportSession } from "../../core/session/share.js";
 import { addMcpServer, removeMcpServer } from "../../core/tools.js";
 import { generateOpenApiSpec } from "../../core/openapi.js";
 

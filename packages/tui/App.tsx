@@ -25,7 +25,7 @@ import { ToolsTab, getToolsHints } from "./tabs/ToolsTab.js";
 import { CostsTab, getCostsHints } from "./tabs/CostsTab.js";
 import { SchedulesTab, getSchedulesHints } from "./tabs/SchedulesTab.js";
 import { MemoryManager, getMemoryHints } from "./components/MemoryManager.js";
-import { loadUiState, saveUiState } from "../core/ui-state.js";
+import { loadUiState, saveUiState } from "../core/state/ui-state.js";
 import { useAppContext } from "./context/AppProvider.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";

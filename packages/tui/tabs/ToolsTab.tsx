@@ -5,7 +5,7 @@ import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
 import type { ToolEntry } from "../../core/tools.js";
 import type { RecipeInstance } from "../../core/index.js";
-import { findProjectRoot } from "../../core/agent.js";
+import { findProjectRoot } from "../../core/agent/agent.js";
 import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";

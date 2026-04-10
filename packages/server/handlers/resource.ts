@@ -1,8 +1,8 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { findProjectRoot } from "../../core/agent.js";
-import { instantiateRecipe } from "../../core/recipe.js";
+import { findProjectRoot } from "../../core/agent/agent.js";
+import { instantiateRecipe } from "../../core/agent/recipe.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type {
   AgentReadParams,

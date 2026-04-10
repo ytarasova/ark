@@ -1,6 +1,6 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
-import { getAllSessionCosts, checkBudget } from "../../core/costs.js";
+import { getAllSessionCosts, checkBudget } from "../../core/observability/costs.js";
 
 export function registerDashboardHandlers(router: Router, app: AppContext): void {
   router.handle("dashboard/summary", async () => {

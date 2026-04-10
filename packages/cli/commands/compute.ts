@@ -7,7 +7,7 @@ import { execFileSync } from "child_process";
 import * as core from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
 import { getArkClient } from "./_shared.js";
-import { ComputePoolManager } from "../../core/compute-pool.js";
+import { ComputePoolManager } from "../../core/compute/pool.js";
 
 export function registerComputeCommands(program: Command) {
   const computeCmd = program.command("compute").description("Manage compute resources");

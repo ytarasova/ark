@@ -17,7 +17,7 @@ import type {
   ComputeSnapshot, PortDecl, PortStatus, Compute, Session,
 } from "../../types.js";
 import type { AppContext } from "../../../core/app.js";
-import * as tmux from "../../../core/tmux.js";
+import * as tmux from "../../../core/infra/tmux.js";
 import { collectLocalMetrics } from "./metrics.js";
 import { safeAsync } from "../../../core/safe.js";
 import { DEFAULT_CONDUCTOR_URL } from "../../../core/constants.js";

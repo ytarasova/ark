@@ -1,6 +1,6 @@
 import { getApp } from "../../core/app.js";
 import { startSession } from "../../core/services/session-orchestration.js";
-import { killSession } from "../../core/tmux.js";
+import { killSession } from "../../core/infra/tmux.js";
 import type { E2EEnv } from "./app.js";
 
 interface CreateOpts {
