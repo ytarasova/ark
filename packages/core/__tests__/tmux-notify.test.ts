@@ -6,24 +6,24 @@ withTestContext();
 
 describe("tmux-notify", () => {
   it("exports updateTmuxStatusBar and clearTmuxStatusBar", async () => {
-    const mod = await import("../tmux-notify.js");
+    const mod = await import("../infra/tmux-notify.js");
     expect(typeof mod.updateTmuxStatusBar).toBe("function");
     expect(typeof mod.clearTmuxStatusBar).toBe("function");
   });
 
   it("updateTmuxStatusBar does not throw when tmux is unavailable", async () => {
-    const { updateTmuxStatusBar } = await import("../tmux-notify.js");
+    const { updateTmuxStatusBar } = await import("../infra/tmux-notify.js");
     // Should silently catch the error from missing tmux
     expect(() => updateTmuxStatusBar()).not.toThrow();
   });
 
   it("clearTmuxStatusBar does not throw when tmux is unavailable", async () => {
-    const { clearTmuxStatusBar } = await import("../tmux-notify.js");
+    const { clearTmuxStatusBar } = await import("../infra/tmux-notify.js");
     expect(() => clearTmuxStatusBar()).not.toThrow();
   });
 
   it("updateTmuxStatusBar handles waiting sessions without crashing", async () => {
-    const { updateTmuxStatusBar } = await import("../tmux-notify.js");
+    const { updateTmuxStatusBar } = await import("../infra/tmux-notify.js");
     // Create some sessions in various states to exercise the filter logic
     const s1 = getApp().sessions.create({ summary: "waiting-session" });
     getApp().sessions.update(s1.id, { status: "waiting" });
@@ -37,7 +37,7 @@ describe("tmux-notify", () => {
   });
 
   it("updateTmuxStatusBar handles empty session list", async () => {
-    const { updateTmuxStatusBar } = await import("../tmux-notify.js");
+    const { updateTmuxStatusBar } = await import("../infra/tmux-notify.js");
     // Fresh context has no sessions
     expect(() => updateTmuxStatusBar()).not.toThrow();
   });
