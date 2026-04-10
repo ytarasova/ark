@@ -125,8 +125,10 @@ export const api = {
   getRecipes: () => rpc<{ recipes: any[] }>("recipe/list").then(r => r.recipes),
   deleteRecipe: (name: string, scope?: string) => rpc<any>("recipe/delete", { name, scope: scope ?? "global" }),
 
-  // Agents & Flows
+  // Agents, Runtimes & Flows
   getAgents: () => rpc<{ agents: any[] }>("agent/list").then(r => r.agents),
+  getRuntimes: () => rpc<{ runtimes: any[] }>("runtime/list").then(r => r.runtimes),
+  getRuntimeDetail: (name: string) => rpc<any>("runtime/read", { name }).then(r => r.runtime),
   createAgent: (data: any) => rpc<any>("agent/create", data).then(r => ({ ok: true, name: r.name })),
   updateAgent: (name: string, data: any) => rpc<any>("agent/update", { ...data, name }),
   deleteAgent: (name: string) => rpc<any>("agent/delete", { name }),

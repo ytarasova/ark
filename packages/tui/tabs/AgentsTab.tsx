@@ -4,6 +4,7 @@ import { getTheme } from "../../core/theme.js";
 import { findProjectRoot } from "../../core/index.js";
 import { getApp } from "../../core/app.js";
 import type { AgentDefinition } from "../../core/index.js";
+import type { RuntimeDefinition } from "../../types/index.js";
 import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
@@ -12,9 +13,20 @@ import { SectionHeader } from "../components/SectionHeader.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useFocus } from "../hooks/useFocus.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 import { AgentForm } from "../forms/AgentForm.js";
 import type { StoreData } from "../hooks/useArkStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
+
+// ── Unified list item ──────────────────────────────────────────────────────
+
+type ListItem =
+  | { kind: "role"; data: AgentDefinition }
+  | { kind: "runtime"; data: RuntimeDefinition };
+
+function groupLabel(item: ListItem): string {
+  return item.kind === "role" ? "Roles" : "Runtimes";
+}
 
 interface AgentsTabProps extends StoreData {
   pane: "left" | "right";
@@ -24,13 +36,30 @@ interface AgentsTabProps extends StoreData {
 
 export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps) {
   const focus = useFocus();
+  const ark = useArkClient();
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
   const hasOverlay = formMode !== null;
-  const { sel } = useListNavigation(agents.length, { active: pane === "left" && !hasOverlay });
   const status = useStatusMessage();
   const projectRoot = useMemo(() => findProjectRoot(process.cwd()) ?? undefined, []);
 
-  const selected = agents[sel] ?? null;
+  // Fetch runtimes
+  const [runtimes, setRuntimes] = useState<RuntimeDefinition[]>([]);
+  useEffect(() => {
+    ark.runtimeList().then(setRuntimes).catch(() => setRuntimes([]));
+  }, [ark]);
+
+  // Build combined list: roles first, then runtimes
+  const items: ListItem[] = useMemo(() => {
+    const roles: ListItem[] = agents.map((a) => ({ kind: "role" as const, data: a }));
+    const rts: ListItem[] = runtimes.map((r) => ({ kind: "runtime" as const, data: r }));
+    // Sort each group by name
+    roles.sort((a, b) => a.data.name.localeCompare(b.data.name));
+    rts.sort((a, b) => a.data.name.localeCompare(b.data.name));
+    return [...roles, ...rts];
+  }, [agents, runtimes]);
+
+  const { sel } = useListNavigation(items.length, { active: pane === "left" && !hasOverlay });
+  const selected = items[sel] ?? null;
 
   useEffect(() => {
     if (formMode) focus.push("form");
@@ -49,8 +78,19 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
 
     if (!selected) return;
 
+    // Only roles support edit/copy/delete
+    if (selected.kind !== "role") {
+      if (input === "e" || input === "c" || input === "x") {
+        status.show("Only agent roles can be edited/copied/deleted");
+        return;
+      }
+      return;
+    }
+
+    const agent = selected.data as AgentDefinition;
+
     if (input === "e") {
-      if (selected._source === "builtin") {
+      if (agent._source === "builtin") {
         status.show("Cannot edit builtin -- press 'c' to copy first");
         return;
       }
@@ -59,10 +99,10 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
     }
 
     if (input === "c") {
-      const copyName = `${selected.name}-copy`;
+      const copyName = `${agent.name}-copy`;
       const scope = projectRoot ? "project" : "global";
       asyncState.run("Copying agent...", async () => {
-        getApp().agents.save(copyName, { ...selected, name: copyName } as AgentDefinition, scope, scope === "project" ? projectRoot : undefined);
+        getApp().agents.save(copyName, { ...agent, name: copyName } as AgentDefinition, scope, scope === "project" ? projectRoot : undefined);
         status.show(`Copied -> '${copyName}' (${scope})`);
         refresh();
       });
@@ -70,19 +110,22 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
     }
 
     if (input === "x") {
-      if (selected._source === "builtin") {
+      if (agent._source === "builtin") {
         status.show("Cannot delete builtin agents");
         return;
       }
-      const scope = selected._source as "project" | "global";
+      const scope = agent._source as "project" | "global";
       asyncState.run("Deleting agent...", async () => {
-        getApp().agents.delete(selected.name, scope, scope === "project" ? projectRoot : undefined);
-        status.show(`Deleted '${selected.name}'`);
+        getApp().agents.delete(agent.name, scope, scope === "project" ? projectRoot : undefined);
+        status.show(`Deleted '${agent.name}'`);
         refresh();
       });
       return;
     }
   });
+
+  // Selected agent for form editing (only if it's a role)
+  const selectedAgent = selected?.kind === "role" ? (selected.data as AgentDefinition) : null;
 
   return (
     <SplitPane
@@ -91,32 +134,46 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
       rightTitle={formMode ? (formMode === "create" ? "New Agent" : "Edit Agent") : "Details"}
       left={
         <TreeList
-          items={agents}
-          renderRow={(a) => {
-            const rt = (a.runtime ?? "claude").padEnd(8);
-            return `${a.name.padEnd(18)} ${rt} ${a.model.padEnd(8)} ${a.description}`;
+          items={items}
+          groupBy={groupLabel}
+          emptyGroups={["Roles", "Runtimes"]}
+          renderRow={(item) => {
+            if (item.kind === "role") {
+              const a = item.data as AgentDefinition;
+              const rt = (a.runtime ?? "claude").padEnd(12);
+              return `${a.name.padEnd(18)} ${rt} ${a.model.padEnd(8)} ${a.description}`;
+            } else {
+              const r = item.data as RuntimeDefinition;
+              const type = (r.type ?? "").padEnd(12);
+              const model = (r.default_model ?? "").padEnd(8);
+              return `${r.name.padEnd(18)} ${type} ${model} ${r.description ?? ""}`;
+            }
           }}
           sel={sel}
-          emptyMessage="  No agents found."
+          emptyMessage="  No agents or runtimes found."
         />
       }
       right={
         formMode ? (
           <AgentForm
-            agent={formMode === "edit" ? selected : null}
+            agent={formMode === "edit" ? selectedAgent : null}
             onDone={closeForm}
             asyncState={asyncState}
             projectRoot={projectRoot}
           />
+        ) : selected?.kind === "role" ? (
+          <AgentDetail agent={selected.data as AgentDefinition} pane={pane} statusMessage={status.message} projectRoot={projectRoot} />
+        ) : selected?.kind === "runtime" ? (
+          <RuntimeDetail runtime={selected.data as RuntimeDefinition} pane={pane} statusMessage={status.message} />
         ) : (
-          <AgentDetail agent={selected} pane={pane} statusMessage={status.message} projectRoot={projectRoot} />
+          <Box flexGrow={1}><Text dimColor>{"  No item selected."}</Text></Box>
         )
       }
     />
   );
 }
 
-// ── Detail ──────────────────────────────────────────────────────────────────
+// ── Agent Detail ───────────────────────────────────────────────────────────
 
 function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
   agent: AgentDefinition | null;
@@ -174,6 +231,69 @@ function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
           <SectionHeader title="System Prompt" />
           {a.system_prompt.split("\n").map((line, i) => (
             <Text key={i} dimColor>{`  ${line}`}</Text>
+          ))}
+        </>
+      )}
+    </DetailPanel>
+  );
+}
+
+// ── Runtime Detail ─────────────────────────────────────────────────────────
+
+function RuntimeDetail({ runtime, pane, statusMessage }: {
+  runtime: RuntimeDefinition;
+  pane: "left" | "right";
+  statusMessage: string | null;
+}) {
+  const theme = getTheme();
+  const ark = useArkClient();
+
+  // Fetch full runtime details
+  const [detail, setDetail] = useState<RuntimeDefinition | null>(null);
+  useEffect(() => {
+    ark.runtimeRead(runtime.name).then(setDetail).catch(() => setDetail(null));
+  }, [runtime.name]);
+
+  const r = detail ?? runtime;
+
+  return (
+    <DetailPanel active={pane === "right"}>
+      <Text bold>{` ${r.name}`}</Text>
+      {r.description && <Text dimColor>{` ${r.description}`}</Text>}
+      {statusMessage && <Text color={theme.waiting}>{` ${statusMessage}`}</Text>}
+
+      <Text> </Text>
+      <SectionHeader title="Config" />
+      <Text>{`  Source:         ${r._source ?? "builtin"}`}</Text>
+      <Text>{`  Type:           ${r.type}`}</Text>
+      <Text>{`  Default model:  ${r.default_model ?? "-"}`}</Text>
+      {r.permission_mode && <Text>{`  Permission:     ${r.permission_mode}`}</Text>}
+      {r.task_delivery && <Text>{`  Task delivery:  ${r.task_delivery}`}</Text>}
+
+      {r.command && r.command.length > 0 && (
+        <>
+          <Text> </Text>
+          <SectionHeader title="Command" />
+          <Text>{`  ${r.command.join(" ")}`}</Text>
+        </>
+      )}
+
+      {r.models && r.models.length > 0 && (
+        <>
+          <Text> </Text>
+          <SectionHeader title={`Models (${r.models.length})`} />
+          {r.models.map((m, i) => (
+            <Text key={i}>{`  ${m.id.padEnd(12)} ${m.label}`}</Text>
+          ))}
+        </>
+      )}
+
+      {r.env && Object.keys(r.env).length > 0 && (
+        <>
+          <Text> </Text>
+          <SectionHeader title="Environment" />
+          {Object.entries(r.env).map(([k, v]) => (
+            <Text key={k}>{`  ${k}=${v}`}</Text>
           ))}
         </>
       )}
