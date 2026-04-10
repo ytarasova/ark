@@ -83,16 +83,15 @@ If Axon isn't installed, we fall back to basic file-level indexing (no symbol ex
 
 ```ts
 async function indexCodebase(repoPath: string, store: KnowledgeStore) {
-  try {
-    // Try Axon (33+ languages, full symbol extraction)
-    const result = execFileSync("axon", ["analyze", "--json", "--project-root", repoPath]);
-    const graph = JSON.parse(result);
-    for (const node of graph.nodes) store.addNode(mapAxonNode(node));
-    for (const edge of graph.edges) store.addEdge(mapAxonEdge(edge));
-  } catch {
-    // Fallback: basic file indexing (no symbol extraction)
-    await indexFilesBasic(repoPath, store);
+  // Axon is required -- 33+ language support via tree-sitter
+  const axonPath = await which("axon");
+  if (!axonPath) {
+    throw new Error("Axon is required for codebase indexing. Install: pip install axoniq");
   }
+  const result = execFileSync("axon", ["analyze", "--json", "--project-root", repoPath]);
+  const graph = JSON.parse(result);
+  for (const node of graph.nodes) store.addNode(mapAxonNode(node));
+  for (const edge of graph.edges) store.addEdge(mapAxonEdge(edge));
 }
 ```
 
@@ -101,36 +100,33 @@ async function indexCodebase(repoPath: string, store: KnowledgeStore) {
 1. **At dispatch time** -- if the repo hasn't been indexed yet, or index is stale (>1 hour old)
 2. **On session completion** -- re-index changed files to update the graph
 3. **Manual** -- `ark index --codebase` command
+4. **Prerequisite check** -- `ark doctor` verifies Axon is installed
 
 ### What gets indexed
 
-**Via Axon (when available):**
+**Via Axon (required):**
 - Files: path, size, language, last modified
 - Symbols: functions, classes, interfaces, exports -- name, kind, line range
 - Dependencies: import/require/from statements -- full dependency chain
 - Call graphs: which functions call which
+- 33+ languages via tree-sitter
 
-**Fallback (basic, no Axon):**
-- Files: path, size, language (from extension)
-- Dependencies: regex-based import detection (`import.*from`, `require(`)
-- No symbol extraction
-
-**Both modes also index:**
+**Additionally (Ark adds on top of Axon output):**
 - Co-change history: `git log --format="%H" --name-only` analysis -- files that change together get `co_changes` edges with frequency-based weight
 
 ### How it stores
 
-Each file becomes a `type=file` node. Each exported symbol becomes a `type=symbol` node (Axon mode only). Import relationships become `depends_on` or `imports` edges.
+Each file becomes a `type=file` node. Each exported symbol becomes a `type=symbol` node. Import relationships become `depends_on` or `imports` edges.
 
 ```
 file:src/auth/login.ts
   metadata: { language: "typescript", lines: 150, last_modified: "2026-04-09" }
   
-symbol:src/auth/login.ts::validateToken  (Axon mode only)
+symbol:src/auth/login.ts::validateToken
   metadata: { kind: "function", line_start: 45, line_end: 72, exported: true }
 
 edge: file:src/auth/login.ts --depends_on--> file:src/lib/jwt.ts
-edge: symbol:login.ts::validateToken --imports--> symbol:jwt.ts::decodeJWT  (Axon mode only)
+edge: symbol:login.ts::validateToken --imports--> symbol:jwt.ts::decodeJWT
 ```
 
 ### Incremental updates
@@ -289,12 +285,43 @@ The agent starts with full context -- no grep needed for orientation.
 
 Graph traversal (2-3 hops) uses recursive CTEs, depth-limited. Full-text search uses FTS5 (SQLite) or tsvector (Postgres).
 
+## Prerequisites & Provisioning
+
+### Local mode
+`ark doctor` checks for Axon and reports if missing:
+```
++ Bun 1.3+
++ tmux
++ git
++ Claude CLI
++ Axon (codebase indexer)    <-- NEW
+```
+
+Install: `pip install axoniq` or `uvx axoniq`
+
+### Control plane (Docker/K8s)
+Axon must be pre-installed in the Docker image:
+```dockerfile
+# In Dockerfile
+RUN pip install axoniq
+```
+
+The Helm chart values should include Axon as a required tool:
+```yaml
+# values.yaml
+prerequisites:
+  axon: true    # install axoniq in the image
+```
+
+### Worker nodes
+Workers that run agent sessions also need Axon (agents may call `ark index --codebase` during execution). The worker Docker image inherits from the same base image.
+
 ## File Structure
 
 ```
 packages/core/
   knowledge-store.ts          -- KnowledgeStore interface + SQLite implementation
-  knowledge-indexer.ts        -- Codebase indexer (tree-sitter, git log)
+  knowledge-indexer.ts        -- Codebase indexer (calls Axon + git log)
   knowledge-mcp.ts            -- MCP server exposing knowledge tools
   knowledge-migration.ts      -- Migrate memories.json + LEARNINGS.md
   __tests__/
