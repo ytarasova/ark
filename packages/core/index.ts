@@ -109,8 +109,12 @@ export { buildReplay, type ReplayStep } from "./session/replay.js";
 export type { ToolDriver } from "./tool-driver.js";
 export { getToolDriver, listToolDrivers, registerToolDriver } from "./tools/registry.js";
 
-// Cost tracking
+// Cost tracking (legacy -- per-session from transcript)
 export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, syncCosts, exportCostsCsv, type SessionCost, type BudgetConfig, type BudgetStatus } from "./observability/costs.js";
+
+// Universal cost tracking (multi-runtime, multi-dimensional)
+export { PricingRegistry, type ModelPricing, type TokenUsage as PricingTokenUsage } from "./observability/pricing.js";
+export { UsageRecorder, type UsageRecord, type RecordOpts, type UsageSummaryRow, type DailyTrendRow } from "./observability/usage.js";
 
 // Conductor learnings (migrated to KnowledgeStore -- kept as type re-exports for backward compat)
 // recordLearning, getLearnings, getPolicies removed -- use app.knowledge directly

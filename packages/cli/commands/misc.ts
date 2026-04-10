@@ -182,9 +182,66 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   program.command("costs")
     .description("Show cost summary across sessions")
-    .option("-n, --limit <n>", "Number of sessions to show", "20")
+    .option("-n, --limit <n>", "Number of rows to show", "20")
+    .option("--by <dimension>", "Group by: model, provider, runtime, agent, session, tenant")
+    .option("--trend", "Show daily cost trend")
+    .option("--days <n>", "Days for trend (default 30)")
+    .option("--since <date>", "Start date (ISO format)")
+    .option("--until <date>", "End date (ISO format)")
+    .option("--tenant <id>", "Filter by tenant")
     .action(async (opts) => {
       const ark = await getArkClient();
+
+      // Daily trend mode
+      if (opts.trend) {
+        const { trend } = await ark.costsTrend({ tenantId: opts.tenant, days: opts.days ? Number(opts.days) : 30 });
+        if (trend.length === 0) {
+          console.log(chalk.dim("No cost data for the selected period."));
+          return;
+        }
+        console.log(chalk.bold("\nDaily Cost Trend\n"));
+        console.log(chalk.dim("Date".padEnd(14) + "Cost"));
+        console.log(chalk.dim("\u2500".repeat(30)));
+        for (const row of trend) {
+          console.log(`${row.date.padEnd(14)}${core.formatCost(row.cost)}`);
+        }
+        const total = trend.reduce((s, r) => s + r.cost, 0);
+        console.log(chalk.dim("\u2500".repeat(30)));
+        console.log(chalk.bold(`Total: ${core.formatCost(total)}\n`));
+        return;
+      }
+
+      // Grouped summary mode
+      if (opts.by) {
+        const groupBy = opts.by === "agent" ? "agent_role" : opts.by === "session" ? "session_id" : opts.by === "tenant" ? "tenant_id" : opts.by;
+        const { summary, total } = await ark.costsSummary({
+          groupBy,
+          tenantId: opts.tenant,
+          since: opts.since,
+          until: opts.until,
+        });
+        if (summary.length === 0) {
+          console.log(chalk.dim("No cost data for the selected filters."));
+          return;
+        }
+        console.log(chalk.bold(`\nTotal cost: ${core.formatCost(total)}\n`));
+        console.log(chalk.dim(opts.by.padEnd(30) + "Cost".padEnd(12) + "In Tokens".padEnd(14) + "Out Tokens".padEnd(14) + "Records"));
+        console.log(chalk.dim("\u2500".repeat(80)));
+        const limit = Number(opts.limit);
+        for (const row of summary.slice(0, limit)) {
+          const key = (row.key ?? "unknown").slice(0, 28).padEnd(30);
+          const cost = core.formatCost(row.cost).padEnd(12);
+          const inp = `${(row.input_tokens / 1000).toFixed(0)}K`.padEnd(14);
+          const out = `${(row.output_tokens / 1000).toFixed(0)}K`.padEnd(14);
+          console.log(`${key}${cost}${inp}${out}${row.count}`);
+        }
+        if (summary.length > limit) {
+          console.log(chalk.dim(`\n... and ${summary.length - limit} more rows`));
+        }
+        return;
+      }
+
+      // Default: legacy per-session view
       const { costs, total } = await ark.costsRead();
 
       if (costs.length === 0) {

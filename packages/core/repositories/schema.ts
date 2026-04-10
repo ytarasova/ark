@@ -178,6 +178,9 @@ export function initSchema(db: IDatabase): void {
 
   // Knowledge graph tables
   initKnowledgeSchema(db);
+
+  // Usage records table (universal cost tracking)
+  initUsageSchema(db);
 }
 
 export function initKnowledgeSchema(db: IDatabase): void {
@@ -211,6 +214,31 @@ export function initKnowledgeSchema(db: IDatabase): void {
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_source ON knowledge_edges(tenant_id, source_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_target ON knowledge_edges(tenant_id, target_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_relation ON knowledge_edges(relation)");
+}
+
+export function initUsageSchema(db: IDatabase): void {
+  safeExec(db, `
+    CREATE TABLE IF NOT EXISTS usage_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      model TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      runtime TEXT,
+      agent_role TEXT,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens INTEGER DEFAULT 0,
+      cache_write_tokens INTEGER DEFAULT 0,
+      cost_usd REAL NOT NULL DEFAULT 0,
+      source TEXT NOT NULL DEFAULT 'transcript',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_records(session_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_tenant ON usage_records(tenant_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_records(model)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at)");
 }
 
 /** Add a column to a table if it doesn't already exist. Silently ignores duplicate column errors. */

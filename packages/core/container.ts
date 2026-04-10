@@ -29,6 +29,8 @@ import type { AgentStore } from "./stores/agent-store.js";
 import type { RecipeStore } from "./stores/recipe-store.js";
 import type { RuntimeStore } from "./stores/runtime-store.js";
 import type { KnowledgeStore } from "./knowledge/store.js";
+import type { PricingRegistry } from "./observability/pricing.js";
+import type { UsageRecorder } from "./observability/usage.js";
 
 /**
  * The cradle -- everything resolvable from the container.
@@ -62,6 +64,10 @@ export interface Cradle {
 
   // Knowledge graph
   knowledge: KnowledgeStore;
+
+  // Cost tracking
+  pricing: PricingRegistry;
+  usageRecorder: UsageRecorder;
 }
 
 export type AppContainer = AwilixContainer<Cradle>;

@@ -457,6 +457,40 @@ export class ArkClient {
     return this.rpc<CostsReadResult>("costs/read");
   }
 
+  async costsSummary(opts?: { groupBy?: string; tenantId?: string; since?: string; until?: string }): Promise<{
+    summary: Array<{ key: string; cost: number; input_tokens: number; output_tokens: number; count: number }>;
+    total: number;
+  }> {
+    return this.rpc("costs/summary", opts as Record<string, unknown>);
+  }
+
+  async costsTrend(opts?: { tenantId?: string; days?: number }): Promise<{
+    trend: Array<{ date: string; cost: number }>;
+  }> {
+    return this.rpc("costs/trend", opts as Record<string, unknown>);
+  }
+
+  async costsSession(sessionId: string): Promise<{
+    cost: number;
+    records: Array<{
+      id: number; session_id: string; tenant_id: string; model: string; provider: string;
+      runtime: string | null; agent_role: string | null;
+      input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number;
+      cost_usd: number; source: string; created_at: string;
+    }>;
+  }> {
+    return this.rpc("costs/session", { sessionId });
+  }
+
+  async costsRecord(opts: {
+    sessionId: string; model: string; provider: string;
+    input_tokens?: number; output_tokens?: number;
+    cache_read_tokens?: number; cache_write_tokens?: number;
+    tenantId?: string; runtime?: string; agentRole?: string; source?: string;
+  }): Promise<{ ok: boolean }> {
+    return this.rpc("costs/record", opts as Record<string, unknown>);
+  }
+
   // ── Session extended ────────────────────────────────────────────────────────
 
   async sessionOutput(sessionId: string, lines?: number): Promise<string> {

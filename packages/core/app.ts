@@ -45,6 +45,8 @@ import type { WorkerRegistry } from "./hosted/worker-registry.js";
 import type { SessionScheduler } from "./hosted/scheduler.js";
 import type { TenantPolicyManager } from "./auth/index.js";
 import { KnowledgeStore } from "./knowledge/store.js";
+import { PricingRegistry } from "./observability/pricing.js";
+import { UsageRecorder } from "./observability/usage.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -140,6 +142,11 @@ export class AppContext {
   get recipes(): RecipeStore { return this._resolve("recipes"); }
   get runtimes(): RuntimeStore { return this._resolve("runtimes"); }
   get knowledge(): KnowledgeStore { return this._resolve("knowledge"); }
+
+  // ── Cost tracking ─────────────────────────────────────────────────────
+
+  get pricing(): PricingRegistry { return this._resolve("pricing"); }
+  get usageRecorder(): UsageRecorder { return this._resolve("usageRecorder"); }
 
   // ── Session launcher ──────────────────────────────────────────────────
 
@@ -319,6 +326,7 @@ export class AppContext {
 
     // 3b. Register all dependencies in the container
     const storeBaseDir = join(fileURLToPath(import.meta.url), "..", "..", "..");
+    const pricingRegistry = new PricingRegistry();
 
     this._container.register({
       db: asValue(db),
@@ -359,7 +367,14 @@ export class AppContext {
 
       // Knowledge graph
       knowledge: asValue(new KnowledgeStore(db)),
+
+      // Cost tracking
+      pricing: asValue(pricingRegistry),
+      usageRecorder: asValue(new UsageRecorder(db, pricingRegistry)),
     });
+
+    // 3c. Non-blocking remote price refresh (best-effort)
+    pricingRegistry.refreshFromRemote().catch(() => {});
 
     // 4. Register compute providers
     await safeAsync("boot: load compute providers", async () => {

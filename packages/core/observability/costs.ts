@@ -1,34 +1,36 @@
 /**
  * Cost calculation from token usage.
- * Pricing per million tokens (as of 2025-05).
+ *
+ * Delegates pricing to PricingRegistry for 300+ model support.
+ * Maintains backward-compatible API for existing callers.
  */
 
 import type { TranscriptUsage } from "../claude/claude.js";
 import { parseTranscriptUsage } from "../claude/claude.js";
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
+import { PricingRegistry } from "./pricing.js";
 
 import { readdirSync, existsSync } from "fs";
 import { join } from "path";
 
-// Pricing per million tokens
-const PRICING: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
-  "opus":   { input: 15.00, output: 75.00, cacheRead: 1.50,  cacheWrite: 18.75 },
-  "sonnet": { input: 3.00,  output: 15.00, cacheRead: 0.30,  cacheWrite: 3.75 },
-  "haiku":  { input: 0.80,  output: 4.00,  cacheRead: 0.08,  cacheWrite: 1.00 },
-};
+// Shared registry instance for standalone function calls
+const _registry = new PricingRegistry();
 
 const DEFAULT_MODEL = "sonnet";
 
 /** Calculate cost in USD from token usage and model name. */
 export function calculateCost(usage: TranscriptUsage, model?: string | null): number {
-  const p = PRICING[model ?? DEFAULT_MODEL] ?? PRICING[DEFAULT_MODEL];
-  return (
-    (usage.input_tokens * p.input / 1_000_000) +
-    (usage.output_tokens * p.output / 1_000_000) +
-    (usage.cache_read_input_tokens * p.cacheRead / 1_000_000) +
-    (usage.cache_creation_input_tokens * p.cacheWrite / 1_000_000)
-  );
+  const m = model ?? DEFAULT_MODEL;
+  const tokenUsage = {
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
+    cache_read_tokens: usage.cache_read_input_tokens,
+    cache_write_tokens: usage.cache_creation_input_tokens,
+  };
+  // Fall back to sonnet pricing for unrecognized model names (backward compat)
+  const resolved = _registry.getPrice(m) ? m : DEFAULT_MODEL;
+  return _registry.calculateCost(resolved, tokenUsage);
 }
 
 /** Format cost as string: "$1.23" or "<$0.01" */

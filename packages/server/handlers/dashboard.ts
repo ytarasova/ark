@@ -15,30 +15,49 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
       if (s.status in counts) counts[s.status]++;
     }
 
-    // Cost summary
-    const { sessions: costSessions, total: totalCost } = getAllSessionCosts(sessions);
-
-    // Cost by model
-    const byModel: Record<string, number> = {};
-    for (const c of costSessions) {
-      const model = c.model ?? "unknown";
-      byModel[model] = (byModel[model] ?? 0) + c.cost;
-    }
-
-    // Time-bucketed costs (today, this week, this month)
+    // Cost summary -- prefer usage_records table, fall back to legacy session config
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const weekStart = new Date(now.getTime() - now.getDay() * 86400000);
     weekStart.setHours(0, 0, 0, 0);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    const todaySessions = sessions.filter(s => s.updated_at >= todayStart);
-    const weekSessions = sessions.filter(s => s.updated_at >= weekStart.toISOString());
-    const monthSessions = sessions.filter(s => s.updated_at >= monthStart);
+    let totalCost: number;
+    let todayCost: number;
+    let weekCost: number;
+    let monthCost: number;
+    let byModel: Record<string, number> = {};
+    let costSessions: any[];
 
-    const todayCost = getAllSessionCosts(todaySessions).total;
-    const weekCost = getAllSessionCosts(weekSessions).total;
-    const monthCost = getAllSessionCosts(monthSessions).total;
+    // Try usage_records first (universal tracking)
+    const usageTotal = app.usageRecorder.getTotalCost();
+    if (usageTotal > 0) {
+      totalCost = usageTotal;
+      todayCost = app.usageRecorder.getTotalCost({ since: todayStart });
+      weekCost = app.usageRecorder.getTotalCost({ since: weekStart.toISOString() });
+      monthCost = app.usageRecorder.getTotalCost({ since: monthStart });
+      const modelSummary = app.usageRecorder.getSummary({ groupBy: "model" });
+      for (const row of modelSummary) {
+        byModel[row.key ?? "unknown"] = row.cost;
+      }
+      costSessions = [];
+    } else {
+      // Fall back to legacy session config-based costs
+      const legacy = getAllSessionCosts(sessions);
+      totalCost = legacy.total;
+      costSessions = legacy.sessions;
+      for (const c of costSessions) {
+        const model = c.model ?? "unknown";
+        byModel[model] = (byModel[model] ?? 0) + c.cost;
+      }
+
+      const todaySessions = sessions.filter(s => s.updated_at >= todayStart);
+      const weekSessions = sessions.filter(s => s.updated_at >= weekStart.toISOString());
+      const monthSessions = sessions.filter(s => s.updated_at >= monthStart);
+      todayCost = getAllSessionCosts(todaySessions).total;
+      weekCost = getAllSessionCosts(weekSessions).total;
+      monthCost = getAllSessionCosts(monthSessions).total;
+    }
 
     // Budget info
     const budgets = app.config.budgets ?? {};
