@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { resolve, join, dirname } from "path";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, writeFileSync, mkdirSync } from "fs";
 import { execSync, execFileSync } from "child_process";
 import * as core from "../../core/index.js";
 import { AppContext, setApp } from "../../core/app.js";
@@ -176,69 +176,7 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       await import("../../core/channel.js");
     });
 
-  // ── Auth ────────────────────────────────────────────────────────────────────
-
-  program.command("auth")
-    .description("Set up Claude authentication (local + sync to remote hosts)")
-    .option("--host <name>", "Run setup-token on a specific remote host instead")
-    .action(async (opts) => {
-      if (opts.host) {
-        const ark = await getArkClient();
-        let compute: any;
-        try { compute = await ark.computeRead(opts.host); } catch { console.error(`Compute '${opts.host}' not found`); process.exit(1); }
-        const cfg = compute.config as { ip?: string };
-        if (!cfg.ip) { console.error(`No IP for '${opts.host}'`); process.exit(1); }
-        const key = `${process.env.HOME}/.ssh/ark-${compute.name}`;
-        console.log(`Running setup-token on ${compute.name} (${cfg.ip})...`);
-        execFileSync("ssh", [
-          "-i", key, "-o", "StrictHostKeyChecking=no", "-t",
-          `ubuntu@${cfg.ip}`, "~/.local/bin/claude setup-token",
-        ], { stdio: "inherit" });
-      } else {
-        const { spawn } = await import("child_process");
-
-        console.log("Setting up Claude authentication...\n");
-
-        // Spawn setup-token as a child process that forwards signals
-        const exitCode = await new Promise<number>((resolve) => {
-          const child = spawn("claude", ["setup-token"], {
-            stdio: "inherit",
-          });
-          // Forward Ctrl+C to the child
-          process.on("SIGINT", () => child.kill("SIGINT"));
-          child.on("close", (code) => resolve(code ?? 1));
-        });
-
-        if (exitCode !== 0) {
-          process.exit(exitCode);
-        }
-
-        console.log("\nPaste the full OAuth token (sk-ant-oat01-...) and press Enter:");
-        process.stdout.write("> ");
-        const readline = await import("readline");
-        const rl = readline.createInterface({ input: process.stdin });
-        let tokenBuf = "";
-        const token = await new Promise<string>((resolve) => {
-          rl.on("close", () => resolve(tokenBuf.trim()));
-          rl.on("line", (line) => {
-            tokenBuf += line.trim();
-            if (tokenBuf.startsWith("sk-ant-oat") && tokenBuf.length >= 100) {
-              rl.close();
-            }
-          });
-        });
-
-        if (token.startsWith("sk-ant-oat")) {
-          const arkDir = join(process.env.HOME!, ".ark");
-          mkdirSync(arkDir, { recursive: true });
-          writeFileSync(join(arkDir, "claude-oauth-token"), token, { mode: 0o600 });
-          console.log(`\n✓ Token saved to ~/.ark/claude-oauth-token`);
-          console.log(`  TUI and dispatch will pick it up automatically.`);
-        } else if (token) {
-          console.log("\nToken doesn't look right (should start with sk-ant-oat). Try again.");
-        }
-      }
-    });
+  // ── Auth is registered via commands/auth.ts (API keys + Claude setup) ──────
 
   // ── Costs ──────────────────────────────────────────────────────────────────
 
@@ -549,7 +487,7 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
         (config as any).port = webPort;
 
         console.log(chalk.cyan("Starting Ark hosted control plane..."));
-        const { app, stop } = await startHostedServer(config);
+        const { stop } = await startHostedServer(config);
 
         console.log(chalk.green(`Ark control plane running`));
         console.log(chalk.dim(`  Web UI:     http://localhost:${webPort}`));
