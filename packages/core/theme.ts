@@ -19,15 +19,15 @@ export interface Theme {
 }
 
 const DARK: Theme = {
-  accent: "#82aaff",          // bright blue -- tabs, titles, bar background
-  highlight: "#c792ea",       // soft purple -- selected items, cursors
+  accent: "#82aaff",          // blue -- tabs, titles, cursor text
+  highlight: "#45475a",       // subtle raised surface -- selected rows, status bar
   running: "#c3e88d",         // bright green
   waiting: "#ffcb6b",         // warm yellow
   error: "#ff5370",           // vivid red
   idle: "#b4befe",            // periwinkle -- clearly visible
-  surface: "#313244",         // Catppuccin surface -- distinct from terminal bg
+  surface: "#313244",         // distinct from terminal bg
   text: "#eef0fc",            // near-white -- maximum readability
-  dimText: "#a6adc8",         // Catppuccin subtext -- still clearly readable
+  dimText: "#a6adc8",         // visible muted text
 };
 
 const LIGHT: Theme = {
