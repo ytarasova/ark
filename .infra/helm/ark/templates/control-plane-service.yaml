@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ark.fullname" . }}-control-plane
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ark.labels" . | nindent 4 }}
+    app.kubernetes.io/component: control-plane
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "ark.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: control-plane
+  ports:
+    - name: web
+      port: {{ .Values.controlPlane.ports.web }}
+      targetPort: web
+      protocol: TCP
+    - name: conductor
+      port: {{ .Values.controlPlane.ports.conductor }}
+      targetPort: conductor
+      protocol: TCP
+    - name: router
+      port: {{ .Values.controlPlane.ports.router }}
+      targetPort: router
+      protocol: TCP

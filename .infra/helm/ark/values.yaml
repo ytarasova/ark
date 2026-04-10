@@ -1,0 +1,96 @@
+# -- Global
+namespace: ark
+replicaCount: 1
+
+# -- Ark Control Plane
+controlPlane:
+  image:
+    repository: ark
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  ports:
+    web: 8420
+    conductor: 19100
+    router: 8430
+  auth:
+    enabled: true
+  router:
+    enabled: true
+    policy: balanced
+
+# -- Workers
+workers:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: ark
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 4000m
+      memory: 4Gi
+  capacity: 5              # max sessions per worker
+  # Kata/Firecracker runtime for hardware isolation
+  kata:
+    enabled: false
+    runtimeClassName: kata-fc
+
+# -- PostgreSQL
+postgresql:
+  enabled: true            # set false to use external
+  image: postgres:16-alpine
+  storage: 10Gi
+  auth:
+    username: ark
+    password: ark           # override in production!
+    database: ark
+  # External Postgres (when postgresql.enabled=false)
+  external:
+    host: ""
+    port: 5432
+    database: ark
+    existingSecret: ""      # K8s secret with DATABASE_URL
+
+# -- Redis
+redis:
+  enabled: true             # set false to use external
+  image: redis:7-alpine
+  # External Redis (when redis.enabled=false)
+  external:
+    host: ""
+    port: 6379
+    existingSecret: ""
+
+# -- Ingress
+ingress:
+  enabled: true
+  className: nginx
+  host: ark.example.com
+  tls:
+    enabled: false
+    secretName: ark-tls
+  annotations: {}
+
+# -- LLM Provider Keys (create a K8s secret)
+llm:
+  anthropicApiKey: ""
+  openaiApiKey: ""
+  googleApiKey: ""
+  existingSecret: ""        # K8s secret with API keys
+
+# -- Service Account
+serviceAccount:
+  create: true
+  name: ark
+  annotations: {}

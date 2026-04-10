@@ -1,0 +1,21 @@
+{{- if .Values.workers.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ark.fullname" . }}-worker
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ark.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  # Headless service for worker discovery
+  clusterIP: None
+  selector:
+    {{- include "ark.workerSelectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  ports:
+    - name: arkd
+      port: 19300
+      targetPort: arkd
+      protocol: TCP
+{{- end }}

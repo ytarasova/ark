@@ -1,0 +1,13 @@
+apiVersion: v2
+name: ark
+description: AI agent orchestration platform
+version: 0.12.0
+appVersion: "0.11.0"
+type: application
+keywords:
+  - ai
+  - agents
+  - orchestration
+  - llm
+maintainers:
+  - name: Ark Team

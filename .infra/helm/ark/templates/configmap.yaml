@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ark.fullname" . }}-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ark.labels" . | nindent 4 }}
+data:
+  ARK_CONDUCTOR_HOST: "0.0.0.0"
+  ARK_CONDUCTOR_PORT: {{ .Values.controlPlane.ports.conductor | quote }}
+  ARK_AUTH_ENABLED: {{ .Values.controlPlane.auth.enabled | quote }}
+  ARK_ROUTER_POLICY: {{ .Values.controlPlane.router.policy | quote }}
+  DATABASE_URL: {{ include "ark.databaseUrl" . | quote }}
+  REDIS_URL: {{ include "ark.redisUrl" . | quote }}

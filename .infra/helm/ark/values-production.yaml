@@ -1,0 +1,61 @@
+# Production values for Ark Helm chart
+#
+# Usage:
+#   helm install ark .infra/helm/ark/ -f .infra/helm/ark/values-production.yaml
+
+namespace: ark
+
+controlPlane:
+  image:
+    repository: ark
+    tag: latest
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 4000m
+      memory: 4Gi
+
+workers:
+  replicaCount: 10
+  kata:
+    enabled: true
+    runtimeClassName: kata-fc
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+  capacity: 5
+
+# Use external managed Postgres (e.g. RDS)
+postgresql:
+  enabled: false
+  external:
+    host: your-rds-endpoint.amazonaws.com
+    port: 5432
+    database: ark
+    existingSecret: ark-db-credentials
+
+# Use external managed Redis (e.g. ElastiCache)
+redis:
+  enabled: false
+  external:
+    host: your-elasticache.amazonaws.com
+    port: 6379
+    existingSecret: ark-redis-credentials
+
+ingress:
+  enabled: true
+  className: nginx
+  host: ark.yourcompany.com
+  tls:
+    enabled: true
+    secretName: ark-tls
+
+llm:
+  existingSecret: ark-llm-keys

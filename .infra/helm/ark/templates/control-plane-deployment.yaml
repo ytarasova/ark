@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ark.fullname" . }}-control-plane
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ark.labels" . | nindent 4 }}
+    app.kubernetes.io/component: control-plane
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ark.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: control-plane
+  template:
+    metadata:
+      labels:
+        {{- include "ark.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: control-plane
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "ark.serviceAccountName" . }}
+      {{- end }}
+      containers:
+        - name: ark
+          image: "{{ .Values.controlPlane.image.repository }}:{{ .Values.controlPlane.image.tag }}"
+          imagePullPolicy: {{ .Values.controlPlane.image.pullPolicy }}
+          command:
+            - bun
+            - packages/cli/index.ts
+            - server
+            - start
+            - --hosted
+            - --port
+            - {{ .Values.controlPlane.ports.web | quote }}
+          ports:
+            - name: web
+              containerPort: {{ .Values.controlPlane.ports.web }}
+              protocol: TCP
+            - name: conductor
+              containerPort: {{ .Values.controlPlane.ports.conductor }}
+              protocol: TCP
+            - name: router
+              containerPort: {{ .Values.controlPlane.ports.router }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "ark.fullname" . }}-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ark.dbSecretName" . }}
+                  key: DATABASE_URL
+          {{- if or .Values.llm.anthropicApiKey .Values.llm.existingSecret }}
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ark.llmSecretName" . }}
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+          {{- end }}
+          {{- if or .Values.llm.openaiApiKey .Values.llm.existingSecret }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ark.llmSecretName" . }}
+                  key: OPENAI_API_KEY
+                  optional: true
+          {{- end }}
+          {{- if or .Values.llm.googleApiKey .Values.llm.existingSecret }}
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ark.llmSecretName" . }}
+                  key: GOOGLE_API_KEY
+                  optional: true
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: conductor
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: conductor
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.controlPlane.resources | nindent 12 }}
+          volumeMounts:
+            - name: ark-data
+              mountPath: /root/.ark
+      volumes:
+        - name: ark-data
+          emptyDir: {}

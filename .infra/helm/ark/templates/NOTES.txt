@@ -1,0 +1,74 @@
+Ark has been deployed to namespace "{{ .Values.namespace }}".
+
+== Getting the Web URL ==
+
+{{- if .Values.ingress.enabled }}
+
+  Ark is available at:
+  {{- if .Values.ingress.tls.enabled }}
+    https://{{ .Values.ingress.host }}
+  {{- else }}
+    http://{{ .Values.ingress.host }}
+  {{- end }}
+
+  Make sure your DNS or /etc/hosts points {{ .Values.ingress.host }} to your ingress controller.
+
+{{- else }}
+
+  Ark is not exposed externally. To access the web UI, use port-forward:
+
+    kubectl port-forward -n {{ .Values.namespace }} svc/{{ include "ark.fullname" . }}-control-plane {{ .Values.controlPlane.ports.web }}:{{ .Values.controlPlane.ports.web }}
+
+  Then open: http://localhost:{{ .Values.controlPlane.ports.web }}
+
+{{- end }}
+
+== Creating an API Key ==
+
+  To create an API key for programmatic access:
+
+    kubectl exec -n {{ .Values.namespace }} deploy/{{ include "ark.fullname" . }}-control-plane -- \
+      bun packages/cli/index.ts auth create-key --name "my-key"
+
+== Checking Worker Status ==
+
+{{- if .Values.workers.enabled }}
+
+  Workers are running with {{ .Values.workers.replicaCount }} replica(s).
+  {{- if .Values.workers.kata.enabled }}
+  Workers use Kata/Firecracker runtime ({{ .Values.workers.kata.runtimeClassName }}) for hardware isolation.
+  {{- end }}
+
+  Check worker pods:
+    kubectl get pods -n {{ .Values.namespace }} -l app.kubernetes.io/component=worker
+
+  Check worker logs:
+    kubectl logs -n {{ .Values.namespace }} -l app.kubernetes.io/component=worker --tail=50
+
+{{- else }}
+
+  Workers are disabled. Enable them in values.yaml:
+    workers:
+      enabled: true
+
+{{- end }}
+
+== LLM API Keys ==
+
+{{- if .Values.llm.existingSecret }}
+
+  Using existing secret "{{ .Values.llm.existingSecret }}" for LLM API keys.
+
+{{- else }}
+
+  Set your LLM API keys via Helm values or create a secret:
+
+    kubectl create secret generic {{ include "ark.fullname" . }}-llm \
+      -n {{ .Values.namespace }} \
+      --from-literal=ANTHROPIC_API_KEY=sk-ant-... \
+      --from-literal=OPENAI_API_KEY=sk-...
+
+  Then upgrade the release:
+    helm upgrade {{ .Release.Name }} .infra/helm/ark/ --set llm.existingSecret={{ include "ark.fullname" . }}-llm
+
+{{- end }}

@@ -1,0 +1,91 @@
+{{- if .Values.workers.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ark.fullname" . }}-worker
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ark.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.workers.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ark.workerSelectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "ark.workerSelectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "ark.serviceAccountName" . }}
+      {{- end }}
+      {{- if .Values.workers.kata.enabled }}
+      runtimeClassName: {{ .Values.workers.kata.runtimeClassName }}
+      {{- end }}
+      containers:
+        - name: arkd
+          image: "{{ .Values.workers.image.repository }}:{{ .Values.workers.image.tag }}"
+          imagePullPolicy: {{ .Values.workers.image.pullPolicy }}
+          command:
+            - bun
+            - packages/cli/index.ts
+            - arkd
+            - --conductor-url
+            - "http://{{ include "ark.fullname" . }}-control-plane:{{ .Values.controlPlane.ports.conductor }}"
+          ports:
+            - name: arkd
+              containerPort: 19300
+              protocol: TCP
+          env:
+            - name: ARK_CONTROL_PLANE_URL
+              value: "http://{{ include "ark.fullname" . }}-control-plane:{{ .Values.controlPlane.ports.web }}"
+            - name: ARK_WORKER_CAPACITY
+              value: {{ .Values.workers.capacity | quote }}
+          {{- if or .Values.llm.anthropicApiKey .Values.llm.existingSecret }}
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ark.llmSecretName" . }}
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+          {{- end }}
+          {{- if or .Values.llm.openaiApiKey .Values.llm.existingSecret }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ark.llmSecretName" . }}
+                  key: OPENAI_API_KEY
+                  optional: true
+          {{- end }}
+          {{- if or .Values.llm.googleApiKey .Values.llm.existingSecret }}
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ark.llmSecretName" . }}
+                  key: GOOGLE_API_KEY
+                  optional: true
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: arkd
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: arkd
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.workers.resources | nindent 12 }}
+          volumeMounts:
+            - name: ark-data
+              mountPath: /root/.ark
+      volumes:
+        - name: ark-data
+          emptyDir: {}
+{{- end }}
