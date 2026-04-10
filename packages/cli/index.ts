@@ -36,6 +36,7 @@ import { registerRouterCommands } from "./commands/router.js";
 import { registerRuntimeCommands } from "./commands/runtime.js";
 import { registerAuthCommands } from "./commands/auth.js";
 import { registerTenantCommands } from "./commands/tenant.js";
+import { registerKnowledgeCommands } from "./commands/knowledge.js";
 import { registerMiscCommands } from "./commands/misc.js";
 
 // ── Resolve remote mode early (before AppContext boot) ──────────────────────
@@ -98,6 +99,7 @@ registerRouterCommands(program);
 registerRuntimeCommands(program);
 registerAuthCommands(program);
 registerTenantCommands(program);
+registerKnowledgeCommands(program);
 registerMiscCommands(program, app);
 
 // ── Run ─────────────────────────────────────────────────────────────────────

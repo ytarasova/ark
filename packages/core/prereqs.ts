@@ -29,6 +29,7 @@ export function checkPrereqs(): PrereqResult[] {
   check("git", ["--version"], true, "brew install git");
   check("claude", ["--version"], false, "npm install -g @anthropic-ai/claude-code");
   check("gh", ["--version"], false, "brew install gh (optional - needed for PR creation)");
+  check("axon", ["--version"], false, "pip install axoniq (optional - needed for knowledge graph codebase indexing)");
 
   return results;
 }

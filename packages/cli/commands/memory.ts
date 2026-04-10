@@ -1,8 +1,5 @@
 import type { Command } from "commander";
 import chalk from "chalk";
-import { resolve } from "path";
-import { existsSync, statSync } from "fs";
-import * as core from "../../core/index.js";
 import { getArkClient } from "./_shared.js";
 
 export function registerMemoryCommands(program: Command) {
@@ -85,29 +82,4 @@ export function registerMemoryCommands(program: Command) {
       console.log(chalk.green(`Cleared ${count} memories`));
     });
 
-  // Knowledge commands (grouped under memory domain)
-  const knowledgeCmd = program.command("knowledge").description("Knowledge ingestion");
-
-  knowledgeCmd.command("ingest")
-    .description("Ingest files into the knowledge base")
-    .argument("<path>", "File or directory to ingest")
-    .option("-s, --scope <scope>", "Scope for ingested knowledge", "knowledge")
-    .option("-t, --tag <tag>", "Tag (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
-    .action((path: string, opts) => {
-      const resolved = resolve(path);
-      if (!existsSync(resolved)) {
-        console.log(chalk.red(`Path not found: ${resolved}`));
-        return;
-      }
-      const stat = statSync(resolved);
-      if (stat.isDirectory()) {
-        const result = core.ingestDirectory(core.getApp(), resolved, { scope: opts.scope, tags: opts.tag });
-        console.log(chalk.green(`Ingested ${result.files} files (${result.chunks} chunks) from ${resolved}`));
-      } else {
-        const chunks = core.ingestFile(core.getApp(), resolved, { scope: opts.scope, tags: opts.tag });
-        console.log(chunks > 0
-          ? chalk.green(`Ingested ${resolved} (${chunks} chunks)`)
-          : chalk.yellow(`Skipped ${resolved} (unsupported or empty)`));
-      }
-    });
 }
