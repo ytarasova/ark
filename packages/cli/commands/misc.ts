@@ -183,7 +183,7 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
   program.command("costs")
     .description("Show cost summary across sessions")
     .option("-n, --limit <n>", "Number of rows to show", "20")
-    .option("--by <dimension>", "Group by: model, provider, runtime, agent, session, tenant")
+    .option("--by <dimension>", "Group by: model, provider, runtime, agent, session, tenant, user")
     .option("--trend", "Show daily cost trend")
     .option("--days <n>", "Days for trend (default 30)")
     .option("--since <date>", "Start date (ISO format)")

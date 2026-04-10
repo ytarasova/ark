@@ -12,6 +12,7 @@ export interface UsageRecord {
   id: number;
   session_id: string;
   tenant_id: string;
+  user_id: string;
   model: string;
   provider: string;
   runtime: string | null;
@@ -28,6 +29,7 @@ export interface UsageRecord {
 export interface RecordOpts {
   sessionId: string;
   tenantId?: string;
+  userId?: string;
   model: string;
   provider: string;
   runtime?: string;
@@ -49,7 +51,7 @@ export interface DailyTrendRow {
   cost: number;
 }
 
-const VALID_GROUP_COLS = new Set(["model", "provider", "runtime", "agent_role", "session_id", "tenant_id"]);
+const VALID_GROUP_COLS = new Set(["model", "provider", "runtime", "agent_role", "session_id", "tenant_id", "user_id"]);
 
 export class UsageRecorder {
   constructor(private db: IDatabase, private pricing: PricingRegistry) {}
@@ -58,12 +60,13 @@ export class UsageRecorder {
   record(opts: RecordOpts): void {
     const cost = this.pricing.calculateCost(opts.model, opts.usage);
     this.db.prepare(`
-      INSERT INTO usage_records (session_id, tenant_id, model, provider, runtime, agent_role,
+      INSERT INTO usage_records (session_id, tenant_id, user_id, model, provider, runtime, agent_role,
         input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd, source)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       opts.sessionId,
       opts.tenantId ?? "default",
+      opts.userId ?? "system",
       opts.model,
       opts.provider,
       opts.runtime ?? null,

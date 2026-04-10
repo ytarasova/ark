@@ -222,6 +222,7 @@ export function initUsageSchema(db: IDatabase): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id TEXT NOT NULL,
       tenant_id TEXT NOT NULL DEFAULT 'default',
+      user_id TEXT NOT NULL DEFAULT 'system',
       model TEXT NOT NULL,
       provider TEXT NOT NULL,
       runtime TEXT,
@@ -237,6 +238,7 @@ export function initUsageSchema(db: IDatabase): void {
   `);
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_records(session_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_tenant ON usage_records(tenant_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_user ON usage_records(user_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_records(model)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at)");
 }
