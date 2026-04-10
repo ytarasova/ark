@@ -90,8 +90,9 @@ export async function indexCodebase(
   const codegraphBin = findCodegraphBinary();
 
   try {
-    const buildArgs = ["build", "--root", repoPath];
+    const buildArgs = ["build"];
     if (!opts?.incremental) buildArgs.push("--no-incremental");
+    buildArgs.push(repoPath);
     exec(codegraphBin, buildArgs, {
       encoding: "utf-8",
       cwd: repoPath,
@@ -110,7 +111,8 @@ export async function indexCodebase(
     throw new Error(`codegraph build did not produce ${dbPath}`);
   }
 
-  const cgDb = new Database(dbPath, { readonly: true });
+  // Note: can't use readonly mode -- ops-codegraph uses WAL, bun:sqlite fails to open -wal/-shm files in readonly
+  const cgDb = new Database(dbPath);
   try {
     // Map codegraph nodes to Ark knowledge nodes
     const nodeRows = cgDb.query(

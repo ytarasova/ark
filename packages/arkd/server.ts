@@ -252,20 +252,33 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
           const body = await req.json() as { repoPath: string; incremental?: boolean };
           const repoPath = body.repoPath;
 
-          const args = ["build", "--root", repoPath];
-          if (!body.incremental) args.push("--no-incremental");
+          // Find codegraph binary: node_modules/.bin -> PATH
+          const { existsSync: existsSyncFs } = await import("fs");
+          const localBin = join(process.cwd(), "node_modules", ".bin", "codegraph");
+          const cgBin = existsSyncFs(localBin) ? localBin : "codegraph";
 
+          const args = ["build"];
+          if (!body.incremental) args.push("--no-incremental");
+          args.push(repoPath);
+
+          let buildExitCode = -1;
+          let buildStderr = "";
           try {
-            const proc = Bun.spawn({ cmd: ["codegraph", ...args], cwd: repoPath, stdout: "pipe", stderr: "pipe" });
-            await proc.exited;
+            const proc = Bun.spawn({ cmd: [cgBin, ...args], cwd: repoPath, stdout: "pipe", stderr: "pipe" });
+            buildExitCode = await proc.exited;
+            buildStderr = await new Response(proc.stderr).text();
           } catch (e: any) {
-            return json({ ok: false, error: e.message }, 500);
+            return json({ ok: false, error: `codegraph spawn failed: ${e.message}` }, 500);
+          }
+
+          if (buildExitCode !== 0) {
+            return json({ ok: false, error: `codegraph build exited ${buildExitCode}: ${buildStderr.slice(0, 500)}` }, 500);
           }
 
           const dbPath = join(repoPath, ".codegraph", "graph.db");
           try {
             const { Database } = require("bun:sqlite");
-            const db = new Database(dbPath, { readonly: true });
+            const db = new Database(dbPath);
 
             const nodes = db.query("SELECT id, kind, name, file, line, end_line, visibility, exported, qualified_name FROM nodes").all();
             const edges = db.query("SELECT source_id, target_id, kind FROM edges").all();
@@ -276,7 +289,7 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
             db.close();
             return json({ ok: true, nodes, edges, files, symbols });
           } catch (e: any) {
-            return json({ ok: false, error: `Failed to read codegraph DB: ${e.message}` }, 500);
+            return json({ ok: false, error: `Failed to read codegraph DB at ${dbPath}: ${e.message}` }, 500);
           }
         }
 
