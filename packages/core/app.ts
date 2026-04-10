@@ -44,6 +44,7 @@ import { ApiKeyManager } from "./api-keys.js";
 import type { WorkerRegistry } from "./worker-registry.js";
 import type { SessionScheduler } from "./scheduler.js";
 import type { TenantPolicyManager } from "./tenant-policy.js";
+import { KnowledgeStore } from "./knowledge/store.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,7 @@ export class AppContext {
   get agents(): AgentStore { return this._resolve("agents"); }
   get recipes(): RecipeStore { return this._resolve("recipes"); }
   get runtimes(): RuntimeStore { return this._resolve("runtimes"); }
+  get knowledge(): KnowledgeStore { return this._resolve("knowledge"); }
 
   // ── Session launcher ──────────────────────────────────────────────────
 
@@ -219,11 +221,15 @@ export class AppContext {
     const scopedTodos = new TodoRepository(db);
     scopedTodos.setTenant(tenantId);
 
+    const scopedKnowledge = new KnowledgeStore(db);
+    scopedKnowledge.setTenant(tenantId);
+
     Object.defineProperty(scoped, "sessions", { get: () => scopedSessions, configurable: true });
     Object.defineProperty(scoped, "computes", { get: () => scopedComputes, configurable: true });
     Object.defineProperty(scoped, "events", { get: () => scopedEvents, configurable: true });
     Object.defineProperty(scoped, "messages", { get: () => scopedMessages, configurable: true });
     Object.defineProperty(scoped, "todos", { get: () => scopedTodos, configurable: true });
+    Object.defineProperty(scoped, "knowledge", { get: () => scopedKnowledge, configurable: true });
 
     return scoped;
   }
@@ -350,6 +356,9 @@ export class AppContext {
         builtinDir: join(storeBaseDir, "runtimes"),
         userDir: join(this.config.arkDir, "runtimes"),
       })),
+
+      // Knowledge graph
+      knowledge: asValue(new KnowledgeStore(db)),
     });
 
     // 4. Register compute providers

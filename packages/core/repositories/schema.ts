@@ -175,6 +175,42 @@ export function initSchema(db: IDatabase): void {
 
   // Compute pools table
   initPoolSchema(db);
+
+  // Knowledge graph tables
+  initKnowledgeSchema(db);
+}
+
+export function initKnowledgeSchema(db: IDatabase): void {
+  safeExec(db, `
+    CREATE TABLE IF NOT EXISTS knowledge (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      label TEXT NOT NULL,
+      content TEXT,
+      metadata TEXT DEFAULT '{}',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_knowledge_type ON knowledge(tenant_id, type)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_knowledge_label ON knowledge(tenant_id, label)");
+
+  safeExec(db, `
+    CREATE TABLE IF NOT EXISTS knowledge_edges (
+      source_id TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      relation TEXT NOT NULL,
+      weight REAL DEFAULT 1.0,
+      metadata TEXT DEFAULT '{}',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (source_id, target_id, relation)
+    )
+  `);
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_source ON knowledge_edges(tenant_id, source_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_target ON knowledge_edges(tenant_id, target_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_relation ON knowledge_edges(relation)");
 }
 
 /** Add a column to a table if it doesn't already exist. Silently ignores duplicate column errors. */

@@ -224,6 +224,10 @@ export { remember, recall, forget, listMemories, clearMemories, formatMemoriesFo
 // Knowledge ingestion
 export { ingestFile, ingestDirectory, queryKnowledge, chunkText } from "./knowledge.js";
 
+// Knowledge graph store
+export { KnowledgeStore } from "./knowledge/index.js";
+export type { KnowledgeNode, KnowledgeEdge, ContextPackage, NodeType, EdgeRelation } from "./knowledge/index.js";
+
 // GitHub issue webhook
 export { handleIssueWebhook, type IssueWebhookPayload, type IssueWebhookConfig } from "./github-webhook.js";
 
