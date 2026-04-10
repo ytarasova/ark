@@ -87,17 +87,89 @@ export function CostsTab({ pane }: CostsTabProps) {
               </>
             )}
             <Text> </Text>
-            {/* Model breakdown summary */}
-            <Text bold>By Model</Text>
-            {byModel.map(([model, data]) => (
-              <Text key={model}>
-                {"  "}{model.padEnd(15)}<Text color={theme.waiting}>{formatCost(data.cost).padEnd(10)}</Text>
-                <Text dimColor>{data.count} sessions</Text>
-              </Text>
-            ))}
+            {/* Model breakdown with ASCII bar chart */}
+            <Text bold>Cost by Model</Text>
+            {byModel.map(([model, data]) => {
+              const maxCost = byModel[0]?.[1]?.cost ?? 1;
+              const barLen = Math.max(1, Math.round((data.cost / maxCost) * 20));
+              const bar = "\u2588".repeat(barLen);
+              return (
+                <Text key={model}>
+                  {"  "}{model.padEnd(12)}<Text color={theme.accent}>{bar}</Text>
+                  {"  "}<Text color={theme.waiting}>{formatCost(data.cost).padEnd(10)}</Text>
+                  <Text dimColor>{data.count} sessions</Text>
+                </Text>
+              );
+            })}
+
+            {/* Sparkline: cost per session trend (last 20) */}
+            {costs.length > 1 && (() => {
+              const recent = costs.slice(0, 20).reverse();
+              const maxC = Math.max(...recent.map(c => c.cost), 0.01);
+              const SPARK = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588";
+              const sparkline = recent.map(c => {
+                const idx = Math.min(7, Math.floor((c.cost / maxC) * 7));
+                return SPARK[idx];
+              }).join("");
+              return (
+                <>
+                  <Text> </Text>
+                  <Text bold>Cost Trend (recent sessions)</Text>
+                  <Text>  <Text color={theme.accent}>{sparkline}</Text></Text>
+                  <Text dimColor>  {"oldest".padEnd(sparkline.length - 6)}newest</Text>
+                </>
+              );
+            })()}
           </Box>
         ) : (
-          <Text dimColor>Select a session to see cost details.</Text>
+          <Box flexDirection="column">
+            {/* Default: overview with model bars and sparkline */}
+            <Text bold>Cost Overview</Text>
+            <Text> </Text>
+            <Text>Total: <Text color={theme.waiting}>{formatCost(total)}</Text>  ({costs.length} sessions)</Text>
+            <Text> </Text>
+
+            {/* ASCII bar chart by model */}
+            {byModel.length > 0 && (
+              <>
+                <Text bold>By Model</Text>
+                {byModel.map(([model, data]) => {
+                  const maxCost = byModel[0]?.[1]?.cost ?? 1;
+                  const barLen = Math.max(1, Math.round((data.cost / maxCost) * 20));
+                  const bar = "\u2588".repeat(barLen);
+                  return (
+                    <Text key={model}>
+                      {"  "}{model.padEnd(12)}<Text color={theme.accent}>{bar}</Text>
+                      {"  "}<Text color={theme.waiting}>{formatCost(data.cost).padEnd(10)}</Text>
+                      <Text dimColor>{data.count} sessions</Text>
+                    </Text>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Sparkline */}
+            {costs.length > 1 && (() => {
+              const recent = costs.slice(0, 30).reverse();
+              const maxC = Math.max(...recent.map(c => c.cost), 0.01);
+              const SPARK = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588";
+              const sparkline = recent.map(c => {
+                const idx = Math.min(7, Math.floor((c.cost / maxC) * 7));
+                return SPARK[idx];
+              }).join("");
+              return (
+                <>
+                  <Text> </Text>
+                  <Text bold>Cost Trend</Text>
+                  <Text>  <Text color={theme.accent}>{sparkline}</Text></Text>
+                  <Text dimColor>  {"oldest".padEnd(Math.max(0, sparkline.length - 6))}newest</Text>
+                </>
+              );
+            })()}
+
+            <Text> </Text>
+            <Text dimColor>Select a session to see details.</Text>
+          </Box>
         )
       }
     />

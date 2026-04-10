@@ -225,22 +225,114 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
     500,
   );
 
+  // Dashboard hooks (must be unconditional)
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { running: 0, waiting: 0, stopped: 0, failed: 0, completed: 0 };
+    for (const sess of sessions) {
+      if (sess.status in counts) counts[sess.status]++;
+    }
+    return counts;
+  }, [sessions]);
+
+  const todayCost = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayIso = today.toISOString();
+    let total = 0;
+    for (const sess of sessions) {
+      if ((sess.updated_at ?? "") >= todayIso) {
+        const ci = getSessionCost(sess);
+        total += ci.cost;
+      }
+    }
+    return total;
+  }, [sessions]);
+
+  const [recentEvts, setRecentEvts] = useState<Event[]>([]);
+  useEffect(() => {
+    if (s || sessions.length === 0) { setRecentEvts([]); return; }
+    const recent = [...sessions]
+      .sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""))
+      .slice(0, 3);
+    Promise.all(recent.map(rs => ark.sessionEvents(rs.id, 3).catch(() => [] as Event[])))
+      .then(results => {
+        const all = results.flat().sort((a, b) => b.created_at.localeCompare(a.created_at));
+        setRecentEvts(all.slice(0, 5));
+      });
+  }, [!s, sessions.length]);
+
   if (!s) {
+    const STATUS_ICONS: Record<string, string> = {
+      running: "\u25CF",
+      waiting: "\u25D1",
+      stopped: "\u25CB",
+      failed: "\u2715",
+      completed: "\u2714",
+    };
+
+    const STATUS_THEME: Record<string, string | undefined> = {
+      running: theme.running,
+      waiting: theme.waiting,
+      stopped: undefined,
+      failed: theme.error,
+      completed: theme.running,
+    };
+
     return (
       <Box flexDirection="column" flexGrow={1} paddingX={2} paddingTop={1}>
-        {sessions.length === 0 ? (
+        <Text bold color={theme.accent}>Dashboard</Text>
+        <Text> </Text>
+
+        {/* Fleet status */}
+        <SectionHeader title="Fleet Status" />
+        <Box>
+          <Text>{"  "}</Text>
+          {Object.entries(statusCounts).map(([status, count], idx) => (
+            <React.Fragment key={status}>
+              {idx > 0 && <Text dimColor>{"  "}</Text>}
+              <Text color={STATUS_THEME[status] as any}>
+                {STATUS_ICONS[status]} {count}
+              </Text>
+              <Text dimColor>{` ${status}`}</Text>
+            </React.Fragment>
+          ))}
+        </Box>
+        <Text dimColor>{"  "}{sessions.length} total sessions</Text>
+
+        {/* Today's cost */}
+        <Text> </Text>
+        <SectionHeader title="Cost (today)" />
+        <Text>{"  "}<Text color={theme.waiting}>{formatCost(todayCost)}</Text></Text>
+
+        {/* Recent events */}
+        {recentEvts.length > 0 && (
           <>
-            <Text bold color={theme.accent}>Welcome to Ark</Text>
             <Text> </Text>
-            <Text>  <Text bold color={theme.accent}>n</Text>  Create your first session</Text>
-            <Text>  <Text bold color={theme.accent}>?</Text>  See all keyboard shortcuts</Text>
-            <Text>  <Text bold color={theme.accent}>q</Text>  Quit</Text>
+            <SectionHeader title="Recent Activity" />
+            {recentEvts.map((ev, idx) => {
+              const ts = hms(ev.created_at).slice(0, 5);
+              const msg = formatEvent(ev.type, ev.data ?? undefined);
+              return (
+                <Text key={`${ev.id}-${idx}`}>
+                  {"  "}<Text dimColor>{ts}</Text>{"  "}{msg}
+                </Text>
+              );
+            })}
+          </>
+        )}
+
+        {/* Quick hints */}
+        <Text> </Text>
+        <SectionHeader title="Quick Start" />
+        <Text>  <Text bold color={theme.accent}>n</Text>  Create a new session</Text>
+        <Text>  <Text bold color={theme.accent}>?</Text>  See all keyboard shortcuts</Text>
+        <Text>  <Text bold color={theme.accent}>q</Text>  Quit</Text>
+        {sessions.length === 0 && (
+          <>
             <Text> </Text>
             <Text dimColor>Or from the terminal:</Text>
             <Text dimColor>  ark session start --repo . --summary "Fix a bug" --dispatch</Text>
           </>
-        ) : (
-          <Text dimColor>Select a session from the list.</Text>
         )}
       </Box>
     );

@@ -14,12 +14,13 @@ import { MemoryPage } from "./pages/MemoryPage.js";
 import { CostsPage } from "./pages/CostsPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
+import { DashboardPage } from "./pages/DashboardPage.js";
 
 const READ_ONLY = document.getElementById("root")?.dataset.readonly === "true";
 const AUTH_REQUIRED = document.getElementById("root")?.dataset.auth === "true";
 
 function App() {
-  const [view, setView] = useState("sessions");
+  const [view, setView] = useState("dashboard");
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null);
   const [toastKey, setToastKey] = useState(0);
   const [authenticated, setAuthenticated] = useState(() => {
@@ -45,6 +46,9 @@ function App() {
 
   return (
     <>
+      {view === "dashboard" && (
+        <DashboardPage view={view} onNavigate={setView} readOnly={readOnly} />
+      )}
       {view === "sessions" && (
         <SessionsPage view={view} onNavigate={setView} readOnly={readOnly} onToast={showToast} />
       )}

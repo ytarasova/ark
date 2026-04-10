@@ -1,9 +1,23 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useCostsQuery } from "../hooks/useCostQueries.js";
 import { fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
 import { DollarSign } from "lucide-react";
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, Legend,
+} from "recharts";
+
+// Chart theme colors
+const CHART_COLORS = ["#82aaff", "#c3e88d", "#ffcb6b", "#ff5370", "#b4befe", "#89ddff", "#f78c6c"];
+
+const MODEL_COLORS: Record<string, string> = {
+  opus: "#ff5370",
+  sonnet: "#82aaff",
+  haiku: "#c3e88d",
+  unknown: "#b4befe",
+};
 
 export function CostsView() {
   const { data: costs } = useCostsQuery();
@@ -18,6 +32,26 @@ export function CostsView() {
     byModel[m].cost += s.cost;
     byModel[m].count++;
   }
+
+  // Chart data: cost by model (pie)
+  const pieData = useMemo(() =>
+    Object.entries(byModel).map(([model, data]) => ({
+      name: model,
+      value: Math.round(data.cost * 100) / 100,
+      fill: MODEL_COLORS[model] ?? CHART_COLORS[Object.keys(byModel).indexOf(model) % CHART_COLORS.length],
+    })),
+    [sessions],
+  );
+
+  // Chart data: top 10 sessions by cost (bar)
+  const barData = useMemo(() =>
+    sessions.slice(0, 10).map((s: any) => ({
+      name: (s.summary || s.sessionId || "").slice(0, 20),
+      cost: Math.round(s.cost * 100) / 100,
+      model: s.model || "unknown",
+    })),
+    [sessions],
+  );
 
   return (
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
@@ -88,6 +122,86 @@ export function CostsView() {
                   <div className="text-4xl font-bold font-mono text-emerald-400">{fmtCost(costs.total || 0)}</div>
                   <div className="text-sm text-muted-foreground mt-1">{sessions.length} sessions with usage data</div>
                 </div>
+
+                {/* Charts */}
+                {sessions.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+                    {/* Pie: cost by model */}
+                    {pieData.length > 0 && (
+                      <Card className="p-4">
+                        <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-3">
+                          Cost by Model
+                        </h3>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <PieChart>
+                            <Pie
+                              data={pieData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={50}
+                              outerRadius={80}
+                              dataKey="value"
+                              label={({ name, value }) => `${name}: $${value.toFixed(2)}`}
+                              labelLine={false}
+                            >
+                              {pieData.map((entry, idx) => (
+                                <Cell key={`cell-${idx}`} fill={entry.fill} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(val: number) => `$${val.toFixed(2)}`}
+                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                              itemStyle={{ color: "hsl(var(--foreground))" }}
+                            />
+                            <Legend
+                              wrapperStyle={{ fontSize: "11px" }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </Card>
+                    )}
+
+                    {/* Bar: top sessions by cost */}
+                    {barData.length > 0 && (
+                      <Card className="p-4">
+                        <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-3">
+                          Top Sessions by Cost
+                        </h3>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <BarChart data={barData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                            <XAxis
+                              dataKey="name"
+                              tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                              tickLine={false}
+                              axisLine={false}
+                              interval={0}
+                              angle={-30}
+                              textAnchor="end"
+                              height={50}
+                            />
+                            <YAxis
+                              tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                              tickLine={false}
+                              axisLine={false}
+                              tickFormatter={(v) => `$${v}`}
+                              width={50}
+                            />
+                            <Tooltip
+                              formatter={(val: number) => `$${val.toFixed(2)}`}
+                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                              itemStyle={{ color: "hsl(var(--foreground))" }}
+                            />
+                            <Bar dataKey="cost" radius={[4, 4, 0, 0]}>
+                              {barData.map((entry, idx) => (
+                                <Cell key={`bar-${idx}`} fill={MODEL_COLORS[entry.model] ?? CHART_COLORS[idx % CHART_COLORS.length]} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </Card>
+                    )}
+                  </div>
+                )}
 
                 {/* Cost by model cards */}
                 {Object.keys(byModel).length > 0 && (

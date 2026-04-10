@@ -618,6 +618,19 @@ export class ArkClient {
     return this.rpc("verify/run", { sessionId });
   }
 
+  // ── Dashboard ──────────────────────────────────────────────────────────────
+
+  async dashboardSummary(): Promise<{
+    counts: Record<string, number>;
+    costs: { total: number; today: number; week: number; month: number; byModel: Record<string, number>; budget: any };
+    recentEvents: Array<{ sessionId: string; sessionSummary: string | null; type: string; data: any; created_at: string }>;
+    topCostSessions: Array<{ sessionId: string; summary: string | null; model: string | null; cost: number }>;
+    system: { conductor: boolean; router: boolean };
+    activeCompute: number;
+  }> {
+    return this.rpc("dashboard/summary");
+  }
+
   // ── Teardown ────────────────────────────────────────────────────────────────
 
   close(): void {

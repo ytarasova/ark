@@ -103,6 +103,9 @@ export const api = {
   refreshHistory: () => rpc<any>("history/refresh-and-index"),
   rebuildHistory: () => rpc<any>("history/rebuild-fts"),
 
+  // Dashboard
+  getDashboardSummary: () => rpc<any>("dashboard/summary"),
+
   // System
   getStatus: () => rpc<any>("status/get"),
   getGroups: () => rpc<{ groups: any[] }>("group/list").then(r => r.groups.map((g: any) => g.name)),

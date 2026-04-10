@@ -3,7 +3,7 @@ import { Button } from "./ui/button.js";
 import {
   Play, Settings, Wrench, GitBranch, Clock, Server,
   Calendar, BookOpen, DollarSign, Cog,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, LayoutDashboard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -16,6 +16,7 @@ interface SidebarProps {
 }
 
 const NAV: { id: string; icon: LucideIcon; label: string }[] = [
+  { id: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { id: "sessions", icon: Play, label: "Sessions" },
   { id: "agents", icon: Settings, label: "Agents" },
   { id: "flows", icon: GitBranch, label: "Flows" },
