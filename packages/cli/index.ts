@@ -37,6 +37,7 @@ import { registerRuntimeCommands } from "./commands/runtime.js";
 import { registerAuthCommands } from "./commands/auth.js";
 import { registerTenantCommands } from "./commands/tenant.js";
 import { registerKnowledgeCommands } from "./commands/knowledge.js";
+import { registerEvalCommands } from "./commands/eval.js";
 import { registerDashboardCommands } from "./commands/dashboard.js";
 import { registerMiscCommands } from "./commands/misc.js";
 
@@ -101,6 +102,7 @@ registerRuntimeCommands(program);
 registerAuthCommands(program);
 registerTenantCommands(program);
 registerKnowledgeCommands(program);
+registerEvalCommands(program);
 registerDashboardCommands(program, app);
 registerMiscCommands(program, app);
 

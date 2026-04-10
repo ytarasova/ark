@@ -554,6 +554,20 @@ export class ArkClient {
     return this.rpc("knowledge/import", { dir });
   }
 
+  // ── Evals ─────────────────────────────────────────────────────────────────
+
+  async evalStats(agentRole?: string): Promise<{ stats: { totalSessions: number; completionRate: number; avgDurationMs: number; avgCost: number; avgTurns: number; testPassRate: number; prRate: number } }> {
+    return this.rpc("eval/stats", { agentRole });
+  }
+
+  async evalDrift(agentRole?: string, recentDays?: number): Promise<{ drift: { completionRateDelta: number; avgCostDelta: number; avgTurnsDelta: number; alert: boolean } }> {
+    return this.rpc("eval/drift", { agentRole, recentDays });
+  }
+
+  async evalList(agentRole?: string, limit?: number): Promise<{ evals: Array<{ agentRole: string; runtime: string; model: string; sessionId: string; metrics: { completed: boolean; testsPassed: boolean | null; prCreated: boolean; turnCount: number; durationMs: number; tokenCost: number; filesChanged: number; retryCount: number }; timestamp: string }> }> {
+    return this.rpc("eval/list", { agentRole, limit });
+  }
+
   // ── Profile extended ───────────────────────────────────────────────────────
 
   async profileCreate(name: string, description?: string): Promise<Profile> {

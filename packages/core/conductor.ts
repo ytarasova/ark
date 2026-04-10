@@ -135,6 +135,13 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
       emitSessionSpanEnd(sessionId, { status: result.newStatus });
       flushSpans();
       // OS notification is handled by handleReport to avoid duplicates
+
+      // Record eval in knowledge graph
+      try {
+        const { evaluateSession } = await import("./knowledge/evals.js");
+        const freshSession = _app.sessions.get(sessionId);
+        if (freshSession) evaluateSession(_app, freshSession);
+      } catch { /* skip eval on error */ }
     }
   }
 

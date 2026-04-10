@@ -12,6 +12,7 @@ import { registerMemoryHandlers } from "./handlers/memory.js";
 import { registerScheduleHandlers } from "./handlers/schedule.js";
 import { registerWebHandlers } from "./handlers/web.js";
 import { registerKnowledgeHandlers } from "./handlers/knowledge.js";
+import { registerEvalHandlers } from "./handlers/eval.js";
 import { registerDashboardHandlers } from "./handlers/dashboard.js";
 
 export function registerAllHandlers(router: Router, app: AppContext): void {
@@ -31,5 +32,6 @@ export function registerAllHandlers(router: Router, app: AppContext): void {
   registerScheduleHandlers(router, app);
   registerWebHandlers(router, app);
   registerKnowledgeHandlers(router, app);
+  registerEvalHandlers(router, app);
   registerDashboardHandlers(router, app);
 }
