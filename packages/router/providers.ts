@@ -16,7 +16,6 @@ import type {
   ChatCompletionRequest,
   ChatCompletionResponse,
   ChatCompletionChunk,
-  Message,
   CircuitBreakerState,
 } from "./types.js";
 

@@ -147,6 +147,7 @@ describe("FileAgentStore.save", () => {
       _path: "/some/path",
     } as any);
     const raw = YAML.parse(
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       require("fs").readFileSync(join(userDir, "stripped.yaml"), "utf-8"),
     );
     expect(raw._source).toBeUndefined();

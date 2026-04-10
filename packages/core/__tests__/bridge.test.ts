@@ -117,6 +117,7 @@ describe("Bridge status notifications", () => {
 
 describe("Bridge config", () => {
   it("loadBridgeConfig returns null for missing file", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { loadBridgeConfig } = require("../bridge.js");
     // The default ARK_DIR won't have bridge.json unless user created it
     // This test is safe because we check the function doesn't throw
@@ -126,6 +127,7 @@ describe("Bridge config", () => {
   });
 
   it("createBridge returns null without config", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createBridge } = require("../bridge.js");
     // Same as above — depends on whether ~/.ark/bridge.json exists
     const bridge = createBridge();

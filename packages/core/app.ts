@@ -28,7 +28,7 @@ import { setProviderResolver, clearProviderResolver } from "./provider-registry.
 import { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
 import { startNotifyDaemon } from "./notify-daemon.js";
 import { track, configureTelemetry } from "./telemetry.js";
-import { logError, logWarn, logInfo, setLogArkDir } from "./structured-log.js";
+import { logError, logWarn, setLogArkDir } from "./structured-log.js";
 import { setProfilesArkDir } from "./profiles.js";
 import { registerExecutor } from "./executor.js";
 import { claudeCodeExecutor } from "./executors/claude-code.js";
@@ -374,7 +374,7 @@ export class AppContext {
         const e2b = new E2BProvider();
         e2b.setApp(this);
         this.registerProvider(e2b);
-      } catch {} // e2b SDK not installed
+      } catch { /* e2b SDK not installed */ }
 
       // Kubernetes providers (optional -- only if @kubernetes/client-node is available)
       try {
@@ -385,7 +385,7 @@ export class AppContext {
         const kata = new KataProvider();
         kata.setApp(this);
         this.registerProvider(kata);
-      } catch {} // @kubernetes/client-node not installed
+      } catch { /* @kubernetes/client-node not installed */ }
     });
 
     // 4b. Wire SessionService with AppContext
@@ -542,7 +542,7 @@ export class AppContext {
     // Step 1: tear down infrastructure (reverse of boot steps 7-10)
     this._removeSignalHandlers();
 
-    try { const { stopAllPollers } = await import("./executors/status-poller.js"); stopAllPollers(); } catch {}
+    try { const { stopAllPollers } = await import("./executors/status-poller.js"); stopAllPollers(); } catch { /* poller module may not be loaded */ }
 
     if (this._notifyDaemon) { this._notifyDaemon.stop(); this._notifyDaemon = null; }
     if (this._tmuxStatusInterval) { clearInterval(this._tmuxStatusInterval); this._tmuxStatusInterval = null; }
@@ -559,11 +559,11 @@ export class AppContext {
       await flushTelemetry();
       await flushSpans();
       resetOtlp();
-    } catch {}
+    } catch { /* telemetry flush is best-effort */ }
 
     // Step 3: tear down compute + DI container (reverse of boot steps 3-5)
     clearProviderResolver();
-    try { this._container.resolve("db").close(); } catch {}
+    try { this._container.resolve("db").close(); } catch { /* db may already be closed */ }
     await this._container.dispose();
 
     // Step 4: clean up temp directory (test mode)

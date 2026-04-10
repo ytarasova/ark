@@ -39,7 +39,7 @@ const IDLE_PATTERNS = [
 
 /** Strip ANSI escape codes from terminal content. */
 export function stripAnsi(content: string): string {
-  // eslint-disable-next-line no-control-regex
+   
   return content.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\x1b\][^\x07]*\x07/g, "");
 }
 

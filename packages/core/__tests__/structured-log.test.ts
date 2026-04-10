@@ -14,6 +14,7 @@ describe("structured logging", () => {
 
   it("writes JSONL entries", () => {
     logInfo("session", "test message", { key: "value" });
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getApp } = require("../app.js");
     const logFile = join(getApp().config.arkDir, "ark.jsonl");
     expect(existsSync(logFile)).toBe(true);
@@ -29,6 +30,7 @@ describe("structured logging", () => {
     setLogLevel("error");
     logInfo("general", "should not appear");
     logError("general", "should appear");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getApp } = require("../app.js");
     const logFile = join(getApp().config.arkDir, "ark.jsonl");
     if (existsSync(logFile)) {
@@ -42,6 +44,7 @@ describe("structured logging", () => {
     setLogComponents(["mcp"]);
     logInfo("session", "filtered out");
     logInfo("mcp", "allowed");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getApp } = require("../app.js");
     const logFile = join(getApp().config.arkDir, "ark.jsonl");
     if (existsSync(logFile)) {
@@ -53,6 +56,7 @@ describe("structured logging", () => {
 
   it("entries have timestamps", () => {
     logInfo("general", "timed");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getApp } = require("../app.js");
     const logFile = join(getApp().config.arkDir, "ark.jsonl");
     const content = readFileSync(logFile, "utf-8").trim();

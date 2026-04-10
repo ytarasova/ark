@@ -5,7 +5,7 @@
  * results in claude_sessions_cache table. Subsequent reads are instant SQLite queries.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync, openSync, readSync, closeSync } from "fs";
+import { existsSync, readdirSync, statSync, openSync, readSync, closeSync } from "fs";
 import { join, basename } from "path";
 import { homedir } from "os";
 import { execFile } from "child_process";
@@ -223,7 +223,7 @@ export function listClaudeSessions(app: AppContext, opts?: ListOpts): ClaudeSess
 /**
  * Find a specific Claude session by ID (prefix match supported).
  */
-export function getClaudeSession(app: AppContext, sessionId: string, opts?: ListOpts): ClaudeSession | null {
+export function getClaudeSession(app: AppContext, sessionId: string, _opts?: ListOpts): ClaudeSession | null {
   const db = app.db;
   try {
     const row = db.prepare(
@@ -273,7 +273,7 @@ export async function refreshClaudeSessionsCache(app: AppContext, opts?: { baseD
   const lastCachedTime = lastCachedAt ? new Date(lastCachedAt).getTime() : 0;
 
   let count = 0;
-  let skipped = 0;
+  let _skipped = 0;
   let fileCount = 0;
   const now = new Date().toISOString();
 
@@ -312,7 +312,7 @@ export async function refreshClaudeSessionsCache(app: AppContext, opts?: { baseD
       // Incremental: skip files not modified since last cache
       // Use Math.floor to handle sub-millisecond mtime precision on APFS/ext4
       if (lastCachedTime > 0 && Math.floor(fileStat.mtimeMs) <= lastCachedTime) {
-        skipped++;
+        _skipped++;
         opts?.onProgress?.(fileCount, totalFiles);
         continue;
       }

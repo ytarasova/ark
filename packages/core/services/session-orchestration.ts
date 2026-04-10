@@ -10,12 +10,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync
 import { join } from "path";
 import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
-import { homedir } from "os";
 
 const execFileAsync = promisify(execFile);
 
 import type { AppContext } from "../app.js";
-import { safeParseConfig } from "../util.js";
 import type { Session, Compute, MessageRole, MessageType } from "../../types/index.js";
 import * as tmux from "../tmux.js";
 import * as flow from "../flow.js";
@@ -30,8 +28,6 @@ import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
 import { buildSessionVars } from "../template.js";
 import { resolveFlow } from "../flow.js";
 import { loadRepoConfig } from "../repo-config.js";
-import { eventBus } from "../hooks.js";
-import { indexSession } from "../search.js";
 import type { OutboundMessage } from "../channel-types.js";
 import { safeAsync } from "../safe.js";
 import { saveCheckpoint } from "../checkpoint.js";
@@ -42,7 +38,7 @@ import { markStageCompleted, setCurrentStage } from "../flow-state.js";
 import { recall, formatMemoriesForPrompt } from "../memory.js";
 import { detectHandoff } from "../handoff.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
-import { logError, logInfo, logWarn } from "../structured-log.js";
+import { logError, logWarn } from "../structured-log.js";
 import { recordEvent } from "../observability.js";
 import { track } from "../telemetry.js";
 import { emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../otlp.js";
@@ -1118,7 +1114,7 @@ export async function prepareRemoteEnvironment(app: AppContext,
   return { finalLaunchContent, ports };
 }
 
-async function launchAgentTmux(app: AppContext, 
+async function _launchAgentTmux(app: AppContext,
   session: Session, stage: string,
   claudeArgs: string[], task: string, agent: agentRegistry.AgentDefinition,
   opts?: { autonomy?: string; onLog?: (msg: string) => void },
@@ -1421,7 +1417,7 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
     const delMatch = shortstat.match(/(\d+) deletions?/);
 
     // Track file hashes for re-review detection
-    let modifiedSinceReview: string[] = [];
+    const modifiedSinceReview: string[] = [];
     try {
       const { stdout: diffNames } = await execFileAsync("git", ["-C", repo, "diff", "--name-only", `${baseBranch}...${branch}`], { encoding: "utf-8" });
       const files = diffNames.trim().split("\n").filter(Boolean);
@@ -1595,7 +1591,7 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
       await execFileAsync("git", ["-C", repo, "checkout", targetBranch], { encoding: "utf-8" });
       // Merge the worktree branch
       await execFileAsync("git", ["-C", repo, "merge", branch, "--no-edit"], { encoding: "utf-8" });
-    } catch (e: any) {
+    } catch {
       // Abort merge on conflict to preserve state
       try { await execFileAsync("git", ["-C", repo, "merge", "--abort"], { encoding: "utf-8" }); } catch { /* ignore */ }
       return { ok: false, message: `Merge conflict: ${branch} into ${targetBranch}. Resolve manually. Worktree preserved.` };
@@ -1615,7 +1611,7 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
   if (!opts?.keepBranch && branch !== targetBranch) {
     try {
       await execFileAsync("git", ["-C", repo, "branch", "-d", branch], { encoding: "utf-8" });
-    } catch (e: any) {
+    } catch {
       // Branch may not exist or not be fully merged -- try force delete
       try { await execFileAsync("git", ["-C", repo, "branch", "-D", branch], { encoding: "utf-8" }); } catch { /* ignore */ }
     }

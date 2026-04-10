@@ -23,7 +23,7 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
   const [newContent, setNewContent] = useState("");
   const [newTags, setNewTags] = useState("");
   const [newScope, setNewScope] = useState("global");
-  const [loading, setLoading] = useState(false);
+  const [_loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (addRequested > 0) {

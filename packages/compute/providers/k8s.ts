@@ -8,7 +8,7 @@
 
 import type { AppContext } from "../../core/app.js";
 import type {
-  ComputeProvider, Compute, Session, ProvisionOpts, LaunchOpts, SyncOpts,
+  ComputeProvider, Compute, Session, LaunchOpts, SyncOpts,
   IsolationMode, ComputeSnapshot, ComputeMetrics, PortDecl, PortStatus,
 } from "../types.js";
 import { DEFAULT_CONDUCTOR_URL } from "../../core/constants.js";

@@ -1,4 +1,5 @@
 import { describe, it, expect, afterAll } from "bun:test";
+import { execFileSync } from "child_process";
 import { homedir } from "os";
 import { join } from "path";
 import { existsSync, mkdtempSync, rmSync } from "fs";
@@ -115,7 +116,6 @@ describe("EC2 SSH primitives", () => {
       const publicKeyPath = `${privateKeyPath}.pub`;
 
       // Use execFileSync directly to generate the key in temp dir
-      const { execFileSync } = require("child_process");
       execFileSync("ssh-keygen", [
         "-t", "ed25519",
         "-f", privateKeyPath,

@@ -15,6 +15,7 @@
  */
 
 import { execFileSync } from "child_process";
+import { writeFileSync } from "fs";
 import { join } from "path";
 import { killSession } from "../../core/tmux.js";
 import { startSession } from "../../core/services/session-orchestration.js";
@@ -132,7 +133,7 @@ function findDividerColumn(body: string[], width: number): number {
 
 /** Strip ANSI escape codes from text. */
 function stripAnsi(text: string): string {
-  // eslint-disable-next-line no-control-regex
+   
   return text.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
 }
 
@@ -455,7 +456,6 @@ export class TuiDriver {
 
   /** Save a screenshot to a file. */
   screenshot(filePath: string): void {
-    const { writeFileSync } = require("fs");
     writeFileSync(filePath, this.screenRaw(), "utf-8");
   }
 

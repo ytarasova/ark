@@ -3,6 +3,7 @@
  * Enables CI/CD integration and programmatic agent control.
  */
 
+import readline from "readline";
 import { startSession, dispatch, stop, resume, deleteSessionAsync, getOutput, send } from "./services/session-orchestration.js";
 import type { AppContext } from "./app.js";
 
@@ -94,7 +95,6 @@ export async function handleAcpRequest(app: AppContext, req: AcpRequest): Promis
 
 /** Run ACP server on stdin/stdout (for headless CLI mode). */
 export function runAcpServer(app: AppContext): void {
-  const readline = require("readline");
   const rl = readline.createInterface({ input: process.stdin });
 
   rl.on("line", async (line: string) => {
@@ -102,7 +102,7 @@ export function runAcpServer(app: AppContext): void {
       const req = JSON.parse(line) as AcpRequest;
       const resp = await handleAcpRequest(app, req);
       process.stdout.write(JSON.stringify(resp) + "\n");
-    } catch (e: any) {
+    } catch {
       const resp: AcpResponse = {
         jsonrpc: "2.0",
         error: { code: -32700, message: "Parse error" },

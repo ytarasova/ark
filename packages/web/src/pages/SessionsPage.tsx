@@ -19,11 +19,11 @@ interface SessionsPageProps {
 }
 
 export function SessionsPage({ view, onNavigate, readOnly, onToast }: SessionsPageProps) {
-  const { sessions, groups, refresh } = useSessions();
+  const { sessions, groups: _groups, refresh } = useSessions();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [groupFilter, setGroupFilter] = useState("");
+  const [groupFilter, _setGroupFilter] = useState("");
   const [showNew, setShowNew] = useState(false);
 
   const runningCount = sessions.filter(s => s.status === "running").length;

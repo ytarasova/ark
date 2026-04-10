@@ -30,7 +30,7 @@ export interface RevertPayload {
 
 // ── Pure logic ─────────────────────────────────────────────────────────────
 
-export function shouldRollback(suites: CheckSuiteResult[], config: RollbackConfig): boolean {
+export function shouldRollback(suites: CheckSuiteResult[], _config: RollbackConfig): boolean {
   const completed = suites.filter(s => s.status === "completed");
   if (completed.length === 0) return false;
   return completed.some(s => s.conclusion === "failure");

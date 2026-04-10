@@ -88,7 +88,7 @@ describe("waitFor", () => {
     const start = Date.now();
     try {
       await waitFor(() => false, { timeout: 150, interval: 10 });
-    } catch {}
+    } catch { /* expected timeout */ }
     const elapsed = Date.now() - start;
     expect(elapsed).toBeGreaterThanOrEqual(140);
     expect(elapsed).toBeLessThan(500);
@@ -101,7 +101,7 @@ describe("waitFor", () => {
         callCount++;
         return false;
       }, { timeout: 100, interval: 40 });
-    } catch {}
+    } catch { /* expected timeout */ }
     // With 100ms timeout and 40ms interval, expect roughly 2-3 checks
     expect(callCount).toBeGreaterThanOrEqual(2);
     expect(callCount).toBeLessThanOrEqual(5);

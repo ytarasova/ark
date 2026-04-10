@@ -4,7 +4,6 @@ import { api } from "../hooks/useApi.js";
 import { useFlowsQuery, useFlowDetail } from "../hooks/useFlowQueries.js";
 import { useAgentsQuery } from "../hooks/useAgentQueries.js";
 import { cn } from "../lib/utils.js";
-import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";

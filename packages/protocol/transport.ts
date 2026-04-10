@@ -59,10 +59,10 @@ export function createWebSocketTransport(
       try {
         const msg = JSON.parse(typeof event.data === "string" ? event.data : new TextDecoder().decode(event.data));
         for (const h of handlers) h(msg);
-      } catch {}
+      } catch { /* ignore malformed messages */ }
     };
 
-    ws.onerror = (err) => {
+    ws.onerror = (_err) => {
       reject(new Error(`WebSocket connection failed: ${connectUrl}`));
     };
 

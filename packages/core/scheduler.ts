@@ -31,7 +31,7 @@ export class SessionScheduler {
    */
   async schedule(session: Session, tenantId?: string): Promise<WorkerNode> {
     const tid = tenantId ?? "default";
-    const registry = this.app.workerRegistry;
+    const _registry = this.app.workerRegistry;
 
     // 1. Check tenant policy (if policy manager is available)
     let policy: TenantComputePolicy | null = null;

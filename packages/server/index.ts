@@ -1,9 +1,9 @@
-import { Router, type Handler, type NotifyFn } from "./router.js";
+import { Router, type Handler } from "./router.js";
 import {
   createNotification, isRequest, isNotification, parseMessage,
-  type JsonRpcMessage, type JsonRpcNotification,
+  type JsonRpcMessage,
 } from "../protocol/types.js";
-import { JsonlCodec, createStdioTransport, type Transport } from "../protocol/transport.js";
+import { createStdioTransport, type Transport } from "../protocol/transport.js";
 
 export interface ServerConnection {
   id: string;
@@ -145,7 +145,7 @@ export class ArkServer {
             const msg = parseMessage(typeof data === "string" ? data : new TextDecoder().decode(data as unknown as ArrayBuffer));
             const meta = wsMetadata.get(ws);
             if (meta) for (const h of meta.handlers) h(msg);
-          } catch {}
+          } catch { /* ignore malformed messages */ }
         },
         close(ws) {
           const meta = wsMetadata.get(ws);

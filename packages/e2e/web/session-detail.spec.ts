@@ -83,7 +83,7 @@ test("add todo via API and verify in detail panel", async () => {
 });
 
 test("add todo via detail panel UI", async () => {
-  const id = await createSession("Todo UI test");
+  const _id = await createSession("Todo UI test");
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
@@ -103,7 +103,7 @@ test("add todo via detail panel UI", async () => {
 // -- Send message to session --------------------------------------------------
 
 test("send message form appears and submits", async () => {
-  const id = await createSession("Message test");
+  const _id = await createSession("Message test");
 
   // Set session to running so the Send button appears
   // We need to dispatch it or manually set status -- use complete instead

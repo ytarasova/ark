@@ -336,6 +336,7 @@ describe("RepoConfig verify field", () => {
 
 describe("archive(getApp()) and restore(getApp())", () => {
   it("archive sets status to archived", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { archive } = require("../services/session-orchestration.js");
     const session = getApp().sessions.create({ summary: "archive-test" });
     getApp().sessions.update(session.id, { status: "completed" });
@@ -349,6 +350,7 @@ describe("archive(getApp()) and restore(getApp())", () => {
   });
 
   it("archive returns error for non-existent session", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { archive } = require("../services/session-orchestration.js");
     const result = await archive(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
@@ -356,6 +358,7 @@ describe("archive(getApp()) and restore(getApp())", () => {
   });
 
   it("restore sets status to stopped", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { archive, restore } = require("../services/session-orchestration.js");
     const session = getApp().sessions.create({ summary: "restore-test" });
     getApp().sessions.update(session.id, { status: "completed" });
@@ -370,6 +373,7 @@ describe("archive(getApp()) and restore(getApp())", () => {
   });
 
   it("restore returns error when not archived", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { restore } = require("../services/session-orchestration.js");
     const session = getApp().sessions.create({ summary: "restore-not-archived" });
     getApp().sessions.update(session.id, { status: "completed" });
@@ -380,6 +384,7 @@ describe("archive(getApp()) and restore(getApp())", () => {
   });
 
   it("archived sessions excluded from default list", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { archive } = require("../services/session-orchestration.js");
     const session = getApp().sessions.create({ summary: "archive-list-test" });
     getApp().sessions.update(session.id, { status: "completed" });

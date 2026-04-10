@@ -13,7 +13,7 @@ import { registerScheduleHandlers } from "./handlers/schedule.js";
 import { registerWebHandlers } from "./handlers/web.js";
 
 export function registerAllHandlers(router: Router, app: AppContext): void {
-  router.handle("initialize", async (params, _notify) => ({
+  router.handle("initialize", async (_params, _notify) => ({
     server: { name: "ark-server", version: ARK_VERSION },
     capabilities: { notifications: true, bidirectional: true },
   }));

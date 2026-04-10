@@ -63,8 +63,7 @@ export async function handleIssueWebhook(
       github_repo: repo.full_name,
     },
   };
-  let session;
-  session = app.sessions.create(createOpts);
+  const session = app.sessions.create(createOpts);
 
   const evOpts = { actor: "github", data: { issue_number: issue.number, label: config.triggerLabel, repo: repo.full_name } };
   app.events.log(session.id, "issue_webhook_triggered", evOpts);

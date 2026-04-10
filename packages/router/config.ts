@@ -79,6 +79,7 @@ function loadYamlConfig(arkDir: string): Record<string, unknown> {
   const configPath = join(arkDir, "router.yaml");
   if (!existsSync(configPath)) return {};
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const YAML = require("yaml");
     return (YAML.parse(readFileSync(configPath, "utf-8")) ?? {}) as Record<string, unknown>;
   } catch {

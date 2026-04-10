@@ -9,7 +9,7 @@ import type {
   ProfileDeleteParams,
 } from "../../types/index.js";
 
-export function registerConfigHandlers(router: Router, app: AppContext): void {
+export function registerConfigHandlers(router: Router, _app: AppContext): void {
   router.handle("config/read", async () => ({ config: core.loadConfig() }));
   router.handle("config/write", async () => {
     throw new RpcError("config/write not yet implemented -- edit ~/.ark/config.yaml directly", -32601);

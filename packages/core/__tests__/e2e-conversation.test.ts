@@ -26,7 +26,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  try { server.stop(); } catch {}
+  try { server.stop(); } catch { /* cleanup */ }
 });
 
 afterAll(async () => {

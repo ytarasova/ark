@@ -5,7 +5,6 @@
 import { instantiateRecipe } from "./recipe.js";
 import { startSession } from "./services/session-orchestration.js";
 import type { AppContext } from "./app.js";
-import type { Session } from "../types/index.js";
 import { getSessionCost } from "./costs.js";
 
 export interface RecipeEvalResult {

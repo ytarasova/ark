@@ -37,6 +37,7 @@ afterEach(() => {
 describe("CLI: version", () => {
   it("ark --version returns version string", () => {
     // Read version from package.json directly
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pkg = require(join(ROOT, "package.json"));
     expect(pkg.version).toMatch(/^\d+\.\d+\.\d+$/);
   });

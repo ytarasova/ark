@@ -2,10 +2,9 @@ import React, { useState, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
 import { buildReplay, getApp } from "../../core/index.js";
-import type { Session, ReplayStep } from "../../core/index.js";
+import type { Session } from "../../core/index.js";
 import { eventTypeColor } from "../helpers/colors.js";
 import { ScrollBox } from "../components/ScrollBox.js";
-import { SectionHeader } from "../components/SectionHeader.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 
 export interface SessionReplayProps {

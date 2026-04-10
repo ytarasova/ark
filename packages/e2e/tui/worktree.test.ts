@@ -35,7 +35,7 @@ afterEach(() => {
   const app = getApp();
   // Kill any tmux sessions created during tests
   for (const name of env.tmuxSessions) {
-    try { killSession(name); } catch {}
+    try { killSession(name); } catch { /* cleanup */ }
   }
   env.tmuxSessions.length = 0;
 
@@ -44,10 +44,10 @@ afterEach(() => {
     try {
       const s = app.sessions.get(id);
       if (s?.session_id) {
-        try { killSession(s.session_id); } catch {}
+        try { killSession(s.session_id); } catch { /* cleanup */ }
       }
       app.sessions.delete(id);
-    } catch {}
+    } catch { /* cleanup */ }
   }
   env.sessionIds.length = 0;
 });
@@ -80,7 +80,7 @@ describe("e2e TUI worktree", () => {
       try {
         execFileSync("git", ["-C", env.workdir, "worktree", "remove", "--force", worktreePath],
           { stdio: "pipe" });
-      } catch {}
+      } catch { /* cleanup */ }
     }
   }, 30_000);
 

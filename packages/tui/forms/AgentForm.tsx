@@ -76,7 +76,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
     onSubmit: () => submitRef.current(),
   });
 
-  const { tools, setTools, toolCursor } = useToolSelection(
+  const { tools, setTools: _setTools, toolCursor } = useToolSelection(
     TOOL_OPTIONS,
     agent?.tools ?? ["Bash", "Read", "Write", "Edit", "Glob", "Grep"],
     active === "tools",

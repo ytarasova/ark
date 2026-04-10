@@ -12,7 +12,6 @@ import { useFocus } from "../hooks/useFocus.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { KeyValue } from "../components/KeyValue.js";
-import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import {
   FormTextField,
   FormSelectField,
@@ -69,7 +68,7 @@ export function SchedulesTab({ pane }: SchedulesTabProps) {
     ark.scheduleList().then(setSchedules).catch(() => {});
   };
 
-  useInput((input, key) => {
+  useInput((input, _key) => {
     if (pane !== "left") return;
     if (showCreate) return;
 

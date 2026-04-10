@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { Box, Text, useApp, useInput, useStdout } from "ink";
+import { Box, useApp, useInput, useStdout } from "ink";
 import { execFile } from "child_process";
 import { useArkClient } from "./hooks/useArkClient.js";
 import { useArkStore } from "./hooks/useArkStore.js";

@@ -6,7 +6,6 @@ import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import type { PortDecl, PortStatus } from "../../types.js";
 import { SSH_OPTS, sshExec } from "./ssh.js";
-import { sshBaseArgs } from "./ssh.js";
 
 const execFileAsync = promisify(execFile);
 

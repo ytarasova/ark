@@ -11,7 +11,7 @@ import { getArkClient } from "./_shared.js";
 export function registerAgentCommands(program: Command) {
   const agent = program.command("agent").description("Manage agent definitions");
 
-  agent.command("list").description("List agents").option("--project <dir>", "Project root").action(async (opts) => {
+  agent.command("list").description("List agents").option("--project <dir>", "Project root").action(async (_opts) => {
     const ark = await getArkClient();
     const agents = await ark.agentList();
     for (const a of agents) {

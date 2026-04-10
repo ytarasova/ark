@@ -126,13 +126,13 @@ export class E2BProvider implements ComputeProvider {
     return "";
   }
 
-  async checkSession(_compute: Compute, tmuxSessionId: string): Promise<boolean> {
+  async checkSession(_compute: Compute, _tmuxSessionId: string): Promise<boolean> {
     // Check if the sandbox is still in our map
     // tmuxSessionId isn't used for E2B -- we track by sandbox instance
     return false;
   }
 
-  async getMetrics(compute: Compute): Promise<ComputeSnapshot> {
+  async getMetrics(_compute: Compute): Promise<ComputeSnapshot> {
     return {
       metrics: EMPTY_METRICS,
       sessions: [],

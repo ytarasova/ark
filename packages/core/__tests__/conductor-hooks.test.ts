@@ -21,7 +21,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try { server.stop(); } catch {}
+  try { server.stop(); } catch { /* cleanup */ }
 });
 
 async function postHook(sessionId: string, payload: Record<string, unknown>): Promise<Response> {

@@ -1,11 +1,11 @@
-import type { Session, CreateSessionOpts, SessionListFilters, SessionStatus, SessionConfig } from "./session.js";
-import type { Compute, CreateComputeOpts, ComputeProviderName } from "./compute.js";
+import type { Session, CreateSessionOpts, SessionListFilters } from "./session.js";
+import type { Compute, CreateComputeOpts } from "./compute.js";
 import type { Event } from "./event.js";
 import type { Message } from "./message.js";
 import type { AgentDefinition, SkillDefinition } from "./agent.js";
 import type { FlowDefinition, RecipeDefinition } from "./flow.js";
 import type {
-  SessionOpResult, ComputeSnapshot, SpawnOpts, WorktreeFinishOpts,
+  ComputeSnapshot,
   Profile, ClaudeSession, ToolEntry, MemoryEntry, Schedule, SessionCost,
   ConversationTurn, SearchResult,
 } from "./common.js";

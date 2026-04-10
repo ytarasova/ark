@@ -20,13 +20,13 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
   const [query, setQuery] = useState("");
   const [internalMode, setInternalMode] = useState<SearchMode>("sessions");
   const mode = controlledMode ?? internalMode;
-  const setMode = onModeChange ?? setInternalMode;
+  const _setMode = onModeChange ?? setInternalMode;
   const [sessionResults, setSessionResults] = useState<any[]>([]);
   const [transcriptResults, setTranscriptResults] = useState<any[]>([]);
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
   const [claudeSessions, setClaudeSessions] = useState<any[]>([]);
   const [searched, setSearched] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [_loading, setLoading] = useState(false);
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [loadingClaude, setLoadingClaude] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

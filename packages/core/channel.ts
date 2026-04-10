@@ -150,7 +150,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(report),
         });
-      } catch {}
+      } catch { /* report delivery is best-effort */ }
     }
 
     return { content: [{ type: "text", text: `Reported: ${reportType}` }] };
@@ -176,7 +176,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(relayPayload),
         });
-      } catch {}
+      } catch { /* relay fallback is best-effort */ }
     }
     return { content: [{ type: "text", text: `Sent to ${args.target_session}` }] };
   }

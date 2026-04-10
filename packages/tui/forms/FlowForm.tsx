@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
-import { findProjectRoot } from "../../core/index.js";
 import { getApp } from "../../core/app.js";
 import type { FlowDefinition, StageDefinition } from "../../core/index.js";
 import { useFormNavigation } from "../components/form/useFormNavigation.js";
@@ -16,7 +15,7 @@ interface FlowFormProps {
   projectRoot?: string;
 }
 
-const GATE_CHOICES = [
+const _GATE_CHOICES = [
   { label: "auto", value: "auto" },
   { label: "manual", value: "manual" },
   { label: "condition", value: "condition" },
@@ -45,7 +44,7 @@ export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
     try { return getApp().agents.list(projectRoot).map(a => a.name); } catch { return []; }
   }, [projectRoot]);
 
-  const agentChoices = React.useMemo(() => [
+  const _agentChoices = React.useMemo(() => [
     { label: "(none)", value: "" },
     ...agents.map(a => ({ label: a, value: a })),
   ], [agents]);

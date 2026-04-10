@@ -12,7 +12,7 @@
  *   GET  /health               -- health check
  */
 
-import type { ChatCompletionRequest, ChatCompletionResponse, RouterConfig } from "./types.js";
+import type { ChatCompletionRequest, RouterConfig } from "./types.js";
 import { classify } from "./classifier.js";
 import { RoutingEngine } from "./engine.js";
 import { Dispatcher } from "./dispatch.js";
@@ -226,7 +226,7 @@ function handleStreamingRoute(
   decision: any,
   dispatcher: Dispatcher,
   feedback: FeedbackTracker,
-  model: any,
+  _model: any,
 ): Response {
   const stream = new ReadableStream({
     async start(controller) {

@@ -24,7 +24,7 @@ beforeAll(() => {
 
 afterAll(() => {
   server.stop();
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch {}
+  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup */ }
 });
 
 // ── Health ──────────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ describe("client agent lifecycle", () => {
   const SESSION_NAME = `arkd-client-test-${Date.now()}`;
 
   afterAll(async () => {
-    try { await client.killAgent({ sessionName: SESSION_NAME }); } catch {}
+    try { await client.killAgent({ sessionName: SESSION_NAME }); } catch { /* cleanup */ }
   });
 
   it("launch → status → capture → kill", async () => {

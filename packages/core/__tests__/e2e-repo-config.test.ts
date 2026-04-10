@@ -27,7 +27,7 @@ afterAll(async () => {
 const sessionIds: string[] = [];
 afterEach(() => {
   for (const id of sessionIds) {
-    try { app.sessions.delete(id); } catch {}
+    try { app.sessions.delete(id); } catch { /* cleanup */ }
   }
   sessionIds.length = 0;
 });

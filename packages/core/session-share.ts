@@ -52,7 +52,6 @@ export function importSessionFromFile(app: AppContext, filePath: string): { ok: 
 
     if (data.version !== 1) return { ok: false, message: "Unsupported export version" };
 
-    let session;
     const createOpts = {
       ticket: data.session.ticket,
       summary: data.session.summary ? `[imported] ${data.session.summary}` : "[imported session]",
@@ -61,7 +60,7 @@ export function importSessionFromFile(app: AppContext, filePath: string): { ok: 
       config: data.session.config,
       group_name: data.session.group_name,
     };
-    session = app.sessions.create(createOpts);
+    const session = app.sessions.create(createOpts);
 
     if (data.session.agent) {
       app.sessions.update(session.id, { agent: data.session.agent });

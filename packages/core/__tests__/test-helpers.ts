@@ -53,12 +53,12 @@ export function killNewArkTmuxSessions(preExisting: Set<string>): void {
             encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
           });
           for (const pid of panes.split("\n").filter(Boolean)) {
-            try { execFileSync("pkill", ["-9", "-P", pid], { stdio: "pipe" }); } catch {}
-            try { process.kill(parseInt(pid), 9); } catch {}
+            try { execFileSync("pkill", ["-9", "-P", pid], { stdio: "pipe" }); } catch { /* process may already be dead */ }
+            try { process.kill(parseInt(pid), 9); } catch { /* process may already be dead */ }
           }
-        } catch {}
+        } catch { /* pane listing may fail */ }
         // Then kill the tmux session
-        try { execFileSync("tmux", ["kill-session", "-t", name], { stdio: "pipe" }); } catch {}
+        try { execFileSync("tmux", ["kill-session", "-t", name], { stdio: "pipe" }); } catch { /* session may already be dead */ }
       }
     }
   } catch {

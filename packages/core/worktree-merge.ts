@@ -40,7 +40,7 @@ export async function mergeChildBranches(
       if (msg.includes("CONFLICT")) {
         try {
           execFileSync("git", ["-C", parentWorktree, "merge", "--abort"], { stdio: "pipe" });
-        } catch {}
+        } catch { /* merge abort may fail if no merge in progress */ }
         conflicts.push(child.id);
       }
     }

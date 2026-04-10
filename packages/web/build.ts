@@ -8,4 +8,5 @@ execFileSync("npx", ["vite", "build"], {
   timeout: 60_000,
 });
 
+// eslint-disable-next-line no-console
 console.log("Build complete: packages/web/dist/");

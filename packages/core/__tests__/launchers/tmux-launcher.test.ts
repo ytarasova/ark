@@ -94,6 +94,7 @@ describe("ArkdLauncher", () => {
   });
 
   it("accepts ArkdClient instance in constructor", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { ArkdClient } = require("../../../arkd/client.js");
     const client = new ArkdClient("http://localhost:19300");
     const launcher = new ArkdLauncher(client);

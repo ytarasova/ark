@@ -121,7 +121,7 @@ describe("compute CRUD", () => {
 
     // Small delay to ensure timestamp differs
     const spinUntil = Date.now() + 5;
-    while (Date.now() < spinUntil) {}
+    while (Date.now() < spinUntil) { /* busy-wait for timestamp to differ */ }
 
     const updated = getApp().computes.update("dev", {});
     expect(updated).not.toBeNull();
@@ -148,7 +148,7 @@ describe("compute CRUD", () => {
     const originalUpdatedAt = compute.updated_at;
 
     const spinUntil = Date.now() + 5;
-    while (Date.now() < spinUntil) {}
+    while (Date.now() < spinUntil) { /* busy-wait for timestamp to differ */ }
 
     const updated = getApp().computes.update("ts-check", { status: "running" });
     expect(updated).not.toBeNull();

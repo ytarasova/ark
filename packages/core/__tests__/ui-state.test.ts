@@ -32,7 +32,9 @@ describe("UI state persistence", () => {
   });
 
   it("loadUiState handles corrupt file gracefully", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { writeFileSync } = require("fs");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { join } = require("path");
     writeFileSync(join(getApp().config.arkDir, "ui-state.json"), "not json{{{");
     const state = loadUiState(getApp().config.arkDir);

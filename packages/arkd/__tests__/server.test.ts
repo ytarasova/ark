@@ -21,7 +21,7 @@ beforeAll(() => {
 
 afterAll(() => {
   server.stop();
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch {}
+  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup */ }
 });
 
 async function post<T>(path: string, body: unknown): Promise<{ status: number; data: T }> {
@@ -180,6 +180,7 @@ describe("File operations", () => {
     expect(data.ok).toBe(true);
 
     // Verify the file is executable by stat-ing it
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { statSync } = require("fs");
     const s = statSync(filePath);
     // Check that owner-execute bit is set
@@ -496,7 +497,7 @@ describe("Server lifecycle", () => {
       }
     } finally {
       // Ensure cleanup even if assertions fail
-      try { ephemeral.stop(); } catch {}
+      try { ephemeral.stop(); } catch { /* cleanup */ }
     }
   });
 });

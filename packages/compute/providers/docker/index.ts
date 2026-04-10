@@ -12,9 +12,6 @@
 
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { homedir } from "os";
-import { join } from "path";
-import { existsSync } from "fs";
 
 const execFileAsync = promisify(execFile);
 import type {

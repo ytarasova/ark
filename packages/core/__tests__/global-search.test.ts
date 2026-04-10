@@ -79,7 +79,7 @@ describe("global search with fixture data", () => {
   });
 
   afterEach(() => {
-    try { rmSync(fixtureDir, { recursive: true }); } catch {}
+    try { rmSync(fixtureDir, { recursive: true }); } catch { /* cleanup */ }
   });
 
   it("finds matches in fixture JSONL", () => {

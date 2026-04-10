@@ -49,7 +49,7 @@ import type {
   ProbePortsReq, ProbePortsRes,
   HealthRes,
   SnapshotRes, SnapshotMetrics, SnapshotSession, SnapshotProcess, SnapshotContainer,
-  ChannelReportReq, ChannelReportRes,
+  ChannelReportRes,
   ChannelRelayReq, ChannelRelayRes,
   ChannelDeliverReq, ChannelDeliverRes,
   ConfigReq, ConfigRes,
@@ -306,7 +306,7 @@ async function listDirectory(dirPath: string, recursive?: boolean): Promise<DirE
 
     let size = 0;
     if (item.isFile()) {
-      try { size = (await stat(fullPath)).size; } catch {}
+      try { size = (await stat(fullPath)).size; } catch { /* stat may fail for broken symlinks */ }
     }
 
     entries.push({ name: item.name, path: fullPath, type, size });
@@ -455,7 +455,7 @@ async function collectMetrics(): Promise<MetricsRes> {
       const parts = lines[1].split(/\s+/);
       diskPct = parseInt(parts[4]?.replace("%", "") ?? "0", 10);
     }
-  } catch {}
+  } catch { /* disk usage command may not be available */ }
 
   // Uptime
   const uptimeSec = uptime();
@@ -704,7 +704,7 @@ async function probePorts(req: ProbePortsReq): Promise<ProbePortsRes> {
         const out = await readStream(proc.stdout);
         await proc.exited;
         listening = out.trim().length > 0;
-      } catch {}
+      } catch { /* port check command may fail */ }
       return { port, listening };
     })
   );

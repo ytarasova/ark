@@ -27,7 +27,7 @@ export function DataTable({ columns, rows, limit }: DataTableProps) {
     <Box flexDirection="column">
       <Text dimColor>
         {"  "}
-        {columns.map((col, i) =>
+        {columns.map((col, _i) =>
           col.width
             ? col.label.padEnd(col.width)
             : col.label
@@ -36,7 +36,7 @@ export function DataTable({ columns, rows, limit }: DataTableProps) {
       {display.map((row, i) => (
         <Text key={i} wrap="truncate">
           {"  "}
-          {columns.map((col, j) => {
+          {columns.map((col, _j) => {
             const val = String(row[col.key] ?? "");
             return col.width ? val.padEnd(col.width) : val;
           }).join("")}

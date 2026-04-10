@@ -132,7 +132,7 @@ export class ComputePoolManager {
   }
 
   /** Release a compute back to the pool after session completes. */
-  releaseCompute(poolName: string, computeName: string): void {
+  releaseCompute(poolName: string, _computeName: string): void {
     const pool = this.getPool(poolName);
     if (!pool) return;
 

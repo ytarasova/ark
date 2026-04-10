@@ -9,8 +9,6 @@
  * extra setup is done during provision (docker install, firecracker, etc.).
  */
 
-import { join } from "path";
-import { existsSync, readFileSync } from "fs";
 import { ArkdBackedProvider } from "./arkd-backed.js";
 import { safeAsync } from "../../core/safe.js";
 import { sshKeyPath } from "./ec2/ssh.js";
@@ -75,7 +73,6 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     try {
       const { ensurePulumi, provisionStack, resolveInstanceType } = await import("./ec2/provision.js");
       const { generateSshKey } = await import("./ec2/ssh.js");
-      const { buildUserData } = await import("./ec2/cloud-init.js");
       const { hourlyRate } = await import("./ec2/cost.js");
       const { poll } = await import("../util.js");
 
@@ -483,7 +480,7 @@ export class RemoteFirecrackerProvider extends RemoteArkdBase {
 
   async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
-    const cfg = compute.config as RemoteConfig;
+    const _cfg = compute.config as RemoteConfig;
     const vmSshPort = 2222; // Default firecracker VM SSH port
 
     const scriptPath = `/tmp/arkd-launcher-${opts.tmuxName}.sh`;

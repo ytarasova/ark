@@ -10,7 +10,7 @@
 
 import { execFile, execFileSync, spawn } from "child_process";
 import { promisify } from "util";
-import { existsSync, writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
+import { writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 

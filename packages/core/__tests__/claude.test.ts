@@ -237,6 +237,7 @@ describe("writeChannelConfig", () => {
 
   it("preserves existing .mcp.json content", () => {
     const workdir = getCtx().arkDir;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { writeFileSync: wfs } = require("fs");
     wfs(join(workdir, ".mcp.json"), JSON.stringify({
       mcpServers: { "other-server": { command: "other" } },

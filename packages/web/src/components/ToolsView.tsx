@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
 import { useSkillsQuery, useRecipesQuery } from "../hooks/useToolQueries.js";
 import { cn } from "../lib/utils.js";
-import { Card } from "./ui/card.js";
 import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
 import { Wrench } from "lucide-react";
@@ -15,7 +14,7 @@ interface ToolsViewProps {
   onTabChange?: (tab: Tab) => void;
 }
 
-export function ToolsView({ activeTab = "skills", onTabChange }: ToolsViewProps) {
+export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: ToolsViewProps) {
   const queryClient = useQueryClient();
   const tab = activeTab;
   const { data: skills = [] } = useSkillsQuery();
@@ -126,7 +125,7 @@ export function ToolsView({ activeTab = "skills", onTabChange }: ToolsViewProps)
                       setSelected(null);
                       queryClient.invalidateQueries({ queryKey: ["skills"] });
                       queryClient.invalidateQueries({ queryKey: ["recipes"] });
-                    } catch {}
+                    } catch { /* delete may fail if resource is in use */ }
                   }}>
                     Delete
                   </Button>

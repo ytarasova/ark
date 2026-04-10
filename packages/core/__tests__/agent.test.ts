@@ -236,6 +236,7 @@ describe("agents.save", () => {
     getApp().agents.save(agent.name, agent, "global");
 
     const raw = YAML.parse(
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       require("fs").readFileSync(join(agentDir(), "stripped.yaml"), "utf-8"),
     );
     expect(raw._source).toBeUndefined();

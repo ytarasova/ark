@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { join, dirname } from "path";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { execFileSync } from "child_process";
 import * as core from "../../core/index.js";
@@ -184,7 +184,7 @@ export function registerComputeCommands(program: Command) {
         }
         await ark.computeDelete(name);
         console.log(chalk.green(`Compute '${name}' deleted`));
-      } catch (e: any) {
+      } catch {
         console.log(chalk.red(`Compute '${name}' not found`));
       }
     });
@@ -225,7 +225,7 @@ export function registerComputeCommands(program: Command) {
         await ark.computeUpdate(name, { config });
         console.log(chalk.green(`Compute '${name}' updated`));
         console.log(JSON.stringify(config, null, 2));
-      } catch (e: any) {
+      } catch {
         console.log(chalk.red(`Compute '${name}' not found`));
       }
     });
@@ -265,7 +265,7 @@ export function registerComputeCommands(program: Command) {
             console.log(chalk.dim(`(metrics unavailable: ${e.message})`));
           }
         }
-      } catch (e: any) {
+      } catch {
         console.log(chalk.red(`Compute '${name}' not found`));
       }
     });

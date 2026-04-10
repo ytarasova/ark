@@ -20,7 +20,7 @@ export const cliAgentExecutor: Executor = {
 
   async launch(opts: LaunchOpts): Promise<LaunchResult> {
     const app = opts.app!;
-    const { sessionId, workdir, agent, task, stage, onLog: log = () => {} } = opts;
+    const { sessionId, workdir, agent, task, stage: _stage, onLog: log = () => {} } = opts;
 
     const command = agent.command;
     if (!command || command.length === 0) {

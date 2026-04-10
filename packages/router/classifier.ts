@@ -64,7 +64,7 @@ const SIMPLE_CHAT_PATTERNS = [
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export function classify(request: ChatCompletionRequest): ClassificationResult {
-  const t0 = performance.now();
+  const _t0 = performance.now();
   const signals: string[] = [];
   let score = 0;
 

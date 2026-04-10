@@ -3,7 +3,7 @@
  * Each profile gets its own set of sessions via group_name prefix.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 
 export interface Profile {

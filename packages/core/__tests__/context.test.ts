@@ -88,6 +88,7 @@ describe("Store context isolation", () => {
     const dir = tempApp.config.arkDir;
     await tempApp.shutdown();
 
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { existsSync } = require("fs");
     expect(existsSync(dir)).toBe(false);
   });

@@ -146,7 +146,7 @@ describe("LocalProvider", () => {
       await new Promise(r => setTimeout(r, 500));
       execFileSync("tmux", ["has-session", "-t", tmuxName], { stdio: "pipe" });
     } finally {
-      try { execFileSync("tmux", ["kill-session", "-t", tmuxName], { stdio: "pipe" }); } catch {}
+      try { execFileSync("tmux", ["kill-session", "-t", tmuxName], { stdio: "pipe" }); } catch { /* cleanup */ }
     }
   }, 10_000);
 

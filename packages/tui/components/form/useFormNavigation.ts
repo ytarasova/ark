@@ -43,7 +43,7 @@ export function useFormNavigation({ fields: allFields, onCancel, onSubmit }: Use
     });
   };
 
-  const isActiveTextField = active?.type === "text" || active?.type === "path" || active?.type === "textarea";
+  const _isActiveTextField = active?.type === "text" || active?.type === "path" || active?.type === "textarea";
 
   useInput((input, key) => {
     // Esc: if editing, let the field handle it (they set editingRef.current = false)

@@ -74,7 +74,7 @@ beforeAll(() => {
 
 afterAll(() => {
   server.stop();
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch {}
+  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup */ }
 });
 
 // ── Launch + Kill + Status ──────────────────────────────────────────────────
@@ -83,7 +83,7 @@ describe("ArkdBackedProvider agent lifecycle", () => {
   const TMUX_NAME = `arkd-backed-test-${Date.now()}`;
 
   afterAll(async () => {
-    try { await provider.killAgent(compute, makeSession(TMUX_NAME)); } catch {}
+    try { await provider.killAgent(compute, makeSession(TMUX_NAME)); } catch { /* cleanup */ }
   });
 
   it("launch creates tmux session via arkd", async () => {

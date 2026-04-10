@@ -60,6 +60,7 @@ function loadYamlConfig(arkDir: string): Record<string, unknown> {
   if (!existsSync(configPath)) return {};
   try {
     // Lazy import YAML to avoid loading it when not needed (test mode)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const YAML = require("yaml");
     return (YAML.parse(readFileSync(configPath, "utf-8")) ?? {}) as Record<string, unknown>;
   } catch {

@@ -20,6 +20,7 @@ import type { IDatabase, IStatement } from "./database.js";
 
 // postgres.js uses `export =` in its type definitions. In Bun's ESM resolution
 // the default export is under .default. We use require + destructure for compat.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { default: createPostgres } = require("postgres") as { default: (url: string, opts?: any) => any };
 
 // ── SQL Translation ─────────────────────────────────────────────────────────

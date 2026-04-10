@@ -199,7 +199,7 @@ function searchTranscriptsFiles(query: string, opts?: SearchOpts): SearchResult[
             });
             break; // One match per file
           }
-        } catch {}
+        } catch { /* skip malformed JSONL entries */ }
       }
     }
   }
@@ -293,7 +293,7 @@ export async function indexTranscripts(app: AppContext, opts?: { transcriptsDir?
           if (!text.trim() || text.length < 10) continue;
           insert.run(sessionId, projectDir, entry.type, text, entry.timestamp ?? null);
           indexed++;
-        } catch {}
+        } catch { /* skip malformed entries */ }
       }
 
       fileCount++;
@@ -319,7 +319,7 @@ export function indexSession(app: AppContext, transcriptPath: string, sessionId:
       "SELECT MAX(timestamp) as ts FROM transcript_index WHERE session_id = ?"
     ).get(sessionId) as { ts: string | null } | undefined;
     maxTs = row?.ts ?? null;
-  } catch {}
+  } catch { /* index table may not exist yet */ }
 
   const insert = db.prepare(
     "INSERT INTO transcript_index (session_id, project, role, content, timestamp) VALUES (?, ?, ?, ?, ?)"
@@ -354,7 +354,7 @@ export function indexSession(app: AppContext, transcriptPath: string, sessionId:
 
       insert.run(sessionId, project ?? "", entry.type, text, ts);
       indexed++;
-    } catch {}
+    } catch { /* skip malformed entries */ }
   }
 
   return indexed;

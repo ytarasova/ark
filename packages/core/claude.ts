@@ -419,7 +419,7 @@ export async function autoAcceptChannelPrompt(
 ): Promise<void> {
   const max = opts?.maxAttempts ?? 45;
   const delay = opts?.delayMs ?? 1000;
-  let accepted = 0;
+  let _accepted = 0;
 
   for (let i = 0; i < max; i++) {
     await Bun.sleep(delay);
@@ -431,7 +431,7 @@ export async function autoAcceptChannelPrompt(
         await tmux.sendKeysAsync(tmuxName, "1");
         await Bun.sleep(300);
         await tmux.sendKeysAsync(tmuxName, "Enter");
-        accepted++;
+        _accepted++;
         continue;
       }
 

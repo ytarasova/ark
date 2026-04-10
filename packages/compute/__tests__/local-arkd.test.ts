@@ -58,7 +58,7 @@ beforeAll(() => {
 
 afterAll(() => {
   server.stop();
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch {}
+  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup */ }
 });
 
 // ── LocalWorktreeProvider ───────────────────────────────────────────────────
@@ -148,7 +148,7 @@ describe("LocalWorktreeProvider", () => {
     const TMUX_NAME = `local-wt-test-${Date.now()}`;
 
     afterAll(async () => {
-      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch {}
+      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch { /* cleanup */ }
     });
 
     it("launch creates tmux session", async () => {
@@ -280,7 +280,7 @@ describe("LocalDockerProvider", () => {
       const status = await client.agentStatus({ sessionName: TMUX_NAME });
       expect(typeof status.running).toBe("boolean");
     } finally {
-      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch {}
+      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch { /* cleanup */ }
     }
   });
 });
@@ -332,7 +332,7 @@ describe("LocalDevcontainerProvider", () => {
       const status = await client.agentStatus({ sessionName: TMUX_NAME });
       expect(typeof status.running).toBe("boolean");
     } finally {
-      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch {}
+      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch { /* cleanup */ }
     }
   });
 });
@@ -397,7 +397,7 @@ describe("LocalFirecrackerProvider", () => {
       const status = await client.agentStatus({ sessionName: TMUX_NAME });
       expect(typeof status.running).toBe("boolean");
     } finally {
-      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch {}
+      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch { /* cleanup */ }
     }
   });
 });

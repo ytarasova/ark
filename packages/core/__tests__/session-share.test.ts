@@ -56,6 +56,7 @@ describe("session sharing", () => {
     expect(ok).toBe(true);
 
     // Verify the file was created
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const content = JSON.parse(require("fs").readFileSync(filePath, "utf-8"));
     expect(content.version).toBe(1);
     expect(content.session.summary).toBe("roundtrip test");

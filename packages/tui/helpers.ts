@@ -1,4 +1,7 @@
 // ── Helper utilities ─────────────────────────────────────────────────────────
+import { readFileSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 
 export function ago(iso: string | null): string {
   if (!iso) return "";
@@ -35,9 +38,6 @@ export function generateName(): string {
 
 export function getAwsProfiles(): string[] {
   try {
-    const { readFileSync } = require("fs");
-    const { join } = require("path");
-    const { homedir } = require("os");
     const cfg = readFileSync(join(homedir(), ".aws", "config"), "utf-8");
     const profiles: string[] = [];
     for (const line of cfg.split("\n")) {

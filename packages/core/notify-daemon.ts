@@ -3,7 +3,6 @@
  * and sends bridge notifications with adaptive polling.
  */
 
-import type { Session } from "../types/index.js";
 import type { AppContext } from "./app.js";
 
 import { Bridge, loadBridgeConfig } from "./bridge.js";

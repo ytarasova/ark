@@ -8,7 +8,7 @@ import { parseTranscriptUsage } from "./claude.js";
 import type { Session } from "../types/index.js";
 import type { AppContext } from "./app.js";
 
-import { readdirSync, statSync, existsSync } from "fs";
+import { readdirSync, existsSync } from "fs";
 import { join } from "path";
 
 // Pricing per million tokens
