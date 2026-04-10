@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
 import { useComputeQuery } from "../hooks/useComputeQueries.js";
@@ -11,21 +11,52 @@ import { selectClassName } from "./ui/styles.js";
 
 function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
   const [form, setForm] = useState({ name: "", provider: "local", size: "", region: "", aws_profile: "", vpc_id: "", subnet_id: "" });
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [templateConfig, setTemplateConfig] = useState<Record<string, unknown>>({});
+
+  useEffect(() => {
+    api.listComputeTemplates().then(setTemplates).catch(() => {});
+  }, []);
 
   function update(key: string, val: string) {
     setForm((prev) => ({ ...prev, [key]: val }));
   }
 
+  function handleTemplateChange(templateName: string) {
+    setSelectedTemplate(templateName);
+    if (!templateName) {
+      setTemplateConfig({});
+      return;
+    }
+    const tmpl = templates.find(t => t.name === templateName);
+    if (tmpl) {
+      setForm(prev => ({ ...prev, provider: tmpl.provider }));
+      setTemplateConfig(tmpl.config ?? {});
+    }
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
-    onSubmit(form);
+    onSubmit({ ...form, templateConfig });
   }
 
   return (
     <div className="flex flex-col h-full p-5 overflow-y-auto">
       <h2 className="text-base font-semibold text-foreground mb-5">New Compute Target</h2>
       <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        {templates.length > 0 && (
+          <div className="mb-3.5">
+            <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Template</label>
+            <select className={selectClassName} value={selectedTemplate} onChange={(e) => handleTemplateChange(e.target.value)}>
+              <option value="">(None)</option>
+              {templates.map((t: any) => (
+                <option key={t.name} value={t.name}>{t.name}{t.description ? ` - ${t.description}` : ""} [{t.provider}]</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
           <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="my-compute" />
@@ -151,7 +182,7 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
 
   async function handleCreate(form: any) {
     try {
-      const config: any = {};
+      const config: any = { ...(form.templateConfig ?? {}) };
       if (form.size) config.size = form.size;
       if (form.region) config.region = form.region;
       await api.createCompute({ name: form.name, provider: form.provider, config });

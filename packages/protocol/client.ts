@@ -352,6 +352,14 @@ export class ArkClient {
     return this.rpc<ComputeCleanZombiesResult>("compute/clean-zombies");
   }
 
+  async computeTemplateList(): Promise<{ templates: Array<{ name: string; description?: string; provider: string; config: Record<string, unknown> }> }> {
+    return this.rpc("compute/template/list");
+  }
+
+  async computeTemplateGet(name: string): Promise<{ name: string; description?: string; provider: string; config: Record<string, unknown> } | null> {
+    return this.rpc("compute/template/get", { name });
+  }
+
   async groupList(): Promise<Array<{ name: string; created_at: string }>> {
     const { groups } = await this.rpc<GroupListResult>("group/list");
     return groups;

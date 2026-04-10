@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
 import { execFile } from "child_process";
@@ -23,6 +23,7 @@ import type { StoreData } from "../hooks/useArkStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useConfirmation } from "../hooks/useConfirmation.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 
 interface ComputeTabProps extends StoreData {
   asyncState: AsyncState;
@@ -34,15 +35,18 @@ interface ComputeTabProps extends StoreData {
 
 export function ComputeTab({ computes, sessions, refresh: _refresh, pane, snapshots, computeLogs, addComputeLog, asyncState, onShowForm, formOverlay }: ComputeTabProps) {
   const theme = getTheme();
+  const ark = useArkClient();
   const confirmation = useConfirmation();
   const focus = useFocus();
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState<Array<{ name: string; description?: string; provider: string; config: Record<string, unknown> }>>([]);
 
   // Sort by provider to match TreeList's visual group order
   const sorted = useMemo(() =>
     [...computes].sort((a, b) => a.provider.localeCompare(b.provider)),
   [computes]);
 
-  const { sel } = useListNavigation(sorted.length, { active: pane === "left" && !formOverlay && !confirmation.pending });
+  const { sel } = useListNavigation(sorted.length, { active: pane === "left" && !formOverlay && !confirmation.pending && !showTemplates });
   const status = useStatusMessage();
   const actions = useComputeActions(asyncState, addComputeLog);
 
@@ -54,7 +58,7 @@ export function ComputeTab({ computes, sessions, refresh: _refresh, pane, snapsh
 
   const selected = sorted[sel] ?? null;
 
-  const hasOverlay = !!formOverlay;
+  const hasOverlay = !!formOverlay || showTemplates;
 
   useInput((input, key) => {
     if (pane !== "left" || hasOverlay) return;
@@ -110,6 +114,12 @@ export function ComputeTab({ computes, sessions, refresh: _refresh, pane, snapsh
       actions.clean();
     } else if (input === "n") {
       onShowForm();
+    } else if (input === "T") {
+      asyncState.run("Loading templates...", async () => {
+        const r = await ark.computeTemplateList();
+        setTemplates(r.templates ?? []);
+        setShowTemplates(true);
+      });
     }
   });
 
@@ -136,7 +146,9 @@ export function ComputeTab({ computes, sessions, refresh: _refresh, pane, snapsh
             emptyMessage="  No compute configured."
           />
         }
-        right={formOverlay ??
+        right={formOverlay ?? (showTemplates ? (
+          <TemplatesList templates={templates} onClose={() => setShowTemplates(false)} />
+        ) : (
           <ComputeDetail
             compute={selected}
             snapshot={selected ? snapshots.get(selected.name) : undefined}
@@ -144,7 +156,7 @@ export function ComputeTab({ computes, sessions, refresh: _refresh, pane, snapsh
             sessions={sessions}
             pane={pane}
           />
-        }
+        ))}
       />
       {status.message && (
         <Box>
@@ -350,6 +362,43 @@ function ComputePortList({ sessions, computeName }: { sessions: Session[]; compu
   );
 }
 
+// -- Templates list ----------------------------------------------------------
+
+interface TemplatesListProps {
+  templates: Array<{ name: string; description?: string; provider: string; config: Record<string, unknown> }>;
+  onClose: () => void;
+}
+
+function TemplatesList({ templates, onClose }: TemplatesListProps) {
+  const theme = getTheme();
+
+  useInput((_input, key) => {
+    if (key.escape) onClose();
+  });
+
+  return (
+    <DetailPanel active>
+      <Text bold color={theme.accent}>{" Compute Templates"}</Text>
+      <Text> </Text>
+      {templates.length === 0 ? (
+        <Text dimColor>{"  No templates defined."}</Text>
+      ) : (
+        templates.map((t, i) => (
+          <Box key={i} flexDirection="column" marginBottom={1}>
+            <Text bold>{`  ${t.name}`}<Text dimColor>{`  [${t.provider}]`}</Text></Text>
+            {t.description && <Text dimColor>{`    ${t.description}`}</Text>}
+            {Object.keys(t.config).length > 0 && (
+              <Text dimColor>{`    config: ${JSON.stringify(t.config)}`}</Text>
+            )}
+          </Box>
+        ))
+      )}
+      <Text> </Text>
+      <Text dimColor>{"  Press Esc to close"}</Text>
+    </DetailPanel>
+  );
+}
+
 export function getComputeHints(): React.ReactNode[] {
   return [
     ...NAV_HINTS, sep(0),
@@ -360,6 +409,7 @@ export function getComputeHints(): React.ReactNode[] {
     <KeyHint key="x" k="x" label="delete" />,
     <KeyHint key="c" k="c" label="clean" />,
     <KeyHint key="n" k="n" label="new" />,
+    <KeyHint key="T" k="T" label="templates" />,
     ...GLOBAL_HINTS,
   ];
 }

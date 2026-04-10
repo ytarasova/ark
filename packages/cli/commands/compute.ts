@@ -44,7 +44,7 @@ export function registerComputeCommands(program: Command) {
 
         // Apply template defaults if specified
         if (opts.fromTemplate) {
-          const tmpl = await ark.rpc("compute/template/get", { name: opts.fromTemplate });
+          const tmpl = await ark.computeTemplateGet(opts.fromTemplate);
           if (!tmpl) {
             console.log(chalk.red(`Template '${opts.fromTemplate}' not found.`));
             return;
@@ -94,7 +94,7 @@ export function registerComputeCommands(program: Command) {
 
         // Merge template config as base, user options override
         if (opts.fromTemplate) {
-          const tmpl = await ark.rpc("compute/template/get", { name: opts.fromTemplate });
+          const tmpl = await ark.computeTemplateGet(opts.fromTemplate);
           if (tmpl?.config) {
             config = { ...tmpl.config, ...config };
           }

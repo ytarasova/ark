@@ -190,6 +190,9 @@ export const api = {
   destroyCompute: (name: string) => rpc<any>("compute/destroy", { name }),
   deleteCompute: (name: string) => rpc<any>("compute/delete", { name }),
 
+  // Compute Templates
+  listComputeTemplates: () => rpc<{ templates: any[] }>("compute/template/list").then(r => r.templates),
+
   // Repo Map
   getRepoMap: (dir?: string) => rpc<any>("repo-map/get", { dir }),
 };

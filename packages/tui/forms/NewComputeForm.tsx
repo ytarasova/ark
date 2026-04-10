@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
@@ -7,7 +7,14 @@ import { generateName, getAwsProfiles } from "../helpers.js";
 import { SelectMenu } from "../components/SelectMenu.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
-type Step = "name" | "provider" | "image" | "size" | "arch" | "region" | "profile";
+type Step = "template" | "name" | "provider" | "image" | "size" | "arch" | "region" | "profile";
+
+interface ComputeTemplate {
+  name: string;
+  description?: string;
+  provider: string;
+  config: Record<string, unknown>;
+}
 
 interface NewComputeFormProps {
   asyncState: AsyncState;
@@ -56,13 +63,20 @@ const PROVIDER_OPTIONS = [
 export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
   const theme = getTheme();
   const ark = useArkClient();
-  const [step, setStep] = useState<Step>("name");
+  const [step, setStep] = useState<Step>("template");
   const [name, setName] = useState(generateName());
   const [provider, setProvider] = useState("");
   const [image, setImage] = useState("ubuntu:22.04");
   const [size, setSize] = useState("");
   const [arch, setArch] = useState("");
   const [region, setRegion] = useState("");
+  const [templates, setTemplates] = useState<ComputeTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<ComputeTemplate | null>(null);
+  const [templateConfig, setTemplateConfig] = useState<Record<string, unknown>>({});
+
+  useEffect(() => {
+    ark.computeTemplateList().then(r => setTemplates(r.templates ?? [])).catch(() => {});
+  }, []);
 
   useInput((input, key) => {
     if (key.escape) {
@@ -70,9 +84,38 @@ export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
     }
   });
 
+  const handleSelectTemplate = (item: { label: string; value: string }) => {
+    if (item.value === "__custom__") {
+      setSelectedTemplate(null);
+      setTemplateConfig({});
+      setStep("name");
+    } else {
+      const tmpl = templates.find(t => t.name === item.value);
+      if (tmpl) {
+        setSelectedTemplate(tmpl);
+        setProvider(tmpl.provider);
+        setTemplateConfig(tmpl.config ?? {});
+      }
+      setStep("name");
+    }
+  };
+
   const handleSubmitName = () => {
     if (!name.trim()) return;
-    setStep("provider");
+    if (selectedTemplate) {
+      // Template selected -- skip provider, create directly with template config
+      const trimmedName = name.trim();
+      onDone();
+      asyncState.run(`Creating '${trimmedName}'...`, async () => {
+        await ark.computeCreate({
+          name: trimmedName,
+          provider: selectedTemplate.provider,
+          config: { ...templateConfig },
+        });
+      });
+    } else {
+      setStep("provider");
+    }
   };
 
   const handleSelectProvider = (item: { label: string; value: string }) => {
@@ -133,13 +176,29 @@ export function NewComputeForm({ asyncState, onDone }: NewComputeFormProps) {
 
   const profileOptions = getAwsProfiles().map((p) => ({ label: p, value: p }));
 
+  const templateItems = [
+    { label: "Custom (no template)", value: "__custom__" },
+    ...templates.map(t => ({
+      label: `${t.name}${t.description ? ` - ${t.description}` : ""} [${t.provider}]`,
+      value: t.name,
+    })),
+  ];
+
   return (
     <Box flexDirection="column" flexGrow={1}>
       <Text bold color={theme.accent}>{" New Compute "}</Text>
       <Text> </Text>
 
+      {step === "template" && (
+        <Box flexDirection="column">
+          <Text>{"Template:"}</Text>
+          <SelectMenu items={templateItems} onSelect={handleSelectTemplate} />
+        </Box>
+      )}
+
       {step === "name" && (
         <Box flexDirection="column">
+          {selectedTemplate && <Text dimColor>{`Template: ${selectedTemplate.name} (${selectedTemplate.provider})`}</Text>}
           <Text>{"Compute name:"}</Text>
           <Box>
             <Text color={theme.accent}>{"> "}</Text>
