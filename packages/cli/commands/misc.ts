@@ -504,8 +504,33 @@ export function registerMiscCommands(program: Command, app: AppContext) {
     .description("Start the Ark server")
     .option("--stdio", "Use stdio transport (JSONL)")
     .option("--ws", "Use WebSocket transport")
+    .option("--hosted", "Start as hosted multi-tenant control plane")
     .option("-p, --port <port>", "WebSocket port", "19400")
     .action(async (opts) => {
+      // Hosted mode: start the full control plane with worker registry + scheduler
+      if (opts.hosted) {
+        const { loadConfig } = await import("../../core/config.js");
+        const { startHostedServer } = await import("../../core/hosted.js");
+
+        const config = loadConfig();
+        const webPort = parseInt(opts.port) || 8420;
+        (config as any).port = webPort;
+
+        console.log(chalk.cyan("Starting Ark hosted control plane..."));
+        const { app, stop } = await startHostedServer(config);
+
+        console.log(chalk.green(`Ark control plane running`));
+        console.log(chalk.dim(`  Web UI:     http://localhost:${webPort}`));
+        console.log(chalk.dim(`  Conductor:  http://localhost:${config.conductorPort}`));
+        if (config.redisUrl) console.log(chalk.dim(`  Redis:      ${config.redisUrl}`));
+        if (config.databaseUrl) console.log(chalk.dim(`  Database:   ${config.databaseUrl}`));
+        console.log(chalk.dim("Press Ctrl+C to stop"));
+
+        process.on("SIGINT", async () => { await stop(); process.exit(0); });
+        await new Promise(() => {});
+        return;
+      }
+
       const { AppContext, loadConfig } = await import("../../core/index.js");
       const { ArkServer } = await import("../../server/index.js");
       const { registerAllHandlers } = await import("../../server/register.js");

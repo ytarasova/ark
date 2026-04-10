@@ -41,6 +41,8 @@ import type { FlowStore, SkillStore, AgentStore, RecipeStore } from "./stores/in
 import type { SessionLauncher } from "./session-launcher.js";
 import { TmuxLauncher } from "./launchers/tmux.js";
 import { ApiKeyManager } from "./api-keys.js";
+import type { WorkerRegistry } from "./worker-registry.js";
+import type { SessionScheduler } from "./scheduler.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +72,8 @@ export class AppContext {
   private _providers = new Map<string, ComputeProvider>();
 
   private _launcher: SessionLauncher = new TmuxLauncher();
+  private _workerRegistry: WorkerRegistry | null = null;
+  private _scheduler: SessionScheduler | null = null;
 
   conductor: { stop(): void } | null = null;
   metricsPoller: { stop(): void } | null = null;
@@ -140,6 +144,32 @@ export class AppContext {
   /** Replace the session launcher (e.g. for remote compute or testing). */
   setLauncher(launcher: SessionLauncher): void {
     this._launcher = launcher;
+  }
+
+  // ── Worker registry (hosted mode only) ─────────────────────────────────
+
+  /** Worker registry for hosted multi-tenant deployment. Throws if not initialized. */
+  get workerRegistry(): WorkerRegistry {
+    if (!this._workerRegistry) throw new Error("Worker registry not initialized (hosted mode only)");
+    return this._workerRegistry;
+  }
+
+  /** Set the worker registry (called by hosted entry point). */
+  setWorkerRegistry(r: WorkerRegistry): void {
+    this._workerRegistry = r;
+  }
+
+  // ── Session scheduler (hosted mode only) ───────────────────────────────
+
+  /** Session scheduler for hosted multi-tenant deployment. Throws if not initialized. */
+  get scheduler(): SessionScheduler {
+    if (!this._scheduler) throw new Error("Scheduler not initialized (hosted mode only)");
+    return this._scheduler;
+  }
+
+  /** Set the session scheduler (called by hosted entry point). */
+  setScheduler(s: SessionScheduler): void {
+    this._scheduler = s;
   }
 
   /** Resolve from container with a user-friendly error if not booted yet. */

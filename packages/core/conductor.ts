@@ -296,6 +296,20 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
           return handlePRMergeWebhook(req);
         }
 
+        // ── Worker management (hosted control plane) ──────────────────
+        if (req.method === "POST" && path === "/api/workers/register") {
+          return handleWorkerRegister(req);
+        }
+        if (req.method === "POST" && path === "/api/workers/heartbeat") {
+          return handleWorkerHeartbeat(req);
+        }
+        if (req.method === "POST" && path === "/api/workers/deregister") {
+          return handleWorkerDeregister(req);
+        }
+        if (req.method === "GET" && path === "/api/workers") {
+          return handleWorkerList(req);
+        }
+
         if (req.method === "GET") {
           return handleRestApi(path);
         }
@@ -398,6 +412,87 @@ export async function deliverToChannel(
     });
   } catch { /* channel not reachable — expected when agent hasn't started channel yet */ }
 }
+
+// ── Worker management handlers ──────────────────────────────────────────────
+
+async function handleWorkerRegister(req: Request): Promise<Response> {
+  try {
+    const registry = _app.workerRegistry;
+    const body = await req.json() as {
+      id: string;
+      url: string;
+      capacity?: number;
+      compute_name?: string;
+      tenant_id?: string;
+      metadata?: Record<string, unknown>;
+    };
+    if (!body.id || !body.url) {
+      return Response.json({ error: "id and url are required" }, { status: 400 });
+    }
+    registry.register({
+      id: body.id,
+      url: body.url,
+      capacity: body.capacity ?? 5,
+      compute_name: body.compute_name ?? null,
+      tenant_id: body.tenant_id ?? null,
+      metadata: body.metadata ?? {},
+    });
+    logInfo("conductor", `Worker registered: ${body.id} (${body.url})`);
+    return Response.json({ status: "registered", id: body.id });
+  } catch (e: any) {
+    if (e.message?.includes("hosted mode only")) {
+      return Response.json({ error: "Worker registry not available (not running in hosted mode)" }, { status: 503 });
+    }
+    throw e;
+  }
+}
+
+async function handleWorkerHeartbeat(req: Request): Promise<Response> {
+  try {
+    const body = await req.json() as { id: string };
+    if (!body.id) {
+      return Response.json({ error: "id is required" }, { status: 400 });
+    }
+    _app.workerRegistry.heartbeat(body.id);
+    return Response.json({ status: "ok" });
+  } catch (e: any) {
+    if (e.message?.includes("hosted mode only")) {
+      return Response.json({ error: "Worker registry not available" }, { status: 503 });
+    }
+    throw e;
+  }
+}
+
+async function handleWorkerDeregister(req: Request): Promise<Response> {
+  try {
+    const body = await req.json() as { id: string };
+    if (!body.id) {
+      return Response.json({ error: "id is required" }, { status: 400 });
+    }
+    _app.workerRegistry.deregister(body.id);
+    logInfo("conductor", `Worker deregistered: ${body.id}`);
+    return Response.json({ status: "deregistered" });
+  } catch (e: any) {
+    if (e.message?.includes("hosted mode only")) {
+      return Response.json({ error: "Worker registry not available" }, { status: 503 });
+    }
+    throw e;
+  }
+}
+
+function handleWorkerList(_req: Request): Response {
+  try {
+    const workers = _app.workerRegistry.list();
+    return Response.json(workers);
+  } catch (e: any) {
+    if (e.message?.includes("hosted mode only")) {
+      return Response.json({ error: "Worker registry not available" }, { status: 503 });
+    }
+    throw e;
+  }
+}
+
+// ── Report handling ─────────────────────────────────────────────────────────
 
 async function handleReport(sessionId: string, report: OutboundMessage): Promise<void> {
   // Delegate business logic to session.ts

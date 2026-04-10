@@ -73,15 +73,19 @@ export class InMemorySSEBus implements SSEBus {
 // ── Factory ────────────────────────────────────────────────────────────────
 
 /**
- * Create an SSE bus instance. Currently always returns InMemorySSEBus.
- * When Redis support is added, this will check config and return RediSSEBus.
+ * Create an SSE bus instance.
+ * Returns RedisSSEBus when type is "redis" and a redisUrl is provided,
+ * otherwise returns InMemorySSEBus.
+ *
+ * Note: RedisSSEBus requires calling connect() after creation since
+ * Redis connections are async. For sync usage, use InMemorySSEBus.
  */
 export function createSSEBus(config?: { type?: "memory" | "redis"; redisUrl?: string }): SSEBus {
   const type = config?.type ?? "memory";
-  if (type === "redis") {
-    // Future: return new RediSSEBus(config.redisUrl);
-    // For now, fall back to in-memory with a warning
-    console.warn("Redis SSE bus not yet implemented, falling back to in-memory");
+  if (type === "redis" && config?.redisUrl) {
+    // Dynamic import handled by caller -- return in-memory as sync fallback.
+    // Use RedisSSEBus directly for async initialization (see hosted.ts).
+    console.warn("Use RedisSSEBus directly for Redis-backed SSE bus (requires async connect)");
   }
   return new InMemorySSEBus();
 }

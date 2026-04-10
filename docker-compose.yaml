@@ -14,12 +14,14 @@ version: "3.8"
 services:
   ark:
     build: .
+    command: ["bun", "packages/cli/index.ts", "server", "start", "--hosted"]
     ports:
       - "8420:8420"     # Web UI
       - "19100:19100"   # Conductor
       - "8430:8430"     # LLM Router
     environment:
       - DATABASE_URL=postgres://ark:ark@postgres:5432/ark
+      - REDIS_URL=redis://redis:6379
       - ARK_CONDUCTOR_HOST=0.0.0.0
       - ARK_AUTH_ENABLED=true
     depends_on:
@@ -30,6 +32,17 @@ services:
     restart: unless-stopped
     volumes:
       - ark-data:/root/.ark
+
+  worker:
+    build: .
+    command: ["bun", "packages/cli/index.ts", "arkd", "--conductor-url", "http://ark:19100"]
+    environment:
+      - ARK_CONTROL_PLANE_URL=http://ark:19100
+    depends_on:
+      - ark
+    restart: unless-stopped
+    deploy:
+      replicas: 3
 
   postgres:
     image: postgres:16-alpine

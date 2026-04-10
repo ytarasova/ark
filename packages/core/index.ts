@@ -177,6 +177,12 @@ export { startWebServer, type WebServerOptions } from "./web.js";
 
 // SSE bus (pluggable broadcast for scaling)
 export { type SSEBus, InMemorySSEBus, createSSEBus } from "./sse-bus.js";
+export { RedisSSEBus } from "./sse-redis.js";
+
+// Worker registry and scheduler (hosted control plane)
+export { WorkerRegistry, type WorkerNode } from "./worker-registry.js";
+export { SessionScheduler } from "./scheduler.js";
+export { startHostedServer } from "./hosted.js";
 
 // Compute pools
 export { ComputePoolManager, type ComputePool, type ComputePoolStatus, initPoolSchema } from "./compute-pool.js";

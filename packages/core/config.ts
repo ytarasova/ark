@@ -50,6 +50,8 @@ export interface ArkConfig {
   auth?: AuthConfig;
   /** Database URL for hosted deployments. postgres://... uses PostgresAdapter; empty/undefined uses SQLite. */
   databaseUrl?: string;
+  /** Redis URL for hosted SSE bus and cross-instance pub/sub. redis://... */
+  redisUrl?: string;
 }
 
 /** Load ~/.ark/config.yaml if it exists. Returns empty object on failure. */
@@ -114,6 +116,7 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
         || (yaml.auth as Record<string, unknown>)?.api_key_enabled === true,
     },
     databaseUrl: process.env.DATABASE_URL ?? (yaml.database_url as string) ?? undefined,
+    redisUrl: process.env.REDIS_URL ?? (yaml.redis_url as string) ?? undefined,
   };
 
   if (overrides) {

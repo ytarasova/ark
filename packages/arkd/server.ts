@@ -69,6 +69,41 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
   let conductorUrl: string | null = opts?.conductorUrl ?? null;
   const bindHost = opts?.hostname ?? "0.0.0.0";
 
+  // Control plane registration
+  const controlPlaneUrl = process.env.ARK_CONTROL_PLANE_URL;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  const workerId = process.env.ARK_WORKER_ID || `worker-${hostname()}-${port}`;
+  const workerCapacity = parseInt(process.env.ARK_WORKER_CAPACITY ?? "5", 10);
+
+  if (controlPlaneUrl) {
+    // Register with control plane
+    const workerUrl = `http://${hostname()}:${port}`;
+    const registerPayload = {
+      id: workerId,
+      url: workerUrl,
+      capacity: workerCapacity,
+      compute_name: process.env.ARK_COMPUTE_NAME || null,
+      tenant_id: process.env.ARK_TENANT_ID || null,
+      metadata: { hostname: hostname(), platform: platform(), port },
+    };
+
+    // Initial registration (fire and forget)
+    fetch(`${controlPlaneUrl}/api/workers/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(registerPayload),
+    }).catch(() => { /* control plane not ready yet -- heartbeat will retry */ });
+
+    // Heartbeat every 30s
+    heartbeatTimer = setInterval(() => {
+      fetch(`${controlPlaneUrl}/api/workers/heartbeat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: workerId }),
+      }).catch(() => { /* control plane unreachable */ });
+    }, 30_000);
+  }
+
   const server = Bun.serve({
     port,
     hostname: bindHost,
@@ -235,7 +270,18 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
   if (!opts?.quiet) process.stderr.write(`[arkd] listening on ${bindHost}:${port}\n`);
 
   return {
-    stop() { server.stop(); },
+    stop() {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      // Deregister from control plane on shutdown
+      if (controlPlaneUrl) {
+        fetch(`${controlPlaneUrl}/api/workers/deregister`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: workerId }),
+        }).catch(() => { /* best effort */ });
+      }
+      server.stop();
+    },
     setConductorUrl(url: string) { conductorUrl = url; },
   };
 }
