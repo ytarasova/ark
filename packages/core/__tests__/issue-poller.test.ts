@@ -15,7 +15,7 @@ import {
   startIssuePoller,
   setGhExec,
   type GhIssue,
-} from "../issue-poller.js";
+} from "../integrations/issue-poller.js";
 import { withTestContext } from "./test-helpers.js";
 
 // ── Test setup ───────────────────────────────────────────────────────────────

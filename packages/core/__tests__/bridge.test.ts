@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
-import { Bridge } from "../bridge.js";
-import type { BridgeConfig, BridgeMessage } from "../bridge.js";
+import { Bridge } from "../integrations/bridge.js";
+import type { BridgeConfig, BridgeMessage } from "../integrations/bridge.js";
 import { withTestContext, mockSession } from "./test-helpers.js";
 
 withTestContext();

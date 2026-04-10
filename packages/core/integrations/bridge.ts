@@ -3,8 +3,8 @@
  * Supports Telegram and Slack for remote monitoring and control.
  */
 
-import type { Session } from "../types/index.js";
-import type { AppContext } from "./app.js";
+import type { Session } from "../../types/index.js";
+import type { AppContext } from "../app.js";
 
 
 /** Telegram getUpdates API response shape. */

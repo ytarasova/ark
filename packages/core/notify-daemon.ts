@@ -5,7 +5,7 @@
 
 import type { AppContext } from "./app.js";
 
-import { Bridge, loadBridgeConfig } from "./bridge.js";
+import { Bridge, loadBridgeConfig } from "./integrations/bridge.js";
 
 export interface NotifyDaemonOptions {
   /** Polling interval when sessions are running (ms). Default: 3000. */

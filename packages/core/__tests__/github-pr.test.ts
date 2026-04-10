@@ -12,7 +12,7 @@ import {
   formatReviewPrompt,
   findSessionByPR,
   handleGitHubWebhook,
-} from "../github-pr.js";
+} from "../integrations/github-pr.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();

@@ -8,10 +8,10 @@
 
 import { execFile } from "child_process";
 import { promisify } from "util";
-import type { Session } from "../types/index.js";
-import type { AppContext } from "./app.js";
+import type { Session } from "../../types/index.js";
+import type { AppContext } from "../app.js";
 
-import { safeAsync } from "./safe.js";
+import { safeAsync } from "../safe.js";
 
 const execFileAsync = promisify(execFile);
 

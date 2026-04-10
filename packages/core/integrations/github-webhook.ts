@@ -3,9 +3,9 @@
  * When an issue gets a specific label, auto-create and dispatch a session.
  */
 
-import type { AppContext } from "./app.js";
+import type { AppContext } from "../app.js";
 
-import { dispatch } from "./services/session-orchestration.js";
+import { dispatch } from "../services/session-orchestration.js";
 
 export interface IssueWebhookPayload {
   action: string;  // "labeled", "opened", "edited"

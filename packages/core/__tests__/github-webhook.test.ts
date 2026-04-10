@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { handleIssueWebhook, type IssueWebhookPayload, type IssueWebhookConfig } from "../github-webhook.js";
+import { handleIssueWebhook, type IssueWebhookPayload, type IssueWebhookConfig } from "../integrations/github-webhook.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 

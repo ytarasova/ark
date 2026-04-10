@@ -58,13 +58,13 @@ export * from "./hooks.js";
 export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, ftsTableExists, type SearchResult, type SearchOpts } from "./search.js";
 
 // GitHub PR utilities (lookup, formatting)
-export { findSessionByPR, formatReviewPrompt, extractComments } from "./github-pr.js";
+export { findSessionByPR, formatReviewPrompt, extractComments } from "./integrations/github-pr.js";
 
 // PR polling
-export { pollPRReviews } from "./pr-poller.js";
+export { pollPRReviews } from "./integrations/pr-poller.js";
 
 // Issue polling
-export { pollIssues, startIssuePoller, fetchLabeledIssues, createSessionFromIssue, type IssuePollerOptions, type GhIssue } from "./issue-poller.js";
+export { pollIssues, startIssuePoller, fetchLabeledIssues, createSessionFromIssue, type IssuePollerOptions, type GhIssue } from "./integrations/issue-poller.js";
 
 // Conductor
 export { startConductor } from "./conductor/conductor.js";
@@ -119,7 +119,7 @@ export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBud
 export { sendReliable, hasPasteMarker, isReadyForInput, type SendOptions } from "./send-reliable.js";
 
 // Messaging bridge
-export { Bridge, loadBridgeConfig, createBridge, type BridgeConfig, type BridgeMessage } from "./bridge.js";
+export { Bridge, loadBridgeConfig, createBridge, type BridgeConfig, type BridgeMessage } from "./integrations/bridge.js";
 
 // Docker sandbox
 export { buildSandboxCommand, isDockerAvailable, listSandboxContainers, type SandboxConfig } from "./sandbox.js";
@@ -202,7 +202,7 @@ export { configureObservability, getObservabilityConfig, recordEvent, flush as f
 export { configureOtlp, resetOtlp, flushSpans, startSpan, endSpan, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId, type OtlpConfig, type OtlpSpan } from "./observability/otlp.js";
 
 // Auto-rollback
-export { watchMergedPR, shouldRollback, allCompleted, createRevertPayload, pollCheckSuites, type RollbackConfig, type CheckSuiteResult, type RevertPayload } from "./rollback.js";
+export { watchMergedPR, shouldRollback, allCompleted, createRevertPayload, pollCheckSuites, type RollbackConfig, type CheckSuiteResult, type RevertPayload } from "./integrations/rollback.js";
 
 // Structured JSONL logging
 export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponents, setLogArkDir, type LogComponent, type LogLevel } from "./observability/structured-log.js";
@@ -227,7 +227,7 @@ export { KnowledgeStore } from "./knowledge/index.js";
 export type { KnowledgeNode, KnowledgeEdge, ContextPackage, NodeType, EdgeRelation } from "./knowledge/index.js";
 
 // GitHub issue webhook
-export { handleIssueWebhook, type IssueWebhookPayload, type IssueWebhookConfig } from "./github-webhook.js";
+export { handleIssueWebhook, type IssueWebhookPayload, type IssueWebhookConfig } from "./integrations/github-webhook.js";
 
 // Agent-initiated handoff
 export { detectHandoff, hasHandoff, type HandoffSignal } from "./handoff.js";

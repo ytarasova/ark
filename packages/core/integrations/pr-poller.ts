@@ -7,13 +7,13 @@
 
 import { execFile } from "child_process";
 import { promisify } from "util";
-import type { Session } from "../types/index.js";
-import type { AppContext } from "./app.js";
+import type { Session } from "../../types/index.js";
+import type { AppContext } from "../app.js";
 
-import * as flow from "./flow.js";
+import * as flow from "../flow.js";
 import { formatReviewPrompt, type ReviewComment } from "./github-pr.js";
-import { safeAsync } from "./safe.js";
-import { DEFAULT_CHANNEL_BASE_URL } from "./constants.js";
+import { safeAsync } from "../safe.js";
+import { DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
 
 const execFileAsync = promisify(execFile);
 

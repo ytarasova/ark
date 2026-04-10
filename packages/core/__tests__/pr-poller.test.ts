@@ -16,7 +16,7 @@ let execFileResult: { stdout: string; stderr: string } = { stdout: "{}", stderr:
 let execFileShouldThrow = false;
 
 import { getApp } from "../app.js";
-import { pollPRReviews, checkSessionPR, fetchPRReviews, processReviewFeedback, setGhExec } from "../pr-poller.js";
+import { pollPRReviews, checkSessionPR, fetchPRReviews, processReviewFeedback, setGhExec } from "../integrations/pr-poller.js";
 import { withTestContext } from "./test-helpers.js";
 
 // ── Test setup ───────────────────────────────────────────────────────────────

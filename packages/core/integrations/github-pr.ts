@@ -5,11 +5,11 @@
  */
 
 import { createHmac } from "crypto";
-import type { AppContext } from "./app.js";
-import { safeParseConfig } from "./util.js";
-import type { Session, SessionStatus } from "../types/index.js";
-import { safeAsync } from "./safe.js";
-import { DEFAULT_CHANNEL_BASE_URL } from "./constants.js";
+import type { AppContext } from "../app.js";
+import { safeParseConfig } from "../util.js";
+import type { Session, SessionStatus } from "../../types/index.js";
+import { safeAsync } from "../safe.js";
+import { DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

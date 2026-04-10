@@ -29,14 +29,14 @@ import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../../compute/index.js";
 import { indexSession } from "../search.js";
 import { listSchedules, cronMatches, updateScheduleLastRun } from "../schedule.js";
-import { pollPRReviews } from "../pr-poller.js";
-import { pollIssues } from "../issue-poller.js";
+import { pollPRReviews } from "../integrations/pr-poller.js";
+import { pollIssues } from "../integrations/issue-poller.js";
 import { ArkdClient } from "../../arkd/client.js";
 import { safeAsync } from "../safe.js";
 import { addEntry } from "../ledger.js";
 import { logError, logInfo, logWarn } from "../observability/structured-log.js";
 import { sendOSNotification } from "../notify.js";
-import { watchMergedPR, type RollbackConfig } from "../rollback.js";
+import { watchMergedPR, type RollbackConfig } from "../integrations/rollback.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
 import { DEFAULT_CONDUCTOR_PORT, DEFAULT_CONDUCTOR_HOST, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
 

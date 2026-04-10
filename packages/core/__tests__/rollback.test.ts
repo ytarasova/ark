@@ -3,7 +3,7 @@ import { withTestContext } from "./test-helpers.js";
 import {
   pollCheckSuites, shouldRollback, createRevertPayload,
   type CheckSuiteResult, type RollbackConfig,
-} from "../rollback.js";
+} from "../integrations/rollback.js";
 
 withTestContext();
 
