@@ -40,8 +40,9 @@ export interface FlowDefinition {
 
 /** Load a flow by name via the AppContext store. */
 function loadFlow(name: string): FlowDefinition | null {
-  return getApp().flows.get(name);
+  try { return getApp().flows.get(name); } catch { return null; }
 }
+// TODO: Migrate getStages/getStage/etc. to accept app as parameter, then remove getApp() here
 
 
 export function getStages(flowName: string): StageDefinition[] {

@@ -167,7 +167,7 @@ export class AppContext {
     }
     this.phase = "booting";
 
-    // Auto-register as global singleton so paths.ts / getApp() work during boot
+    // Auto-register as global singleton (used by flow.ts loadFlow fallback)
     if (!_app) _app = this;
 
     // 1. Ensure directories
