@@ -299,8 +299,8 @@ Every feature must exist in all three surfaces:
 | Schedules | ✅ | ✅ | ✅ | Done |
 | Costs | ✅ | ✅ | ✅ | Done (no charts) |
 | Settings | ✅ | ✅ | ✅ | Done |
-| Dashboard Overview | 🔄 | ❌ | ❌ | In progress |
-| Cost Charts | ❌ | ❌ | N/A | Not started |
+| Dashboard Overview | ✅ | ✅ | ✅ | Done (v0.12.0) |
+| Cost Charts | ✅ | ✅ | N/A | Done (Recharts web, ASCII TUI) |
 | Router Status | ❌ | ❌ | ✅ | CLI only |
 | Tenant/User Mgmt | ❌ | ❌ | ✅ | CLI only |
 | Knowledge Search | ❌ | ❌ | ✅ | CLI only |
