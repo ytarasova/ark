@@ -18,7 +18,7 @@ import type { Session, Compute, MessageRole, MessageType } from "../../types/ind
 import * as tmux from "../tmux.js";
 import * as flow from "../flow.js";
 import type { FlowDefinition } from "../flow.js";
-import * as agentRegistry from "../agent.js";
+import * as agentRegistry from "../agent/agent.js";
 import * as claude from "../claude/claude.js";
 import { parseTranscriptUsage } from "../claude/claude.js";
 import { getProvider } from "../../compute/index.js";

@@ -10,7 +10,7 @@ import { join } from "path";
 import YAML from "yaml";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { resolveFlow } from "../flow.js";
-import { resolveAgent } from "../agent.js";
+import { resolveAgent } from "../agent/agent.js";
 import { substituteVars, buildSessionVars } from "../template.js";
 
 let app: AppContext;

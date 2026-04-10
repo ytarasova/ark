@@ -9,7 +9,7 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "fs";
 import { join, basename } from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import type { SkillDefinition } from "../skill.js";
+import type { SkillDefinition } from "../agent/skill.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

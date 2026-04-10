@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
-import { sessionToRecipe } from "../recipe.js";
+import { sessionToRecipe } from "../agent/recipe.js";
 import type { RecipeDefinition } from "../../types/index.js";
 
 let app: AppContext;

@@ -9,7 +9,7 @@
 import { readFileSync, existsSync, readdirSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import type { AgentDefinition } from "../agent.js";
+import type { AgentDefinition } from "../agent/agent.js";
 
 // ── Defaults ────────────────────────────────────────────────────────────────
 

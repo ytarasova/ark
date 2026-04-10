@@ -9,7 +9,7 @@ import YAML from "yaml";
 import {
   resolveAgent, buildClaudeArgs, findProjectRoot,
   type AgentDefinition,
-} from "../agent.js";
+} from "../agent/agent.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 

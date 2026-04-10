@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
-import { extractSkillCandidates } from "../skill-extractor.js";
+import { extractSkillCandidates } from "../agent/skill-extractor.js";
 
 const { getCtx } = withTestContext();
 

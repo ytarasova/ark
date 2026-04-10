@@ -8,8 +8,8 @@
  * instantiation, validation, and sub-recipe resolution.
  */
 
-import type { AppContext } from "./app.js";
-import type { Session } from "../types/index.js";
+import type { AppContext } from "../app.js";
+import type { Session } from "../../types/index.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

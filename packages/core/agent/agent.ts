@@ -10,8 +10,8 @@
 
 import { existsSync } from "fs";
 import { join, dirname } from "path";
-import { substituteVars, buildSessionVars } from "./template.js";
-import type { AppContext } from "./app.js";
+import { substituteVars, buildSessionVars } from "../template.js";
+import type { AppContext } from "../app.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -129,7 +129,7 @@ export function resolveAgentWithRuntime(
 
 // ── Build claude CLI args ───────────────────────────────────────────────────
 
-import * as claude from "./claude/claude.js";
+import * as claude from "../claude/claude.js";
 
 export function buildClaudeArgs(agent: AgentDefinition, opts?: {
   task?: string;

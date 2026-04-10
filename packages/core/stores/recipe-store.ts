@@ -9,7 +9,7 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "fs";
 import { join, basename } from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import type { RecipeDefinition } from "../recipe.js";
+import type { RecipeDefinition } from "../agent/recipe.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

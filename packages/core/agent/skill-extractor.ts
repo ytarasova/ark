@@ -6,7 +6,7 @@
  * Returns candidate skills with confidence scores.
  */
 
-import type { AppContext } from "./app.js";
+import type { AppContext } from "../app.js";
 
 export interface ConversationTurn {
   role: string;

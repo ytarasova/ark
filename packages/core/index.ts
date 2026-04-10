@@ -24,13 +24,13 @@ export * from "./flow.js";
 export { substituteVars, buildSessionVars } from "./template.js";
 
 // Agent
-export { resolveAgent, resolveAgentWithRuntime, buildClaudeArgs, findProjectRoot, type AgentDefinition } from "./agent.js";
+export { resolveAgent, resolveAgentWithRuntime, buildClaudeArgs, findProjectRoot, type AgentDefinition } from "./agent/agent.js";
 
 // Skill
-export { type SkillDefinition } from "./skill.js";
+export { type SkillDefinition } from "./agent/skill.js";
 
 // Recipe
-export { instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecipes, sessionToRecipe, type RecipeDefinition, type RecipeVariable, type RecipeParameter, type RecipeInstance, type SubRecipeRef } from "./recipe.js";
+export { instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecipes, sessionToRecipe, type RecipeDefinition, type RecipeVariable, type RecipeParameter, type RecipeInstance, type SubRecipeRef } from "./agent/recipe.js";
 
 // Executor
 export type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "./executor.js";
@@ -79,7 +79,7 @@ export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
 export { createSchedule, listSchedules, getSchedule, deleteSchedule, enableSchedule, updateScheduleLastRun, cronMatches, type Schedule } from "./schedule.js";
 
 // Skill extraction
-export { extractSkillCandidates, extractAndSaveSkills, type SkillCandidate, type ConversationTurn } from "./skill-extractor.js";
+export { extractSkillCandidates, extractAndSaveSkills, type SkillCandidate, type ConversationTurn } from "./agent/skill-extractor.js";
 
 // Structured review output
 export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review.js";
