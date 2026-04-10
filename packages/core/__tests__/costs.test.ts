@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget } from "../observability/costs.js";
-import type { TranscriptUsage } from "../claude.js";
+import type { TranscriptUsage } from "../claude/claude.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 

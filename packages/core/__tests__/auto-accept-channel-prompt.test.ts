@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterAll, spyOn } from "bun:test";
 import * as tmux from "../tmux.js";
-import { autoAcceptChannelPrompt } from "../claude.js";
+import { autoAcceptChannelPrompt } from "../claude/claude.js";
 
 // ── Spy setup ──────────────────────────────────────────────────────────────
 

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { channelMcpConfig } from "../claude.js";
+import { channelMcpConfig } from "../claude/claude.js";
 
 describe("channelMcpConfig", () => {
   it("defaults conductor URL to localhost:19100", () => {

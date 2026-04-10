@@ -129,7 +129,7 @@ export function resolveAgentWithRuntime(
 
 // ── Build claude CLI args ───────────────────────────────────────────────────
 
-import * as claude from "./claude.js";
+import * as claude from "./claude/claude.js";
 
 export function buildClaudeArgs(agent: AgentDefinition, opts?: {
   task?: string;

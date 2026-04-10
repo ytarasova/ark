@@ -3,8 +3,8 @@
  * Pricing per million tokens (as of 2025-05).
  */
 
-import type { TranscriptUsage } from "../claude.js";
-import { parseTranscriptUsage } from "../claude.js";
+import type { TranscriptUsage } from "../claude/claude.js";
+import { parseTranscriptUsage } from "../claude/claude.js";
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 

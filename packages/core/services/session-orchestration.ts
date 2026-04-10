@@ -19,8 +19,8 @@ import * as tmux from "../tmux.js";
 import * as flow from "../flow.js";
 import type { FlowDefinition } from "../flow.js";
 import * as agentRegistry from "../agent.js";
-import * as claude from "../claude.js";
-import { parseTranscriptUsage } from "../claude.js";
+import * as claude from "../claude/claude.js";
+import { parseTranscriptUsage } from "../claude/claude.js";
 import { getProvider } from "../../compute/index.js";
 
 export type SessionOpResult = { ok: true; sessionId: string } | { ok: false; message: string };

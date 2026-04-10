@@ -1,6 +1,6 @@
 import type { ToolDriver } from "../tool-driver.js";
 import { randomUUID } from "crypto";
-import { shellQuoteArgs } from "../claude.js";
+import { shellQuoteArgs } from "../claude/claude.js";
 
 const MODEL_MAP: Record<string, string> = {
   pro: "gemini-2.5-pro",

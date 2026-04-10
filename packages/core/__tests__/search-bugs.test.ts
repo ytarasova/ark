@@ -6,7 +6,7 @@ import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { indexTranscripts, ftsTableExists, getIndexStats } from "../search.js";
-import { refreshClaudeSessionsCache, listClaudeSessions } from "../claude-sessions.js";
+import { refreshClaudeSessionsCache, listClaudeSessions } from "../claude/sessions.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 

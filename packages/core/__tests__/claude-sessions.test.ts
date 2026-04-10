@@ -6,7 +6,7 @@ import { getApp } from "../app.js";
 import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync, utimesSync } from "fs";
 import { join } from "path";
-import { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache } from "../claude-sessions.js";
+import { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache } from "../claude/sessions.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();

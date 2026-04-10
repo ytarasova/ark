@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { execFileSync } from "child_process";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
-import * as claude from "../claude.js";
+import * as claude from "../claude/claude.js";
 
 let app: AppContext;
 

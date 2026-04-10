@@ -11,7 +11,7 @@ import { writeFileSync, mkdirSync, readFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
-import { buildArgs, writeHooksConfig, removeHooksConfig } from "../claude.js";
+import { buildArgs, writeHooksConfig, removeHooksConfig } from "../claude/claude.js";
 import { resolveFlow } from "../flow.js";
 import { buildClaudeArgs } from "../agent.js";
 import { buildSessionVars } from "../template.js";

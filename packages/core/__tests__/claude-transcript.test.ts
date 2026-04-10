@@ -4,7 +4,7 @@
 import { describe, it, expect } from "bun:test";
 import { writeFileSync } from "fs";
 import { join } from "path";
-import { parseTranscriptUsage } from "../claude.js";
+import { parseTranscriptUsage } from "../claude/claude.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();

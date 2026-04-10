@@ -1,5 +1,5 @@
 import type { ToolDriver } from "../tool-driver.js";
-import * as claude from "../claude.js";
+import * as claude from "../claude/claude.js";
 
 const MODEL_MAP: Record<string, string> = {
   opus: "claude-opus-4-6",

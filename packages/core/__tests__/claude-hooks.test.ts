@@ -4,7 +4,7 @@
 import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { writeHooksConfig, removeHooksConfig } from "../claude.js";
+import { writeHooksConfig, removeHooksConfig } from "../claude/claude.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();

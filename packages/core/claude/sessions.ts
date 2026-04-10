@@ -10,7 +10,7 @@ import { join, basename } from "path";
 import { homedir } from "os";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import type { AppContext } from "./app.js";
+import type { AppContext } from "../app.js";
 
 const execFileAsync = promisify(execFile);
 

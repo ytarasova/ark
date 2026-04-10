@@ -17,7 +17,7 @@ import {
   trustDirectory,
   type ClaudeArgsOpts,
   type LauncherOpts,
-} from "../claude.js";
+} from "../claude/claude.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 

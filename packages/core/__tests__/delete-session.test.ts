@@ -11,7 +11,7 @@ import { join } from "path";
 
 import { AppContext, setApp, clearApp, getApp } from "../app.js";
 import { startSession, deleteSessionAsync } from "../services/session-orchestration.js";
-import { writeHooksConfig } from "../claude.js";
+import { writeHooksConfig } from "../claude/claude.js";
 
 let app: AppContext;
 

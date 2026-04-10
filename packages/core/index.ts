@@ -46,7 +46,7 @@ export type { LaunchResult as SessionLaunchResult } from "./session-launcher.js"
 export { TmuxLauncher, ContainerLauncher, ArkdLauncher } from "./launchers/index.js";
 
 // Claude integration
-export * as claude from "./claude.js";
+export * as claude from "./claude/claude.js";
 
 // Tmux
 export * from "./tmux.js";
@@ -70,7 +70,7 @@ export { pollIssues, startIssuePoller, fetchLabeledIssues, createSessionFromIssu
 export { startConductor } from "./conductor/conductor.js";
 
 // Claude sessions
-export { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache, type ClaudeSession } from "./claude-sessions.js";
+export { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache, type ClaudeSession } from "./claude/sessions.js";
 
 // Repo-scoped config
 export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
