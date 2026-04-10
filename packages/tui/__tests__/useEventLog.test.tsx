@@ -109,11 +109,12 @@ describe("useEventLog", () => {
 
     const errorEntry = capturedEvents.find(e => e.type === "agent_error");
     expect(errorEntry).toBeDefined();
-    expect(errorEntry!.color).toBe("red");
+    const theme = (await import("../../core/theme.js")).getTheme();
+    expect(errorEntry!.color).toBe(theme.error);
 
     const completeEntry = capturedEvents.find(e => e.type === "session_completed");
     expect(completeEntry).toBeDefined();
-    expect(completeEntry!.color).toBe("green");
+    expect(completeEntry!.color).toBe(theme.running);
 
     const startEntry = capturedEvents.find(e => e.type === "stage_started");
     expect(startEntry).toBeDefined();
