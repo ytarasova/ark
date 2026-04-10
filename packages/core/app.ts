@@ -38,6 +38,9 @@ import { SessionRepository, ComputeRepository, EventRepository, MessageRepositor
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
 import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore } from "./stores/index.js";
 import type { FlowStore, SkillStore, AgentStore, RecipeStore } from "./stores/index.js";
+import type { SessionLauncher } from "./session-launcher.js";
+import { TmuxLauncher } from "./launchers/tmux.js";
+import { ApiKeyManager } from "./api-keys.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -65,6 +68,8 @@ export class AppContext {
   // Keep infrastructure fields that aren't in the container
   private _eventBus: typeof eventBus | null = null;
   private _providers = new Map<string, ComputeProvider>();
+
+  private _launcher: SessionLauncher = new TmuxLauncher();
 
   conductor: { stop(): void } | null = null;
   metricsPoller: { stop(): void } | null = null;
@@ -108,6 +113,14 @@ export class AppContext {
   get messages(): MessageRepository { return this._resolve("messages"); }
   get todos(): TodoRepository { return this._resolve("todos"); }
 
+  private _apiKeys: ApiKeyManager | null = null;
+
+  /** API key manager for multi-tenant auth. Available after boot. */
+  get apiKeys(): ApiKeyManager {
+    if (!this._apiKeys) throw new Error("AppContext not booted -- apiKeys not available");
+    return this._apiKeys;
+  }
+
   get sessionService(): SessionService { return this._resolve("sessionService"); }
   get computeService(): ComputeService { return this._resolve("computeService"); }
   get historyService(): HistoryService { return this._resolve("historyService"); }
@@ -119,6 +132,16 @@ export class AppContext {
   get agents(): AgentStore { return this._resolve("agents"); }
   get recipes(): RecipeStore { return this._resolve("recipes"); }
 
+  // ── Session launcher ──────────────────────────────────────────────────
+
+  /** The session launcher (defaults to TmuxLauncher for local compute). */
+  get launcher(): SessionLauncher { return this._launcher; }
+
+  /** Replace the session launcher (e.g. for remote compute or testing). */
+  setLauncher(launcher: SessionLauncher): void {
+    this._launcher = launcher;
+  }
+
   /** Resolve from container with a user-friendly error if not booted yet. */
   private _resolve<K extends keyof import("./container.js").Cradle>(key: K): import("./container.js").Cradle[K] {
     try {
@@ -126,6 +149,38 @@ export class AppContext {
     } catch {
       throw new Error(`AppContext not booted -- ${key} not available`);
     }
+  }
+
+  // ── Tenant scoping ─────────────────────────────────────────────────────
+
+  /**
+   * Create a tenant-scoped view of this AppContext.
+   * Returns a shallow copy with all repositories scoped to the given tenant.
+   * Shares the same DB, container, providers, and infrastructure.
+   */
+  forTenant(tenantId: string): AppContext {
+    const scoped = Object.create(this) as AppContext;
+    // Override repository accessors to return tenant-scoped instances.
+    // We create new repo instances that share the same DB but are scoped to the tenant.
+    const db = this.db;
+    const scopedSessions = new SessionRepository(db);
+    scopedSessions.setTenant(tenantId);
+    const scopedComputes = new ComputeRepository(db);
+    scopedComputes.setTenant(tenantId);
+    const scopedEvents = new EventRepository(db);
+    scopedEvents.setTenant(tenantId);
+    const scopedMessages = new MessageRepository(db);
+    scopedMessages.setTenant(tenantId);
+    const scopedTodos = new TodoRepository(db);
+    scopedTodos.setTenant(tenantId);
+
+    Object.defineProperty(scoped, "sessions", { get: () => scopedSessions, configurable: true });
+    Object.defineProperty(scoped, "computes", { get: () => scopedComputes, configurable: true });
+    Object.defineProperty(scoped, "events", { get: () => scopedEvents, configurable: true });
+    Object.defineProperty(scoped, "messages", { get: () => scopedMessages, configurable: true });
+    Object.defineProperty(scoped, "todos", { get: () => scopedTodos, configurable: true });
+
+    return scoped;
   }
 
   // ── Container access ───────────────────────────────────────────────────
@@ -193,6 +248,9 @@ export class AppContext {
     // 3. Initialize schema (new column names: ticket, summary, flow)
     initRepoSchema(db);
     seedLocalCompute(db);
+
+    // 3a. Initialize API key manager
+    this._apiKeys = new ApiKeyManager(db);
 
     // 3b. Register all dependencies in the container
     const storeBaseDir = join(fileURLToPath(import.meta.url), "..", "..", "..");

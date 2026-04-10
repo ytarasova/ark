@@ -335,12 +335,12 @@ describe("RepoConfig verify field", () => {
 // ── Test 8: archive(getApp()) and restore(getApp()) ──────────────────────────────────────────
 
 describe("archive(getApp()) and restore(getApp())", () => {
-  it("archive sets status to archived", () => {
+  it("archive sets status to archived", async () => {
     const { archive } = require("../services/session-orchestration.js");
     const session = getApp().sessions.create({ summary: "archive-test" });
     getApp().sessions.update(session.id, { status: "completed" });
 
-    const result = archive(getApp(), session.id);
+    const result = await archive(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session archived");
 
@@ -348,18 +348,18 @@ describe("archive(getApp()) and restore(getApp())", () => {
     expect(updated!.status).toBe("archived");
   });
 
-  it("archive returns error for non-existent session", () => {
+  it("archive returns error for non-existent session", async () => {
     const { archive } = require("../services/session-orchestration.js");
-    const result = archive(getApp(), "s-nonexistent");
+    const result = await archive(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
 
-  it("restore sets status to stopped", () => {
+  it("restore sets status to stopped", async () => {
     const { archive, restore } = require("../services/session-orchestration.js");
     const session = getApp().sessions.create({ summary: "restore-test" });
     getApp().sessions.update(session.id, { status: "completed" });
-    archive(getApp(), session.id);
+    await archive(getApp(), session.id);
 
     const result = restore(getApp(), session.id);
     expect(result.ok).toBe(true);
@@ -379,11 +379,11 @@ describe("archive(getApp()) and restore(getApp())", () => {
     expect(result.message).toContain("not archived");
   });
 
-  it("archived sessions excluded from default list", () => {
+  it("archived sessions excluded from default list", async () => {
     const { archive } = require("../services/session-orchestration.js");
     const session = getApp().sessions.create({ summary: "archive-list-test" });
     getApp().sessions.update(session.id, { status: "completed" });
-    archive(getApp(), session.id);
+    await archive(getApp(), session.id);
 
     // Default list should not include archived
     const defaultList = getApp().sessions.list();

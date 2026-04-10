@@ -2,6 +2,7 @@ import { join } from "path";
 import { homedir } from "os";
 import { existsSync, readFileSync } from "fs";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ROUTER_URL } from "./constants.js";
+import type { AuthConfig } from "./auth.js";
 
 export interface OtlpSettings {
   enabled: boolean;
@@ -46,6 +47,7 @@ export interface ArkConfig {
   budgets?: { dailyLimit?: number; weeklyLimit?: number; monthlyLimit?: number };
   theme?: string;
   notifications?: boolean;
+  auth?: AuthConfig;
 }
 
 /** Load ~/.ark/config.yaml if it exists. Returns empty object on failure. */
@@ -104,6 +106,11 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
     budgets: yaml.budgets as ArkConfig["budgets"],
     theme: yaml.theme as string | undefined,
     notifications: yaml.notifications as boolean | undefined,
+    auth: {
+      enabled: (yaml.auth as Record<string, unknown>)?.enabled === true,
+      apiKeyEnabled: (yaml.auth as Record<string, unknown>)?.apiKeyEnabled === true
+        || (yaml.auth as Record<string, unknown>)?.api_key_enabled === true,
+    },
   };
 
   if (overrides) {

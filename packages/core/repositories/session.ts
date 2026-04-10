@@ -68,7 +68,12 @@ const SESSION_COLUMNS = new Set([
 // ── Repository ──────────────────────────────────────────────────────────────
 
 export class SessionRepository {
+  private tenantId: string = "default";
+
   constructor(private db: IDatabase) {}
+
+  setTenant(tenantId: string): void { this.tenantId = tenantId; }
+  getTenant(): string { return this.tenantId; }
 
   create(opts: CreateSessionOpts): Session {
     const id = this.generateId();
@@ -79,27 +84,27 @@ export class SessionRepository {
 
     this.db.prepare(`
       INSERT INTO sessions (id, ticket, summary, repo, branch, compute_name,
-        workdir, stage, status, flow, agent, group_name, config, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?, ?)
+        workdir, stage, status, flow, agent, group_name, config, tenant_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, opts.ticket ?? null, opts.summary ?? null, opts.repo ?? null,
       branch, opts.compute_name ?? null, opts.workdir ?? null,
       opts.flow ?? "default", opts.agent ?? null, opts.group_name ?? null,
-      JSON.stringify(opts.config ?? {}), ts, ts,
+      JSON.stringify(opts.config ?? {}), this.tenantId, ts, ts,
     );
 
     return this.get(id)!;
   }
 
   get(id: string): Session | null {
-    const row = this.db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as SessionRow | undefined;
+    const row = this.db.prepare("SELECT * FROM sessions WHERE id = ? AND tenant_id = ?").get(id, this.tenantId) as SessionRow | undefined;
     if (!row) return null;
     return rowToSession(row);
   }
 
   list(filters?: SessionListFilters): Session[] {
-    let sql = "SELECT * FROM sessions WHERE status != 'deleting'";
-    const params: any[] = [];
+    let sql = "SELECT * FROM sessions WHERE tenant_id = ? AND status != 'deleting'";
+    const params: any[] = [this.tenantId];
 
     // Exclude archived sessions unless explicitly filtering for them
     if (!filters?.status || filters.status !== "archived") {
@@ -134,15 +139,15 @@ export class SessionRepository {
         values.push(value ?? null);
       }
     }
-    values.push(id);
+    values.push(id, this.tenantId);
 
-    this.db.prepare(`UPDATE sessions SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+    this.db.prepare(`UPDATE sessions SET ${updates.join(", ")} WHERE id = ? AND tenant_id = ?`).run(...values);
     return this.get(id);
   }
 
   delete(id: string): boolean {
-    this.db.prepare("DELETE FROM events WHERE track_id = ?").run(id);
-    const result = this.db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
+    this.db.prepare("DELETE FROM events WHERE track_id = ? AND tenant_id = ?").run(id, this.tenantId);
+    const result = this.db.prepare("DELETE FROM sessions WHERE id = ? AND tenant_id = ?").run(id, this.tenantId);
     return result.changes > 0;
   }
 
@@ -178,10 +183,10 @@ export class SessionRepository {
         values.push(key === "config" ? JSON.stringify(value) : value ?? null);
       }
     }
-    values.push(id, expected);
+    values.push(id, expected, this.tenantId);
 
     const result = this.db.prepare(
-      `UPDATE sessions SET ${updates.join(", ")} WHERE id = ? AND status = ?`
+      `UPDATE sessions SET ${updates.join(", ")} WHERE id = ? AND status = ? AND tenant_id = ?`
     ).run(...values);
     return result.changes > 0;
   }
@@ -189,8 +194,8 @@ export class SessionRepository {
   purgeDeleted(olderThanMs?: number): number {
     const cutoff = olderThanMs ?? 90_000;
     const deleted = (this.db.prepare(
-      "SELECT * FROM sessions WHERE status = 'deleting' ORDER BY updated_at DESC"
-    ).all() as SessionRow[]).map(rowToSession);
+      "SELECT * FROM sessions WHERE tenant_id = ? AND status = 'deleting' ORDER BY updated_at DESC"
+    ).all(this.tenantId) as SessionRow[]).map(rowToSession);
 
     let count = 0;
     const cutoffTime = Date.now() - cutoff;
@@ -210,12 +215,12 @@ export class SessionRepository {
 
   mergeConfig(sessionId: string, patch: Partial<SessionConfig>): void {
     this.db.transaction(() => {
-      const row = this.db.prepare("SELECT config FROM sessions WHERE id = ?").get(sessionId) as { config: string } | undefined;
+      const row = this.db.prepare("SELECT config FROM sessions WHERE id = ? AND tenant_id = ?").get(sessionId, this.tenantId) as { config: string } | undefined;
       if (!row) return;
       const existing = safeParseConfig(row.config);
       const merged = { ...existing, ...patch };
-      this.db.prepare("UPDATE sessions SET config = ?, updated_at = ? WHERE id = ?")
-        .run(JSON.stringify(merged), new Date().toISOString(), sessionId);
+      this.db.prepare("UPDATE sessions SET config = ?, updated_at = ? WHERE id = ? AND tenant_id = ?")
+        .run(JSON.stringify(merged), new Date().toISOString(), sessionId, this.tenantId);
     });
   }
 
@@ -224,10 +229,11 @@ export class SessionRepository {
     const pattern = `%${query}%`;
     const rows = this.db.prepare(`
       SELECT * FROM sessions
-      WHERE (ticket LIKE ? OR summary LIKE ? OR repo LIKE ? OR id LIKE ?)
+      WHERE tenant_id = ?
+        AND (ticket LIKE ? OR summary LIKE ? OR repo LIKE ? OR id LIKE ?)
         AND status != 'deleting'
       ORDER BY created_at DESC LIMIT ?
-    `).all(pattern, pattern, pattern, pattern, limit) as SessionRow[];
+    `).all(this.tenantId, pattern, pattern, pattern, pattern, limit) as SessionRow[];
     return rows.map(rowToSession);
   }
 
@@ -265,8 +271,8 @@ export class SessionRepository {
   /** List sessions in 'deleting' status (soft-deleted). */
   listDeleted(): Session[] {
     return (this.db.prepare(
-      "SELECT * FROM sessions WHERE status = 'deleting' ORDER BY updated_at DESC"
-    ).all() as SessionRow[]).map(rowToSession);
+      "SELECT * FROM sessions WHERE tenant_id = ? AND status = 'deleting' ORDER BY updated_at DESC"
+    ).all(this.tenantId) as SessionRow[]).map(rowToSession);
   }
 
   /** Generate a unique session ID (s-<6 hex chars>). Public for backward compat. */
@@ -281,8 +287,8 @@ export class SessionRepository {
   /** Check whether a channel port is in use by any running/waiting session. */
   isChannelPortAvailable(port: number, excludeSessionId?: string): boolean {
     const sessions = this.db.prepare(
-      "SELECT id FROM sessions WHERE status IN ('running', 'waiting') AND id != ?"
-    ).all(excludeSessionId ?? "") as { id: string }[];
+      "SELECT id FROM sessions WHERE tenant_id = ? AND status IN ('running', 'waiting') AND id != ?"
+    ).all(this.tenantId, excludeSessionId ?? "") as { id: string }[];
     return !sessions.some(s => this.channelPort(s.id) === port);
   }
 }

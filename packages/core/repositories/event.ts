@@ -26,7 +26,12 @@ function rowToEvent(row: EventRow): Event {
 // ── Repository ──────────────────────────────────────────────────────────────
 
 export class EventRepository {
+  private tenantId: string = "default";
+
   constructor(private db: IDatabase) {}
+
+  setTenant(tenantId: string): void { this.tenantId = tenantId; }
+  getTenant(): string { return this.tenantId; }
 
   log(
     trackId: string,
@@ -34,11 +39,11 @@ export class EventRepository {
     opts?: { stage?: string; actor?: string; data?: Record<string, unknown> },
   ): void {
     this.db.prepare(`
-      INSERT INTO events (track_id, type, stage, actor, data, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO events (track_id, type, stage, actor, data, tenant_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       trackId, type, opts?.stage ?? null, opts?.actor ?? null,
-      opts?.data ? JSON.stringify(opts.data) : null, now(),
+      opts?.data ? JSON.stringify(opts.data) : null, this.tenantId, now(),
     );
   }
 
@@ -46,8 +51,8 @@ export class EventRepository {
     trackId: string,
     opts?: { type?: string; limit?: number },
   ): Event[] {
-    let sql = "SELECT * FROM events WHERE track_id = ?";
-    const params: any[] = [trackId];
+    let sql = "SELECT * FROM events WHERE track_id = ? AND tenant_id = ?";
+    const params: any[] = [trackId, this.tenantId];
     if (opts?.type) { sql += " AND type = ?"; params.push(opts.type); }
     sql += " ORDER BY id ASC LIMIT ?";
     params.push(opts?.limit ?? 200);
@@ -56,6 +61,6 @@ export class EventRepository {
   }
 
   deleteForTrack(trackId: string): void {
-    this.db.prepare("DELETE FROM events WHERE track_id = ?").run(trackId);
+    this.db.prepare("DELETE FROM events WHERE track_id = ? AND tenant_id = ?").run(trackId, this.tenantId);
   }
 }

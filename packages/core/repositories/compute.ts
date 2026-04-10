@@ -47,7 +47,12 @@ const COMPUTE_COLUMNS = new Set([
 // ── Repository ──────────────────────────────────────────────────────────────
 
 export class ComputeRepository {
+  private tenantId: string = "default";
+
   constructor(private db: IDatabase) {}
+
+  setTenant(tenantId: string): void { this.tenantId = tenantId; }
+  getTenant(): string { return this.tenantId; }
 
   create(opts: CreateComputeOpts): Compute {
     const ts = now();
@@ -56,13 +61,14 @@ export class ComputeRepository {
     const initialStatus: ComputeStatus = provider === "local" ? "running" : "stopped";
 
     this.db.prepare(`
-      INSERT INTO compute (name, provider, status, config, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO compute (name, provider, status, config, tenant_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       opts.name,
       provider,
       initialStatus,
       JSON.stringify(opts.config ?? {}),
+      this.tenantId,
       ts, ts,
     );
 
@@ -70,14 +76,14 @@ export class ComputeRepository {
   }
 
   get(name: string): Compute | null {
-    const row = this.db.prepare("SELECT * FROM compute WHERE name = ?").get(name) as ComputeRow | undefined;
+    const row = this.db.prepare("SELECT * FROM compute WHERE name = ? AND tenant_id = ?").get(name, this.tenantId) as ComputeRow | undefined;
     if (!row) return null;
     return rowToCompute(row);
   }
 
   list(filters?: { status?: ComputeStatus; provider?: ComputeProviderName; limit?: number }): Compute[] {
-    let sql = "SELECT * FROM compute WHERE 1=1";
-    const params: any[] = [];
+    let sql = "SELECT * FROM compute WHERE tenant_id = ?";
+    const params: any[] = [this.tenantId];
 
     if (filters?.provider) { sql += " AND provider = ?"; params.push(filters.provider); }
     if (filters?.status) { sql += " AND status = ?"; params.push(filters.status); }
@@ -103,26 +109,26 @@ export class ComputeRepository {
         values.push(value ?? null);
       }
     }
-    values.push(name);
+    values.push(name, this.tenantId);
 
-    this.db.prepare(`UPDATE compute SET ${updates.join(", ")} WHERE name = ?`).run(...values);
+    this.db.prepare(`UPDATE compute SET ${updates.join(", ")} WHERE name = ? AND tenant_id = ?`).run(...values);
     return this.get(name);
   }
 
   delete(name: string): boolean {
     if (name === "local") return false;
-    const result = this.db.prepare("DELETE FROM compute WHERE name = ?").run(name);
+    const result = this.db.prepare("DELETE FROM compute WHERE name = ? AND tenant_id = ?").run(name, this.tenantId);
     return result.changes > 0;
   }
 
   mergeConfig(name: string, patch: Partial<ComputeConfig>): Compute | null {
     this.db.transaction(() => {
-      const row = this.db.prepare("SELECT config FROM compute WHERE name = ?").get(name) as { config: string } | undefined;
+      const row = this.db.prepare("SELECT config FROM compute WHERE name = ? AND tenant_id = ?").get(name, this.tenantId) as { config: string } | undefined;
       if (!row) return;
       const existing = safeParseConfig(row.config);
       const merged = { ...existing, ...patch };
-      this.db.prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ?")
-        .run(JSON.stringify(merged), new Date().toISOString(), name);
+      this.db.prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ? AND tenant_id = ?")
+        .run(JSON.stringify(merged), new Date().toISOString(), name, this.tenantId);
     });
     return this.get(name);
   }
