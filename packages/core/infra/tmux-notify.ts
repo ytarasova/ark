@@ -6,7 +6,7 @@
  * and all arguments are internally constructed (no user input).
  */
 
-import type { AppContext } from "./app.js";
+import type { AppContext } from "../app.js";
 import { execFileSync } from "child_process";
 
 /** Update tmux status bar with waiting session indicators. */

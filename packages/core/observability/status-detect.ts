@@ -4,7 +4,7 @@
  * Fallback for when hook-based detection is unavailable.
  */
 
-import { capturePaneAsync } from "../tmux.js";
+import { capturePaneAsync } from "../infra/tmux.js";
 
 export type DetectedStatus = "running" | "waiting" | "idle" | "unknown";
 

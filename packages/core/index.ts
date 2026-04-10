@@ -49,7 +49,7 @@ export { TmuxLauncher, ContainerLauncher, ArkdLauncher } from "./launchers/index
 export * as claude from "./claude/claude.js";
 
 // Tmux
-export * from "./tmux.js";
+export * from "./infra/tmux.js";
 
 // Event bus
 export * from "./hooks.js";
@@ -134,16 +134,16 @@ export { truncateLog, cleanupLogs, logDir, type LogManagerOptions } from "./obse
 export { exportSession, exportSessionToFile, importSessionFromFile, type SessionExport } from "./session/share.js";
 
 // Auto-update check
-export { checkForUpdate, getCurrentVersion } from "./update-check.js";
+export { checkForUpdate, getCurrentVersion } from "./infra/update-check.js";
 
 // Tmux status bar notifications
-export { updateTmuxStatusBar, clearTmuxStatusBar } from "./tmux-notify.js";
+export { updateTmuxStatusBar, clearTmuxStatusBar } from "./infra/tmux-notify.js";
 
 // Profiles
 export { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix, setProfilesArkDir, type Profile } from "./profiles.js";
 
 // Notification daemon
-export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./notify-daemon.js";
+export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./infra/notify-daemon.js";
 
 // Global search
 export { searchAllConversations, type GlobalSearchResult } from "./search/global-search.js";
@@ -152,7 +152,7 @@ export { searchAllConversations, type GlobalSearchResult } from "./search/global
 export { detectStatusFromContent, detectSessionStatus, stripAnsi, parseAgentProgress, type DetectedStatus } from "./observability/status-detect.js";
 
 // Multi-instance coordination
-export { registerInstance, activeInstanceCount } from "./instance-lock.js";
+export { registerInstance, activeInstanceCount } from "./infra/instance-lock.js";
 
 // Theme
 export { getTheme, setThemeMode, getThemeMode, type Theme, type ThemeMode } from "./theme.js";

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { getCurrentVersion, checkForUpdate } from "../update-check.js";
+import { getCurrentVersion, checkForUpdate } from "../infra/update-check.js";
 import { withTestContext } from "./test-helpers.js";
 import { writeFileSync, existsSync, readFileSync } from "fs";
 import { join } from "path";

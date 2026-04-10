@@ -11,7 +11,7 @@
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import { AppContext, setApp, clearApp } from "../app.js";
 import { startSession, dispatch, stop, resume, complete, getOutput } from "../services/session-orchestration.js";
-import { sessionExists, killSession } from "../tmux.js";
+import { sessionExists, killSession } from "../infra/tmux.js";
 import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "./test-helpers.js";
 
 let app: AppContext;

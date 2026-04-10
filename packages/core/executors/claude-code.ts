@@ -10,7 +10,7 @@ import { join } from "path";
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as claude from "../claude/claude.js";
-import * as tmux from "../tmux.js";
+import * as tmux from "../infra/tmux.js";
 import { parseArcJson } from "../../compute/arc-json.js";
 import { getProvider } from "../../compute/index.js";
 

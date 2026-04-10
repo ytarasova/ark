@@ -11,7 +11,7 @@
  */
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
-import * as tmux from "../tmux.js";
+import * as tmux from "../infra/tmux.js";
 import { join } from "path";
 import { writeFileSync, mkdirSync } from "fs";
 

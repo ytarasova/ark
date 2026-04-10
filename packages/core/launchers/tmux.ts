@@ -7,7 +7,7 @@
 
 import type { SessionLauncher, LaunchResult } from "../session-launcher.js";
 import type { Session, Compute } from "../../types/index.js";
-import * as tmux from "../tmux.js";
+import * as tmux from "../infra/tmux.js";
 
 export class TmuxLauncher implements SessionLauncher {
   async launch(session: Session, script: string, opts: {

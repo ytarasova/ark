@@ -15,7 +15,7 @@ const execFileAsync = promisify(execFile);
 
 import type { AppContext } from "../app.js";
 import type { Session, Compute, MessageRole, MessageType } from "../../types/index.js";
-import * as tmux from "../tmux.js";
+import * as tmux from "../infra/tmux.js";
 import * as flow from "../flow.js";
 import type { FlowDefinition } from "../flow.js";
 import * as agentRegistry from "../agent/agent.js";

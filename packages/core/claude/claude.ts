@@ -13,7 +13,7 @@ import { homedir } from "os";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
-import * as tmux from "../tmux.js";
+import * as tmux from "../infra/tmux.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

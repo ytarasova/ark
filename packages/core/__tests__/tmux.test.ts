@@ -14,7 +14,7 @@ import {
   writeLauncher,
   sessionExists,
   listArkSessionsAsync,
-} from "../tmux.js";
+} from "../infra/tmux.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 

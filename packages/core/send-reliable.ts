@@ -3,7 +3,7 @@
  * Retries with paste marker detection and readiness gating.
  */
 
-import * as tmux from "./tmux.js";
+import * as tmux from "./infra/tmux.js";
 
 export interface SendOptions {
   maxRetries?: number;

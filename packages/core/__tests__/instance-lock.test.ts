@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "bun:test";
-import { registerInstance, activeInstanceCount } from "../instance-lock.js";
+import { registerInstance, activeInstanceCount } from "../infra/instance-lock.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 

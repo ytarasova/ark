@@ -8,7 +8,7 @@
 
 import type { Session, Event } from "../../types/index.js";
 import type { AppContext } from "../app.js";
-import * as tmux from "../tmux.js";
+import * as tmux from "../infra/tmux.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
