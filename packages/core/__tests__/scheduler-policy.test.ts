@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext, setApp, clearApp } from "../app.js";
-import { WorkerRegistry } from "../worker-registry.js";
-import { SessionScheduler } from "../scheduler.js";
+import { WorkerRegistry } from "../hosted/worker-registry.js";
+import { SessionScheduler } from "../hosted/scheduler.js";
 import { TenantPolicyManager } from "../auth/index.js";
 import { mockSession } from "./test-helpers.js";
 

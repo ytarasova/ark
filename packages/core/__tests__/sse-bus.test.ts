@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { InMemorySSEBus, createSSEBus } from "../sse-bus.js";
+import { InMemorySSEBus, createSSEBus } from "../hosted/sse-bus.js";
 
 describe("InMemorySSEBus", () => {
   it("publishes events to subscribers", () => {

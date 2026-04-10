@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext, setApp, clearApp } from "../app.js";
-import { WorkerRegistry, type WorkerNode } from "../worker-registry.js";
+import { WorkerRegistry, type WorkerNode } from "../hosted/worker-registry.js";
 
 let app: AppContext;
 

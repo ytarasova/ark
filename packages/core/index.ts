@@ -173,17 +173,17 @@ export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry
 export { generateOpenApiSpec } from "./openapi.js";
 
 // Web dashboard
-export { startWebServer, type WebServerOptions } from "./web.js";
-export { startWebProxy, type WebProxyOptions } from "./web-proxy.js";
+export { startWebServer, type WebServerOptions } from "./hosted/web.js";
+export { startWebProxy, type WebProxyOptions } from "./hosted/web-proxy.js";
 
 // SSE bus (pluggable broadcast for scaling)
-export { type SSEBus, InMemorySSEBus, createSSEBus } from "./sse-bus.js";
-export { RedisSSEBus } from "./sse-redis.js";
+export { type SSEBus, InMemorySSEBus, createSSEBus } from "./hosted/sse-bus.js";
+export { RedisSSEBus } from "./hosted/sse-redis.js";
 
 // Worker registry and scheduler (hosted control plane)
-export { WorkerRegistry, type WorkerNode } from "./worker-registry.js";
-export { SessionScheduler } from "./scheduler.js";
-export { startHostedServer } from "./hosted.js";
+export { WorkerRegistry, type WorkerNode } from "./hosted/worker-registry.js";
+export { SessionScheduler } from "./hosted/scheduler.js";
+export { startHostedServer } from "./hosted/server.js";
 
 // Tenant compute policies
 export { TenantPolicyManager, type TenantComputePolicy, type ComputePoolRef } from "./auth/index.js";
