@@ -117,7 +117,7 @@ describe("listFlows", () => {
     const def = flows.find((f) => f.name === "default");
     expect(def).toBeDefined();
     expect(Array.isArray(def!.stages)).toBe(true);
-    expect(def!.stages[0]).toBe("plan");
+    expect(def!.stages[0]).toBe("intake");
   });
 });
 
@@ -132,7 +132,7 @@ describe("getStages", () => {
     const stages = getStages("default");
     const names = stages.map((s) => s.name);
     expect(names).toEqual([
-      "plan", "implement", "pr", "review", "build", "merge", "close", "docs",
+      "intake", "plan", "audit", "implement", "verify", "pr", "review", "close", "retro",
     ]);
   });
 });
@@ -154,7 +154,6 @@ describe("getStage", () => {
     expect(stage!.name).toBe("implement");
     expect(stage!.agent).toBe("implementer");
     expect(stage!.gate).toBe("auto");
-    expect(stage!.on_failure).toBe("retry(3)");
   });
 });
 
@@ -166,7 +165,7 @@ describe("getFirstStage", () => {
   });
 
   it("returns the first stage name", () => {
-    expect(getFirstStage("default")).toBe("plan");
+    expect(getFirstStage("default")).toBe("intake");
   });
 
   it("returns first stage of a user flow", () => {
@@ -185,12 +184,12 @@ describe("getFirstStage", () => {
 
 describe("getNextStage", () => {
   it("returns the next stage name", () => {
-    expect(getNextStage("default", "plan")).toBe("implement");
-    expect(getNextStage("default", "implement")).toBe("pr");
+    expect(getNextStage("default", "intake")).toBe("plan");
+    expect(getNextStage("default", "plan")).toBe("audit");
   });
 
   it("returns null at the last stage", () => {
-    expect(getNextStage("default", "docs")).toBeNull();
+    expect(getNextStage("default", "retro")).toBeNull();
   });
 
   it("returns null for unknown current stage", () => {
@@ -284,7 +283,7 @@ describe("getStageAction", () => {
   it("returns agent type with agent name", () => {
     const action = getStageAction("default", "plan");
     expect(action.type).toBe("agent");
-    expect(action.agent).toBe("planner");
+    expect(action.agent).toBe("spec-planner");
   });
 
   it("returns action type with action name", () => {
@@ -324,13 +323,8 @@ describe("getStageAction", () => {
     expect(action.max_parallel).toBe(8);
   });
 
-  it("includes on_failure field when present", () => {
-    const action = getStageAction("default", "implement");
-    expect(action.on_failure).toBe("retry(3)");
-  });
-
   it("includes optional field when present", () => {
-    const action = getStageAction("default", "docs");
+    const action = getStageAction("default", "audit");
     expect(action.optional).toBe(true);
   });
 

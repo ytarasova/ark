@@ -73,18 +73,18 @@ describe("DAG-based advance", () => {
     const s = app.sessions.create({ summary: "Test linear quick flow", flow: "quick" });
     app.sessions.update(s.id, { stage: "implement", status: "ready" });
 
-    const result = await advance(app, s.id, true); // force=true to bypass gate
+    const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
     const updated = app.sessions.get(s.id);
-    // implement -> pr is the next linear stage in quick flow
-    expect(updated!.stage).toBe("pr");
+    // implement -> verify is the next stage in quick flow
+    expect(updated!.stage).toBe("verify");
   });
 
   test("linear flow (quick) completes when last stage done", async () => {
     const s = app.sessions.create({ summary: "Test linear completion", flow: "quick" });
-    app.sessions.update(s.id, { stage: "merge", status: "ready" });
+    app.sessions.update(s.id, { stage: "pr", status: "ready" });
 
-    const result = await advance(app, s.id, true); // force=true, merge is the last stage
+    const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
     const updated = app.sessions.get(s.id);
     expect(updated!.status).toBe("completed");
