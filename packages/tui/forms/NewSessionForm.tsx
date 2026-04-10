@@ -112,12 +112,11 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
   }, [ark]);
 
   const submit = () => {
-    let workdir: string | undefined;
     let repo = repoPath || process.cwd();
     const rp = resolvePath(repo).replace(/\/+$/, "");
     if (!existsSync(rp)) return;
     if (!existsSync(resolvePath(rp, ".git"))) return;
-    workdir = rp;
+    const workdir = rp;
     if (repo === "." || repo === "./") repo = basename(rp);
     addRecentRepo(repoPath);
 
@@ -246,7 +245,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
 
       {repoPath && !isGitRepo && (
         <Box marginTop={1}>
-          <Text color="red">{" Not a git repository - select a folder with .git"}</Text>
+          <Text color={theme.error}>{" Not a git repository - select a folder with .git"}</Text>
         </Box>
       )}
       <Box flexGrow={1} />

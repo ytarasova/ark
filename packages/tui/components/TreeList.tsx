@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { ListRow } from "./ListRow.js";
 import { ScrollBox } from "./ScrollBox.js";
 
@@ -52,6 +53,7 @@ export function TreeList<T>({
   emptyMessage = "No items.",
   spacing = false,
 }: TreeListProps<T>) {
+  const theme = getTheme();
   // Group items and sort keys (memoized to avoid rebuilding on every render)
   const { sortedKeys, groupMap } = useMemo(() => {
     const gm = new Map<string, { item: T; flatIndex: number }[]>();
@@ -93,7 +95,7 @@ export function TreeList<T>({
       const entries = groupMap.get(groupName)!;
       if (groupName) {
         rows.push(
-          <Text key={`grp-${groupName}`} backgroundColor="gray" color="white">{` ${groupName} `}</Text>
+          <Text key={`grp-${groupName}`} backgroundColor={theme.dimText} color="white">{` ${groupName} `}</Text>
         );
       }
       if (entries.length === 0 && groupName) {

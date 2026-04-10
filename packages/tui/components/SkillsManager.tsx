@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { useArkClient } from "../hooks/useArkClient.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
@@ -10,6 +11,7 @@ interface SkillsManagerProps {
 }
 
 export function SkillsManager({ session, asyncState, onClose }: SkillsManagerProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const [allSkills, setAllSkills] = useState<any[]>([]);
   useEffect(() => { ark.skillList().then(setAllSkills); }, []);
@@ -51,8 +53,8 @@ export function SkillsManager({ session, asyncState, onClose }: SkillsManagerPro
 
   if (allSkills.length === 0) {
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={1}>
-        <Text bold color="magenta">Skills Manager</Text>
+      <Box flexDirection="column" borderStyle="round" borderColor={theme.highlight} paddingX={1}>
+        <Text bold color={theme.highlight}>Skills Manager</Text>
         <Text dimColor>No skills found. Create skills in ~/.ark/skills/ or skills/</Text>
         <Text dimColor>Esc to close</Text>
       </Box>
@@ -60,9 +62,9 @@ export function SkillsManager({ session, asyncState, onClose }: SkillsManagerPro
   }
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor={theme.highlight} paddingX={1}>
       <Box marginBottom={1}>
-        <Text bold color="magenta">Skills Manager</Text>
+        <Text bold color={theme.highlight}>Skills Manager</Text>
       </Box>
       {skillNames.map((name, i) => {
         const enabled = toggleState.get(name) ?? false;
@@ -73,11 +75,11 @@ export function SkillsManager({ session, asyncState, onClose }: SkillsManagerPro
             <Text color={isCursor ? "magenta" : undefined} bold={isCursor}>
               {isCursor ? ">" : " "} {enabled ? "[x]" : "[ ]"} {name}
             </Text>
-            {skill?.description && <Text color="gray"> — {skill.description.slice(0, 50)}</Text>}
+            {skill?.description && <Text color={theme.dimText}> — {skill.description.slice(0, 50)}</Text>}
           </Box>
         );
       })}
-      <Box marginTop={1}><Text color="gray">Space:toggle  Enter:apply  Esc:cancel</Text></Box>
+      <Box marginTop={1}><Text color={theme.dimText}>Space:toggle  Enter:apply  Esc:cancel</Text></Box>
     </Box>
   );
 }

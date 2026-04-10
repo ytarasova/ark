@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { findProjectRoot } from "../../core/index.js";
 import { getApp } from "../../core/app.js";
 import type { AgentDefinition } from "../../core/index.js";
@@ -122,6 +123,7 @@ function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
   statusMessage: string | null;
   projectRoot?: string;
 }) {
+  const theme = getTheme();
   if (!agent) {
     return <Box flexGrow={1}><Text dimColor>{"  No agent selected."}</Text></Box>;
   }
@@ -143,7 +145,7 @@ function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
     <DetailPanel active={pane === "right"}>
       <Text bold>{` ${a.name}`}</Text>
       {a.description && <Text dimColor>{` ${a.description}`}</Text>}
-      {statusMessage && <Text color="yellow">{` ${statusMessage}`}</Text>}
+      {statusMessage && <Text color={theme.waiting}>{` ${statusMessage}`}</Text>}
 
       <Text> </Text>
       <SectionHeader title="Config" />

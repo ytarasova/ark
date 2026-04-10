@@ -71,7 +71,7 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
   });
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor={theme.text} paddingX={2} paddingY={1}>
       <Box marginBottom={1}><Text bold>Keyboard Shortcuts</Text></Box>
       {GROUPS.map((group, gi) => (
         <Box key={group.title} flexDirection="column" marginBottom={gi < GROUPS.length - 1 ? 1 : 0}>
@@ -84,7 +84,7 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
           ))}
         </Box>
       ))}
-      <Box marginTop={1}><Text color="gray">Press ? or Esc to close</Text></Box>
+      <Box marginTop={1}><Text color={theme.dimText}>Press ? or Esc to close</Text></Box>
     </Box>
   );
 }

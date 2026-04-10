@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Box, Text } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { useArkClient } from "../hooks/useArkClient.js";
 import { GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
@@ -11,6 +12,7 @@ interface CostsTabProps {
 }
 
 export function CostsTab({ pane }: CostsTabProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const [costs, setCosts] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -72,7 +74,7 @@ export function CostsTab({ pane }: CostsTabProps) {
           <Box flexDirection="column">
             <Text bold>{selected.summary ?? selected.sessionId}</Text>
             <Text> </Text>
-            <Text>Cost:    <Text color="yellow">{formatCost(selected.cost)}</Text></Text>
+            <Text>Cost:    <Text color={theme.waiting}>{formatCost(selected.cost)}</Text></Text>
             <Text>Model:   {selected.model ?? "unknown"}</Text>
             {selected.usage && (
               <>
@@ -89,7 +91,7 @@ export function CostsTab({ pane }: CostsTabProps) {
             <Text bold>By Model</Text>
             {byModel.map(([model, data]) => (
               <Text key={model}>
-                {"  "}{model.padEnd(15)}<Text color="yellow">{formatCost(data.cost).padEnd(10)}</Text>
+                {"  "}{model.padEnd(15)}<Text color={theme.waiting}>{formatCost(data.cost).padEnd(10)}</Text>
                 <Text dimColor>{data.count} sessions</Text>
               </Text>
             ))}

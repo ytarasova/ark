@@ -3,7 +3,6 @@ import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
 import { findProjectRoot } from "../../core/index.js";
 import { getApp } from "../../core/app.js";
-import type { FlowDefinition } from "../../core/index.js";
 import { KeyHint, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
@@ -124,7 +123,7 @@ function FlowDetail({ flow, pane, statusMessage }: {
     <DetailPanel active={pane === "right"}>
       <Text bold>{` ${p.name}`}</Text>
       {p.description && <Text dimColor>{` ${p.description}`}</Text>}
-      {statusMessage && <Text color="yellow">{` ${statusMessage}`}</Text>}
+      {statusMessage && <Text color={theme.waiting}>{` ${statusMessage}`}</Text>}
 
       <Text> </Text>
       <SectionHeader title="Stages" />

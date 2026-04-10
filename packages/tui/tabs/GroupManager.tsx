@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
 import type { Session } from "../../core/index.js";
@@ -74,7 +74,7 @@ export function GroupManager({ sessions, asyncState, onDone }: GroupManagerProps
 
     return (
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold color="red">{" Delete Group "}</Text>
+        <Text bold color={theme.error}>{" Delete Group "}</Text>
         <Text> </Text>
         <Text>{"Select group to delete:"}</Text>
         <SelectMenu

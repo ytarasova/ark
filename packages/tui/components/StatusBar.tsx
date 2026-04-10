@@ -3,7 +3,7 @@ import { Box, Text, useStdout } from "ink";
 import { getTheme } from "../../core/theme.js";
 import { getActiveProfile } from "../../core/index.js";
 import type { Session } from "../../core/index.js";
-import { flattenHints, NAV_BAR_TEXT } from "../helpers/statusBarHints.js";
+import { NAV_BAR_TEXT } from "../helpers/statusBarHints.js";
 
 interface StatusBarProps {
   /** Context-specific hints from the active tab (line 1, right-aligned) */
@@ -45,7 +45,7 @@ export function StatusBar({ hints, overlayBarText, sessions, loading, error }: S
       {!overlayBarText && (
         <Box>
           <Box>
-            {profile !== "default" && <Text color="magenta">{` [${profile}]`}</Text>}
+            {profile !== "default" && <Text color={theme.highlight}>{` [${profile}]`}</Text>}
             <Text bold>{` ${sessions.length} sessions`}</Text>
             {!loading && counts.running > 0 && <Text color={theme.running}>{`  ● ${counts.running}`}</Text>}
             {counts.waiting > 0 && <Text color={theme.waiting}>{`  ◑ ${counts.waiting}`}</Text>}

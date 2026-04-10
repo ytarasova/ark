@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { getTheme } from "../../core/theme.js";
 import { useEventLog } from "../hooks/useEventLog.js";
 
 interface EventLogProps {
@@ -7,12 +8,13 @@ interface EventLogProps {
 }
 
 export function EventLog({ expanded }: EventLogProps) {
+  const theme = getTheme();
   const events = useEventLog(expanded);
   const latest = events[0];
 
   if (!expanded) {
     return (
-      <Box borderStyle="single" borderColor="gray" paddingX={1}>
+      <Box borderStyle="single" borderColor={theme.dimText} paddingX={1}>
         <Text dimColor>
           {"Events "}
           {latest
@@ -29,7 +31,7 @@ export function EventLog({ expanded }: EventLogProps) {
   }
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} height={Math.min(events.length + 2, 10)}>
+    <Box flexDirection="column" borderStyle="single" borderColor={theme.dimText} paddingX={1} height={Math.min(events.length + 2, 10)}>
       <Text bold>{"Events"}<Text dimColor>{" (e:collapse)"}</Text></Text>
       {events.map((ev, idx) => (
         <Text key={`${ev.time}-${ev.source}-${idx}`}>

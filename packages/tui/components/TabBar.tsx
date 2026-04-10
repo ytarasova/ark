@@ -45,7 +45,7 @@ export function TabBar({ active, loading, loadingLabel }: TabBarProps) {
       })}
       <Box flexGrow={1} />
       {loading && (
-        <Text color="yellow">
+        <Text color={theme.waiting}>
           <Spinner type="dots" />
           {loadingLabel ? ` ${loadingLabel}` : ""}
         </Text>

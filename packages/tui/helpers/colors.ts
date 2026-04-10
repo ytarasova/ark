@@ -32,10 +32,11 @@ export function getStatusColor(status: SessionStatus | string): InkColor {
 
 /** Map a compute status to an Ink color. */
 export function getComputeStatusColor(status: ComputeStatus | string): InkColor {
-  if (status === "running") return "green";
-  if (status === "provisioning") return "yellow";
-  if (status === "destroyed") return "red";
-  return "gray";
+  const theme = getTheme();
+  if (status === "running") return theme.running as InkColor;
+  if (status === "provisioning") return theme.waiting as InkColor;
+  if (status === "destroyed") return theme.error as InkColor;
+  return theme.dimText as InkColor;
 }
 
 /** Map an event type string to a theme-aware Ink color. */
@@ -52,16 +53,18 @@ export function eventTypeColor(type: string): InkColor {
 
 /** Map a role string to an Ink color for message display. */
 export function roleColor(role: string): InkColor {
-  if (role === "user") return getTheme().accent as InkColor;
-  if (role === "agent") return "green";
-  if (role === "system") return "gray";
-  return "gray";
+  const theme = getTheme();
+  if (role === "user") return theme.accent as InkColor;
+  if (role === "agent") return theme.running as InkColor;
+  if (role === "system") return theme.dimText as InkColor;
+  return theme.dimText as InkColor;
 }
 
 /** Map an event log type to an Ink color. */
 export function eventLogColor(type: string): InkColor {
-  if (type.includes("error") || type.includes("exit") || type.includes("fail")) return "red";
-  if (type.includes("complete")) return "green";
-  if (type.includes("start")) return getTheme().accent as InkColor;
-  return "gray";
+  const theme = getTheme();
+  if (type.includes("error") || type.includes("exit") || type.includes("fail")) return theme.error as InkColor;
+  if (type.includes("complete")) return theme.running as InkColor;
+  if (type.includes("start")) return theme.accent as InkColor;
+  return theme.dimText as InkColor;
 }

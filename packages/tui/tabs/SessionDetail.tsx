@@ -272,20 +272,20 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
       </KeyValue>
       {s.status === "completed" && (
         <>
-          <Text color="green" bold>{`  ✓ Agent completed successfully`}</Text>
+          <Text color={theme.running} bold>{`  ✓ Agent completed successfully`}</Text>
           {s.config?.completion_summary && (
-            <Text color="green" wrap="wrap">{`  ${s.config.completion_summary}`}</Text>
+            <Text color={theme.running} wrap="wrap">{`  ${s.config.completion_summary}`}</Text>
           )}
         </>
       )}
       {s.status === "stopped" && (
-        <Text color="gray">{`  ■ Session stopped by user`}</Text>
+        <Text color={theme.dimText}>{`  ■ Session stopped by user`}</Text>
       )}
       {s.status === "failed" && !s.error && (
-        <Text color="red">{`  ✕ Session failed`}</Text>
+        <Text color={theme.error}>{`  ✕ Session failed`}</Text>
       )}
       {s.status === "waiting" && s.breakpoint_reason && (
-        <Text color="yellow" bold wrap="wrap">{`  ⏸ ${s.breakpoint_reason}`}</Text>
+        <Text color={theme.waiting} bold wrap="wrap">{`  ⏸ ${s.breakpoint_reason}`}</Text>
       )}
       <KeyValue label="Compute">{s.compute_name || "local"}</KeyValue>
       {s.repo && <KeyValue label="Repo">{s.repo}</KeyValue>}
@@ -314,7 +314,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
               return (
                 <React.Fragment key={st.name}>
                   {idx > 0 && <Text dimColor>{" > "}</Text>}
-                  <Text color={isCurrent ? theme.highlight : isPast ? "green" : undefined} bold={isCurrent} dimColor={!isCurrent && !isPast}>
+                  <Text color={isCurrent ? theme.highlight : isPast ? theme.running : undefined} bold={isCurrent} dimColor={!isCurrent && !isPast}>
                     {isCurrent ? `[${st.name}]` : st.name}
                   </Text>
                 </React.Fragment>
@@ -347,7 +347,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
             const isSel = pane === "right" && idx === todoSel;
             return (
               <Text key={t.id} wrap="wrap" inverse={isSel}>
-                {"  "}<Text color={t.done ? "green" : "yellow"}>{t.done ? "+" : "o"}</Text>
+                {"  "}<Text color={t.done ? theme.running : theme.waiting}>{t.done ? "+" : "o"}</Text>
                 <Text dimColor={t.done}>{` ${t.content}`}</Text>
               </Text>
             );
@@ -438,7 +438,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
 
       {/* Channel status */}
       {s.session_id && (s.status === "running" || s.status === "waiting") && (
-        <Text color="green">
+        <Text color={theme.running}>
           {`  ⚡ Channel: port ${channelPort}`}
         </Text>
       )}

@@ -32,7 +32,7 @@ interface ComputeTabProps extends StoreData {
   refresh: () => void;
 }
 
-export function ComputeTab({ computes, sessions, refresh, pane, snapshots, computeLogs, addComputeLog, asyncState, onShowForm, formOverlay }: ComputeTabProps) {
+export function ComputeTab({ computes, sessions, refresh: _refresh, pane, snapshots, computeLogs, addComputeLog, asyncState, onShowForm, formOverlay }: ComputeTabProps) {
   const theme = getTheme();
   const confirmation = useConfirmation();
   const focus = useFocus();
@@ -185,6 +185,7 @@ interface ComputeDetailProps {
 }
 
 function ComputeDetail({ compute: h, snapshot, computeLogs, sessions, pane }: ComputeDetailProps) {
+  const theme = getTheme();
   if (!h) {
     return <Box flexGrow={1}><Text dimColor>{"  No compute selected."}</Text></Box>;
   }
@@ -203,9 +204,9 @@ function ComputeDetail({ compute: h, snapshot, computeLogs, sessions, pane }: Co
       {/* Status */}
       {h.status === "running" && h.provider === "ec2" ? (
         cloudInitDone ? (
-          <Text color="green" bold>{"  ready - fully provisioned"}</Text>
+          <Text color={theme.running} bold>{"  ready - fully provisioned"}</Text>
         ) : (
-          <Text color="yellow">{"  running - cloud-init in progress..."}</Text>
+          <Text color={theme.waiting}>{"  running - cloud-init in progress..."}</Text>
         )
       ) : (
         <KeyValue label="Status" width={12}><Text color={statusColor}>{h.status}</Text></KeyValue>
@@ -216,7 +217,7 @@ function ComputeDetail({ compute: h, snapshot, computeLogs, sessions, pane }: Co
       {cfg.last_error && (
         <>
           <Text> </Text>
-          <Text color="red" bold wrap="truncate">{`  Error: ${String(cfg.last_error)}`}</Text>
+          <Text color={theme.error} bold wrap="truncate">{`  Error: ${String(cfg.last_error)}`}</Text>
         </>
       )}
 

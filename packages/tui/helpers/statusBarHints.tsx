@@ -1,12 +1,14 @@
 import React from "react";
 import { Text } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { Tab } from "../components/TabBar.js";
 
 export function KeyHint({ k, label }: { k: string; label: string }) {
+  const theme = getTheme();
   return (
     <Text>
-      <Text color="white" bold>{k}</Text>
-      <Text color="gray">:{label}  </Text>
+      <Text color={theme.text} bold>{k}</Text>
+      <Text color={theme.dimText}>:{label}  </Text>
     </Text>
   );
 }

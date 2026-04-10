@@ -63,17 +63,17 @@ export function SessionSearch({ sessions, onSelect, onClose }: SessionSearchProp
       <Box>
         <Text color={theme.accent} bold>/ </Text>
         <Text>{query}</Text>
-        <Text color="gray">█</Text>
+        <Text color={theme.dimText}>█</Text>
       </Box>
       {results.map((s, i) => (
         <Box key={s.id}>
           <Text color={i === cursor ? theme.highlight : undefined} bold={i === cursor}>
             {i === cursor ? ">" : " "} {s.summary ?? s.id}
           </Text>
-          <Text color="gray"> ({s.status})</Text>
+          <Text color={theme.dimText}> ({s.status})</Text>
         </Box>
       ))}
-      {results.length === 0 && <Text color="gray">  No matches</Text>}
+      {results.length === 0 && <Text color={theme.dimText}>  No matches</Text>}
     </Box>
   );
 }

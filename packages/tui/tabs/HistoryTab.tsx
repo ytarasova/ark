@@ -69,7 +69,7 @@ function buildHistoryItems(arkSessions: any[], claudeSessions: ClaudeSession[]):
   return items;
 }
 
-export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, onImport }: HistoryTabProps) {
+export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh: _refresh, onImport }: HistoryTabProps) {
   const theme = getTheme();
   const ark = useArkClient();
   const focus = useFocus();
@@ -234,7 +234,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh, o
                   return (
                     <Text wrap="truncate">
                       {"  "}
-                      {item.type === "ark" && <Text color="green" bold>{"ARK "}</Text>}
+                      {item.type === "ark" && <Text color={theme.running} bold>{"ARK "}</Text>}
                       <Text>{label}</Text>
                       {"  "}
                       <Text dimColor>{msgs}  {time}</Text>
@@ -285,6 +285,7 @@ function HistoryDetail({ item, searchResult, pane, conversation }: { item: Histo
 }
 
 function HistoryDetailContent({ item, searchResult, pane, conversation, detailId }: { item: HistoryItem | null; searchResult?: SearchResult | null; pane: string; conversation: any[]; detailId: string }) {
+  const theme = getTheme();
   const metadata = item ? (
     item.type === "ark" ? (
       <>
@@ -319,7 +320,7 @@ function HistoryDetailContent({ item, searchResult, pane, conversation, detailId
         {metadata}
       </Box>
       {/* Scrollable conversation section */}
-      <Box flexDirection="column" flexGrow={1} borderStyle="single" borderColor="gray" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false}>
+      <Box flexDirection="column" flexGrow={1} borderStyle="single" borderColor={theme.dimText} borderTop={true} borderBottom={false} borderLeft={false} borderRight={false}>
         <ScrollBox active={pane === "right"} reserveRows={18} resetKey={detailId}>
           <ConversationScrollContent turns={conversation} />
         </ScrollBox>

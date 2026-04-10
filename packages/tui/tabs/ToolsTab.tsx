@@ -1,5 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
+import { readFileSync } from "fs";
+import path from "path";
 import { Box, Text, useInput } from "ink";
+import { getTheme } from "../../core/theme.js";
 import type { ToolEntry } from "../../core/tools.js";
 import type { RecipeInstance } from "../../core/index.js";
 import { findProjectRoot } from "../../core/agent.js";
@@ -51,6 +54,7 @@ interface ToolsTabProps {
 // ── Main Component ──────────────────────────────────────────────────────────
 
 export function ToolsTab({ pane, asyncState, refresh, onUseRecipe }: ToolsTabProps) {
+  const theme = getTheme();
   const ark = useArkClient();
   const focus = useFocus();
   const status = useStatusMessage();
@@ -205,7 +209,7 @@ export function ToolsTab({ pane, asyncState, refresh, onUseRecipe }: ToolsTabPro
       right={
         confirmDelete && selected ? (
           <DetailPanel active={pane === "right"}>
-            <Text bold color="red">{` Delete '${selected.name}'?`}</Text>
+            <Text bold color={theme.error}>{` Delete '${selected.name}'?`}</Text>
             <Text> </Text>
             <Text>{`  Type: ${selected.kind}`}</Text>
             <Text>{`  Source: ${selected.source}`}</Text>
@@ -227,6 +231,7 @@ function ToolDetail({ item, pane, statusMessage }: {
   pane: string;
   statusMessage: string | null;
 }) {
+  const theme = getTheme();
   if (!item) {
     return <Box flexGrow={1}><Text dimColor>{"  No tool selected."}</Text></Box>;
   }
@@ -235,7 +240,7 @@ function ToolDetail({ item, pane, statusMessage }: {
     <DetailPanel active={pane === "right"}>
       <Text bold>{` ${item.name}`}</Text>
       <Text dimColor>{` ${item.description}`}</Text>
-      {statusMessage && <Text color="yellow">{` ${statusMessage}`}</Text>}
+      {statusMessage && <Text color={theme.waiting}>{` ${statusMessage}`}</Text>}
 
       <Text> </Text>
       <SectionHeader title="Info" />
@@ -306,7 +311,6 @@ function CommandContent({ source }: { source: string }) {
   const ark = useArkClient();
   const [content, setContent] = useState<string | null>(null);
   useEffect(() => {
-    const path = require("path");
     const projectRoot = path.dirname(path.dirname(path.dirname(source)));
     const name = path.basename(source, ".md");
     ark.toolsRead({ name, kind: "command", projectRoot }).then((r: any) => setContent(r?.content ?? null)).catch(() => setContent(null));
@@ -331,7 +335,6 @@ function CommandContent({ source }: { source: string }) {
 function SkillFileContent({ source }: { source: string }) {
   const content = useMemo(() => {
     try {
-      const { readFileSync } = require("fs");
       return readFileSync(source, "utf-8") as string;
     } catch { return null; }
   }, [source]);
@@ -415,7 +418,6 @@ function ArkRecipeDetail({ name }: { name: string }) {
 function ContextPreview({ source }: { source: string }) {
   const content = useMemo(() => {
     try {
-      const { readFileSync } = require("fs");
       return readFileSync(source, "utf-8") as string;
     } catch { return null; }
   }, [source]);

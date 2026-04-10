@@ -20,7 +20,7 @@ interface MemoryManagerProps {
   onClose?: () => void;
 }
 
-export function MemoryManager({ asyncState, pane = "left", onClose }: MemoryManagerProps) {
+export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose }: MemoryManagerProps) {
   const theme = getTheme();
   const ark = useArkClient();
   const [memories, setMemories] = useState<any[]>([]);
@@ -168,14 +168,14 @@ export function MemoryManager({ asyncState, pane = "left", onClose }: MemoryMana
               emptyMessage="  No memories. Press n to add."
             />
           )}
-          {statusMsg && <Text color="green">{`  ${statusMsg}`}</Text>}
+          {statusMsg && <Text color={theme.running}>{`  ${statusMsg}`}</Text>}
         </Box>
       }
       right={
         mode === "add" ? (
           <Box flexDirection="column" paddingX={1} paddingTop={1}>
             <Box>
-              <Text color={addField === "content" ? theme.accent : "gray"}>
+              <Text color={addField === "content" ? theme.accent : theme.dimText}>
                 {addField === "content" ? "> " : "  "}Content:{" "}
               </Text>
               {addField === "content" ? (

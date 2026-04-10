@@ -113,7 +113,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   useEffect(() => { ark.groupList().then(setGroups); }, [sessions.length]);
 
   const actions = useSessionActions(asyncState, status.show);
-  const groupActions = useGroupActions(asyncState);
+  const _groupActions = useGroupActions(asyncState);
 
   // Extracted attach helper -- shared between left-pane useInput and right-pane overlay callback
   const doAttach = useCallback((session: Session) => {
@@ -148,7 +148,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
         process.stdout.write("\x1b[?1049l"); // exit alt screen if active
         process.stdout.write("\x1b[?25h");    // show cursor
         // Spawn attach command -- local tmux or SSH+tmux for remote
-        const result = Bun.spawnSync(attachCmd, {
+        Bun.spawnSync(attachCmd, {
           stdin: "inherit",
           stdout: "inherit",
           stderr: "inherit",
@@ -407,7 +407,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
                   {" "} <Text color={color}>{icon}</Text>{` ${summary}`}
                   {s.branch && <Text color={theme.accent}>{` [${s.branch}]`}</Text>}
                   {` ${stage} ${age}`}
-                  {unread > 0 && <Text color="yellow" bold>{` (${unread})`}</Text>}
+                  {unread > 0 && <Text color={theme.waiting} bold>{` (${unread})`}</Text>}
                 </Text>
               );
             }}
