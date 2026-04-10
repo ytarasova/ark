@@ -1,6 +1,7 @@
 # Ark Platform Roadmap
 
-> Last updated: 2026-04-10
+> Last updated: 2026-04-10 (end of session)
+> Tests: 2580 pass, 0 fail, 0 lint errors, 0 process leaks
 
 ---
 
@@ -10,73 +11,79 @@ The orchestration platform for AI-powered software development. Manages the full
 
 ---
 
-## What's Done
+## Status: What's Done, What's Partial, What's Missing
 
-### Core Platform (2552+ tests, 0 fail, 0 lint errors, 0 process leaks)
+### DONE -- Fully built, unit-tested, integrated
 
-| Area | What's built |
-|------|-------------|
-| **DI Container** | Awilix-based. All services/repos/stores resolve from AppContext. Zero global state in production code. |
-| **Database** | IDatabase abstraction. SQLite (local) + Postgres adapter (hosted). |
-| **Session Orchestration** | Full lifecycle: start, dispatch, stop, resume, advance, complete, fork, clone, spawn, fan-out, handoff. |
-| **DAG Flow Engine** | `depends_on` field, parallel stages, auto-join on child completion, branch merge with conflict detection. |
-| **Compute Providers (7)** | Local (tmux), Docker, DevContainer, Firecracker (local+EC2), EC2+ArkD, E2B (managed sandboxes), K8s (vanilla+Kata). |
-| **LLM Router** | OpenAI-compatible proxy. Request classifier, 3 policies (quality/balanced/cost), sticky sessions, circuit breakers, cascade fallback. |
-| **Knowledge Graph** | Unified store: codebase (Axon indexer), sessions, memories, learnings, skills -- all as typed nodes with edges. MCP tools for agents. Context injection at dispatch. Markdown export/import. |
-| **Auth & Multi-Tenancy** | API keys, tenant_id on all entities, per-tenant AppContext, auth middleware. |
-| **Session Launcher** | Interface abstraction: TmuxLauncher (local), ContainerLauncher (Docker/K8s), ArkdLauncher (remote). |
-| **Control Plane** | Worker registry, session scheduler, tenant compute policies, Redis SSE bus. |
-| **SDLC Flows** | 7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 16 agents, 7 skills, 5 recipes. |
-| **Runtime/Role Separation** | Agents define roles (what). Runtimes define backends (how). Any role on any runtime. 4 runtimes: Claude, Codex, Gemini, Aider. |
-| **Remote Client** | CLI/TUI/Web connect to hosted control plane via `--server`/`--token`. Web proxy mode. |
-| **Deployment** | Dockerfile, docker-compose (control-plane + workers + Postgres + Redis), Helm chart with Kata/Firecracker support. |
-| **CLI** | 14 command modules (from 2367-line monolith). |
-| **Web UI** | Domain-scoped queries/pages. Sessions, Agents+Runtimes, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings, Login. |
-| **TUI** | 9-tab React/Ink dashboard. All colors from theme.ts. Keyboard-driven. |
-| **ESLint** | 0 errors, 0 warnings. CI lint step. |
-| **MCP Configs** | Stubs for Atlassian, GitHub, Linear, Figma. |
+| Area | Details | Tests |
+|------|---------|-------|
+| **Awilix DI container** | All services/repos/stores resolve from AppContext. Zero `getApp()` in production code. | Yes |
+| **IDatabase abstraction** | SQLite adapter (local). Postgres adapter (hosted -- sync-over-async, see caveats). | Yes |
+| **Session orchestration** | Full lifecycle: start, dispatch, stop, resume, advance, complete, fork, clone, spawn, fan-out, handoff. | Yes |
+| **DAG flow engine** | `depends_on`, parallel stages, auto-join on child completion, branch merge with conflict detection. | Yes |
+| **Knowledge graph** | Unified store (codebase + sessions + memories + learnings + skills). MCP tools. Context injection at dispatch. Markdown export/import. Old systems (memory.ts, learnings.ts, hybrid-search.ts) deleted. | 79 tests |
+| **Agent eval system** | Runtime evals: evaluateSession, getAgentStats, detectDrift, listEvals. Auto-evaluates on session completion. Old keyword-matching evals deleted. | 10 tests |
+| **Universal cost tracking** | PricingRegistry (300+ models via LiteLLM JSON), UsageRecorder (usage_records table), multi-dimensional attribution (session, user, tenant, model, provider, runtime, agent_role). | 28 tests |
+| **Runtime/role separation** | Agents define roles. Runtimes define backends. 4 runtimes: Claude, Codex, Gemini, Aider. 12 agent roles. `--runtime` override at dispatch. | Yes |
+| **Module reorganization** | 91 flat files reorganized into 13 domain directories. Barrel exports. All imports updated. | Yes |
+| **SDLC flows** | 7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 9 flow definitions. | Yes |
+| **Skills** | 7 builtin (spec-extraction, sanity-gate, plan-audit, security-scan, self-review, code-review, test-writing). | Yes |
+| **Recipes** | 8 templates (islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature). | Yes |
+| **CLI** | 17 command modules. `ark dashboard/knowledge/eval/router/runtime/tenant/auth` all working. | Yes |
+| **Web UI** | Dashboard (widget grid + Recharts cost charts), Sessions, Agents+Runtimes, Flows, Compute, History, Memory/Knowledge, Tools, Schedules, Costs, Settings, Login. | Yes |
+| **TUI** | 9-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary in empty state. ASCII cost charts. Agents+Runtimes sub-groups. | Yes |
+| **ESLint** | 0 errors, 0 warnings. CI lint step. | Yes |
+| **Process leak prevention** | stopAll via provider, awaited dispatches, proper shutdown order. | Yes |
+| **Auth** | API keys (create/validate/revoke/rotate), tenant_id on all entities, per-tenant AppContext, auth middleware. | Yes |
+| **Session launcher** | Interface: TmuxLauncher, ContainerLauncher, ArkdLauncher. Orchestration uses `app.launcher.*` not direct tmux. | Yes |
+| **MCP config stubs** | Templates for Atlassian, GitHub, Linear, Figma. | N/A |
 
----
+### PARTIAL -- Built but NOT integration-tested or incomplete
 
-## What's NOT Done (Honest Assessment)
+| Area | What exists | What's untested / missing | Risk |
+|------|------------|--------------------------|------|
+| **LLM Router** | Full server with classifier, 3 policies, streaming, CLI. 30 unit tests. | Never made a real API call. Anthropic adapter format untested against real Messages API. Streaming untested end-to-end. | High -- may not work in production |
+| **Postgres adapter** | `PostgresAdapter` implements `IDatabase`. SQL translator for SQLite→Postgres syntax. | Sync-over-async via `Bun.sleepSync` spin loop. Never tested under concurrent load. Repos need async migration for real scale. | High -- will bottleneck under load |
+| **Redis SSE bus** | `RedisSSEBus` implements `SSEBus` interface. | Never tested against real Redis server. | Medium |
+| **Compute: K8s** | `K8sProvider` + `KataProvider` with pod creation, kill, metrics. | Never tested against real K8s cluster. API calls are untested. | High |
+| **Compute: E2B** | `E2BProvider` with sandbox creation. | Never tested against real E2B API. SDK calls untested. | High |
+| **Compute: Firecracker** | `LocalFirecrackerProvider` + `RemoteFirecrackerProvider`. | Requires Linux with /dev/kvm. Never tested outside dev machine. | Medium |
+| **Compute: Docker** | `DockerProvider` + `LocalDockerProvider`. | Works locally when Docker is running. Not tested in CI. | Low |
+| **Compute: EC2+ArkD** | `RemoteArkdBase` with 4 isolation modes. | Requires AWS credentials. Provisioning flow untested end-to-end. | Medium |
+| **Control plane** | Worker registry, scheduler, tenant policies, hosted entry point. 20 unit tests. | Never deployed as a running service. Docker-compose untested. Helm chart untested. Worker registration flow untested. | High |
+| **Remote client** | `--server`/`--token` for CLI, TUI, Web. WebSocket transport. Web proxy mode. | Never tested with a real remote server. | High |
+| **Auth middleware** | Token extraction, tenant scoping in web server. | Never tested with real multi-user sessions. No session management. | Medium |
+| **SDLC flow E2E** | Full pipeline defined with agents, skills, recipes. | Never processed a real Jira ticket end-to-end. MCP integrations untested. | High |
+| **OTLP observability** | `otlp.ts` sends spans to OTLP/HTTP endpoint. | Never tested against real Jaeger/Tempo/Honeycomb. | Medium |
+| **Knowledge: Axon indexer** | Calls Axon subprocess, parses output, stores in graph. | Never tested with real Axon installed. Mock-tested only. | Medium |
+| **Cost: router feed-back** | Router has in-memory cost tracking. UsageRecorder exists. | Router doesn't call `app.usageRecorder.record()` yet. Not wired. | Medium |
+| **Cost: non-Claude runtimes** | UsageRecorder supports any model/provider. | Codex/Gemini/Aider executors don't report usage yet. Only Claude transcript parsing works. | High |
+| **Dashboard** | Web widget grid, TUI summary, CLI command. | Data sources are partially mocked. No real fleet to visualize. | Low |
+| **Deployment** | Dockerfile, docker-compose, Helm chart. | Never built the Docker image. Never `helm install`-ed. Never pushed to registry. | High |
 
-### Built but NOT integration-tested
+### NOT BUILT -- Identified gaps, no code exists
 
-These exist as code with unit tests but have never been tested against real external services:
-
-| Item | Risk |
-|------|------|
-| LLM Router -- real API calls | Anthropic adapter format conversion untested against real API |
-| Postgres adapter under load | Sync-over-async bridge (Bun.sleepSync) won't scale |
-| Redis SSE bus | Never tested against real Redis |
-| K8s/E2B compute providers | Never tested against real cluster/API |
-| Auth middleware in production | Multi-user web sessions untested |
-| Control plane deployment | Docker-compose and Helm chart never deployed |
-| OTLP observability | Never tested against real Jaeger/Tempo |
-| MCP configs | Never tested with real Jira/GitHub/Figma |
-| SDLC flow end-to-end | Never processed a real Jira ticket through the full pipeline |
-| Remote client mode | TUI/CLI connecting to remote server untested |
-
-### Not built at all
-
-| Item | Why it matters |
-|------|---------------|
-| Agent performance evals | Current evals are keyword matching -- useless. Need real runtime eval. |
-| Dashboard overview | No homepage with fleet status, cost summary, activity stream. |
-| Cost charts | Plain table, no pie/line/bar charts. |
-| Task/Kanban board | No task queue for agents. Sessions are execution units, not work items. |
-| Security posture | No trust scoring, secret detection, injection logging, audit trail. |
-| Webhooks | No outbound event delivery. |
-| Alert rules | No declarative alerting. |
-| User management UI | Token auth only, no user CRUD panel. |
-| GitHub Issues sync | Auto-PR only, no issue import/tracking. |
-| Exec approval queue | Guardrails block/allow, no interactive approval. |
-| Standup reports | No auto-generated daily summaries. |
-| i18n | English only. |
-| Onboarding wizard | No first-run guided setup. |
-| Async Postgres repos | Repos are sync -- blocks real hosted scale. |
-| Docker image published | No image in any registry. |
-| Core module reorganization | 91 flat files in packages/core/ -- needs domain directories. |
+| Area | Why it matters | Source |
+|------|---------------|--------|
+| **Workflow persistence / recovery** | Sessions crash → restart from stage start, not from where they stopped. No checkpoint/resume. | This session analysis |
+| **Temporal integration** | Control plane needs durable workflow execution for crash recovery, retries, scheduling. | This session analysis |
+| **Task/Kanban board** | No agent work queue. Sessions are execution units, not assignable tasks. MC has 8-column Kanban. | Mission Control gap analysis |
+| **Security posture** | No trust scoring, secret detection, injection logging, exec approval queue. MC has composite 0-100 score. | Mission Control gap analysis |
+| **Audit trail** | No immutable log of sensitive operations (login, dispatch, delete, config change). | Mission Control gap analysis |
+| **Webhooks** | No outbound event delivery (HMAC-signed, retry, circuit breaker). | Mission Control gap analysis |
+| **Alert rules** | No declarative alerting (entity/field/operator/value → action). | Mission Control gap analysis |
+| **User management UI** | No web panel for user CRUD. CLI-only via `ark auth`. | Mission Control gap analysis |
+| **GitHub Issues sync** | Auto-PR exists but no bidirectional issue import/tracking. | Mission Control gap analysis |
+| **Standup reports** | No auto-generated daily per-agent summaries. | Mission Control gap analysis |
+| **i18n** | English only. No translation framework. | Mission Control gap analysis |
+| **Onboarding wizard** | No first-run guided setup for new users. | Mission Control gap analysis |
+| **Docker image published** | No image in any registry. Can't `docker pull ark`. | Deployment gap |
+| **CI/CD pipeline for Ark** | GitHub Actions runs tests but doesn't build/publish artifacts. | Deployment gap |
+| **Async Postgres repos** | Repos use sync IDatabase methods. Postgres adapter uses `Bun.sleepSync` hack. | Architecture gap |
+| **Higress gateway integration** | Custom router works for dev. Enterprise needs CNCF-grade gateway. | LLM Router research |
+| **Knowledge graph visualization** | No visual rendering of the graph in web UI. MC uses reagraph. | Mission Control gap analysis |
+| **Live feed sidebar** | No real-time event stream without leaving current view. MC has collapsible sidebar. | Mission Control gap analysis |
+| **Boot sequence** | No staged loading screen with progress. MC shows 9-step boot. | Mission Control gap analysis |
 
 ---
 
@@ -84,56 +91,68 @@ These exist as code with unit tests but have never been tested against real exte
 
 ### Camp 1: Integration Testing & Production Readiness
 
-**Goal:** Everything that exists actually works against real services.
+**Goal:** Everything that exists actually works against real services. Nothing ships until it's proven.
 
-| Task | Effort |
-|------|--------|
-| Test LLM Router against real Anthropic/OpenAI/Google APIs | 1-2 days |
-| Test MCP configs with real Jira, GitHub, Figma | 1-2 days |
-| Test Postgres adapter under concurrent load | 1 day |
-| Make repos async for real Postgres scale | 3-5 days |
-| Test Redis SSE bus against real Redis | 0.5 day |
-| Test K8s provider against real cluster | 1 day |
-| Test E2B provider against real API | 0.5 day |
-| Deploy Docker-compose, verify all services start | 1 day |
-| Deploy Helm chart, verify on K8s | 1 day |
-| End-to-end: real Jira ticket through SDLC flow | 2-3 days |
-| Publish Docker image to registry | 0.5 day |
+| Task | Effort | Blocks |
+|------|--------|--------|
+| Test LLM Router against real Anthropic/OpenAI/Google APIs | 1-2 days | Router launch |
+| Wire router cost feed-back to UsageRecorder | 0.5 day | Accurate cost tracking |
+| Wire non-Claude executor usage reporting (Codex/Gemini/Aider stdout parsing) | 1-2 days | Universal cost tracking |
+| Test MCP configs with real Jira, GitHub, Figma | 1-2 days | SDLC flow |
+| Test Postgres adapter under concurrent load | 1 day | Hosted mode |
+| Test Redis SSE bus against real Redis | 0.5 day | Hosted mode |
+| Test K8s provider against real cluster | 1 day | K8s compute |
+| Test E2B provider against real API | 0.5 day | E2B compute |
+| Deploy Docker-compose, verify all services start | 1 day | Hosted mode |
+| Deploy Helm chart on K8s, verify | 1 day | Production |
+| Build + publish Docker image to registry | 0.5 day | Deployment |
+| End-to-end: real Jira ticket through full SDLC flow | 2-3 days | "Send to dev" workflow |
+| Test remote client mode (TUI/CLI → remote server) | 1 day | Multi-user |
+| Test Axon indexer with real codebase | 0.5 day | Knowledge graph |
 
-### Camp 2: Agent Intelligence & Evaluation
+### Camp 2: Workflow Persistence & Recovery
 
-**Goal:** Agents get smarter over time. We can measure and improve their performance.
+**Goal:** Sessions survive crashes. Workflows are durable. Same interface local and hosted.
 
-| Task | Effort |
-|------|--------|
-| Rewrite eval system -- live runtime evals, not keyword matching | 2-3 days |
-| Agent completion rate tracking (per role, per runtime) | 1 day |
-| Tool call latency tracking (p50/p95/p99 per tool) | 1 day |
-| Drift detection (compare recent vs 4-week baseline) | 1 day |
-| Per-agent trust scoring (weighted success/failure history) | 1 day |
-| Standup reports (auto-generated daily per agent) | 1 day |
-| Per-task automatic model routing (extend LLM Router) | 1-2 days |
-| Feed eval results into knowledge graph as nodes | 0.5 day |
+| Task | Effort | Notes |
+|------|--------|-------|
+| Research: Temporal vs alternatives for control plane | 1 day | Deep dive needed |
+| Design WorkflowEngine interface (local + hosted backends) | 1 day | Like IDatabase pattern |
+| Local backend: event-sourced from events table | 2-3 days | SQLite, no extra deps |
+| Hosted backend: Temporal integration | 3-5 days | Temporal SDK, Helm chart update |
+| Checkpoint/resume: agent gets "you were on turn 47" context | 1-2 days | Needs per-turn event logging |
+| Crash recovery test suite | 1-2 days | Kill mid-session, verify resume |
 
-### Camp 3: Dashboard & Visualization
+### Camp 3: Agent Intelligence
 
-**Goal:** Operators see the full picture at a glance. All three surfaces (Web/TUI/CLI) aligned.
+**Goal:** Agents get smarter over time. We can measure and improve performance.
 
-| Task | Effort |
-|------|--------|
-| Dashboard overview page (Web) -- widget grid | 1-2 days |
-| Dashboard summary (TUI) -- empty state enhancement | 0.5 day |
-| `ark dashboard` CLI command | 0.5 day |
-| Cost charts -- Recharts pie/line/bar (Web) | 1 day |
-| Cost sparklines (TUI) | 0.5 day |
-| Smart polling (pause when tab hidden) | 0.5 day |
-| Live feed sidebar (Web) | 1 day |
-| Boot sequence with progress steps (Web) | 0.5 day |
-| Agent detail depth -- tabs for memory/tasks/activity/eval (Web+TUI) | 1-2 days |
-| Session detail -- inline diff viewer, cost breakdown, timeline (Web) | 1-2 days |
-| Onboarding wizard (Web) | 1 day |
+| Task | Effort | Status |
+|------|--------|--------|
+| ~~Rewrite eval system~~ | ~~2-3 days~~ | **DONE** -- evaluateSession, getAgentStats, detectDrift |
+| ~~Universal cost tracking~~ | ~~2-3 days~~ | **DONE** -- PricingRegistry + UsageRecorder |
+| Trust scoring per agent (weighted success/failure) | 1 day | Not started |
+| Tool call latency instrumentation (p50/p95/p99) | 1 day | Not started |
+| Standup reports (auto-generated daily per agent) | 1 day | Not started |
+| Per-task automatic model routing (extend LLM Router) | 1-2 days | Not started |
 
-### Camp 4: Security & Compliance
+### Camp 4: Dashboard & Visualization
+
+**Goal:** Operators see the full picture. All three surfaces aligned.
+
+| Task | Effort | Status |
+|------|--------|--------|
+| ~~Dashboard overview (Web/TUI/CLI)~~ | ~~1-2 days~~ | **DONE** -- widget grid, ASCII charts, ark dashboard |
+| ~~Cost charts (Recharts)~~ | ~~1 day~~ | **DONE** -- pie + bar charts |
+| ~~Smart polling~~ | ~~0.5 day~~ | **DONE** -- useSmartPoll hook |
+| Live feed sidebar (Web) | 1 day | Not started |
+| Boot sequence with progress steps (Web) | 0.5 day | Not started |
+| Agent detail depth -- tabs for memory/tasks/activity/eval | 1-2 days | Not started |
+| Session detail -- inline diff viewer, cost breakdown, timeline | 1-2 days | Not started |
+| Knowledge graph visualization (reagraph or similar) | 2-3 days | Not started |
+| Onboarding wizard (Web) | 1 day | Not started |
+
+### Camp 5: Security & Compliance
 
 **Goal:** Enterprise-ready security posture. Audit everything.
 
@@ -143,25 +162,24 @@ These exist as code with unit tests but have never been tested against real exte
 | Security posture score (composite 0-100) | 1 day |
 | Secret detection (scan tool I/O for API keys, tokens) | 1 day |
 | Injection attempt tracking | 0.5 day |
-| Exec approval queue (interactive approve/deny for borderline ops) | 1-2 days |
+| Exec approval queue (interactive approve/deny) | 1-2 days |
 | Trust scoring per agent | 1 day |
 | Security dashboard panel (Web+TUI) | 1 day |
 
-### Camp 5: Integrations & Webhooks
+### Camp 6: Integrations & Webhooks
 
 **Goal:** Ark connects to the tools teams already use.
 
 | Task | Effort |
 |------|--------|
 | Outbound webhook system (HMAC-signed, retry, circuit breaker) | 2-3 days |
-| Declarative alert rules (entity/field/operator/value/action) | 1-2 days |
+| Declarative alert rules | 1-2 days |
 | GitHub Issues bidirectional sync | 2-3 days |
 | Slack commands + thread-based interaction | 2-3 days |
 | Linear integration | 1-2 days |
-| Webhook management panel (Web+TUI) | 1 day |
-| Alert management panel (Web+TUI) | 1 day |
+| Webhook/alert management panels (Web+TUI) | 1 day |
 
-### Camp 6: Task Management
+### Camp 7: Task Management
 
 **Goal:** Agents have a work queue. Humans can assign, prioritize, and review.
 
@@ -172,11 +190,10 @@ These exist as code with unit tests but have never been tested against real exte
 | Task list view (TUI) | 1 day |
 | `ark task create/list/assign/dispatch` CLI | 1 day |
 | Quality gate / Aegis review system (agent-to-agent review) | 2-3 days |
-| Task → session mapping (dispatching a task creates a session) | 1 day |
-| Task feedback rating on completion | 0.5 day |
-| Task comments with @mentions | 1-2 days |
+| Task → session mapping | 1 day |
+| Task feedback rating + comments | 1-2 days |
 
-### Camp 7: User Experience Polish
+### Camp 8: User Experience Polish
 
 **Goal:** Professional, polished product.
 
@@ -184,150 +201,144 @@ These exist as code with unit tests but have never been tested against real exte
 |------|--------|
 | Full user management UI (create/edit/delete users, roles) | 1-2 days |
 | Google/GitHub SSO | 1-2 days |
-| Access request workflow (new users request, admins approve) | 1 day |
-| i18n foundation (framework + English strings extracted) | 1-2 days |
+| Access request workflow | 1 day |
+| i18n foundation | 1-2 days |
 | Natural language schedule parsing | 1 day |
-| Calendar view for schedules (day/week/month) | 1-2 days |
-| Knowledge graph visualization (Web) | 2-3 days |
+| Calendar view for schedules | 1-2 days |
 
-### Camp 8: Architecture Cleanup
+### Camp 9: Architecture Hardening
 
-**Goal:** Codebase is maintainable and well-organized.
+**Goal:** Codebase is production-grade and maintainable.
 
-| Task | Effort |
-|------|--------|
-| Core module reorganization (91 flat files → 15 domain directories) | 3-5 days |
-| Remove/rewrite eval system (evals.ts, recipe-eval.ts) | 1-2 days |
-| Async repo layer for Postgres | 3-5 days |
-| CI/CD pipeline for Ark itself (build/test/publish) | 1-2 days |
-| Update CLAUDE.md with current architecture | 0.5 day |
-| Update all documentation (guide, CLI ref, config ref) | 1-2 days |
+| Task | Effort | Status |
+|------|--------|--------|
+| ~~Core module reorganization~~ | ~~3-5 days~~ | **DONE** -- 13 domain directories |
+| ~~Delete old eval system~~ | ~~1-2 days~~ | **DONE** |
+| ~~Delete old knowledge systems~~ | ~~1-2 days~~ | **DONE** -- memory.ts, learnings.ts, hybrid-search.ts, knowledge.ts |
+| Async repo layer for Postgres | 3-5 days | Not started -- blocks hosted scale |
+| CI/CD pipeline (build/test/publish) | 1-2 days | Not started |
+| Higress gateway integration (enterprise) | 2-3 days | Research done, not started |
 
 ---
 
 ## Priority Sequence
 
 ```
-Camp 1: Integration Testing      ████████████   FIRST -- nothing else matters if it doesn't work
-Camp 2: Agent Intelligence       ████████       Core value prop -- agents that get smarter
-Camp 3: Dashboard & Viz          ████████       Operator experience -- see the fleet
-Camp 4: Security                 ██████         Enterprise requirement
-Camp 8: Architecture Cleanup     ██████         Maintainability (can run in parallel)
-Camp 5: Integrations             ██████         Connect to existing tools
-Camp 6: Task Management          ████████       New capability -- work queues
-Camp 7: UX Polish                ██████         Professional finish
+Camp 1: Integration Testing      ████████████   FIRST -- prove what we built works
+Camp 2: Workflow Persistence     ████████       Temporal + crash recovery
+Camp 3: Agent Intelligence       ████           Partially done (evals, costs done; trust, latency remain)
+Camp 4: Dashboard & Viz          ████           Partially done (dashboard, charts done; live feed, graph viz remain)
+Camp 5: Security                 ██████         Enterprise blocker
+Camp 9: Architecture             ████           Partially done (reorg, old code deleted; async Postgres remains)
+Camp 6: Integrations             ██████         Connect to existing tools
+Camp 7: Task Management          ████████       New capability
+Camp 8: UX Polish                ██████         Professional finish
 ```
 
 ---
 
-## Competitive Landscape & Research
+## Competitive Landscape
 
-### Direct Competitors Analyzed
-
-| Product | What they do | What we learned | License |
-|---------|-------------|-----------------|---------|
-| **Mission Control** (builderz-labs) | 32-panel dashboard, Kanban, Aegis review, trust scoring, webhooks, alerts | UX bar for dashboards. We beat them on compute orchestration, they beat us on operator UX. | Open source |
-| **SoulForge** (ProxySoul) | Codebase knowledge graph, PageRank, blast radius, symbol extraction | "1.8x faster, 2.1x cheaper" -- context injection is the highest-ROI optimization | BSL 1.1 (study only) |
-| **GitNexus** | Browser-based knowledge graph, Leiden community detection, SKILL.md generation | Zero-server approach, skill auto-generation from codebase analysis | PolyForm NC (study only) |
-| **Goose** (Block) | Recipe-based SDLC orchestration, server mode | ISLC recipes converted to Ark native flows. We replace Goose. | Open source |
-| **Axon** (harshkedia) | Graph-powered code intelligence, MCP tools, 33+ languages | Integrated as codebase indexer subprocess (MIT licensed) | MIT |
-| **Higress** (Alibaba/CNCF) | AI-native API gateway, model routing, MCP support | Production gateway for enterprise. Our router is dev-grade; Higress is enterprise-grade. | Apache 2.0 |
-
-### LLM Router Research
-
-From the product spec and research doc analyzed:
-- **Market split**: Intelligent routers (Martian, Not Diamond, RouteLLM) vs Infrastructure gateways (Portkey, LiteLLM, TensorZero, Bifrost) vs Unified APIs (OpenRouter)
-- **Production reality**: Benchmark claims of 85% cost savings compress to 30-60% in production
-- **Key insight**: Prompt caching (90% savings), batch APIs (50%), and semantic caching (31% of queries) should come BEFORE routing
-- **Our router**: Rule-based classifier v1. Needs real API testing, bandit-based learning, and cascade mode validation.
-- **Higress integration**: Consider for enterprise deployments (CNCF, 99.99% uptime guarantee)
-
-### Internal Team Context (from Slack)
-
-- Team is converting workflows to Goose recipes -- Ark replaces this
-- Server mode for multi-user: "server mode is the answer" -- our control plane addresses this
-- "Send to dev" workflow: PRD ready → remote devbox → everything → tested PR at 95% readiness -- this is our SDLC flow
-- Risk team needs: PAI-32794 -- server-oriented solution with per-user MCP credentials and chat history
-- Connected with Sreerag/Rohit/Atul for Goose scripts on server -- Ark hosted mode replaces this
-
-### Foundry 2.0 (Internal Initiative)
-
-Two tracks converging by Apr 20 deadline:
-- **Track 1: QA Infra in Cloud** -- on-demand testing infrastructure, CLI-based, 24x7 availability
-- **Track 2: AI Monitor** -- Prometheus-backed monitoring with AI agent, Slack-first alerts
-- **Vision**: Fully Automated QA + Self-Healing Systems
+| Product | Their strength | Our strength | Gap to close |
+|---------|---------------|-------------|--------------|
+| **Mission Control** | 32-panel dashboard, Kanban, security posture, webhooks | Compute orchestration, DAG flows, knowledge graph | Dashboard depth, task board, security |
+| **SoulForge** | Codebase knowledge graph, PageRank, blast radius | Unified knowledge (code + sessions + memories) | Symbol-level precision (Axon handles this) |
+| **Goose** | Recipe-based SDLC, server mode | We replaced Goose's recipes with native Ark flows | Server mode (our control plane) |
+| **Higress** | CNCF AI gateway, enterprise-grade | Custom router with Ark-specific features | Enterprise gateway (use Higress for prod) |
 
 ---
 
-## Evaluation System (Current → Target)
+## Internal Context
 
-### Current (broken -- needs rewrite)
-
-| File | Problem |
-|------|---------|
-| `evals.ts` | Keyword matching against expected output strings. `output.includes(keyword)`. No semantic evaluation. |
-| `recipe-eval.ts` | Creates sessions but doesn't dispatch them. Comment: "does NOT dispatch -- requires real agents". Tests creation, not performance. |
-
-### Target
-
-| Layer | What it measures | How |
-|-------|-----------------|-----|
-| **Output evals** | Did the agent complete the task? Were tests passing? Was the PR accepted? | Parse session outcome, test results, PR status |
-| **Trace evals** | How many turns to completion? Any loops? Convergence speed? | Analyze event timeline |
-| **Component evals** | Tool call latency (p50/p95/p99). Which tools fail most? | Instrument tool calls with timing |
-| **Drift detection** | Is this agent getting worse over time? | Compare recent 7-day scores to 4-week rolling baseline |
-| **Trust scoring** | Weighted history: success (+0.02), failure (-0.05), injection (-0.15), secret exposure (-0.20) | Accumulate per agent in knowledge graph |
-| **Benchmarks** | Run known tasks against different agents/runtimes/models, compare | Actually dispatch and evaluate results |
-
-All eval results stored as `type=eval` nodes in knowledge graph, linked to sessions and agents.
+- **Foundry 2.0**: QA Infra (fan-out test suites) + AI Monitor (Prometheus + Slack alerts). Apr 20 deadline.
+- **Team**: Converting Goose recipes → Ark handles this. Server mode needed → control plane addresses it.
+- **"Send to dev"**: PRD ready → remote devbox → tested PR at 95% readiness. Requires: Camp 1 (integration testing) + Camp 2 (workflow persistence).
+- **Risk team (PAI-32794)**: Per-user MCP credentials, chat history on server → auth + control plane + knowledge graph.
 
 ---
 
-## Surface Parity (Web / TUI / CLI)
+## Mission Control Feature Gaps (detailed)
 
-Every feature must exist in all three surfaces:
+From deep analysis of builderz-labs/mission-control (32 panels):
 
-| Feature | Web | TUI | CLI | Status |
-|---------|-----|-----|-----|--------|
-| Sessions | ✅ | ✅ | ✅ | Done |
-| Agents+Runtimes | ✅ | ✅ | ✅ | Done |
-| Flows | ✅ | ✅ | ✅ | Done |
-| Compute | ✅ | ✅ | ✅ | Done |
-| History | ✅ | ✅ | ✅ | Done |
-| Memory/Knowledge | ✅ | ✅ | ✅ | Done |
-| Tools/Skills | ✅ | ✅ | ✅ | Done |
-| Schedules | ✅ | ✅ | ✅ | Done |
-| Costs | ✅ | ✅ | ✅ | Done (no charts) |
-| Settings | ✅ | ✅ | ✅ | Done |
-| Dashboard Overview | ✅ | ✅ | ✅ | Done (v0.12.0) |
-| Cost Charts | ✅ | ✅ | N/A | Done (Recharts web, ASCII TUI) |
-| Router Status | ❌ | ❌ | ✅ | CLI only |
-| Tenant/User Mgmt | ❌ | ❌ | ✅ | CLI only |
-| Knowledge Search | ❌ | ❌ | ✅ | CLI only |
-| Task Board | ❌ | ❌ | ❌ | Not started |
-| Security | ❌ | ❌ | ❌ | Not started |
-| Audit Trail | ❌ | ❌ | ❌ | Not started |
-| Webhooks | ❌ | ❌ | ❌ | Not started |
-| Alerts | ❌ | ❌ | ❌ | Not started |
-| Agent Evals | ❌ | ❌ | ❌ | Not started |
-| Standup Reports | ❌ | ❌ | ❌ | Not started |
+| MC Feature | Ark Status | Priority |
+|-----------|-----------|----------|
+| Overview dashboard (widget grid) | **DONE** (v0.12.0) | -- |
+| Cost charts (Recharts pie/line/bar) | **DONE** (v0.12.0) | -- |
+| Smart polling (pause when tab hidden) | **DONE** (v0.12.0) | -- |
+| Agent detail depth (11 tabs: overview, soul, memory, tasks, activity, config, files, tools, channels, cron, models) | Partial (2 tabs: roles + runtimes) | Medium |
+| Task board (8-column Kanban with dispatch, retry, quality gate) | **NOT BUILT** | High |
+| Aegis quality review (agent-to-agent blocking review before completion) | **NOT BUILT** | High |
+| Exec approval queue (real-time approve/deny tool calls with risk classification) | **NOT BUILT** | Medium |
+| Security posture score (0-100 composite) | **NOT BUILT** | High |
+| Trust scoring per agent (weighted event history) | **NOT BUILT** | Medium |
+| Secret detection (scan tool I/O for API keys) | **NOT BUILT** | Medium |
+| Audit trail (immutable log with IP/user-agent) | **NOT BUILT** | High |
+| Outbound webhooks (HMAC-SHA256, retry, circuit breaker) | **NOT BUILT** | Medium |
+| Declarative alert rules (entity/field/operator/value → action) | **NOT BUILT** | Medium |
+| GitHub Issues bidirectional sync | **NOT BUILT** (auto-PR only) | Medium |
+| Multi-gateway support (connect multiple LLM gateways) | **NOT BUILT** (single router) | Low |
+| Agent eval framework (completion rate, correctness, tool latency, drift) | **DONE** (v0.12.0 -- evaluateSession, getAgentStats, detectDrift) | -- |
+| Standup reports (auto-generated daily per agent) | **NOT BUILT** | Low |
+| Notifications (@mention inbox) | **NOT BUILT** | Low |
+| Office spatial visualization (agents at desks) | **NOT BUILT** (skip -- gimmick) | Skip |
+| System monitor (CPU/mem/disk/GPU charts) | **NOT BUILT** | Low |
+| Cron with natural language + calendar view | Partial (cron list, no NLP/calendar) | Low |
+| Boot sequence with progress steps | **NOT BUILT** | Low |
+| Live feed sidebar (real-time events without leaving view) | **NOT BUILT** | Medium |
+| User management UI (full CRUD) | **NOT BUILT** (CLI only) | Medium |
+| Google/GitHub SSO | **NOT BUILT** | Medium |
+| Pipeline builder (visual workflow editor) | **NOT BUILT** (YAML-only flow definition) | Low |
+| i18n (10 languages) | **NOT BUILT** | Low |
+| Onboarding wizard | **NOT BUILT** | Low |
+
+## Slack Thread Gaps (Harinder + Abhimanyu)
+
+| Requirement | Ark Status | Gap |
+|-------------|-----------|-----|
+| "Send to dev" -- PRD → remote devbox → tested PR at 95% | SDLC flow exists, never tested E2E | Need: real Jira E2E test, verified compute, crash recovery |
+| Server mode with per-user MCP credentials | Auth + tenants exist, MCP creds not per-user | Need: user-level MCP credential storage |
+| Chat history on server | Knowledge graph stores sessions | Need: verify conversation persistence in hosted mode |
+| Connect Goose scripts to server | Ark replaces Goose. CLI-agent runtime runs any tool. | Need: verify codex/gemini/aider runtimes work |
+| Goose recipe orchestration with sub-recipes | SDLC flow stages map to sub-recipes | Need: verify stage → recipe mapping works |
+
+## SoulForge / Codebase Intelligence Gaps
+
+| Feature | Ark Status | Gap |
+|---------|-----------|-----|
+| PageRank ranking of files | Axon does this (via indexer) | Need: verify Axon integration works with real repo |
+| Blast radius scoring | knowledge/impact MCP tool exists | Need: real-world testing |
+| Symbol-level extraction (33+ languages) | Axon handles via tree-sitter | Need: Axon as required dependency, tested |
+| Git co-change history | indexCoChanges() in indexer.ts | Need: real-world testing |
+| Real-time graph updates as files change | Incremental indexing on session completion | Need: verify incremental path works |
+
+## LLM Router Research Gaps
+
+| Finding | Ark Status | Gap |
+|---------|-----------|-----|
+| Prompt caching (90% savings) | Not implemented | Need: pass-through caching headers to providers |
+| Batch API (50% savings on async) | Not implemented | Need: batch endpoint in router |
+| Semantic caching (31% of queries cacheable) | Not implemented | Need: embedding-based cache in router |
+| Bandit-based online learning | Not implemented (rule-based classifier only) | Need: feedback loop → routing weights |
+| Multi-turn warm handoff | Sticky sessions exist but no handoff with context summary | Need: conversation summarization on model switch |
+| Tool-call reliability matrix | Not tracked | Need: per-model tool success rate tracking |
+
+## Key Decisions Needed
+
+1. **Temporal for control plane workflow engine?** Plan: start with local event-sourced engine, plan for Temporal hosted backend. Same WorkflowEngine interface.
+2. **Async Postgres repos?** Required for hosted scale. Big refactor. Should be Camp 9 priority.
+3. **Higress vs custom router?** Custom for dev/small. Higress for enterprise. Both behind same config.
+4. **Task board scope?** Tasks sit ABOVE sessions. Creating a task doesn't dispatch -- dispatching a task creates a session.
 
 ---
 
-## Key Learnings from This Session
+## Key Learnings
 
-1. **Architecture before features.** DI, database abstraction, and compute provider interfaces had to come first. Everything after was easier because the foundation was right.
-
-2. **Global state is poison.** 225 `getApp()` calls created hidden dependencies everywhere. Awilix container + explicit parameter passing fixed testability and multi-tenancy in one move.
-
-3. **Process leaks are insidious.** Fan-out dispatch + async tmux + fire-and-forget = orphaned claude/tmux processes. Fixed by: awaiting dispatches, stopAll in shutdown, proper provider-based kill chain.
-
-4. **Build ≠ integrated.** We built 7 compute providers, a router, auth, Postgres adapter, Redis SSE, control plane. None have been tested against real services. Unit tests prove logic, not deployment.
-
-5. **Knowledge should be unified.** 7 fragmented knowledge systems (memories, search, learnings, transcripts, skills, knowledge, sessions) converged into one graph. Agents go from "grep and pray" to "query the graph."
-
-6. **The ISLC recipes are a goldmine.** Converting Goose ISLC stages into Ark native flows gave us a complete SDLC pipeline with quality-tested prompts.
-
-7. **Theme consistency matters.** Every hardcoded `"cyan"` or `"gray"` had to be replaced with `theme.accent` / `theme.dimText`. One color system, one source of truth.
-
-8. **Mission Control sets the UX bar.** 32 panels, Kanban board, security posture, agent evals, cost charts, webhooks, audit trail. We have stronger orchestration; they have stronger dashboard.
+1. Architecture before features (DI, database abstraction, compute interfaces).
+2. Global state is poison (225 getApp() calls eliminated).
+3. Process leaks are insidious (fixed by: awaited dispatches, stopAll, provider kill chain).
+4. Build ≠ integrated (7 providers, router, auth, Postgres -- none tested against real services).
+5. Knowledge should be unified (7 systems → 1 graph).
+6. Theme consistency matters (0 hardcoded colors).
+7. Mission Control sets the UX bar (32 panels vs our 11 views).
+8. Cost tracking must be universal (not just Claude -- every provider, every user, every dimension).
