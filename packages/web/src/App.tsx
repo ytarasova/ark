@@ -1,5 +1,5 @@
 import "./styles.css";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { queryClient, QueryClientProvider } from "./providers/QueryProvider.js";
 import { Toast } from "./components/Toast.js";
@@ -13,18 +13,34 @@ import { SchedulesPage } from "./pages/SchedulesPage.js";
 import { MemoryPage } from "./pages/MemoryPage.js";
 import { CostsPage } from "./pages/CostsPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
+import { LoginPage } from "./pages/LoginPage.js";
 
 const READ_ONLY = document.getElementById("root")?.dataset.readonly === "true";
+const AUTH_REQUIRED = document.getElementById("root")?.dataset.auth === "true";
 
 function App() {
   const [view, setView] = useState("sessions");
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null);
   const [toastKey, setToastKey] = useState(0);
+  const [authenticated, setAuthenticated] = useState(() => {
+    // If no auth required, or token exists in URL params or localStorage, skip login
+    if (!AUTH_REQUIRED) return true;
+    const urlToken = new URLSearchParams(window.location.search).get("token");
+    if (urlToken) {
+      localStorage.setItem("ark-token", urlToken);
+      return true;
+    }
+    return !!localStorage.getItem("ark-token");
+  });
   const readOnly = READ_ONLY;
 
   function showToast(msg: string, type: string) {
     setToast({ msg, type });
     setToastKey((k) => k + 1);
+  }
+
+  if (!authenticated) {
+    return <LoginPage onLogin={() => setAuthenticated(true)} />;
   }
 
   return (

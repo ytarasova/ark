@@ -23,6 +23,8 @@ export interface SessionConfig {
   // Compute/infra
   remoteWorkdir?: string;
   worktree?: string | boolean;
+  /** Git URL to clone on compute target (no local repo needed) */
+  remoteRepo?: string;
   // Lifecycle
   _pre_delete_status?: string;
   _deleted_at?: string;

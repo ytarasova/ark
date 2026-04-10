@@ -27,6 +27,7 @@ export function registerSessionCommands(program: Command) {
     .description("Start a new session")
     .argument("[ticket]", "External ticket reference (Jira key, GitHub issue, etc.)")
     .option("-r, --repo <path>", "Repository path or name")
+    .option("--remote-repo <url>", "Git URL to clone on compute target (no local repo needed)")
     .option("-s, --summary <text>", "Task summary")
     .option("-p, --flow <name>", "Flow name", "default")
     .option("-c, --compute <name>", "Compute name")
@@ -92,6 +93,18 @@ export function registerSessionCommands(program: Command) {
         }
       }
 
+      // Handle --remote-repo: use git URL as repo, no local path needed
+      let sessionConfig: Record<string, unknown> | undefined;
+      if (opts.remoteRepo) {
+        if (!repo) {
+          // Extract repo name from git URL for display
+          const urlMatch = opts.remoteRepo.match(/\/([^/]+?)(?:\.git)?$/);
+          repo = urlMatch?.[1] ?? opts.remoteRepo;
+        }
+        sessionConfig = { remoteRepo: opts.remoteRepo };
+        console.log(chalk.dim(`Remote repo: ${opts.remoteRepo}`));
+      }
+
       // Sanitize session name: alphanumeric, dash, underscore only
       const rawName = opts.summary ?? ticket ?? "";
       const summary = sanitizeSummary(rawName);
@@ -102,6 +115,7 @@ export function registerSessionCommands(program: Command) {
         repo, flow: opts.flow, compute_name: opts.compute,
         agent: recipeAgent,
         workdir, group_name: opts.group,
+        ...(sessionConfig ? { config: sessionConfig } : {}),
       });
 
       if (claudeSessionId) {

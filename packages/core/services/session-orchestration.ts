@@ -172,6 +172,30 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     return { ok: false, message: `Compute '${session.compute_name}' not found. Delete and recreate the session.` };
   }
 
+  // Handle remote repo: clone to local temp directory if no workdir set
+  if (session.config?.remoteRepo && !session.workdir) {
+    const remoteUrl = session.config.remoteRepo as string;
+    log(`Cloning remote repo: ${remoteUrl}`);
+    try {
+      const tmpDir = join(app.arkDir, "worktrees", sessionId);
+      mkdirSync(tmpDir, { recursive: true });
+      await execFileAsync("git", ["clone", "--depth", "1", remoteUrl, tmpDir], { timeout: 120_000 });
+      app.sessions.update(sessionId, { workdir: tmpDir });
+      // Re-fetch session to pick up workdir
+      const updated = app.sessions.get(sessionId);
+      if (updated) {
+        // Copy updated fields into session reference for the rest of dispatch
+        (session as any).workdir = updated.workdir;
+      }
+      log(`Cloned remote repo to ${tmpDir}`);
+      app.events.log(sessionId, "remote_repo_cloned", {
+        actor: "system", data: { url: remoteUrl, dir: tmpDir },
+      });
+    } catch (e: any) {
+      return { ok: false, message: `Failed to clone remote repo: ${e.message}` };
+    }
+  }
+
   // Check task summary for prompt injection
   try {
     const injection = detectInjection(session.summary ?? "");
@@ -419,8 +443,8 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
     await p.cleanupSession(c, session);
   });
   if (!stopped && session.session_id) {
-    // Fallback: direct tmux kill (no compute assigned)
-    await tmux.killSessionAsync(session.session_id);
+    // Fallback: kill via launcher (no compute assigned)
+    await app.launcher.kill(session.session_id);
   }
 
   // Stop status poller if active (non-Claude executors)
@@ -461,7 +485,7 @@ export async function resume(app: AppContext, sessionId: string, opts?: { onLog?
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status === "running" && session.session_id) return { ok: false, message: "Already running" };
 
-  if (session.session_id) await tmux.killSessionAsync(session.session_id);
+  if (session.session_id) await app.launcher.kill(session.session_id);
 
   app.sessions.update(sessionId, {
     status: "ready", error: null, breakpoint_reason: null,
@@ -619,13 +643,13 @@ export function pause(app: AppContext, sessionId: string, reason?: string): { ok
   return { ok: true, message: "Paused" };
 }
 
-export function archive(app: AppContext, sessionId: string): { ok: boolean; message: string } {
+export async function archive(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   // Stop if running
   if (session.session_id) {
-    tmux.killSession(session.session_id);
+    await app.launcher.kill(session.session_id);
   }
 
   app.sessions.update(sessionId, { status: "archived", session_id: null });
@@ -657,8 +681,8 @@ export async function interrupt(app: AppContext, sessionId: string): Promise<{ o
   }
   if (!session.session_id) return { ok: false, message: "No tmux session" };
 
-  // Send Ctrl+C to interrupt the agent without killing the tmux session
-  await tmux.sendKeysAsync(session.session_id, "C-c");
+  // Send Ctrl+C to interrupt the agent without killing the session
+  await app.launcher.sendKeys(session.session_id, "C-c");
 
   app.sessions.update(sessionId, { status: "waiting" });
   app.events.log(sessionId, "session_interrupted", {
@@ -903,7 +927,7 @@ export async function deleteSessionAsync(app: AppContext, sessionId: string): Pr
     await p.cleanupSession(c, session);
   });
   if (!handled && session.session_id) {
-    await tmux.killSessionAsync(session.session_id);
+    await app.launcher.kill(session.session_id);
   }
 
   // 2. Clean up hook config (not provider-dependent)
@@ -1138,15 +1162,18 @@ async function launchAgentTmux(app: AppContext,
     return result;
   }
 
-  // Local launch
-  log("Starting local tmux session...");
-  await tmux.createSessionAsync(tmuxName, `bash ${launcher}`, { arkDir: app.config.arkDir });
-  claude.autoAcceptChannelPrompt(tmuxName);
+  // Local launch via launcher abstraction
+  log("Starting local session...");
+  const launchResult = await app.launcher.launch(session, `bash ${launcher}`, {
+    arkDir: app.config.arkDir,
+    workdir: effectiveWorkdir,
+  });
+  claude.autoAcceptChannelPrompt(launchResult.handle);
   log("Delivering task...");
   claude.deliverTask(session.id, channelPort, task, stage);
   app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
-  return tmuxName;
+  return launchResult.handle;
 }
 
 /** Build the task header: agent role, stage description, and reporting instructions. */

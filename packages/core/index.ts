@@ -40,6 +40,11 @@ export { subprocessExecutor } from "./executors/subprocess.js";
 export { cliAgentExecutor } from "./executors/cli-agent.js";
 export { startStatusPoller, stopStatusPoller, stopAllPollers } from "./executors/status-poller.js";
 
+// Session launcher abstraction
+export type { SessionLauncher } from "./session-launcher.js";
+export type { LaunchResult as SessionLaunchResult } from "./session-launcher.js";
+export { TmuxLauncher, ContainerLauncher, ArkdLauncher } from "./launchers/index.js";
+
 // Claude integration
 export * as claude from "./claude.js";
 
@@ -170,6 +175,12 @@ export { generateOpenApiSpec } from "./openapi.js";
 // Web dashboard
 export { startWebServer, type WebServerOptions } from "./web.js";
 
+// SSE bus (pluggable broadcast for scaling)
+export { type SSEBus, InMemorySSEBus, createSSEBus } from "./sse-bus.js";
+
+// Compute pools
+export { ComputePoolManager, type ComputePool, type ComputePoolStatus, initPoolSchema } from "./compute-pool.js";
+
 // Evals framework
 export { loadEvalSuite, scoreOutput, saveEvalResults, listEvalSuites, summarizeResults, type EvalScenario, type EvalResult, type EvalSuite } from "./evals.js";
 
@@ -236,6 +247,11 @@ export type { ComputeSnapshot, PortDecl } from "../types/index.js";
 export type { AgentDefinition as AgentDefinitionDomain } from "../types/index.js";
 // GateType is from types/flow.ts — FlowDefinition/StageDefinition already come from ./flow.js via export *
 export type { GateType } from "../types/index.js";
+
+// Auth and multi-tenancy
+export { extractTenantContext, canWrite, isAdmin, DEFAULT_AUTH_CONFIG, DEFAULT_TENANT_CONTEXT, type AuthConfig } from "./auth.js";
+export { ApiKeyManager } from "./api-keys.js";
+export type { TenantContext, ApiKey } from "../types/index.js";
 
 // Repositories
 export { SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";

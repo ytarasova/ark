@@ -20,6 +20,9 @@ import { Router } from "../server/router.js";
 import { registerAllHandlers } from "../server/register.js";
 import { DEFAULT_CHANNEL_BASE_URL } from "./constants.js";
 import { handleIssueWebhook, type IssueWebhookConfig, type IssueWebhookPayload } from "./github-webhook.js";
+import { type SSEBus, createSSEBus } from "./sse-bus.js";
+import { extractTenantContext, canWrite, type AuthConfig } from "./auth.js";
+import type { TenantContext } from "../types/index.js";
 
 const WEB_DIST = join(import.meta.dir, "../../packages/web/dist");
 
@@ -98,16 +101,23 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
     } catch { /* build failed - will serve 404s */ }
   }
 
-  // ── SSE ──────────────────────────────────────────────────────────────────
+  // ── SSE (backed by pluggable SSEBus) ─────────────────────────────────────
+  const sseBus: SSEBus = createSSEBus();
   const sseClients = new Set<ReadableStreamDefaultController>();
 
   function broadcast(event: string, data: any) {
+    // Publish through the bus (enables future Redis-backed scaling)
+    sseBus.publish("sessions", event, data);
+  }
+
+  // Subscribe the direct-to-client broadcaster to the bus
+  sseBus.subscribe("sessions", (event, data) => {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of sseClients) {
       try { client.enqueue(new TextEncoder().encode(msg)); }
       catch { sseClients.delete(client); }
     }
-  }
+  });
 
   function broadcastSessions() {
     const sessions = app.sessions.list({ limit: 200 });
@@ -126,6 +136,11 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
     }
   });
 
+  // ── Auth config ──────────────────────────────────────────────────────────
+  const authConfig: AuthConfig = app.config.auth ?? { enabled: false, apiKeyEnabled: false };
+  let apiKeyMgr: import("./api-keys.js").ApiKeyManager | null = null;
+  try { apiKeyMgr = app.apiKeys; } catch { /* not booted yet or unavailable */ }
+
   // ── Server ───────────────────────────────────────────────────────────────
   const server = Bun.serve({
     port,
@@ -137,13 +152,27 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
         return new Response(null, { status: 204, headers: CORS });
       }
 
-      // Token auth
+      // Token auth (legacy simple token) -- checked first for backward compat
       if (token) {
         const provided = url.searchParams.get("token") ?? req.headers.get("authorization")?.replace("Bearer ", "");
         if (provided !== token) {
           return new Response("Unauthorized", { status: 401 });
         }
       }
+
+      // Multi-tenant auth -- extract tenant context from request
+      let tenantCtx: TenantContext | null = null;
+      if (authConfig.enabled) {
+        tenantCtx = extractTenantContext(req, authConfig, apiKeyMgr);
+        if (!tenantCtx) {
+          return jsonResponse({ error: "Unauthorized - valid API key required" }, 401);
+        }
+      }
+
+      // Determine which app context to use for this request
+      const requestApp = tenantCtx && tenantCtx.tenantId !== "default"
+        ? app.forTenant(tenantCtx.tenantId)
+        : app;
 
       // SSE endpoint
       if (url.pathname === "/api/events/stream") {
@@ -178,7 +207,21 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
               error: { code: -32603, message: "Read-only mode" },
             }, 403);
           }
-          const result = await router.dispatch(body);
+          // Tenant write permission guard
+          if (tenantCtx && WRITE_METHODS.has(body.method) && !canWrite(tenantCtx)) {
+            return jsonResponse({
+              jsonrpc: "2.0", id: body.id,
+              error: { code: -32603, message: "Insufficient permissions -- viewer role cannot write" },
+            }, 403);
+          }
+          // Create a tenant-scoped router if needed
+          let rpcRouter = router;
+          if (tenantCtx && tenantCtx.tenantId !== "default") {
+            rpcRouter = new Router();
+            registerAllHandlers(rpcRouter, requestApp);
+            rpcRouter.markInitialized();
+          }
+          const result = await rpcRouter.dispatch(body);
           return jsonResponse(result);
         } catch (err) {
           return errorResponse(err, 400);
@@ -196,7 +239,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
             flow: url.searchParams.get("flow") ?? undefined,
             group: url.searchParams.get("group") ?? undefined,
           };
-          const result = await handleIssueWebhook(app, payload, config);
+          const result = await handleIssueWebhook(requestApp, payload, config);
           return jsonResponse(result, result.ok ? 200 : 400);
         } catch (err) {
           return errorResponse(err);
@@ -227,7 +270,8 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
         const indexPath = join(WEB_DIST, "index.html");
         if (existsSync(indexPath)) {
           let html = readFileSync(indexPath, "utf-8");
-          const rootAttrs = `id="root"${readOnly ? ' data-readonly="true"' : ""}`;
+          const authAttr = token ? ' data-auth="true"' : "";
+          const rootAttrs = `id="root"${readOnly ? ' data-readonly="true"' : ""}${authAttr}`;
           html = html.replace('id="root"', rootAttrs);
           return new Response(html, {
             headers: { "Content-Type": "text/html", ...CORS },
@@ -246,6 +290,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
     stop: () => {
       clearInterval(statusInterval);
       unsubEventBus();
+      sseBus.clear();
       for (const client of sseClients) {
         try { client.close(); } catch { /* ignore */ }
       }
