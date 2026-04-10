@@ -67,7 +67,7 @@ export { pollPRReviews } from "./pr-poller.js";
 export { pollIssues, startIssuePoller, fetchLabeledIssues, createSessionFromIssue, type IssuePollerOptions, type GhIssue } from "./issue-poller.js";
 
 // Conductor
-export { startConductor } from "./conductor.js";
+export { startConductor } from "./conductor/conductor.js";
 
 // Claude sessions
 export { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache, type ClaudeSession } from "./claude-sessions.js";

@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test"
 import { writeFileSync, mkdirSync, appendFileSync } from "fs";
 import { join } from "path";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
-import { startConductor } from "../conductor.js";
+import { startConductor } from "../conductor/conductor.js";
 import { getSessionConversation, searchSessionConversation, searchTranscripts } from "../search.js";
 
 const TEST_PORT = 19197;

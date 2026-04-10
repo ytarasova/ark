@@ -427,7 +427,7 @@ export class AppContext {
     // 7. Optionally start conductor (dynamic import to avoid circular deps)
     if (!this.options.skipConductor) {
       await safeAsync("boot: start conductor", async () => {
-        const { startConductor } = await import("./conductor.js");
+        const { startConductor } = await import("./conductor/conductor.js");
         this.conductor = startConductor(this, this.config.conductorPort, { quiet: true });
       });
     }

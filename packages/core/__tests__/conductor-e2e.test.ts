@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
-import { startConductor } from "../conductor.js";
+import { startConductor } from "../conductor/conductor.js";
 
 // Use a non-default port to avoid conflicts with a running conductor
 const TEST_PORT = 19199;

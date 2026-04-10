@@ -28,7 +28,7 @@ import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
 import { buildSessionVars } from "../template.js";
 import { resolveFlow } from "../flow.js";
 import { loadRepoConfig } from "../repo-config.js";
-import type { OutboundMessage } from "../channel-types.js";
+import type { OutboundMessage } from "../conductor/channel-types.js";
 import { safeAsync } from "../safe.js";
 import { saveCheckpoint } from "../checkpoint.js";
 import { profileGroupPrefix } from "../profiles.js";

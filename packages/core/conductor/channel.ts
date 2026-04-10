@@ -19,7 +19,7 @@ import {
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { OutboundMessage } from "./channel-types.js";
-import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL } from "./constants.js";
+import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL } from "../constants.js";
 
 const SESSION_ID = process.env.ARK_SESSION_ID ?? "unknown";
 const ARKD_URL = DEFAULT_ARKD_URL;

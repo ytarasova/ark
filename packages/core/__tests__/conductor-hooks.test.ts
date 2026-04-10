@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { getApp } from "../app.js";
-import { startConductor } from "../conductor.js";
+import { startConductor } from "../conductor/conductor.js";
 import { withTestContext } from "./test-helpers.js";
 
 const TEST_PORT = 19198;

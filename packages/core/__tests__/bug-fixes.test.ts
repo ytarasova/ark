@@ -10,7 +10,7 @@ import { withTestContext } from "./test-helpers.js";
 import { getApp } from "../app.js";
 import { safeParseConfig } from "../util.js";
 import { applyReport } from "../services/session-orchestration.js";
-import type { OutboundMessage } from "../channel-types.js";
+import type { OutboundMessage } from "../conductor/channel-types.js";
 
 withTestContext();
 
