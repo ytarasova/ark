@@ -36,7 +36,7 @@ export function TabBar({ active, loading, loadingLabel }: TabBarProps) {
         return (
           <Box key={tab} marginRight={1}>
             {isActive ? (
-              <Text backgroundColor={theme.accent} color="white" bold>{` ${label} `}</Text>
+              <Text backgroundColor={theme.highlight} color={theme.text} bold>{` ${label} `}</Text>
             ) : (
               <Text dimColor>{` ${label} `}</Text>
             )}

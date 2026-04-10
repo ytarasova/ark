@@ -95,7 +95,7 @@ export function TreeList<T>({
       const entries = groupMap.get(groupName)!;
       if (groupName) {
         rows.push(
-          <Text key={`grp-${groupName}`} backgroundColor={theme.dimText} color="white">{` ${groupName} `}</Text>
+          <Text key={`grp-${groupName}`} backgroundColor={theme.highlight} color={theme.text} bold>{` ${groupName} `}</Text>
         );
       }
       if (entries.length === 0 && groupName) {
