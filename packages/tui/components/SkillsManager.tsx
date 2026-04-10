@@ -53,8 +53,8 @@ export function SkillsManager({ session, asyncState, onClose }: SkillsManagerPro
 
   if (allSkills.length === 0) {
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={theme.highlight} paddingX={1}>
-        <Text bold color={theme.highlight}>Skills Manager</Text>
+      <Box flexDirection="column" borderStyle="round" borderColor={theme.accent} paddingX={1}>
+        <Text bold color={theme.accent}>Skills Manager</Text>
         <Text dimColor>No skills found. Create skills in ~/.ark/skills/ or skills/</Text>
         <Text dimColor>Esc to close</Text>
       </Box>
@@ -62,9 +62,9 @@ export function SkillsManager({ session, asyncState, onClose }: SkillsManagerPro
   }
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={theme.highlight} paddingX={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor={theme.accent} paddingX={1}>
       <Box marginBottom={1}>
-        <Text bold color={theme.highlight}>Skills Manager</Text>
+        <Text bold color={theme.accent}>Skills Manager</Text>
       </Box>
       {skillNames.map((name, i) => {
         const enabled = toggleState.get(name) ?? false;

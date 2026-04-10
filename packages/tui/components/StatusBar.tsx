@@ -45,7 +45,7 @@ export function StatusBar({ hints, overlayBarText, sessions, loading, error }: S
       {!overlayBarText && (
         <Box>
           <Box>
-            {profile !== "default" && <Text color={theme.highlight}>{` [${profile}]`}</Text>}
+            {profile !== "default" && <Text color={theme.accent}>{` [${profile}]`}</Text>}
             <Text bold>{` ${sessions.length} sessions`}</Text>
             {!loading && counts.running > 0 && <Text color={theme.running}>{`  ● ${counts.running}`}</Text>}
             {counts.waiting > 0 && <Text color={theme.waiting}>{`  ◑ ${counts.waiting}`}</Text>}

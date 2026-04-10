@@ -178,10 +178,10 @@ export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
 
       {/* Stages list */}
       <Box>
-        <Text color={active === "stages" ? theme.highlight : "gray"}>
+        <Text color={active === "stages" ? theme.accent : theme.dimText}>
           {active === "stages" ? "> " : "  "}
         </Text>
-        <Text color={active === "stages" ? "white" : "gray"} bold={active === "stages"}>
+        <Text color={active === "stages" ? "white" : theme.dimText} bold={active === "stages"}>
           {"Stages    "}
         </Text>
         {active === "stages" ? (
@@ -190,7 +190,7 @@ export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
               const isCurrent = i === stageCursor;
               return (
                 <Text key={i}>
-                  <Text color={isCurrent ? theme.highlight : "white"}>
+                  <Text color={isCurrent ? theme.accent : "white"}>
                     {isCurrent ? "> " : "  "}
                     {`${(i + 1)}. `}
                   </Text>

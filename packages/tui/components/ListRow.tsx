@@ -9,14 +9,14 @@ interface ListRowProps {
 
 /**
  * A list row with colored highlight when selected.
- * Uses theme.highlight for clear visibility on both dark and light terminals.
+ * Uses theme.accent for clear visibility on both dark and light terminals.
  */
 export function ListRow({ selected, children }: ListRowProps) {
   const theme = getTheme();
   return (
     <Text
       bold={selected}
-      backgroundColor={selected ? theme.highlight : undefined}
+      backgroundColor={selected ? theme.accent : undefined}
       color={selected ? "white" : undefined}
       wrap="truncate"
     >

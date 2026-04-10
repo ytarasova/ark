@@ -20,11 +20,11 @@ export function SplitPane({ left, right, leftTitle, rightTitle, leftWidth = "30%
     <Box flexGrow={1}>
       <Box flexDirection="column" width={leftWidth}
         borderStyle="single"
-        borderColor={focus === "left" ? theme.highlight : "gray"}
+        borderColor={focus === "left" ? theme.accent : theme.dimText}
         paddingX={1}>
         {leftTitle && (
           <>
-            <Text color={focus === "left" ? theme.highlight : "white"} bold={focus === "left"}>
+            <Text color={focus === "left" ? theme.accent : "white"} bold={focus === "left"}>
               {` ${leftTitle} `}
             </Text>
             <Text> </Text>
@@ -36,11 +36,11 @@ export function SplitPane({ left, right, leftTitle, rightTitle, leftWidth = "30%
       </Box>
       <Box flexDirection="column" width={rightWidth}
         borderStyle="single"
-        borderColor={focus === "right" ? theme.highlight : "gray"}
+        borderColor={focus === "right" ? theme.accent : theme.dimText}
         paddingLeft={1} paddingRight={2}>
         {rightTitle && (
           <>
-            <Text color={focus === "right" ? theme.highlight : "white"} bold={focus === "right"}>
+            <Text color={focus === "right" ? theme.accent : "white"} bold={focus === "right"}>
               {` ${rightTitle} `}
             </Text>
             <Text> </Text>

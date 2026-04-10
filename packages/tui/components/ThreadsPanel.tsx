@@ -190,10 +190,10 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
         <Box flexDirection="column" marginLeft={2}>
           {completions.slice(0, 8).map((c, i) => (
             <Text key={c.id}>
-              <Text color={i === completionIndex ? theme.highlight : undefined} bold={i === completionIndex}>
+              <Text color={i === completionIndex ? theme.accent : undefined} bold={i === completionIndex}>
                 {i === completionIndex ? "❯ " : "  "}
               </Text>
-              <Text color={i === completionIndex ? theme.highlight : "white"} bold={i === completionIndex}>
+              <Text color={i === completionIndex ? theme.accent : "white"} bold={i === completionIndex}>
                 {c.label}
               </Text>
               <Text dimColor>{` (${c.id})`}</Text>

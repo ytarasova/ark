@@ -111,7 +111,7 @@ export function McpManager({ session, onClose, onApply }: McpManagerProps) {
 
         return (
           <Box key={name}>
-            <Text color={isCursor ? theme.highlight : undefined} bold={isCursor}>
+            <Text color={isCursor ? theme.accent : undefined} bold={isCursor}>
               {isCursor ? ">" : " "} {enabled ? "[x]" : "[ ]"} {name}
             </Text>
             <Text color={theme.dimText}> — {info.description}</Text>

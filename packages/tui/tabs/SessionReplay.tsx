@@ -123,7 +123,7 @@ export function SessionReplay({ session, onClose }: SessionReplayProps) {
           return (
             <React.Fragment key={step.index}>
               <Text wrap="truncate">
-                <Text color={isSel ? theme.highlight : undefined} bold={isSel}>{pointer}</Text>
+                <Text color={isSel ? theme.accent : undefined} bold={isSel}>{pointer}</Text>
                 {" "}
                 <Text dimColor>[{step.elapsed}]</Text>
                 {" "}

@@ -144,17 +144,17 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
 
       {/* Tools checkbox list */}
       <Box>
-        <Text color={active === "tools" ? theme.highlight : "gray"}>
+        <Text color={active === "tools" ? theme.accent : theme.dimText}>
           {active === "tools" ? "> " : "  "}
         </Text>
-        <Text color={active === "tools" ? "white" : "gray"} bold={active === "tools"}>
+        <Text color={active === "tools" ? "white" : theme.dimText} bold={active === "tools"}>
           {"Tools     "}
         </Text>
         {active === "tools" ? (
           <Box flexDirection="column">
             {TOOL_OPTIONS.map((t, i) => (
               <Text key={t}>
-                <Text color={i === toolCursor ? theme.highlight : "white"}>
+                <Text color={i === toolCursor ? theme.accent : "white"}>
                   {tools.includes(t) ? "[x] " : "[ ] "}
                   {t}
                 </Text>
@@ -175,10 +175,10 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
 
       {/* System prompt */}
       <Box>
-        <Text color={active === "prompt" ? theme.highlight : "gray"}>
+        <Text color={active === "prompt" ? theme.accent : theme.dimText}>
           {active === "prompt" ? "> " : "  "}
         </Text>
-        <Text color={active === "prompt" ? "white" : "gray"} bold={active === "prompt"}>
+        <Text color={active === "prompt" ? "white" : theme.dimText} bold={active === "prompt"}>
           {"Prompt    "}
         </Text>
         <Text dimColor>
