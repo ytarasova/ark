@@ -7,16 +7,25 @@
  */
 
 /** Default conductor URL (env: ARK_CONDUCTOR_URL) */
-export const DEFAULT_CONDUCTOR_URL = process.env.ARK_CONDUCTOR_URL ?? "http://localhost:19100";
+export const DEFAULT_CONDUCTOR_URL = process.env.ARK_CONDUCTOR_URL || "http://localhost:19100";
+
+/** Default conductor host / bind address (env: ARK_CONDUCTOR_HOST) */
+export const DEFAULT_CONDUCTOR_HOST = process.env.ARK_CONDUCTOR_HOST || "0.0.0.0";
 
 /** Default conductor port (env: ARK_CONDUCTOR_PORT) */
 export const DEFAULT_CONDUCTOR_PORT = parseInt(process.env.ARK_CONDUCTOR_PORT ?? "19100", 10);
 
 /** Default arkd URL (env: ARK_ARKD_URL) */
-export const DEFAULT_ARKD_URL = process.env.ARK_ARKD_URL ?? "http://localhost:19300";
+export const DEFAULT_ARKD_URL = process.env.ARK_ARKD_URL || "http://localhost:19300";
 
 /** Default arkd port (env: ARK_ARKD_PORT) */
 export const DEFAULT_ARKD_PORT = parseInt(process.env.ARK_ARKD_PORT ?? "19300", 10);
+
+/** Base URL for channel HTTP servers (env: ARK_CHANNEL_BASE_URL) */
+export const DEFAULT_CHANNEL_BASE_URL = process.env.ARK_CHANNEL_BASE_URL || "http://localhost";
+
+/** Default LLM router URL (env: ARK_ROUTER_URL) */
+export const DEFAULT_ROUTER_URL = process.env.ARK_ROUTER_URL || "http://localhost:8430";
 
 /** Docker host conductor URL (for devcontainer/docker dispatch) */
 export const DOCKER_CONDUCTOR_URL = "http://host.docker.internal:19100";

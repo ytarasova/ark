@@ -1,6 +1,7 @@
 import { join } from "path";
 import { homedir } from "os";
 import { existsSync, readFileSync } from "fs";
+import { DEFAULT_CONDUCTOR_URL, DEFAULT_ROUTER_URL } from "./constants.js";
 
 export interface OtlpSettings {
   enabled: boolean;
@@ -21,6 +22,12 @@ export interface TelemetrySettings {
   endpoint?: string;
 }
 
+export interface RouterSettings {
+  enabled: boolean;
+  url: string;
+  policy: "quality" | "balanced" | "cost";
+}
+
 export interface ArkConfig {
   arkDir: string;
   dbPath: string;
@@ -33,6 +40,7 @@ export interface ArkConfig {
   otlp: OtlpSettings;
   rollback: RollbackSettings;
   telemetry: TelemetrySettings;
+  router: RouterSettings;
   default_compute: string | null;
   hotkeys?: Record<string, string | null>;
   budgets?: { dailyLimit?: number; weeklyLimit?: number; monthlyLimit?: number };
@@ -68,7 +76,7 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
     worktreesDir: join(arkDir, "worktrees"),
     logDir: join(arkDir, "logs"),
     conductorPort,
-    conductorUrl: process.env.ARK_CONDUCTOR_URL ?? `http://localhost:${conductorPort}`,
+    conductorUrl: process.env.ARK_CONDUCTOR_URL ?? (conductorPort !== 19100 ? `http://localhost:${conductorPort}` : DEFAULT_CONDUCTOR_URL),
     env: process.env.ARK_TEST_DIR !== undefined ? "test" : "production",
     otlp: {
       enabled: (yaml.otlp as Record<string, unknown>)?.enabled === true,
@@ -85,6 +93,11 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
     telemetry: {
       enabled: process.env.ARK_TELEMETRY === "1" || (yaml.telemetry as Record<string, unknown>)?.enabled === true,
       endpoint: (yaml.telemetry as Record<string, unknown>)?.endpoint as string | undefined,
+    },
+    router: {
+      enabled: (yaml.router as Record<string, unknown>)?.enabled === true,
+      url: ((yaml.router as Record<string, unknown>)?.url as string) ?? DEFAULT_ROUTER_URL,
+      policy: ((yaml.router as Record<string, unknown>)?.policy as "quality" | "balanced" | "cost") ?? "balanced",
     },
     default_compute: process.env.ARK_DEFAULT_COMPUTE ?? (yaml.default_compute as string) ?? null,
     hotkeys: yaml.hotkeys as Record<string, string | null> | undefined,

@@ -17,8 +17,9 @@ import { sshKeyPath } from "./ec2/ssh.js";
 import type {
   Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
 } from "../types.js";
+import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_PORT } from "../../core/constants.js";
 
-const ARKD_REMOTE_PORT = 19300;
+const ARKD_REMOTE_PORT = DEFAULT_ARKD_PORT;
 const REMOTE_USER = "ubuntu";
 const REMOTE_HOME = `/home/${REMOTE_USER}`;
 
@@ -84,7 +85,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       const { privateKeyPath } = await generateSshKey(compute.name);
 
       log("Building cloud-init script with arkd...");
-      const conductorUrl = process.env.ARK_CONDUCTOR_URL ?? `http://localhost:${process.env.ARK_CONDUCTOR_PORT ?? "19100"}`;
+      const conductorUrl = DEFAULT_CONDUCTOR_URL;
       const userData = await buildUserDataWithArkd({
         idleMinutes: cfg.idle_minutes ?? 60,
         isolation: this.isolationType,
@@ -282,8 +283,8 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
         ARK_CHANNEL_PORT: String(channelPort),
-        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? process.env.ARK_CONDUCTOR_URL ?? "http://localhost:19100",
-        ARK_ARKD_URL: `http://localhost:${ARKD_REMOTE_PORT}`,
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
+        ARK_ARKD_URL: `http://localhost:${ARKD_REMOTE_PORT}`,  // always localhost on the remote host
       },
     };
   }

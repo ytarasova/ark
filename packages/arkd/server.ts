@@ -33,6 +33,7 @@ declare const Bun: {
 import { readFile, writeFile, stat, mkdir, readdir } from "fs/promises";
 import { join } from "path";
 import { hostname, platform, uptime, totalmem, freemem, cpus } from "os";
+import { DEFAULT_CHANNEL_BASE_URL } from "../core/constants.js";
 import type {
   ReadFileReq, ReadFileRes,
   WriteFileReq, WriteFileRes,
@@ -703,7 +704,7 @@ async function channelRelay(
 
 async function channelDeliver(req: ChannelDeliverReq): Promise<ChannelDeliverRes> {
   try {
-    const resp = await fetch(`http://localhost:${req.channelPort}`, {
+    const resp = await fetch(`${DEFAULT_CHANNEL_BASE_URL}:${req.channelPort}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.payload),

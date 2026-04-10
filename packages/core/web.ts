@@ -18,6 +18,7 @@ import type { AppContext } from "./app.js";
 import { eventBus } from "./hooks.js";
 import { Router } from "../server/router.js";
 import { registerAllHandlers } from "../server/register.js";
+import { DEFAULT_CHANNEL_BASE_URL } from "./constants.js";
 import { handleIssueWebhook, type IssueWebhookConfig, type IssueWebhookPayload } from "./github-webhook.js";
 
 const WEB_DIST = join(import.meta.dir, "../../packages/web/dist");
@@ -238,7 +239,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
     },
   });
 
-  const serverUrl = `http://localhost:${port}${token ? `?token=${token}` : ""}`;
+  const serverUrl = `${DEFAULT_CHANNEL_BASE_URL}:${port}${token ? `?token=${token}` : ""}`;
 
   return {
     url: serverUrl,

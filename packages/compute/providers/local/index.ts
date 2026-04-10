@@ -20,6 +20,7 @@ import type { AppContext } from "../../../core/app.js";
 import * as tmux from "../../../core/tmux.js";
 import { collectLocalMetrics } from "./metrics.js";
 import { safeAsync } from "../../../core/safe.js";
+import { DEFAULT_CONDUCTOR_URL } from "../../../core/constants.js";
 
 /** Check if a port is listening locally. */
 async function checkLocalPort(port: number): Promise<boolean> {
@@ -140,7 +141,7 @@ export class LocalProvider implements ComputeProvider {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
         ARK_CHANNEL_PORT: String(channelPort),
-        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? process.env.ARK_CONDUCTOR_URL ?? "http://localhost:19100",
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
       },
     };
   }

@@ -14,6 +14,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 
 import * as tmux from "./tmux.js";
+import { DEFAULT_CONDUCTOR_URL, DEFAULT_CHANNEL_BASE_URL } from "./constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -109,7 +110,7 @@ export function channelMcpConfig(
       ARK_SESSION_ID: sessionId,
       ARK_STAGE: stage,
       ARK_CHANNEL_PORT: String(channelPort),
-      ARK_CONDUCTOR_URL: opts?.conductorUrl ?? (process.env.ARK_CONDUCTOR_URL || "http://localhost:19100"),
+      ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
     },
   };
 }
@@ -475,7 +476,7 @@ export async function deliverTask(
     }
 
     // Fallback: direct HTTP to channel port with retry
-    const url = `http://localhost:${channelPort}`;
+    const url = `${DEFAULT_CHANNEL_BASE_URL}:${channelPort}`;
     for (let i = 0; i < 60; i++) {
       try {
         const resp = await fetch(url);

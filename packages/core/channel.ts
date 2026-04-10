@@ -19,11 +19,12 @@ import {
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { OutboundMessage } from "./channel-types.js";
+import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL } from "./constants.js";
 
 const SESSION_ID = process.env.ARK_SESSION_ID ?? "unknown";
-const ARKD_URL = process.env.ARK_ARKD_URL ?? `http://localhost:${process.env.ARK_ARKD_PORT ?? "19300"}`;
+const ARKD_URL = DEFAULT_ARKD_URL;
 // Fallback: if no arkd available, try conductor directly
-const CONDUCTOR_URL = process.env.ARK_CONDUCTOR_URL ?? `http://localhost:${process.env.ARK_CONDUCTOR_PORT ?? "19100"}`;
+const CONDUCTOR_URL = DEFAULT_CONDUCTOR_URL;
 const HTTP_PORT = parseInt(process.env.ARK_CHANNEL_PORT ?? "0");
 
 // ── MCP Server with channel capability ──────────────────────────────────────

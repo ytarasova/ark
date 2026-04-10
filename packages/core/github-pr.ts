@@ -9,6 +9,7 @@ import type { AppContext } from "./app.js";
 import { safeParseConfig } from "./util.js";
 import type { Session, SessionStatus } from "../types/index.js";
 import { safeAsync } from "./safe.js";
+import { DEFAULT_CHANNEL_BASE_URL } from "./constants.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -198,7 +199,7 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
       }).then(delivered => {
         if (!delivered) {
           safeAsync(`[github-pr] direct HTTP fallback for ${session.id}`, async () => {
-            await fetch(`http://localhost:${channelPort}`, {
+            await fetch(`${DEFAULT_CHANNEL_BASE_URL}:${channelPort}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(steerPayload),

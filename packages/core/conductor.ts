@@ -38,8 +38,9 @@ import { logError, logInfo, logWarn } from "./structured-log.js";
 import { sendOSNotification } from "./notify.js";
 import { watchMergedPR, type RollbackConfig } from "./rollback.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "./otlp.js";
+import { DEFAULT_CONDUCTOR_PORT, DEFAULT_CONDUCTOR_HOST, DEFAULT_CHANNEL_BASE_URL } from "./constants.js";
 
-const DEFAULT_PORT = 19100;
+const DEFAULT_PORT = DEFAULT_CONDUCTOR_PORT;
 
 /** Interval between schedule and PR review poll ticks */
 const POLL_INTERVAL_MS = 60_000;
@@ -271,7 +272,7 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
   _app = app;
   const server = Bun.serve({
     port,
-    hostname: "127.0.0.1",
+    hostname: DEFAULT_CONDUCTOR_HOST,
     async fetch(req) {
       const url = new URL(req.url);
       const path = url.pathname;
@@ -390,7 +391,7 @@ export async function deliverToChannel(
 
   // Fallback: direct HTTP to channel port (local only)
   try {
-    await fetch(`http://localhost:${channelPort}`, {
+    await fetch(`${DEFAULT_CHANNEL_BASE_URL}:${channelPort}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

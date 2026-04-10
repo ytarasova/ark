@@ -8,6 +8,7 @@
 
 import type { Command } from "commander";
 import chalk from "chalk";
+import { DEFAULT_ROUTER_URL } from "../../core/constants.js";
 
 export function registerRouterCommands(program: Command) {
   const router = program.command("router").description("LLM routing proxy");
@@ -57,7 +58,7 @@ export function registerRouterCommands(program: Command) {
   router
     .command("status")
     .description("Show router status and stats")
-    .option("--url <url>", "Router URL", "http://localhost:8430")
+    .option("--url <url>", "Router URL", DEFAULT_ROUTER_URL)
     .action(async (opts) => {
       try {
         const [healthResp, statsResp] = await Promise.all([
@@ -106,7 +107,7 @@ export function registerRouterCommands(program: Command) {
   router
     .command("costs")
     .description("Show routing cost breakdown")
-    .option("--url <url>", "Router URL", "http://localhost:8430")
+    .option("--url <url>", "Router URL", DEFAULT_ROUTER_URL)
     .option("--group-by <field>", "Group by: model, provider, session", "model")
     .action(async (opts) => {
       try {

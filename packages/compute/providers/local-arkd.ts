@@ -21,11 +21,9 @@ import {
 import type {
   Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
 } from "../types.js";
+import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL } from "../../core/constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-const ARKD_PORT = 19300;
-const ARKD_URL = `http://localhost:${ARKD_PORT}`;
 
 // ── Shared local base ───────────────────────────────────────────────────────
 
@@ -33,7 +31,7 @@ abstract class LocalArkdBase extends ArkdBackedProvider {
   readonly canReboot = false;
   readonly needsAuth = false;
 
-  getArkdUrl(_compute: Compute): string { return ARKD_URL; }
+  getArkdUrl(_compute: Compute): string { return DEFAULT_ARKD_URL; }
 
   async attach(_compute: Compute, _session: Session): Promise<void> {
     // Local: tmux attach handled by CLI layer, no tunnels
@@ -56,8 +54,8 @@ abstract class LocalArkdBase extends ArkdBackedProvider {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
         ARK_CHANNEL_PORT: String(channelPort),
-        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? process.env.ARK_CONDUCTOR_URL ?? "http://localhost:19100",
-        ARK_ARKD_URL: ARKD_URL,
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
+        ARK_ARKD_URL: DEFAULT_ARKD_URL,
       },
     };
   }

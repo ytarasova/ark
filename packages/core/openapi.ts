@@ -2,6 +2,8 @@
  * OpenAPI 3.0 specification for the Ark web API.
  */
 
+const DEFAULT_WEB_URL = process.env.ARK_WEB_URL || "http://localhost:8420";
+
 export function generateOpenApiSpec(): object {
   return {
     openapi: "3.0.3",
@@ -10,7 +12,7 @@ export function generateOpenApiSpec(): object {
       version: "0.6.0",
       description: "Ark autonomous agent ecosystem API",
     },
-    servers: [{ url: "http://localhost:8420", description: "Local" }],
+    servers: [{ url: DEFAULT_WEB_URL, description: "Local" }],
     paths: {
       "/api/sessions": {
         get: {

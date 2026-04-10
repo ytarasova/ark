@@ -18,6 +18,7 @@ import { RoutingEngine } from "./engine.js";
 import { Dispatcher } from "./dispatch.js";
 import { FeedbackTracker } from "./feedback.js";
 import { ProviderRegistry } from "./providers.js";
+import { DEFAULT_CHANNEL_BASE_URL } from "../core/constants.js";
 
 export interface RouterServer {
   stop(): void;
@@ -106,7 +107,7 @@ export function startRouter(config: RouterConfig): RouterServer {
       server.stop();
     },
     port: server.port,
-    url: `http://localhost:${server.port}`,
+    url: `${DEFAULT_CHANNEL_BASE_URL}:${server.port}`,
   };
 }
 

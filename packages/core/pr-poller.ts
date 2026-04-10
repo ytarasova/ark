@@ -13,6 +13,7 @@ import type { AppContext } from "./app.js";
 import * as flow from "./flow.js";
 import { formatReviewPrompt, type ReviewComment } from "./github-pr.js";
 import { safeAsync } from "./safe.js";
+import { DEFAULT_CHANNEL_BASE_URL } from "./constants.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -152,7 +153,7 @@ export async function processReviewFeedback(
 
   // Fallback: direct HTTP
   await safeAsync(`pr-poller: direct HTTP fallback for ${session.id}`, async () => {
-    await fetch(`http://localhost:${channelPort}`, {
+    await fetch(`${DEFAULT_CHANNEL_BASE_URL}:${channelPort}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(steerPayload),

@@ -150,7 +150,8 @@ export function registerMiscCommands(program: Command, app: AppContext) {
     .option("--conductor-url <url>", "Conductor URL for channel relay")
     .action(async (opts) => {
       const { startArkd } = await import("../../arkd/index.js");
-      const conductorUrl = opts.conductorUrl || process.env.ARK_CONDUCTOR_URL || "http://localhost:19100";
+      const { DEFAULT_CONDUCTOR_URL } = await import("../../core/constants.js");
+      const conductorUrl = opts.conductorUrl || DEFAULT_CONDUCTOR_URL;
       startArkd(parseInt(opts.port), { conductorUrl, hostname: opts.hostname });
       // Keep alive
       setInterval(() => {}, 60_000);

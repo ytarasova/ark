@@ -11,6 +11,7 @@ import type {
   ComputeProvider, Compute, Session, ProvisionOpts, LaunchOpts, SyncOpts,
   IsolationMode, ComputeSnapshot, ComputeMetrics, PortDecl, PortStatus,
 } from "../types.js";
+import { DEFAULT_CONDUCTOR_URL } from "../../core/constants.js";
 
 export interface K8sConfig {
   provider: "k8s" | "k8s-kata";
@@ -236,7 +237,7 @@ export class K8sProvider implements ComputeProvider {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
         ARK_CHANNEL_PORT: String(channelPort),
-        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? process.env.ARK_CONDUCTOR_URL ?? "http://localhost:19100",
+        ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
       },
     };
   }
