@@ -88,6 +88,7 @@ export class AppContext {
   rollbackConfig: import("./config.js").RollbackSettings | null = null;
 
   private _tensorZero: TensorZeroManager | null = null;
+  private _router: any = null;
 
   private _signalHandlers: { signal: string; handler: () => void }[] = [];
   private _forceExitCount = 0;
@@ -498,6 +499,31 @@ export class AppContext {
       });
     }
 
+    // 6e. Optionally auto-start LLM Router
+    if (this.config.router?.enabled && this.config.router.autoStart && !this.options.skipConductor) {
+      await safeAsync("boot: start router", async () => {
+        const { loadRouterConfig, startRouter } = await import("../router/index.js");
+        const routerConfig = loadRouterConfig({
+          port: parseInt(this.config.router!.url.split(":").pop() ?? "8430", 10),
+          policy: this.config.router!.policy,
+        });
+        if (routerConfig.providers.length > 0) {
+          const tensorZeroUrl = this._tensorZero?.url;
+          this._router = startRouter(routerConfig, {
+            tensorZeroUrl,
+            onUsage: (event) => {
+              this.usageRecorder.record({
+                sessionId: "router",
+                model: event.model,
+                provider: event.provider,
+                usage: { input_tokens: event.input_tokens, output_tokens: event.output_tokens },
+              });
+            },
+          });
+        }
+      });
+    }
+
     // 7. Optionally start conductor (dynamic import to avoid circular deps)
     if (!this.options.skipConductor) {
       await safeAsync("boot: start conductor", async () => {
@@ -637,6 +663,7 @@ export class AppContext {
     clearTmuxStatusBar();
     if (this._purgeInterval) { clearInterval(this._purgeInterval); this._purgeInterval = null; }
     if (this.metricsPoller) { this.metricsPoller.stop(); this.metricsPoller = null; }
+    if (this._router) { this._router.stop(); this._router = null; }
     if (this._tensorZero) { await this._tensorZero.stop().catch(() => {}); this._tensorZero = null; }
     if (this.conductor) { this.conductor.stop(); this.conductor = null; }
     if (this._eventBus) { this._eventBus.clear(); this._eventBus = null; }

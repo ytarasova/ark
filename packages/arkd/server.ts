@@ -247,6 +247,39 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
           return json(result);
         }
 
+        // ── Codegraph: index ─────────────────────────────────────────
+        if (req.method === "POST" && path === "/codegraph/index") {
+          const body = await req.json() as { repoPath: string; incremental?: boolean };
+          const repoPath = body.repoPath;
+
+          const args = ["build", "--root", repoPath];
+          if (!body.incremental) args.push("--no-incremental");
+
+          try {
+            const proc = Bun.spawn({ cmd: ["codegraph", ...args], cwd: repoPath, stdout: "pipe", stderr: "pipe" });
+            await proc.exited;
+          } catch (e: any) {
+            return json({ ok: false, error: e.message }, 500);
+          }
+
+          const dbPath = join(repoPath, ".codegraph", "graph.db");
+          try {
+            const { Database } = require("bun:sqlite");
+            const db = new Database(dbPath, { readonly: true });
+
+            const nodes = db.query("SELECT id, kind, name, file, line, end_line, visibility, exported, qualified_name FROM nodes").all();
+            const edges = db.query("SELECT source_id, target_id, kind FROM edges").all();
+
+            const files = new Set(nodes.map((n: any) => n.file)).size;
+            const symbols = nodes.length;
+
+            db.close();
+            return json({ ok: true, nodes, edges, files, symbols });
+          } catch (e: any) {
+            return json({ ok: false, error: `Failed to read codegraph DB: ${e.message}` }, 500);
+          }
+        }
+
         // ── Config: runtime config update ────────────────────────────
         if (req.method === "POST" && path === "/config") {
           const body = await req.json() as ConfigReq;

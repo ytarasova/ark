@@ -55,6 +55,13 @@ export const claudeCodeExecutor: Executor = {
     // Build launch env from agent config + provider-specific env
     const launchEnv = { ...(opts.agent.env ?? {}), ...(provider?.buildLaunchEnv(session) ?? {}) };
 
+    // Inject router URL if router is enabled (all LLM calls go through Router -> TensorZero -> Provider)
+    if (app.config.router?.enabled) {
+      const routerUrl = app.config.router.url;
+      // Claude Code uses ANTHROPIC_BASE_URL to redirect API calls
+      launchEnv.ANTHROPIC_BASE_URL = `${routerUrl}`;
+    }
+
     const claudeArgs = opts.claudeArgs ?? [];
     const { content: launchContent, claudeSessionId } = claude.buildLauncher({
       workdir: effectiveWorkdir,

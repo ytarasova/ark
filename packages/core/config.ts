@@ -27,6 +27,15 @@ export interface RouterSettings {
   enabled: boolean;
   url: string;
   policy: "quality" | "balanced" | "cost";
+  /** Auto-start the router on boot (local mode). */
+  autoStart: boolean;
+}
+
+export interface KnowledgeSettings {
+  /** Auto-index codebase on first dispatch for a repo. */
+  autoIndex: boolean;
+  /** Run incremental re-index on subsequent dispatches. */
+  incrementalIndex: boolean;
 }
 
 export interface TensorZeroSettings {
@@ -67,6 +76,8 @@ export interface ArkConfig {
   theme?: string;
   notifications?: boolean;
   auth?: AuthConfig;
+  /** Knowledge graph settings (auto-index, etc.). */
+  knowledge?: KnowledgeSettings;
   /** TensorZero LLM gateway settings. */
   tensorZero?: TensorZeroSettings;
   /** Predefined compute templates (local mode). */
@@ -128,6 +139,12 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
       enabled: (yaml.router as Record<string, unknown>)?.enabled === true,
       url: ((yaml.router as Record<string, unknown>)?.url as string) ?? DEFAULT_ROUTER_URL,
       policy: ((yaml.router as Record<string, unknown>)?.policy as "quality" | "balanced" | "cost") ?? "balanced",
+      autoStart: (yaml.router as Record<string, unknown>)?.auto_start === true,
+    },
+    knowledge: {
+      autoIndex: (yaml.knowledge as Record<string, unknown>)?.auto_index === true
+        || process.env.ARK_AUTO_INDEX === "1",
+      incrementalIndex: (yaml.knowledge as Record<string, unknown>)?.incremental_index !== false,
     },
     default_compute: process.env.ARK_DEFAULT_COMPUTE ?? (yaml.default_compute as string) ?? null,
     hotkeys: yaml.hotkeys as Record<string, string | null> | undefined,

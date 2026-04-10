@@ -276,6 +276,61 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   log("Building task...");
   let task = await buildTaskWithHandoff(app, session, stage, agentName);
 
+  // Auto-index codebase if enabled and repo exists
+  if (app.config.knowledge?.autoIndex && session.repo) {
+    const repoPath = session.workdir ?? session.repo;
+    const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
+    const computeIp = (compute?.config as any)?.ip as string | undefined;
+
+    if (computeIp) {
+      // Remote compute -- call arkd codegraph endpoint
+      const arkdPort = ((compute?.config as any)?.arkd_port as number) ?? 19300;
+      const arkdUrl = `http://${computeIp}:${arkdPort}`;
+      try {
+        const resp = await fetch(`${arkdUrl}/codegraph/index`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ repoPath, incremental: true }),
+        });
+        if (resp.ok) {
+          const data = await resp.json() as any;
+          for (const node of data.nodes ?? []) {
+            app.knowledge.addNode({
+              id: `symbol:${node.qualified_name ?? node.name}`,
+              type: "symbol",
+              label: node.name,
+              metadata: { kind: node.kind, file: node.file, line: node.line, end_line: node.end_line, visibility: node.visibility, exported: node.exported },
+            });
+          }
+          for (const edge of data.edges ?? []) {
+            app.knowledge.addEdge(
+              `symbol:${edge.source_id}`,
+              `symbol:${edge.target_id}`,
+              "depends_on",
+              1.0,
+              { kind: edge.kind },
+            );
+          }
+          log(`Remote index: ${data.files} files, ${data.symbols} symbols`);
+        }
+      } catch (e: any) {
+        log(`Remote index failed: ${e.message}`);
+      }
+    } else {
+      // Local compute -- index directly
+      try {
+        const { indexCodebase } = await import("../knowledge/indexer.js");
+        const existingFiles = app.knowledge.listNodes({ type: "file", limit: 1 });
+        if (existingFiles.length === 0) {
+          log("Auto-indexing codebase...");
+          await indexCodebase(repoPath, app.knowledge);
+        }
+      } catch (e: any) {
+        log(`Auto-index skipped: ${e.message}`);
+      }
+    }
+  }
+
   // Inject knowledge graph context (memories, learnings, related sessions, files)
   if (app.knowledge) {
     try {

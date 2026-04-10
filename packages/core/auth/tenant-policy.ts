@@ -18,6 +18,13 @@ export interface TenantComputePolicy {
   max_concurrent_sessions: number;     // 20
   max_cost_per_day_usd: number | null; // budget limit
   compute_pools: ComputePoolRef[];     // pools assigned to this tenant
+  // Integration settings
+  router_enabled: boolean | null;       // null = inherit from global config
+  router_required: boolean;             // tenant MUST use router (control plane enforced)
+  router_policy: string | null;         // "quality" | "balanced" | "cost" | null = inherit
+  auto_index: boolean | null;           // null = inherit from global config
+  auto_index_required: boolean;         // tenant MUST auto-index
+  tensorzero_enabled: boolean | null;   // null = inherit from global config
 }
 
 export interface ComputePoolRef {
@@ -35,6 +42,12 @@ const DEFAULT_POLICY: Omit<TenantComputePolicy, "tenant_id"> = {
   max_concurrent_sessions: 10,
   max_cost_per_day_usd: null,
   compute_pools: [],
+  router_enabled: null,
+  router_required: false,
+  router_policy: null,
+  auto_index: null,
+  auto_index_required: false,
+  tensorzero_enabled: null,
 };
 
 // ── Manager ────────────────────────────────────────────────────────────────
@@ -48,9 +61,30 @@ export class TenantPolicyManager {
       max_concurrent_sessions INTEGER NOT NULL DEFAULT 10,
       max_cost_per_day_usd REAL,
       compute_pools TEXT NOT NULL DEFAULT '[]',
+      router_enabled INTEGER,
+      router_required INTEGER NOT NULL DEFAULT 0,
+      router_policy TEXT,
+      auto_index INTEGER,
+      auto_index_required INTEGER NOT NULL DEFAULT 0,
+      tensorzero_enabled INTEGER,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`);
+    this._migrateIntegrationColumns();
+  }
+
+  private _migrateIntegrationColumns(): void {
+    const cols: [string, string][] = [
+      ["router_enabled", "INTEGER"],
+      ["router_required", "INTEGER NOT NULL DEFAULT 0"],
+      ["router_policy", "TEXT"],
+      ["auto_index", "INTEGER"],
+      ["auto_index_required", "INTEGER NOT NULL DEFAULT 0"],
+      ["tensorzero_enabled", "INTEGER"],
+    ];
+    for (const [col, def] of cols) {
+      try { this.db.prepare(`ALTER TABLE tenant_policies ADD COLUMN ${col} ${def}`).run(); } catch { /* exists */ }
+    }
   }
 
   /** Get the policy for a tenant, or null if no explicit policy exists. */
@@ -74,6 +108,11 @@ export class TenantPolicyManager {
     const now = new Date().toISOString();
     const providers = JSON.stringify(policy.allowed_providers);
     const pools = JSON.stringify(policy.compute_pools);
+    const routerEnabled = policy.router_enabled == null ? null : (policy.router_enabled ? 1 : 0);
+    const routerRequired = policy.router_required ? 1 : 0;
+    const autoIndex = policy.auto_index == null ? null : (policy.auto_index ? 1 : 0);
+    const autoIndexRequired = policy.auto_index_required ? 1 : 0;
+    const tensorzeroEnabled = policy.tensorzero_enabled == null ? null : (policy.tensorzero_enabled ? 1 : 0);
 
     const existing = this.db.prepare(
       "SELECT tenant_id FROM tenant_policies WHERE tenant_id = ?"
@@ -84,24 +123,35 @@ export class TenantPolicyManager {
         UPDATE tenant_policies
         SET allowed_providers = ?, default_provider = ?,
             max_concurrent_sessions = ?, max_cost_per_day_usd = ?,
-            compute_pools = ?, updated_at = ?
+            compute_pools = ?,
+            router_enabled = ?, router_required = ?, router_policy = ?,
+            auto_index = ?, auto_index_required = ?, tensorzero_enabled = ?,
+            updated_at = ?
         WHERE tenant_id = ?
       `).run(
         providers, policy.default_provider,
         policy.max_concurrent_sessions, policy.max_cost_per_day_usd ?? null,
-        pools, now, policy.tenant_id,
+        pools,
+        routerEnabled, routerRequired, policy.router_policy ?? null,
+        autoIndex, autoIndexRequired, tensorzeroEnabled,
+        now, policy.tenant_id,
       );
     } else {
       this.db.prepare(`
         INSERT INTO tenant_policies
           (tenant_id, allowed_providers, default_provider,
            max_concurrent_sessions, max_cost_per_day_usd, compute_pools,
+           router_enabled, router_required, router_policy,
+           auto_index, auto_index_required, tensorzero_enabled,
            created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         policy.tenant_id, providers, policy.default_provider,
         policy.max_concurrent_sessions, policy.max_cost_per_day_usd ?? null,
-        pools, now, now,
+        pools,
+        routerEnabled, routerRequired, policy.router_policy ?? null,
+        autoIndex, autoIndexRequired, tensorzeroEnabled,
+        now, now,
       );
     }
   }
@@ -169,6 +219,27 @@ export class TenantPolicyManager {
     return { allowed: true };
   }
 
+  /** Get effective integration settings: tenant policy -> global config fallback. */
+  getEffectiveIntegrationSettings(tenantId: string, globalConfig: {
+    routerEnabled: boolean;
+    autoIndex: boolean;
+    tensorZeroEnabled: boolean;
+    routerPolicy: string;
+  }): {
+    routerEnabled: boolean;
+    routerPolicy: string;
+    autoIndex: boolean;
+    tensorZeroEnabled: boolean;
+  } {
+    const policy = this.getEffectivePolicy(tenantId);
+    return {
+      routerEnabled: policy.router_required || (policy.router_enabled ?? globalConfig.routerEnabled),
+      routerPolicy: policy.router_policy ?? globalConfig.routerPolicy,
+      autoIndex: policy.auto_index_required || (policy.auto_index ?? globalConfig.autoIndex),
+      tensorZeroEnabled: policy.tensorzero_enabled ?? globalConfig.tensorZeroEnabled,
+    };
+  }
+
   // ── Internal ────────────────────────────────────────────────────────────
 
   private _hydrateRow(row: any): TenantComputePolicy {
@@ -184,6 +255,12 @@ export class TenantPolicyManager {
       max_concurrent_sessions: row.max_concurrent_sessions,
       max_cost_per_day_usd: row.max_cost_per_day_usd ?? null,
       compute_pools: computePools,
+      router_enabled: row.router_enabled == null ? null : !!row.router_enabled,
+      router_required: !!row.router_required,
+      router_policy: row.router_policy ?? null,
+      auto_index: row.auto_index == null ? null : !!row.auto_index,
+      auto_index_required: !!row.auto_index_required,
+      tensorzero_enabled: row.tensorzero_enabled == null ? null : !!row.tensorzero_enabled,
     };
   }
 }

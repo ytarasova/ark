@@ -52,6 +52,16 @@ export const cliAgentExecutor: Executor = {
 
     // Write env vars to a file and source it (avoids shell injection via env values)
     const mergedEnv = { ...agent.env, ...(opts.env ?? {}) };
+
+    // Inject router URL if router is enabled
+    if (app.config.router?.enabled) {
+      const routerUrl = app.config.router.url;
+      // OpenAI-compatible tools (codex, etc.) use OPENAI_BASE_URL
+      mergedEnv.OPENAI_BASE_URL = `${routerUrl}/v1`;
+      // Some tools use ANTHROPIC_BASE_URL
+      mergedEnv.ANTHROPIC_BASE_URL = `${routerUrl}`;
+    }
+
     const envFile = join(trackDir, "env.sh");
     const envLines = Object.entries(mergedEnv)
       .map(([k, v]) => `export ${k}=${JSON.stringify(v)}`)
