@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { track, getBuffer, clearBuffer, enableTelemetry, disableTelemetry, isTelemetryEnabled } from "../telemetry.js";
+import { track, getBuffer, clearBuffer, enableTelemetry, disableTelemetry, isTelemetryEnabled } from "../observability/telemetry.js";
 
 describe("telemetry", () => {
   beforeEach(() => { clearBuffer(); disableTelemetry(); });

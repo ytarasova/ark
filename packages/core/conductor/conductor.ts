@@ -34,10 +34,10 @@ import { pollIssues } from "../issue-poller.js";
 import { ArkdClient } from "../../arkd/client.js";
 import { safeAsync } from "../safe.js";
 import { addEntry } from "../ledger.js";
-import { logError, logInfo, logWarn } from "../structured-log.js";
+import { logError, logInfo, logWarn } from "../observability/structured-log.js";
 import { sendOSNotification } from "../notify.js";
 import { watchMergedPR, type RollbackConfig } from "../rollback.js";
-import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../otlp.js";
+import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
 import { DEFAULT_CONDUCTOR_PORT, DEFAULT_CONDUCTOR_HOST, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
 
 const DEFAULT_PORT = DEFAULT_CONDUCTOR_PORT;

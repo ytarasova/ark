@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import {
   configureOtlp, resetOtlp, startSpan, endSpan, getSpanBuffer, flushSpans,
   type OtlpConfig,
-} from "../otlp.js";
+} from "../observability/otlp.js";
 
 beforeEach(() => resetOtlp());
 

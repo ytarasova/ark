@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
-import { configureOtlp, resetOtlp, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId } from "../otlp.js";
+import { configureOtlp, resetOtlp, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId } from "../observability/otlp.js";
 
 withTestContext();
 

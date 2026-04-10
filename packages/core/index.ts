@@ -110,7 +110,7 @@ export type { ToolDriver } from "./tool-driver.js";
 export { getToolDriver, listToolDrivers, registerToolDriver } from "./tools/registry.js";
 
 // Cost tracking
-export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, syncCosts, exportCostsCsv, type SessionCost, type BudgetConfig, type BudgetStatus } from "./costs.js";
+export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, syncCosts, exportCostsCsv, type SessionCost, type BudgetConfig, type BudgetStatus } from "./observability/costs.js";
 
 // Conductor learnings (migrated to KnowledgeStore -- kept as type re-exports for backward compat)
 // recordLearning, getLearnings, getPolicies removed -- use app.knowledge directly
@@ -128,7 +128,7 @@ export { buildSandboxCommand, isDockerAvailable, listSandboxContainers, type San
 export { getHotkeys, matchesHotkey, resetHotkeys, hotkeyLabel, type HotkeyMap } from "./hotkeys.js";
 
 // Log management
-export { truncateLog, cleanupLogs, logDir, type LogManagerOptions } from "./log-manager.js";
+export { truncateLog, cleanupLogs, logDir, type LogManagerOptions } from "./observability/log-manager.js";
 
 // Session sharing
 export { exportSession, exportSessionToFile, importSessionFromFile, type SessionExport } from "./session-share.js";
@@ -149,7 +149,7 @@ export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./not
 export { searchAllConversations, type GlobalSearchResult } from "./global-search.js";
 
 // Tmux content-based status detection
-export { detectStatusFromContent, detectSessionStatus, stripAnsi, parseAgentProgress, type DetectedStatus } from "./status-detect.js";
+export { detectStatusFromContent, detectSessionStatus, stripAnsi, parseAgentProgress, type DetectedStatus } from "./observability/status-detect.js";
 
 // Multi-instance coordination
 export { registerInstance, activeInstanceCount } from "./instance-lock.js";
@@ -167,7 +167,7 @@ export { McpPool, getMcpPool, destroyMcpPool, discoverPoolSockets, runMcpProxy, 
 export { detectInjection, hasInjection, type InjectionResult } from "./prompt-guard.js";
 
 // Telemetry
-export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry, isTelemetryEnabled, configureTelemetry, resetTelemetry, type TelemetryEvent, type TelemetryConfig } from "./telemetry.js";
+export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry, isTelemetryEnabled, configureTelemetry, resetTelemetry, type TelemetryEvent, type TelemetryConfig } from "./observability/telemetry.js";
 
 // OpenAPI spec
 export { generateOpenApiSpec } from "./openapi.js";
@@ -199,13 +199,13 @@ export type { AgentEvalResult } from "./knowledge/evals.js";
 export { configureObservability, getObservabilityConfig, recordEvent, flush as flushObservability, getEventBuffer, resetObservability, type ObservabilityConfig, type ObservabilityEvent } from "./observability.js";
 
 // OTLP observability
-export { configureOtlp, resetOtlp, flushSpans, startSpan, endSpan, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId, type OtlpConfig, type OtlpSpan } from "./otlp.js";
+export { configureOtlp, resetOtlp, flushSpans, startSpan, endSpan, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId, type OtlpConfig, type OtlpSpan } from "./observability/otlp.js";
 
 // Auto-rollback
 export { watchMergedPR, shouldRollback, allCompleted, createRevertPayload, pollCheckSuites, type RollbackConfig, type CheckSuiteResult, type RevertPayload } from "./rollback.js";
 
 // Structured JSONL logging
-export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponents, setLogArkDir, type LogComponent, type LogLevel } from "./structured-log.js";
+export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponents, setLogArkDir, type LogComponent, type LogLevel } from "./observability/structured-log.js";
 
 // Extension catalog
 export { EXTENSION_CATALOG, searchCatalog, getCatalogByCategory, getCatalogEntry, type ExtensionEntry } from "./extension-catalog.js";

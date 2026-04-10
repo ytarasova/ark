@@ -3,7 +3,7 @@
  * fire-and-forget error handling.
  */
 
-import { logError } from "./structured-log.js";
+import { logError } from "./observability/structured-log.js";
 
 /** Run an async function, log errors instead of throwing. Returns true on success. */
 export async function safeAsync(label: string, fn: () => Promise<void>): Promise<boolean> {

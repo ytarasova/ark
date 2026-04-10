@@ -38,10 +38,10 @@ import { markStageCompleted, setCurrentStage } from "../flow-state.js";
 // memory.ts removed -- knowledge graph context injection handles memory/learning recall
 import { detectHandoff } from "../handoff.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
-import { logError, logWarn } from "../structured-log.js";
+import { logError, logWarn } from "../observability/structured-log.js";
 import { recordEvent } from "../observability.js";
-import { track } from "../telemetry.js";
-import { emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../otlp.js";
+import { track } from "../observability/telemetry.js";
+import { emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../observability/otlp.js";
 import { detectInjection } from "../prompt-guard.js";
 import { generateRepoMap, formatRepoMap } from "../repo-map.js";
 import { getExecutor } from "../executor.js";

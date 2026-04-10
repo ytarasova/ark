@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { log, setLogLevel, setLogComponents, logInfo, logError } from "../structured-log.js";
+import { log, setLogLevel, setLogComponents, logInfo, logError } from "../observability/structured-log.js";
 import { withTestContext } from "./test-helpers.js";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";

@@ -8,7 +8,7 @@
 
 import type { AppContext } from "../app.js";
 import { getExecutor } from "../executor.js";
-import { logInfo } from "../structured-log.js";
+import { logInfo } from "../observability/structured-log.js";
 
 const activePollers = new Map<string, ReturnType<typeof setInterval>>();
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { detectStatusFromContent, stripAnsi } from "../status-detect.js";
+import { detectStatusFromContent, stripAnsi } from "../observability/status-detect.js";
 
 describe("stripAnsi", () => {
   it("removes escape codes", () => {

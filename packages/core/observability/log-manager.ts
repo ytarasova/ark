@@ -4,7 +4,7 @@
 
 import { readdirSync, statSync, readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
-import type { AppContext } from "./app.js";
+import type { AppContext } from "../app.js";
 
 export interface LogManagerOptions {
   maxSizeMb?: number;    // Max log file size (default: 10)
