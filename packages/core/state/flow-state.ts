@@ -5,7 +5,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
-import type { AppContext } from "./app.js";
+import type { AppContext } from "../app.js";
 
 export interface FlowState {
   sessionId: string;

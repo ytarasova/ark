@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { parseGraphFlow, getSuccessors, getPredecessors, isJoinNode, isFanOutNode, topologicalSort, validateGraphFlow } from "../graph-flow.js";
+import { parseGraphFlow, getSuccessors, getPredecessors, isJoinNode, isFanOutNode, topologicalSort, validateGraphFlow } from "../state/graph-flow.js";
 
 describe("graph flow", () => {
   const flow = parseGraphFlow({

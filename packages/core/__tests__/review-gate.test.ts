@@ -10,7 +10,7 @@ import YAML from "yaml";
 
 import { getApp } from "../app.js";
 import { startSession, advance, approveReviewGate } from "../services/session-orchestration.js";
-import { evaluateGate } from "../flow.js";
+import { evaluateGate } from "../state/flow.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();

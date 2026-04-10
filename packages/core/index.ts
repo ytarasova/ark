@@ -18,7 +18,7 @@ export type { Session, Event, Compute, Message } from "../types/index.js";
 export type { HookStatusResult, ReportResult, SessionOpResult } from "./services/session-orchestration.js";
 
 // Flow
-export * from "./flow.js";
+export * from "./state/flow.js";
 
 // Template
 export { substituteVars, buildSessionVars } from "./template.js";
@@ -140,7 +140,7 @@ export { checkForUpdate, getCurrentVersion } from "./infra/update-check.js";
 export { updateTmuxStatusBar, clearTmuxStatusBar } from "./infra/tmux-notify.js";
 
 // Profiles
-export { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix, setProfilesArkDir, type Profile } from "./profiles.js";
+export { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix, setProfilesArkDir, type Profile } from "./state/profiles.js";
 
 // Notification daemon
 export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./infra/notify-daemon.js";
@@ -158,7 +158,7 @@ export { registerInstance, activeInstanceCount } from "./infra/instance-lock.js"
 export { getTheme, setThemeMode, getThemeMode, type Theme, type ThemeMode } from "./theme.js";
 
 // UI state persistence
-export { loadUiState, saveUiState, type UiState } from "./ui-state.js";
+export { loadUiState, saveUiState, type UiState } from "./state/ui-state.js";
 
 // MCP Socket Pool
 export { McpPool, getMcpPool, destroyMcpPool, discoverPoolSockets, runMcpProxy, type McpServerDef, type PoolConfig } from "./mcp-pool.js";
@@ -211,13 +211,13 @@ export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponent
 export { EXTENSION_CATALOG, searchCatalog, getCatalogByCategory, getCatalogEntry, type ExtensionEntry } from "./extension-catalog.js";
 
 // Graph-based flow definitions
-export { parseGraphFlow, getSuccessors, getPredecessors, isJoinNode, isFanOutNode, topologicalSort, validateGraphFlow, type GraphFlow, type FlowNode, type FlowEdge } from "./graph-flow.js";
+export { parseGraphFlow, getSuccessors, getPredecessors, isJoinNode, isFanOutNode, topologicalSort, validateGraphFlow, type GraphFlow, type FlowNode, type FlowEdge } from "./state/graph-flow.js";
 
 // Composable termination conditions
 export { evaluateTermination, parseTermination, maxTurns, maxTokens, timeout, textMention, and, or, type TerminationCondition, type TerminationContext } from "./termination.js";
 
 // Flow state persistence
-export { saveFlowState, loadFlowState, markStageCompleted, setCurrentStage, isStageCompleted, deleteFlowState, type FlowState } from "./flow-state.js";
+export { saveFlowState, loadFlowState, markStageCompleted, setCurrentStage, isStageCompleted, deleteFlowState, type FlowState } from "./state/flow-state.js";
 
 // Cross-session memory (migrated to KnowledgeStore -- old file-based memory removed)
 // remember, recall, forget, listMemories, clearMemories, formatMemoriesForPrompt removed -- use app.knowledge directly

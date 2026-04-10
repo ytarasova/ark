@@ -23,7 +23,7 @@ declare const Bun: {
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 import * as session from "../services/session-orchestration.js";
-import * as flow from "../flow.js";
+import * as flow from "../state/flow.js";
 import { eventBus } from "../hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../../compute/index.js";

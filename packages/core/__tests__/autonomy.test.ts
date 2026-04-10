@@ -10,7 +10,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { buildArgs, writeHooksConfig } from "../claude/claude.js";
-import { resolveFlow } from "../flow.js";
+import { resolveFlow } from "../state/flow.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 

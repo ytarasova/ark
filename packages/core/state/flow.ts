@@ -6,8 +6,8 @@
  * Fork stages split into parallel children.
  */
 
-import { substituteVars } from "./template.js";
-import { getApp } from "./app.js";
+import { substituteVars } from "../template.js";
+import { getApp } from "../app.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

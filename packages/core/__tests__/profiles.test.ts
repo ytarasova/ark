@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix } from "../profiles.js";
+import { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix } from "../state/profiles.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 

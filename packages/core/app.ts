@@ -29,7 +29,7 @@ import { updateTmuxStatusBar, clearTmuxStatusBar } from "./infra/tmux-notify.js"
 import { startNotifyDaemon } from "./infra/notify-daemon.js";
 import { track, configureTelemetry } from "./observability/telemetry.js";
 import { logError, logWarn, setLogArkDir } from "./observability/structured-log.js";
-import { setProfilesArkDir } from "./profiles.js";
+import { setProfilesArkDir } from "./state/profiles.js";
 import { registerExecutor } from "./executor.js";
 import { claudeCodeExecutor } from "./executors/claude-code.js";
 import { subprocessExecutor } from "./executors/subprocess.js";

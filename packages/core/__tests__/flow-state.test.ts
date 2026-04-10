@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { saveFlowState, loadFlowState, markStageCompleted, setCurrentStage, isStageCompleted, deleteFlowState } from "../flow-state.js";
+import { saveFlowState, loadFlowState, markStageCompleted, setCurrentStage, isStageCompleted, deleteFlowState } from "../state/flow-state.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 

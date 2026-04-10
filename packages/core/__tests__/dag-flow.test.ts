@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
-import { getReadyStages, validateDAG } from "../flow.js";
-import type { StageDefinition } from "../flow.js";
+import { getReadyStages, validateDAG } from "../state/flow.js";
+import type { StageDefinition } from "../state/flow.js";
 
 describe("DAG flow resolution", () => {
   const stages: StageDefinition[] = [

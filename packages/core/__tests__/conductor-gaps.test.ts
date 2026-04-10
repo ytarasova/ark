@@ -8,7 +8,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { withTestContext } from "./test-helpers.js";
 import { interrupt, worktreeDiff, createWorktreePR, runVerification } from "../services/session-orchestration.js";
-import { getStageDefinition } from "../flow.js";
+import { getStageDefinition } from "../state/flow.js";
 import { loadRepoConfig } from "../repo-config.js";
 import { getApp } from "../app.js";
 

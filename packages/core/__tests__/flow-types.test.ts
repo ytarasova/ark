@@ -3,7 +3,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { getStageAction } from "../flow.js";
+import { getStageAction } from "../state/flow.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
