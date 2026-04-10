@@ -285,6 +285,21 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     }
   } catch { /* skip memory recall on error */ }
 
+  // Inject knowledge graph context if available
+  if (app.knowledge && (session.workdir || session.repo)) {
+    try {
+      const { buildContext, formatContextAsMarkdown } = await import("../knowledge/context.js");
+      const ctx = buildContext(app.knowledge, task, {
+        repo: session.repo ?? undefined,
+        sessionId: session.id,
+      });
+      const contextMd = formatContextAsMarkdown(ctx);
+      if (contextMd) {
+        task = contextMd + task;
+      }
+    } catch { /* knowledge not available -- continue without context */ }
+  }
+
   // Inject repo map into agent context for codebase awareness
   if (session.repo) {
     try {

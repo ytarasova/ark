@@ -635,6 +635,22 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
     });
   }
 
+  // Index session completion in knowledge graph (best-effort)
+  if (report.type === "completed" && _app.knowledge) {
+    try {
+      const { indexSessionCompletion } = await import("./knowledge/indexer.js");
+      const s = _app.sessions.get(sessionId);
+      const changedFiles = ((report as any).filesChanged as string[]) ?? [];
+      indexSessionCompletion(
+        _app.knowledge,
+        sessionId,
+        s?.summary ?? "",
+        "completed",
+        changedFiles,
+      );
+    } catch { /* best-effort knowledge indexing */ }
+  }
+
   // Auto-create PR on completion (when session has a git remote and no PR yet)
   if (report.type === "completed" && !result.prUrl) {
     const s = _app.sessions.get(sessionId);
