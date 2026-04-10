@@ -6,9 +6,9 @@
         "/Users/paytmlabs/Projects/ark/packages/core/channel.ts"
       ],
       "env": {
-        "ARK_SESSION_ID": "s-6f2666",
+        "ARK_SESSION_ID": "s-123a53",
         "ARK_STAGE": "implement",
-        "ARK_CHANNEL_PORT": "23526",
+        "ARK_CHANNEL_PORT": "23779",
         "ARK_CONDUCTOR_URL": "http://localhost:19100"
       }
     }
