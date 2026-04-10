@@ -1,0 +1,78 @@
+# Ark -- Postgres StatefulSet
+#
+# For production, consider using a managed Postgres service
+# (RDS, Cloud SQL, etc.) instead of running Postgres in k8s.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ark-postgres
+  labels:
+    app: ark-postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: ark-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ark-postgres
+  labels:
+    app: ark-postgres
+spec:
+  serviceName: ark-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ark-postgres
+  template:
+    metadata:
+      labels:
+        app: ark-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: ark
+            - name: POSTGRES_PASSWORD
+              value: ark
+            - name: POSTGRES_DB
+              value: ark
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "ark"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "ark"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

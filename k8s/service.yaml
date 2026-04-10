@@ -1,0 +1,25 @@
+# Ark -- Kubernetes Service
+#
+# Exposes the Ark server ports within the cluster.
+# Use with an Ingress for external access.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ark
+  labels:
+    app: ark
+spec:
+  type: ClusterIP
+  selector:
+    app: ark
+  ports:
+    - name: web
+      port: 8420
+      targetPort: 8420
+    - name: conductor
+      port: 19100
+      targetPort: 19100
+    - name: router
+      port: 8430
+      targetPort: 8430

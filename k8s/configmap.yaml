@@ -1,0 +1,15 @@
+# Ark -- Kubernetes ConfigMap
+#
+# Environment configuration for the Ark deployment.
+# Sensitive values (DATABASE_URL, API keys) should use Secrets instead.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ark-config
+  labels:
+    app: ark
+data:
+  ARK_CONDUCTOR_HOST: "0.0.0.0"
+  ARK_CONDUCTOR_PORT: "19100"
+  ARK_AUTH_ENABLED: "true"

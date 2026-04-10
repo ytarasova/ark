@@ -1,0 +1,67 @@
+# Ark -- Docker Compose for hosted deployment
+#
+# Services:
+#   ark      - Ark server (web UI + conductor + API)
+#   postgres - PostgreSQL 16 database
+#   redis    - Redis 7 (session cache, pub/sub for multi-instance)
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f ark
+
+version: "3.8"
+
+services:
+  ark:
+    build: .
+    ports:
+      - "8420:8420"     # Web UI
+      - "19100:19100"   # Conductor
+      - "8430:8430"     # LLM Router
+    environment:
+      - DATABASE_URL=postgres://ark:ark@postgres:5432/ark
+      - ARK_CONDUCTOR_HOST=0.0.0.0
+      - ARK_AUTH_ENABLED=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ark-data:/root/.ark
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ark
+      POSTGRES_PASSWORD: ark
+      POSTGRES_DB: ark
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ark"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+volumes:
+  pgdata:
+  redis-data:
+  ark-data:

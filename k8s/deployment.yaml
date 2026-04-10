@@ -1,0 +1,65 @@
+# Ark -- Kubernetes Deployment
+#
+# Runs the Ark server with web UI and conductor.
+# Connects to Postgres via DATABASE_URL from the Secret.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ark
+  labels:
+    app: ark
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ark
+  template:
+    metadata:
+      labels:
+        app: ark
+    spec:
+      containers:
+        - name: ark
+          image: ark:latest
+          ports:
+            - name: web
+              containerPort: 8420
+            - name: conductor
+              containerPort: 19100
+            - name: router
+              containerPort: 8430
+          envFrom:
+            - configMapRef:
+                name: ark-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ark-secrets
+                  key: DATABASE_URL
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: conductor
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: conductor
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          volumeMounts:
+            - name: ark-data
+              mountPath: /root/.ark
+      volumes:
+        - name: ark-data
+          emptyDir: {}

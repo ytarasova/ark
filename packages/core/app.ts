@@ -239,15 +239,29 @@ export class AppContext {
     setLogArkDir(this.config.arkDir);
     setProfilesArkDir(this.config.arkDir);
 
-    // 2. Open database with pragmas
-    const rawDb = new Database(this.config.dbPath);
-    rawDb.run("PRAGMA journal_mode = WAL");
-    rawDb.run("PRAGMA busy_timeout = 5000");
-    const db = new BunSqliteAdapter(rawDb);
+    // 2. Open database -- Postgres for hosted deployments, SQLite for local
+    let db: IDatabase;
+    const dbUrl = this.config.databaseUrl;
+    if (dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
+      const { PostgresAdapter } = await import("./database-postgres.js");
+      db = new PostgresAdapter(dbUrl);
+    } else {
+      const rawDb = new Database(this.config.dbPath);
+      rawDb.run("PRAGMA journal_mode = WAL");
+      rawDb.run("PRAGMA busy_timeout = 5000");
+      db = new BunSqliteAdapter(rawDb);
+    }
 
     // 3. Initialize schema (new column names: ticket, summary, flow)
-    initRepoSchema(db);
-    seedLocalCompute(db);
+    const isPostgres = !!(dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://")));
+    if (isPostgres) {
+      const { initPostgresSchema, seedLocalComputePostgres } = await import("./repositories/schema-postgres.js");
+      initPostgresSchema(db);
+      seedLocalComputePostgres(db);
+    } else {
+      initRepoSchema(db);
+      seedLocalCompute(db);
+    }
 
     // 3a. Initialize API key manager
     this._apiKeys = new ApiKeyManager(db);

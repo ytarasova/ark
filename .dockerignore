@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.git/
+.worktrees/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+.claude/
+packages/desktop/out/
+packages/desktop/node_modules/
+docs/

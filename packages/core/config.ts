@@ -48,6 +48,8 @@ export interface ArkConfig {
   theme?: string;
   notifications?: boolean;
   auth?: AuthConfig;
+  /** Database URL for hosted deployments. postgres://... uses PostgresAdapter; empty/undefined uses SQLite. */
+  databaseUrl?: string;
 }
 
 /** Load ~/.ark/config.yaml if it exists. Returns empty object on failure. */
@@ -111,6 +113,7 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
       apiKeyEnabled: (yaml.auth as Record<string, unknown>)?.apiKeyEnabled === true
         || (yaml.auth as Record<string, unknown>)?.api_key_enabled === true,
     },
+    databaseUrl: process.env.DATABASE_URL ?? (yaml.database_url as string) ?? undefined,
   };
 
   if (overrides) {
