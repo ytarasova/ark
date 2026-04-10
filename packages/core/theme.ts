@@ -19,20 +19,20 @@ export interface Theme {
 }
 
 const DARK: Theme = {
-  accent: "#7aa2f7",
-  highlight: "#bb9af7",       // bright purple -- visible on dark backgrounds
-  running: "#9ece6a",
-  waiting: "#e0af68",
-  error: "#f7768e",
-  idle: "#787fa0",
-  surface: "#24283b",
-  text: "#c0caf5",
-  dimText: "#565f89",
+  accent: "#82aaff",          // brighter blue -- readable on dark bg
+  highlight: "#c792ea",       // soft purple -- selected items
+  running: "#c3e88d",         // bright green
+  waiting: "#ffcb6b",         // warm yellow
+  error: "#ff5370",           // vivid red
+  idle: "#939ede",            // soft lavender
+  surface: "#2b2f3e",        // slightly lighter than terminal bg
+  text: "#d6deeb",            // bright off-white -- main content
+  dimText: "#7e8eba",         // visible muted text
 };
 
 const LIGHT: Theme = {
   accent: "#2e7de9",
-  highlight: "#7847bd",       // deep purple -- visible on light backgrounds
+  highlight: "#7847bd",
   running: "#587539",
   waiting: "#8c6c3e",
   error: "#f52a65",
