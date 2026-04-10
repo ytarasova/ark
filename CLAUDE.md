@@ -442,14 +442,14 @@ The knowledge graph (`packages/core/knowledge/`) provides a unified view of code
 
 **Components:**
 - **KnowledgeStore** (`store.ts`) - Node/edge storage in SQLite. Nodes have type (file, symbol, session, memory, learning, skill, recipe, agent), label, content, and metadata. Edges have relationship types (depends_on, imports, modified_by, etc.).
-- **Indexer** (`indexer.ts`) - Indexes a codebase into the knowledge graph (files, symbols, dependencies).
+- **Indexer** (`indexer.ts`) - Indexes a codebase using ops-codegraph (@optave/codegraph) -- 33 languages via tree-sitter, native Rust engine. Reads .codegraph/graph.db and maps nodes/edges into Ark's tenant-scoped knowledge store. Also runs git co-change analysis.
 - **Context Builder** (`context.ts`) - Builds relevant knowledge context for agent prompts at dispatch time.
 - **MCP Tools** (`mcp.ts`) - MCP tool handler for agent queries against the knowledge graph.
 - **Export/Import** (`export.ts`) - Markdown export/import for portability.
 
 **CLI:** `ark knowledge search`, `ark knowledge index`, `ark knowledge stats`, `ark knowledge remember`, `ark knowledge recall`, `ark knowledge export`, `ark knowledge import`, `ark knowledge ingest`.
 
-**Prerequisite:** The indexer uses Axon (if available) for symbol extraction. Without Axon, file-level indexing still works.
+**Prerequisite:** The indexer uses codegraph (npm install -g @optave/codegraph) for codebase parsing. 33 languages supported via tree-sitter.
 
 ## Control Plane (Hosted Mode)
 

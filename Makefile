@@ -14,6 +14,7 @@
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-watch lint \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
+        vendor-tmux vendor-tensorzero vendor-codegraph \
         clean uninstall
 
 BUN := bun
@@ -125,18 +126,72 @@ build-desktop: build-web ## Build Electron app for current platform
 
 package: package-cli package-desktop ## Package CLI + Electron for all platforms
 
-package-cli: ## Build CLI binaries for macOS + Linux (4 targets)
-	@echo "Building CLI for all platforms..."
+package-cli: build-web ## Build self-contained CLI bundles for macOS + Linux (4 targets)
+	@echo "Building Ark bundles for all platforms..."
 	@mkdir -p dist node_modules/react-devtools-core 2>/dev/null; \
 	  test -f shims/react-devtools-core.js && \
 	  cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js && \
 	  echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json || true
-	$(BUN) build --compile --target bun-darwin-arm64 packages/cli/index.ts --outfile dist/ark-darwin-arm64
-	$(BUN) build --compile --target bun-darwin-x64   packages/cli/index.ts --outfile dist/ark-darwin-x64
-	$(BUN) build --compile --target bun-linux-arm64  packages/cli/index.ts --outfile dist/ark-linux-arm64
-	$(BUN) build --compile --target bun-linux-x64    packages/cli/index.ts --outfile dist/ark-linux-x64
+	$(BUN) build --compile --target bun-darwin-arm64 packages/cli/index.ts --outfile dist/bin/ark-darwin-arm64
+	$(BUN) build --compile --target bun-darwin-x64   packages/cli/index.ts --outfile dist/bin/ark-darwin-x64
+	$(BUN) build --compile --target bun-linux-arm64  packages/cli/index.ts --outfile dist/bin/ark-linux-arm64
+	$(BUN) build --compile --target bun-linux-x64    packages/cli/index.ts --outfile dist/bin/ark-linux-x64
 	@echo ""
-	@ls -lh dist/ark-*
+	@echo "Downloading vendored binaries..."
+	@$(MAKE) vendor-tmux vendor-tensorzero vendor-codegraph --no-print-directory
+	@echo ""
+	@echo "Creating distribution tarballs..."
+	@for plat in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do \
+	  mkdir -p dist/ark-$$plat/bin; \
+	  cp dist/bin/ark-$$plat dist/ark-$$plat/bin/ark; \
+	  cp -r agents runtimes flows skills recipes mcp-configs dist/ark-$$plat/; \
+	  if [ -f dist/vendor/tmux-$$plat ]; then cp dist/vendor/tmux-$$plat dist/ark-$$plat/bin/tmux; fi; \
+	  if [ -f dist/vendor/tensorzero-$$plat ]; then cp dist/vendor/tensorzero-$$plat dist/ark-$$plat/bin/tensorzero-gateway; fi; \
+	  if [ -f dist/vendor/codegraph-$$plat ]; then cp dist/vendor/codegraph-$$plat dist/ark-$$plat/bin/codegraph; fi; \
+	  cd dist && tar czf ark-$$plat.tar.gz ark-$$plat && cd ..; \
+	  echo "  dist/ark-$$plat.tar.gz ($$(du -h dist/ark-$$plat.tar.gz | cut -f1))"; \
+	done
+
+vendor-tmux: ## Download/compile tmux for all platforms
+	@mkdir -p dist/vendor
+	@echo "  tmux: checking for pre-built binaries..."
+	@# For now, skip vendor -- users have tmux. Will add static builds in CI.
+	@echo "  tmux: skipped (install separately: brew install tmux)"
+
+vendor-codegraph: ## Extract codegraph native binaries from npm packages
+	@mkdir -p dist/vendor
+	@echo "  codegraph: extracting native binaries from npm..."
+	@for pkg_plat in darwin-arm64 darwin-x64 linux-arm64-gnu linux-x64-gnu; do \
+	  dist_plat=$$(echo $$pkg_plat | sed 's/-gnu//'); \
+	  pkg="@optave/codegraph-$$pkg_plat"; \
+	  pkg_dir="node_modules/@optave/codegraph-$$pkg_plat"; \
+	  if [ -d "$$pkg_dir" ]; then \
+	    bin=$$(find "$$pkg_dir" -name "codegraph*" -type f -perm +111 2>/dev/null | head -1); \
+	    if [ -n "$$bin" ]; then \
+	      cp "$$bin" "dist/vendor/codegraph-$$dist_plat"; \
+	      echo "  codegraph-$$dist_plat: extracted"; \
+	    else \
+	      echo "  codegraph-$$dist_plat: binary not found in $$pkg_dir"; \
+	    fi; \
+	  else \
+	    echo "  codegraph-$$dist_plat: npm package not installed (bun add $$pkg)"; \
+	  fi; \
+	done
+
+vendor-tensorzero: ## Build TensorZero gateway from source for all platforms
+	@mkdir -p dist/vendor
+	@echo "  tensorzero: checking for pre-built binaries..."
+	@# Build from source if cargo is available, otherwise skip
+	@if command -v cargo >/dev/null 2>&1; then \
+	  echo "  tensorzero: building from source (this takes a few minutes)..."; \
+	  cd /tmp && git clone --depth 1 https://github.com/tensorzero/tensorzero.git tz-build 2>/dev/null || true; \
+	  cd /tmp/tz-build && cargo build --release --bin gateway 2>/dev/null && \
+	  cp target/release/gateway $(CURDIR)/dist/vendor/tensorzero-$$(uname -s | tr A-Z a-z)-$$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/') && \
+	  echo "  tensorzero: built successfully" || \
+	  echo "  tensorzero: build failed (install Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh)"; \
+	else \
+	  echo "  tensorzero: skipped (install Rust to build, or use Docker for hosted mode)"; \
+	fi
 
 package-desktop: build-web ## Package Electron app (.dmg + .AppImage)
 	cd packages/desktop && npm install --silent 2>/dev/null && npx electron-builder --mac --linux

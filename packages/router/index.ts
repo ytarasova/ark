@@ -48,4 +48,4 @@ export { Dispatcher, TensorZeroDispatcher } from "./dispatch.js";
 export { FeedbackTracker } from "./feedback.js";
 
 // Server
-export { startRouter, type RouterServer, type RouterStartOpts } from "./server.js";
+export { startRouter, type RouterServer, type RouterStartOpts, type RouterUsageEvent } from "./server.js";

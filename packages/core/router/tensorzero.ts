@@ -1,19 +1,24 @@
 /**
  * TensorZero lifecycle manager.
  *
- * Manages starting/stopping TensorZero as a Docker container (local mode)
- * or detects an existing sidecar (hosted mode). Generates config on startup,
- * waits for healthy, and tears down on stop.
+ * Start order:
+ * 1. Sidecar mode -- detect existing instance (control plane / docker-compose)
+ * 2. Native binary -- vendored binary at bin/tensorzero-gateway next to ark
+ * 3. Docker fallback -- Docker container (only if native binary not found)
+ *
+ * Local mode prefers native binary so no Docker dependency is required.
  */
 
-import { execFileSync } from "child_process";
-import { writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
+import { spawn, execFileSync, type ChildProcess } from "child_process";
+import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { join, dirname } from "path";
 import { generateTensorZeroConfig } from "./tensorzero-config.js";
 
 export interface TensorZeroManagerOpts {
   port?: number;
   configDir?: string;
+  /** Path to vendored binary. Auto-detected from ark binary location if omitted. */
+  binaryPath?: string;
   anthropicKey?: string;
   openaiKey?: string;
   geminiKey?: string;
@@ -21,6 +26,7 @@ export interface TensorZeroManagerOpts {
 }
 
 export class TensorZeroManager {
+  private process: ChildProcess | null = null;
   private container: string | null = null;
   private port: number;
   private configDir: string;
@@ -43,73 +49,40 @@ export class TensorZeroManager {
   }
 
   /**
-   * Start TensorZero.
-   * First checks if an instance is already running (sidecar mode).
-   * If not, starts a Docker container with the generated config.
+   * Start TensorZero. Tries in order:
+   * 1. Sidecar -- if already running, use it
+   * 2. Native binary -- vendored or in PATH
+   * 3. Docker container -- fallback
    */
   async start(): Promise<void> {
-    // Check if already running (sidecar mode on control plane)
+    // 1. Sidecar mode: already running (control plane, docker-compose)
     if (await this.isHealthy()) return;
 
     // Generate config
-    mkdirSync(this.configDir, { recursive: true });
-    const config = generateTensorZeroConfig({
-      anthropicKey: this.opts.anthropicKey,
-      openaiKey: this.opts.openaiKey,
-      geminiKey: this.opts.geminiKey,
-      postgresUrl: this.opts.postgresUrl,
-      port: this.port,
-    });
-    writeFileSync(join(this.configDir, "tensorzero.toml"), config);
+    const configPath = this.writeConfig();
 
-    // Check if Docker is available
-    try {
-      execFileSync("docker", ["info"], { stdio: "pipe" });
-    } catch {
-      throw new Error("TensorZero requires Docker. Install Docker or run TensorZero as a sidecar.");
+    // 2. Try native binary
+    const binary = this.findBinary();
+    if (binary) {
+      await this.startNative(binary, configPath);
+      return;
     }
 
-    // Stop existing container if any
-    try {
-      execFileSync("docker", ["rm", "-f", "ark-tensorzero"], { stdio: "pipe" });
-    } catch {
-      /* not running */
-    }
-
-    // Build env args
-    const envArgs: string[] = [];
-    if (this.opts.anthropicKey) envArgs.push("-e", `ANTHROPIC_API_KEY=${this.opts.anthropicKey}`);
-    if (this.opts.openaiKey) envArgs.push("-e", `OPENAI_API_KEY=${this.opts.openaiKey}`);
-    if (this.opts.geminiKey) envArgs.push("-e", `GEMINI_API_KEY=${this.opts.geminiKey}`);
-
-    // Start container
-    execFileSync("docker", [
-      "run", "-d",
-      "--name", "ark-tensorzero",
-      "-v", `${this.configDir}:/app/config`,
-      "-p", `${this.port}:${this.port}`,
-      ...envArgs,
-      "tensorzero/gateway",
-      "--config-file", "/app/config/tensorzero.toml",
-    ], { stdio: "pipe" });
-
-    this.container = "ark-tensorzero";
-
-    // Wait for healthy
-    for (let i = 0; i < 30; i++) {
-      if (await this.isHealthy()) return;
-      await new Promise(r => setTimeout(r, 1000));
-    }
-    throw new Error("TensorZero failed to start within 30s");
+    // 3. Docker fallback
+    await this.startDocker(configPath);
   }
 
-  /** Stop TensorZero (local Docker mode only -- sidecars are not affected). */
+  /** Stop TensorZero (native process or Docker container). Sidecars are not affected. */
   async stop(): Promise<void> {
+    if (this.process) {
+      this.process.kill("SIGTERM");
+      this.process = null;
+    }
     if (this.container) {
       try {
         execFileSync("docker", ["rm", "-f", this.container], { stdio: "pipe" });
       } catch {
-        /* already gone */
+        // already gone
       }
       this.container = null;
     }
@@ -123,5 +96,125 @@ export class TensorZeroManager {
     } catch {
       return false;
     }
+  }
+
+  // ── Private ────────────────────────────────────────────────────────────────
+
+  private writeConfig(): string {
+    mkdirSync(this.configDir, { recursive: true });
+    const configPath = join(this.configDir, "tensorzero.toml");
+    const config = generateTensorZeroConfig({
+      anthropicKey: this.opts.anthropicKey,
+      openaiKey: this.opts.openaiKey,
+      geminiKey: this.opts.geminiKey,
+      postgresUrl: this.opts.postgresUrl,
+      port: this.port,
+    });
+    writeFileSync(configPath, config);
+    return configPath;
+  }
+
+  /**
+   * Find the tensorzero-gateway binary.
+   * Search order:
+   * 1. Explicit binaryPath from opts
+   * 2. bin/tensorzero-gateway next to the ark binary (vendored in tarball)
+   * 3. tensorzero-gateway in PATH
+   */
+  private findBinary(): string | null {
+    // Explicit path
+    if (this.opts.binaryPath && existsSync(this.opts.binaryPath)) {
+      return this.opts.binaryPath;
+    }
+
+    // Next to ark binary (vendored distribution)
+    const arkBin = process.argv[0];
+    if (arkBin) {
+      const vendored = join(dirname(arkBin), "tensorzero-gateway");
+      if (existsSync(vendored)) return vendored;
+    }
+
+    // In PATH
+    try {
+      const which = execFileSync("which", ["tensorzero-gateway"], { stdio: "pipe" }).toString().trim();
+      if (which && existsSync(which)) return which;
+    } catch {
+      // not in PATH
+    }
+
+    return null;
+  }
+
+  private async startNative(binary: string, configPath: string): Promise<void> {
+    const env: Record<string, string> = { ...process.env } as Record<string, string>;
+    if (this.opts.anthropicKey) env.ANTHROPIC_API_KEY = this.opts.anthropicKey;
+    if (this.opts.openaiKey) env.OPENAI_API_KEY = this.opts.openaiKey;
+    if (this.opts.geminiKey) env.GEMINI_API_KEY = this.opts.geminiKey;
+
+    this.process = spawn(binary, ["--config-file", configPath], {
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: false,
+    });
+
+    this.process.on("error", (err) => {
+      console.error(`[tensorzero] Process error: ${err.message}`);
+    });
+
+    this.process.on("exit", (code) => {
+      if (code !== null && code !== 0) {
+        console.error(`[tensorzero] Process exited with code ${code}`);
+      }
+      this.process = null;
+    });
+
+    await this.waitForHealthy(15);
+  }
+
+  private async startDocker(configPath: string): Promise<void> {
+    // Check if Docker is available
+    try {
+      execFileSync("docker", ["info"], { stdio: "pipe" });
+    } catch {
+      throw new Error(
+        "TensorZero gateway not found. Either:\n" +
+        "  - Install the vendored binary (in bin/tensorzero-gateway)\n" +
+        "  - Install Docker and try again\n" +
+        "  - Run TensorZero as a sidecar (control plane mode)"
+      );
+    }
+
+    // Stop existing container if any
+    try {
+      execFileSync("docker", ["rm", "-f", "ark-tensorzero"], { stdio: "pipe" });
+    } catch {
+      // not running
+    }
+
+    const envArgs: string[] = [];
+    if (this.opts.anthropicKey) envArgs.push("-e", `ANTHROPIC_API_KEY=${this.opts.anthropicKey}`);
+    if (this.opts.openaiKey) envArgs.push("-e", `OPENAI_API_KEY=${this.opts.openaiKey}`);
+    if (this.opts.geminiKey) envArgs.push("-e", `GEMINI_API_KEY=${this.opts.geminiKey}`);
+
+    execFileSync("docker", [
+      "run", "-d",
+      "--name", "ark-tensorzero",
+      "-v", `${dirname(configPath)}:/app/config`,
+      "-p", `${this.port}:${this.port}`,
+      ...envArgs,
+      "tensorzero/gateway",
+      "--config-file", "/app/config/tensorzero.toml",
+    ], { stdio: "pipe" });
+
+    this.container = "ark-tensorzero";
+    await this.waitForHealthy(30);
+  }
+
+  private async waitForHealthy(timeoutSecs: number): Promise<void> {
+    for (let i = 0; i < timeoutSecs; i++) {
+      if (await this.isHealthy()) return;
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    throw new Error(`TensorZero failed to become healthy within ${timeoutSecs}s`);
   }
 }

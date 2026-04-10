@@ -1,5 +1,9 @@
 import { execFileSync } from "child_process";
+import { existsSync } from "fs";
+import { join, dirname } from "path";
+import { Database } from "bun:sqlite";
 import type { KnowledgeStore } from "./store.js";
+import type { EdgeRelation } from "./types.js";
 
 export interface IndexResult {
   files: number;
@@ -15,19 +19,46 @@ const defaultExec: ExecFn = (cmd, args, opts) =>
   execFileSync(cmd, args, opts) as unknown as string;
 
 /**
- * Check if Axon CLI is installed.
+ * Find the codegraph binary. Search order:
+ * 1. node_modules/.bin/codegraph (local dev, after bun install)
+ * 2. bin/codegraph next to the ark binary (vendored distribution)
+ * 3. codegraph in PATH (global install)
  */
-export function isAxonInstalled(exec: ExecFn = defaultExec): boolean {
-  try {
-    exec("axon", ["--version"], { stdio: "pipe" });
-    return true;
-  } catch { return false; /* not installed */ }
+export function findCodegraphBinary(): string {
+  // Local dev: node_modules/.bin
+  const localBin = join(process.cwd(), "node_modules", ".bin", "codegraph");
+  if (existsSync(localBin)) return localBin;
+
+  // Vendored: next to ark binary
+  const arkBin = process.argv[0];
+  if (arkBin) {
+    const vendored = join(dirname(arkBin), "codegraph");
+    if (existsSync(vendored)) return vendored;
+  }
+
+  // Fall back to PATH
+  return "codegraph";
 }
 
 /**
- * Index a codebase using Axon + git co-change analysis.
- * Axon parses 33+ languages via tree-sitter, extracts files, symbols, dependencies.
- * Results are stored as nodes + edges in the knowledge store.
+ * Check if the codegraph native engine is available.
+ */
+export function isCodegraphInstalled(): boolean {
+  try {
+    const bin = findCodegraphBinary();
+    execFileSync(bin, ["--version"], { stdio: "pipe" });
+    return true;
+  } catch { return false; }
+}
+
+/**
+ * Index a codebase using ops-codegraph (native Rust engine) + git co-change analysis.
+ *
+ * Flow:
+ * 1. Run `codegraph build` to parse the codebase (33 languages, tree-sitter)
+ * 2. Read the resulting .codegraph/graph.db with bun:sqlite
+ * 3. Map nodes + edges into Ark's tenant-scoped KnowledgeStore
+ * 4. Add git co-change edges on top
  */
 export async function indexCodebase(
   repoPath: string,
@@ -42,75 +73,167 @@ export async function indexCodebase(
   if (opts?.incremental && opts.changedFiles?.length) {
     for (const f of opts.changedFiles) {
       store.removeNode(`file:${f}`);
-      // Remove symbol nodes for this file
       const symbolNodes = store.listNodes({ type: "symbol" }).filter(
         n => (n.metadata as any).file === f
       );
       for (const sn of symbolNodes) store.removeNode(sn.id);
     }
   } else if (!opts?.incremental) {
-    // Full re-index: clear existing codebase nodes
+    // Full re-index: clear existing codebase nodes (preserve session/memory/learning nodes)
     store.clear({ type: "file" });
     store.clear({ type: "symbol" });
   }
 
-  // Call Axon
+  // Build graph with codegraph native engine
+  const cgDir = join(repoPath, ".codegraph");
+  const dbPath = join(cgDir, "graph.db");
+  const codegraphBin = findCodegraphBinary();
+
   try {
-    const result = exec("axon", ["analyze", "--json", "--project-root", repoPath], {
+    const buildArgs = ["build", "--root", repoPath];
+    if (!opts?.incremental) buildArgs.push("--no-incremental");
+    exec(codegraphBin, buildArgs, {
       encoding: "utf-8",
-      maxBuffer: 50 * 1024 * 1024, // 50MB for large repos
-      timeout: 120_000, // 2 minutes
+      cwd: repoPath,
+      timeout: 300_000, // 5 minutes for large repos
+      stdio: ["pipe", "pipe", "pipe"],
     });
-    const graph = JSON.parse(result);
-
-    // Map Axon nodes to our schema
-    for (const node of graph.nodes ?? []) {
-      if (node.type === "file" || node.type === "module") {
-        store.addNode({
-          id: `file:${node.path ?? node.id}`,
-          type: "file",
-          label: node.path ?? node.id,
-          content: node.summary ?? null,
-          metadata: { language: node.language, lines: node.lines, ...node.metadata },
-        });
-        files++;
-      } else if (node.type === "function" || node.type === "class" || node.type === "symbol") {
-        store.addNode({
-          id: `symbol:${node.file ?? ""}::${node.name ?? node.id}`,
-          type: "symbol",
-          label: node.name ?? node.id,
-          content: node.docstring ?? null,
-          metadata: { kind: node.type, file: node.file, line_start: node.line_start, line_end: node.line_end, exported: node.exported },
-        });
-        symbols++;
-      }
-    }
-
-    // Map Axon edges
-    for (const edge of graph.edges ?? []) {
-      const sourceId = edge.source_type === "file" ? `file:${edge.source}` : `symbol:${edge.source}`;
-      const targetId = edge.target_type === "file" ? `file:${edge.target}` : `symbol:${edge.target}`;
-      const relation = mapAxonRelation(edge.type ?? edge.relation ?? "depends_on");
-      store.addEdge(sourceId, targetId, relation, edge.weight ?? 1.0);
-      edges++;
-    }
   } catch (e: any) {
     if (e.message?.includes("ENOENT") || e.message?.includes("not found")) {
-      throw new Error("Axon is required for codebase indexing. Install: pip install axoniq");
+      throw new Error("codegraph is required for codebase indexing. Install: bun add @optave/codegraph");
     }
     throw e;
   }
 
-  // Git co-change analysis
+  // Read results from .codegraph/graph.db
+  if (!existsSync(dbPath)) {
+    throw new Error(`codegraph build did not produce ${dbPath}`);
+  }
+
+  const cgDb = new Database(dbPath, { readonly: true });
+  try {
+    // Map codegraph nodes to Ark knowledge nodes
+    const nodeRows = cgDb.query(
+      "SELECT id, kind, name, file, line, end_line, visibility, exported, qualified_name FROM nodes"
+    ).all() as CodegraphNode[];
+
+    // Build ID lookup for edge mapping
+    const nodeIdMap = new Map<number, { kind: string; name: string; file: string }>();
+
+    // Track files we've already added (codegraph stores file as a column, not a separate node kind)
+    const addedFiles = new Set<string>();
+
+    for (const node of nodeRows) {
+      nodeIdMap.set(node.id, { kind: node.kind, name: node.name, file: node.file });
+
+      // Ensure the file node exists
+      if (node.file && !addedFiles.has(node.file)) {
+        store.addNode({
+          id: `file:${node.file}`,
+          type: "file",
+          label: node.file,
+          content: null,
+          metadata: { language: detectLanguage(node.file) },
+        });
+        addedFiles.add(node.file);
+        files++;
+      }
+
+      // Add symbol node
+      const symbolId = `symbol:${node.file}::${node.name}`;
+      store.addNode({
+        id: symbolId,
+        type: "symbol",
+        label: node.name,
+        content: null,
+        metadata: {
+          kind: node.kind,
+          file: node.file,
+          line_start: node.line,
+          line_end: node.end_line,
+          exported: node.exported === 1,
+          visibility: node.visibility,
+          qualified_name: node.qualified_name,
+        },
+      });
+      symbols++;
+    }
+
+    // Map codegraph edges to Ark knowledge edges
+    const edgeRows = cgDb.query(
+      "SELECT source_id, target_id, kind FROM edges"
+    ).all() as CodegraphEdge[];
+
+    for (const edge of edgeRows) {
+      const src = nodeIdMap.get(edge.source_id);
+      const tgt = nodeIdMap.get(edge.target_id);
+      if (!src || !tgt) continue;
+
+      const sourceId = `symbol:${src.file}::${src.name}`;
+      const targetId = `symbol:${tgt.file}::${tgt.name}`;
+
+      const relation = mapEdgeRelation(edge.kind);
+      store.addEdge(sourceId, targetId, relation);
+      edges++;
+    }
+  } finally {
+    cgDb.close();
+  }
+
+  // Git co-change analysis (codegraph has this built-in, but we also store in Ark's graph)
   edges += indexCoChanges(repoPath, store, { exec });
 
   return { files, symbols, edges, duration_ms: Date.now() - start };
 }
 
-function mapAxonRelation(type: string): "depends_on" | "imports" | "co_changes" {
-  if (type === "imports" || type === "import") return "imports";
-  if (type === "co_changes" || type === "co-change") return "co_changes";
-  return "depends_on";
+function mapEdgeRelation(kind: string): EdgeRelation {
+  switch (kind) {
+    case "imports":
+    case "imports-type":
+    case "dynamic-imports":
+    case "reexports":
+      return "imports";
+    case "co_changes":
+      return "co_changes";
+    case "calls":
+    case "extends":
+    case "implements":
+    case "contains":
+    default:
+      return "depends_on";
+  }
+}
+
+function detectLanguage(filePath: string): string {
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+  const langMap: Record<string, string> = {
+    ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+    py: "python", go: "go", rs: "rust", java: "java", kt: "kotlin",
+    c: "c", cpp: "cpp", h: "c", hpp: "cpp", cs: "csharp",
+    rb: "ruby", php: "php", swift: "swift", dart: "dart",
+    scala: "scala", ex: "elixir", erl: "erlang", hs: "haskell",
+    ml: "ocaml", lua: "lua", zig: "zig", r: "r",
+    sol: "solidity", v: "verilog", sh: "bash", bash: "bash",
+  };
+  return langMap[ext] ?? "unknown";
+}
+
+interface CodegraphNode {
+  id: number;
+  kind: string;
+  name: string;
+  file: string;
+  line: number;
+  end_line: number;
+  visibility: string | null;
+  exported: number;
+  qualified_name: string | null;
+}
+
+interface CodegraphEdge {
+  source_id: number;
+  target_id: number;
+  kind: string;
 }
 
 /**
@@ -176,7 +299,6 @@ export function indexSessionCompletion(
   outcome: string,
   changedFiles: string[],
 ): void {
-  // Create/update session node
   const existing = store.getNode(`session:${sessionId}`);
   if (existing) {
     store.updateNode(`session:${sessionId}`, {
@@ -192,7 +314,6 @@ export function indexSessionCompletion(
     });
   }
 
-  // Create modified_by edges
   for (const file of changedFiles) {
     store.addEdge(`file:${file}`, `session:${sessionId}`, "modified_by");
   }

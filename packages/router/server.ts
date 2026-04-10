@@ -12,7 +12,7 @@
  *   GET  /health               -- health check
  */
 
-import type { ChatCompletionRequest, ChatCompletionResponse, RouterConfig } from "./types.js";
+import type { ChatCompletionRequest, ChatCompletionResponse, RouterConfig, RoutingDecision, ModelConfig } from "./types.js";
 import { classify } from "./classifier.js";
 import { RoutingEngine } from "./engine.js";
 import { Dispatcher, TensorZeroDispatcher } from "./dispatch.js";
@@ -26,9 +26,19 @@ export interface RouterServer {
   url: string;
 }
 
+export interface RouterUsageEvent {
+  model: string;
+  provider: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+}
+
 export interface RouterStartOpts {
   /** TensorZero gateway URL. When set, dispatches go through TensorZero instead of direct provider adapters. */
   tensorZeroUrl?: string;
+  /** Called after each successful dispatch with usage data. Wire to UsageRecorder for persistent cost tracking. */
+  onUsage?: (event: RouterUsageEvent) => void;
 }
 
 export function startRouter(config: RouterConfig, opts?: RouterStartOpts): RouterServer {
@@ -88,7 +98,7 @@ export function startRouter(config: RouterConfig, opts?: RouterStartOpts): Route
         // Chat completions
         if (url.pathname === "/v1/chat/completions" && req.method === "POST") {
           const request = await req.json() as ChatCompletionRequest;
-          return await handleChatCompletion(request, registry, engine, dispatcher, feedback, config, tzDispatcher);
+          return await handleChatCompletion(request, registry, engine, dispatcher, feedback, config, tzDispatcher, opts?.onUsage);
         }
 
         // List models (OpenAI-compatible)
@@ -133,6 +143,7 @@ async function handleChatCompletion(
   feedback: FeedbackTracker,
   config: RouterConfig,
   tzDispatcher: TensorZeroDispatcher | null,
+  onUsage?: (event: RouterUsageEvent) => void,
 ): Promise<Response> {
   const isAutoRoute = request.model === "auto";
 
@@ -178,6 +189,7 @@ async function handleChatCompletion(
       // Record usage from TensorZero response
       if (response.usage && model) {
         feedback.logDecision(decision, response, model);
+        emitUsage(onUsage, decision, response, model);
       }
       return Response.json(response);
     } catch (err) {
@@ -211,6 +223,7 @@ async function handleChatCompletion(
         const response = await dispatcher.cascade(request, cascadeModels, config.cascade_confidence_threshold);
         response.routing = decision;
         feedback.logDecision(decision, response, model);
+        emitUsage(onUsage, decision, response, model);
         return Response.json(response);
       }
     }
@@ -218,6 +231,7 @@ async function handleChatCompletion(
     const response = await dispatcher.dispatch(request, decision);
     response.routing = decision;
     feedback.logDecision(decision, response, model);
+    emitUsage(onUsage, decision, response, model);
     return Response.json(response);
   } catch (err) {
     feedback.logFailure(decision.selected_model, (err as Error).message);
@@ -227,6 +241,26 @@ async function handleChatCompletion(
       { status: 502 },
     );
   }
+}
+
+// ── Usage callback ──────────────────────────────────────────────────────────
+
+function emitUsage(
+  onUsage: ((event: RouterUsageEvent) => void) | undefined,
+  decision: RoutingDecision,
+  response: ChatCompletionResponse,
+  model: ModelConfig | undefined,
+): void {
+  if (!onUsage || !response.usage || !model) return;
+  const inputCost = (response.usage.prompt_tokens / 1_000_000) * model.cost_input;
+  const outputCost = (response.usage.completion_tokens / 1_000_000) * model.cost_output;
+  onUsage({
+    model: decision.selected_model,
+    provider: decision.selected_provider,
+    input_tokens: response.usage.prompt_tokens,
+    output_tokens: response.usage.completion_tokens,
+    cost_usd: inputCost + outputCost,
+  });
 }
 
 // ── Passthrough handler ──────────────────────────────────────────────────────
