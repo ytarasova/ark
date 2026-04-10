@@ -85,10 +85,10 @@ export { extractSkillCandidates, extractAndSaveSkills, type SkillCandidate, type
 export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review.js";
 
 // Guardrails
-export { evaluateGuardrail, evaluateToolCall, DEFAULT_RULES, type GuardrailRule } from "./guardrails.js";
+export { evaluateGuardrail, evaluateToolCall, DEFAULT_RULES, type GuardrailRule } from "./session/guardrails.js";
 
 // Checkpoint and crash recovery
-export { saveCheckpoint, getCheckpoint, listCheckpoints, findOrphanedSessions, recoverSession, type Checkpoint } from "./checkpoint.js";
+export { saveCheckpoint, getCheckpoint, listCheckpoints, findOrphanedSessions, recoverSession, type Checkpoint } from "./session/checkpoint.js";
 
 // Safe async helper
 export { safeAsync } from "./safe.js";
@@ -103,7 +103,7 @@ export { sendOSNotification } from "./notify.js";
 export { discoverTools, removeMcpServer, removeCommand, getCommand, addMcpServer, addCommand, type ToolEntry } from "./tools.js";
 
 // Replay
-export { buildReplay, type ReplayStep } from "./replay.js";
+export { buildReplay, type ReplayStep } from "./session/replay.js";
 
 // Tool drivers
 export type { ToolDriver } from "./tool-driver.js";
@@ -131,7 +131,7 @@ export { getHotkeys, matchesHotkey, resetHotkeys, hotkeyLabel, type HotkeyMap } 
 export { truncateLog, cleanupLogs, logDir, type LogManagerOptions } from "./observability/log-manager.js";
 
 // Session sharing
-export { exportSession, exportSessionToFile, importSessionFromFile, type SessionExport } from "./session-share.js";
+export { exportSession, exportSessionToFile, importSessionFromFile, type SessionExport } from "./session/share.js";
 
 // Auto-update check
 export { checkForUpdate, getCurrentVersion } from "./update-check.js";
@@ -164,7 +164,7 @@ export { loadUiState, saveUiState, type UiState } from "./ui-state.js";
 export { McpPool, getMcpPool, destroyMcpPool, discoverPoolSockets, runMcpProxy, type McpServerDef, type PoolConfig } from "./mcp-pool.js";
 
 // Prompt injection detection
-export { detectInjection, hasInjection, type InjectionResult } from "./prompt-guard.js";
+export { detectInjection, hasInjection, type InjectionResult } from "./session/prompt-guard.js";
 
 // Telemetry
 export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry, isTelemetryEnabled, configureTelemetry, resetTelemetry, type TelemetryEvent, type TelemetryConfig } from "./observability/telemetry.js";

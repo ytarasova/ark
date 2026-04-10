@@ -3,8 +3,8 @@
  */
 
 import { readFileSync, writeFileSync } from "fs";
-import type { Session, Event } from "../types/index.js";
-import type { AppContext } from "./app.js";
+import type { Session, Event } from "../../types/index.js";
+import type { AppContext } from "../app.js";
 
 export interface SessionExport {
   version: 1;

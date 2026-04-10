@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { detectInjection, hasInjection } from "../prompt-guard.js";
+import { detectInjection, hasInjection } from "../session/prompt-guard.js";
 
 describe("prompt guard coverage", () => {
   it("detects injection in task descriptions", () => {

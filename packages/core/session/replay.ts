@@ -5,8 +5,8 @@
  * session's history event-by-event.
  */
 
-import type { Event } from "../types/index.js";
-import type { AppContext } from "./app.js";
+import type { Event } from "../../types/index.js";
+import type { AppContext } from "../app.js";
 
 export interface ReplayStep {
   index: number;

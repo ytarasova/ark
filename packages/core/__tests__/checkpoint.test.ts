@@ -4,7 +4,7 @@
 
 import { describe, it, expect, mock } from "bun:test";
 import { getApp } from "../app.js";
-import { saveCheckpoint, getCheckpoint, listCheckpoints, findOrphanedSessions, recoverSession } from "../checkpoint.js";
+import { saveCheckpoint, getCheckpoint, listCheckpoints, findOrphanedSessions, recoverSession } from "../session/checkpoint.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();

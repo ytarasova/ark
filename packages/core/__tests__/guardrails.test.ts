@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { evaluateGuardrail, DEFAULT_RULES, type GuardrailRule } from "../guardrails.js";
+import { evaluateGuardrail, DEFAULT_RULES, type GuardrailRule } from "../session/guardrails.js";
 
 describe("guardrails", () => {
   it("blocks dangerous bash commands", () => {

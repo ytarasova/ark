@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { evaluateToolCall } from "../guardrails.js";
+import { evaluateToolCall } from "../session/guardrails.js";
 
 describe("guardrails integration", () => {
   it("evaluateToolCall blocks dangerous bash commands", () => {
