@@ -12,10 +12,10 @@
  *   GET  /health               -- health check
  */
 
-import type { ChatCompletionRequest, RouterConfig } from "./types.js";
+import type { ChatCompletionRequest, ChatCompletionResponse, RouterConfig } from "./types.js";
 import { classify } from "./classifier.js";
 import { RoutingEngine } from "./engine.js";
-import { Dispatcher } from "./dispatch.js";
+import { Dispatcher, TensorZeroDispatcher } from "./dispatch.js";
 import { FeedbackTracker } from "./feedback.js";
 import { ProviderRegistry } from "./providers.js";
 import { DEFAULT_CHANNEL_BASE_URL } from "../core/constants.js";
@@ -26,7 +26,12 @@ export interface RouterServer {
   url: string;
 }
 
-export function startRouter(config: RouterConfig): RouterServer {
+export interface RouterStartOpts {
+  /** TensorZero gateway URL. When set, dispatches go through TensorZero instead of direct provider adapters. */
+  tensorZeroUrl?: string;
+}
+
+export function startRouter(config: RouterConfig, opts?: RouterStartOpts): RouterServer {
   // ── Initialize components ──────────────────────────────────────────────
 
   const registry = new ProviderRegistry();
@@ -38,7 +43,14 @@ export function startRouter(config: RouterConfig): RouterServer {
   const dispatcher = new Dispatcher(registry);
   const feedback = new FeedbackTracker();
 
+  // TensorZero dispatcher (used when TensorZero gateway is available)
+  const tensorZeroUrl = opts?.tensorZeroUrl ?? process.env.ARK_TENSORZERO_URL;
+  const tzDispatcher = tensorZeroUrl ? new TensorZeroDispatcher(tensorZeroUrl) : null;
+
   console.error(`[router] Starting on port ${config.port}, policy=${config.policy}, providers=${config.providers.map(p => p.name).join(",")}`);
+  if (tzDispatcher) {
+    console.error(`[router] TensorZero gateway: ${tensorZeroUrl}`);
+  }
   console.error(`[router] Models: ${registry.listModels().map(m => m.id).join(", ")}`);
 
   // ── HTTP server ────────────────────────────────────────────────────────
@@ -76,7 +88,7 @@ export function startRouter(config: RouterConfig): RouterServer {
         // Chat completions
         if (url.pathname === "/v1/chat/completions" && req.method === "POST") {
           const request = await req.json() as ChatCompletionRequest;
-          return await handleChatCompletion(request, registry, engine, dispatcher, feedback, config);
+          return await handleChatCompletion(request, registry, engine, dispatcher, feedback, config, tzDispatcher);
         }
 
         // List models (OpenAI-compatible)
@@ -120,12 +132,17 @@ async function handleChatCompletion(
   dispatcher: Dispatcher,
   feedback: FeedbackTracker,
   config: RouterConfig,
+  tzDispatcher: TensorZeroDispatcher | null,
 ): Promise<Response> {
   const isAutoRoute = request.model === "auto";
 
   // ── Passthrough mode (specific model requested) ────────────────────────
 
   if (!isAutoRoute) {
+    // TensorZero passthrough: if available, route specific models through TZ
+    if (tzDispatcher) {
+      return handleTensorZeroPassthrough(request, tzDispatcher, feedback);
+    }
     return handlePassthrough(request, registry, dispatcher, feedback);
   }
 
@@ -147,6 +164,33 @@ async function handleChatCompletion(
   }
 
   const model = registry.findModel(decision.selected_model);
+
+  // ── TensorZero dispatch (if available) ─────────────────────────────────
+
+  if (tzDispatcher) {
+    if (request.stream) {
+      return handleStreamingTZ(request, decision, tzDispatcher, feedback, model);
+    }
+
+    try {
+      const response = await tzDispatcher.dispatch(request, decision);
+      response.routing = decision;
+      // Record usage from TensorZero response
+      if (response.usage && model) {
+        feedback.logDecision(decision, response, model);
+      }
+      return Response.json(response);
+    } catch (err) {
+      feedback.logFailure(decision.selected_model, (err as Error).message);
+      feedback.logFallback();
+      return Response.json(
+        { error: { message: (err as Error).message, type: "tensorzero_error", routing: decision } },
+        { status: 502 },
+      );
+    }
+  }
+
+  // ── Fallback to direct provider dispatch (no TensorZero) ───────────────
 
   // ── Streaming response ─────────────────────────────────────────────────
 
@@ -280,6 +324,133 @@ function handleStreamingPassthrough(
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       } catch (err) {
+        const errorChunk = {
+          error: { message: (err as Error).message, type: "stream_error" },
+        };
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    },
+  });
+}
+
+// ── TensorZero handlers ─────────────────────────────────────────────────────
+
+/**
+ * Handle a passthrough request through TensorZero (specific model, no routing).
+ */
+async function handleTensorZeroPassthrough(
+  request: ChatCompletionRequest,
+  tzDispatcher: TensorZeroDispatcher,
+  feedback: FeedbackTracker,
+): Promise<Response> {
+  feedback.logPassthrough(request.model, "tensorzero");
+
+  if (request.stream) {
+    return handleStreamingTZPassthrough(request, tzDispatcher);
+  }
+
+  const passthroughDecision = {
+    selected_model: request.model,
+    selected_provider: "tensorzero",
+    reason: "passthrough",
+    alternatives_considered: [],
+    latency_ms: { classification: 0, routing: 0, total_overhead: 0 },
+    complexity: { score: 0, task_type: "passthrough", has_tools: false, estimated_difficulty: "simple" as const },
+  };
+
+  try {
+    const response = await tzDispatcher.dispatch(request, passthroughDecision);
+    return Response.json(response);
+  } catch (err) {
+    feedback.logFailure(request.model, (err as Error).message);
+    return Response.json(
+      { error: { message: (err as Error).message, type: "tensorzero_error" } },
+      { status: 502 },
+    );
+  }
+}
+
+/**
+ * Handle a streaming passthrough request through TensorZero.
+ */
+function handleStreamingTZPassthrough(
+  request: ChatCompletionRequest,
+  tzDispatcher: TensorZeroDispatcher,
+): Response {
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      // Build a minimal routing decision for the stream helper
+      const passthroughDecision = {
+        selected_model: request.model,
+        selected_provider: "tensorzero",
+        reason: "passthrough",
+        alternatives_considered: [],
+        latency_ms: { classification: 0, routing: 0, total_overhead: 0 },
+        complexity: { score: 0, task_type: "passthrough", has_tools: false, estimated_difficulty: "simple" as const },
+      };
+
+      try {
+        for await (const chunk of tzDispatcher.stream(request, passthroughDecision)) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+        }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      } catch (err) {
+        const errorChunk = {
+          error: { message: (err as Error).message, type: "stream_error" },
+        };
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    },
+  });
+}
+
+/**
+ * Handle a streaming auto-routed request through TensorZero.
+ */
+function handleStreamingTZ(
+  request: ChatCompletionRequest,
+  decision: any,
+  tzDispatcher: TensorZeroDispatcher,
+  feedback: FeedbackTracker,
+  _model: any,
+): Response {
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      let firstChunk = true;
+
+      try {
+        for await (const chunk of tzDispatcher.stream(request, decision)) {
+          if (firstChunk) {
+            (chunk as any).routing = decision;
+            firstChunk = false;
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+        }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      } catch (err) {
+        feedback.logFailure(decision.selected_model, (err as Error).message);
         const errorChunk = {
           error: { message: (err as Error).message, type: "stream_error" },
         };

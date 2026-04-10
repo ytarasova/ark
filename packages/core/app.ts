@@ -47,6 +47,7 @@ import type { TenantPolicyManager } from "./auth/index.js";
 import { KnowledgeStore } from "./knowledge/store.js";
 import { PricingRegistry } from "./observability/pricing.js";
 import { UsageRecorder } from "./observability/usage.js";
+import type { TensorZeroManager } from "./router/tensorzero.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,8 @@ export class AppContext {
   metricsPoller: { stop(): void } | null = null;
   /** Rollback config stored here so conductor can access it without globalThis. */
   rollbackConfig: import("./config.js").RollbackSettings | null = null;
+
+  private _tensorZero: TensorZeroManager | null = null;
 
   private _signalHandlers: { signal: string; handler: () => void }[] = [];
   private _forceExitCount = 0;
@@ -147,6 +150,17 @@ export class AppContext {
 
   get pricing(): PricingRegistry { return this._resolve("pricing"); }
   get usageRecorder(): UsageRecorder { return this._resolve("usageRecorder"); }
+
+  // ── TensorZero gateway ────────────────────────────────────────────────
+
+  /** TensorZero manager, or null if not enabled. */
+  get tensorZero(): TensorZeroManager | null { return this._tensorZero; }
+
+  /** URL for the TensorZero gateway, or null if not enabled. */
+  get tensorZeroUrl(): string | null {
+    if (this._tensorZero) return this._tensorZero.url;
+    return process.env.ARK_TENSORZERO_URL ?? null;
+  }
 
   // ── Session launcher ──────────────────────────────────────────────────
 
@@ -439,6 +453,23 @@ export class AppContext {
     this.rollbackConfig = this.config.rollback;
     configureTelemetry(this.config.telemetry);
 
+    // 6d. Optionally start TensorZero gateway
+    if (this.config.tensorZero?.enabled && !this.options.skipConductor) {
+      await safeAsync("boot: start TensorZero", async () => {
+        const { TensorZeroManager } = await import("./router/tensorzero.js");
+        this._tensorZero = new TensorZeroManager({
+          port: this.config.tensorZero!.port,
+          configDir: this.config.tensorZero!.configDir,
+          anthropicKey: process.env.ANTHROPIC_API_KEY,
+          openaiKey: process.env.OPENAI_API_KEY,
+          geminiKey: process.env.GEMINI_API_KEY,
+        });
+        if (this.config.tensorZero!.autoStart) {
+          await this._tensorZero.start();
+        }
+      });
+    }
+
     // 7. Optionally start conductor (dynamic import to avoid circular deps)
     if (!this.options.skipConductor) {
       await safeAsync("boot: start conductor", async () => {
@@ -578,6 +609,7 @@ export class AppContext {
     clearTmuxStatusBar();
     if (this._purgeInterval) { clearInterval(this._purgeInterval); this._purgeInterval = null; }
     if (this.metricsPoller) { this.metricsPoller.stop(); this.metricsPoller = null; }
+    if (this._tensorZero) { await this._tensorZero.stop().catch(() => {}); this._tensorZero = null; }
     if (this.conductor) { this.conductor.stop(); this.conductor = null; }
     if (this._eventBus) { this._eventBus.clear(); this._eventBus = null; }
 

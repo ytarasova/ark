@@ -24,10 +24,17 @@ services:
       - REDIS_URL=redis://redis:6379
       - ARK_CONDUCTOR_HOST=0.0.0.0
       - ARK_AUTH_ENABLED=true
+      - ARK_TENSORZERO_URL=http://tensorzero:3000
+      - ARK_TENSORZERO_ENABLED=1
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      tensorzero:
         condition: service_healthy
     restart: unless-stopped
     volumes:
@@ -74,7 +81,25 @@ services:
     volumes:
       - redis-data:/data
 
+  tensorzero:
+    image: tensorzero/gateway
+    volumes:
+      - tensorzero-config:/app/config
+    ports:
+      - "3000:3000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redis-data:
   ark-data:
+  tensorzero-config:

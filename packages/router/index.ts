@@ -42,10 +42,10 @@ export { classify, type ClassificationResult } from "./classifier.js";
 export { RoutingEngine } from "./engine.js";
 
 // Dispatcher
-export { Dispatcher } from "./dispatch.js";
+export { Dispatcher, TensorZeroDispatcher } from "./dispatch.js";
 
 // Feedback
 export { FeedbackTracker } from "./feedback.js";
 
 // Server
-export { startRouter, type RouterServer } from "./server.js";
+export { startRouter, type RouterServer, type RouterStartOpts } from "./server.js";

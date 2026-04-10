@@ -5,6 +5,7 @@
  * - Fallback on provider failure (try next provider with same tier)
  * - Circuit breaker awareness
  * - Cascade mode (try cheap first, escalate if low confidence)
+ * - TensorZero dispatch (OpenAI-compatible gateway)
  */
 
 import type {
@@ -209,4 +210,95 @@ function assessConfidence(response: ChatCompletionResponse): number {
   }
 
   return Math.max(0, Math.min(1, confidence));
+}
+
+// ── TensorZero Dispatcher ───────────────────────────────────────────────────
+
+/**
+ * Dispatches requests through TensorZero's OpenAI-compatible endpoint.
+ *
+ * TensorZero handles provider format conversion, retries, fallbacks, and
+ * circuit breakers. Ark's routing intelligence (classifier + engine) still
+ * decides WHICH model; TensorZero handles HOW to call it.
+ */
+export class TensorZeroDispatcher {
+  constructor(private tensorZeroUrl: string) {}
+
+  /**
+   * Dispatch a non-streaming request through TensorZero.
+   */
+  async dispatch(
+    request: ChatCompletionRequest,
+    decision: RoutingDecision,
+  ): Promise<ChatCompletionResponse> {
+    const resp = await fetch(`${this.tensorZeroUrl}/openai/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: decision.selected_model,
+        messages: request.messages,
+        temperature: request.temperature,
+        max_tokens: request.max_tokens,
+        tools: request.tools,
+        tool_choice: request.tool_choice,
+        stream: false,
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(`TensorZero error (${resp.status}): ${err}`);
+    }
+
+    return await resp.json() as ChatCompletionResponse;
+  }
+
+  /**
+   * Dispatch a streaming request through TensorZero.
+   * Returns an async generator of SSE chunks.
+   */
+  async *stream(
+    request: ChatCompletionRequest,
+    decision: RoutingDecision,
+  ): AsyncGenerator<ChatCompletionChunk> {
+    const resp = await fetch(`${this.tensorZeroUrl}/openai/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: decision.selected_model,
+        messages: request.messages,
+        temperature: request.temperature,
+        max_tokens: request.max_tokens,
+        tools: request.tools,
+        stream: true,
+      }),
+    });
+
+    if (!resp.ok) {
+      throw new Error(`TensorZero stream error: ${resp.status}`);
+    }
+
+    if (!resp.body) return;
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("data: ") && line !== "data: [DONE]") {
+            yield JSON.parse(line.slice(6));
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
 }

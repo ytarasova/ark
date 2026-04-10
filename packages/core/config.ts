@@ -29,6 +29,17 @@ export interface RouterSettings {
   policy: "quality" | "balanced" | "cost";
 }
 
+export interface TensorZeroSettings {
+  /** Enable TensorZero as the LLM dispatch backend. */
+  enabled: boolean;
+  /** TensorZero gateway port (default: 3000). */
+  port: number;
+  /** Config directory for generated tensorzero.toml (default: ~/.ark/tensorzero). */
+  configDir?: string;
+  /** Auto-start Docker container on boot (local mode). Disabled in hosted/sidecar mode. */
+  autoStart: boolean;
+}
+
 export interface ArkConfig {
   arkDir: string;
   dbPath: string;
@@ -48,6 +59,8 @@ export interface ArkConfig {
   theme?: string;
   notifications?: boolean;
   auth?: AuthConfig;
+  /** TensorZero LLM gateway settings. */
+  tensorZero?: TensorZeroSettings;
   /** Database URL for hosted deployments. postgres://... uses PostgresAdapter; empty/undefined uses SQLite. */
   databaseUrl?: string;
   /** Redis URL for hosted SSE bus and cross-instance pub/sub. redis://... */
@@ -115,6 +128,17 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
       enabled: (yaml.auth as Record<string, unknown>)?.enabled === true,
       apiKeyEnabled: (yaml.auth as Record<string, unknown>)?.apiKeyEnabled === true
         || (yaml.auth as Record<string, unknown>)?.api_key_enabled === true,
+    },
+    tensorZero: {
+      enabled: process.env.ARK_TENSORZERO_ENABLED === "1"
+        || (yaml.tensorzero as Record<string, unknown>)?.enabled === true
+        || (yaml.tensor_zero as Record<string, unknown>)?.enabled === true,
+      port: parseInt(process.env.ARK_TENSORZERO_PORT ?? "3000", 10),
+      configDir: (yaml.tensorzero as Record<string, unknown>)?.config_dir as string
+        ?? (yaml.tensor_zero as Record<string, unknown>)?.config_dir as string
+        ?? undefined,
+      autoStart: (yaml.tensorzero as Record<string, unknown>)?.auto_start === true
+        || (yaml.tensor_zero as Record<string, unknown>)?.auto_start === true,
     },
     databaseUrl: process.env.DATABASE_URL ?? (yaml.database_url as string) ?? undefined,
     redisUrl: process.env.REDIS_URL ?? (yaml.redis_url as string) ?? undefined,

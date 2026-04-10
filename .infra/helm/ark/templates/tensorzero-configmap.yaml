@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ark.fullname" . }}-tensorzero-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ark.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tensorzero
+data:
+  tensorzero.toml: |
+    [gateway]
+    bind_address = "0.0.0.0:3000"
+
+    {{- if .Values.llm.anthropicApiKey }}
+    [models.claude-opus]
+    routing = ["anthropic"]
+
+    [models.claude-opus.providers.anthropic]
+    type = "anthropic"
+    model_name = "claude-opus-4-6"
+    api_key_location = "env::ANTHROPIC_API_KEY"
+
+    [models.claude-sonnet]
+    routing = ["anthropic"]
+
+    [models.claude-sonnet.providers.anthropic]
+    type = "anthropic"
+    model_name = "claude-sonnet-4-6"
+    api_key_location = "env::ANTHROPIC_API_KEY"
+
+    [models.claude-haiku]
+    routing = ["anthropic"]
+
+    [models.claude-haiku.providers.anthropic]
+    type = "anthropic"
+    model_name = "claude-haiku-4-5"
+    api_key_location = "env::ANTHROPIC_API_KEY"
+    {{- end }}
+
+    {{- if .Values.llm.openaiApiKey }}
+    [models.gpt-4-1]
+    routing = ["openai"]
+
+    [models.gpt-4-1.providers.openai]
+    type = "openai"
+    model_name = "gpt-4.1"
+    api_key_location = "env::OPENAI_API_KEY"
+
+    [models.gpt-4-1-mini]
+    routing = ["openai"]
+
+    [models.gpt-4-1-mini.providers.openai]
+    type = "openai"
+    model_name = "gpt-4.1-mini"
+    api_key_location = "env::OPENAI_API_KEY"
+
+    [models.gpt-4-1-nano]
+    routing = ["openai"]
+
+    [models.gpt-4-1-nano.providers.openai]
+    type = "openai"
+    model_name = "gpt-4.1-nano"
+    api_key_location = "env::OPENAI_API_KEY"
+    {{- end }}
+
+    {{- if .Values.llm.googleApiKey }}
+    [models.gemini-pro]
+    routing = ["google"]
+
+    [models.gemini-pro.providers.google]
+    type = "google_ai_studio_gemini"
+    model_name = "gemini-2.5-pro"
+    api_key_location = "env::GEMINI_API_KEY"
+
+    [models.gemini-flash]
+    routing = ["google"]
+
+    [models.gemini-flash.providers.google]
+    type = "google_ai_studio_gemini"
+    model_name = "gemini-2.5-flash"
+    api_key_location = "env::GEMINI_API_KEY"
+    {{- end }}
+
+    [functions.chat]
+    type = "chat"
+
+    [functions.chat.variants.default]
+    type = "chat_completion"
+    model = "claude-sonnet"

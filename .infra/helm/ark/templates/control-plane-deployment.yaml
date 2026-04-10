@@ -52,6 +52,10 @@ spec:
                 secretKeyRef:
                   name: {{ include "ark.dbSecretName" . }}
                   key: DATABASE_URL
+            - name: ARK_TENSORZERO_URL
+              value: "http://localhost:3000"
+            - name: ARK_TENSORZERO_ENABLED
+              value: "1"
           {{- if or .Values.llm.anthropicApiKey .Values.llm.existingSecret }}
             - name: ANTHROPIC_API_KEY
               valueFrom:
@@ -93,6 +97,53 @@ spec:
           volumeMounts:
             - name: ark-data
               mountPath: /root/.ark
+        - name: tensorzero
+          image: "{{ .Values.tensorZero.image.repository | default "tensorzero/gateway" }}:{{ .Values.tensorZero.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.tensorZero.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: tensorzero
+              containerPort: 3000
+              protocol: TCP
+          volumeMounts:
+            - name: tensorzero-config
+              mountPath: /app/config
+          env:
+          {{- if or .Values.llm.anthropicApiKey .Values.llm.existingSecret }}
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ark.llmSecretName" . }}
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+          {{- end }}
+          {{- if or .Values.llm.openaiApiKey .Values.llm.existingSecret }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ark.llmSecretName" . }}
+                  key: OPENAI_API_KEY
+                  optional: true
+          {{- end }}
+          {{- if or .Values.llm.googleApiKey .Values.llm.existingSecret }}
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ark.llmSecretName" . }}
+                  key: GOOGLE_API_KEY
+                  optional: true
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: tensorzero
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml (.Values.tensorZero.resources | default (dict "requests" (dict "cpu" "100m" "memory" "128Mi") "limits" (dict "cpu" "500m" "memory" "256Mi"))) | nindent 12 }}
       volumes:
         - name: ark-data
           emptyDir: {}
+        - name: tensorzero-config
+          configMap:
+            name: {{ include "ark.fullname" . }}-tensorzero-config
+            optional: true

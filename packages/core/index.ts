@@ -9,7 +9,7 @@ export { BunSqliteAdapter } from "./database/index.js";
 // Re-exports
 export { getApp, setApp, clearApp, AppContext } from "./app.js";
 export { safeParseConfig } from "./util.js";
-export { loadConfig, type ArkConfig, type OtlpSettings, type RollbackSettings, type TelemetrySettings } from "./config.js";
+export { loadConfig, type ArkConfig, type OtlpSettings, type RollbackSettings, type TelemetrySettings, type TensorZeroSettings } from "./config.js";
 
 // Domain types (previously from store.ts, now from types/)
 export type { Session, Event, Compute, Message } from "../types/index.js";
@@ -229,6 +229,10 @@ export { saveFlowState, loadFlowState, markStageCompleted, setCurrentStage, isSt
 // Knowledge graph store
 export { KnowledgeStore } from "./knowledge/index.js";
 export type { KnowledgeNode, KnowledgeEdge, ContextPackage, NodeType, EdgeRelation } from "./knowledge/index.js";
+
+// TensorZero LLM gateway
+export { generateTensorZeroConfig, TensorZeroManager } from "./router/index.js";
+export type { TensorZeroConfigOpts, TensorZeroManagerOpts } from "./router/index.js";
 
 // GitHub issue webhook
 export { handleIssueWebhook, type IssueWebhookPayload, type IssueWebhookConfig } from "./integrations/github-webhook.js";

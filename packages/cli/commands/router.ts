@@ -1,7 +1,7 @@
 /**
  * CLI commands for the LLM Router.
  *
- * ark router start [--port 8430] [--policy balanced] [--config path]
+ * ark router start [--port 8430] [--policy balanced] [--tensorzero]
  * ark router status
  * ark router costs
  */
@@ -19,6 +19,9 @@ export function registerRouterCommands(program: Command) {
     .option("-p, --port <port>", "Listen port", "8430")
     .option("--policy <policy>", "Routing policy: quality, balanced, cost", "balanced")
     .option("--config <path>", "Path to router config YAML")
+    .option("--tensorzero", "Enable TensorZero gateway (starts Docker container)")
+    .option("--tensorzero-url <url>", "TensorZero URL (skip auto-start, use existing)")
+    .option("--tensorzero-port <port>", "TensorZero gateway port", "3000")
     .action(async (opts) => {
       const { loadRouterConfig, startRouter } = await import("../../router/index.js");
 
@@ -35,18 +38,50 @@ export function registerRouterCommands(program: Command) {
         process.exit(1);
       }
 
-      const server = startRouter(config);
+      // TensorZero setup
+      let tensorZeroUrl: string | undefined = opts.tensorzeroUrl;
+      let tzManager: any = null;
+
+      if (opts.tensorzero && !tensorZeroUrl) {
+        const { TensorZeroManager } = await import("../../core/router/index.js");
+        const tzPort = parseInt(opts.tensorzeroPort, 10);
+        tzManager = new TensorZeroManager({
+          port: tzPort,
+          anthropicKey: process.env.ANTHROPIC_API_KEY,
+          openaiKey: process.env.OPENAI_API_KEY,
+          geminiKey: process.env.GEMINI_API_KEY,
+        });
+
+        console.log(chalk.dim("Starting TensorZero gateway..."));
+        try {
+          await tzManager.start();
+          tensorZeroUrl = tzManager.url;
+          console.log(chalk.green(`TensorZero gateway running at ${tensorZeroUrl}`));
+        } catch (err) {
+          console.log(chalk.red(`Failed to start TensorZero: ${(err as Error).message}`));
+          console.log(chalk.dim("Falling back to direct provider dispatch."));
+        }
+      }
+
+      const server = startRouter(config, { tensorZeroUrl });
 
       console.log(chalk.green(`LLM Router running at ${server.url}`));
       console.log(chalk.dim(`Policy: ${config.policy}`));
+      if (tensorZeroUrl) {
+        console.log(chalk.dim(`TensorZero: ${tensorZeroUrl}`));
+      }
       console.log(chalk.dim(`Providers: ${config.providers.map(p => p.name).join(", ")}`));
       console.log(chalk.dim(`Models: ${config.providers.flatMap(p => p.models).length}`));
       console.log(chalk.dim("\nUsage:"));
       console.log(chalk.dim(`  curl ${server.url}/v1/chat/completions -d '{"model":"auto","messages":[{"role":"user","content":"hello"}]}'`));
       console.log(chalk.dim("\nPress Ctrl+C to stop"));
 
-      process.on("SIGINT", () => {
+      process.on("SIGINT", async () => {
         server.stop();
+        if (tzManager) {
+          console.log(chalk.dim("Stopping TensorZero..."));
+          await tzManager.stop();
+        }
         console.log(chalk.dim("\nRouter stopped."));
         process.exit(0);
       });
@@ -59,6 +94,7 @@ export function registerRouterCommands(program: Command) {
     .command("status")
     .description("Show router status and stats")
     .option("--url <url>", "Router URL", DEFAULT_ROUTER_URL)
+    .option("--tensorzero-url <url>", "TensorZero URL", process.env.ARK_TENSORZERO_URL ?? "http://localhost:3000")
     .action(async (opts) => {
       try {
         const [healthResp, statsResp] = await Promise.all([
@@ -79,6 +115,16 @@ export function registerRouterCommands(program: Command) {
         console.log(`  Uptime:     ${formatDuration(health.uptime_ms)}`);
         console.log(`  Providers:  ${(health.providers || []).join(", ")}`);
         console.log(`  Models:     ${health.models}`);
+
+        // TensorZero health check
+        let tzHealthy = false;
+        try {
+          const tzResp = await fetch(`${opts.tensorzeroUrl}/status`);
+          tzHealthy = tzResp.ok;
+        } catch { /* not running */ }
+
+        console.log(`  TensorZero: ${tzHealthy ? chalk.green("running") : chalk.dim("not running")} (${opts.tensorzeroUrl})`);
+
         console.log();
         console.log(chalk.bold("Stats"));
         console.log(`  Total requests:      ${stats.total_requests}`);
