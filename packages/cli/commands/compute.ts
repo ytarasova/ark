@@ -33,13 +33,28 @@ export function registerComputeCommands(program: Command) {
     .option("--namespace <ns>", "K8s namespace (k8s/k8s-kata provider)", "ark")
     .option("--kubeconfig <path>", "Path to kubeconfig (k8s/k8s-kata provider)")
     .option("--runtime-class <class>", "K8s runtime class (kata-fc for Firecracker)")
+    .option("--from-template <name>", "Use a compute template as defaults")
     .action(async (name, opts) => {
-      if (opts.provider === "local") {
-        console.log(chalk.red("Local compute is auto-created. Use 'ec2' or 'docker' provider."));
+      if (opts.provider === "local" && !opts.fromTemplate) {
+        console.log(chalk.red("Local compute is auto-created. Use 'ec2' or 'docker' provider, or --from-template."));
         return;
       }
       try {
         const ark = await getArkClient();
+
+        // Apply template defaults if specified
+        if (opts.fromTemplate) {
+          const tmpl = await ark.rpc("compute/template/get", { name: opts.fromTemplate });
+          if (!tmpl) {
+            console.log(chalk.red(`Template '${opts.fromTemplate}' not found.`));
+            return;
+          }
+          // Template sets provider unless user overrides
+          if (!opts.provider || opts.provider === "local") {
+            opts.provider = tmpl.provider;
+          }
+        }
+
         let config: Record<string, unknown>;
 
         if (opts.provider === "docker") {
@@ -75,6 +90,14 @@ export function registerComputeCommands(program: Command) {
           };
         } else {
           config = {};
+        }
+
+        // Merge template config as base, user options override
+        if (opts.fromTemplate) {
+          const tmpl = await ark.rpc("compute/template/get", { name: opts.fromTemplate });
+          if (tmpl?.config) {
+            config = { ...tmpl.config, ...config };
+          }
         }
 
         const compute = await ark.computeCreate({
@@ -423,6 +446,134 @@ export function registerComputeCommands(program: Command) {
         } else {
           console.log(chalk.red(`Pool '${name}' not found`));
         }
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
+
+  // ── Template subcommands ──────────────────────────────────────────────
+
+  const template = computeCmd.command("template").description("Manage compute templates");
+
+  template.command("list")
+    .description("List compute templates")
+    .action(async () => {
+      try {
+        const app = core.getApp();
+        const templates = app.computeTemplates.list();
+
+        // Also show config-defined templates
+        const configTemplates = app.config.computeTemplates ?? [];
+        const dbNames = new Set(templates.map(t => t.name));
+        const allTemplates = [
+          ...templates,
+          ...configTemplates.filter(t => !dbNames.has(t.name)).map(t => ({
+            name: t.name,
+            description: t.description,
+            provider: t.provider as any,
+            config: t.config,
+          })),
+        ];
+
+        if (!allTemplates.length) {
+          console.log(chalk.dim("No templates. Add to ~/.ark/config.yaml:"));
+          console.log(chalk.dim("  compute_templates:"));
+          console.log(chalk.dim("    gpu-large:"));
+          console.log(chalk.dim("      provider: ec2"));
+          console.log(chalk.dim("      size: l"));
+          console.log(chalk.dim("      region: us-east-1"));
+          return;
+        }
+
+        console.log(`  ${"NAME".padEnd(20)} ${"PROVIDER".padEnd(12)} DESCRIPTION`);
+        for (const t of allTemplates) {
+          console.log(`  ${t.name.padEnd(20)} ${t.provider.padEnd(12)} ${t.description ?? ""}`);
+        }
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
+
+  template.command("show")
+    .description("Show a compute template")
+    .argument("<name>", "Template name")
+    .action(async (name) => {
+      try {
+        const app = core.getApp();
+        let tmpl = app.computeTemplates.get(name);
+
+        // Fall back to config
+        if (!tmpl) {
+          const cfgTmpl = (app.config.computeTemplates ?? []).find(t => t.name === name);
+          if (cfgTmpl) {
+            tmpl = { name: cfgTmpl.name, description: cfgTmpl.description, provider: cfgTmpl.provider as any, config: cfgTmpl.config };
+          }
+        }
+
+        if (!tmpl) {
+          console.log(chalk.red(`Template '${name}' not found.`));
+          return;
+        }
+
+        console.log(chalk.bold(tmpl.name));
+        if (tmpl.description) console.log(`  Description: ${tmpl.description}`);
+        console.log(`  Provider:    ${tmpl.provider}`);
+        console.log(`  Config:`);
+        for (const [k, v] of Object.entries(tmpl.config)) {
+          console.log(`    ${k}: ${JSON.stringify(v)}`);
+        }
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
+
+  template.command("create")
+    .description("Create a compute template")
+    .argument("<name>", "Template name")
+    .option("--provider <type>", "Provider type", "ec2")
+    .option("--description <desc>", "Description")
+    .option("--size <size>", "Instance size (ec2)")
+    .option("--arch <arch>", "Architecture (ec2)")
+    .option("--region <region>", "Region (ec2)")
+    .option("--profile <profile>", "AWS profile (ec2)")
+    .option("--image <image>", "Docker image (docker)")
+    .option("--namespace <ns>", "K8s namespace (k8s)")
+    .action(async (name, opts) => {
+      try {
+        const app = core.getApp();
+        const config: Record<string, unknown> = {};
+        if (opts.size) config.size = opts.size;
+        if (opts.arch) config.arch = opts.arch;
+        if (opts.region) config.region = opts.region;
+        if (opts.profile) config.aws_profile = opts.profile;
+        if (opts.image) config.image = opts.image;
+        if (opts.namespace) config.namespace = opts.namespace;
+
+        app.computeTemplates.create({
+          name,
+          description: opts.description,
+          provider: opts.provider,
+          config,
+        });
+
+        console.log(chalk.green(`Template '${name}' created`));
+        console.log(`  Provider: ${opts.provider}`);
+        for (const [k, v] of Object.entries(config)) {
+          console.log(`  ${k}: ${v}`);
+        }
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
+
+  template.command("delete")
+    .description("Delete a compute template")
+    .argument("<name>", "Template name")
+    .action(async (name) => {
+      try {
+        const app = core.getApp();
+        app.computeTemplates.delete(name);
+        console.log(chalk.green(`Template '${name}' deleted`));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));
       }

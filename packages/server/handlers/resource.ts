@@ -206,6 +206,44 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const cleaned = await cleanZombieSessions(app);
     return { cleaned };
   });
+  // ── Compute templates ──────────────────────────────────────────────────
+  router.handle("compute/template/list", async () => {
+    const dbTemplates = app.computeTemplates.list();
+    const configTemplates = app.config.computeTemplates ?? [];
+    const dbNames = new Set(dbTemplates.map(t => t.name));
+    const merged = [
+      ...dbTemplates,
+      ...configTemplates.filter(t => !dbNames.has(t.name)).map(t => ({
+        name: t.name,
+        description: t.description,
+        provider: t.provider,
+        config: t.config,
+      })),
+    ];
+    return { templates: merged };
+  });
+  router.handle("compute/template/get", async (p) => {
+    const { name } = extract<{ name: string }>(p, ["name"]);
+    let tmpl = app.computeTemplates.get(name);
+    if (!tmpl) {
+      const cfgTmpl = (app.config.computeTemplates ?? []).find(t => t.name === name);
+      if (cfgTmpl) {
+        tmpl = { name: cfgTmpl.name, description: cfgTmpl.description, provider: cfgTmpl.provider as any, config: cfgTmpl.config };
+      }
+    }
+    return tmpl ?? null;
+  });
+  router.handle("compute/template/create", async (p) => {
+    const { name, provider, config, description } = extract<{ name: string; provider: string; config?: Record<string, unknown>; description?: string }>(p, ["name", "provider"]);
+    app.computeTemplates.create({ name, description, provider: provider as any, config: config ?? {} });
+    return { ok: true };
+  });
+  router.handle("compute/template/delete", async (p) => {
+    const { name } = extract<{ name: string }>(p, ["name"]);
+    app.computeTemplates.delete(name);
+    return { ok: true };
+  });
+
   router.handle("group/list", async () => ({ groups: app.sessions.getGroups() }));
   router.handle("group/create", async (p) => {
     const { name } = extract<GroupCreateParams>(p, ["name"]);

@@ -25,6 +25,7 @@ export interface ComputePoolRow {
   min_instances: number;
   max_instances: number;
   config: string;
+  tenant_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -39,13 +40,15 @@ export interface ComputePoolStatus extends ComputePool {
 export function initPoolSchema(db: { exec(sql: string): void }): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS compute_pools (
-      name TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
       provider TEXT NOT NULL,
       min_instances INTEGER NOT NULL DEFAULT 0,
       max_instances INTEGER NOT NULL DEFAULT 10,
       config TEXT DEFAULT '{}',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (name, tenant_id)
     );
   `);
 }
@@ -53,7 +56,12 @@ export function initPoolSchema(db: { exec(sql: string): void }): void {
 // ── Manager ────────────────────────────────────────────────────────────────
 
 export class ComputePoolManager {
+  private tenantId: string = "default";
+
   constructor(private app: AppContext) {}
+
+  setTenant(id: string): void { this.tenantId = id; }
+  getTenant(): string { return this.tenantId; }
 
   /** Ensure the compute_pools table exists. */
   ensureSchema(): void {
@@ -65,16 +73,16 @@ export class ComputePoolManager {
     this.ensureSchema();
     const ts = new Date().toISOString();
     this.app.db.prepare(`
-      INSERT INTO compute_pools (name, provider, min_instances, max_instances, config, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(pool.name, pool.provider, pool.min, pool.max, JSON.stringify(pool.config), ts, ts);
+      INSERT INTO compute_pools (name, provider, min_instances, max_instances, config, tenant_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(pool.name, pool.provider, pool.min, pool.max, JSON.stringify(pool.config), this.tenantId, ts, ts);
     return pool;
   }
 
   /** Get a pool by name. Returns null if not found. */
   getPool(name: string): ComputePool | null {
     this.ensureSchema();
-    const row = this.app.db.prepare("SELECT * FROM compute_pools WHERE name = ?").get(name) as ComputePoolRow | undefined;
+    const row = this.app.db.prepare("SELECT * FROM compute_pools WHERE name = ? AND tenant_id = ?").get(name, this.tenantId) as ComputePoolRow | undefined;
     if (!row) return null;
     return this._rowToPool(row);
   }
@@ -82,7 +90,7 @@ export class ComputePoolManager {
   /** Delete a pool definition. Returns true if deleted. */
   deletePool(name: string): boolean {
     this.ensureSchema();
-    const result = this.app.db.prepare("DELETE FROM compute_pools WHERE name = ?").run(name);
+    const result = this.app.db.prepare("DELETE FROM compute_pools WHERE name = ? AND tenant_id = ?").run(name, this.tenantId);
     return (result as any)?.changes > 0;
   }
 
@@ -154,7 +162,7 @@ export class ComputePoolManager {
   /** List all pools with their current utilization. */
   listPools(): ComputePoolStatus[] {
     this.ensureSchema();
-    const rows = this.app.db.prepare("SELECT * FROM compute_pools ORDER BY name").all() as ComputePoolRow[];
+    const rows = this.app.db.prepare("SELECT * FROM compute_pools WHERE tenant_id = ? ORDER BY name").all(this.tenantId) as ComputePoolRow[];
     const runningSessions = this.app.sessions.list({ status: "running" });
 
     return rows.map(row => {

@@ -58,6 +58,8 @@ export interface Session {
   breakpoint_reason: string | null;
   attached_by: string | null;
   config: SessionConfig;
+  /** User who created this session (multi-user mode). */
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -72,6 +74,7 @@ export interface CreateSessionOpts {
   workdir?: string;
   group_name?: string;
   config?: Partial<SessionConfig>;
+  user_id?: string;
 }
 
 export interface SessionListFilters {

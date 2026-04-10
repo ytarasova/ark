@@ -49,4 +49,23 @@ export interface CreateComputeOpts {
   name: string;
   provider?: ComputeProviderName;
   config?: Partial<ComputeConfig>;
+  /** Apply a named template's defaults before user config overrides. */
+  template?: string;
+}
+
+/**
+ * A reusable compute configuration preset.
+ * Stored in config.yaml (local) or DB (control plane).
+ */
+export interface ComputeTemplate {
+  /** Unique template name (e.g. "gpu-large", "sandbox", "quick"). */
+  name: string;
+  /** Human-readable description. */
+  description?: string;
+  /** Target provider. */
+  provider: ComputeProviderName;
+  /** Provider-specific config defaults. */
+  config: Partial<ComputeConfig>;
+  /** Tenant that owns this template (control plane only). */
+  tenant_id?: string;
 }

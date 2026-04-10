@@ -36,11 +36,14 @@ export function initPostgresSchema(db: IDatabase): void {
       breakpoint_reason TEXT,
       attached_by TEXT,
       config TEXT DEFAULT '{}',
+      user_id TEXT,
       tenant_id TEXT NOT NULL DEFAULT 'default',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
   `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`);
 
   // Events table
   db.exec(`
@@ -81,6 +84,20 @@ export function initPostgresSchema(db: IDatabase): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status)`);
 
+  // Compute templates table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS compute_templates (
+      name TEXT NOT NULL,
+      description TEXT,
+      provider TEXT NOT NULL,
+      config TEXT DEFAULT '{}',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (name, tenant_id)
+    )
+  `);
+
   // Messages table
   db.exec(`
     CREATE TABLE IF NOT EXISTS messages (
@@ -100,8 +117,10 @@ export function initPostgresSchema(db: IDatabase): void {
   // Groups table
   db.exec(`
     CREATE TABLE IF NOT EXISTS groups (
-      name TEXT PRIMARY KEY,
-      created_at TEXT NOT NULL
+      name TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (name, tenant_id)
     )
   `);
 
@@ -166,6 +185,8 @@ export function initPostgresSchema(db: IDatabase): void {
       group_name TEXT,
       enabled INTEGER NOT NULL DEFAULT 1,
       last_run TEXT,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      user_id TEXT,
       created_at TEXT NOT NULL
     )
   `);
@@ -187,23 +208,41 @@ export function initPostgresSchema(db: IDatabase): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)`);
 
+  // Resource definitions table (DB-backed stores for control plane)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS resource_definitions (
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      content TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (name, kind, tenant_id)
+    )
+  `);
+
   // Tenant indexes
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_tenant ON compute(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_messages_tenant ON messages(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_todos_tenant ON todos(tenant_id)`);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_groups_tenant ON groups(tenant_id)`);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_schedules_tenant ON schedules(tenant_id)`);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)`);
 
   // Compute pools table
   db.exec(`
     CREATE TABLE IF NOT EXISTS compute_pools (
-      name TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
       provider TEXT NOT NULL,
       min_instances INTEGER NOT NULL DEFAULT 0,
       max_instances INTEGER NOT NULL DEFAULT 10,
       config TEXT DEFAULT '{}',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (name, tenant_id)
     )
   `);
 

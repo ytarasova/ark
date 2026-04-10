@@ -17,6 +17,7 @@ import type { IDatabase } from "./database/index.js";
 import type { ArkConfig } from "./config.js";
 import type { SessionRepository } from "./repositories/session.js";
 import type { ComputeRepository } from "./repositories/compute.js";
+import type { ComputeTemplateRepository } from "./repositories/compute-template.js";
 import type { EventRepository } from "./repositories/event.js";
 import type { MessageRepository } from "./repositories/message.js";
 import type { TodoRepository } from "./repositories/todo.js";
@@ -46,6 +47,7 @@ export interface Cradle {
   // Repositories
   sessions: SessionRepository;
   computes: ComputeRepository;
+  computeTemplates: ComputeTemplateRepository;
   events: EventRepository;
   messages: MessageRepository;
   todos: TodoRepository;

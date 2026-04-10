@@ -33,6 +33,7 @@ interface SessionRow {
   breakpoint_reason: string | null;
   attached_by: string | null;
   config: string;
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,7 +63,7 @@ const SESSION_COLUMNS = new Set([
   "ticket", "summary", "repo", "branch", "compute_name", "session_id",
   "claude_session_id", "stage", "status", "flow", "agent", "workdir",
   "pr_url", "pr_id", "error", "parent_id", "fork_group", "group_name",
-  "breakpoint_reason", "attached_by", "config", "updated_at",
+  "breakpoint_reason", "attached_by", "config", "user_id", "updated_at",
 ]);
 
 // ── Repository ──────────────────────────────────────────────────────────────
@@ -84,13 +85,13 @@ export class SessionRepository {
 
     this.db.prepare(`
       INSERT INTO sessions (id, ticket, summary, repo, branch, compute_name,
-        workdir, stage, status, flow, agent, group_name, config, tenant_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?, ?, ?)
+        workdir, stage, status, flow, agent, group_name, config, user_id, tenant_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, opts.ticket ?? null, opts.summary ?? null, opts.repo ?? null,
       branch, opts.compute_name ?? null, opts.workdir ?? null,
       opts.flow ?? "default", opts.agent ?? null, opts.group_name ?? null,
-      JSON.stringify(opts.config ?? {}), this.tenantId, ts, ts,
+      JSON.stringify(opts.config ?? {}), opts.user_id ?? null, this.tenantId, ts, ts,
     );
 
     return this.get(id)!;
@@ -244,28 +245,29 @@ export class SessionRepository {
   getGroups(): Array<{ name: string; created_at: string }> {
     return this.db.prepare(`
       SELECT name, created_at FROM groups
+      WHERE tenant_id = ?
       ORDER BY name
-    `).all() as Array<{ name: string; created_at: string }>;
+    `).all(this.tenantId) as Array<{ name: string; created_at: string }>;
   }
 
   /** Return all group names — union of groups table + distinct session group_names, sorted. */
   getGroupNames(): string[] {
     const rows = this.db.prepare(`
-      SELECT name FROM groups
+      SELECT name FROM groups WHERE tenant_id = ?
       UNION
-      SELECT DISTINCT group_name FROM sessions WHERE group_name IS NOT NULL
+      SELECT DISTINCT group_name FROM sessions WHERE group_name IS NOT NULL AND tenant_id = ?
       ORDER BY 1
-    `).all() as { name: string }[];
+    `).all(this.tenantId, this.tenantId) as { name: string }[];
     return rows.map((r) => r.name);
   }
 
   createGroup(name: string): void {
-    this.db.prepare("INSERT OR IGNORE INTO groups (name, created_at) VALUES (?, ?)").run(name, now());
+    this.db.prepare("INSERT OR IGNORE INTO groups (name, tenant_id, created_at) VALUES (?, ?, ?)").run(name, this.tenantId, now());
   }
 
   deleteGroup(name: string): void {
-    this.db.prepare("DELETE FROM groups WHERE name = ?").run(name);
-    this.db.prepare("UPDATE sessions SET group_name = NULL WHERE group_name = ?").run(name);
+    this.db.prepare("DELETE FROM groups WHERE name = ? AND tenant_id = ?").run(name, this.tenantId);
+    this.db.prepare("UPDATE sessions SET group_name = NULL WHERE group_name = ? AND tenant_id = ?").run(name, this.tenantId);
   }
 
   /** List sessions in 'deleting' status (soft-deleted). */

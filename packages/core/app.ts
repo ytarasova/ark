@@ -34,9 +34,10 @@ import { registerExecutor } from "./executor.js";
 import { claudeCodeExecutor } from "./executors/claude-code.js";
 import { subprocessExecutor } from "./executors/subprocess.js";
 import { cliAgentExecutor } from "./executors/cli-agent.js";
-import { SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
+import { SessionRepository, ComputeRepository, ComputeTemplateRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
 import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "./stores/index.js";
+import { DbResourceStore, initResourceDefinitionsTable } from "./stores/db-resource-store.js";
 import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore } from "./stores/index.js";
 import type { SessionLauncher } from "./session-launcher.js";
 import { TmuxLauncher } from "./launchers/tmux.js";
@@ -121,6 +122,7 @@ export class AppContext {
 
   get sessions(): SessionRepository { return this._resolve("sessions"); }
   get computes(): ComputeRepository { return this._resolve("computes"); }
+  get computeTemplates(): ComputeTemplateRepository { return this._resolve("computeTemplates"); }
   get events(): EventRepository { return this._resolve("events"); }
   get messages(): MessageRepository { return this._resolve("messages"); }
   get todos(): TodoRepository { return this._resolve("todos"); }
@@ -245,12 +247,41 @@ export class AppContext {
     const scopedKnowledge = new KnowledgeStore(db);
     scopedKnowledge.setTenant(tenantId);
 
+    const scopedComputeTemplates = new ComputeTemplateRepository(db);
+    scopedComputeTemplates.setTenant(tenantId);
+
+    // UsageRecorder with tenant default
+    const scopedUsage = new UsageRecorder(db, this.pricing);
+    scopedUsage.setTenant(tenantId);
+
     Object.defineProperty(scoped, "sessions", { get: () => scopedSessions, configurable: true });
     Object.defineProperty(scoped, "computes", { get: () => scopedComputes, configurable: true });
+    Object.defineProperty(scoped, "computeTemplates", { get: () => scopedComputeTemplates, configurable: true });
     Object.defineProperty(scoped, "events", { get: () => scopedEvents, configurable: true });
     Object.defineProperty(scoped, "messages", { get: () => scopedMessages, configurable: true });
     Object.defineProperty(scoped, "todos", { get: () => scopedTodos, configurable: true });
     Object.defineProperty(scoped, "knowledge", { get: () => scopedKnowledge, configurable: true });
+    Object.defineProperty(scoped, "usageRecorder", { get: () => scopedUsage, configurable: true });
+
+    // Scope DB-backed resource stores (hosted mode only)
+    if (this.config.databaseUrl) {
+      const scopedAgents = new DbResourceStore(db, "agent", { description: "", model: "sonnet", max_turns: 200, system_prompt: "", tools: [], mcp_servers: [], skills: [], memories: [], context: [], permission_mode: "bypassPermissions", env: {} });
+      scopedAgents.setTenant(tenantId);
+      const scopedFlows = new DbResourceStore(db, "flow", { stages: [] });
+      scopedFlows.setTenant(tenantId);
+      const scopedSkills = new DbResourceStore(db, "skill", { description: "", content: "" });
+      scopedSkills.setTenant(tenantId);
+      const scopedRecipes = new DbResourceStore(db, "recipe", { description: "", flow: "default" });
+      scopedRecipes.setTenant(tenantId);
+      const scopedRuntimes = new DbResourceStore(db, "runtime", { description: "", type: "cli-agent", command: [] });
+      scopedRuntimes.setTenant(tenantId);
+
+      Object.defineProperty(scoped, "agents", { get: () => scopedAgents, configurable: true });
+      Object.defineProperty(scoped, "flows", { get: () => scopedFlows, configurable: true });
+      Object.defineProperty(scoped, "skills", { get: () => scopedSkills, configurable: true });
+      Object.defineProperty(scoped, "recipes", { get: () => scopedRecipes, configurable: true });
+      Object.defineProperty(scoped, "runtimes", { get: () => scopedRuntimes, configurable: true });
+    }
 
     return scoped;
   }
@@ -335,7 +366,22 @@ export class AppContext {
       seedLocalCompute(db);
     }
 
-    // 3a. Initialize API key manager
+    // 3a. Seed compute templates from config.yaml
+    if (this.config.computeTemplates?.length) {
+      const tmplRepo = new ComputeTemplateRepository(db);
+      for (const tmpl of this.config.computeTemplates) {
+        if (!tmplRepo.get(tmpl.name)) {
+          tmplRepo.create({
+            name: tmpl.name,
+            description: tmpl.description,
+            provider: tmpl.provider as any,
+            config: tmpl.config,
+          });
+        }
+      }
+    }
+
+    // 3b. Initialize API key manager
     this._apiKeys = new ApiKeyManager(db);
 
     // 3b. Register all dependencies in the container
@@ -348,6 +394,7 @@ export class AppContext {
       // Repositories
       sessions: asClass(SessionRepository).singleton(),
       computes: asClass(ComputeRepository).singleton(),
+      computeTemplates: asClass(ComputeTemplateRepository).singleton(),
       events: asClass(EventRepository).singleton(),
       messages: asClass(MessageRepository).singleton(),
       todos: asClass(TodoRepository).singleton(),
@@ -357,27 +404,8 @@ export class AppContext {
       computeService: asClass(ComputeService).singleton(),
       historyService: asClass(HistoryService).singleton(),
 
-      // Resource stores (constructed with config, not DI)
-      flows: asValue(new FileFlowStore({
-        builtinDir: join(storeBaseDir, "flows", "definitions"),
-        userDir: join(this.config.arkDir, "flows"),
-      })),
-      skills: asValue(new FileSkillStore({
-        builtinDir: join(storeBaseDir, "skills"),
-        userDir: join(this.config.arkDir, "skills"),
-      })),
-      agents: asValue(new FileAgentStore({
-        builtinDir: join(storeBaseDir, "agents"),
-        userDir: join(this.config.arkDir, "agents"),
-      })),
-      recipes: asValue(new FileRecipeStore({
-        builtinDir: join(storeBaseDir, "recipes"),
-        userDir: join(this.config.arkDir, "recipes"),
-      })),
-      runtimes: asValue(new FileRuntimeStore({
-        builtinDir: join(storeBaseDir, "runtimes"),
-        userDir: join(this.config.arkDir, "runtimes"),
-      })),
+      // Resource stores: file-backed for local mode, DB-backed for hosted/control plane
+      ...this.createResourceStores(db, storeBaseDir),
 
       // Knowledge graph
       knowledge: asValue(new KnowledgeStore(db)),
@@ -636,6 +664,48 @@ export class AppContext {
     if (_app === this) _app = null;
 
     this.phase = "stopped";
+  }
+
+  // ── Resource Store Factory ─────────────────────────────────────────────
+
+  private createResourceStores(db: IDatabase, storeBaseDir: string): Record<string, any> {
+    const isHosted = !!this.config.databaseUrl;
+
+    if (isHosted) {
+      // Control plane: DB-backed stores with tenant scoping
+      initResourceDefinitionsTable(db);
+      return {
+        flows: asValue(new DbResourceStore(db, "flow", { stages: [] })),
+        skills: asValue(new DbResourceStore(db, "skill", { description: "", content: "" })),
+        agents: asValue(new DbResourceStore(db, "agent", { description: "", model: "sonnet", max_turns: 200, system_prompt: "", tools: [], mcp_servers: [], skills: [], memories: [], context: [], permission_mode: "bypassPermissions", env: {} })),
+        recipes: asValue(new DbResourceStore(db, "recipe", { description: "", flow: "default" })),
+        runtimes: asValue(new DbResourceStore(db, "runtime", { description: "", type: "cli-agent", command: [] })),
+      };
+    }
+
+    // Local mode: file-backed stores with three-tier resolution
+    return {
+      flows: asValue(new FileFlowStore({
+        builtinDir: join(storeBaseDir, "flows", "definitions"),
+        userDir: join(this.config.arkDir, "flows"),
+      })),
+      skills: asValue(new FileSkillStore({
+        builtinDir: join(storeBaseDir, "skills"),
+        userDir: join(this.config.arkDir, "skills"),
+      })),
+      agents: asValue(new FileAgentStore({
+        builtinDir: join(storeBaseDir, "agents"),
+        userDir: join(this.config.arkDir, "agents"),
+      })),
+      recipes: asValue(new FileRecipeStore({
+        builtinDir: join(storeBaseDir, "recipes"),
+        userDir: join(this.config.arkDir, "recipes"),
+      })),
+      runtimes: asValue(new FileRuntimeStore({
+        builtinDir: join(storeBaseDir, "runtimes"),
+        userDir: join(this.config.arkDir, "runtimes"),
+      })),
+    };
   }
 
   // ── Metrics Poller ─────────────────────────────────────────────────────

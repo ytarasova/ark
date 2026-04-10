@@ -54,7 +54,12 @@ export interface DailyTrendRow {
 const VALID_GROUP_COLS = new Set(["model", "provider", "runtime", "agent_role", "session_id", "tenant_id", "user_id"]);
 
 export class UsageRecorder {
+  private tenantId: string = "default";
+
   constructor(private db: IDatabase, private pricing: PricingRegistry) {}
+
+  setTenant(id: string): void { this.tenantId = id; }
+  getTenant(): string { return this.tenantId; }
 
   /** Record a usage event. Called by executors, router, or transcript parser. */
   record(opts: RecordOpts): void {
@@ -65,7 +70,7 @@ export class UsageRecorder {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       opts.sessionId,
-      opts.tenantId ?? "default",
+      opts.tenantId ?? this.tenantId,
       opts.userId ?? "system",
       opts.model,
       opts.provider,

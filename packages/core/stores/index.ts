@@ -3,3 +3,4 @@ export { type SkillStore, FileSkillStore, type FileSkillStoreOpts } from "./skil
 export { type AgentStore, FileAgentStore, type FileAgentStoreOpts } from "./agent-store.js";
 export { type RecipeStore, FileRecipeStore, type FileRecipeStoreOpts } from "./recipe-store.js";
 export { type RuntimeStore, FileRuntimeStore, type FileRuntimeStoreOpts } from "./runtime-store.js";
+export { DbResourceStore, initResourceDefinitionsTable, type ResourceKind } from "./db-resource-store.js";

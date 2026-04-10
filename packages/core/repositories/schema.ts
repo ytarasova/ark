@@ -26,10 +26,13 @@ export function initSchema(db: IDatabase): void {
       breakpoint_reason TEXT,
       attached_by TEXT,
       config TEXT DEFAULT '{}',
+      user_id TEXT,
       tenant_id TEXT NOT NULL DEFAULT 'default',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,6 +66,17 @@ export function initSchema(db: IDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider);
     CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status);
 
+    CREATE TABLE IF NOT EXISTS compute_templates (
+      name TEXT NOT NULL,
+      description TEXT,
+      provider TEXT NOT NULL,
+      config TEXT DEFAULT '{}',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (name, tenant_id)
+    );
+
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id TEXT NOT NULL,
@@ -77,8 +91,10 @@ export function initSchema(db: IDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
 
     CREATE TABLE IF NOT EXISTS groups (
-      name TEXT PRIMARY KEY,
-      created_at TEXT NOT NULL
+      name TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (name, tenant_id)
     );
 
     CREATE TABLE IF NOT EXISTS claude_sessions_cache (
@@ -124,6 +140,8 @@ export function initSchema(db: IDatabase): void {
       group_name TEXT,
       enabled INTEGER NOT NULL DEFAULT 1,
       last_run TEXT,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      user_id TEXT,
       created_at TEXT NOT NULL
     );
 
@@ -141,6 +159,19 @@ export function initSchema(db: IDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
   `);
 
+  // Resource definitions table (DB-backed stores for control plane)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS resource_definitions (
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      content TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (name, kind, tenant_id)
+    )
+  `);
+
   // Migration: add tenant_id column to existing tables that lack it.
   // ALTER TABLE ADD COLUMN is safe to run -- SQLite errors if column exists,
   // so we catch and ignore.
@@ -150,12 +181,21 @@ export function initSchema(db: IDatabase): void {
   migrateAddColumn(db, "messages", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
   migrateAddColumn(db, "todos", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
 
+  // Migrations for groups, schedules, compute_pools tenant columns
+  migrateAddColumn(db, "groups", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
+  migrateAddColumn(db, "schedules", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
+  migrateAddColumn(db, "schedules", "user_id", "TEXT");
+  migrateAddColumn(db, "compute_pools", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
+
   // Tenant indexes
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_compute_tenant ON compute(tenant_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_messages_tenant ON messages(tenant_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_todos_tenant ON todos(tenant_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_groups_tenant ON groups(tenant_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_schedules_tenant ON schedules(tenant_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)");
 
   // Ensure api_keys table exists for existing DBs (CREATE TABLE IF NOT EXISTS handles it)
   safeExec(db, `

@@ -40,6 +40,14 @@ export interface TensorZeroSettings {
   autoStart: boolean;
 }
 
+export interface ComputeTemplateConfig {
+  /** Template name (key in config.yaml compute_templates map). */
+  name: string;
+  description?: string;
+  provider: string;
+  config: Record<string, unknown>;
+}
+
 export interface ArkConfig {
   arkDir: string;
   dbPath: string;
@@ -61,6 +69,8 @@ export interface ArkConfig {
   auth?: AuthConfig;
   /** TensorZero LLM gateway settings. */
   tensorZero?: TensorZeroSettings;
+  /** Predefined compute templates (local mode). */
+  computeTemplates?: ComputeTemplateConfig[];
   /** Database URL for hosted deployments. postgres://... uses PostgresAdapter; empty/undefined uses SQLite. */
   databaseUrl?: string;
   /** Redis URL for hosted SSE bus and cross-instance pub/sub. redis://... */
@@ -140,6 +150,7 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
       autoStart: (yaml.tensorzero as Record<string, unknown>)?.auto_start === true
         || (yaml.tensor_zero as Record<string, unknown>)?.auto_start === true,
     },
+    computeTemplates: parseComputeTemplates(yaml.compute_templates),
     databaseUrl: process.env.DATABASE_URL ?? (yaml.database_url as string) ?? undefined,
     redisUrl: process.env.REDIS_URL ?? (yaml.redis_url as string) ?? undefined,
   };
@@ -150,4 +161,27 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
   }
 
   return base;
+}
+
+/**
+ * Parse compute_templates from config.yaml.
+ * Accepts a map of name → { provider, description?, ...config } entries.
+ */
+function parseComputeTemplates(raw: unknown): ComputeTemplateConfig[] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const templates: ComputeTemplateConfig[] = [];
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!value || typeof value !== "object") continue;
+    const entry = value as Record<string, unknown>;
+    const provider = entry.provider as string;
+    if (!provider) continue;
+    const { provider: _p, description: _d, ...config } = entry;
+    templates.push({
+      name,
+      description: entry.description as string | undefined,
+      provider,
+      config,
+    });
+  }
+  return templates.length > 0 ? templates : undefined;
 }
