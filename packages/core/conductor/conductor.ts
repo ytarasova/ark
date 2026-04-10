@@ -27,7 +27,7 @@ import * as flow from "../flow.js";
 import { eventBus } from "../hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../../compute/index.js";
-import { indexSession } from "../search.js";
+import { indexSession } from "../search/search.js";
 import { listSchedules, cronMatches, updateScheduleLastRun } from "../schedule.js";
 import { pollPRReviews } from "../integrations/pr-poller.js";
 import { pollIssues } from "../integrations/issue-poller.js";

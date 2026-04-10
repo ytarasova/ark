@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { searchAllConversations } from "../global-search.js";
+import { searchAllConversations } from "../search/global-search.js";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 

@@ -5,8 +5,8 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { searchSessions, searchTranscripts } from "../../core/search.js";
-import { searchAllConversations } from "../../core/global-search.js";
+import { searchSessions, searchTranscripts } from "../../core/search/search.js";
+import { searchAllConversations } from "../../core/search/global-search.js";
 import type { KnowledgeNode } from "../../core/knowledge/types.js";
 import { generateRepoMap } from "../../core/repo-map.js";
 import { getHotkeys } from "../../core/hotkeys.js";

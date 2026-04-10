@@ -55,7 +55,7 @@ export * from "./tmux.js";
 export * from "./hooks.js";
 
 // Search
-export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, ftsTableExists, type SearchResult, type SearchOpts } from "./search.js";
+export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, ftsTableExists, type SearchResult, type SearchOpts } from "./search/search.js";
 
 // GitHub PR utilities (lookup, formatting)
 export { findSessionByPR, formatReviewPrompt, extractComments } from "./integrations/github-pr.js";
@@ -146,7 +146,7 @@ export { listProfiles, createProfile, deleteProfile, getActiveProfile, setActive
 export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./notify-daemon.js";
 
 // Global search
-export { searchAllConversations, type GlobalSearchResult } from "./global-search.js";
+export { searchAllConversations, type GlobalSearchResult } from "./search/global-search.js";
 
 // Tmux content-based status detection
 export { detectStatusFromContent, detectSessionStatus, stripAnsi, parseAgentProgress, type DetectedStatus } from "./observability/status-detect.js";

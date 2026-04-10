@@ -7,7 +7,7 @@ import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { getApp } from "../app.js";
-import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, readTranscriptTail } from "../search.js";
+import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, readTranscriptTail } from "../search/search.js";
 import type { MessageRole } from "../../types/index.js";
 import { withTestContext } from "./test-helpers.js";
 

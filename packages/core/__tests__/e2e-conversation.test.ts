@@ -12,7 +12,7 @@ import { writeFileSync, mkdirSync, appendFileSync } from "fs";
 import { join } from "path";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
-import { getSessionConversation, searchSessionConversation, searchTranscripts } from "../search.js";
+import { getSessionConversation, searchSessionConversation, searchTranscripts } from "../search/search.js";
 
 const TEST_PORT = 19197;
 let app: AppContext;

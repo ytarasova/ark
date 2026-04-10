@@ -6,7 +6,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, openSync, readSync, closeSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import type { AppContext } from "./app.js";
+import type { AppContext } from "../app.js";
 
 /**
  * Max bytes to read from the tail of large transcript files for indexing.

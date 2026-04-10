@@ -1,7 +1,7 @@
 import { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { searchSessions, getSessionConversation, searchSessionConversation } from "../../core/search.js";
+import { searchSessions, getSessionConversation, searchSessionConversation } from "../../core/search/search.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type {
   SessionIdParams,
