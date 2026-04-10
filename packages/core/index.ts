@@ -189,7 +189,7 @@ export { startHostedServer } from "./hosted/server.js";
 export { TenantPolicyManager, type TenantComputePolicy, type ComputePoolRef } from "./auth/index.js";
 
 // Compute pools
-export { ComputePoolManager, type ComputePool, type ComputePoolStatus, initPoolSchema } from "./compute-pool.js";
+export { ComputePoolManager, type ComputePool, type ComputePoolStatus, initPoolSchema } from "./compute/pool.js";
 
 // Runtime evals (knowledge-backed agent performance tracking)
 export { evaluateSession, getAgentStats, detectDrift, listEvals } from "./knowledge/evals.js";

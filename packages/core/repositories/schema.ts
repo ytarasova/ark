@@ -1,5 +1,5 @@
 import type { IDatabase } from "../database/index.js";
-import { initPoolSchema } from "../compute-pool.js";
+import { initPoolSchema } from "../compute/pool.js";
 
 export function initSchema(db: IDatabase): void {
   db.exec(`

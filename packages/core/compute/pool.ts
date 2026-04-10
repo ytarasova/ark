@@ -6,8 +6,8 @@
  * When a session completes, its compute is released back to the pool for reuse.
  */
 
-import type { AppContext } from "./app.js";
-import type { Compute } from "../types/index.js";
+import type { AppContext } from "../app.js";
+import type { Compute } from "../../types/index.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
