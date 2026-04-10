@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "atlassian": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-atlassian"],
+      "env": {
+        "JIRA_API_TOKEN": "${JIRA_API_TOKEN}",
+        "JIRA_BASE_URL": "${JIRA_BASE_URL}",
+        "JIRA_USER_EMAIL": "${JIRA_USER_EMAIL}",
+        "CONFLUENCE_API_TOKEN": "${CONFLUENCE_API_TOKEN}",
+        "CONFLUENCE_BASE_URL": "${CONFLUENCE_BASE_URL}"
+      }
+    }
+  }
+}

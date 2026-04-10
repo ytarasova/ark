@@ -1,0 +1,11 @@
+name: islc-quick
+description: "Fast ISLC pipeline -- skip audit and retro stages"
+flow: islc-quick
+variables:
+  - name: ticket
+    description: "Jira ticket key (e.g. IN-1234)"
+    required: true
+  - name: repo
+    description: Repository path
+    required: true
+summary: "ISLC Quick: {ticket}"

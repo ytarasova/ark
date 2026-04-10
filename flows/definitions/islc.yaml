@@ -1,0 +1,59 @@
+name: islc
+description: "Intent-to-Software Lifecycle -- Jira ticket to merged PR"
+stages:
+  - name: ticket-intake
+    agent: ticket-intake
+    gate: auto
+    task: |
+      Process Jira ticket {ticket}. Run sanity gate and extract 27-section spec.
+      Write artifacts to {workdir}/.workflow/{ticket}/
+
+  - name: plan
+    agent: islc-planner
+    gate: manual
+    depends_on: [ticket-intake]
+    task: |
+      Read spec from {workdir}/.workflow/{ticket}/spec.md.
+      Decompose into subtasks, create Jira sub-tasks.
+
+  - name: audit
+    agent: plan-auditor
+    gate: auto
+    depends_on: [plan]
+    optional: true
+    task: |
+      Audit plan coverage against spec. Write audit-report.md.
+
+  - name: execute
+    type: fan_out
+    agent: islc-implementer
+    gate: auto
+    depends_on: [audit]
+    max_parallel: 4
+    task: |
+      Execute subtasks from plan. Each child implements one subtask.
+
+  - name: verify
+    agent: islc-verifier
+    gate: manual
+    depends_on: [execute]
+    verify:
+      - "npm test"
+      - "npm run lint"
+    task: |
+      Run verification layers. Write verify-report.md.
+
+  - name: close
+    agent: islc-closer
+    gate: auto
+    depends_on: [verify]
+    task: |
+      Create PR, transition Jira, publish Confluence.
+
+  - name: retro
+    agent: islc-retro
+    gate: auto
+    depends_on: [close]
+    optional: true
+    task: |
+      Analyse workflow run. Write retro-report.md.

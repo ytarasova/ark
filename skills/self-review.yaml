@@ -1,0 +1,44 @@
+name: self-review
+description: Pre-PR code review checklist for quality assurance
+prompt: |
+  Perform a structured self-review of all code changes on the feature branch
+  before raising a pull request. Run through each checklist item and mark
+  it PASS or FAIL.
+
+  ## Code Quality
+  - [ ] No dead code, commented-out blocks, or unused imports left in.
+  - [ ] No debug statements (console.log, debugger, print) left in production code.
+  - [ ] Error handling is complete -- no bare catch blocks or silent swallows.
+  - [ ] Logging follows project conventions (structured logging, appropriate levels).
+  - [ ] No unnecessary complexity introduced (KISS principle).
+  - [ ] Functions/methods are reasonably sized (< 50 lines preferred).
+
+  ## Documentation
+  - [ ] All new public functions/methods have docstrings or JSDoc comments.
+  - [ ] Complex logic has inline comments explaining the "why".
+  - [ ] CHANGELOG or release notes updated (if project requires it).
+  - [ ] README updated if any user-facing behavior changed.
+
+  ## Data & Migrations
+  - [ ] Migration scripts are idempotent and reversible.
+  - [ ] No breaking schema changes without a migration plan.
+  - [ ] Default values provided for new required fields.
+
+  ## Security
+  - [ ] Secrets/credentials are NOT committed (check for .env files, API keys).
+  - [ ] No sensitive data logged or exposed in error responses.
+
+  ## Scope
+  - [ ] PR is scoped to the ticket only -- no unrelated changes bundled in.
+  - [ ] No files accidentally included (build artifacts, IDE configs, node_modules).
+  - [ ] Git history is clean (no merge commits from main, no fixup commits left).
+
+  ## Tests
+  - [ ] All new code paths have corresponding tests.
+  - [ ] Edge cases and error conditions are tested.
+  - [ ] Tests are deterministic (no flaky tests introduced).
+  - [ ] Test names clearly describe what they verify.
+
+  If any item is FAIL, fix it before proceeding. List all findings with
+  file locations and recommended fixes.
+tags: [islc, review, quality]

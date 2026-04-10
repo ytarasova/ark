@@ -1,0 +1,43 @@
+name: islc-quick
+description: "Fast ISLC -- ticket intake -> plan -> execute -> verify -> close (skip audit + retro)"
+stages:
+  - name: ticket-intake
+    agent: ticket-intake
+    gate: auto
+    task: |
+      Process Jira ticket {ticket}. Run sanity gate and extract 27-section spec.
+      Write artifacts to {workdir}/.workflow/{ticket}/
+
+  - name: plan
+    agent: islc-planner
+    gate: manual
+    depends_on: [ticket-intake]
+    task: |
+      Read spec from {workdir}/.workflow/{ticket}/spec.md.
+      Decompose into subtasks, create Jira sub-tasks.
+
+  - name: execute
+    type: fan_out
+    agent: islc-implementer
+    gate: auto
+    depends_on: [plan]
+    max_parallel: 4
+    task: |
+      Execute subtasks from plan. Each child implements one subtask.
+
+  - name: verify
+    agent: islc-verifier
+    gate: auto
+    depends_on: [execute]
+    verify:
+      - "npm test"
+      - "npm run lint"
+    task: |
+      Run verification layers. Write verify-report.md.
+
+  - name: close
+    agent: islc-closer
+    gate: auto
+    depends_on: [verify]
+    task: |
+      Create PR, transition Jira, publish Confluence.

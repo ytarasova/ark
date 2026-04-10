@@ -1,0 +1,46 @@
+name: security-scan
+description: Security review checklist for code verification
+prompt: |
+  Perform a security review of all code changes on the feature branch.
+  Run the project's configured security scanner if available (e.g. npm audit,
+  trivy, bandit). If no scanner is configured, perform a manual review.
+
+  ## Automated Scan
+  - Run `npm audit` or equivalent dependency vulnerability scanner.
+  - Run `trivy fs .` or equivalent container/filesystem scanner if available.
+  - Capture all findings with severity levels.
+
+  ## Manual Review Checklist
+  Check for the following in all changed files:
+
+  1. Hardcoded secrets or credentials (API keys, passwords, tokens, connection
+     strings). Check for patterns like `password =`, `api_key =`, `secret =`,
+     or Base64-encoded strings that look like credentials.
+  2. SQL injection vectors in any new or modified query strings. Look for
+     string concatenation or template literals building SQL queries instead
+     of parameterized queries.
+  3. Unvalidated user input in new API endpoints. Check that all request
+     body fields, query params, and path params are validated/sanitized
+     before use.
+  4. Insecure dependency versions introduced. Cross-reference any new
+     dependencies against known CVE databases.
+  5. Cross-site scripting (XSS) vectors in any rendered HTML or JSX.
+     Check for unsafe HTML injection patterns, unescaped template output,
+     or direct innerHTML assignments. Ensure all user-provided content is
+     sanitized before rendering.
+  6. Insecure cryptographic practices (weak hashing algorithms like MD5/SHA1
+     for passwords, hardcoded IVs, ECB mode).
+  7. Directory traversal vulnerabilities in file path handling.
+  8. Missing authentication or authorization checks on new endpoints.
+  9. Sensitive data exposure in logs, error messages, or API responses.
+  10. Insecure deserialization of untrusted data.
+
+  ## Output Format
+  For each finding:
+  - File and line number
+  - Severity: CRITICAL / HIGH / MEDIUM / LOW
+  - Description of the vulnerability
+  - Recommended fix
+
+  Final verdict: PASS | WARN (non-critical only) | FAIL (any critical/high)
+tags: [islc, security, verification]

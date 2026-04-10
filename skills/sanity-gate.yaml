@@ -1,0 +1,28 @@
+name: sanity-gate
+description: 11-field sanity gate checklist for Jira ticket readiness
+prompt: |
+  Evaluate the Jira ticket against all 11 required fields. Mark each as
+  PASS / FAIL / WARN and display a formatted gate table.
+
+  1.  Summary present and non-trivial (> 10 chars)
+  2.  Description present and non-trivial (> 50 chars)
+  3.  Acceptance criteria explicitly defined
+  4.  Priority set (not default/unset)
+  5.  Assignee set
+  6.  Reporter set
+  7.  Epic or parent link present
+  8.  Story-point estimate present
+  9.  Target sprint or fix version set
+  10. No blocking linked issues unresolved
+  11. Labels include at least one team/domain tag
+
+  If ANY field is FAIL, output "SANITY: FAIL -- <list of failed fields>" and
+  recommend the ticket be sent back for enrichment before entering the pipeline.
+
+  If all fields are PASS or WARN, output "SANITY: PASS" and note any warnings
+  for the operator to review.
+
+  Format the output as a Markdown table:
+  | # | Field | Value | Status |
+  |---|-------|-------|--------|
+tags: [islc, gate, quality]

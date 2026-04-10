@@ -1,0 +1,43 @@
+name: plan-audit
+description: Coverage matrix methodology for auditing plan against spec
+prompt: |
+  Audit the execution plan against the specification using a coverage matrix.
+
+  ## Step 1 -- Requirement Extraction
+  From the specification, extract a flat list of atomic requirements.
+  Assign each a unique ID (R-<N>) and a criticality level:
+  - CRITICAL: Acceptance Criteria, Security & Compliance, Non-Functional Requirements
+  - HIGH: Functional Requirements, API Contract, Data Model Changes
+  - MEDIUM: UI/UX, Analytics, Error Handling, Localisation
+  - LOW: Documentation, Observability improvements, Nice-to-haves
+
+  ## Step 2 -- Coverage Mapping
+  For each requirement R-<N>:
+  - Identify which subtask(s) T-<N> in the plan address it (use AC Refs field).
+  - Mark as: COVERED | PARTIAL | UNCOVERED.
+
+  Build a coverage matrix:
+  | Req ID | Criticality | Description (brief) | Covered By | Status   |
+  |--------|-------------|---------------------|------------|----------|
+  | R-1    | CRITICAL    | ...                 | T-2, T-5   | COVERED  |
+  | R-2    | HIGH        | ...                 | T-3        | PARTIAL  |
+  | R-7    | CRITICAL    | ...                 | --         | UNCOVERED|
+
+  ## Step 3 -- Gap Analysis
+  Identify all UNCOVERED or PARTIAL requirements. For each gap:
+  - State the requirement and its criticality.
+  - Suggest one or more remediation options:
+    a. Add a new subtask to cover it.
+    b. Expand an existing subtask's scope.
+    c. Flag as out-of-scope (requires PO sign-off).
+
+  ## Step 4 -- Audit Verdict
+  Compute:
+  - Total requirements: <N>
+  - Covered: <N> | Partial: <N> | Uncovered: <N>
+  - Coverage score: <percent>%
+
+  If any CRITICAL requirement is UNCOVERED, output "AUDIT: FAIL" and list
+  all blocking gaps. Otherwise output "AUDIT: PASS" with warnings for any
+  MEDIUM/LOW gaps.
+tags: [islc, audit, coverage]

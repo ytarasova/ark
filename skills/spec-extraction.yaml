@@ -1,0 +1,43 @@
+name: spec-extraction
+description: 27-section specification extraction from a Jira ticket
+prompt: |
+  Extract a full 27-section specification from the ticket data. For sections
+  where information is not present, write "NOT SPECIFIED -- clarification required."
+
+  1.  Business Objective
+  2.  Problem Statement
+  3.  Success Metrics / KPIs
+  4.  In-Scope Features
+  5.  Out-of-Scope Items
+  6.  User Personas Affected
+  7.  User Stories / Use Cases
+  8.  Acceptance Criteria (verbatim from ticket)
+  9.  Functional Requirements
+  10. Non-Functional Requirements (performance, availability, SLA)
+  11. Security & Compliance Requirements
+  12. Data Model Changes (new tables, columns, migrations)
+  13. API Contract Changes (new/modified endpoints, payloads)
+  14. UI / UX Requirements:
+      - Scan the ticket description, comments, and attachments for any Figma URLs
+        (matching figma.com/design/, figma.com/board/, or figma.com/make/).
+      - For each Figma URL found, extract the fileKey and nodeId from the URL,
+        then call the Figma MCP tool get_design_context with those values.
+      - If the design uses a design-system, call get_variable_defs to capture
+        colour/spacing tokens and include them in this section.
+      - Capture and embed a screenshot via get_screenshot so that downstream
+        stages have a visual reference.
+      - If no Figma URL is found, write "NOT SPECIFIED -- no Figma link provided."
+  15. Integration Points (external services, internal services)
+  16. Dependencies (other tickets, teams, services)
+  17. Configuration / Feature-Flag Changes
+  18. Localisation / i18n Impact
+  19. Analytics / Tracking Events
+  20. Error Handling & Edge Cases
+  21. Test Requirements (unit, integration, E2E, UAT)
+  22. Documentation Requirements (Confluence, README, ADR)
+  23. Deployment Strategy (rollout plan, feature flags, dark launch)
+  24. Rollback Strategy
+  25. Observability (logging, alerting, dashboards)
+  26. Open Questions (items needing PO/stakeholder sign-off)
+  27. Definition of Done (checklist pulled from ticket or org default)
+tags: [islc, spec, intake]
