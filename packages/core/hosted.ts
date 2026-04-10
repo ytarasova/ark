@@ -11,7 +11,7 @@ import type { ArkConfig } from "./config.js";
 import { AppContext, setApp } from "./app.js";
 import { WorkerRegistry } from "./worker-registry.js";
 import { SessionScheduler } from "./scheduler.js";
-import { TenantPolicyManager } from "./tenant-policy.js";
+import { TenantPolicyManager } from "./auth/index.js";
 
 export async function startHostedServer(config: ArkConfig): Promise<{
   app: AppContext;

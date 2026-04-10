@@ -2,7 +2,7 @@ import { join } from "path";
 import { homedir } from "os";
 import { existsSync, readFileSync } from "fs";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ROUTER_URL } from "./constants.js";
-import type { AuthConfig } from "./auth.js";
+import type { AuthConfig } from "./auth/index.js";
 
 export interface OtlpSettings {
   enabled: boolean;

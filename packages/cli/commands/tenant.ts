@@ -10,7 +10,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import * as core from "../../core/index.js";
-import { TenantPolicyManager } from "../../core/tenant-policy.js";
+import { TenantPolicyManager } from "../../core/auth/index.js";
 
 export function registerTenantCommands(program: Command) {
   const tenant = program.command("tenant").description("Manage tenant settings");

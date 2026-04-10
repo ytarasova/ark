@@ -40,10 +40,10 @@ import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRun
 import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore } from "./stores/index.js";
 import type { SessionLauncher } from "./session-launcher.js";
 import { TmuxLauncher } from "./launchers/tmux.js";
-import { ApiKeyManager } from "./api-keys.js";
+import { ApiKeyManager } from "./auth/index.js";
 import type { WorkerRegistry } from "./worker-registry.js";
 import type { SessionScheduler } from "./scheduler.js";
-import type { TenantPolicyManager } from "./tenant-policy.js";
+import type { TenantPolicyManager } from "./auth/index.js";
 import { KnowledgeStore } from "./knowledge/store.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────

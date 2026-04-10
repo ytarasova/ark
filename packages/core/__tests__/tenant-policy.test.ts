@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext, setApp, clearApp } from "../app.js";
-import { TenantPolicyManager } from "../tenant-policy.js";
+import { TenantPolicyManager } from "../auth/index.js";
 
 let app: AppContext;
 let pm: TenantPolicyManager;

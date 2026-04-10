@@ -21,7 +21,7 @@ import { registerAllHandlers } from "../server/register.js";
 import { DEFAULT_CHANNEL_BASE_URL } from "./constants.js";
 import { handleIssueWebhook, type IssueWebhookConfig, type IssueWebhookPayload } from "./github-webhook.js";
 import { type SSEBus, createSSEBus } from "./sse-bus.js";
-import { extractTenantContext, canWrite, type AuthConfig } from "./auth.js";
+import { extractTenantContext, canWrite, type AuthConfig } from "./auth/index.js";
 import type { TenantContext } from "../types/index.js";
 
 const WEB_DIST = join(import.meta.dir, "../../packages/web/dist");

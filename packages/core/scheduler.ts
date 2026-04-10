@@ -13,7 +13,7 @@
 import type { AppContext } from "./app.js";
 import type { Session } from "../types/index.js";
 import type { WorkerNode } from "./worker-registry.js";
-import type { TenantPolicyManager, TenantComputePolicy } from "./tenant-policy.js";
+import type { TenantPolicyManager, TenantComputePolicy } from "./auth/index.js";
 
 export class SessionScheduler {
   private policyManager: TenantPolicyManager | null = null;

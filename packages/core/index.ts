@@ -186,7 +186,7 @@ export { SessionScheduler } from "./scheduler.js";
 export { startHostedServer } from "./hosted.js";
 
 // Tenant compute policies
-export { TenantPolicyManager, type TenantComputePolicy, type ComputePoolRef } from "./tenant-policy.js";
+export { TenantPolicyManager, type TenantComputePolicy, type ComputePoolRef } from "./auth/index.js";
 
 // Compute pools
 export { ComputePoolManager, type ComputePool, type ComputePoolStatus, initPoolSchema } from "./compute-pool.js";
@@ -259,8 +259,8 @@ export type { AgentDefinition as AgentDefinitionDomain } from "../types/index.js
 export type { GateType } from "../types/index.js";
 
 // Auth and multi-tenancy
-export { extractTenantContext, canWrite, isAdmin, DEFAULT_AUTH_CONFIG, DEFAULT_TENANT_CONTEXT, type AuthConfig } from "./auth.js";
-export { ApiKeyManager } from "./api-keys.js";
+export { extractTenantContext, canWrite, isAdmin, DEFAULT_AUTH_CONFIG, DEFAULT_TENANT_CONTEXT, type AuthConfig } from "./auth/index.js";
+export { ApiKeyManager } from "./auth/index.js";
 export type { TenantContext, ApiKey } from "../types/index.js";
 
 // Repositories
