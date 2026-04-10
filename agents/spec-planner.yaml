@@ -1,4 +1,4 @@
-name: islc-planner
+name: spec-planner
 description: "Decomposes spec into ordered subtasks, creates Jira sub-tasks"
 model: opus
 max_turns: 100

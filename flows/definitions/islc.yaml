@@ -1,5 +1,5 @@
 name: islc
-description: "Intent-to-Software Lifecycle -- Jira ticket to merged PR"
+description: "Intent-to-Software Lifecycle -- full pipeline from Jira ticket to merged PR with fan-out execution"
 stages:
   - name: ticket-intake
     agent: ticket-intake
@@ -9,7 +9,7 @@ stages:
       Write artifacts to {workdir}/.workflow/{ticket}/
 
   - name: plan
-    agent: islc-planner
+    agent: spec-planner
     gate: manual
     depends_on: [ticket-intake]
     task: |
@@ -26,7 +26,7 @@ stages:
 
   - name: execute
     type: fan_out
-    agent: islc-implementer
+    agent: task-implementer
     gate: auto
     depends_on: [audit]
     max_parallel: 4
@@ -34,7 +34,7 @@ stages:
       Execute subtasks from plan. Each child implements one subtask.
 
   - name: verify
-    agent: islc-verifier
+    agent: verifier
     gate: manual
     depends_on: [execute]
     verify:
@@ -44,14 +44,14 @@ stages:
       Run verification layers. Write verify-report.md.
 
   - name: close
-    agent: islc-closer
+    agent: closer
     gate: auto
     depends_on: [verify]
     task: |
       Create PR, transition Jira, publish Confluence.
 
   - name: retro
-    agent: islc-retro
+    agent: retro
     gate: auto
     depends_on: [close]
     optional: true

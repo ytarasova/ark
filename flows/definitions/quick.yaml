@@ -1,20 +1,17 @@
 name: quick
-description: "Quick flow: implement → PR → build (no planning or review stages)"
+description: "Quick flow: implement -> verify -> PR (no planning, no review)"
 stages:
   - name: implement
     agent: implementer
     gate: auto
     on_failure: "retry(3)"
 
+  - name: verify
+    agent: verifier
+    gate: auto
+    depends_on: [implement]
+
   - name: pr
     action: create_pr
     gate: auto
-
-  - name: build
-    action: wait_flow
-    gate: auto
-    on_failure: notify
-
-  - name: merge
-    action: merge_pr
-    gate: manual
+    depends_on: [verify]

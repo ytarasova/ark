@@ -1,4 +1,4 @@
-name: islc-verifier
+name: verifier
 description: "Runs verification layers: tests, security, AC, design UAT"
 model: sonnet
 max_turns: 100

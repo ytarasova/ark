@@ -1,39 +1,74 @@
 name: default
-description: "Default SDLC flow: plan → implement → PR → review → build → merge → close"
+description: "Full SDLC flow: intake -> plan -> audit -> implement -> verify -> PR -> review -> close -> retro"
 stages:
+  - name: intake
+    agent: ticket-intake
+    gate: auto
+    optional: true
+    task: |
+      Process ticket {ticket}. Run sanity gate and extract specification.
+      Write artifacts to {workdir}/.workflow/{ticket}/
+      If no ticket provided, skip this stage.
+
   - name: plan
-    agent: planner
+    agent: spec-planner
     gate: manual
-    artifacts:
-      - PLAN.md
+    depends_on: [intake]
+    task: |
+      Analyse {summary} and create PLAN.md with implementation strategy.
+      If spec exists at {workdir}/.workflow/{ticket}/spec.md, use it.
+      Decompose into independently-executable subtasks.
+
+  - name: audit
+    agent: plan-auditor
+    gate: auto
+    depends_on: [plan]
+    optional: true
+    task: |
+      Audit plan coverage against spec requirements.
+      Write audit-report.md with coverage matrix and gap analysis.
 
   - name: implement
     agent: implementer
     gate: auto
+    depends_on: [audit]
     on_failure: "retry(3)"
+    task: |
+      Implement {summary}. Follow the plan from PLAN.md.
+      Write code, tests, and commit.
+
+  - name: verify
+    agent: verifier
+    gate: auto
+    depends_on: [implement]
+    verify:
+      - "npm test"
+      - "npm run lint"
+    task: |
+      Run verification: tests, security scan, code quality, AC validation.
+      Write verify-report.md.
 
   - name: pr
     action: create_pr
     gate: auto
+    depends_on: [verify]
 
   - name: review
     agent: reviewer
-    gate: auto
-
-  - name: build
-    action: wait_flow
-    gate: auto
-    on_failure: notify
-
-  - name: merge
-    action: merge_pr
     gate: manual
+    depends_on: [pr]
 
   - name: close
-    action: close_ticket
+    agent: closer
     gate: auto
+    depends_on: [review]
+    task: |
+      Transition ticket to done. Publish implementation notes.
 
-  - name: docs
-    agent: documenter
+  - name: retro
+    agent: retro
     gate: auto
+    depends_on: [close]
     optional: true
+    task: |
+      Analyse workflow run. Generate improvement recommendations.

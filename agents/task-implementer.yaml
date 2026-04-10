@@ -1,4 +1,4 @@
-name: islc-implementer
+name: task-implementer
 description: "Implements a single subtask from the ISLC plan"
 model: opus
 max_turns: 200

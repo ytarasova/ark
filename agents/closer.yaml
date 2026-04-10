@@ -1,4 +1,4 @@
-name: islc-closer
+name: closer
 description: "Creates PR, transitions Jira, publishes Confluence implementation page"
 model: sonnet
 max_turns: 50

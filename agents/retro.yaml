@@ -1,4 +1,4 @@
-name: islc-retro
+name: retro
 description: "Automated retrospective on the ISLC workflow run"
 model: sonnet
 max_turns: 50
