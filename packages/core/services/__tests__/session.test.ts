@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
+import { BunSqliteAdapter } from "../../database-sqlite.js";
+import type { IDatabase } from "../../database.js";
 import { SessionService } from "../session.js";
 import { SessionRepository } from "../../repositories/session.js";
 import { EventRepository } from "../../repositories/event.js";
@@ -7,14 +9,14 @@ import { MessageRepository } from "../../repositories/message.js";
 import { initSchema } from "../../repositories/schema.js";
 import type { Session, SessionStatus, SessionOpResult } from "../../../types/index.js";
 
-let db: Database;
+let db: IDatabase;
 let sessions: SessionRepository;
 let events: EventRepository;
 let messages: MessageRepository;
 let svc: SessionService;
 
 beforeEach(() => {
-  db = new Database(":memory:");
+  db = new BunSqliteAdapter(new Database(":memory:"));
   initSchema(db);
   sessions = new SessionRepository(db);
   events = new EventRepository(db);

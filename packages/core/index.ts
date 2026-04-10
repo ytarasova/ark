@@ -2,6 +2,10 @@
  * Ark Core - public API.
  */
 
+// Database abstraction
+export type { IDatabase, IStatement } from "./database.js";
+export { BunSqliteAdapter } from "./database-sqlite.js";
+
 // Re-exports
 export { getApp, setApp, clearApp, AppContext } from "./app.js";
 export { safeParseConfig } from "./util.js";

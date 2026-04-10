@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import type { IDatabase } from "../database.js";
 import type {
   Compute,
   ComputeStatus,
@@ -47,7 +47,7 @@ const COMPUTE_COLUMNS = new Set([
 // ── Repository ──────────────────────────────────────────────────────────────
 
 export class ComputeRepository {
-  constructor(private db: Database) {}
+  constructor(private db: IDatabase) {}
 
   create(opts: CreateComputeOpts): Compute {
     const ts = now();
@@ -123,7 +123,7 @@ export class ComputeRepository {
       const merged = { ...existing, ...patch };
       this.db.prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ?")
         .run(JSON.stringify(merged), new Date().toISOString(), name);
-    })();
+    });
     return this.get(name);
   }
 }

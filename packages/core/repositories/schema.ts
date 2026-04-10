@@ -1,6 +1,6 @@
-import { Database } from "bun:sqlite";
+import type { IDatabase } from "../database.js";
 
-export function initSchema(db: Database): void {
+export function initSchema(db: IDatabase): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
@@ -123,7 +123,7 @@ export function initSchema(db: Database): void {
   `);
 }
 
-export function seedLocalCompute(db: Database): void {
+export function seedLocalCompute(db: IDatabase): void {
   const ts = new Date().toISOString();
   db.prepare(`
     INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at)

@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import type { IDatabase } from "../database.js";
 import type { Event } from "../../types/index.js";
 
 // ── Row type (data stored as JSON string) ───────────────────────────────────
@@ -26,7 +26,7 @@ function rowToEvent(row: EventRow): Event {
 // ── Repository ──────────────────────────────────────────────────────────────
 
 export class EventRepository {
-  constructor(private db: Database) {}
+  constructor(private db: IDatabase) {}
 
   log(
     trackId: string,

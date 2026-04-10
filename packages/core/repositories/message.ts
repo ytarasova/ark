@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import type { IDatabase } from "../database.js";
 import type { Message, MessageRole, MessageType } from "../../types/index.js";
 
 // ── Row type (read stored as integer 0/1) ───────────────────────────────────
@@ -31,7 +31,7 @@ function rowToMessage(row: MessageRow): Message {
 // ── Repository ──────────────────────────────────────────────────────────────
 
 export class MessageRepository {
-  constructor(private db: Database) {}
+  constructor(private db: IDatabase) {}
 
   send(sessionId: string, role: MessageRole, content: string, type?: MessageType): Message {
     const ts = now();

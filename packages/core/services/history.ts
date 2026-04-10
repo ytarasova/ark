@@ -5,7 +5,7 @@
  * Full transcript indexing integration will be added in a later pass.
  */
 
-import { Database } from "bun:sqlite";
+import type { IDatabase } from "../database.js";
 
 export interface HistorySearchResult {
   sessionId: string;
@@ -24,7 +24,7 @@ interface HistoryRow {
 }
 
 export class HistoryService {
-  constructor(private db: Database) {}
+  constructor(private db: IDatabase) {}
 
   /**
    * Search sessions by metadata (ticket, summary, repo, id).

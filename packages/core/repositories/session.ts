@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import type { IDatabase } from "../database.js";
 import { randomBytes } from "crypto";
 import type {
   Session,
@@ -68,7 +68,7 @@ const SESSION_COLUMNS = new Set([
 // ── Repository ──────────────────────────────────────────────────────────────
 
 export class SessionRepository {
-  constructor(private db: Database) {}
+  constructor(private db: IDatabase) {}
 
   create(opts: CreateSessionOpts): Session {
     const id = this.generateId();
@@ -216,7 +216,7 @@ export class SessionRepository {
       const merged = { ...existing, ...patch };
       this.db.prepare("UPDATE sessions SET config = ?, updated_at = ? WHERE id = ?")
         .run(JSON.stringify(merged), new Date().toISOString(), sessionId);
-    })();
+    });
   }
 
   search(query: string, opts?: { limit?: number }): Session[] {

@@ -13,7 +13,7 @@ import {
   InjectionMode,
   type AwilixContainer,
 } from "awilix";
-import type { Database } from "bun:sqlite";
+import type { IDatabase } from "./database.js";
 import type { ArkConfig } from "./config.js";
 import type { SessionRepository } from "./repositories/session.js";
 import type { ComputeRepository } from "./repositories/compute.js";
@@ -37,7 +37,7 @@ export interface Cradle {
   config: ArkConfig;
 
   // Database
-  db: Database;
+  db: IDatabase;
 
   // Repositories
   sessions: SessionRepository;

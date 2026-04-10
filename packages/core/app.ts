@@ -8,6 +8,8 @@
 
 import { Database } from "bun:sqlite";
 import { mkdirSync, rmSync, existsSync, mkdtempSync, readFileSync } from "fs";
+import type { IDatabase } from "./database.js";
+import { BunSqliteAdapter } from "./database-sqlite.js";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { tmpdir } from "os";
@@ -93,7 +95,7 @@ export class AppContext {
   /** Convenience shortcut for config.arkDir (used heavily in tests). */
   get arkDir(): string { return this.config.arkDir; }
 
-  get db(): Database { return this._resolve("db"); }
+  get db(): IDatabase { return this._resolve("db"); }
 
   get eventBus(): typeof eventBus {
     if (!this._eventBus) throw new Error("AppContext not booted -- eventBus not available");
@@ -183,9 +185,10 @@ export class AppContext {
     setProfilesArkDir(this.config.arkDir);
 
     // 2. Open database with pragmas
-    const db = new Database(this.config.dbPath);
-    db.run("PRAGMA journal_mode = WAL");
-    db.run("PRAGMA busy_timeout = 5000");
+    const rawDb = new Database(this.config.dbPath);
+    rawDb.run("PRAGMA journal_mode = WAL");
+    rawDb.run("PRAGMA busy_timeout = 5000");
+    const db = new BunSqliteAdapter(rawDb);
 
     // 3. Initialize schema (new column names: ticket, summary, flow)
     initRepoSchema(db);

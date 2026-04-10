@@ -1,14 +1,16 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
+import { BunSqliteAdapter } from "../../database-sqlite.js";
+import type { IDatabase } from "../../database.js";
 import { ComputeRepository } from "../compute.js";
 import { initSchema, seedLocalCompute } from "../schema.js";
 import type { ComputeStatus, ComputeConfig } from "../../../types/index.js";
 
-let db: Database;
+let db: IDatabase;
 let repo: ComputeRepository;
 
 beforeEach(() => {
-  db = new Database(":memory:");
+  db = new BunSqliteAdapter(new Database(":memory:"));
   initSchema(db);
   seedLocalCompute(db);
   repo = new ComputeRepository(db);

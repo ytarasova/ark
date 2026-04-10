@@ -1,14 +1,16 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
+import { BunSqliteAdapter } from "../../database-sqlite.js";
+import type { IDatabase } from "../../database.js";
 import { SessionRepository } from "../session.js";
 import { initSchema } from "../schema.js";
 import type { SessionStatus, SessionConfig } from "../../../types/index.js";
 
-let db: Database;
+let db: IDatabase;
 let repo: SessionRepository;
 
 beforeEach(() => {
-  db = new Database(":memory:");
+  db = new BunSqliteAdapter(new Database(":memory:"));
   initSchema(db);
   repo = new SessionRepository(db);
 });

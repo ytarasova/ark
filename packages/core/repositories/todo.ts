@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import type { IDatabase } from "../database.js";
 
 function now(): string { return new Date().toISOString(); }
 
@@ -20,7 +20,7 @@ interface TodoRow {
 }
 
 export class TodoRepository {
-  constructor(private db: Database) {}
+  constructor(private db: IDatabase) {}
 
   add(sessionId: string, content: string): Todo {
     const ts = now();
