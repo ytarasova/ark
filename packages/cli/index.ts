@@ -28,6 +28,7 @@ import { registerSearchCommands } from "./commands/search.js";
 import { registerMemoryCommands } from "./commands/memory.js";
 import { registerProfileCommands } from "./commands/profile.js";
 import { registerConductorCommands } from "./commands/conductor.js";
+import { registerRouterCommands } from "./commands/router.js";
 import { registerMiscCommands } from "./commands/misc.js";
 
 const app = new AppContext(loadConfig(), { skipConductor: true, skipMetrics: true });
@@ -60,6 +61,7 @@ registerSearchCommands(program);
 registerMemoryCommands(program);
 registerProfileCommands(program);
 registerConductorCommands(program);
+registerRouterCommands(program);
 registerMiscCommands(program, app);
 
 // ── Run ─────────────────────────────────────────────────────────────────────
