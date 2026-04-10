@@ -11,6 +11,7 @@ Ark uses several configuration files:
 | `~/.ark/profiles.json` | Profile definitions | `ark profile` commands |
 | `~/.ark/ui-state.json` | TUI state persistence | Auto-managed by TUI |
 | `.ark.yaml` (repo root) | Per-repository defaults | User |
+| `~/.ark/router.yaml` | LLM router configuration (optional) | User |
 
 ## ~/.ark/config.yaml
 
@@ -270,6 +271,56 @@ Theme colors:
 | Text | `#c0caf5` | `#3760bf` |
 | Dim text | `#565f89` | `#8990b3` |
 
+### Router Configuration
+
+Configure the LLM router (used by `ark router start` and hosted mode):
+
+```yaml
+router:
+  enabled: false
+  port: 8430
+  policy: balanced     # quality | balanced | cost
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable LLM router in hosted mode |
+| `port` | number | `8430` | Router listen port |
+| `policy` | string | `balanced` | Default routing policy: `quality`, `balanced`, or `cost` |
+
+Providers are auto-detected from environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`). Advanced provider configuration can be placed in `~/.ark/router.yaml`.
+
+### Auth Configuration
+
+Configure multi-tenant authentication (for hosted mode):
+
+```yaml
+auth:
+  enabled: false
+  apiKeyEnabled: false
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable auth middleware |
+| `apiKeyEnabled` | boolean | `false` | Enable API key validation |
+
+When auth is disabled (default for local use), all requests get the "default" tenant context with admin role.
+
+### Database Configuration
+
+```yaml
+database_url: null    # PostgreSQL connection URL for hosted mode
+redis_url: null       # Redis URL for SSE bus (multi-instance deployments)
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `database_url` | string \| null | `null` | PostgreSQL connection string. When null, uses SQLite at `~/.ark/ark.db` |
+| `redis_url` | string \| null | `null` | Redis connection string for SSE bus. When null, uses in-memory bus |
+
+Can also be set via `DATABASE_URL` and `REDIS_URL` environment variables.
+
 ---
 
 ## ~/.ark/bridge.json
@@ -465,7 +516,41 @@ runtime:               # optional - executor system configuration
 
 See the [Agents Reference](agents-reference.md) for detailed documentation of all builtin agents.
 
-### runtime Field
+### Runtime YAML
+
+Runtime definitions live in `runtimes/<name>.yaml` (builtin), `.ark/runtimes/<name>.yaml` (project), or `~/.ark/runtimes/<name>.yaml` (global).
+
+```yaml
+name: my-runtime
+description: "Custom LLM backend"
+type: cli-agent        # claude-code | cli-agent | subprocess
+command: ["my-tool", "--auto"]
+task_delivery: arg     # stdin | file | arg
+models:
+  - id: default
+    label: "Default Model"
+default_model: default
+env:
+  CUSTOM_VAR: "value"
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Runtime identifier (matches filename) |
+| `description` | string | Short description |
+| `type` | string | Executor type: `claude-code`, `cli-agent`, or `subprocess` |
+| `command` | string[] | Command to run (for cli-agent and subprocess) |
+| `task_delivery` | string | How task is sent: `stdin`, `file`, or `arg` (default) |
+| `models` | object[] | Available models with id and label |
+| `default_model` | string | Default model id |
+| `permission_mode` | string | Permission mode override |
+| `env` | object | Environment variables |
+
+CLI: `ark runtime list`, `ark runtime show <name>`.
+
+At dispatch, runtime config is merged with agent config. The `--runtime` flag on `ark session start` overrides the agent's default runtime.
+
+### runtime Field (in Agent YAML)
 
 The `runtime` field controls which executor launches the agent process.
 
@@ -517,8 +602,16 @@ When `runtime` is omitted the agent runs in the local environment (same machine,
 | `ARK_CHANNEL_PORT` | auto-assigned | Per-session MCP channel port |
 | `ARK_SESSION_ID` | -- | Set in channel context |
 | `ARK_STAGE` | -- | Current flow stage in channel |
+| `ARK_SERVER` | -- | Remote Ark server URL (enables remote client mode) |
+| `ARK_TOKEN` | -- | API key for remote server authentication |
 | `ARK_PROFILE` | `default` | Active profile name |
 | `ARK_DEFAULT_COMPUTE` | -- | Default compute resource name for new sessions |
 | `ARK_TELEMETRY` | -- | Set to `1` to enable telemetry (overrides config) |
 | `ARK_TEST_DIR` | -- | Temp directory for test isolation (development only) |
+| `DATABASE_URL` | -- | PostgreSQL connection URL (hosted mode; defaults to SQLite) |
+| `REDIS_URL` | -- | Redis URL for SSE bus (hosted mode; defaults to in-memory) |
+| `ANTHROPIC_API_KEY` | -- | API key for Anthropic (LLM router) |
+| `OPENAI_API_KEY` | -- | API key for OpenAI (LLM router) |
+| `GOOGLE_API_KEY` | -- | API key for Google (LLM router) |
+| `E2B_API_KEY` | -- | API key for E2B compute provider |
 | `EDITOR` | `vi` | Editor for `ark config` and `ark agent create/edit` |

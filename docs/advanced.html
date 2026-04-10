@@ -37,7 +37,7 @@
   <div class="page-layout">
     <main class="content">
       <h1>Advanced Features</h1>
-      <p class="subtitle">Git worktrees, memory, search, scheduling, integrations, guardrails, observability, and more.</p>
+      <p class="subtitle">Git worktrees, knowledge graph, search, scheduling, integrations, guardrails, observability, and more.</p>
 
       <!-- ── Git Worktrees ────────────────────────────────────────────────── -->
       <h2>Git Worktrees</h2>
@@ -86,33 +86,30 @@
       <h3>TUI Workflow</h3>
       <p>In the TUI Sessions tab, press <kbd>W</kbd> to open the worktree finish overlay. It shows a diff preview and lets you choose between merge and PR creation without leaving the TUI.</p>
 
-      <!-- ── Memory ───────────────────────────────────────────────────────── -->
-      <h2>Memory</h2>
-      <p>Ark maintains a persistent memory store at <code>~/.ark/memories.json</code>. Memories are tagged notes with a scope and importance level that survive across sessions.</p>
+      <!-- ── Knowledge Graph ────────────────────────────────────────────── -->
+      <h2>Knowledge Graph</h2>
+      <p>Ark maintains a unified knowledge graph that spans your codebase, session history, memories, and learnings. This replaces the old <code>memories.json</code> and <code>LEARNINGS.md</code> files -- all knowledge is stored as nodes and edges in the database.</p>
 
       <h3>How It Works</h3>
-      <p>At dispatch time, Ark scores all stored memories against the session summary using keyword overlap. Relevant memories are injected into the agent's task prompt automatically, giving the agent context from prior sessions without any manual copy-paste.</p>
+      <p>At dispatch time, the context builder queries the knowledge graph for nodes relevant to the session summary and injects them into the agent's task prompt. This includes memories, learnings from prior sessions, and relevant file/symbol information. Agents can also query the knowledge graph during execution via MCP tools.</p>
 
-      <h3>Memory Commands</h3>
-      <pre><code><span class="prompt">$</span> ark memory list                            <span class="yaml-comment"># list all memories (--scope to filter)</span>
-<span class="prompt">$</span> ark memory add "Always use transactions for DB writes" --tags db,safety --importance high
-<span class="prompt">$</span> ark memory recall "database"               <span class="yaml-comment"># find memories matching a keyword</span>
-<span class="prompt">$</span> ark memory forget mem-3a4b                 <span class="yaml-comment"># delete a single memory by ID</span>
-<span class="prompt">$</span> ark memory clear --scope project --force   <span class="yaml-comment"># delete all memories in a scope</span></code></pre>
+      <h3>Knowledge Commands</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge search "authentication"       <span class="yaml-comment"># search all node types</span>
+<span class="prompt">$</span> ark knowledge index --repo .                 <span class="yaml-comment"># index codebase into graph</span>
+<span class="prompt">$</span> ark knowledge stats                          <span class="yaml-comment"># show node/edge counts</span>
+<span class="prompt">$</span> ark knowledge remember "Always use transactions" --tags db,safety
+<span class="prompt">$</span> ark knowledge recall "database"              <span class="yaml-comment"># search memories + learnings</span>
+<span class="prompt">$</span> ark knowledge export --dir ./backup
+<span class="prompt">$</span> ark knowledge import --dir ./backup</code></pre>
 
-      <table>
-        <thead>
-          <tr><th>Option</th><th>Description</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>--tags &lt;list&gt;</code></td><td>Comma-separated tags for retrieval filtering</td></tr>
-          <tr><td><code>--scope &lt;name&gt;</code></td><td>Logical scope (e.g. <code>project</code>, <code>global</code>, a repo name)</td></tr>
-          <tr><td><code>--importance &lt;level&gt;</code></td><td><code>low</code>, <code>medium</code>, or <code>high</code></td></tr>
-        </tbody>
-      </table>
+      <h3>Memory Commands (Backward-Compatible)</h3>
+      <pre><code><span class="prompt">$</span> ark memory list                              <span class="yaml-comment"># list memory nodes</span>
+<span class="prompt">$</span> ark memory add "Important note" --tags tag1  <span class="yaml-comment"># add a memory</span>
+<span class="prompt">$</span> ark memory recall "keyword"                  <span class="yaml-comment"># search memories</span>
+<span class="prompt">$</span> ark memory forget &lt;id&gt;                       <span class="yaml-comment"># delete a memory</span></code></pre>
 
       <h3>TUI and Web</h3>
-      <p>In the TUI, press <kbd>Y</kbd> to open the Memory Manager overlay. Use <kbd>j</kbd>/<kbd>k</kbd> to navigate, <kbd>n</kbd> to add a new memory, and <kbd>x</kbd> to delete. The Web dashboard also has a dedicated Memory view.</p>
+      <p>In the TUI, press <kbd>Y</kbd> to open the Memory Manager overlay. Use <kbd>j</kbd>/<kbd>k</kbd> to navigate, <kbd>n</kbd> to add a new memory, and <kbd>x</kbd> to delete. The Web dashboard has a dedicated Memory view showing knowledge stats and memory management.</p>
 
       <!-- ── Search ───────────────────────────────────────────────────────── -->
       <h2>Search</h2>

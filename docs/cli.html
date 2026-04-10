@@ -534,22 +534,73 @@
 
       <!-- ── ark auth ─────────────────────────────────────────────────────── -->
       <h2>ark auth</h2>
-      <p>Set up Claude authentication for remote compute. Runs <code>claude setup-token</code> to create a persistent OAuth token, then saves it to <code>~/.ark/claude-oauth-token</code>. The TUI and dispatch read this token automatically -- no environment variables needed.</p>
-      <pre><code><span class="prompt">$</span> ark auth
-<span class="prompt">$</span> ark auth --host my-ec2</code></pre>
+      <p>Manage authentication -- Claude setup and API key management.</p>
 
-      <table>
-        <thead>
-          <tr><th>Option</th><th>Description</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>--host &lt;name&gt;</code></td><td>Run <code>setup-token</code> on a specific remote compute host instead of locally</td></tr>
-        </tbody>
-      </table>
+      <h3>ark auth setup</h3>
+      <p>Set up Claude authentication for remote compute. Runs <code>claude setup-token</code> to create a persistent OAuth token.</p>
+      <pre><code><span class="prompt">$</span> ark auth setup
+<span class="prompt">$</span> ark auth setup --host my-ec2</code></pre>
 
-      <div class="callout info">
-        <strong>Note:</strong> Run <code>ark auth</code> once before dispatching sessions to EC2 compute. The token persists across reboots and is synced to remote hosts during provisioning.
-      </div>
+      <h3>ark auth create-key</h3>
+      <p>Create a new API key for multi-tenant authentication.</p>
+      <pre><code><span class="prompt">$</span> ark auth create-key --tenant acme --name "CI pipeline" --role member</code></pre>
+
+      <h3>ark auth list-keys</h3>
+      <p>List API keys for a tenant.</p>
+      <pre><code><span class="prompt">$</span> ark auth list-keys --tenant acme</code></pre>
+
+      <h3>ark auth revoke-key / rotate-key</h3>
+      <pre><code><span class="prompt">$</span> ark auth revoke-key ak-abcd1234
+<span class="prompt">$</span> ark auth rotate-key ak-abcd1234</code></pre>
+
+      <!-- ── ark dashboard ─────────────────────────────────────────────────── -->
+      <h2>ark dashboard</h2>
+      <p>Show fleet status, costs (today/week/month), budget progress, recent activity, and system health.</p>
+      <pre><code><span class="prompt">$</span> ark dashboard
+<span class="prompt">$</span> ark dashboard --json</code></pre>
+
+      <!-- ── ark runtime ───────────────────────────────────────────────────── -->
+      <h2>ark runtime</h2>
+      <p>Manage runtime definitions (LLM backends).</p>
+      <h3>ark runtime list</h3>
+      <pre><code><span class="prompt">$</span> ark runtime list</code></pre>
+      <h3>ark runtime show &lt;name&gt;</h3>
+      <pre><code><span class="prompt">$</span> ark runtime show claude</code></pre>
+
+      <!-- ── ark knowledge ─────────────────────────────────────────────────── -->
+      <h2>ark knowledge</h2>
+      <p>Knowledge graph -- search, index, remember, export.</p>
+      <h3>ark knowledge search &lt;query&gt;</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge search "authentication" --types file,symbol</code></pre>
+      <h3>ark knowledge index</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge index --repo . --incremental</code></pre>
+      <h3>ark knowledge stats</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge stats</code></pre>
+      <h3>ark knowledge remember / recall</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge remember "Always run tests first" --tags process
+<span class="prompt">$</span> ark knowledge recall "testing"</code></pre>
+      <h3>ark knowledge export / import</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge export --dir ./backup
+<span class="prompt">$</span> ark knowledge import --dir ./backup</code></pre>
+
+      <!-- ── ark router ────────────────────────────────────────────────────── -->
+      <h2>ark router</h2>
+      <p>LLM routing proxy -- OpenAI-compatible, multi-provider.</p>
+      <h3>ark router start</h3>
+      <pre><code><span class="prompt">$</span> ark router start --port 8430 --policy balanced</code></pre>
+      <h3>ark router status</h3>
+      <pre><code><span class="prompt">$</span> ark router status</code></pre>
+      <h3>ark router costs</h3>
+      <pre><code><span class="prompt">$</span> ark router costs --group-by model</code></pre>
+
+      <!-- ── ark tenant ────────────────────────────────────────────────────── -->
+      <h2>ark tenant</h2>
+      <p>Manage tenant compute policies (hosted mode).</p>
+      <h3>ark tenant policy set/get/list/delete</h3>
+      <pre><code><span class="prompt">$</span> ark tenant policy set acme --providers k8s,e2b --max-sessions 20
+<span class="prompt">$</span> ark tenant policy get acme
+<span class="prompt">$</span> ark tenant policy list
+<span class="prompt">$</span> ark tenant policy delete acme</code></pre>
 
       <!-- ── ark channel ───────────────────────────────────────────────────── -->
       <h2>ark channel</h2>

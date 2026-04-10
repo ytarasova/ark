@@ -7,9 +7,13 @@ Complete reference for all `ark` commands. Run `ark --help` or `ark <command> --
 ```
 ark [options] <command>
   -p, --profile <name>    Use a specific profile
+  --server <url>          Connect to a remote Ark control plane
+  --token <key>           API key for authentication with the remote server
   -V, --version           Show version
   -h, --help              Show help
 ```
+
+Remote mode can also be set via `ARK_SERVER` and `ARK_TOKEN` environment variables.
 
 ---
 
@@ -36,6 +40,9 @@ ark session start [ticket] [options]
 | `-a, --attach` | Dispatch and attach to the session | -- |
 | `--claude-session <id>` | Create from an existing Claude Code session | -- |
 | `--recipe <name>` | Create session from a recipe template | -- |
+| `--agent <name>` | Agent override | -- |
+| `--runtime <name>` | Runtime override (e.g., codex, gemini, aider) | -- |
+| `--remote-repo <url>` | Git URL to clone on compute target (no local repo needed) | -- |
 
 Examples:
 
@@ -45,6 +52,8 @@ ark session start PROJ-123 --repo ./my-app --summary "Fix login bug" --flow quic
 ark session start --recipe quick-fix --repo . --dispatch --attach
 ark session start --claude-session abc12345 --flow bare
 ark session start --repo . --summary "Task" --group backend
+ark session start --repo . --summary "Fix bug" --agent implementer --runtime codex --dispatch
+ark session start --remote-repo https://github.com/org/repo.git --summary "Task" --compute my-ec2
 ```
 
 ### ark session list
@@ -674,12 +683,14 @@ ark web [options]
 | `--port <port>` | Listen port | `8420` |
 | `--read-only` | Read-only mode (no mutations) | -- |
 | `--token <token>` | Bearer token for authentication | -- |
+| `--server <url>` | Proxy to a remote Ark server | -- |
 
 ```bash
 ark web
 ark web --port 9000
 ark web --read-only
 ark web --token my-secret-token
+ark web --server https://ark.company.com --token xxx
 ```
 
 ---
@@ -736,7 +747,7 @@ ark search <query> [options]
 | `-l, --limit <n>` | Max results | `20` |
 | `-t, --transcripts` | Also search Claude transcripts (slower) | -- |
 | `--index` | Rebuild transcript search index before searching | -- |
-| `--hybrid` | Use hybrid search (memory + knowledge + transcripts with LLM re-ranking) | -- |
+| `--hybrid` | Use hybrid search (knowledge graph + transcripts with LLM re-ranking) | -- |
 
 ```bash
 ark search "authentication"
@@ -1337,7 +1348,14 @@ ark schedule delete <id>
 Launch the terminal UI dashboard.
 
 ```
+ark tui [options]
+```
+
+Supports `--server` and `--token` global options for remote mode:
+
+```bash
 ark tui
+ark tui --server https://ark.company.com --token ark_default_xxx
 ```
 
 See [TUI Reference](tui-reference.md) for keyboard shortcuts.
@@ -1394,9 +1412,9 @@ ark arkd --hostname 127.0.0.1
 
 ---
 
-## ark auth
+## ark auth (Claude setup)
 
-Set up Claude authentication.
+Set up Claude authentication. For API key management, see [ark auth](#ark-auth) (full auth commands) below.
 
 ```
 ark auth [options]
@@ -1410,6 +1428,8 @@ ark auth [options]
 ark auth                        # Local auth setup
 ark auth --host my-ec2          # Remote auth setup
 ```
+
+This is an alias for `ark auth setup`. See the [full auth commands](#ark-auth-1) section for API key management.
 
 ---
 
@@ -1594,6 +1614,7 @@ ark server start [options]
 | `--stdio` | Use stdio transport (JSONL) | -- |
 | `--ws` | Use WebSocket transport | default |
 | `-p, --port <port>` | WebSocket port | `19400` |
+| `--hosted` | Start as hosted multi-tenant control plane | -- |
 
 Examples:
 
@@ -1601,9 +1622,12 @@ Examples:
 ark server start                   # WebSocket on port 19400
 ark server start --stdio           # JSONL over stdin/stdout
 ark server start --port 9000       # Custom port
+ark server start --hosted          # Multi-tenant control plane with workers + scheduler
 ```
 
 The TUI and CLI embed the server in-process. Start it explicitly only for external clients.
+
+With `--hosted`, the server boots a full control plane: worker registry, session scheduler, tenant policies, and optional Redis SSE bus (via `REDIS_URL`). Database defaults to PostgreSQL (via `DATABASE_URL`).
 
 ---
 
@@ -1685,23 +1709,364 @@ ark memory clear [options]
 
 Knowledge base ingestion.
 
+### ark knowledge search
+
+Search across all knowledge (files, memories, sessions, learnings).
+
+```
+ark knowledge search <query> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-t, --types <types>` | Comma-separated node types to filter (file,symbol,session,memory,learning,skill) | all |
+| `-n, --limit <n>` | Max results | `20` |
+
+```bash
+ark knowledge search "authentication"
+ark knowledge search "auth" --types file,symbol --limit 50
+```
+
+### ark knowledge index
+
+Index/re-index codebase into the knowledge graph.
+
+```
+ark knowledge index [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-r, --repo <path>` | Repository path | cwd |
+| `--incremental` | Only re-index changed files | -- |
+
+```bash
+ark knowledge index --repo .
+ark knowledge index --repo . --incremental
+```
+
+### ark knowledge stats
+
+Show node/edge counts by type.
+
+```
+ark knowledge stats
+```
+
+### ark knowledge remember
+
+Store a new memory in the knowledge graph.
+
+```
+ark knowledge remember <content> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-t, --tags <tags>` | Comma-separated tags | -- |
+| `-i, --importance <n>` | Importance 0-1 | `0.5` |
+
+```bash
+ark knowledge remember "Always run tests before merging" --tags process,testing
+```
+
+### ark knowledge recall
+
+Search memories and learnings.
+
+```
+ark knowledge recall <query> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-n, --limit <n>` | Max results | `10` |
+
+```bash
+ark knowledge recall "authentication"
+```
+
+### ark knowledge export
+
+Export knowledge as markdown files.
+
+```
+ark knowledge export [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-d, --dir <path>` | Output directory | `./knowledge-export` |
+| `-t, --types <types>` | Comma-separated types to export | `memory,learning` |
+
+```bash
+ark knowledge export
+ark knowledge export --dir ./backup --types memory,learning,skill
+```
+
+### ark knowledge import
+
+Import knowledge from markdown files.
+
+```
+ark knowledge import [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-d, --dir <path>` | Input directory | `./knowledge-export` |
+
+```bash
+ark knowledge import --dir ./backup
+```
+
 ### ark knowledge ingest
 
-Ingest files or directories into the knowledge base. Files are chunked and stored as searchable knowledge entries, available to hybrid search (`ark search --hybrid`).
+Ingest a directory into the knowledge graph (indexes files and symbols).
 
 ```
 ark knowledge ingest <path> [options]
 ```
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-s, --scope <scope>` | Scope for ingested knowledge | `knowledge` |
-| `-t, --tag <tag>` | Tag (repeatable) | -- |
+| Option | Description |
+|--------|-------------|
+| `--incremental` | Only re-index changed files |
 
 ```bash
-ark knowledge ingest README.md
-ark knowledge ingest docs/ --scope project --tag docs --tag architecture
-ark knowledge ingest src/api/ --tag api
+ark knowledge ingest docs/
+ark knowledge ingest src/api/ --incremental
 ```
 
-When given a directory, all supported files are ingested recursively. Output shows the number of files processed and chunks created.
+---
+
+## ark dashboard
+
+Show fleet status, costs, and recent activity.
+
+```
+ark dashboard [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output as JSON |
+
+```bash
+ark dashboard
+ark dashboard --json
+```
+
+---
+
+## ark runtime
+
+Manage runtime definitions.
+
+### ark runtime list
+
+List available runtimes.
+
+```
+ark runtime list
+```
+
+### ark runtime show
+
+Show runtime details.
+
+```
+ark runtime show <name>
+```
+
+```bash
+ark runtime show claude
+ark runtime show codex
+```
+
+---
+
+## ark router
+
+LLM routing proxy.
+
+### ark router start
+
+Start the LLM router server.
+
+```
+ark router start [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --port <port>` | Listen port | `8430` |
+| `--policy <policy>` | Routing policy: quality, balanced, cost | `balanced` |
+| `--config <path>` | Path to router config YAML | -- |
+
+```bash
+ark router start
+ark router start --port 9000 --policy cost
+```
+
+Requires at least one API key env var: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY`.
+
+### ark router status
+
+Show router status and stats.
+
+```
+ark router status [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--url <url>` | Router URL | `http://localhost:8430` |
+
+```bash
+ark router status
+```
+
+### ark router costs
+
+Show routing cost breakdown.
+
+```
+ark router costs [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--url <url>` | Router URL | `http://localhost:8430` |
+| `--group-by <field>` | Group by: model, provider, session | `model` |
+
+```bash
+ark router costs
+ark router costs --group-by provider
+```
+
+---
+
+## ark tenant
+
+Manage tenant settings.
+
+### ark tenant policy set
+
+Set compute policy for a tenant.
+
+```
+ark tenant policy set <tenant-id> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--providers <list>` | Comma-separated allowed providers | all |
+| `--default-provider <provider>` | Default provider | `k8s` |
+| `--max-sessions <n>` | Maximum concurrent sessions | `10` |
+| `--max-cost <usd>` | Maximum daily cost in USD | -- |
+
+```bash
+ark tenant policy set acme --providers k8s,e2b --max-sessions 20 --max-cost 100
+```
+
+### ark tenant policy get
+
+Get compute policy for a tenant.
+
+```
+ark tenant policy get <tenant-id>
+```
+
+### ark tenant policy list
+
+List all tenant compute policies.
+
+```
+ark tenant policy list
+```
+
+### ark tenant policy delete
+
+Delete compute policy for a tenant.
+
+```
+ark tenant policy delete <tenant-id>
+```
+
+---
+
+## ark auth
+
+Manage authentication and API keys.
+
+### ark auth setup
+
+Set up Claude authentication (local or remote).
+
+```
+ark auth setup [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--host <name>` | Run setup-token on a specific remote compute |
+
+```bash
+ark auth setup                        # Local auth setup
+ark auth setup --host my-ec2          # Remote auth setup
+```
+
+### ark auth create-key
+
+Create a new API key.
+
+```
+ark auth create-key [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--name <name>` | Human-readable label | `default` |
+| `--role <role>` | Role: admin, member, or viewer | `member` |
+| `--tenant <tenantId>` | Tenant ID | `default` |
+| `--expires <date>` | Expiration date (ISO 8601) | -- |
+
+```bash
+ark auth create-key --tenant acme --name "CI pipeline" --role member
+```
+
+### ark auth list-keys
+
+List API keys.
+
+```
+ark auth list-keys [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--tenant <tenantId>` | Tenant ID | `default` |
+
+### ark auth revoke-key
+
+Revoke an API key.
+
+```
+ark auth revoke-key <id>
+```
+
+```bash
+ark auth revoke-key ak-abcd1234
+```
+
+### ark auth rotate-key
+
+Rotate an API key (revoke old, create new with same metadata).
+
+```
+ark auth rotate-key <id>
+```
+
+```bash
+ark auth rotate-key ak-abcd1234
+```

@@ -1,6 +1,6 @@
 # Ark User Guide
 
-Ark orchestrates AI coding agents through multi-stage workflows. You define the workflow, Ark manages the agents.
+Ark orchestrates AI coding agents through DAG-based SDLC workflows. You define the workflow, Ark manages the agents -- across local machines, containers, cloud VMs, or Kubernetes pods.
 
 ## Quickstart (60 seconds)
 
@@ -452,19 +452,51 @@ env:
 
 Template variables `{ticket}`, `{summary}`, `{workdir}`, `{repo}`, and `{branch}` are substituted at dispatch time. See the [Agents Reference](agents-reference.md) for complete field documentation.
 
+### Runtime/Role Separation
+
+Agents define WHAT an agent does (role, prompt, skills, tools). Runtimes define HOW it runs (LLM backend, CLI command). Any agent role can run on any runtime:
+
+```bash
+# Default: implementer role on claude runtime
+ark session start --repo . --summary "Fix bug" --agent implementer --dispatch
+
+# Override: implementer role on codex runtime
+ark session start --repo . --summary "Fix bug" --agent implementer --runtime codex --dispatch
+
+# Override: worker role on gemini runtime
+ark session start --repo . --summary "Fix bug" --agent worker --runtime gemini --dispatch
+```
+
+### Builtin Runtimes
+
+| Runtime | Type | Description |
+|---------|------|-------------|
+| `claude` | claude-code | Claude Code CLI (default) |
+| `codex` | cli-agent | OpenAI Codex CLI |
+| `gemini` | cli-agent | Google Gemini CLI |
+| `aider` | cli-agent | Aider pair programming |
+
+```bash
+ark runtime list                    # List all runtimes
+ark runtime show claude             # Show runtime details
+```
+
 ### Builtin Agents
 
-| Agent | Model | Runtime | Purpose |
-|-------|-------|---------|---------|
-| `planner` | Sonnet | claude-code | Creates PLAN.md with architecture and implementation strategy |
-| `implementer` | Opus | claude-code | Writes code, tests, and commits |
-| `reviewer` | Sonnet | claude-code | Reviews code changes for quality, correctness, and security |
-| `documenter` | Sonnet | claude-code | Updates documentation based on code changes |
-| `worker` | Opus | claude-code | General-purpose agent with no predefined system prompt |
-| `codex-worker` | o4-mini | cli-agent | OpenAI Codex CLI coding agent |
-| `gemini-worker` | gemini | cli-agent | Google Gemini CLI coding agent |
-| `aider-worker` | aider | cli-agent | Aider AI pair programming agent |
-| `generic-cli` | custom | cli-agent | Template for wrapping any CLI tool |
+| Agent | Role | Purpose |
+|-------|------|---------|
+| `planner` | Planning | Creates PLAN.md with architecture and implementation strategy |
+| `implementer` | Execution | Writes code, tests, and commits |
+| `reviewer` | Review | Reviews code changes for quality, correctness, and security |
+| `documenter` | Documentation | Updates documentation based on code changes |
+| `worker` | General | General-purpose agent with no predefined system prompt |
+| `ticket-intake` | Intake | Processes tickets, runs sanity gate, extracts spec |
+| `spec-planner` | Planning | Decomposes spec into subtasks with implementation strategy |
+| `plan-auditor` | Audit | Audits plan coverage against spec requirements |
+| `task-implementer` | Execution | Implements individual subtasks from a plan |
+| `verifier` | Verification | Runs tests, security scan, code quality, AC validation |
+| `closer` | Close | Creates PRs, transitions tickets, publishes notes |
+| `retro` | Retrospective | Analyses workflow run, generates improvement recommendations |
 
 See the [Agents Reference](agents-reference.md) for full details on each agent.
 
@@ -603,7 +635,9 @@ Todos are shown in the TUI detail panel. Press `V` to run verification.
 
 | Flow | Stages | Use Case |
 |------|--------|----------|
-| `default` | plan > implement > pr > review > build > merge > close > docs | Full SDLC pipeline |
+| `default` | intake > plan > audit > implement > verify > pr > review > close > retro | Full SDLC pipeline |
+| `islc` | ticket-intake > plan > audit > execute[fan_out] > verify > close > retro | Full ISLC with fan-out execution |
+| `islc-quick` | implement > verify > close | Quick ISLC variant |
 | `quick` | implement > pr > build > merge | Fast implementation |
 | `bare` | work | Single-agent, no gates |
 | `parallel` | plan > implement[fork] > review > pr > merge | Parallel workstreams |
@@ -740,7 +774,7 @@ ark worktree finish s-a1b2c3 --pr             # Finish worktree and create PR
 
 ## Compute
 
-Ark supports multiple compute providers for running agents.
+Ark supports 7 compute providers for running agents.
 
 ### Local Provider
 
@@ -779,6 +813,36 @@ Size options:
 | `xxxl` | 64 | 256 GB |
 
 Additional options: `--arch` (x64/arm), `--region`, `--profile` (AWS profile), `--subnet-id`, `--tag key=value`.
+
+### E2B Provider
+
+Managed Firecracker sandboxes via the [E2B](https://e2b.dev) SDK. Sub-second boot, full isolation.
+
+```bash
+ark compute create my-e2b --provider e2b
+ark compute provision my-e2b
+```
+
+Requires `E2B_API_KEY` environment variable. Options:
+- `--template <name>`: E2B sandbox template (default: `base`)
+- `--timeout <seconds>`: Sandbox timeout (default: 3600)
+
+### Kubernetes Provider
+
+Run agents in Kubernetes pods. Supports vanilla pods and Kata Containers with Firecracker microVM isolation.
+
+```bash
+# Standard K8s pod
+ark compute create my-k8s --provider k8s
+
+# Kata Container with Firecracker isolation
+ark compute create my-kata --provider k8s-kata
+```
+
+Options:
+- `--namespace <ns>`: Kubernetes namespace (default: `ark`)
+- `--image <image>`: Container image (default: `ubuntu:22.04`)
+- `--runtime-class <class>`: RuntimeClassName (default: `kata-fc` for k8s-kata)
 
 ### Compute Lifecycle
 
@@ -970,51 +1034,69 @@ These defaults are used when starting sessions in that repository. CLI flags ove
 
 ---
 
-## Memory
+## Knowledge Graph
 
-Ark maintains cross-session persistent memory -- knowledge that agents can recall during future sessions. Memories are stored in `~/.ark/memories.json` with tags, scopes, and importance scores.
+Ark maintains a unified knowledge graph that spans your codebase, session history, memories, and learnings. This replaces the old `memories.json` and `LEARNINGS.md` files -- all knowledge is now stored as nodes and edges in the database.
+
+### Node Types
+
+| Type | Description |
+|------|-------------|
+| `file` | Source files indexed from a codebase |
+| `symbol` | Functions, classes, types extracted during indexing |
+| `session` | Session history (linked to files modified) |
+| `memory` | Persistent knowledge (replaces old memory system) |
+| `learning` | Learnings from session runs (replaces old learnings system) |
+| `skill` | Skill definitions |
+| `recipe` | Recipe definitions |
+| `agent` | Agent definitions |
 
 ### CLI
 
 ```bash
-ark memory list                                  # List all memories
-ark memory list --scope project                  # Filter by scope
-ark memory add "Always run tests before merging" --tags "process,testing"
-ark memory add "API uses OAuth2" --scope project --importance 0.8
-ark memory recall "authentication"               # Search by keyword
-ark memory forget mem-1234567890-abc123          # Delete a specific memory
-ark memory clear --scope project --force         # Clear all project memories
+ark knowledge search "authentication"                 # Search all node types
+ark knowledge search "auth" --types file,symbol       # Filter by type
+ark knowledge index --repo .                          # Index codebase into graph
+ark knowledge index --repo . --incremental            # Only re-index changed files
+ark knowledge stats                                   # Show node/edge counts
+ark knowledge remember "Always run tests first"       # Store a memory node
+ark knowledge recall "testing"                        # Search memories + learnings
+ark knowledge export --dir ./export                   # Export as markdown
+ark knowledge import --dir ./export                   # Import from markdown
+ark knowledge ingest docs/                            # Index a directory
 ```
+
+### Memory Commands (Backward-Compatible)
+
+The `ark memory` commands still work and now store into the knowledge graph:
+
+```bash
+ark memory list                                       # List memory nodes
+ark memory add "API uses OAuth2" --scope project      # Add a memory
+ark memory recall "authentication"                    # Search memories
+ark memory forget <id>                                # Delete a memory
+```
+
+### How Knowledge Works at Dispatch
+
+At dispatch time, the context builder queries the knowledge graph for nodes relevant to the session summary and injects them into the agent's task prompt. This includes:
+- Memories matching the task description
+- Learnings from prior sessions on the same repo
+- Relevant file/symbol information (if the repo is indexed)
+
+Agents can also query the knowledge graph during execution via MCP tools.
+
+### Indexing Prerequisites
+
+The codebase indexer works at the file level by default. For symbol-level extraction (functions, classes, imports), [Axon](https://github.com/axon-ai/axon) must be available. Run `ark doctor` to check.
 
 ### TUI
 
-Press `Y` in the Sessions tab to open the Memory Manager. Use `j/k` to navigate, `n` to add, `x` to delete, `Esc` to close.
+Press `Y` in the Sessions tab to open the Memory Manager. The Memory tab (6) also shows knowledge stats and allows browsing/adding/deleting memories.
 
 ### Web Dashboard
 
 The web dashboard includes a Memory view accessible from the sidebar. Add, search, and delete memories from the browser.
-
-### Knowledge Ingestion
-
-Pre-populate the knowledge base from files or directories:
-
-```bash
-ark knowledge ingest README.md                                    # Single file
-ark knowledge ingest docs/ --scope project --tag docs             # Whole directory
-ark knowledge ingest src/api/ --tag api --tag endpoints            # Multiple tags
-```
-
-Ingested knowledge is available to hybrid search (`ark search --hybrid`), giving agents deeper context about your codebase and documentation.
-
-### How memories work
-
-At dispatch time, Ark recalls memories relevant to the session summary (keyword overlap scoring) and injects them into the agent's task prompt. This gives agents context from prior sessions without explicit configuration.
-
-Memories have:
-- **content** -- the knowledge to remember
-- **tags** -- categorical labels for retrieval
-- **scope** -- "global", "project", or custom scopes
-- **importance** -- 0-1 score affecting recall ranking
 
 ---
 
@@ -1390,6 +1472,192 @@ CLI and TUI E2E tests import from `dist/`. Build first with `make dev` or `tsc`.
 
 ---
 
+## LLM Router
+
+The LLM Router is an OpenAI-compatible proxy that routes `/v1/chat/completions` requests across multiple LLM providers (Anthropic, OpenAI, Google).
+
+### Starting
+
+```bash
+ark router start                            # Default: port 8430, balanced policy
+ark router start --port 9000                # Custom port
+ark router start --policy cost              # Minimize cost
+ark router start --policy quality           # Prefer best model
+```
+
+### Routing Policies
+
+| Policy | Behavior |
+|--------|----------|
+| `quality` | Always routes to the highest-quality available model |
+| `balanced` | Classifies prompt complexity and picks appropriate model tier |
+| `cost` | Minimizes cost by preferring cheaper models |
+
+### Usage
+
+Point any OpenAI-compatible client at the router:
+
+```bash
+curl http://localhost:8430/v1/chat/completions \
+  -d '{"model":"auto","messages":[{"role":"user","content":"hello"}]}'
+```
+
+Use `model: "auto"` for automatic routing, or specify a model directly for passthrough.
+
+### Monitoring
+
+```bash
+ark router status                           # Health, uptime, provider status, request stats
+ark router costs                            # Cost breakdown by model
+ark router costs --group-by provider        # Cost breakdown by provider
+```
+
+The router includes circuit breakers that automatically fall back to healthy providers when a provider fails.
+
+### Configuration
+
+The router auto-detects providers from environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`). Advanced configuration via `~/.ark/router.yaml` or `--config` flag.
+
+---
+
+## Dashboard
+
+Fleet-level overview of all sessions, costs, and system health.
+
+### CLI
+
+```bash
+ark dashboard                               # Colored terminal output
+ark dashboard --json                        # Machine-readable JSON
+```
+
+Shows:
+- Fleet status (running/waiting/stopped/failed/completed counts)
+- Cost summary (today/week/month with model breakdown)
+- Budget progress bar
+- Recent activity (last 8 events across all sessions)
+- System health (conductor, router)
+
+### Web
+
+The web dashboard includes a Dashboard page (first item in the sidebar) with:
+- Fleet status cards
+- Cost charts (Recharts bar/pie charts)
+- Budget usage visualization
+- Recent activity timeline
+
+---
+
+## Remote Client Mode
+
+CLI, TUI, and Web can connect to a remote Ark server instead of running locally. This enables a hosted control plane architecture where agents run on remote workers.
+
+### Usage
+
+```bash
+# Via flags
+ark --server https://ark.company.com --token ark_default_xxx session list
+ark tui --server https://ark.company.com --token ark_default_xxx
+
+# Via environment variables
+export ARK_SERVER=https://ark.company.com
+export ARK_TOKEN=ark_default_xxx
+ark session list
+ark tui
+```
+
+When remote mode is active, the CLI creates a WebSocket `ArkClient` to the remote server instead of booting a local AppContext. All commands work the same way -- the protocol is transparent.
+
+### Web Proxy Mode
+
+The web dashboard can proxy to a remote server:
+
+```bash
+ark web --server https://ark.company.com --token xxx
+```
+
+---
+
+## Control Plane
+
+Ark can run as a hosted multi-tenant control plane for teams.
+
+### Starting
+
+```bash
+ark server start --hosted
+```
+
+This boots:
+- AppContext with PostgreSQL backend (set `DATABASE_URL`)
+- Worker registry (workers register via HTTP)
+- Session scheduler (assigns sessions to workers)
+- Tenant policy manager
+- Redis SSE bus (set `REDIS_URL` for multi-instance)
+- LLM router (if configured)
+
+### Tenant Policies
+
+Control per-tenant compute access:
+
+```bash
+ark tenant policy set acme --providers k8s,e2b --max-sessions 20 --max-cost 100
+ark tenant policy get acme
+ark tenant policy list
+ark tenant policy delete acme
+```
+
+### Auth
+
+Create and manage API keys for tenants:
+
+```bash
+ark auth create-key --tenant acme --name "CI pipeline" --role member
+ark auth list-keys --tenant acme
+ark auth revoke-key ak-abcd1234
+ark auth rotate-key ak-abcd1234
+```
+
+Roles: `admin` (full access), `member` (read + write), `viewer` (read only).
+
+---
+
+## Deployment
+
+### Docker
+
+```bash
+docker build -t ark .
+docker-compose up -d          # Ark + PostgreSQL + Redis
+```
+
+### Helm (Kubernetes)
+
+```bash
+helm install ark .infra/helm/ark -f .infra/helm/ark/values-production.yaml
+```
+
+The Helm chart deploys:
+- Control plane (deployment + service)
+- Worker pool (deployment + service)
+- PostgreSQL (StatefulSet)
+- Redis (deployment)
+- Ingress
+
+Production values include Kata/Firecracker runtime class for worker pod isolation.
+
+### MCP Config Stubs
+
+Pre-configured MCP server templates are available in `mcp-configs/`:
+- `atlassian.json` -- Jira/Confluence integration
+- `github.json` -- GitHub API integration
+- `linear.json` -- Linear issue tracker
+- `figma.json` -- Figma design files
+
+Copy these into your project's `.mcp.json` or session config to give agents access to external tools.
+
+---
+
 ## Environment Variables
 
 | Variable | Default | Purpose |
@@ -1402,5 +1670,12 @@ CLI and TUI E2E tests import from `dist/`. Build first with `make dev` or `tsc`.
 | `ARK_SESSION_ID` | -- | Set in channel context |
 | `ARK_STAGE` | -- | Current flow stage in channel |
 | `ARK_PROFILE` | `default` | Active profile name |
+| `ARK_SERVER` | -- | Remote Ark server URL (enables remote client mode) |
+| `ARK_TOKEN` | -- | API key for remote server authentication |
+| `DATABASE_URL` | -- | PostgreSQL connection URL (hosted mode) |
+| `REDIS_URL` | -- | Redis URL for SSE bus (hosted mode) |
 | `ARK_TEST_DIR` | -- | Temp directory for test isolation |
-| `ANTHROPIC_API_KEY` | -- | Required for hybrid search LLM re-ranking |
+| `ANTHROPIC_API_KEY` | -- | Required for LLM router Anthropic provider |
+| `OPENAI_API_KEY` | -- | Required for LLM router OpenAI provider |
+| `GOOGLE_API_KEY` | -- | Required for LLM router Google provider |
+| `E2B_API_KEY` | -- | Required for E2B compute provider |

@@ -1,7 +1,7 @@
 {
   "name": "ark",
-  "version": "0.11.0",
-  "description": "Autonomous agent ecosystem — JIRA to production",
+  "version": "0.12.0",
+  "description": "Autonomous agent ecosystem -- AI coding agent orchestration",
   "type": "module",
   "bin": {
     "ark": "./ark"

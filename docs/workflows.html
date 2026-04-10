@@ -227,14 +227,21 @@
       <h3>Builtin Agents</h3>
       <table>
         <thead>
-          <tr><th>Agent</th><th>Model</th><th>Purpose</th></tr>
+          <tr><th>Agent</th><th>Role</th><th>Purpose</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>planner</code></td><td>Sonnet</td><td>Creates PLAN.md with architecture and implementation strategy</td></tr>
-          <tr><td><code>implementer</code></td><td>Opus</td><td>Writes code, tests, and commits</td></tr>
-          <tr><td><code>reviewer</code></td><td>Sonnet</td><td>Reviews PRs and produces structured JSON feedback (P0-P3)</td></tr>
-          <tr><td><code>documenter</code></td><td>Sonnet</td><td>Generates project documentation</td></tr>
-          <tr><td><code>worker</code></td><td>Opus</td><td>General-purpose lightweight agent</td></tr>
+          <tr><td><code>planner</code></td><td>Planning</td><td>Creates PLAN.md with architecture and implementation strategy</td></tr>
+          <tr><td><code>implementer</code></td><td>Execution</td><td>Writes code, tests, and commits</td></tr>
+          <tr><td><code>reviewer</code></td><td>Review</td><td>Reviews PRs and produces structured JSON feedback (P0-P3)</td></tr>
+          <tr><td><code>documenter</code></td><td>Documentation</td><td>Generates project documentation</td></tr>
+          <tr><td><code>worker</code></td><td>General</td><td>General-purpose lightweight agent</td></tr>
+          <tr><td><code>ticket-intake</code></td><td>Intake</td><td>Processes tickets, runs sanity gate, extracts spec</td></tr>
+          <tr><td><code>spec-planner</code></td><td>Planning</td><td>Decomposes spec into independently-executable subtasks</td></tr>
+          <tr><td><code>plan-auditor</code></td><td>Audit</td><td>Audits plan coverage against spec requirements</td></tr>
+          <tr><td><code>task-implementer</code></td><td>Execution</td><td>Implements individual subtasks from a plan</td></tr>
+          <tr><td><code>verifier</code></td><td>Verification</td><td>Runs tests, security scan, code quality checks</td></tr>
+          <tr><td><code>closer</code></td><td>Close</td><td>Creates PRs, transitions tickets, publishes notes</td></tr>
+          <tr><td><code>retro</code></td><td>Retrospective</td><td>Analyses workflow run and generates improvement recommendations</td></tr>
         </tbody>
       </table>
 

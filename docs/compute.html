@@ -37,15 +37,17 @@
   <div class="page-layout">
     <main class="content">
       <h1>Compute Providers</h1>
-      <p class="subtitle">Run agents on local tmux, Docker containers, or EC2 instances.</p>
+      <p class="subtitle">Run agents on local tmux, Docker, EC2, E2B sandboxes, or Kubernetes pods.</p>
 
       <h2>Overview</h2>
-      <p>Ark supports three compute providers. Each provider handles how agent sessions are launched, monitored, and cleaned up. The <code>local</code> provider is always available; Docker and EC2 require additional setup.</p>
+      <p>Ark supports seven compute providers. Each provider handles how agent sessions are launched, monitored, and cleaned up. The <code>local</code> provider is always available; others require additional setup.</p>
       <p>Providers declare their own <strong>isolation modes</strong>:</p>
       <ul>
         <li><strong>Local</strong>: worktree (git worktree per session) or inplace (use repo directly)</li>
         <li><strong>EC2</strong>: inplace (remote workspace)</li>
         <li><strong>Docker</strong>: container (isolated container per session)</li>
+        <li><strong>E2B</strong>: sandbox (managed Firecracker microVM via E2B SDK)</li>
+        <li><strong>K8s</strong>: pod (Kubernetes pod) or kata (Kata Container with Firecracker microVM)</li>
       </ul>
 
       <h2>Local Provider</h2>
@@ -85,14 +87,14 @@ ark compute provision my-docker</code></pre>
       <p>Each provider declares its own capabilities, which determine what operations are available:</p>
       <table>
         <thead>
-          <tr><th>Capability</th><th>Local</th><th>EC2</th><th>Docker</th></tr>
+          <tr><th>Capability</th><th>Local</th><th>EC2</th><th>Docker</th><th>E2B</th><th>K8s</th></tr>
         </thead>
         <tbody>
-          <tr><td>Always running</td><td>Yes</td><td>No (needs provisioning)</td><td>No (needs provisioning)</td></tr>
-          <tr><td><code>supportsWorktree</code></td><td>Yes (git worktree per session)</td><td>No (remote clone)</td><td>No</td></tr>
-          <tr><td><code>canReboot</code></td><td>No</td><td>Yes</td><td>Yes</td></tr>
-          <tr><td><code>canDelete</code></td><td>No</td><td>Yes</td><td>Yes</td></tr>
-          <tr><td>Test support</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td>Always running</td><td>Yes</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+          <tr><td><code>supportsWorktree</code></td><td>Yes</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+          <tr><td><code>canReboot</code></td><td>No</td><td>Yes</td><td>Yes</td><td>No</td><td>Yes</td></tr>
+          <tr><td><code>canDelete</code></td><td>No</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td>Isolation</td><td>worktree</td><td>instance</td><td>container</td><td>Firecracker VM</td><td>pod / Kata VM</td></tr>
         </tbody>
       </table>
 
@@ -166,7 +168,7 @@ ark compute sync dev-box      # sync environment (push/pull)
 ark compute metrics dev-box   # show CPU, memory, disk, network</code></pre>
 
       <h2>Monitoring</h2>
-      <p>The TUI Compute tab (press <kbd>6</kbd>) shows real-time metrics for running computes:</p>
+      <p>The TUI Compute tab (press <kbd>4</kbd>) shows real-time metrics for running computes:</p>
       <ul>
         <li>CPU, memory, disk usage</li>
         <li>Network I/O</li>
@@ -180,6 +182,30 @@ ark compute metrics dev-box   # show CPU, memory, disk, network</code></pre>
       <pre><code>ark session start --repo . --summary "Deploy" --compute dev-box</code></pre>
       <p>Or select it in the TUI's New Session form.</p>
       <p>The agent will be launched on the remote compute. Attach via <kbd>a</kbd> in the TUI to get a remote tmux session. Press <kbd>Ctrl+B</kbd> <kbd>d</kbd> to detach from the tmux session without interrupting the agent.</p>
+
+      <h2>E2B Provider</h2>
+      <p>Managed Firecracker sandboxes via the <a href="https://e2b.dev">E2B</a> SDK. Sub-second boot with full isolation.</p>
+      <pre><code>ark compute create my-e2b --provider e2b
+ark compute provision my-e2b</code></pre>
+      <p>Requires <code>E2B_API_KEY</code> environment variable. Options:</p>
+      <ul>
+        <li><code>--template</code>: E2B sandbox template (default: <code>base</code>)</li>
+        <li><code>--timeout</code>: Sandbox timeout in seconds (default: 3600)</li>
+      </ul>
+
+      <h2>Kubernetes Provider</h2>
+      <p>Run agents in Kubernetes pods. Supports vanilla pods and <strong>Kata Containers</strong> with Firecracker microVM isolation.</p>
+      <pre><code># Standard K8s pod
+ark compute create my-k8s --provider k8s
+
+# Kata Container with Firecracker isolation
+ark compute create my-kata --provider k8s-kata</code></pre>
+      <p>Options:</p>
+      <ul>
+        <li><code>--namespace</code>: Kubernetes namespace (default: <code>ark</code>)</li>
+        <li><code>--image</code>: Container image (default: <code>ubuntu:22.04</code>)</li>
+        <li><code>--runtime-class</code>: RuntimeClassName (<code>kata-fc</code> for k8s-kata)</li>
+      </ul>
 
       <h2>Devcontainer and Compose</h2>
       <p>Devcontainer and Docker Compose support require explicit opt-in via <code>arc.json</code> in your project root:</p>

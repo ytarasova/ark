@@ -64,15 +64,16 @@
           <tr><th>View</th><th>Purpose</th></tr>
         </thead>
         <tbody>
+          <tr><td><strong>Dashboard</strong></td><td>Fleet status overview with cost charts (Recharts), budget progress, recent activity, system health</td></tr>
           <tr><td><strong>Sessions</strong></td><td>Session list with status indicators, detail panel, and all lifecycle actions</td></tr>
-          <tr><td><strong>Agents</strong></td><td>Browse agent definitions, view configs, manage custom agents</td></tr>
+          <tr><td><strong>Agents</strong></td><td>Browse agent definitions, view configs, manage custom agents. Includes Runtimes sub-group</td></tr>
           <tr><td><strong>Tools</strong></td><td>MCP servers, commands, skills, recipes, and context management</td></tr>
           <tr><td><strong>Flows</strong></td><td>Flow definitions with stage visualization and gate configuration</td></tr>
           <tr><td><strong>History</strong></td><td>Claude Code session discovery, search, and import into Ark</td></tr>
-          <tr><td><strong>Compute</strong></td><td>Compute resource provisioning and lifecycle (local, Docker, EC2)</td></tr>
+          <tr><td><strong>Compute</strong></td><td>Compute resource provisioning and lifecycle (local, Docker, EC2, E2B, K8s)</td></tr>
           <tr><td><strong>Costs</strong></td><td>Per-session and aggregate token usage with budget tracking</td></tr>
           <tr><td><strong>Schedules</strong></td><td>Cron-based recurring session management -- create, enable/disable, delete</td></tr>
-          <tr><td><strong>Memory</strong></td><td>Cross-session persistent memory -- add, search, delete memories</td></tr>
+          <tr><td><strong>Memory</strong></td><td>Knowledge graph -- memories, learnings, knowledge stats</td></tr>
           <tr><td><strong>Settings</strong></td><td>Dashboard and system configuration</td></tr>
         </tbody>
       </table>
@@ -111,8 +112,8 @@
         <li>Budget usage shown against daily, weekly, and monthly limits configured in settings</li>
       </ul>
 
-      <h2>Memory</h2>
-      <p>The Memory view manages cross-session persistent memories that agents can read at dispatch time:</p>
+      <h2>Memory / Knowledge</h2>
+      <p>The Memory view manages the knowledge graph -- memories, learnings, and knowledge stats. Agents access this at dispatch time:</p>
       <ul>
         <li>Add new memories with optional tags, scope, and importance level</li>
         <li>Search memories by keyword</li>

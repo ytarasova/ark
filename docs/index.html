@@ -297,21 +297,22 @@
     <div class="logo">ark</div>
     <p class="tagline">
       <strong>Autonomous agent ecosystem.</strong><br>
-      Orchestrate Claude agents through multi-stage flows with local, Docker, and EC2 compute.
+      Orchestrate AI coding agents through DAG-based SDLC flows with 7 compute providers.
     </p>
 
     <div class="features">
-      <span class="pill">multi-stage flows</span>
-      <span class="pill green">hook-based status</span>
-      <span class="pill purple">TUI + web dashboard</span>
-      <span class="pill">tiered autonomy</span>
-      <span class="pill green">FTS5 search</span>
-      <span class="pill purple">PR monitoring</span>
-      <span class="pill">headless CI mode</span>
-      <span class="pill green">fan-out / DAG flows</span>
-      <span class="pill purple">multi-agent orchestration</span>
-      <span class="pill">guardrails</span>
-      <span class="pill green">cost tracking</span>
+      <span class="pill">DAG flow engine</span>
+      <span class="pill green">knowledge graph</span>
+      <span class="pill purple">LLM router</span>
+      <span class="pill">4 runtimes</span>
+      <span class="pill green">12 agents</span>
+      <span class="pill purple">7 compute providers</span>
+      <span class="pill">TUI + web + desktop</span>
+      <span class="pill green">multi-tenancy</span>
+      <span class="pill purple">fan-out / auto-join</span>
+      <span class="pill">cost tracking</span>
+      <span class="pill green">Helm chart</span>
+      <span class="pill purple">remote client mode</span>
     </div>
 
     <div class="install-section">
@@ -353,33 +354,33 @@
       <div class="grid">
         <div class="card">
           <div class="icon">&#9881;</div>
-          <h3>Multi-Stage Flows</h3>
-          <p>YAML-defined pipelines with plan, implement, review, and deploy stages. Gates control advancement.</p>
+          <h3>DAG Flow Engine</h3>
+          <p>YAML-defined SDLC pipelines: intake, plan, audit, execute, verify, close, retro. Fan-out, auto-join, verification gates.</p>
         </div>
         <div class="card">
           <div class="icon">&#9000;</div>
-          <h3>TUI + Web Dashboard</h3>
-          <p>React + Ink terminal UI and browser-based web dashboard. 9 tabs, live agent output, conversation search.</p>
+          <h3>TUI + Web + Desktop</h3>
+          <p>Terminal UI (9 tabs), web dashboard with cost charts, and Electron desktop app. Live agent output.</p>
         </div>
         <div class="card">
           <div class="icon">&#9889;</div>
-          <h3>Multi-Compute</h3>
-          <p>Run agents on local tmux, Docker containers, or EC2 instances. Provider-driven isolation.</p>
+          <h3>7 Compute Providers</h3>
+          <p>Local, Docker, DevContainer, Firecracker, EC2, E2B sandboxes, and Kubernetes with Kata Containers.</p>
         </div>
         <div class="card">
           <div class="icon">&#128269;</div>
-          <h3>Session Intelligence</h3>
-          <p>FTS5-indexed transcripts, cost tracking, conversation history, and Claude session import.</p>
+          <h3>Knowledge Graph</h3>
+          <p>Unified knowledge across codebase, sessions, memories, and learnings. Axon-powered indexing.</p>
         </div>
         <div class="card">
           <div class="icon">&#128274;</div>
-          <h3>Tiered Autonomy</h3>
-          <p>Per-stage permission levels: full, execute, edit, or read-only. Control what agents can do.</p>
+          <h3>Multi-Runtime</h3>
+          <p>4 runtimes (Claude, Codex, Gemini, Aider). 12 specialized agents. Any role on any LLM backend.</p>
         </div>
         <div class="card">
           <div class="icon">&#128232;</div>
-          <h3>PR Monitoring</h3>
-          <p>GitHub webhook integration. Review comments auto-steer agents. Approval opens flow gates.</p>
+          <h3>Control Plane</h3>
+          <p>Multi-tenant hosted mode with API keys, tenant policies, worker registry, Helm chart deployment.</p>
         </div>
       </div>
     </div>
@@ -419,7 +420,7 @@
         </a>
         <a href="compute.html" class="card" style="text-decoration:none">
           <h3>Compute Providers</h3>
-          <p>Local, Docker, and EC2 setup and operations.</p>
+          <p>Local, Docker, EC2, E2B, Kubernetes -- setup and operations.</p>
         </a>
         <a href="advanced.html" class="card" style="text-decoration:none">
           <h3>Advanced Features</h3>

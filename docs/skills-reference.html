@@ -97,6 +97,21 @@
 <span class="yaml-key">tags</span>: <span class="yaml-value">[testing, quality]</span></code></pre>
       <p><strong>Prompt behavior:</strong> Analyzes specified code and writes tests following the project's existing test patterns and framework conventions.</p>
 
+      <h3>plan-audit</h3>
+      <p>Audits implementation plans against spec requirements. Produces a coverage matrix and gap analysis.</p>
+
+      <h3>sanity-gate</h3>
+      <p>Pre-implementation sanity check. Validates that the task is well-defined and feasible before execution begins.</p>
+
+      <h3>security-scan</h3>
+      <p>Scans code changes for security vulnerabilities, secrets exposure, and unsafe patterns.</p>
+
+      <h3>self-review</h3>
+      <p>Agent self-reviews its own changes before reporting completion. Catches obvious issues before human review.</p>
+
+      <h3>spec-extraction</h3>
+      <p>Extracts a structured specification from tickets, PRs, or issue descriptions.</p>
+
       <!-- ── Attaching Skills ─────────────────────────────────────────────── -->
       <h2>Attaching Skills to Agents</h2>
       <p>Add skills to an agent definition via the <code>skills</code> field:</p>

@@ -2,7 +2,7 @@
 
 Launch the TUI with `ark tui`. All keyboard shortcuts listed below. Shortcuts are remappable via `~/.ark/config.yaml` -- see [Configuration](configuration.md#hotkey-remapping).
 
-The TUI has 9 tabs: Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs. The web dashboard (`ark web`) mirrors these and adds a System Status view.
+The TUI has 9 tabs: Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs. The web dashboard (`ark web`) mirrors these and adds a Dashboard overview page with cost charts.
 
 ## Global Shortcuts
 

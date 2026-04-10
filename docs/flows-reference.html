@@ -174,6 +174,30 @@
       <p><strong>Best for</strong>: Complex tasks where implementation and testing can proceed in parallel, then converge.</p>
       <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Refactor auth system" --flow dag-parallel --dispatch</code></pre>
 
+      <h3>islc</h3>
+      <p>Full Intent-to-Software Lifecycle pipeline with fan-out execution and 7 stages.</p>
+      <pre><code>ticket-intake (auto) -> plan (manual) -> audit (auto, optional) -> execute [fan_out] (auto) -> verify (manual) -> close (auto) -> retro (auto, optional)</code></pre>
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>Agent</th><th>Gate</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ticket-intake</td><td>ticket-intake</td><td>auto</td><td>Extracts spec from ticket</td></tr>
+          <tr><td>plan</td><td>spec-planner</td><td>manual</td><td>Decomposes into subtasks</td></tr>
+          <tr><td>audit</td><td>plan-auditor</td><td>auto</td><td>Optional. Audits plan coverage</td></tr>
+          <tr><td>execute</td><td>task-implementer</td><td>auto</td><td>Fan-out: parallel subtask execution (max 4)</td></tr>
+          <tr><td>verify</td><td>verifier</td><td>manual</td><td>Runs verification scripts</td></tr>
+          <tr><td>close</td><td>closer</td><td>auto</td><td>Creates PR, transitions ticket</td></tr>
+          <tr><td>retro</td><td>retro</td><td>auto</td><td>Optional. Generates improvement recommendations</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Best for</strong>: Full SDLC from ticket to merged PR with automated decomposition and parallel execution.</p>
+      <pre><code><span class="prompt">$</span> ark session start PROJ-123 --repo . --summary "Implement feature X" --flow islc --dispatch</code></pre>
+
+      <h3>islc-quick</h3>
+      <p>Shortened ISLC pipeline: implement, verify, close.</p>
+      <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Quick fix" --flow islc-quick --dispatch</code></pre>
+
       <!-- ── Flow YAML Fields ────────────────────────────────────────────── -->
       <h2>Flow YAML Fields</h2>
       <p>Full field reference for flow definition files.</p>

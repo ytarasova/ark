@@ -137,6 +137,31 @@
       <p><strong>System prompt summary</strong>: Empty. The task prompt from the flow stage or user provides all context.</p>
       <p><strong>Used by flows</strong>: bare, pr-review</p>
 
+      <!-- ── SDLC Pipeline Agents ─────────────────────────────────────────── -->
+      <h2>SDLC Pipeline Agents</h2>
+      <p>These agents are used by the ISLC/default flow for the full 7-stage SDLC pipeline.</p>
+
+      <h3>ticket-intake</h3>
+      <p>Processes tickets, runs sanity gate, and extracts a 27-section spec.</p>
+
+      <h3>spec-planner</h3>
+      <p>Reads spec and decomposes into independently-executable subtasks with implementation strategy.</p>
+
+      <h3>plan-auditor</h3>
+      <p>Audits plan coverage against spec requirements. Writes audit-report.md with coverage matrix.</p>
+
+      <h3>task-implementer</h3>
+      <p>Implements individual subtasks from a plan. Used in fan-out execution stages.</p>
+
+      <h3>verifier</h3>
+      <p>Runs verification layers: tests, security scan, code quality, acceptance criteria validation.</p>
+
+      <h3>closer</h3>
+      <p>Creates PRs, transitions tickets to done, publishes implementation notes.</p>
+
+      <h3>retro</h3>
+      <p>Analyses workflow run and generates improvement recommendations in retro-report.md.</p>
+
       <!-- ── CLI Agents ──────────────────────────────────────────────────── -->
       <h2>CLI Agents</h2>
       <p>These agents use the <code>cli-agent</code> executor, which launches third-party CLI tools in tmux with the same worktree isolation and session tracking as Claude Code agents.</p>
@@ -265,6 +290,24 @@
 <span class="prompt">$</span> ark agent copy implementer --global    <span class="yaml-comment"># Copy to global scope</span>
 <span class="prompt">$</span> ark agent delete my-agent              <span class="yaml-comment"># Delete custom agent (cannot delete builtins)</span></code></pre>
       <p>In the TUI, press <kbd>2</kbd> to switch to the Agents tab. Use <kbd>n</kbd> to create, <kbd>e</kbd> to edit, <kbd>c</kbd> to copy, <kbd>x</kbd> to delete.</p>
+
+      <!-- ── Runtimes ───────────────────────────────────────────────────────── -->
+      <h2>Runtimes</h2>
+      <p>Runtimes define HOW an agent runs (LLM backend, CLI command). Agents define WHAT to do. Any agent role can run on any runtime.</p>
+      <table>
+        <thead>
+          <tr><th>Runtime</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>claude</code></td><td>claude-code</td><td>Claude Code CLI (default)</td></tr>
+          <tr><td><code>codex</code></td><td>cli-agent</td><td>OpenAI Codex CLI</td></tr>
+          <tr><td><code>gemini</code></td><td>cli-agent</td><td>Google Gemini CLI</td></tr>
+          <tr><td><code>aider</code></td><td>cli-agent</td><td>Aider pair programming</td></tr>
+        </tbody>
+      </table>
+      <pre><code><span class="prompt">$</span> ark runtime list                        <span class="yaml-comment"># List available runtimes</span>
+<span class="prompt">$</span> ark runtime show claude                 <span class="yaml-comment"># Show runtime details</span>
+<span class="prompt">$</span> ark session start --agent implementer --runtime codex --dispatch  <span class="yaml-comment"># Override runtime</span></code></pre>
 
       <div class="doc-footer">
         <a href="workflows.html">&larr; Workflows</a>

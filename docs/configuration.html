@@ -168,6 +168,24 @@
   <span class="yaml-key">endpoint</span>: <span class="yaml-value">null</span></code></pre>
       <p>Optional anonymous usage telemetry. Disabled by default. Can also be enabled via <code>ARK_TELEMETRY=1</code>.</p>
 
+      <h3>Router</h3>
+      <pre><code><span class="yaml-key">router</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">false</span>
+  <span class="yaml-key">port</span>: <span class="yaml-value">8430</span>
+  <span class="yaml-key">policy</span>: <span class="yaml-value">balanced</span>     <span class="yaml-comment"># quality | balanced | cost</span></code></pre>
+      <p>Configure the LLM router. Providers are auto-detected from env vars (<code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>GOOGLE_API_KEY</code>).</p>
+
+      <h3>Auth</h3>
+      <pre><code><span class="yaml-key">auth</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">false</span>
+  <span class="yaml-key">apiKeyEnabled</span>: <span class="yaml-value">false</span></code></pre>
+      <p>Multi-tenant authentication. Disabled by default for local use. Enable for hosted mode.</p>
+
+      <h3>Database</h3>
+      <pre><code><span class="yaml-key">database_url</span>: <span class="yaml-value">null</span>    <span class="yaml-comment"># PostgreSQL for hosted mode</span>
+<span class="yaml-key">redis_url</span>: <span class="yaml-value">null</span>       <span class="yaml-comment"># Redis for SSE bus</span></code></pre>
+      <p>Set <code>DATABASE_URL</code> for PostgreSQL (hosted mode). Set <code>REDIS_URL</code> for multi-instance SSE. Both default to local (SQLite, in-memory bus).</p>
+
       <!-- ── bridge.json ──────────────────────────────────────────────────── -->
       <h2>~/.ark/bridge.json</h2>
       <p>Configuration for messaging bridges (Telegram, Slack, Discord). All fields are optional -- only configure the platforms you want.</p>
@@ -307,8 +325,15 @@
           <tr><td><code>ARK_PROFILE</code></td><td><code>default</code></td><td>Active profile name</td></tr>
           <tr><td><code>ARK_DEFAULT_COMPUTE</code></td><td>--</td><td>Default compute resource name</td></tr>
           <tr><td><code>ARK_TELEMETRY</code></td><td>--</td><td>Set to <code>1</code> to enable telemetry (overrides config)</td></tr>
+          <tr><td><code>ARK_SERVER</code></td><td>--</td><td>Remote Ark server URL (enables remote client mode)</td></tr>
+          <tr><td><code>ARK_TOKEN</code></td><td>--</td><td>API key for remote server authentication</td></tr>
           <tr><td><code>ARK_TEST_DIR</code></td><td>--</td><td>Temp directory for test isolation (development only)</td></tr>
-          <tr><td><code>ANTHROPIC_API_KEY</code></td><td>--</td><td>Required for hybrid search LLM re-ranking</td></tr>
+          <tr><td><code>DATABASE_URL</code></td><td>--</td><td>PostgreSQL connection URL (hosted mode)</td></tr>
+          <tr><td><code>REDIS_URL</code></td><td>--</td><td>Redis URL for SSE bus (hosted mode)</td></tr>
+          <tr><td><code>ANTHROPIC_API_KEY</code></td><td>--</td><td>Anthropic API key (LLM router, knowledge graph)</td></tr>
+          <tr><td><code>OPENAI_API_KEY</code></td><td>--</td><td>OpenAI API key (LLM router)</td></tr>
+          <tr><td><code>GOOGLE_API_KEY</code></td><td>--</td><td>Google API key (LLM router)</td></tr>
+          <tr><td><code>E2B_API_KEY</code></td><td>--</td><td>E2B API key (E2B compute provider)</td></tr>
           <tr><td><code>EDITOR</code></td><td><code>vi</code></td><td>Editor for <code>ark config</code> and <code>ark agent create/edit</code></td></tr>
         </tbody>
       </table>

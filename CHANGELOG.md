@@ -1,5 +1,68 @@
 # Changelog
 
+## v0.12.0 (2026-04-10)
+
+### Knowledge Graph
+- **Unified knowledge store**: nodes (file, symbol, session, memory, learning, skill, recipe, agent) and edges (depends_on, imports, modified_by, etc.) in SQLite
+- **Codebase indexer**: `ark knowledge index --repo .` indexes files and symbols into the graph (Axon integration for symbol extraction)
+- **Context builder**: automatically injects relevant knowledge into agent prompts at dispatch time
+- **MCP tool handler**: agents can query the knowledge graph via MCP tools during execution
+- **Markdown export/import**: `ark knowledge export` / `ark knowledge import` for portability
+- **CLI commands**: `ark knowledge search/index/stats/remember/recall/export/import/ingest`
+- **Old systems removed**: `memory.ts`, `learnings.ts`, `hybrid-search.ts` deleted -- all functionality migrated to knowledge graph
+
+### LLM Router
+- **OpenAI-compatible proxy**: `ark router start` serves `/v1/chat/completions` across multiple LLM providers
+- **3 routing policies**: quality (best model), balanced (cost/quality tradeoff), cost (minimize spend)
+- **Circuit breakers**: per-provider failure tracking with automatic fallback to healthy providers
+- **Request classification**: classifies prompt complexity to select appropriate model tier
+- **Cost tracking**: per-request cost accumulation; `ark router status` and `ark router costs` commands
+
+### Control Plane & Hosted Mode
+- **`ark server start --hosted`**: starts multi-tenant control plane with worker registry, session scheduler, and tenant policies
+- **Worker registry**: workers register via HTTP, health-checked every 60s, stale workers pruned after 90s
+- **Session scheduler**: assigns sessions to available workers, respects tenant policies
+- **Tenant policies**: per-tenant allowed providers, default provider, max concurrent sessions, daily cost cap
+- **CLI**: `ark tenant policy set/get/list/delete`
+- **Redis SSE bus**: multi-instance event streaming via Redis pub/sub (falls back to in-memory)
+- **IDatabase abstraction**: `database.ts` interface with SQLite (`database-sqlite.ts`) and PostgreSQL (`database-postgres.ts`) adapters
+
+### Auth & Multi-Tenancy
+- **API key auth**: `ark auth create-key/list-keys/revoke-key/rotate-key` commands
+- **Tenant scoping**: API keys scoped to tenants, per-tenant AppContext in hosted mode
+- **Role-based access**: admin, member, viewer roles with write/read permissions
+- **Auth middleware**: extracts tenant context from Bearer tokens or query params
+
+### Compute Providers
+- **E2B provider**: managed Firecracker sandboxes via E2B SDK (sub-second boot, full isolation)
+- **K8s provider**: Kubernetes pods for agent execution, with optional Kata Containers (Firecracker microVM isolation)
+- **7 total providers**: local, docker, devcontainer, firecracker, ec2+arkd, e2b, k8s+kata
+
+### SDLC Pipeline
+- **ISLC flow**: full 7-stage pipeline (intake, plan, audit, execute, verify, close, retro)
+- **12 agents**: ticket-intake, spec-planner, plan-auditor, task-implementer, verifier, closer, retro (added to existing planner, implementer, reviewer, documenter, worker)
+- **7 skills**: code-review, plan-audit, sanity-gate, security-scan, self-review, spec-extraction, test-writing
+- **Runtime/role separation**: agents define WHAT (role, prompt, skills), runtimes define HOW (LLM backend, command). Override at dispatch with `--runtime codex`
+
+### Dashboard & Web
+- **Dashboard command**: `ark dashboard` shows fleet status, costs (today/week/month), budget progress, recent activity, system health
+- **Web dashboard page**: DashboardView with cost charts (Recharts), fleet status counts, budget bar
+- **MCP config stubs**: pre-configured `.mcp.json` templates for Atlassian, GitHub, Linear, Figma
+
+### Remote Client Mode
+- **`--server`/`--token` flags**: CLI, TUI, and Web can connect to a remote Ark control plane
+- **`ARK_SERVER`/`ARK_TOKEN` env vars**: alternative to CLI flags
+- **WebSocket client**: remote mode uses typed WebSocket ArkClient instead of local AppContext
+
+### Deployment
+- **Dockerfile**: production container image for Ark
+- **docker-compose.yaml**: Ark + PostgreSQL + Redis stack
+- **Helm chart**: `.infra/helm/ark/` with control plane, worker pool, PostgreSQL, Redis, Ingress
+- **Production values**: `.infra/helm/ark/values-production.yaml` with Kata/Firecracker runtime class
+
+### Documentation
+- **Comprehensive rewrite**: all docs updated to reflect current platform state
+
 ## v0.11.0 (2026-04-09)
 
 ### Code Quality & Security

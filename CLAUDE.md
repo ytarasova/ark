@@ -1,6 +1,6 @@
 # Ark
 
-Autonomous agent ecosystem. Orchestrates Claude agents through multi-stage SDLC flows with local, Docker, and EC2 compute.
+Autonomous agent ecosystem. Orchestrates AI coding agents through DAG-based SDLC flows with 7 compute providers, unified knowledge graph, LLM router, and multi-tenant control plane.
 
 ## Commands
 
@@ -27,34 +27,59 @@ ark arkd              # start the arkd daemon (--port 19300, --conductor-url htt
 ```
 packages/
   cli/       → Commander.js CLI entry (ark command)
-  core/      → Sessions, store (SQLite), flows, agents, channels, conductor, search (FTS5), claude-sessions, app context, config
+  core/      → Sessions, store, flows, agents, channels, conductor, search (FTS5), app context, config
+    knowledge/     → Knowledge graph store, indexer, context builder, MCP tools, export/import
     repositories/  → SQL CRUD (SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository)
     services/      → Business logic (SessionService, ComputeService, HistoryService) + orchestration
     stores/        → Resource stores (FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore) -- file-backed, three-tier resolution
-  compute/   → Providers: local (worktree/docker/devcontainer/firecracker), remote EC2 (worktree/docker/devcontainer/firecracker)
-  arkd/      → Universal agent daemon - HTTP server on every compute target (agent lifecycle, file ops, metrics, channel relay)
+    auth.ts        → Multi-tenant auth middleware (API key-based)
+    api-keys.ts    → API key manager (create, validate, revoke, rotate)
+    tenant-policy.ts → Tenant compute policies (provider limits, cost caps)
+    hosted.ts      → Hosted mode entry point (worker registry, scheduler, SSE bus)
+    worker-registry.ts → Worker registration and health checking
+    scheduler.ts   → Session scheduler with tenant policy enforcement
+    sse-bus.ts     → In-memory SSE event bus
+    sse-redis.ts   → Redis-backed SSE bus for multi-instance deployments
+    database.ts    → IDatabase abstraction interface
+    database-sqlite.ts → SQLite adapter (local mode, bun:sqlite)
+    database-postgres.ts → PostgreSQL adapter (hosted mode)
+  compute/   → 7 providers: local, docker, devcontainer, firecracker, ec2+arkd, e2b, k8s+kata
+  arkd/      → Universal agent daemon - HTTP server on every compute target
+  router/    → LLM Router -- OpenAI-compatible proxy with routing policies, circuit breakers
   server/    → JSON-RPC handlers (delegate to services + stores via AppContext)
   protocol/  → ArkClient (typed JSON-RPC client)
   tui/       → React + Ink terminal dashboard
-agents/      → Agent YAML definitions -- roles (planner, implementer, reviewer, documenter, worker)
-runtimes/    → Runtime YAML definitions -- LLM backends (claude, codex, gemini, aider)
-flows/       → Flow YAML definitions (default, quick, bare, parallel)
-skills/      → Builtin skill definitions (reusable prompt fragments)
-recipes/     → Recipe templates (quick-fix, feature-build, code-review)
+  web/       → Vite-based web dashboard (SSE live updates, Dashboard page with Recharts)
+  desktop/   → Electron shell wrapping the web dashboard
+  types/     → Domain interfaces (Session, Compute, Event, Message, Tenant, etc.)
+agents/      → 12 agent definitions (ticket-intake, spec-planner, plan-auditor, implementer,
+               task-implementer, verifier, reviewer, documenter, closer, retro, planner, worker)
+runtimes/    → 4 runtime definitions (claude, codex, gemini, aider)
+flows/       → 9 flow definitions (default, quick, bare, parallel, fan-out, pr-review, dag-parallel, islc, islc-quick)
+skills/      → 7 builtin skills (code-review, plan-audit, sanity-gate, security-scan, self-review, spec-extraction, test-writing)
+recipes/     → 8 recipe templates (quick-fix, feature-build, code-review, fix-bug, new-feature, ideate, islc, islc-quick)
+mcp-configs/ → MCP config stubs (Atlassian, GitHub, Linear, Figma)
+.infra/      → Dockerfile, docker-compose, Helm chart
 ```
 
 No workspaces config - packages are coordinated manually via relative imports.
 
 **Core module layers** (from bottom to top):
 ```
-packages/types/                         → Domain interfaces (Session, Compute, Event, Message, etc.)
+packages/types/                         → Domain interfaces (Session, Compute, Event, Message, Tenant, etc.)
 packages/core/
+  database.ts / database-sqlite.ts / database-postgres.ts → IDatabase abstraction
   repositories/                         → SQL CRUD (SessionRepository, ComputeRepository, etc.)
   stores/                               → Resource stores (FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore)
+  knowledge/                            → Knowledge graph (store, indexer, context builder, MCP tools, export)
   services/session.ts                   → SessionService -- lifecycle facade, delegates complex ops to orchestration
   services/session-orchestration.ts     → All orchestration (dispatch, advance, fork, clone, spawn, fan-out, etc.)
+  auth.ts + api-keys.ts                 → Multi-tenant auth middleware + API key manager
+  tenant-policy.ts                      → Tenant compute policies
+  hosted.ts                             → Hosted mode entry (worker registry, scheduler, Redis SSE)
   app.ts                                → AppContext wires repos + services + stores, boot/shutdown lifecycle
   conductor.ts                          → HTTP server (:19100), hook status, channel relay
+packages/router/                        → LLM Router (OpenAI-compatible, 3 policies, circuit breakers)
 packages/server/                        → JSON-RPC handlers (delegate to services + stores via AppContext)
 packages/protocol/                      → ArkClient (typed JSON-RPC client)
 ```
@@ -139,13 +164,17 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 | `ARK_CHANNEL_PORT` | auto-assigned | Per-session MCP channel port |
 | `ARK_SESSION_ID` | - | Set in channel context |
 | `ARK_STAGE` | - | Current flow stage in channel |
+| `ARK_SERVER` | - | Remote Ark server URL (enables remote client mode) |
+| `ARK_TOKEN` | - | API key for remote server authentication |
+| `DATABASE_URL` | - | PostgreSQL connection URL (hosted mode; defaults to SQLite) |
+| `REDIS_URL` | - | Redis URL for SSE bus (hosted mode; defaults to in-memory) |
 | `ARK_TEST_DIR` | - | Temp dir for test isolation |
 
 ## Data Locations
 
 | Path | Purpose |
 |------|---------|
-| `~/.ark/ark.db` | SQLite database (WAL mode, 5s busy timeout) |
+| `~/.ark/ark.db` | SQLite database (WAL mode, 5s busy timeout) -- includes knowledge graph tables |
 | `~/.ark/tracks/<sessionId>/` | Launcher scripts, channel configs |
 | `~/.ark/worktrees/<sessionId>/` | Git worktrees for isolated sessions |
 | `~/.ark/skills/` | Global skill definitions (user tier for SkillStore) |
@@ -155,6 +184,8 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 | `~/.ark/runtimes/` | Global runtime definitions (user tier for RuntimeStore) |
 | `~/.claude/projects/` | Claude Code session transcripts (JSONL) - read by search and import |
 | `.claude/settings.local.json` | Per-session hook config (written at dispatch, cleaned on stop) |
+
+**Note:** The old `~/.ark/memories.json` and `~/.ark/LEARNINGS.md` files are no longer used. Memory and learnings are now stored as nodes in the knowledge graph (in `ark.db`).
 
 ## Adding an Agent (Role)
 
@@ -379,22 +410,79 @@ Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/h
 - ES modules (`"type": "module"`) - always use `.js` import extensions
 - React + Ink for TUI components
 - YAML for agent/flow definitions
-- SQLite for persistence (no ORM)
+- SQLite for local persistence, PostgreSQL for hosted mode (IDatabase abstraction, no ORM)
 - **Never use em dashes** (U+2014). Use hyphens (-) or dashes (--) instead. This applies to code, comments, strings, and documentation.
 
 ## Architecture Boundaries
 
-- **`packages/types/`** - All domain interfaces. Single source of truth. No logic, no dependencies. Imported by every other package.
+- **`packages/types/`** - All domain interfaces (`Session`, `Compute`, `Event`, `Message`, `TenantContext`, etc.). Single source of truth. No logic, no dependencies. Imported by every other package.
 - **`repositories/`** - SQL CRUD behind typed classes. Column whitelists prevent injection. `SessionRepository`, `ComputeRepository`, `EventRepository`, `MessageRepository`, `TodoRepository`. Access via `app.sessions`, `app.computes`, `app.todos`, etc.
-- **`stores/`** - File-backed resource stores with three-tier resolution (builtin > global/user > project). `FlowStore`, `SkillStore`, `AgentStore`, `RecipeStore`. Access via `app.flows`, `app.skills`, `app.agents`, `app.recipes`. Each store has `list()`, `get()`, `save()`, `delete()` methods.
+- **`stores/`** - File-backed resource stores with three-tier resolution (builtin > global/user > project). `FlowStore`, `SkillStore`, `AgentStore`, `RecipeStore`, `RuntimeStore`. Access via `app.flows`, `app.skills`, `app.agents`, `app.recipes`, `app.runtimes`. Each store has `list()`, `get()`, `save()`, `delete()` methods.
+- **`knowledge/`** - Knowledge graph. `KnowledgeStore` (nodes + edges in SQLite), `indexer.ts` (codebase indexing), `context.ts` (context builder for agent prompts), `mcp.ts` (MCP tool handler), `export.ts` (markdown export/import). Access via `app.knowledge`.
+- **`database.ts` / `database-sqlite.ts` / `database-postgres.ts`** - `IDatabase` abstraction. SQLite for local, PostgreSQL for hosted. All repositories and stores use `IDatabase`, not raw bun:sqlite.
+- **`auth.ts` + `api-keys.ts`** - Multi-tenant auth middleware. API key validation, tenant context extraction, role-based access control (admin/member/viewer).
+- **`tenant-policy.ts`** - Tenant compute policies (allowed providers, max sessions, cost caps). `TenantPolicyManager` uses `IDatabase`.
+- **`hosted.ts`** - Hosted mode entry point. Boots AppContext with worker registry, session scheduler, tenant policies, optional Redis SSE bus, optional LLM router.
+- **`packages/router/`** - LLM Router. OpenAI-compatible `/v1/chat/completions` proxy. 3 routing policies (quality/balanced/cost), circuit breakers, request classification, cost tracking. Separate from the server `Router` class (which is the JSON-RPC method dispatcher).
 - **`services/session.ts`** - `SessionService` facade. Owns simple lifecycle (start, stop, resume, complete, pause, delete). Delegates complex ops to `session-orchestration.ts` via dynamic import.
 - **`services/session-orchestration.ts`** - All orchestration: dispatch, advance, fork, clone, spawn, fan-out, handoff, worktree ops, hook status, report handling. Every exported function takes `app: AppContext` as its first argument -- no `getApp()` calls.
 - **`provider-registry.ts`** - Provider resolver plumbing between `app.ts` and `session-orchestration.ts`. Breaks what was a circular import.
 - **`packages/server/validate.ts`** - `extract<T>()` validates RPC params at the boundary. All handlers use it.
-- **`constants.ts`** - Shared URL/port defaults (`DEFAULT_CONDUCTOR_URL`, `DEFAULT_ARKD_URL`, `DOCKER_CONDUCTOR_URL`). All providers and executors use these.
+- **`constants.ts`** - Shared URL/port defaults (`DEFAULT_CONDUCTOR_URL`, `DEFAULT_ARKD_URL`, `DOCKER_CONDUCTOR_URL`, `DEFAULT_ROUTER_URL`). All providers and executors use these.
 - **`claude.ts`** - ALL Claude Code knowledge (model mapping, args, hooks config, launcher, trust, transcript parsing).
 - **`conductor.ts`** - HTTP server (:19100). Channel reports + hook status. Receives `app: AppContext` via `startConductor(app, port)` -- no `getApp()` calls. Delegates to `session-orchestration.ts` for applyHookStatus/applyReport.
 - **`arkd/`** - Stateless HTTP daemon (:19300) on every compute target. Agent lifecycle, file ops, metrics, channel relay.
 - **`search.ts`** - Search + FTS5. Uses FTS5 when index exists, falls back to file scanning only when FTS table is absent.
-- **`app.ts`** - Boot/shutdown. Creates repos, services, stores, providers. CLI skips conductor; TUI runs it.
+- **`app.ts`** - Boot/shutdown. Creates repos, services, stores, providers, knowledge store. CLI skips conductor; TUI runs it. Supports Awilix DI container via `container.ts`.
 - **`packages/tui/hooks/useFocus.ts`** - Focus stack for TUI keyboard input ownership.
+
+## Knowledge Graph
+
+The knowledge graph (`packages/core/knowledge/`) provides a unified view of codebase structure, session history, memories, and learnings.
+
+**Components:**
+- **KnowledgeStore** (`store.ts`) - Node/edge storage in SQLite. Nodes have type (file, symbol, session, memory, learning, skill, recipe, agent), label, content, and metadata. Edges have relationship types (depends_on, imports, modified_by, etc.).
+- **Indexer** (`indexer.ts`) - Indexes a codebase into the knowledge graph (files, symbols, dependencies).
+- **Context Builder** (`context.ts`) - Builds relevant knowledge context for agent prompts at dispatch time.
+- **MCP Tools** (`mcp.ts`) - MCP tool handler for agent queries against the knowledge graph.
+- **Export/Import** (`export.ts`) - Markdown export/import for portability.
+
+**CLI:** `ark knowledge search`, `ark knowledge index`, `ark knowledge stats`, `ark knowledge remember`, `ark knowledge recall`, `ark knowledge export`, `ark knowledge import`, `ark knowledge ingest`.
+
+**Prerequisite:** The indexer uses Axon (if available) for symbol extraction. Without Axon, file-level indexing still works.
+
+## Control Plane (Hosted Mode)
+
+`hosted.ts` starts Ark as a multi-tenant control plane:
+
+- **Worker Registry** (`worker-registry.ts`) - Workers register via HTTP, health-checked every 60s, stale workers pruned after 90s.
+- **Session Scheduler** (`scheduler.ts`) - Assigns sessions to available workers, respects tenant policies.
+- **Tenant Policies** (`tenant-policy.ts`) - Per-tenant: allowed providers, default provider, max concurrent sessions, daily cost cap, compute pools.
+- **SSE Bus** - In-memory (`sse-bus.ts`) or Redis-backed (`sse-redis.ts`) for multi-instance deployments.
+- **IDatabase** - `database-postgres.ts` for hosted mode (connection string via `DATABASE_URL`).
+
+Start hosted mode: `ark server start --hosted`.
+
+## Remote Client Mode
+
+CLI, TUI, and Web can connect to a remote Ark server instead of running locally:
+
+```bash
+ark --server https://ark.company.com --token ark_default_xxx session list
+ark tui --server https://ark.company.com --token ark_default_xxx
+```
+
+Set via `ARK_SERVER` and `ARK_TOKEN` env vars. When remote mode is active, the CLI creates a WebSocket `ArkClient` to the remote server instead of booting a local AppContext.
+
+## LLM Router
+
+The LLM Router (`packages/router/`) is an OpenAI-compatible proxy that routes requests across multiple LLM providers.
+
+- **3 Routing Policies:** `quality` (prefer best model), `balanced` (optimize cost/quality), `cost` (minimize cost)
+- **Circuit Breakers:** Per-provider failure tracking with automatic fallback
+- **Request Classification:** Classifies prompt complexity to select appropriate model tier
+- **Cost Tracking:** Per-request cost accumulation with model/provider breakdown
+
+Start: `ark router start [--port 8430] [--policy balanced]`
+Status: `ark router status`
+Costs: `ark router costs`

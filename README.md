@@ -2,7 +2,7 @@
 
 **The orchestration layer for AI coding agents.** Manage sessions, workflows, and compute so your agents ship code -- not just write it.
 
-AI coding agents are powerful but ephemeral. They spin up, do work, and vanish -- leaving you to manage context, coordinate stages, track costs, and wire up infrastructure yourself. Ark handles all of that. Define a task, pick a workflow, and Ark drives your agents through planning, implementation, review, and documentation -- across local machines, Docker containers, or EC2 instances. It works with any CLI coding tool: Claude Code, OpenAI Codex, Google Gemini CLI, Aider, or your own.
+AI coding agents are powerful but ephemeral. They spin up, do work, and vanish -- leaving you to manage context, coordinate stages, track costs, and wire up infrastructure yourself. Ark handles all of that. Define a task, pick a workflow, and Ark drives your agents through a full SDLC pipeline -- intake, planning, audit, execution, verification, close, and retro -- across local machines, containers, cloud VMs, or Kubernetes pods. It works with any CLI coding tool: Claude Code, OpenAI Codex, Google Gemini CLI, Aider, or your own.
 
 ## Prerequisites
 
@@ -33,6 +33,9 @@ ark tui
 # Launch the web dashboard (or desktop app)
 ark web
 
+# Fleet overview with cost charts
+ark dashboard
+
 # Search across all sessions and transcripts
 ark search "authentication"
 ```
@@ -42,48 +45,63 @@ ark search "authentication"
 | Feature | Description | Docs |
 |---------|-------------|------|
 | **Sessions** | Full lifecycle management -- create, dispatch, stop, resume, fork, clone, export/import | [Guide](docs/guide.md#sessions) |
-| **Multi-Agent Support** | Pluggable executor system -- Claude Code, Codex, Gemini CLI, Aider, or any CLI tool via `cli-agent` runtime | [CLAUDE.md](CLAUDE.md#executor-system) |
-| **Flows & Agents** | YAML-defined multi-stage workflows with specialized AI agents and verification gates | [Guide](docs/guide.md#flows--agents) |
-| **TUI Dashboard** | 7-tab terminal UI with keyboard-driven navigation, search, status filters | [TUI Reference](docs/tui-reference.md) |
+| **Multi-Runtime Support** | 4 runtimes (Claude/Codex/Gemini/Aider) with runtime/role separation -- any agent role on any LLM backend | [CLAUDE.md](CLAUDE.md#runtimes) |
+| **SDLC Flows** | DAG-based multi-stage pipelines with fan-out, auto-join, verification gates, and 12 specialized agents | [Guide](docs/guide.md#flows--agents) |
+| **Knowledge Graph** | Unified knowledge across codebase, sessions, memories, and learnings via Axon indexer | [Guide](docs/guide.md#knowledge-graph) |
+| **LLM Router** | OpenAI-compatible proxy with 3 routing policies, circuit breakers, and cost tracking | [Guide](docs/guide.md#llm-router) |
+| **Dashboard** | Fleet status overview with cost charts (Recharts), budget tracking, and recent activity | [CLI](docs/cli-reference.md#ark-dashboard) |
+| **TUI Dashboard** | 9-tab terminal UI with keyboard-driven navigation, search, status filters | [TUI Reference](docs/tui-reference.md) |
 | **Web Dashboard** | Browser-based session management with SSE live updates, token auth, read-only mode | [Guide](docs/guide.md#web-dashboard) |
 | **Desktop App** | Electron wrapper around the web dashboard -- native menus, system tray, local-first | -- |
-| **Compute Providers** | Local (tmux), Docker, DevContainer, Firecracker, and EC2 with full lifecycle management | [Guide](docs/guide.md#compute) |
+| **7 Compute Providers** | Local, Docker, DevContainer, Firecracker, EC2+ArkD, E2B (managed sandbox), K8s+Kata | [Guide](docs/guide.md#compute) |
 | **Git Worktrees** | Automatic branch isolation per session, diff preview, merge + auto-PR in one command | [Guide](docs/guide.md#git-worktrees) |
-| **Skills & Recipes** | Reusable prompt fragments and session templates with three-tier resolution (project, global, builtin) | [Guide](docs/guide.md#skills--recipes) |
-| **Cost Tracking** | Automatic token usage collection, per-model pricing, budget limits | [Guide](docs/guide.md#cost-tracking) |
+| **Skills & Recipes** | Reusable prompt fragments and session templates with three-tier resolution | [Guide](docs/guide.md#skills--recipes) |
+| **Cost Tracking** | Automatic token usage collection, per-model pricing, budget limits, cost export | [Guide](docs/guide.md#cost-tracking) |
 | **Search** | Full-text search across sessions, events, messages, and transcripts (FTS5) | [Guide](docs/guide.md#search) |
+| **Auth & Multi-Tenancy** | API key auth, tenant scoping, role-based access (admin/member/viewer) | [CLI](docs/cli-reference.md#ark-auth) |
+| **Remote Client Mode** | CLI/TUI/Web connect to a hosted Ark server via `--server`/`--token` | [Guide](docs/guide.md#remote-client-mode) |
+| **Control Plane** | Worker registry, session scheduler, tenant policies, Redis SSE bus | [Guide](docs/guide.md#control-plane) |
 | **MCP Socket Pooling** | 85-90% memory reduction by sharing MCP server processes across agents | [Guide](docs/guide.md#mcp-socket-pooling) |
+| **MCP Config Stubs** | Pre-configured integrations for Atlassian, GitHub, Linear, Figma | -- |
 | **ACP Server** | Headless JSON-RPC protocol for programmatic access (stdin/stdout) | [CLI Reference](docs/cli-reference.md#ark-acp) |
 | **Messaging Bridges** | Telegram, Slack, Discord notifications and remote control | [Guide](docs/guide.md#messaging-bridges) |
-| **Conductor** | Orchestration server with hook-based status detection and learning system | [Guide](docs/guide.md#conductor) |
-| **Profiles** | Isolated session namespaces for multiple projects/accounts | [Guide](docs/guide.md#profiles) |
-| **Schedules** | Cron-based recurring sessions | [CLI Reference](docs/cli-reference.md#ark-schedule) |
-| **Doctor & Init** | Environment verification and project scaffolding | [CLI Reference](docs/cli-reference.md#ark-doctor) |
+| **Deployment** | Dockerfile, docker-compose, Helm chart with Kata/Firecracker support | [Guide](docs/guide.md#deployment) |
 
 ## Architecture
 
 ```
 packages/
   cli/        Commander.js CLI entry point (ark command)
-  core/       Sessions, store (SQLite), flows, agents, channels, conductor,
-              search (FTS5), costs, profiles, themes, web server, bridge
-  compute/    Providers: local (tmux/worktree/docker/devcontainer/firecracker),
-              remote EC2 (worktree/docker/devcontainer/firecracker)
+  core/       Sessions, store, flows, agents, channels, conductor, search (FTS5),
+              costs, knowledge graph, auth, tenant policies, scheduler, SSE bus
+    knowledge/  Knowledge graph store, indexer, context builder, MCP tools, export/import
+    services/   SessionService, ComputeService, HistoryService + orchestration
+    repositories/  SQL CRUD (Session, Compute, Event, Message, Todo)
+    stores/     Resource stores (Flow, Skill, Agent, Recipe, Runtime) -- three-tier
+  compute/    7 providers: local, docker, devcontainer, firecracker, ec2, e2b, k8s+kata
   arkd/       Universal agent daemon -- HTTP server on every compute target
-  tui/        React + Ink terminal dashboard (7 tabs)
-  web/        Vite-based web dashboard (SSE live updates)
+  router/     LLM Router -- OpenAI-compatible proxy with routing policies
+  tui/        React + Ink terminal dashboard (9 tabs)
+  web/        Vite-based web dashboard (SSE live updates, Dashboard page)
   desktop/    Electron shell wrapping the web dashboard
   server/     JSON-RPC handlers (delegate to services via AppContext)
   protocol/   ArkClient (typed JSON-RPC client)
-  types/      Domain interfaces (Session, Compute, Event, Message, etc.)
+  types/      Domain interfaces (Session, Compute, Event, Message, Tenant, etc.)
   e2e/        End-to-end tests (Playwright for web + desktop)
 
-agents/       Agent YAML definitions (planner, implementer, reviewer, documenter,
-              worker, codex-worker, gemini-worker, aider-worker, generic-cli)
-flows/        Flow YAML definitions (default, quick, bare, parallel, fan-out, pr-review)
-skills/       Builtin skill definitions
-recipes/      Recipe templates (quick-fix, feature-build, code-review, fix-bug, new-feature)
-docs/         User documentation
+agents/       12 agent definitions (ticket-intake, spec-planner, plan-auditor,
+              implementer, task-implementer, verifier, reviewer, documenter,
+              closer, retro, planner, worker)
+runtimes/     4 runtime definitions (claude, codex, gemini, aider)
+flows/        9 flow definitions (default, quick, bare, parallel, fan-out,
+              pr-review, dag-parallel, islc, islc-quick)
+skills/       7 builtin skills (code-review, plan-audit, sanity-gate,
+              security-scan, self-review, spec-extraction, test-writing)
+recipes/      8 recipe templates (quick-fix, feature-build, code-review,
+              fix-bug, new-feature, ideate, islc, islc-quick)
+mcp-configs/  MCP config stubs (Atlassian, GitHub, Linear, Figma)
+.infra/       Dockerfile, docker-compose, Helm chart
+docs/         User documentation + GitHub Pages site
 ```
 
 ## Documentation
@@ -111,11 +129,24 @@ make uninstall        # Remove ark symlink
 
 Tests use `bun:test`. Always run via `make test` -- never call `bun test` directly (tests must run sequentially to avoid port collisions).
 
+## Deployment
+
+```bash
+# Docker
+docker build -t ark .
+docker-compose up -d          # Ark + Postgres + Redis
+
+# Kubernetes (Helm)
+helm install ark .infra/helm/ark -f .infra/helm/ark/values-production.yaml
+```
+
+The Helm chart deploys: control plane, worker pool, PostgreSQL, Redis, Ingress.
+
 ## Data
 
 | Path | Purpose |
 |------|---------|
-| `~/.ark/ark.db` | SQLite database (WAL mode) |
+| `~/.ark/ark.db` | SQLite database (WAL mode) -- local mode |
 | `~/.ark/config.yaml` | User configuration |
 | `~/.ark/tracks/` | Launcher scripts per session |
 | `~/.ark/worktrees/` | Git worktrees for isolated sessions |
