@@ -10,7 +10,7 @@ interface Column {
 
 interface DataTableProps {
   columns: Column[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   rows: readonly any[];
   /** Max rows to display (default: all) */
   limit?: number;

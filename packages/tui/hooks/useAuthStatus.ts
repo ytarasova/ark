@@ -42,7 +42,7 @@ export function useAuthStatus(compute: Compute | undefined | null): AuthStatus {
           process.env.CLAUDE_CODE_OAUTH_TOKEN = token;
           return { hasAuth: true, authType: "saved_token" };
         }
-      } catch {}
+      } catch { /* token retrieval is optional */ }
     }
 
     return { hasAuth: false, authType: null };

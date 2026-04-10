@@ -144,7 +144,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
         process.stdout.write = origWrite;
         process.stderr.write = origErrWrite;
         // Reset terminal state so tmux gets a clean terminal
-        try { process.stdin.setRawMode(false); } catch {}
+        try { process.stdin.setRawMode(false); } catch { /* stdin may not be a TTY */ }
         process.stdout.write("\x1b[?1049l"); // exit alt screen if active
         process.stdout.write("\x1b[?25h");    // show cursor
         // Spawn attach command -- local tmux or SSH+tmux for remote
@@ -155,7 +155,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
           env: { ...process.env, TERM: "xterm-256color" },
         });
         // Restore terminal for Ink
-        try { process.stdin.setRawMode(true); } catch {}
+        try { process.stdin.setRawMode(true); } catch { /* stdin may not be a TTY */ }
         process.stdout.write("\x1b[?25l");      // hide cursor
         process.stdout.write("\x1b[2J\x1b[H");  // clear screen
         status.show("Detached from session");

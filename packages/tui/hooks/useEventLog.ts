@@ -39,9 +39,9 @@ async function fetchEvents(ark: ArkClient, expanded: boolean): Promise<EventLogE
             color: eventLogColor(ev.type),
           });
         }
-      } catch {}
+      } catch { /* skip sessions with missing events */ }
     }));
-  } catch {}
+  } catch { /* event loading is best-effort */ }
 
   allEvents.sort((a, b) => b.time.localeCompare(a.time));
   return allEvents.slice(0, expanded ? 30 : 5);

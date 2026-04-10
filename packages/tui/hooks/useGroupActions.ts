@@ -31,7 +31,7 @@ export function useGroupActions(asyncState: AsyncState) {
         const groupSessions = sessions.filter(s => s.group_name === name);
         for (const s of groupSessions) {
           if (s.session_id) {
-            try { await ark.sessionStop(s.id); } catch {}
+            try { await ark.sessionStop(s.id); } catch { /* session may already be stopped */ }
           }
           await ark.sessionDelete(s.id);
         }

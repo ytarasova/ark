@@ -67,7 +67,7 @@ export function SessionSearch({ sessions, onSelect, onClose }: SessionSearchProp
       </Box>
       {results.map((s, i) => (
         <Box key={s.id}>
-          <Text color={i === cursor ? theme.accent : undefined} bold={i === cursor}>
+          <Text color={i === cursor ? theme.highlight : undefined} bold={i === cursor}>
             {i === cursor ? ">" : " "} {s.summary ?? s.id}
           </Text>
           <Text color="gray"> ({s.status})</Text>

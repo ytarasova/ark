@@ -22,12 +22,12 @@ function mockAsyncState() {
     ran: [],
     run(label: string, fn: (updateLabel: (msg: string) => void) => void | Promise<void>) {
       state.ran.push({ label, fn });
-      try { fn(() => {}); } catch {} // Execute sync side-effects for testing
+      try { fn(() => {}); } catch { /* test side-effects may throw */ } // Execute sync side-effects for testing
     },
     clearError() {},
     async flush() {
       for (const { fn } of state.ran) {
-        try { await fn(() => {}); } catch {}
+        try { await fn(() => {}); } catch { /* test side-effects may throw */ }
       }
     },
   };

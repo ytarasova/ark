@@ -120,7 +120,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
       setEditing(true);
       try {
         setSystemPrompt(openExternalEditor(systemPrompt));
-      } catch {}
+      } catch { /* editor may not be available */ }
       setEditing(false);
     }
   });
@@ -144,7 +144,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
 
       {/* Tools checkbox list */}
       <Box>
-        <Text color={active === "tools" ? theme.accent : "gray"}>
+        <Text color={active === "tools" ? theme.highlight : "gray"}>
           {active === "tools" ? "> " : "  "}
         </Text>
         <Text color={active === "tools" ? "white" : "gray"} bold={active === "tools"}>
@@ -154,7 +154,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
           <Box flexDirection="column">
             {TOOL_OPTIONS.map((t, i) => (
               <Text key={t}>
-                <Text color={i === toolCursor ? theme.accent : "white"}>
+                <Text color={i === toolCursor ? theme.highlight : "white"}>
                   {tools.includes(t) ? "[x] " : "[ ] "}
                   {t}
                 </Text>
@@ -175,7 +175,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
 
       {/* System prompt */}
       <Box>
-        <Text color={active === "prompt" ? theme.accent : "gray"}>
+        <Text color={active === "prompt" ? theme.highlight : "gray"}>
           {active === "prompt" ? "> " : "  "}
         </Text>
         <Text color={active === "prompt" ? "white" : "gray"} bold={active === "prompt"}>

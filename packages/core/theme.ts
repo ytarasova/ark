@@ -8,6 +8,7 @@ export type ThemeMode = "dark" | "light" | "system";
 
 export interface Theme {
   accent: string;
+  highlight: string;
   running: string;
   waiting: string;
   error: string;
@@ -19,6 +20,7 @@ export interface Theme {
 
 const DARK: Theme = {
   accent: "#7aa2f7",
+  highlight: "#bb9af7",       // bright purple -- visible on dark backgrounds
   running: "#9ece6a",
   waiting: "#e0af68",
   error: "#f7768e",
@@ -30,6 +32,7 @@ const DARK: Theme = {
 
 const LIGHT: Theme = {
   accent: "#2e7de9",
+  highlight: "#7847bd",       // deep purple -- visible on light backgrounds
   running: "#587539",
   waiting: "#8c6c3e",
   error: "#f52a65",

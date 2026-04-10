@@ -25,12 +25,12 @@ if (!isRemote) {
 // ── Logging ─────────────────────────────────────────────────────────────────
 const config = app?.config ?? loadConfig();
 const logDir = config.logDir ?? join(process.env.HOME ?? "/tmp", ".ark", "logs");
-try { mkdirSync(logDir, { recursive: true }); } catch {}
+try { mkdirSync(logDir, { recursive: true }); } catch { /* log dir may already exist */ }
 const LOG_FILE = join(logDir, "tui.log");
 
 function log(level: string, msg: string): void {
   const ts = new Date().toISOString();
-  try { appendFileSync(LOG_FILE, `${ts} [${level}] ${msg}\n`); } catch {}
+  try { appendFileSync(LOG_FILE, `${ts} [${level}] ${msg}\n`); } catch { /* logging is best-effort */ }
 }
 
 process.on("unhandledRejection", (err: any) => {
@@ -58,7 +58,7 @@ if (!process.stdin.isTTY) {
   process.exit(1);
 }
 
-try { process.stdin.setRawMode(true); process.stdin.setRawMode(false); } catch {}
+try { process.stdin.setRawMode(true); process.stdin.setRawMode(false); } catch { /* stdin may not be a TTY */ }
 
 // ── Render ──────────────────────────────────────────────────────────────────
 try {

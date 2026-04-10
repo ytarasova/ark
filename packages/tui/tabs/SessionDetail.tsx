@@ -314,7 +314,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
               return (
                 <React.Fragment key={st.name}>
                   {idx > 0 && <Text dimColor>{" > "}</Text>}
-                  <Text color={isCurrent ? theme.accent : isPast ? "green" : undefined} bold={isCurrent} dimColor={!isCurrent && !isPast}>
+                  <Text color={isCurrent ? theme.highlight : isPast ? "green" : undefined} bold={isCurrent} dimColor={!isCurrent && !isPast}>
                     {isCurrent ? `[${st.name}]` : st.name}
                   </Text>
                 </React.Fragment>
