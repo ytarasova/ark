@@ -310,6 +310,20 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
           return handleWorkerList(req);
         }
 
+        // ── Tenant policy management (hosted control plane) ────────────
+        if (path.startsWith("/api/tenant/polic")) {
+          if (req.method === "GET" && path === "/api/tenant/policies") {
+            return handleTenantPolicyList();
+          }
+          if (path.startsWith("/api/tenant/policy/")) {
+            const tenantId = extractPathSegment(path, 4);
+            if (!tenantId) return Response.json({ error: "missing tenant id" }, { status: 400 });
+            if (req.method === "GET") return handleTenantPolicyGet(tenantId);
+            if (req.method === "PUT") return handleTenantPolicySet(req, tenantId);
+            if (req.method === "DELETE") return handleTenantPolicyDelete(tenantId);
+          }
+        }
+
         if (req.method === "GET") {
           return handleRestApi(path);
         }
@@ -489,6 +503,63 @@ function handleWorkerList(_req: Request): Response {
       return Response.json({ error: "Worker registry not available" }, { status: 503 });
     }
     throw e;
+  }
+}
+
+// ── Tenant policy handlers ─────────────────────────────────────────────────
+
+function handleTenantPolicyGet(tenantId: string): Response {
+  try {
+    const pm = _app.tenantPolicyManager;
+    if (!pm) return Response.json({ error: "Tenant policy manager not available (not running in hosted mode)" }, { status: 503 });
+    const policy = pm.getPolicy(tenantId);
+    if (!policy) return Response.json({ error: "policy not found" }, { status: 404 });
+    return Response.json(policy);
+  } catch (e: any) {
+    return Response.json({ error: String(e) }, { status: 500 });
+  }
+}
+
+async function handleTenantPolicySet(req: Request, tenantId: string): Promise<Response> {
+  try {
+    const pm = _app.tenantPolicyManager;
+    if (!pm) return Response.json({ error: "Tenant policy manager not available (not running in hosted mode)" }, { status: 503 });
+    const body = await req.json() as Record<string, unknown>;
+    pm.setPolicy({
+      tenant_id: tenantId,
+      allowed_providers: (body.allowed_providers as string[]) ?? [],
+      default_provider: (body.default_provider as string) ?? "k8s",
+      max_concurrent_sessions: (body.max_concurrent_sessions as number) ?? 10,
+      max_cost_per_day_usd: (body.max_cost_per_day_usd as number | null) ?? null,
+      compute_pools: (body.compute_pools as any[]) ?? [],
+    });
+    logInfo("conductor", `Tenant policy set for: ${tenantId}`);
+    return Response.json({ status: "ok", tenant_id: tenantId });
+  } catch (e: any) {
+    return Response.json({ error: String(e) }, { status: 500 });
+  }
+}
+
+function handleTenantPolicyDelete(tenantId: string): Response {
+  try {
+    const pm = _app.tenantPolicyManager;
+    if (!pm) return Response.json({ error: "Tenant policy manager not available (not running in hosted mode)" }, { status: 503 });
+    const deleted = pm.deletePolicy(tenantId);
+    if (!deleted) return Response.json({ error: "policy not found" }, { status: 404 });
+    logInfo("conductor", `Tenant policy deleted for: ${tenantId}`);
+    return Response.json({ status: "deleted", tenant_id: tenantId });
+  } catch (e: any) {
+    return Response.json({ error: String(e) }, { status: 500 });
+  }
+}
+
+function handleTenantPolicyList(): Response {
+  try {
+    const pm = _app.tenantPolicyManager;
+    if (!pm) return Response.json({ error: "Tenant policy manager not available (not running in hosted mode)" }, { status: 503 });
+    return Response.json(pm.listPolicies());
+  } catch (e: any) {
+    return Response.json({ error: String(e) }, { status: 500 });
   }
 }
 

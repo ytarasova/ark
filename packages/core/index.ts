@@ -184,6 +184,9 @@ export { WorkerRegistry, type WorkerNode } from "./worker-registry.js";
 export { SessionScheduler } from "./scheduler.js";
 export { startHostedServer } from "./hosted.js";
 
+// Tenant compute policies
+export { TenantPolicyManager, type TenantComputePolicy, type ComputePoolRef } from "./tenant-policy.js";
+
 // Compute pools
 export { ComputePoolManager, type ComputePool, type ComputePoolStatus, initPoolSchema } from "./compute-pool.js";
 

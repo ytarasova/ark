@@ -172,6 +172,37 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     return { ok: false, message: `Compute '${session.compute_name}' not found. Delete and recreate the session.` };
   }
 
+  // Hosted mode: delegate to scheduler which enforces tenant policies
+  try {
+    const scheduler = app.scheduler;
+    // Scheduler is available -- we are in hosted mode
+    const tenantId = (session.config as any)?.tenantId ?? "default";
+    log(`Scheduling session for tenant: ${tenantId}`);
+    try {
+      const worker = await scheduler.schedule(session, tenantId);
+      log(`Dispatched to worker ${worker.id} (${worker.url})`);
+      const { ArkdClient } = await import("../../arkd/client.js");
+      const client = new ArkdClient(worker.url);
+      const sessionName = `ark-s-${sessionId}`;
+      const script = `#!/bin/bash\necho "Dispatched session ${sessionId}"`;
+      await client.launchAgent({
+        sessionName,
+        script,
+        workdir: session.workdir ?? session.repo ?? ".",
+      });
+      app.sessions.update(sessionId, { status: "running", compute_name: worker.compute_name });
+      app.events.log(sessionId, "dispatched_to_worker", {
+        actor: "scheduler",
+        data: { worker_id: worker.id, worker_url: worker.url, tenant_id: tenantId },
+      });
+      return { ok: true, message: `Dispatched to worker ${worker.id}` };
+    } catch (schedErr: any) {
+      return { ok: false, message: schedErr.message ?? "Scheduling failed" };
+    }
+  } catch {
+    // Scheduler not available -- fall through to local dispatch
+  }
+
   // Handle remote repo: clone to local temp directory if no workdir set
   if (session.config?.remoteRepo && !session.workdir) {
     const remoteUrl = session.config.remoteRepo as string;

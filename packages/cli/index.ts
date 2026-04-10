@@ -30,6 +30,7 @@ import { registerProfileCommands } from "./commands/profile.js";
 import { registerConductorCommands } from "./commands/conductor.js";
 import { registerRouterCommands } from "./commands/router.js";
 import { registerAuthCommands } from "./commands/auth.js";
+import { registerTenantCommands } from "./commands/tenant.js";
 import { registerMiscCommands } from "./commands/misc.js";
 
 const app = new AppContext(loadConfig(), { skipConductor: true, skipMetrics: true });
@@ -64,6 +65,7 @@ registerProfileCommands(program);
 registerConductorCommands(program);
 registerRouterCommands(program);
 registerAuthCommands(program);
+registerTenantCommands(program);
 registerMiscCommands(program, app);
 
 // ── Run ─────────────────────────────────────────────────────────────────────

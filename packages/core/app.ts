@@ -43,6 +43,7 @@ import { TmuxLauncher } from "./launchers/tmux.js";
 import { ApiKeyManager } from "./api-keys.js";
 import type { WorkerRegistry } from "./worker-registry.js";
 import type { SessionScheduler } from "./scheduler.js";
+import type { TenantPolicyManager } from "./tenant-policy.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ export class AppContext {
   private _launcher: SessionLauncher = new TmuxLauncher();
   private _workerRegistry: WorkerRegistry | null = null;
   private _scheduler: SessionScheduler | null = null;
+  private _tenantPolicyManager: TenantPolicyManager | null = null;
 
   conductor: { stop(): void } | null = null;
   metricsPoller: { stop(): void } | null = null;
@@ -170,6 +172,18 @@ export class AppContext {
   /** Set the session scheduler (called by hosted entry point). */
   setScheduler(s: SessionScheduler): void {
     this._scheduler = s;
+  }
+
+  // ── Tenant policy manager (hosted mode only) ──────────────────────────
+
+  /** Tenant policy manager for hosted multi-tenant deployment. Null if not initialized. */
+  get tenantPolicyManager(): TenantPolicyManager | null {
+    return this._tenantPolicyManager;
+  }
+
+  /** Set the tenant policy manager (called by hosted entry point). */
+  setTenantPolicyManager(pm: TenantPolicyManager): void {
+    this._tenantPolicyManager = pm;
   }
 
   /** Resolve from container with a user-friendly error if not booted yet. */

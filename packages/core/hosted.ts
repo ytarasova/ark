@@ -11,6 +11,7 @@ import type { ArkConfig } from "./config.js";
 import { AppContext, setApp } from "./app.js";
 import { WorkerRegistry } from "./worker-registry.js";
 import { SessionScheduler } from "./scheduler.js";
+import { TenantPolicyManager } from "./tenant-policy.js";
 
 export async function startHostedServer(config: ArkConfig): Promise<{
   app: AppContext;
@@ -28,8 +29,13 @@ export async function startHostedServer(config: ArkConfig): Promise<{
   const registry = new WorkerRegistry(app.db);
   app.setWorkerRegistry(registry);
 
-  // Initialize scheduler
+  // Initialize tenant policy manager
+  const policyManager = new TenantPolicyManager(app.db);
+  app.setTenantPolicyManager(policyManager);
+
+  // Initialize scheduler with tenant policy enforcement
   const scheduler = new SessionScheduler(app);
+  scheduler.setPolicyManager(policyManager);
   app.setScheduler(scheduler);
 
   // Start SSE bus (Redis if configured, in-memory otherwise)
