@@ -4,3 +4,5 @@ export { indexCodebase, isAxonInstalled, indexCoChanges, indexSessionCompletion 
 export type { IndexResult, ExecFn } from "./indexer.js";
 export { buildContext, formatContextAsMarkdown } from "./context.js";
 export { exportToMarkdown, importFromMarkdown } from "./export.js";
+export { handleKnowledgeTool, KNOWLEDGE_TOOLS } from "./mcp.js";
+export type { KnowledgeToolResult } from "./mcp.js";
