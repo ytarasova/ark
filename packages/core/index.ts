@@ -24,7 +24,7 @@ export * from "./flow.js";
 export { substituteVars, buildSessionVars } from "./template.js";
 
 // Agent
-export { resolveAgent, buildClaudeArgs, findProjectRoot, type AgentDefinition } from "./agent.js";
+export { resolveAgent, resolveAgentWithRuntime, buildClaudeArgs, findProjectRoot, type AgentDefinition } from "./agent.js";
 
 // Skill
 export { type SkillDefinition } from "./skill.js";
@@ -274,3 +274,4 @@ export { type FlowStore, type FlowSummary, FileFlowStore } from "./stores/index.
 export { type SkillStore, FileSkillStore } from "./stores/index.js";
 export { type AgentStore, FileAgentStore } from "./stores/index.js";
 export { type RecipeStore, FileRecipeStore } from "./stores/index.js";
+export { type RuntimeStore, FileRuntimeStore } from "./stores/index.js";

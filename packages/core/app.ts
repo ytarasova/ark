@@ -36,8 +36,8 @@ import { subprocessExecutor } from "./executors/subprocess.js";
 import { cliAgentExecutor } from "./executors/cli-agent.js";
 import { SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
-import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore } from "./stores/index.js";
-import type { FlowStore, SkillStore, AgentStore, RecipeStore } from "./stores/index.js";
+import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "./stores/index.js";
+import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore } from "./stores/index.js";
 import type { SessionLauncher } from "./session-launcher.js";
 import { TmuxLauncher } from "./launchers/tmux.js";
 import { ApiKeyManager } from "./api-keys.js";
@@ -137,6 +137,7 @@ export class AppContext {
   get skills(): SkillStore { return this._resolve("skills"); }
   get agents(): AgentStore { return this._resolve("agents"); }
   get recipes(): RecipeStore { return this._resolve("recipes"); }
+  get runtimes(): RuntimeStore { return this._resolve("runtimes"); }
 
   // ── Session launcher ──────────────────────────────────────────────────
 
@@ -344,6 +345,10 @@ export class AppContext {
       recipes: asValue(new FileRecipeStore({
         builtinDir: join(storeBaseDir, "recipes"),
         userDir: join(this.config.arkDir, "recipes"),
+      })),
+      runtimes: asValue(new FileRuntimeStore({
+        builtinDir: join(storeBaseDir, "runtimes"),
+        userDir: join(this.config.arkDir, "runtimes"),
       })),
     });
 

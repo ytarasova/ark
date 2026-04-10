@@ -1,5 +1,6 @@
 name: ticket-intake
 description: "Fetches Jira ticket, runs 11-field sanity gate, extracts 27-section spec"
+runtime: claude
 model: sonnet
 max_turns: 50
 system_prompt: |

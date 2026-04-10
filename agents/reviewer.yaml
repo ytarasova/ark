@@ -1,5 +1,6 @@
 name: reviewer
 description: "Reviews code changes for quality, correctness, and standards"
+runtime: claude
 model: sonnet
 max_turns: 50
 system_prompt: |

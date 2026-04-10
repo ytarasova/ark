@@ -93,7 +93,8 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
         <TreeList
           items={agents}
           renderRow={(a) => {
-            return `${a.name.padEnd(18)} ${a.model.padEnd(8)} ${a.description}`;
+            const rt = (a.runtime ?? "claude").padEnd(8);
+            return `${a.name.padEnd(18)} ${rt} ${a.model.padEnd(8)} ${a.description}`;
           }}
           sel={sel}
           emptyMessage="  No agents found."
@@ -150,6 +151,7 @@ function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
       <Text> </Text>
       <SectionHeader title="Config" />
       <Text>{`  Source:     ${a._source}`}</Text>
+      <Text>{`  Runtime:    ${a.runtime ?? "claude"}`}</Text>
       <Text>{`  Model:      ${a.model}`}</Text>
       <Text>{`  Max turns:  ${a.max_turns}`}</Text>
       <Text>{`  Permission: ${a.permission_mode}`}</Text>

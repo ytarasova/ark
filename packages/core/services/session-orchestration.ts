@@ -257,7 +257,10 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   const agentName = action.agent!;
   log(`Resolving agent: ${agentName}`);
   const projectRoot = agentRegistry.findProjectRoot(session.workdir || session.repo) ?? undefined;
-  const agent = agentRegistry.resolveAgent(app, agentName, sessionAsVars(session), projectRoot);
+
+  // Resolve runtime override from session config (set by --runtime CLI flag)
+  const runtimeOverride = session.config?.runtime_override as string | undefined;
+  const agent = agentRegistry.resolveAgentWithRuntime(app, agentName, sessionAsVars(session), { runtimeOverride, projectRoot });
   if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
 
   // Resolve autonomy level from flow stage definition
@@ -293,8 +296,8 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     } catch { /* skip repo map on error */ }
   }
 
-  // Resolve executor -- defaults to claude-code
-  const runtime = agent.runtime ?? "claude-code";
+  // Resolve executor -- use resolved runtime type (from RuntimeStore merge), fall back to agent.runtime, then claude-code
+  const runtime = agent._resolved_runtime_type ?? agent.runtime ?? "claude-code";
   const executor = getExecutor(runtime);
   if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
 

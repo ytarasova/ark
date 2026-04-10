@@ -6,6 +6,20 @@ export interface SkillDefinition {
   _source?: "builtin" | "project" | "global";
 }
 
+export interface RuntimeDefinition {
+  name: string;
+  description?: string;
+  type: "claude-code" | "cli-agent" | "subprocess";
+  command?: string[];
+  task_delivery?: "stdin" | "file" | "arg";
+  models?: Array<{ id: string; label: string }>;
+  default_model?: string;
+  permission_mode?: string;
+  env?: Record<string, string>;
+  _source?: "builtin" | "global" | "project";
+  _path?: string;
+}
+
 export interface AgentDefinition {
   name: string;
   description: string;
@@ -21,6 +35,7 @@ export interface AgentDefinition {
   env: Record<string, string>;
   runtime?: string;
   command?: string[];
+  task_delivery?: "stdin" | "file" | "arg";
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }

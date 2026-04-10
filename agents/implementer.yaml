@@ -1,5 +1,6 @@
 name: implementer
 description: "Implements features with tests"
+runtime: claude
 model: opus
 max_turns: 200
 system_prompt: |

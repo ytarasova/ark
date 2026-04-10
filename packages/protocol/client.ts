@@ -27,7 +27,8 @@ import type {
   AgentListResult, AgentReadResult, FlowListResult, FlowReadResult,
   SkillListResult, SkillReadResult,
   RecipeListResult, RecipeReadResult, RecipeUseResult,
-  SkillDefinition, RecipeDefinition,
+  RuntimeListResult, RuntimeReadResult,
+  SkillDefinition, RecipeDefinition, RuntimeDefinition,
   HistoryListResult, HistoryRefreshResult, HistoryIndexResult, HistorySearchResult,
   HistoryRebuildFtsResult, HistoryImportResult,
   MetricsSnapshotResult, CostsReadResult,
@@ -269,6 +270,16 @@ export class ArkClient {
   async skillRead(name: string): Promise<SkillDefinition> {
     const { skill } = await this.rpc<SkillReadResult>("skill/read", { name });
     return skill;
+  }
+
+  async runtimeList(): Promise<RuntimeDefinition[]> {
+    const { runtimes } = await this.rpc<RuntimeListResult>("runtime/list");
+    return runtimes;
+  }
+
+  async runtimeRead(name: string): Promise<RuntimeDefinition> {
+    const { runtime } = await this.rpc<RuntimeReadResult>("runtime/read", { name });
+    return runtime;
   }
 
   async recipeList(): Promise<RecipeDefinition[]> {

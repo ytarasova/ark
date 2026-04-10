@@ -2,7 +2,7 @@ import type { Session, CreateSessionOpts, SessionListFilters } from "./session.j
 import type { Compute, CreateComputeOpts } from "./compute.js";
 import type { Event } from "./event.js";
 import type { Message } from "./message.js";
-import type { AgentDefinition, SkillDefinition } from "./agent.js";
+import type { AgentDefinition, SkillDefinition, RuntimeDefinition } from "./agent.js";
 import type { FlowDefinition, RecipeDefinition } from "./flow.js";
 import type {
   ComputeSnapshot,
@@ -81,6 +81,10 @@ export interface ComputeCleanZombiesResult { cleaned: number }
 export interface AgentListResult { agents: AgentDefinition[] }
 export interface AgentReadParams { name: string }
 export interface AgentReadResult { agent: AgentDefinition }
+
+export interface RuntimeListResult { runtimes: RuntimeDefinition[] }
+export interface RuntimeReadParams { name: string }
+export interface RuntimeReadResult { runtime: RuntimeDefinition }
 
 export interface FlowListResult { flows: FlowDefinition[] }
 export interface FlowReadParams { name: string }

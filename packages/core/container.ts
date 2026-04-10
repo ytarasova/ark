@@ -27,6 +27,7 @@ import type { FlowStore } from "./stores/flow-store.js";
 import type { SkillStore } from "./stores/skill-store.js";
 import type { AgentStore } from "./stores/agent-store.js";
 import type { RecipeStore } from "./stores/recipe-store.js";
+import type { RuntimeStore } from "./stores/runtime-store.js";
 
 /**
  * The cradle -- everything resolvable from the container.
@@ -56,6 +57,7 @@ export interface Cradle {
   skills: SkillStore;
   agents: AgentStore;
   recipes: RecipeStore;
+  runtimes: RuntimeStore;
 }
 
 export type AppContainer = AwilixContainer<Cradle>;

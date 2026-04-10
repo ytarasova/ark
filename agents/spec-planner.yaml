@@ -1,5 +1,6 @@
 name: spec-planner
 description: "Decomposes spec into ordered subtasks, creates Jira sub-tasks"
+runtime: claude
 model: opus
 max_turns: 100
 system_prompt: |

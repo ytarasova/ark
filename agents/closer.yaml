@@ -1,5 +1,6 @@
 name: closer
 description: "Creates PR, transitions Jira, publishes Confluence implementation page"
+runtime: claude
 model: sonnet
 max_turns: 50
 system_prompt: |

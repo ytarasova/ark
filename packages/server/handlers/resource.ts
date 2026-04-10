@@ -10,6 +10,7 @@ import type {
   SkillReadParams,
   RecipeReadParams,
   RecipeUseParams,
+  RuntimeReadParams,
   ComputeNameParams,
   ComputeUpdateParams,
   GroupCreateParams,
@@ -53,6 +54,13 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("skill/read", async (p) => {
     const { name } = extract<SkillReadParams>(p, ["name"]);
     return { skill: app.skills.get(name) };
+  });
+  router.handle("runtime/list", async () => ({ runtimes: app.runtimes.list() }));
+  router.handle("runtime/read", async (p) => {
+    const { name } = extract<RuntimeReadParams>(p, ["name"]);
+    const runtime = app.runtimes.get(name);
+    if (!runtime) throw new Error(`Runtime '${name}' not found`);
+    return { runtime };
   });
   router.handle("recipe/list", async () => ({ recipes: app.recipes.list() }));
   router.handle("recipe/read", async (p) => {

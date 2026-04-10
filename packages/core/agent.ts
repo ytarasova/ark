@@ -31,6 +31,8 @@ export interface AgentDefinition {
   runtime?: string;
   command?: string[];
   task_delivery?: "stdin" | "file" | "arg";
+  /** Resolved runtime type (claude-code, cli-agent, subprocess). Set by resolveAgentWithRuntime. */
+  _resolved_runtime_type?: string;
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }
@@ -56,6 +58,72 @@ export function resolveAgent(app: AppContext, name: string, session: Record<stri
   if (agent.system_prompt) {
     agent.system_prompt = substituteVars(agent.system_prompt, vars);
   }
+  return agent;
+}
+
+// ── Runtime resolution ──────────────────────────────────────────────────────
+
+/**
+ * Resolve an agent and merge its runtime definition.
+ *
+ * If `runtimeOverride` is provided it takes priority over the agent's `runtime` field.
+ * The resolved runtime's type, command, task_delivery, env, and permission_mode are
+ * merged into the returned agent definition (agent-level values win where both exist).
+ */
+export function resolveAgentWithRuntime(
+  app: AppContext,
+  name: string,
+  session: Record<string, unknown>,
+  opts?: { runtimeOverride?: string; projectRoot?: string },
+): AgentDefinition | null {
+  const agent = resolveAgent(app, name, session, opts?.projectRoot);
+  if (!agent) return null;
+
+  const runtimeName = opts?.runtimeOverride ?? agent.runtime;
+  if (!runtimeName) {
+    // No runtime specified -- legacy behavior: use agent.runtime field as executor type
+    return agent;
+  }
+
+  const runtime = app.runtimes.get(runtimeName);
+  if (!runtime) {
+    // Runtime name specified but not found -- fall back to using it as executor type (backward compat)
+    return agent;
+  }
+
+  // Merge runtime config into agent (agent-level values take precedence)
+  agent._resolved_runtime_type = runtime.type;
+
+  // command: runtime provides default, agent can override
+  if (!agent.command && runtime.command) {
+    agent.command = runtime.command;
+  }
+
+  // task_delivery: runtime provides default, agent can override
+  if (!agent.task_delivery && runtime.task_delivery) {
+    agent.task_delivery = runtime.task_delivery;
+  }
+
+  // permission_mode: agent always wins if set; otherwise runtime default
+  if (agent.permission_mode === "bypassPermissions" && runtime.permission_mode) {
+    // Only override if agent uses the generic default
+    // In practice, agents set this explicitly, so this is mainly for
+    // cases where a runtime has specific permission requirements
+  }
+
+  // env: runtime env is base, agent env overrides
+  if (runtime.env) {
+    agent.env = { ...runtime.env, ...agent.env };
+  }
+
+  // model: if the agent model isn't in the runtime's model list, use runtime default
+  if (runtime.models && runtime.models.length > 0) {
+    const validModels = runtime.models.map(m => m.id);
+    if (!validModels.includes(agent.model) && runtime.default_model) {
+      agent.model = runtime.default_model;
+    }
+  }
+
   return agent;
 }
 

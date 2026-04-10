@@ -2,3 +2,4 @@ export { type FlowStore, type FlowSummary, FileFlowStore, type FileFlowStoreOpts
 export { type SkillStore, FileSkillStore, type FileSkillStoreOpts } from "./skill-store.js";
 export { type AgentStore, FileAgentStore, type FileAgentStoreOpts } from "./agent-store.js";
 export { type RecipeStore, FileRecipeStore, type FileRecipeStoreOpts } from "./recipe-store.js";
+export { type RuntimeStore, FileRuntimeStore, type FileRuntimeStoreOpts } from "./runtime-store.js";

@@ -1,0 +1,9 @@
+name: codex
+description: "OpenAI Codex CLI"
+type: cli-agent
+command: ["codex", "--approval-mode", "full-auto"]
+task_delivery: arg
+models:
+  - id: o4-mini
+    label: "O4 Mini"
+default_model: o4-mini

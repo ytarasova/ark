@@ -36,6 +36,7 @@ export function registerSessionCommands(program: Command) {
     .option("-a, --attach", "Dispatch and attach to the session")
     .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
     .option("--recipe <name>", "Create session from a recipe template")
+    .option("--runtime <name>", "Override agent runtime (e.g. codex, gemini, claude)")
     .action(async (ticket, opts) => {
       const { checkPrereqs, hasRequiredPrereqs, formatPrereqCheck } = await import("../../core/prereqs.js");
       const prereqs = checkPrereqs();
@@ -93,15 +94,20 @@ export function registerSessionCommands(program: Command) {
         }
       }
 
-      // Handle --remote-repo: use git URL as repo, no local path needed
+      // Handle --runtime: store runtime override in session config
       let sessionConfig: Record<string, unknown> | undefined;
+      if (opts.runtime) {
+        sessionConfig = { ...sessionConfig, runtime_override: opts.runtime };
+      }
+
+      // Handle --remote-repo: use git URL as repo, no local path needed
       if (opts.remoteRepo) {
         if (!repo) {
           // Extract repo name from git URL for display
           const urlMatch = opts.remoteRepo.match(/\/([^/]+?)(?:\.git)?$/);
           repo = urlMatch?.[1] ?? opts.remoteRepo;
         }
-        sessionConfig = { remoteRepo: opts.remoteRepo };
+        sessionConfig = { ...sessionConfig, remoteRepo: opts.remoteRepo };
         console.log(chalk.dim(`Remote repo: ${opts.remoteRepo}`));
       }
 
@@ -129,6 +135,7 @@ export function registerSessionCommands(program: Command) {
       console.log(`  Flow:     ${s.flow}`);
       console.log(`  Stage:    ${s.stage ?? "-"}`);
       if (workdir) console.log(`  Workdir:  ${workdir}`);
+      if (opts.runtime) console.log(`  Runtime:  ${opts.runtime}`);
 
       if (opts.dispatch || opts.attach) {
         const result = await ark.sessionDispatch(s.id);

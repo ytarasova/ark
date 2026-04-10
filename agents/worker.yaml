@@ -1,5 +1,6 @@
 name: worker
-description: "General-purpose agent — no assumptions, no special prompt"
+description: "General-purpose agent -- no assumptions, no special prompt"
+runtime: claude
 model: opus
 max_turns: 200
 system_prompt: ""

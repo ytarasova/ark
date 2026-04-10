@@ -30,13 +30,14 @@ packages/
   core/      → Sessions, store (SQLite), flows, agents, channels, conductor, search (FTS5), claude-sessions, app context, config
     repositories/  → SQL CRUD (SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository)
     services/      → Business logic (SessionService, ComputeService, HistoryService) + orchestration
-    stores/        → Resource stores (FlowStore, SkillStore, AgentStore, RecipeStore) -- file-backed, three-tier resolution
+    stores/        → Resource stores (FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore) -- file-backed, three-tier resolution
   compute/   → Providers: local (worktree/docker/devcontainer/firecracker), remote EC2 (worktree/docker/devcontainer/firecracker)
   arkd/      → Universal agent daemon - HTTP server on every compute target (agent lifecycle, file ops, metrics, channel relay)
   server/    → JSON-RPC handlers (delegate to services + stores via AppContext)
   protocol/  → ArkClient (typed JSON-RPC client)
   tui/       → React + Ink terminal dashboard
-agents/      → Agent YAML definitions (planner, implementer, reviewer, documenter, worker)
+agents/      → Agent YAML definitions -- roles (planner, implementer, reviewer, documenter, worker)
+runtimes/    → Runtime YAML definitions -- LLM backends (claude, codex, gemini, aider)
 flows/       → Flow YAML definitions (default, quick, bare, parallel)
 skills/      → Builtin skill definitions (reusable prompt fragments)
 recipes/     → Recipe templates (quick-fix, feature-build, code-review)
@@ -49,7 +50,7 @@ No workspaces config - packages are coordinated manually via relative imports.
 packages/types/                         → Domain interfaces (Session, Compute, Event, Message, etc.)
 packages/core/
   repositories/                         → SQL CRUD (SessionRepository, ComputeRepository, etc.)
-  stores/                               → Resource stores (FlowStore, SkillStore, AgentStore, RecipeStore)
+  stores/                               → Resource stores (FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore)
   services/session.ts                   → SessionService -- lifecycle facade, delegates complex ops to orchestration
   services/session-orchestration.ts     → All orchestration (dispatch, advance, fork, clone, spawn, fan-out, etc.)
   app.ts                                → AppContext wires repos + services + stores, boot/shutdown lifecycle
@@ -151,54 +152,75 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 | `~/.ark/recipes/` | Global recipe definitions (user tier for RecipeStore) |
 | `~/.ark/flows/` | Global flow definitions (user tier for FlowStore) |
 | `~/.ark/agents/` | Global agent definitions (user tier for AgentStore) |
+| `~/.ark/runtimes/` | Global runtime definitions (user tier for RuntimeStore) |
 | `~/.claude/projects/` | Claude Code session transcripts (JSONL) - read by search and import |
 | `.claude/settings.local.json` | Per-session hook config (written at dispatch, cleaned on stop) |
 
-## Adding an Agent
+## Adding an Agent (Role)
+
+Agents define WHAT an agent does (role, prompt, skills, tools). Runtimes define HOW it runs (LLM backend, CLI command).
 
 Create `agents/<name>.yaml`:
 ```yaml
 name: my-agent
 description: What it does
+runtime: claude     # references runtimes/claude.yaml -- can be overridden at dispatch with --runtime
 model: opus        # opus | sonnet | haiku
 max_turns: 200
 system_prompt: |
   Working on {repo}. Task: {summary}. Ticket: {ticket}.
 tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch]
 permission_mode: bypassPermissions
-env:
-  CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80"  # optional - env vars exported before claude launch
+env: {}
 ```
 
 Template variables: `{ticket}`, `{summary}`, `{workdir}`, `{repo}`, `{branch}` - substituted at dispatch.
 
-**Adding a cli-agent (non-Claude CLI tool):**
-```yaml
-name: codex-worker
-description: OpenAI Codex CLI coding agent
-runtime: cli-agent
-command: ["codex", "--approval-mode", "full-auto"]
-task_delivery: arg    # stdin | file | arg (default: stdin)
-model: o4-mini
-max_turns: 200
-system_prompt: ""
-tools: []
-permission_mode: bypassPermissions
-env: {}
+**Override runtime at dispatch:**
+```bash
+# Use default runtime (claude) for implementer role
+ark session start --repo . --summary "Fix bug" --agent implementer --dispatch
+
+# Override: run implementer role on codex runtime
+ark session start --repo . --summary "Fix bug" --agent implementer --runtime codex --dispatch
+
+# Override: run worker role on gemini runtime
+ark session start --repo . --summary "Fix bug" --agent worker --runtime gemini --dispatch
 ```
 
-The `task_delivery` field controls how the task is sent to the CLI tool: `stdin` pipes via cat, `file` passes a file path, `arg` appends the task as the last CLI argument.
+## Runtimes
+
+Runtimes define HOW an agent runs. Three-tier resolution: `runtimes/` (builtin) > `~/.ark/runtimes/` (global) > `.ark/runtimes/` (project).
+
+**Built-in runtimes:** `claude` (Claude Code), `codex` (OpenAI Codex CLI), `gemini` (Google Gemini CLI), `aider` (Aider).
+
+Create `runtimes/<name>.yaml`:
+```yaml
+name: my-runtime
+description: "Custom LLM backend"
+type: cli-agent     # claude-code | cli-agent | subprocess
+command: ["my-tool", "--auto"]
+task_delivery: arg  # stdin | file | arg
+models:
+  - id: default
+    label: "Default Model"
+default_model: default
+```
+
+CLI: `ark runtime list`, `ark runtime show <name>`.
+
+At dispatch, runtime config (type, command, task_delivery, env) is merged with agent config. Agent-level values take precedence.
 
 ## Executor System
 
-Agents dispatch through pluggable executors. The `runtime` field in agent YAML selects which executor launches the agent.
+Agents dispatch through pluggable executors. The runtime's `type` field selects which executor launches the agent.
 
 **Built-in executors:**
 - `claude-code` (default) -- launches Claude Code in tmux with hooks + MCP channel
 - `subprocess` -- spawns any command as a child process
 - `cli-agent` -- runs any CLI tool (codex, gemini, aider, etc.) in tmux with worktree isolation
 
-**Executor interface:** 5 methods — `launch`, `kill`, `status`, `send`, `capture`. Defined in `packages/core/executor.ts`.
+**Executor interface:** 5 methods -- `launch`, `kill`, `status`, `send`, `capture`. Defined in `packages/core/executor.ts`.
 
 **Adding a subprocess agent:**
 ```yaml

@@ -1,5 +1,6 @@
 name: documenter
 description: "Updates documentation based on code changes"
+runtime: claude
 model: sonnet
 max_turns: 30
 system_prompt: |
