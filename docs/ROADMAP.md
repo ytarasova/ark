@@ -3,6 +3,8 @@
 > Last updated: 2026-04-11
 > Tests: 2630 pass, 0 fail, 0 lint errors, 0 process leaks
 >
+> **2026-04-10 decision (Foundry 2.0 review meeting):** Ark selected as the company-wide dev-workflow orchestrator -- the layer ABOVE tools like Goose / Claude Code / Codex, not a replacement. Framed as "the foundry" (control plane) with those tools as "the machines." First hand-out to early adopters targeted for the week of 2026-04-13. See **Camp 0: Early Adopter Ship** below.
+>
 > **Recent completions (not yet reflected in the tables below):**
 > - TensorZero gateway integrated (lifecycle manager, sidecar/native/Docker modes, cost feed-back)
 > - LLM Router wired into executor dispatch flow (ANTHROPIC_BASE_URL / OPENAI_BASE_URL injection)
@@ -23,6 +25,8 @@
 ## What Ark Is
 
 The orchestration platform for AI-powered software development. Manages the full lifecycle -- from ticket to merged PR -- across any agent, any model, any compute target. Runs locally as a CLI/TUI or hosted as a multi-tenant service with a control plane.
+
+**Positioning (post-Apr-10 decision):** Ark is an opinionated control plane that orchestrates agents; it does not replace the agent runtimes themselves. Goose, Claude Code, Codex, Gemini are the "machines on the factory floor." Ark provides central knowledge, memory, cost tracking, LLM routing, compute provisioning, flow engine, and multi-tenant governance so a company can change models, policies, or skills in ONE place and have it propagate everywhere. The test we want to pass: an agent autonomously finds and fixes a real bug, and the only reason a human hears about it is the commit notification.
 
 ---
 
@@ -80,6 +84,12 @@ The orchestration platform for AI-powered software development. Manages the full
 
 | Area | Why it matters | Source |
 |------|---------------|--------|
+| **Remote Claude subscription auth provisioning** | Soft preference (not hard ban) for subscription auth at fleet scale to avoid per-token bills. Local `claude-max` works; provisioning N remote VMs with device-code login is the open question. API-key mode stays supported -- this is a "make the non-key path work too," not "delete keys." | 2026-04-10 meeting |
+| **MiniMax / DeepSeek / self-hosted provider support** | Internal teams are hosting OSS models (DeepSeek) and have free MiniMax credits. Router must accept custom OpenAI-compatible endpoints with zero-cost tracking. Jay: "share the key you can use with some on our API" / "let's start hosting them." | 2026-04-10 meeting |
+| **Dev-environment provisioning (compose + dynamic DNS)** | Per-session isolated dev environments via docker-compose + Traefik-style dynamic DNS so two engineers on the same repo don't collide. Abhimanyu built a prototype against Goose; Ark should absorb the pattern as a compute provider or a session-level addon. | 2026-04-10 meeting |
+| **Built-in secrets vault** | Per-user MCP secrets (Bitbucket app password, Jira, Figma, etc.) injected at dispatch, not checked into YAML. **Hard constraint:** must ship in the single Ark package and work IDENTICALLY in local and control-plane modes. No external vault service required. Design implication: encrypted-at-rest storage inside the Ark DB (SQLite locally, Postgres in hosted) with a pluggable backend so enterprise deployments can optionally point at HashiCorp Vault / VaultMan / AWS Secrets Manager -- but the default path has to be batteries-included. | 2026-04-10 meeting + follow-up |
+| **Pre-engineering product flow (ideate → PRD)** | Before engineering starts, agents should mine Elasticsearch, customer-care logs, repos to identify gaps, build hypotheses, draft PRDs. Reference products: Premium (Mehul), Sage. PM needs a session that can read repos + dashboards + Jira + Figma at once. | 2026-04-10 meeting |
+| **Multi-repo sessions** | Today `Session.repo` is a single string and worktrees are provisioned one-per-repo. Real work crosses repos: a payment-gateway change spans backend + mobile SDK + docs; infra changes span IaC + app config + runbook repos; reviewer agents need read access to N dependent repos. Without multi-repo, those flows either run as N separate sessions with manual coordination or fall back to cursor-style manual work. Touches: Session schema, worktree provisioning, knowledge graph (cross-repo nodes), auto-PR (N linked PRs per ticket), compute mount layer, dispatch CLI, web/TUI session list. | 2026-04-11 follow-up |
 | **Workflow persistence / recovery** | Sessions crash → restart from stage start, not from where they stopped. No checkpoint/resume. | This session analysis |
 | **Temporal integration** | Control plane needs durable workflow execution for crash recovery, retries, scheduling. | This session analysis |
 | **Task/Kanban board** | No agent work queue. Sessions are execution units, not assignable tasks. MC has 8-column Kanban. | Mission Control gap analysis |
@@ -103,6 +113,45 @@ The orchestration platform for AI-powered software development. Manages the full
 ---
 
 ## Roadmap Camps
+
+### Camp 0: Early Adopter Ship (IMMEDIATE -- week of 2026-04-13)
+
+**Goal:** Hand Ark to one user per pilot team with a LIMITED, working feature set. Not a broad release -- individual recruits who give daily feedback.
+
+**Pilot recruits (one user + one builder each):**
+- Feature Store -- Yana (builder) + peer from FS team
+- RU -- Abhimanyu (builder) + peer from RU team (replaces his current Goose+Traefik harness)
+- Risk / PML / Inference -- Atul (builder) + peer (likely inference team first)
+
+**Explicit scoping feedback from the meeting:** Ship a small, reliable surface first. Do NOT dump every feature at once -- foundry-1.0 lesson was that premature breadth drowns the team in shallow bug reports. Decide what's in/out before Monday.
+
+**Candidate "in scope" for the first hand-out** (builder trio to confirm):
+- Local docker compute with worktree isolation (no AWS creds required on the user's laptop)
+- Optionally **federated compute via Ark token** (see Camp 12) for users who need heavier than local docker -- lets them hit remote EC2/k8s/firecracker without any cloud credentials
+- `claude-max` + `codex` runtimes, subscription auth preferred over API keys
+- Knowledge graph auto-index on dispatch (already DONE)
+- One polished flow: `code-review` or `fix-bug`, driven from web UI
+- Web dashboard (local mode), limited to Sessions / Flows / Knowledge tabs
+- Cost tracking visible even when it's $0 (subscription mode)
+
+**Candidate "out of scope" for the first hand-out:**
+- Control plane / multi-tenant (builder team uses local mode first)
+- K8s / E2B / Firecracker providers (untested -- see Camp 1)
+- Pre-engineering product flow (ideate/PRD) -- defer to Camp 10
+- Dev-environment provisioning with dynamic DNS -- defer to Camp 10
+
+**Ship-blockers to resolve this week:**
+| Blocker | Owner | Notes |
+|---------|-------|-------|
+| Unified Claude settings bundle (tools, OTEL, cost, router, hooks) | Yana | **Camp 0 slice DONE (2026-04-11):** `.claude/settings.local.json` writer extended with `buildPermissionsAllow(agent)` -- maps `agent.tools` into `permissions.allow`, auto-expands declared `mcp_servers` to `mcp__<server>__*` wildcards, rejects explicit `mcp__X__*` entries that reference undeclared servers, and cleans up on session stop via the `_ark.managedAllow` marker. **Confirmed design:** `--dangerously-skip-permissions` (autonomy=full) remains the explicit override -- it bypasses the allow list on purpose. The list is authoritative when bypass is off. **Still to land on the same writer:** OpenTelemetry exporter config, cost-tracking / router URL env vars, Codex / Gemini executor parity (different permission models), load-time agent validation. |
+| ISLC recipe decomposition audit | Yana + Abhimanyu | Ark ships consolidated `islc.yaml` / `islc-quick.yaml`; Abhimanyu's Goose set has 9 separate sub-recipes with specific MCP tool contracts. Decide port-vs-consolidate before hand-out. Porting the decomposed form requires sub-recipe runtime invocation -- see Camp 10. |
+| Decide in/out feature list | Yana + Abhimanyu + Zining | Monday sync |
+| Bug-sweep the chosen surface (limited-features smoke pass) | Yana | Keep tests green |
+| Onboarding note for the recruit (how to install, what works, what doesn't) | Yana | 1-page README, no marketing |
+| Feedback channel (Slack or doc) | Abhimanyu | Daily gather, weekly triage |
+| Twice-weekly adoption review with leadership | Atul to schedule | Track who's using what |
+
+**Success metric for the pilot:** at least one pilot user has an agent autonomously identify and fix a real bug on their repo, end-to-end, within 2 weeks of hand-out.
 
 ### Camp 1: Integration Testing & Production Readiness
 
@@ -221,6 +270,80 @@ The orchestration platform for AI-powered software development. Manages the full
 | Natural language schedule parsing | 1 day |
 | Calendar view for schedules | 1-2 days |
 
+### Camp 10: Dev-Environment Orchestration & Pre-Engineering Flows
+
+**Goal:** Close the gaps surfaced in the 2026-04-10 meeting that extend Ark beyond "ticket → PR" into "problem → ticket → PR → devbox."
+
+| Task | Effort | Notes |
+|------|--------|-------|
+| Sub-recipe runtime invocation | 3-5 days | Schema already exists: `RecipeDefinition.sub_recipes: SubRecipeRef[]`, `resolveSubRecipe`, `listSubRecipes` in `packages/core/agent/recipe.ts`. Runtime invocation does NOT -- session-orchestration never calls these helpers. Gaps: (1) expose a sub-recipe invocation as an MCP tool the agent can call mid-session (Goose-style), (2) spawn a child session with parent vars + `ref.values` merged, (3) agree on artifact sharing path so parent reads child output (Abhimanyu's ISLC orchestrator uses `.workflow/<jira-key>/`), (4) decide return semantics -- sync block vs async-with-join, (5) fan-out support (same sub-recipe, N inputs). Unblocks the ISLC decomposed recipe set and any future orchestrator-that-delegates pattern. |
+| Remote Claude subscription auth distribution | 2-3 days | Research: device-code flow at scale, or mount token from a trusted side-channel. Blocks Claude on remote compute. |
+| MiniMax / DeepSeek / OpenAI-compatible custom provider in router | 1 day | Accept arbitrary base URL + key. Cost_mode=free for self-hosted. |
+| Dev-env provider (compose + Traefik dynamic DNS) | 3-5 days | Either a new compute provider or a session-level addon. Absorb Abhimanyu's prototype. |
+| Built-in secrets vault (batteries-included) | 3-4 days | Encrypted-at-rest in Ark DB (SQLite local / Postgres hosted), per-user + per-tenant scoping, injected at dispatch. Pluggable backend interface so VaultMan / HashiCorp Vault / AWS Secrets Manager are optional adapters, not required. Must ship in the single binary -- no external dependency. |
+| Pre-engineering `ideate` flow | 2-3 days | PM-facing recipe with ES + Jira + Figma + repo MCPs. Output: draft PRD in Confluence. |
+| PM-facing web surface polish | 1-2 days | Non-engineer UX: chat-first, repo access without clone, Confluence/Jira publishing buttons. |
+
+### Camp 11: Multi-Repo Support
+
+**Goal:** A single session can read from and write to N repositories simultaneously, with coordinated PRs and cross-repo knowledge. Multi-repo describes the real shape of a "product" at Paytm: N equal-weight repos contributing pieces of the same shipped thing.
+
+**Design decisions (locked in 2026-04-11):**
+- **Atomicity model**: **atomic**. All cross-repo PRs merge together or none do. Requires a merge queue / coordinator. Harder to build but matches the "one product, many repos" framing -- partial merges leave the product in a broken state.
+- **Repo roles**: **fully symmetric**. No primary. Each repo is just another piece of the product. Artifacts like `.workflow/<ticket>/` live in a session-owned directory, not inside any single repo.
+- **Knowledge graph scoping**: **add `repo_id` on every node**. Cross-repo impact queries ("who consumes this symbol from repo A?") must work. Existing single-repo indexing stays the same; the field is populated for every node going forward.
+- **Worktree layout**: **sibling worktrees under one session dir**. `~/.ark/worktrees/<session-id>/<repo-name>/` for each repo. One session dir owns all of them.
+- **Product manifest**: **detached from any individual repo**. A product definition file that lists the N repos, their branches, their roles, and optional per-repo overrides. Lives OUTSIDE any one repo so none of them "owns" the cross-repo relationship. Stored in `~/.ark/manifests/<product>.yaml` (global) or `.ark/manifests/<product>.yaml` (user's local working dir). Tenant-scoped in hosted mode.
+
+| Task | Effort | Notes |
+|------|--------|-------|
+| Product manifest schema + store | 1-2 days | `ProductManifest` type with repos array, branches, tenant scoping. New `ManifestStore` with three-tier resolution (builtin / global / project), same pattern as `FlowStore` / `SkillStore`. CLI: `ark product list / show / create / delete`. |
+| Session schema: `repo` (string) → `repos` (array, symmetric) | 1 day | Migration for existing sessions; keep `repo` as a single-element projection for backward compat. Session can optionally reference a product manifest by name. |
+| Worktree provisioning: sibling layout | 2 days | `~/.ark/worktrees/<session>/<repo>/` for each. All compute providers (local, docker, ec2, arkd) mount the full session dir. |
+| Knowledge graph: `repo_id` on every node, cross-repo edges | 2-3 days | Migration adds the column. Indexer writes it on insert. Context builder pulls from all session repos. New edge types for cross-repo dependency. |
+| Atomic multi-PR auto-merge coordinator | 3-5 days | Create N PRs on dispatch; watch CI on all of them; merge only when all green AND approved. Needs a background worker. Partial-merge rollback if any fails post-merge. |
+| Dispatch CLI + recipe schema | 1 day | `ark session start --product <name>` or `--repo X --repo Y`. Recipe `repos:` list. |
+| Web + TUI: multi-repo session list, multi-repo diff preview | 2 days | Surface parity rule applies -- every surface shows all session repos. |
+| arkd workdir handling | 1-2 days | N workdirs per session pushed / pulled to remote compute. |
+| Verify scripts across repos | 1 day | `verify:` field scopes per-repo or all-repos. |
+| Flow engine: stage `target_repo` field | 1 day | Optional per-stage scoping when a stage naturally touches one repo only. |
+| Cross-repo E2E test | 1-2 days | Full SDLC flow across a test product with 3 linked repos. |
+
+**Pilot (Camp 0) scope:** explicitly OUT. First hand-out is single-repo sessions. Multi-repo lands after the pilot has closed at least one real bug end-to-end.
+
+### Camp 12: Federated Compute (Local Client, Remote Provisioning)
+
+**Goal:** A user running local Ark can provision remote compute -- EC2, k8s, firecracker, etc. -- WITHOUT holding any cloud credentials themselves. All cloud access lives inside the control plane; local Ark talks to the control plane over RPC with an Ark token. User experience: `ark session start --compute heavy-ec2` just works, even though the user has never configured AWS.
+
+**Why this matters for the pilot:** Pilot users on feature-store / RU / inference teams don't want to install `aws-cli`, configure kubectl, or set up credentials. Every onboarding step that isn't "download one binary" is a point where adoption drops. Federated compute turns a 30-minute provisioning-setup tutorial into zero config.
+
+**Architecture:**
+- New compute provider: `FederatedProvider` in `packages/compute/federated.ts`
+- Constructor takes: control-plane URL + Ark token (`ark_<tenantId>_<secret>`)
+- `provision()` → JSON-RPC to control plane → control plane's internal providers (ec2/k8s/firecracker) do the real work → returns a compute handle
+- `run()` / `kill()` / `status()` / `metrics()` → delegated via RPC (method names mirror the existing compute interface)
+- Local Ark still owns session state, history, knowledge; only the compute plane is remote
+- Tokens scope which compute templates a user can provision (enforced via tenant policy)
+
+**Deployment spectrum (all use the same binary):**
+1. **Pure local** -- local state + local compute (today's default)
+2. **Federated compute** -- local state + delegated compute via control plane token (new)
+3. **Full hosted** -- state + compute both on the control plane, CLI talks to it via `--server` / `--token` (today's `hosted.ts` mode)
+
+All three are the same binary with different config. No separate builds.
+
+| Task | Effort | Notes |
+|------|--------|-------|
+| Control-plane compute RPC API | 2-3 days | JSON-RPC methods: `compute.listTemplates`, `compute.provision`, `compute.status`, `compute.run`, `compute.kill`, `compute.metrics`. Scoped by the caller's Ark token. |
+| `FederatedProvider` on the client side | 2 days | Implements the existing `ComputeProvider` interface; delegates every call to the control plane. |
+| Token distribution flow | 1 day | `ark auth request-token` or similar; admin approves + issues. Reuses existing API-key machinery. |
+| Session dispatch over federated compute | 2 days | Worktree sync: push the local session dir to the remote compute handle, pull artifacts on completion. Arkd already handles most of this; tighten the client-side delta sync. |
+| Tenant-policy enforcement on federated calls | 1 day | Existing `tenant-policy.ts` plus an auth middleware hook on the new RPC methods. Don't let a token with `compute: [docker]` ask for EC2. |
+| Client-side telemetry: users still tracked by token | 1 day | Usage records (`cost_mode`, `usage_records`) land in the control plane DB, not the client DB. |
+| E2E test: local client provisions remote EC2 via token, session runs, artifacts return | 1-2 days | The validation. |
+
+**Pilot (Camp 0) scope:** **IN, optional**. If the pilot user needs anything heavier than local docker, they get an Ark token and federated compute instead of setting up AWS. If local docker is enough, this is deferred.
+
 ### Camp 9: Architecture Hardening
 
 **Goal:** Codebase is production-grade and maintainable.
@@ -239,7 +362,11 @@ The orchestration platform for AI-powered software development. Manages the full
 ## Priority Sequence
 
 ```
-Camp 1: Integration Testing      ████████████   FIRST -- prove what we built works
+Camp 0: Early Adopter Ship       ████████████   IMMEDIATE -- week of Apr 13, limited-features hand-out
+Camp 1: Integration Testing      ████████████   Prove what we built works against real services
+Camp 10: Dev-Env + Pre-Eng       ██████████     Unblocks Claude-at-fleet, non-engineer adoption
+Camp 11: Multi-Repo Support      ██████████     Real work crosses repos; lands after pilot closes first bug
+Camp 12: Federated Compute       ██████████     Unblocks pilot: local client + remote compute via token, no AWS creds on user laptops
 Camp 2: Workflow Persistence     ████████       Temporal + crash recovery
 Camp 3: Agent Intelligence       ████           Partially done (evals, costs done; trust, latency remain)
 Camp 4: Dashboard & Viz          ████           Partially done (dashboard, charts done; live feed, graph viz remain)
@@ -265,10 +392,18 @@ Camp 8: UX Polish                ██████         Professional finish
 
 ## Internal Context
 
-- **Foundry 2.0**: QA Infra (fan-out test suites) + AI Monitor (Prometheus + Slack alerts). Apr 20 deadline.
-- **Team**: Converting Goose recipes → Ark handles this. Server mode needed → control plane addresses it.
-- **"Send to dev"**: PRD ready → remote devbox → tested PR at 95% readiness. Requires: Camp 1 (integration testing) + Camp 2 (workflow persistence).
-- **Risk team (PAI-32794)**: Per-user MCP credentials, chat history on server → auth + control plane + knowledge graph.
+- **#ark-init origin (2026-03-09)**: Harinder kicked off the channel with a deep research note on agent-orchestration layers -- Strategy (Paperclip) / Orchestration (Symphony, Jido) / Execution (Goose, Claude Code, Codex). Core design calls: task-driven not heartbeat-driven; workers execute tasks but don't invent them; every task produces a structured artifact (PR, test report, design doc, eval result); traceability runs `goal → task → run → artifact → decision`; governance gates on merges, deployments, secrets access, financial operations. Ark's design is aligned with these principles -- keep them as invariants when adding features.
+- **2026-03-16 → 04-10 arc**: Harinder first said "goose is the answer" (Mar 16-18), then Abhimanyu's Goose+Traefik prototype showed the orchestration-layer gap, then the Apr 10 meeting reversed to Ark-on-top-of-tools. The "workflow control is the real moat" note (Mar 22) is the durable framing: intelligence is commoditized, the system that owns the workflow wins.
+- **Upstream of the subscription preference**: Harinder flagged on 2026-04-05 that "Claude CLI is going to get restricted" -- this is the origin of the fleet-scale auth anxiety, not a sudden Apr 10 decision.
+- **ISLC recipe set (parity gap flagged)**: Abhimanyu shipped 9 Goose recipes on 2026-04-06 -- a master `islc-orchestrate` that delegates to 8 sub-recipes: `islc-ticket-intake`, `islc-ideate`, `islc-plan`, `islc-audit`, `islc-execute`, `islc-verify`, `islc-close`, `islc-retro`. Ark currently ships only two consolidated recipes (`islc.yaml`, `islc-quick.yaml`). Before the pilot hand-out, either (a) verify the consolidated form covers everything Abhimanyu's decomposed form did, or (b) port the decomposed form so each stage is individually resumable and sub-recipe-addressable. Abhimanyu's orchestrator has specific contracts (`.workflow/<jira-key>/` artifact paths, `mcp__Atlassian__createJiraIssue` for sub-tasks, `mcp__bitbucket__bb_post` for PRs) that our recipes should match or intentionally diverge from. Files available in Yana's Downloads folder.
+- **2026-04-10 platform decision**: Ark chosen as the company-wide dev-workflow orchestrator, positioned ABOVE Goose / Claude Code / Codex. Builder trio: Yana (core), Abhimanyu (product + user feedback), Zining (collaboration). Each builder recruits one user from a pilot team (feature-store / RU / risk-PML-inference). Twice-weekly adoption sync with leadership starting week of Apr 13. Leadership framing: "factory floor" -- Ark is the foundry, tools are the machines, one place to swap models/policies/skills for the whole company.
+- **Project name caveat**: internally the repo stays "ark". External branding may be "Foundry" (technically the better fit, per the factory metaphor). Keep technical name separate from any productized name.
+- **Soft constraint**: Prefer subscription auth (or self-hosted / MiniMax / DeepSeek via router + TensorZero) for fleet-scale Claude, but keep API-key mode fully supported. Ark must accommodate all three `cost_mode` values (`api` / `subscription` / `free`) -- different tenants and different models will land in different modes.
+- **Foundry 2.0**: QA Infra (fan-out test suites) + AI Monitor (Prometheus + Slack alerts). Apr 20 deadline. Both tracks now delivered AS USE CASES ON Ark, not as separate products.
+- **Competing harnesses**: Goose + Traefik (Abhimanyu), mehul mathur's harness, shrinivasan's personal harness, others. Arc's differentiator is the control layer on top -- compute orchestration + central knowledge/cost/router -- not a better chat loop.
+- **"Send to dev"**: PRD ready → remote devbox → tested PR at 95% readiness. Requires: Camp 1 (integration testing) + Camp 2 (workflow persistence) + Camp 10 (dev-env provisioning).
+- **Risk team (PAI-32794)**: Per-user MCP credentials, chat history on server → auth + control plane + knowledge graph + Camp 10 credential vault.
+- **Rollout discipline**: Start with individuals, not teams. Limited feature set, not everything at once. Daily feedback from recruits, weekly triage by builders. Success = an agent autonomously closing a real bug end-to-end (the Srinivasan-tweet test).
 
 ---
 
