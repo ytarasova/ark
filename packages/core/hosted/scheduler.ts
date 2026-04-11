@@ -11,7 +11,7 @@
  */
 
 import type { AppContext } from "../app.js";
-import type { Session } from "../../types/index.js";
+import type { Session, ComputeProviderName } from "../../types/index.js";
 import type { WorkerNode } from "./worker-registry.js";
 import type { TenantPolicyManager, TenantComputePolicy } from "../auth/index.js";
 
@@ -134,7 +134,7 @@ export class SessionScheduler {
     const computeName = `${tenantId}-${provider}-${Date.now()}`;
     this.app.computes.create({
       name: computeName,
-      provider: provider as any,
+      provider: provider as ComputeProviderName,
       config: poolRef.config ?? {},
     });
     const compute = this.app.computes.get(computeName)!;

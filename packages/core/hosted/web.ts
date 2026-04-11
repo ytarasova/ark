@@ -193,7 +193,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       // JSON-RPC endpoint
       if (url.pathname === "/api/rpc" && req.method === "POST") {
         try {
-          const body = await req.json() as any;
+          const body = await req.json() as { jsonrpc?: string; method?: string; id?: string | number; params?: unknown };
           if (!body || body.jsonrpc !== "2.0" || !body.method) {
             return jsonResponse({
               jsonrpc: "2.0", id: body?.id ?? null,
