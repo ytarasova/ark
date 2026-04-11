@@ -40,6 +40,7 @@ import { registerKnowledgeCommands } from "./commands/knowledge.js";
 import { registerEvalCommands } from "./commands/eval.js";
 import { registerDashboardCommands } from "./commands/dashboard.js";
 import { registerCostsCommands } from "./commands/costs.js";
+import { registerServerCommands } from "./commands/server.js";
 import { registerMiscCommands } from "./commands/misc.js";
 
 // ── Resolve remote mode early (before AppContext boot) ──────────────────────
@@ -106,6 +107,7 @@ registerKnowledgeCommands(program);
 registerEvalCommands(program);
 registerDashboardCommands(program, app);
 registerCostsCommands(program);
+registerServerCommands(program);
 registerMiscCommands(program, app);
 
 // ── Run ─────────────────────────────────────────────────────────────────────
