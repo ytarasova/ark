@@ -7,7 +7,7 @@
  */
 
 import type { AppContext } from "../app.js";
-import type { Compute } from "../../types/index.js";
+import type { Compute, ComputeProviderName } from "../../types/index.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ export class ComputePoolManager {
   deletePool(name: string): boolean {
     this.ensureSchema();
     const result = this.app.db.prepare("DELETE FROM compute_pools WHERE name = ? AND tenant_id = ?").run(name, this.tenantId);
-    return (result as any)?.changes > 0;
+    return (result?.changes ?? 0) > 0;
   }
 
   /**
@@ -125,7 +125,7 @@ export class ComputePoolManager {
     const computeName = `${poolName}-${idx}`;
     const compute = this.app.computes.create({
       name: computeName,
-      provider: pool.provider as any,
+      provider: pool.provider as ComputeProviderName,
       config: { ...pool.config, pool: poolName },
     });
 

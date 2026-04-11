@@ -23,7 +23,7 @@ import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
 import { safeParseConfig } from "./util.js";
 import { initSchema as initRepoSchema, seedLocalCompute } from "./repositories/schema.js";
-import type { Compute, Session } from "../types/index.js";
+import type { Compute, Session, ComputeProviderName } from "../types/index.js";
 import { setProviderResolver, clearProviderResolver } from "./provider-registry.js";
 import { updateTmuxStatusBar, clearTmuxStatusBar } from "./infra/tmux-notify.js";
 import { startNotifyDaemon } from "./infra/notify-daemon.js";
@@ -405,7 +405,7 @@ export class AppContext {
         tmplRepo.create({
           name: tmpl.name,
           description: tmpl.description,
-          provider: tmpl.provider as any,
+          provider: tmpl.provider as ComputeProviderName,
           config: tmpl.config,
         });
       }
