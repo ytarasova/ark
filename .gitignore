@@ -7,6 +7,7 @@ dist/
 !shims/**/*.js
 !packages/desktop/main.js
 !packages/desktop/preload.js
+!eslint.config.js
 .env
 .worktrees/
 
