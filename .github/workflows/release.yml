@@ -116,6 +116,7 @@ jobs:
       - name: Build static tmux in Alpine
         env:
           TMUX_VERSION: 3.5a
+          PLAT: ${{ matrix.name }}
         run: |
           mkdir -p out
           docker run --rm -v "$PWD/out:/out" alpine:3.20 sh -c '
@@ -134,17 +135,23 @@ jobs:
             file /out/tmux
             /out/tmux -V
           '
+          # Rename so the file inside the artifact carries the platform suffix.
+          # The package job assembles by globbing tmux-${PLAT}, so a bare `tmux`
+          # would silently produce a tarball without a bundled tmux binary.
+          mv out/tmux "out/tmux-$PLAT"
 
       - name: Verify static binary on host
+        env:
+          PLAT: ${{ matrix.name }}
         run: |
-          file out/tmux
-          test -s out/tmux
+          file "out/tmux-$PLAT"
+          test -s "out/tmux-$PLAT"
 
       - name: Upload tmux binary
         uses: actions/upload-artifact@v4
         with:
           name: tmux-${{ matrix.name }}
-          path: out/tmux
+          path: out/tmux-${{ matrix.name }}
           retention-days: 1
 
   # Vendor codegraph - extract native binaries from npm optional deps
