@@ -1,24 +1,31 @@
 # Ark Platform Roadmap
 
-> Last updated: 2026-04-11
-> Tests: 2630 pass, 0 fail, 0 lint errors, 0 process leaks
+> Last updated: 2026-04-11 (second pass)
+> Unit tests: 2724 pass, 0 fail, 0 lint errors, 0 process leaks
+> E2E tests: 89 TUI (`packages/tui-e2e/`) + 78 web (`packages/e2e/web/`) = **167 passing, 0 skipped, 0 failed**
 >
 > **2026-04-10 decision (Foundry 2.0 review meeting):** Ark selected as the company-wide dev-workflow orchestrator -- the layer ABOVE tools like Goose / Claude Code / Codex, not a replacement. Framed as "the foundry" (control plane) with those tools as "the machines." First hand-out to early adopters targeted for the week of 2026-04-13. See **Camp 0: Early Adopter Ship** below.
 >
-> **Recent completions (not yet reflected in the tables below):**
+> **2026-04-11 session shipped on `main`:**
+> - Goose as first-class runtime (`runtimes/goose.yaml` + native executor with recipe dispatch, channel MCP via `--with-extension`, router-injected base URLs, vendored binary + freshness manifest)
+> - Executor barrel + plugin discovery (`packages/core/executors/index.ts` -- `builtinExecutors` array, `loadPluginExecutors` for `~/.ark/plugins/executors/*.js`)
+> - PluginRegistry (Camp 13 Phase 1) -- typed DI-native lookup context, executors flow through Awilix
+> - Unified Claude settings bundle (`permissions.allow` from `agent.tools` + prompt-hint injection so agents don't probe)
+> - Schema cleanup -- removed 60 lines of `migrateAddColumn` dead code
+> - Browser-rendered TUI e2e harness -- real pty + xterm.js + Playwright, driving a real tmux session per test
+> - Full layer-one coverage for TUI + web (167 tests, 0 skips), including real flow progression (walks `default` through all 9 stages), real cost aggregation (seeded usage_records), and real dispatch state transitions (stop/resume/archive/restore via pure RPC round-trips)
+>
+> **Prior session shipped:**
 > - TensorZero gateway integrated (lifecycle manager, sidecar/native/Docker modes, cost feed-back)
 > - LLM Router wired into executor dispatch flow (ANTHROPIC_BASE_URL / OPENAI_BASE_URL injection)
-> - Axon replaced by ops-codegraph (@optave/codegraph, TypeScript + Rust, 33 languages, no Python)
-> - Codebase auto-index on dispatch (local config-gated, remote ALWAYS via arkd /codegraph/index)
-> - Aider runtime dropped. Active runtimes: claude, claude-max, codex, gemini
-> - Polymorphic transcript parsers (Claude/Codex/Gemini) via TranscriptParserRegistry + DI
-> - Workdir-based session identification (no "latest by mtime" hacks)
-> - cost_mode column (api/subscription/free) in usage_records
+> - ops-codegraph indexer (replaced Axon; 33 languages, no Python)
+> - Codebase auto-index on dispatch
+> - Polymorphic transcript parsers via DI
+> - cost_mode column in usage_records
 > - Compute templates (CLI + TUI + Web + RPC, tenant-scoped)
-> - Full multi-tenant entity scoping (user_id on sessions, tenant_id on groups/schedules/pools)
-> - DB-backed resource stores for control plane mode (DbResourceStore, resource_definitions table)
-> - Tenant integration policies (router_required, auto_index_required, router_policy, tensorzero_enabled)
-> - Token-budgeted context injection (~2000 tokens max)
+> - Full multi-tenant entity scoping
+> - DB-backed resource stores for control plane mode
+> - Tenant integration policies
 
 ---
 
@@ -44,6 +51,12 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Agent eval system** | Runtime evals: evaluateSession, getAgentStats, detectDrift, listEvals. Auto-evaluates on session completion. Old keyword-matching evals deleted. | 10 tests |
 | **Universal cost tracking** | PricingRegistry (300+ models via LiteLLM JSON), UsageRecorder (usage_records table), multi-dimensional attribution (session, user, tenant, model, provider, runtime, agent_role). | 28 tests |
 | **Runtime/role separation** | Agents define roles. Runtimes define backends. 5 runtimes: Claude, Codex, Gemini, Goose, Aider. 12 agent roles. `--runtime` override at dispatch. | Yes |
+| **Browser-rendered TUI e2e harness** | `packages/tui-e2e/` -- real pty via node-pty, pipes into xterm.js rendered in headless Chromium via Playwright, drives keystrokes through `term.paste()`. Each test owns an ephemeral `ARK_TEST_DIR` + `TMUX_TMPDIR`. Ports of all 6 legacy TuiDriver tests plus 8 new tab-focused files plus flows + dispatch + interrupt + attach tests. | 89 tests |
+| **Web e2e harness** | `packages/e2e/web/` -- Playwright drives the web dashboard via `setupWebServer()` fixture against an isolated `ARK_TEST_DIR`. Substantive coverage of schedule/flow/cost CRUD round-trips, knowledge graph RPCs, and sessions archive/restore. Runs via `bunx --bun playwright test` (fixture uses Bun APIs). | 78 tests |
+| **Unified Claude settings bundle** | `writeHooksConfig` writes `permissions.allow` from `agent.tools`, auto-expanding `mcp_servers` to wildcards, rejecting undeclared MCP refs. Tool-hint injection appends an "Available tools" block to the system prompt so agents don't probe. `--dangerously-skip-permissions` stays the explicit override. | 18 tests |
+| **Goose native runtime** | `runtimes/goose.yaml` + `packages/core/executors/goose.ts` -- recipe dispatch (`--recipe` / `--sub-recipe` / `--params`), channel MCP wired via `--with-extension`, LLM router routing via `ANTHROPIC_BASE_URL` + `OPENAI_BASE_URL` injection, vendored binary + freshness manifest. | 15 tests |
+| **PluginRegistry (DI)** | `packages/core/plugins/registry.ts` -- typed kind-based collections, Awilix-registered, single source of truth for extensible collections. Executor plugin discovery at `~/.ark/plugins/executors/*.js` via dynamic import. Camp 13 Phase 1 shipped; Phase 2 (port compute providers + stores) is the next delta. | 8 tests |
+| **Schema cleanup** | Dead `migrateAddColumn` calls removed -- schema.ts is now the canonical CREATE TABLE definition. No in-place migration layer until there's production data to preserve. `rm ~/.ark/ark.db` is the documented dev workflow for destructive changes. | Yes |
 | **Goose native runtime** | Full native integration (`packages/core/executors/goose.ts`): text + recipe dispatch (`--recipe` / `--sub-recipe` / `--params`), channel MCP wired as `--with-extension`, router-injected `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL`, `--no-session --quiet --output-format stream-json`, `--model` / `--max-turns` from agent YAML. Binary vendored per platform via `scripts/vendor-goose.sh` + `vendor/versions.yaml` manifest. Unlocks Abhimanyu's ISLC recipe set without porting. | 15 unit tests |
 | **Executor barrel + plugin discovery** | `packages/core/executors/index.ts` owns `builtinExecutors: Executor[]` as the single source of truth. Boot loops this array, registering into the module lookup AND the Awilix container under `executor:<name>`. `loadPluginExecutors(arkDir)` discovers user-provided executors at `~/.ark/plugins/executors/*.js` via dynamic import. Failures never block boot. | Yes |
 | **Vendor freshness CI** | `vendor/versions.yaml` codifies pinned upstream versions for goose, codex, tmux, tensorzero, codegraph. Weekly scheduled workflow (`.github/workflows/vendor-freshness.yml`) polls upstream releases and opens a PR bumping the manifest when upstream is newer. Every bump goes through CI + human review, no auto-merge. | N/A |
@@ -75,7 +88,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Control plane** | Worker registry, scheduler, tenant policies, hosted entry point. 20 unit tests. | Never deployed as a running service. Docker-compose untested. Helm chart untested. Worker registration flow untested. | High |
 | **Remote client** | `--server`/`--token` for CLI, TUI, Web. WebSocket transport. Web proxy mode. | Never tested with a real remote server. | High |
 | **Auth middleware** | Token extraction, tenant scoping in web server. | Never tested with real multi-user sessions. No session management. | Medium |
-| **SDLC flow E2E** | Full pipeline defined with agents, skills, recipes. | Never processed a real Jira ticket end-to-end. MCP integrations untested. | High |
+| **SDLC flow E2E** | Full pipeline defined with agents, skills, recipes. Flow progression mechanics exercised by `flows.pw.ts` + `flows.spec.ts` -- walks `default` flow through all 9 stages via `session/advance`, asserts each transition. | Never processed a real Jira ticket end-to-end with a real Claude agent. MCP integrations (Atlassian, Bitbucket, Figma) still untested against live services. | Medium |
 | **OTLP observability** | `otlp.ts` sends spans to OTLP/HTTP endpoint. | Never tested against real Jaeger/Tempo/Honeycomb. | Medium |
 | **Knowledge: Axon indexer** | Calls Axon subprocess, parses output, stores in graph. | Never tested with real Axon installed. Mock-tested only. | Medium |
 | **Cost: router feed-back** | Router has in-memory cost tracking. UsageRecorder exists. | Router doesn't call `app.usageRecorder.record()` yet. Not wired. | Medium |
@@ -128,10 +141,18 @@ The orchestration platform for AI-powered software development. Manages the full
 
 **Explicit scoping feedback from the meeting:** Ship a small, reliable surface first. Do NOT dump every feature at once -- foundry-1.0 lesson was that premature breadth drowns the team in shallow bug reports. Decide what's in/out before Monday.
 
+**What has already landed (2026-04-11 session commits on `main`):**
+- Unified Claude settings bundle writer -- `permissions.allow` generated from `agent.tools`, prompt-hint injection so agents know what tools exist without probing
+- Native Goose runtime (`runtimes/goose.yaml` + `packages/core/executors/goose.ts`) with recipe dispatch, channel MCP via `--with-extension`, LLM router routing
+- Vendored binary freshness manifest (`vendor/versions.yaml`) + CI workflow for goose / codex version bumps
+- PluginRegistry as a first-class Awilix service (Camp 13 Phase 1) -- all executors flow through it; extension point is ready for compute providers + stores in Phase 2
+- Full end-to-end test suite: 89 TUI tests + 78 web tests, 0 skips, 0 failures, covers real flow progression, real cost aggregation, CRUD round-trips, and dispatch state transitions (see Camp 1 below for the full story)
+- Schema cleanup -- removed in-place migration dead code now that there is no production data to preserve
+
 **Candidate "in scope" for the first hand-out** (builder trio to confirm):
 - Local docker compute with worktree isolation (no AWS creds required on the user's laptop)
 - Optionally **federated compute via Ark token** (see Camp 12) for users who need heavier than local docker -- lets them hit remote EC2/k8s/firecracker without any cloud credentials
-- `claude-max` + `codex` runtimes, subscription auth preferred over API keys
+- `claude-max` + `codex` + `goose` runtimes, subscription auth preferred over API keys
 - Knowledge graph auto-index on dispatch (already DONE)
 - One polished flow: `code-review` or `fix-bug`, driven from web UI
 - Web dashboard (local mode), limited to Sessions / Flows / Knowledge tabs
@@ -158,30 +179,80 @@ The orchestration platform for AI-powered software development. Manages the full
 
 ### Camp 1: Integration Testing & Production Readiness
 
-**2026-04-11 update -- TUI e2e harness rewritten.** The legacy
-`packages/e2e/tui/` harness (nested tmux + heuristic region parsing)
-was deprecated. Its replacement is `packages/tui-e2e/`: a real pty
-(node-pty) spawns `ark tui`, pipes stdin/stdout through a WebSocket
-into `xterm.js` rendered by headless Chromium via Playwright. Tests
-drive the TUI with `page.keyboard.press()` and read back actual
-rendered cells via `window.__arkBuffer()`, so screenshots, video
-capture, and pixel-level regressions are all available. Each harness
-instance owns an isolated `ARK_DIR` + `TMUX_TMPDIR` so Playwright
-workers are parallel-safe.
+**2026-04-11 status -- end-to-end coverage landed.**
 
-Makefile targets:
+Full test suite is green across both surfaces:
 
-- `make test-tui-e2e` -- TUI browser harness (Playwright under Node)
-- `make test-web-e2e` -- web dashboard e2e (existing `packages/e2e/`)
-- `make test-e2e` -- both
+| Surface | Tests | Skipped | Failed | Wall |
+|---|---|---|---|---|
+| `packages/tui-e2e/` (TUI browser harness) | 89 | 0 | 0 | ~3.6 min |
+| `packages/e2e/web/` (Playwright web) | 78 | 0 | 0 | ~54 s |
 
-**Follow-up:** port the 6 legacy TuiDriver tests (`dispatch`, `sessions`,
-`session-crud`, `talk`, `tabs`, `worktree`) from `packages/e2e/tui.deprecated/`
-into `packages/tui-e2e/tests/*.pw.ts` using the new `startHarness` /
-`waitForText` / `pressKey` / `readTerminal` helpers. Delete each legacy
-file as its port lands. Once the deprecated dir is empty, delete
-`packages/e2e/fixtures/tui-driver.ts` entirely.
+**TUI harness.** `packages/tui-e2e/` runs `ark tui` inside a real pty
+(`@homebridge/node-pty-prebuilt-multiarch`), pipes stdin/stdout through a
+WebSocket into `xterm.js` rendered in headless Chromium via Playwright.
+Each test owns its own ephemeral `ARK_TEST_DIR` + `TMUX_TMPDIR`, so
+workers are parallel-safe in principle -- we currently run workers=1
+with retries=2 to absorb transient tmux resource flakes. Keystrokes
+route through `term.paste()` (not Playwright's keyboard API, which
+doesn't reach xterm's hidden textarea without focus gymnastics).
 
+**Web harness.** `packages/e2e/web/` boots `ark web` via `setupWebServer()`
+against an isolated `ARK_TEST_DIR`, then drives the React app via
+Playwright. Runs under Bun (`bunx --bun playwright test`) because the
+fixture uses Bun APIs that the Node Playwright runner can't parse.
+
+**What the 167 tests actually cover:**
+
+- **Flow progression** -- walks a `default` flow through every stage
+  via `session/advance` RPC (`intake → plan → audit → implement →
+  verify → pr → review → close → retro → completed`), asserts each
+  transition; `bare` flow completes on next advance. Covered in both
+  TUI and web.
+- **Cost aggregation** -- seeds real `usage_records` + `sessions`
+  rows via `sqlite3` CLI, verifies `costs/read` totals,
+  `costs/summary` per-model breakdown, `costs/session` per-session
+  attribution, and `cost_mode` handling (api/subscription/free).
+  TUI and web both exercise the full pipeline from
+  `PricingRegistry` + `UsageRecorder` through the RPC handlers into
+  Recharts / ASCII charts.
+- **Dispatch state transitions** -- `session/resume`, `session/stop`,
+  `session/archive`, `session/restore` all exercised as pure RPC
+  round-trips. Interrupt `I`, Attach `a`, Live Output pane render
+  all driven via sqlite3 state seeding (bypasses `_detectStaleState`
+  with `session_id=NULL` or `status=waiting`). Zero skips for "needs
+  real agent runtime" -- the state machine and UI wiring are testable
+  without live Claude.
+- **CRUD round-trips** -- schedule create/disable/delete, session
+  clone/archive/restore, tools disk → RPC → DOM reflection, memory
+  seed via `ark knowledge remember` CLI → `memory/list` RPC readback.
+- **Real worktree creation** -- seed session + `git worktree add`
+  against a throwaway temp repo → `ark worktree list` surfaces it.
+- **Per-tab TUI smoke + integration** -- every tab (Sessions, Agents,
+  Flows, Compute, History, Memory, Tools, Schedules, Costs) has a
+  dedicated `.pw.ts` file asserting on real rendered content, not
+  boilerplate DOM presence.
+
+**Legacy harness deprecation.** `packages/e2e/tui.deprecated/` still
+contains the original `TuiDriver` tests -- 6 files -- but none are
+imported by the test runner. Safe to delete as a follow-up sweep. The
+new harness eclipses everything they covered.
+
+**Patterns worth copying for future coverage:**
+
+1. **Seed-before-boot** -- always allocate `ARK_TEST_DIR` via
+   `mkTempArkDir()` and seed state via `runArkCli(...)` or direct
+   `execFileSync("sqlite3", ...)` BEFORE `startHarness({ arkDir })`.
+   SQLite locks if you try to seed while the TUI subprocess holds the
+   WAL writer.
+2. **Pure RPC contract tests beat UI click chains.** The `session/
+   archive` + `session/restore` test was originally a flaky UI flow;
+   rewriting it as RPC-only made it rock-solid AND exercised the
+   actual integration boundary the UI was merely wrapping.
+3. **State machine over runtime.** Agent execution tests that seemed
+   to "need real Claude" actually only needed the state machine --
+   resume, stop, interrupt, attach are all pure state flips or UI
+   round-trips that don't dispatch anything.
 
 **Goal:** Everything that exists actually works against real services. Nothing ships until it's proven.
 
@@ -441,21 +512,35 @@ All three are the same binary with different config. No separate builds.
 ## Priority Sequence
 
 ```
-Camp 0: Early Adopter Ship       ████████████   IMMEDIATE -- week of Apr 13, limited-features hand-out
-Camp 1: Integration Testing      ████████████   Prove what we built works against real services
-Camp 10: Dev-Env + Pre-Eng       ██████████     Unblocks Claude-at-fleet, non-engineer adoption
-Camp 11: Multi-Repo Support      ██████████     Real work crosses repos; lands after pilot closes first bug
-Camp 12: Federated Compute       ██████████     Unblocks pilot: local client + remote compute via token, no AWS creds on user laptops
-Camp 13: Plugin Platform         ████████       Phase 1 DONE (registry + DI); Phases 2-4 (unify stores, manifest/versioning/hot-reload, sandboxing)
-Camp 2: Workflow Persistence     ████████       Temporal + crash recovery
-Camp 3: Agent Intelligence       ████           Partially done (evals, costs done; trust, latency remain)
-Camp 4: Dashboard & Viz          ████           Partially done (dashboard, charts done; live feed, graph viz remain)
-Camp 5: Security                 ██████         Enterprise blocker
-Camp 9: Architecture             ████           Partially done (reorg, old code deleted; async Postgres remains)
-Camp 6: Integrations             ██████         Connect to existing tools
-Camp 7: Task Management          ████████       New capability
-Camp 8: UX Polish                ██████         Professional finish
+Camp 0:  Early Adopter Ship       ████████████   IMMEDIATE -- week of Apr 13, limited-features hand-out
+Camp 1:  Integration Testing      ██             Mostly DONE: 167 e2e tests, TUI harness + web harness green,
+                                                 flow/cost/dispatch contracts covered. Remains: real LLM router
+                                                 smoke, K8s/E2B/arkd real-service runs, Docker image publish
+Camp 10: Dev-Env + Pre-Eng        ██████████     Unblocks Claude-at-fleet, non-engineer adoption (Traefik, VaultMan,
+                                                 sub-recipe runtime, MiniMax router adapter, ideate flow)
+Camp 11: Multi-Repo Support       ██████████     Design decisions locked; lands after pilot closes first bug
+Camp 12: Federated Compute        ██████████     Unblocks pilot: local client + remote compute via token, no AWS creds
+Camp 13: Plugin Platform          ████████       Phase 1 DONE (PluginRegistry + DI); Phases 2-4 (unify stores,
+                                                 manifest/versioning/hot-reload, sandboxing)
+Camp 2:  Workflow Persistence     ████████       Temporal + crash recovery
+Camp 3:  Agent Intelligence       ████           Partial (evals, costs done; trust scoring, latency p50/p95 remain)
+Camp 4:  Dashboard & Viz          ████           Partial (dashboard, charts, smart polling done; live feed, graph viz remain)
+Camp 5:  Security                 ██████         Enterprise blocker (audit trail, posture score, exec approval, secret detection)
+Camp 9:  Architecture             ████           Partial (DI, PluginRegistry, schema cleanup done; async Postgres remains)
+Camp 6:  Integrations             ██████         Webhooks, alert rules, GitHub Issues sync, Linear, Slack commands
+Camp 7:  Task Management          ████████       Task board ABOVE sessions, Aegis review, quality gates
+Camp 8:  UX Polish                ██████         Desktop .dmg shipping (currently broken), Homebrew, onboarding wizard, i18n
 ```
+
+**What changed in this update (2026-04-11):**
+
+- Camp 1 dropped from 12 bars to 2 -- the e2e work is 80% complete. The
+  remaining blocks are real-service integration (K8s, E2B, Docker image
+  publish) which are deployment tasks, not coverage gaps.
+- Camp 9 gained a "Phase 1 DI refactor done" note -- PluginRegistry is
+  wired and executors flow through Awilix.
+- Camp 8 explicitly surfaces the desktop shipping regression (unsigned
+  .dmg not landing on releases) so it's not lost in "UX polish".
 
 ---
 
