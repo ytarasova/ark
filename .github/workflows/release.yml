@@ -56,38 +56,28 @@ jobs:
           path: ark-${{ matrix.name }}
           retention-days: 1
 
-  # Vendor tmux for macOS - build natively on macOS runners.
-  # continue-on-error so a single cancelled/failed matrix instance (e.g.
-  # macos-13 queue saturation) doesn't propagate "cancelled" to the package
-  # job's needs check. The package job's download-artifact is itself
-  # continue-on-error, so missing binaries just produce a tarball without
-  # that specific vendor; smoke-test catches any resulting runtime gap.
+  # Vendor tmux for macOS arm64. darwin-x64 is skipped: the macos-13
+  # Intel runner is regularly queue-saturated / cancelled, which breaks
+  # the whole pipeline downstream (cancelled needs-resolution doesn't
+  # respect continue-on-error). Intel macs are rare enough that shipping
+  # a darwin-x64 tarball without a bundled tmux (users install via
+  # `brew install tmux`) is acceptable.
   vendor-tmux-darwin:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: darwin-arm64
-            runner: macos-14
-          - name: darwin-x64
-            runner: macos-13
-
-    runs-on: ${{ matrix.runner }}
-    name: vendor-tmux (${{ matrix.name }})
+    runs-on: macos-14
+    name: vendor-tmux (darwin-arm64)
     timeout-minutes: 15
-    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Build static tmux
         env:
-          PLAT: ${{ matrix.name }}
+          PLAT: darwin-arm64
         run: ./scripts/vendor-tmux.sh "$PLAT"
 
       - name: Verify binary
         env:
-          PLAT: ${{ matrix.name }}
+          PLAT: darwin-arm64
         run: |
           test -f "dist/vendor/tmux-$PLAT"
           file "dist/vendor/tmux-$PLAT"
@@ -96,8 +86,8 @@ jobs:
       - name: Upload tmux binary
         uses: actions/upload-artifact@v4
         with:
-          name: tmux-${{ matrix.name }}
-          path: dist/vendor/tmux-${{ matrix.name }}
+          name: tmux-darwin-arm64
+          path: dist/vendor/tmux-darwin-arm64
           retention-days: 1
 
   # Vendor tmux for Linux - build in Alpine via `docker run` so the
@@ -202,7 +192,11 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
-  # Vendor tensorzero - build Rust gateway per platform
+  # Vendor tensorzero - build Rust gateway per platform.
+  # Skips darwin-x64 (macos-13 queue saturation) and linux-arm64 (cross-compile
+  # toolchain headache). The remaining platforms still produce useful vendor
+  # binaries; everyone else gets a tarball without a tensorzero sidecar and
+  # falls back to the Docker launcher at runtime.
   vendor-tensorzero:
     strategy:
       fail-fast: false
@@ -210,12 +204,8 @@ jobs:
         include:
           - name: darwin-arm64
             runner: macos-14
-          - name: darwin-x64
-            runner: macos-13
           - name: linux-x64
             runner: ubuntu-latest
-          - name: linux-arm64
-            runner: ubuntu-24.04-arm
 
     runs-on: ${{ matrix.runner }}
     name: vendor-tensorzero (${{ matrix.name }})
