@@ -173,6 +173,9 @@ export async function sendTextAsync(name: string, text: string): Promise<void> {
   try {
     await execFileAsync(tmuxBin(), ["load-buffer", "-b", "ark-msg", tmpFile]);
     await execFileAsync(tmuxBin(), ["paste-buffer", "-b", "ark-msg", "-t", name]);
+    // Let Claude Code's bracketed-paste handling flush before the Enter lands,
+    // otherwise Enter can fire against an empty prompt state.
+    await new Promise(r => setTimeout(r, 50));
     await execFileAsync(tmuxBin(), ["send-keys", "-t", name, "Enter"]);
   } finally {
     try { unlinkSync(tmpFile); } catch { /* OS tmpdir cleanup is acceptable fallback */ }
