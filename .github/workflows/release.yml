@@ -56,7 +56,12 @@ jobs:
           path: ark-${{ matrix.name }}
           retention-days: 1
 
-  # Vendor tmux for macOS - build natively on macOS runners
+  # Vendor tmux for macOS - build natively on macOS runners.
+  # continue-on-error so a single cancelled/failed matrix instance (e.g.
+  # macos-13 queue saturation) doesn't propagate "cancelled" to the package
+  # job's needs check. The package job's download-artifact is itself
+  # continue-on-error, so missing binaries just produce a tarball without
+  # that specific vendor; smoke-test catches any resulting runtime gap.
   vendor-tmux-darwin:
     strategy:
       fail-fast: false
@@ -70,6 +75,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     name: vendor-tmux (${{ matrix.name }})
     timeout-minutes: 15
+    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4
@@ -97,7 +103,7 @@ jobs:
   # Vendor tmux for Linux - build in Alpine via `docker run` so the
   # upload-artifact step (which is a JavaScript action) runs on the host.
   # Putting Alpine at the job level breaks on arm64 runners because the JS
-  # action assumes x64.
+  # action assumes x64. continue-on-error matches vendor-tmux-darwin.
   vendor-tmux-linux:
     strategy:
       fail-fast: false
@@ -111,6 +117,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     name: vendor-tmux (${{ matrix.name }})
     timeout-minutes: 15
+    continue-on-error: true
 
     steps:
       - name: Build static tmux in Alpine
@@ -277,16 +284,13 @@ jobs:
           path: packages/web/dist
           retention-days: 1
 
-  # Assemble self-contained distribution tarballs.
-  # We `needs:` the vendor jobs so package waits for them, but use
-  # `if: !cancelled() && needs.build-ark.result == 'success'` so a partial
-  # vendor failure (e.g. one matrix instance gets cancelled because of runner
-  # queue saturation) doesn't skip the whole package job. The download-artifact
-  # steps for individual vendors are continue-on-error, so a missing artifact
-  # produces a tarball without that vendor binary instead of failing the build.
+  # Assemble self-contained distribution tarballs. The vendor jobs are all
+  # marked continue-on-error at the job level, so a cancelled/failed matrix
+  # instance still reports success for the purposes of needs-resolution. No
+  # `if:` condition here -- that propagates to smoke-test and breaks matrix
+  # expansion downstream.
   package:
     needs: [build-ark, build-web, vendor-tmux-darwin, vendor-tmux-linux, vendor-codegraph]
-    if: ${{ !cancelled() && needs.build-ark.result == 'success' && needs.build-web.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
