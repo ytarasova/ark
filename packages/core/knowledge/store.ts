@@ -2,6 +2,27 @@ import type { IDatabase } from "../database/index.js";
 import type { KnowledgeNode, KnowledgeEdge, NodeType, EdgeRelation } from "./types.js";
 import { randomUUID } from "crypto";
 
+interface NodeRow {
+  id: string;
+  type: NodeType;
+  label: string;
+  content: string | null;
+  metadata: string;
+  tenant_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface EdgeRow {
+  source_id: string;
+  target_id: string;
+  relation: EdgeRelation;
+  weight: number;
+  metadata: string;
+  tenant_id: string;
+  created_at: string;
+}
+
 export class KnowledgeStore {
   private tenantId: string = "default";
 
@@ -20,7 +41,7 @@ export class KnowledgeStore {
   }
 
   getNode(id: string): KnowledgeNode | null {
-    const row = this.db.prepare("SELECT * FROM knowledge WHERE id = ? AND tenant_id = ?").get(id, this.tenantId) as any;
+    const row = this.db.prepare("SELECT * FROM knowledge WHERE id = ? AND tenant_id = ?").get(id, this.tenantId) as NodeRow | undefined;
     return row ? this.rowToNode(row) : null;
   }
 
@@ -44,11 +65,11 @@ export class KnowledgeStore {
 
   listNodes(opts?: { type?: NodeType; limit?: number }): KnowledgeNode[] {
     let sql = "SELECT * FROM knowledge WHERE tenant_id = ?";
-    const params: any[] = [this.tenantId];
+    const params: unknown[] = [this.tenantId];
     if (opts?.type) { sql += " AND type = ?"; params.push(opts.type); }
     sql += " ORDER BY updated_at DESC";
     if (opts?.limit) { sql += " LIMIT ?"; params.push(opts.limit); }
-    return (this.db.prepare(sql).all(...params) as any[]).map(this.rowToNode);
+    return (this.db.prepare(sql).all(...params) as NodeRow[]).map(r => this.rowToNode(r));
   }
 
   // --- Edge CRUD ---
@@ -69,13 +90,13 @@ export class KnowledgeStore {
   getEdges(nodeId: string, opts?: { relation?: EdgeRelation; direction?: "out" | "in" | "both" }): KnowledgeEdge[] {
     const dir = opts?.direction ?? "both";
     const parts: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
     if (dir === "out" || dir === "both") { parts.push("source_id = ?"); params.push(nodeId); }
     if (dir === "in" || dir === "both") { parts.push("target_id = ?"); params.push(nodeId); }
     let sql = `SELECT * FROM knowledge_edges WHERE (${parts.join(" OR ")}) AND tenant_id = ?`;
     params.push(this.tenantId);
     if (opts?.relation) { sql += " AND relation = ?"; params.push(opts.relation); }
-    return (this.db.prepare(sql).all(...params) as any[]).map(this.rowToEdge);
+    return (this.db.prepare(sql).all(...params) as EdgeRow[]).map(r => this.rowToEdge(r));
   }
 
   // --- Traversal ---
@@ -116,7 +137,7 @@ export class KnowledgeStore {
     if (words.length === 0) return [];
 
     let sql = "SELECT * FROM knowledge WHERE tenant_id = ?";
-    const params: any[] = [this.tenantId];
+    const params: unknown[] = [this.tenantId];
     if (opts?.types?.length) {
       sql += ` AND type IN (${opts.types.map(() => "?").join(", ")})`;
       params.push(...opts.types);
@@ -128,7 +149,7 @@ export class KnowledgeStore {
     sql += ` LIMIT ?`;
     params.push(opts?.limit ?? 20);
 
-    const rows = this.db.prepare(sql).all(...params) as any[];
+    const rows = this.db.prepare(sql).all(...params) as NodeRow[];
     return rows.map(row => {
       const node = this.rowToNode(row);
       // Simple scoring: count word matches
@@ -141,7 +162,7 @@ export class KnowledgeStore {
   // --- Bulk ---
   clear(opts?: { type?: NodeType }): void {
     if (opts?.type) {
-      const ids = (this.db.prepare("SELECT id FROM knowledge WHERE type = ? AND tenant_id = ?").all(opts.type, this.tenantId) as any[]).map(r => r.id);
+      const ids = (this.db.prepare("SELECT id FROM knowledge WHERE type = ? AND tenant_id = ?").all(opts.type, this.tenantId) as Array<{ id: string }>).map(r => r.id);
       for (const id of ids) this.removeNode(id);
     } else {
       this.db.prepare("DELETE FROM knowledge_edges WHERE tenant_id = ?").run(this.tenantId);
@@ -151,23 +172,23 @@ export class KnowledgeStore {
 
   nodeCount(type?: NodeType): number {
     if (type) {
-      return (this.db.prepare("SELECT COUNT(*) as c FROM knowledge WHERE type = ? AND tenant_id = ?").get(type, this.tenantId) as any).c;
+      return (this.db.prepare("SELECT COUNT(*) as c FROM knowledge WHERE type = ? AND tenant_id = ?").get(type, this.tenantId) as { c: number }).c;
     }
-    return (this.db.prepare("SELECT COUNT(*) as c FROM knowledge WHERE tenant_id = ?").get(this.tenantId) as any).c;
+    return (this.db.prepare("SELECT COUNT(*) as c FROM knowledge WHERE tenant_id = ?").get(this.tenantId) as { c: number }).c;
   }
 
   edgeCount(relation?: EdgeRelation): number {
     if (relation) {
-      return (this.db.prepare("SELECT COUNT(*) as c FROM knowledge_edges WHERE relation = ? AND tenant_id = ?").get(relation, this.tenantId) as any).c;
+      return (this.db.prepare("SELECT COUNT(*) as c FROM knowledge_edges WHERE relation = ? AND tenant_id = ?").get(relation, this.tenantId) as { c: number }).c;
     }
-    return (this.db.prepare("SELECT COUNT(*) as c FROM knowledge_edges WHERE tenant_id = ?").get(this.tenantId) as any).c;
+    return (this.db.prepare("SELECT COUNT(*) as c FROM knowledge_edges WHERE tenant_id = ?").get(this.tenantId) as { c: number }).c;
   }
 
   // --- Helpers ---
-  private rowToNode(row: any): KnowledgeNode {
+  private rowToNode(row: NodeRow): KnowledgeNode {
     return { ...row, metadata: JSON.parse(row.metadata || "{}") };
   }
-  private rowToEdge(row: any): KnowledgeEdge {
+  private rowToEdge(row: EdgeRow): KnowledgeEdge {
     return { ...row, metadata: JSON.parse(row.metadata || "{}") };
   }
 }

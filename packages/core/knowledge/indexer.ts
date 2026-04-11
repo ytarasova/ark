@@ -74,7 +74,7 @@ export async function indexCodebase(
     for (const f of opts.changedFiles) {
       store.removeNode(`file:${f}`);
       const symbolNodes = store.listNodes({ type: "symbol" }).filter(
-        n => (n.metadata as any).file === f
+        n => (n.metadata?.file as string | undefined) === f
       );
       for (const sn of symbolNodes) store.removeNode(sn.id);
     }

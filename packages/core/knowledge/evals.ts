@@ -24,6 +24,41 @@ export interface AgentEvalResult {
   timestamp: string;
 }
 
+/** Shape of the metadata we attach to an `eval:<sessionId>` knowledge node. */
+interface EvalNodeMetadata {
+  eval: boolean;
+  agentRole: string;
+  runtime: string;
+  model: string;
+  completed: boolean;
+  testsPassed: boolean | null;
+  prCreated: boolean;
+  turnCount: number;
+  durationMs: number;
+  tokenCost: number;
+  filesChanged: number;
+  retryCount: number;
+}
+
+/** Narrow an untyped knowledge node metadata record into our EvalNodeMetadata shape. */
+function asEvalMeta(metadata: Record<string, unknown> | undefined): EvalNodeMetadata {
+  const m = metadata ?? {};
+  return {
+    eval: Boolean(m.eval),
+    agentRole: typeof m.agentRole === "string" ? m.agentRole : "unknown",
+    runtime: typeof m.runtime === "string" ? m.runtime : "claude",
+    model: typeof m.model === "string" ? m.model : "unknown",
+    completed: Boolean(m.completed),
+    testsPassed: m.testsPassed === null ? null : Boolean(m.testsPassed),
+    prCreated: Boolean(m.prCreated),
+    turnCount: typeof m.turnCount === "number" ? m.turnCount : 0,
+    durationMs: typeof m.durationMs === "number" ? m.durationMs : 0,
+    tokenCost: typeof m.tokenCost === "number" ? m.tokenCost : 0,
+    filesChanged: typeof m.filesChanged === "number" ? m.filesChanged : 0,
+    retryCount: typeof m.retryCount === "number" ? m.retryCount : 0,
+  };
+}
+
 /**
  * Evaluate a completed session and store results in the knowledge graph.
  * Called automatically when a session completes.
@@ -37,30 +72,30 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
   // Check if tests passed (look for verification events)
   const verifyEvents = events.filter(e => e.type === "verification_result");
   const testsPassed = verifyEvents.length > 0
-    ? verifyEvents.every(e => (e.data as any)?.result === "PASS")
+    ? verifyEvents.every(e => {
+        const data = e.data as Record<string, unknown> | undefined;
+        return data?.result === "PASS";
+      })
     : null;
 
-  // Check PR creation
   const prCreated = !!session.pr_url;
-
-  // Count retries
   const retryCount = events.filter(e => e.type === "retry_with_context").length;
 
-  // Duration
   const created = new Date(session.created_at).getTime();
   const updated = new Date(session.updated_at).getTime();
   const durationMs = updated - created;
 
-  // Cost (from usage_records)
   const tokenCost = app.usageRecorder.getSessionCost(session.id).cost;
 
-  // Files changed
-  const filesChanged = ((session.config as any)?.filesChanged as string[])?.length ?? 0;
+  const config = (session.config ?? {}) as Record<string, unknown>;
+  const filesChanged = Array.isArray(config.filesChanged) ? config.filesChanged.length : 0;
+  const runtime = typeof config.runtime_override === "string" ? config.runtime_override : "claude";
+  const model = typeof config.model === "string" ? config.model : "unknown";
 
   const result: AgentEvalResult = {
     agentRole: session.agent ?? "unknown",
-    runtime: (session.config as any)?.runtime_override ?? "claude",
-    model: (session.config as any)?.model ?? "unknown",
+    runtime,
+    model,
     sessionId: session.id,
     metrics: {
       completed: session.status === "completed",
@@ -75,10 +110,9 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
     timestamp: new Date().toISOString(),
   };
 
-  // Store as knowledge node
   app.knowledge.addNode({
     id: `eval:${session.id}`,
-    type: "session", // evals are metadata on sessions
+    type: "session",
     label: `Eval: ${session.summary ?? session.id}`,
     content: JSON.stringify(result.metrics),
     metadata: {
@@ -90,7 +124,6 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
     },
   });
 
-  // Link to session node if it exists
   const sessionNode = app.knowledge.getNode(`session:${session.id}`);
   if (sessionNode) {
     app.knowledge.addEdge(`eval:${session.id}`, `session:${session.id}`, "relates_to");
@@ -112,19 +145,20 @@ export function getAgentStats(app: AppContext, agentRole: string): {
   prRate: number;
 } {
   const evalNodes = app.knowledge.listNodes({ type: "session" })
-    .filter(n => (n.metadata as any).eval && (n.metadata as any).agentRole === agentRole);
+    .map(n => ({ node: n, meta: asEvalMeta(n.metadata) }))
+    .filter(({ meta }) => meta.eval && meta.agentRole === agentRole);
 
   if (evalNodes.length === 0) {
     return { totalSessions: 0, completionRate: 0, avgDurationMs: 0, avgCost: 0, avgTurns: 0, testPassRate: 0, prRate: 0 };
   }
 
-  const completed = evalNodes.filter(n => (n.metadata as any).completed).length;
-  const withTests = evalNodes.filter(n => (n.metadata as any).testsPassed !== null);
-  const testsPassed = withTests.filter(n => (n.metadata as any).testsPassed).length;
-  const withPR = evalNodes.filter(n => (n.metadata as any).prCreated).length;
-  const totalDuration = evalNodes.reduce((s, n) => s + ((n.metadata as any).durationMs ?? 0), 0);
-  const totalCost = evalNodes.reduce((s, n) => s + ((n.metadata as any).tokenCost ?? 0), 0);
-  const totalTurns = evalNodes.reduce((s, n) => s + ((n.metadata as any).turnCount ?? 0), 0);
+  const completed = evalNodes.filter(({ meta }) => meta.completed).length;
+  const withTests = evalNodes.filter(({ meta }) => meta.testsPassed !== null);
+  const testsPassed = withTests.filter(({ meta }) => meta.testsPassed).length;
+  const withPR = evalNodes.filter(({ meta }) => meta.prCreated).length;
+  const totalDuration = evalNodes.reduce((s, { meta }) => s + meta.durationMs, 0);
+  const totalCost = evalNodes.reduce((s, { meta }) => s + meta.tokenCost, 0);
+  const totalTurns = evalNodes.reduce((s, { meta }) => s + meta.turnCount, 0);
 
   return {
     totalSessions: evalNodes.length,
@@ -148,15 +182,16 @@ export function detectDrift(app: AppContext, agentRole: string, recentDays: numb
   alert: boolean;
 } {
   const allEvals = app.knowledge.listNodes({ type: "session" })
-    .filter(n => (n.metadata as any).eval && (n.metadata as any).agentRole === agentRole);
+    .map(n => ({ node: n, meta: asEvalMeta(n.metadata) }))
+    .filter(({ meta }) => meta.eval && meta.agentRole === agentRole);
 
   const now = Date.now();
   const recentCutoff = now - recentDays * 86400000;
   const baselineCutoff = now - baselineDays * 86400000;
 
-  const recent = allEvals.filter(n => new Date(n.created_at).getTime() >= recentCutoff);
-  const baseline = allEvals.filter(n => {
-    const t = new Date(n.created_at).getTime();
+  const recent = allEvals.filter(({ node }) => new Date(node.created_at).getTime() >= recentCutoff);
+  const baseline = allEvals.filter(({ node }) => {
+    const t = new Date(node.created_at).getTime();
     return t >= baselineCutoff && t < recentCutoff;
   });
 
@@ -164,14 +199,14 @@ export function detectDrift(app: AppContext, agentRole: string, recentDays: numb
     return { completionRateDelta: 0, avgCostDelta: 0, avgTurnsDelta: 0, alert: false };
   }
 
-  const recentCompletion = recent.filter(n => (n.metadata as any).completed).length / recent.length;
-  const baselineCompletion = baseline.filter(n => (n.metadata as any).completed).length / baseline.length;
+  const recentCompletion = recent.filter(({ meta }) => meta.completed).length / recent.length;
+  const baselineCompletion = baseline.filter(({ meta }) => meta.completed).length / baseline.length;
 
-  const recentCost = recent.reduce((s, n) => s + ((n.metadata as any).tokenCost ?? 0), 0) / recent.length;
-  const baselineCost = baseline.reduce((s, n) => s + ((n.metadata as any).tokenCost ?? 0), 0) / baseline.length;
+  const recentCost = recent.reduce((s, { meta }) => s + meta.tokenCost, 0) / recent.length;
+  const baselineCost = baseline.reduce((s, { meta }) => s + meta.tokenCost, 0) / baseline.length;
 
-  const recentTurns = recent.reduce((s, n) => s + ((n.metadata as any).turnCount ?? 0), 0) / recent.length;
-  const baselineTurns = baseline.reduce((s, n) => s + ((n.metadata as any).turnCount ?? 0), 0) / baseline.length;
+  const recentTurns = recent.reduce((s, { meta }) => s + meta.turnCount, 0) / recent.length;
+  const baselineTurns = baseline.reduce((s, { meta }) => s + meta.turnCount, 0) / baseline.length;
 
   const completionDelta = recentCompletion - baselineCompletion;
   const costDelta = baselineCost > 0 ? (recentCost - baselineCost) / baselineCost : 0;
@@ -193,31 +228,35 @@ export function detectDrift(app: AppContext, agentRole: string, recentDays: numb
  */
 export function listEvals(app: AppContext, agentRole?: string, limit: number = 20): AgentEvalResult[] {
   let evalNodes = app.knowledge.listNodes({ type: "session", limit: limit * 2 })
-    .filter(n => (n.metadata as any).eval);
+    .map(n => ({ node: n, meta: asEvalMeta(n.metadata) }))
+    .filter(({ meta }) => meta.eval);
 
   if (agentRole) {
-    evalNodes = evalNodes.filter(n => (n.metadata as any).agentRole === agentRole);
+    evalNodes = evalNodes.filter(({ meta }) => meta.agentRole === agentRole);
   }
 
-  return evalNodes.slice(0, limit).map(n => {
-    const meta = n.metadata as any;
-    const metrics = n.content ? JSON.parse(n.content) : {};
+  return evalNodes.slice(0, limit).map(({ node, meta }) => {
+    const metrics = node.content ? JSON.parse(node.content) as Record<string, unknown> : {};
+    const pickNum = (k: string): number => {
+      if (typeof meta[k as keyof EvalNodeMetadata] === "number") return meta[k as keyof EvalNodeMetadata] as number;
+      return typeof metrics[k] === "number" ? metrics[k] as number : 0;
+    };
     return {
-      agentRole: meta.agentRole ?? "unknown",
-      runtime: meta.runtime ?? "claude",
-      model: meta.model ?? "unknown",
-      sessionId: n.id.replace("eval:", ""),
+      agentRole: meta.agentRole,
+      runtime: meta.runtime,
+      model: meta.model,
+      sessionId: node.id.replace("eval:", ""),
       metrics: {
-        completed: meta.completed ?? false,
-        testsPassed: meta.testsPassed ?? null,
-        prCreated: meta.prCreated ?? false,
-        turnCount: meta.turnCount ?? metrics.turnCount ?? 0,
-        durationMs: meta.durationMs ?? metrics.durationMs ?? 0,
-        tokenCost: meta.tokenCost ?? metrics.tokenCost ?? 0,
-        filesChanged: meta.filesChanged ?? metrics.filesChanged ?? 0,
-        retryCount: meta.retryCount ?? metrics.retryCount ?? 0,
+        completed: meta.completed,
+        testsPassed: meta.testsPassed,
+        prCreated: meta.prCreated,
+        turnCount: pickNum("turnCount"),
+        durationMs: pickNum("durationMs"),
+        tokenCost: pickNum("tokenCost"),
+        filesChanged: pickNum("filesChanged"),
+        retryCount: pickNum("retryCount"),
       },
-      timestamp: n.created_at,
+      timestamp: node.created_at,
     };
   });
 }
