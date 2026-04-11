@@ -8,6 +8,7 @@ import * as core from "../../core/index.js";
 import { getProvider } from "../../compute/index.js";
 import { getArkClient } from "./_shared.js";
 import { ComputePoolManager } from "../../core/compute/pool.js";
+import type { ComputeProviderName } from "../../types/index.js";
 
 export function registerComputeCommands(program: Command) {
   const computeCmd = program.command("compute").description("Manage compute resources");
@@ -470,7 +471,7 @@ export function registerComputeCommands(program: Command) {
           ...configTemplates.filter(t => !dbNames.has(t.name)).map(t => ({
             name: t.name,
             description: t.description,
-            provider: t.provider as any,
+            provider: t.provider as ComputeProviderName,
             config: t.config,
           })),
         ];
@@ -506,7 +507,7 @@ export function registerComputeCommands(program: Command) {
         if (!tmpl) {
           const cfgTmpl = (app.config.computeTemplates ?? []).find(t => t.name === name);
           if (cfgTmpl) {
-            tmpl = { name: cfgTmpl.name, description: cfgTmpl.description, provider: cfgTmpl.provider as any, config: cfgTmpl.config };
+            tmpl = { name: cfgTmpl.name, description: cfgTmpl.description, provider: cfgTmpl.provider as ComputeProviderName, config: cfgTmpl.config };
           }
         }
 

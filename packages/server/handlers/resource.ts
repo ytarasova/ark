@@ -15,6 +15,7 @@ import type {
   ComputeUpdateParams,
   GroupCreateParams,
   GroupDeleteParams,
+  ComputeProviderName,
 } from "../../types/index.js";
 
 /** Kill tmux sessions for zombie ark sessions (no DB record or terminal status). */
@@ -228,14 +229,14 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (!tmpl) {
       const cfgTmpl = (app.config.computeTemplates ?? []).find(t => t.name === name);
       if (cfgTmpl) {
-        tmpl = { name: cfgTmpl.name, description: cfgTmpl.description, provider: cfgTmpl.provider as any, config: cfgTmpl.config };
+        tmpl = { name: cfgTmpl.name, description: cfgTmpl.description, provider: cfgTmpl.provider as ComputeProviderName, config: cfgTmpl.config };
       }
     }
     return tmpl ?? null;
   });
   router.handle("compute/template/create", async (p) => {
     const { name, provider, config, description } = extract<{ name: string; provider: string; config?: Record<string, unknown>; description?: string }>(p, ["name", "provider"]);
-    app.computeTemplates.create({ name, description, provider: provider as any, config: config ?? {} });
+    app.computeTemplates.create({ name, description, provider: provider as ComputeProviderName, config: config ?? {} });
     return { ok: true };
   });
   router.handle("compute/template/delete", async (p) => {
