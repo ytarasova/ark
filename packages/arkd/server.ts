@@ -229,14 +229,16 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
         if (req.method === "POST" && path.startsWith("/channel/") && !path.endsWith("/relay") && !path.endsWith("/deliver")) {
           const sessionId = path.split("/")[2]!;
           const report = await req.json() as Record<string, unknown>;
-          const result = await channelReport(sessionId, report, conductorUrl);
+          const tenantId = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
+          const result = await channelReport(sessionId, report, conductorUrl, tenantId);
           return json(result);
         }
 
         // ── Channel: relay (agent → agent via conductor) ─────────────
         if (req.method === "POST" && path === "/channel/relay") {
           const body = await req.json() as ChannelRelayReq;
-          const result = await channelRelay(body, conductorUrl);
+          const tenantId = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
+          const result = await channelRelay(body, conductorUrl, tenantId);
           return json(result);
         }
 
@@ -763,12 +765,15 @@ async function channelReport(
   sessionId: string,
   report: Record<string, unknown>,
   conductorUrl: string | null,
+  tenantId?: string | null,
 ): Promise<ChannelReportRes> {
   if (!conductorUrl) return { ok: true, forwarded: false };
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (tenantId) headers["X-Ark-Tenant-Id"] = tenantId;
     await fetch(`${conductorUrl}/api/channel/${sessionId}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(report),
     });
     return { ok: true, forwarded: true };
@@ -780,12 +785,15 @@ async function channelReport(
 async function channelRelay(
   req: ChannelRelayReq,
   conductorUrl: string | null,
+  tenantId?: string | null,
 ): Promise<ChannelRelayRes> {
   if (!conductorUrl) return { ok: true, forwarded: false };
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (tenantId) headers["X-Ark-Tenant-Id"] = tenantId;
     await fetch(`${conductorUrl}/api/relay`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(req),
     });
     return { ok: true, forwarded: true };
