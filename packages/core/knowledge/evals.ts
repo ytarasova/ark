@@ -51,8 +51,8 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
   const updated = new Date(session.updated_at).getTime();
   const durationMs = updated - created;
 
-  // Cost (from session config if available)
-  const tokenCost = (session.config as any)?.usage?.totalCost ?? 0;
+  // Cost (from usage_records)
+  const tokenCost = app.usageRecorder.getSessionCost(session.id).cost;
 
   // Files changed
   const filesChanged = ((session.config as any)?.filesChanged as string[])?.length ?? 0;

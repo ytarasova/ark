@@ -530,18 +530,18 @@ export async function advance(app: AppContext, sessionId: string, force = false)
 
     emitStageSpanEnd(sessionId, { status: "completed" });
     const s = app.sessions.get(sessionId);
-    const usage = s?.config?.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; total_cost?: number } | undefined;
+    const agg = app.usageRecorder.getSessionCost(sessionId);
     emitSessionSpanEnd(sessionId, {
       status: "completed",
-      tokens_in: usage?.input_tokens, tokens_out: usage?.output_tokens, tokens_cache: usage?.cache_read_input_tokens,
-      cost_usd: usage?.total_cost, turns: s?.config?.turns as number | undefined,
+      tokens_in: agg.input_tokens, tokens_out: agg.output_tokens, tokens_cache: agg.cache_read_tokens,
+      cost_usd: agg.cost, turns: s?.config?.turns as number | undefined,
     });
     flushSpans();
 
     // Extract skills from completed session transcript
     try {
-      const { extractAndSaveSkills } = await import("../skill-extractor.js");
-      const { getSessionConversation } = await import("../search.js");
+      const { extractAndSaveSkills } = await import("../agent/skill-extractor.js");
+      const { getSessionConversation } = await import("../search/search.js");
       const conv = getSessionConversation(app, sessionId);
       if (conv.length > 0) {
         const turns = conv.map((c) => ({ role: c.role === "message" ? "user" : "assistant", content: c.content }));
@@ -1859,7 +1859,7 @@ export async function send(app: AppContext, sessionId: string, message: string):
 export async function detectStatus(app: AppContext, sessionId: string): Promise<string | null> {
   const session = app.sessions.get(sessionId);
   if (!session?.session_id) return null;
-  const { detectSessionStatus } = await import("../status-detect.js");
+  const { detectSessionStatus } = await import("../observability/status-detect.js");
   const detected = await detectSessionStatus(session.session_id);
   return detected === "unknown" ? null : detected;
 }
@@ -1874,14 +1874,6 @@ export interface HookStatusResult {
   updates?: Partial<Session>;
   /** Events to log */
   events?: Array<{ type: string; opts: { actor?: string; stage?: string; data?: Record<string, unknown> } }>;
-  /** Usage data parsed from transcript (Claude-shaped; kept for backward compat with existing callers) */
-  usage?: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens: number;
-    cache_creation_input_tokens: number;
-    total_tokens: number;
-  };
   /** Transcript indexing info */
   indexTranscript?: { transcriptPath: string; sessionId: string };
 }
@@ -1974,7 +1966,7 @@ export function applyHookStatus(app: AppContext,
         const ctx: TerminationContext = {
           session,
           turnCount: (session.config?.turns as number | undefined) ?? 0,
-          tokenCount: ((session.config?.usage as { total_tokens?: number } | undefined)?.total_tokens) ?? 0,
+          tokenCount: app.usageRecorder.getSessionCost(session.id).total_tokens,
           elapsedMs: Date.now() - new Date(session.updated_at).getTime(),
           lastOutput: "",
         };
@@ -1995,13 +1987,6 @@ export function applyHookStatus(app: AppContext,
         const { usage } = parser.parse(transcriptPath);
         const total = usage.input_tokens + usage.output_tokens + (usage.cache_read_tokens ?? 0) + (usage.cache_write_tokens ?? 0);
         if (total > 0) {
-          result.usage = {
-            input_tokens: usage.input_tokens,
-            output_tokens: usage.output_tokens,
-            cache_read_input_tokens: usage.cache_read_tokens ?? 0,
-            cache_creation_input_tokens: usage.cache_write_tokens ?? 0,
-            total_tokens: total,
-          };
           recordSessionUsage(app, session, usage, "anthropic", "transcript");
         }
       }

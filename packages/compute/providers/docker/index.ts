@@ -20,6 +20,7 @@ import type {
 } from "../../types.js";
 import type { Compute, Session } from "../../../types/index.js";
 import type { AppContext } from "../../../core/app.js";
+import { tmuxBin } from "../../../core/infra/tmux.js";
 import { buildDevcontainer, detectDevcontainer } from "./devcontainer.js";
 import {
   pullImage, createContainer, startContainer, stopContainer, removeContainer, DEFAULT_IMAGE,
@@ -177,7 +178,7 @@ export class DockerProvider implements ComputeProvider {
   // ── Launch ───────────────────────────────────────────────────────────────
 
   async launch(_compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
-    const { createSessionAsync, writeLauncher } = await import("../../../core/tmux.js");
+    const { createSessionAsync, writeLauncher } = await import("../../../core/infra/tmux.js");
 
     const cfg = _compute.config as Record<string, unknown>;
     const name = (cfg.container_name as string) || containerName(_compute.name);
@@ -210,13 +211,13 @@ export class DockerProvider implements ComputeProvider {
 
   async killAgent(_compute: Compute, session: Session): Promise<void> {
     if (!session.session_id) return;
-    const { killSessionAsync } = await import("../../../core/tmux.js");
+    const { killSessionAsync } = await import("../../../core/infra/tmux.js");
     await killSessionAsync(session.session_id);
   }
 
   async captureOutput(_compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
     if (!session.session_id) return "";
-    const { capturePaneAsync } = await import("../../../core/tmux.js");
+    const { capturePaneAsync } = await import("../../../core/infra/tmux.js");
     return capturePaneAsync(session.session_id, opts);
   }
 
@@ -381,13 +382,13 @@ export class DockerProvider implements ComputeProvider {
   }
 
   async checkSession(_compute: Compute, tmuxSessionId: string): Promise<boolean> {
-    const { sessionExistsAsync } = await import("../../../core/tmux.js");
+    const { sessionExistsAsync } = await import("../../../core/infra/tmux.js");
     return sessionExistsAsync(tmuxSessionId);
   }
 
   getAttachCommand(_compute: Compute, session: Session): string[] {
     if (!session.session_id) return [];
-    return ["tmux", "attach", "-t", session.session_id];
+    return [tmuxBin(), "attach", "-t", session.session_id];
   }
 
   buildChannelConfig(sessionId: string, stage: string, channelPort: number, _opts?: { conductorUrl?: string }): Record<string, unknown> {

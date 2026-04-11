@@ -58,9 +58,9 @@ class SocketProxy {
     if (this.status === "running") return;
     this.status = "starting";
 
-    // Clean up stale socket
+    // Clean up stale socket (may not exist or be owned by another process; re-listen will error visibly below)
     if (existsSync(this.socketPath)) {
-      try { unlinkSync(this.socketPath); } catch { /* ignore */ }
+      try { unlinkSync(this.socketPath); } catch { /* stale socket may vanish between existsSync and unlinkSync */ }
     }
 
     // Start MCP process
@@ -183,7 +183,7 @@ class SocketProxy {
     this.status = "stopped";
 
     for (const client of this.clients) {
-      try { client.destroy(); } catch { /* ignore */ }
+      try { client.destroy(); } catch { /* client already destroyed/errored; nothing to do */ }
     }
     this.clients.clear();
     this.requestMap.clear();
@@ -204,7 +204,7 @@ class SocketProxy {
     }
 
     if (existsSync(this.socketPath)) {
-      try { unlinkSync(this.socketPath); } catch { /* ignore */ }
+      try { unlinkSync(this.socketPath); } catch { /* shutdown cleanup; stale socket is harmless */ }
     }
   }
 
@@ -226,7 +226,7 @@ class SocketProxy {
 
   private safeWrite(socket: Socket, data: string): void {
     try { if (!socket.destroyed) socket.write(data); }
-    catch { /* ignore */ }
+    catch { /* socket may race-close between the destroyed check and write */ }
   }
 }
 

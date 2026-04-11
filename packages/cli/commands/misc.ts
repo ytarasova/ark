@@ -35,7 +35,7 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
     .description("Show session bound to a PR URL")
     .argument("<pr-url>", "GitHub PR URL")
     .action(async (prUrl) => {
-      const { findSessionByPR } = await import("../../core/github-pr.js");
+      const { findSessionByPR } = await import("../../core/integrations/github-pr.js");
       const { getApp } = await import("../../core/app.js");
       const session = findSessionByPR(getApp(), prUrl);
       if (!session) {
@@ -57,7 +57,7 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
     .option("-d, --dispatch", "Auto-dispatch created sessions")
     .option("-i, --interval <ms>", "Poll interval in ms", "60000")
     .action(async (opts) => {
-      const { startIssuePoller } = await import("../../core/issue-poller.js");
+      const { startIssuePoller } = await import("../../core/integrations/issue-poller.js");
       const label = opts.label;
       const intervalMs = parseInt(opts.interval, 10);
 
@@ -173,7 +173,7 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
   program.command("channel")
     .description("Run the MCP channel server (used by remote agents)")
     .action(async () => {
-      await import("../../core/channel.js");
+      await import("../../core/conductor/channel.js");
     });
 
   // ── Auth is registered via commands/auth.ts (API keys + Claude setup) ──────
@@ -423,7 +423,7 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
       if (remoteUrl) {
         // Proxy mode: forward /api/* to remote control plane
-        const { startWebProxy } = await import("../../core/web-proxy.js");
+        const { startWebProxy } = await import("../../core/hosted/web-proxy.js");
         const proxy = startWebProxy({
           port: Number(opts.port),
           remoteUrl,
@@ -513,7 +513,7 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       // Hosted mode: start the full control plane with worker registry + scheduler
       if (opts.hosted) {
         const { loadConfig } = await import("../../core/config.js");
-        const { startHostedServer } = await import("../../core/hosted.js");
+        const { startHostedServer } = await import("../../core/hosted/index.js");
 
         const config = loadConfig();
         const webPort = parseInt(opts.port) || 8420;

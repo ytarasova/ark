@@ -92,13 +92,36 @@ export class UsageRecorder {
     );
   }
 
-  /** Get total cost and all records for a session. */
-  getSessionCost(sessionId: string): { cost: number; records: UsageRecord[] } {
+  /** Get total cost, aggregated token totals, and all records for a session. */
+  getSessionCost(sessionId: string): {
+    cost: number;
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_tokens: number;
+    cache_write_tokens: number;
+    total_tokens: number;
+    records: UsageRecord[];
+  } {
     const records = this.db.prepare(
       "SELECT * FROM usage_records WHERE session_id = ? ORDER BY created_at",
     ).all(sessionId) as UsageRecord[];
-    const cost = records.reduce((s, r) => s + r.cost_usd, 0);
-    return { cost, records };
+    let cost = 0, input = 0, output = 0, cacheR = 0, cacheW = 0;
+    for (const r of records) {
+      cost += r.cost_usd;
+      input += r.input_tokens;
+      output += r.output_tokens;
+      cacheR += r.cache_read_tokens;
+      cacheW += r.cache_write_tokens;
+    }
+    return {
+      cost,
+      input_tokens: input,
+      output_tokens: output,
+      cache_read_tokens: cacheR,
+      cache_write_tokens: cacheW,
+      total_tokens: input + output,
+      records,
+    };
   }
 
   /** Get cost summary with multi-dimensional grouping. */

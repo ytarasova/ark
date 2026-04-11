@@ -63,7 +63,12 @@ export interface TmuxSession {
   alive: boolean;
 }
 
-/** Check if tmux is available (sync — one-shot startup check) */
+// Probe-style helpers below treat the tmux command failing as "no" -- that's
+// the authoritative signal (tmux exits non-zero when the session is missing
+// or the binary is absent). We don't log here because a probe's job is to
+// answer a yes/no question.
+
+/** Check if tmux is available (sync - one-shot startup check) */
 export function hasTmux(): boolean {
   try {
     execFileSync(tmuxBin(), ["-V"], { stdio: "pipe" });
@@ -73,7 +78,7 @@ export function hasTmux(): boolean {
   }
 }
 
-/** Check if a tmux session exists (sync — fast guard) */
+/** Check if a tmux session exists (sync - fast guard) */
 export function sessionExists(name: string): boolean {
   try {
     execFileSync(tmuxBin(), ["has-session", "-t", name], { stdio: "pipe" });
@@ -93,7 +98,7 @@ export async function sessionExistsAsync(name: string): Promise<boolean> {
   }
 }
 
-/** Kill a tmux session (sync — fast, used in cleanup) */
+/** Kill a tmux session (sync - fast, used in cleanup). Returns false if the session was already gone. */
 export function killSession(name: string): boolean {
   try {
     execFileSync(tmuxBin(), ["kill-session", "-t", name], { stdio: "pipe" });
@@ -170,7 +175,7 @@ export async function sendTextAsync(name: string, text: string): Promise<void> {
     await execFileAsync(tmuxBin(), ["paste-buffer", "-b", "ark-msg", "-t", name]);
     await execFileAsync(tmuxBin(), ["send-keys", "-t", name, "Enter"]);
   } finally {
-    try { unlinkSync(tmpFile); } catch { /* ignore */ }
+    try { unlinkSync(tmpFile); } catch { /* OS tmpdir cleanup is acceptable fallback */ }
   }
 }
 

@@ -1,9 +1,13 @@
 /**
- * Auto-update check — looks for newer versions on GitHub.
+ * Auto-update check -- looks for newer versions on GitHub.
+ *
+ * This is a best-effort background check. Errors (network, parse, disk)
+ * are swallowed: a failed update check MUST NOT block the user from running
+ * Ark. The caller treats `null` as "no update available / couldn't check".
  */
 
 const REPO = process.env.ARK_GITHUB_REPO ?? "yana/ark";
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
@@ -18,7 +22,7 @@ function statePath(arkDir: string): string {
   return join(arkDir, "update-check.json");
 }
 
-/** Get the current version from package.json. */
+/** Get the current version from package.json. Falls back to 0.0.0 when run from a compiled bundle without the file. */
 export function getCurrentVersion(): string {
   try {
     const pkg = JSON.parse(readFileSync(join(__dirname, "../../package.json"), "utf-8"));
@@ -35,7 +39,6 @@ export async function checkForUpdate(arkDir?: string): Promise<string | null> {
     const path = statePath(arkDir);
     const current = getCurrentVersion();
 
-    // Rate limit checks
     if (existsSync(path)) {
       const state: UpdateState = JSON.parse(readFileSync(path, "utf-8"));
       const elapsed = Date.now() - new Date(state.lastCheck).getTime();
@@ -44,7 +47,6 @@ export async function checkForUpdate(arkDir?: string): Promise<string | null> {
       }
     }
 
-    // Check GitHub releases
     const resp = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
       headers: { "User-Agent": "ark-update-check" },
     });
@@ -53,7 +55,6 @@ export async function checkForUpdate(arkDir?: string): Promise<string | null> {
     const data = await resp.json() as { tag_name: string };
     const latest = data.tag_name?.replace(/^v/, "") ?? null;
 
-    // Save state
     writeFileSync(path, JSON.stringify({
       lastCheck: new Date().toISOString(),
       latestVersion: latest,
@@ -62,6 +63,7 @@ export async function checkForUpdate(arkDir?: string): Promise<string | null> {
 
     return latest && latest !== current ? latest : null;
   } catch {
+    // Best-effort: any failure (offline, stale cache, disk full) means "don't show an update banner".
     return null;
   }
 }

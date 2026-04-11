@@ -257,14 +257,12 @@ describe("E2E: Token usage stored on hook", () => {
 
     const updated = app.sessions.get(session.id);
     expect(updated).toBeTruthy();
-    const config = typeof updated!.config === "string"
-      ? JSON.parse(updated!.config) : updated!.config;
-    expect(config.usage).toBeDefined();
-    expect(config.usage.input_tokens).toBe(3000);   // 1000 + 2000
-    expect(config.usage.output_tokens).toBe(1300);   // 500 + 800
-    expect(config.usage.cache_read_input_tokens).toBe(8000);  // 5000 + 3000
-    expect(config.usage.cache_creation_input_tokens).toBe(150); // 100 + 50
-    expect(config.usage.total_tokens).toBe(12450);   // 3000 + 1300 + 8000 + 150
+    const agg = app.usageRecorder.getSessionCost(session.id);
+    expect(agg.input_tokens).toBe(3000);   // 1000 + 2000
+    expect(agg.output_tokens).toBe(1300);   // 500 + 800
+    expect(agg.cache_read_tokens).toBe(8000);  // 5000 + 3000
+    expect(agg.cache_write_tokens).toBe(150); // 100 + 50
+    expect(agg.total_tokens).toBe(4300); // input + output
   });
 });
 

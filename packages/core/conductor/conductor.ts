@@ -90,7 +90,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   if (event === "PreToolUse") {
     const toolName = String(payload.tool_name ?? "");
     const toolInput = (payload.tool_input ?? {}) as Record<string, any>;
-    const { evaluateToolCall } = await import("./guardrails.js");
+    const { evaluateToolCall } = await import("../session/guardrails.js");
     const evalResult = evaluateToolCall(toolName, toolInput);
 
     if (evalResult.action === "block") {
@@ -138,16 +138,11 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
       // Record eval in knowledge graph
       try {
-        const { evaluateSession } = await import("./knowledge/evals.js");
+        const { evaluateSession } = await import("../knowledge/evals.js");
         const freshSession = _app.sessions.get(sessionId);
         if (freshSession) evaluateSession(_app, freshSession);
       } catch { /* skip eval on error */ }
     }
-  }
-
-  // Apply usage data
-  if (result.usage) {
-    _app.sessions.mergeConfig(sessionId, { usage: result.usage });
   }
 
   // Index transcript
@@ -645,7 +640,7 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
   // Index session completion in knowledge graph (best-effort)
   if (report.type === "completed" && _app.knowledge) {
     try {
-      const { indexSessionCompletion } = await import("./knowledge/indexer.js");
+      const { indexSessionCompletion } = await import("../knowledge/indexer.js");
       const s = _app.sessions.get(sessionId);
       const changedFiles = ((report as any).filesChanged as string[]) ?? [];
       indexSessionCompletion(
@@ -663,7 +658,7 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
     const s = _app.sessions.get(sessionId);
     if (s && !s.pr_url && s.config?.github_url && s.branch) {
       // Check repo config for auto_pr override (defaults to true)
-      const { loadRepoConfig } = await import("./repo-config.js");
+      const { loadRepoConfig } = await import("../repo-config.js");
       const repoConfig = s.workdir ? loadRepoConfig(s.workdir) : {};
       const autoPR = repoConfig.auto_pr !== false;
 

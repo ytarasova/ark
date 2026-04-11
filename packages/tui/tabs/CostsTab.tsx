@@ -78,11 +78,11 @@ export function CostsTab({ pane }: CostsTabProps) {
             <Text>Model:   {selected.model ?? "unknown"}</Text>
             {selected.usage && (
               <>
-                <Text>Tokens:  {(selected.usage.total_tokens / 1000).toFixed(1)}K</Text>
+                <Text>Tokens:  {((selected.usage.input_tokens + selected.usage.output_tokens) / 1000).toFixed(1)}K</Text>
                 <Text>  Input:  {(selected.usage.input_tokens / 1000).toFixed(1)}K</Text>
                 <Text>  Output: {(selected.usage.output_tokens / 1000).toFixed(1)}K</Text>
-                {selected.usage.cache_read_input_tokens > 0 && (
-                  <Text>  Cache:  {(selected.usage.cache_read_input_tokens / 1000).toFixed(1)}K</Text>
+                {(selected.usage.cache_read_tokens ?? 0) > 0 && (
+                  <Text>  Cache:  {((selected.usage.cache_read_tokens ?? 0) / 1000).toFixed(1)}K</Text>
                 )}
               </>
             )}

@@ -127,7 +127,7 @@ build_linux() {
   local BUILD_SCRIPT
   BUILD_SCRIPT=$(cat <<'EOF'
 set -eu
-apk add --no-cache build-base libevent-dev libevent-static ncurses-dev ncurses-static curl tar
+apk add --no-cache build-base libevent-dev libevent-static ncurses-dev ncurses-static byacc bison curl tar
 cd /tmp
 curl -fsSL "https://github.com/tmux/tmux/releases/download/TMUX_VERSION/tmux-TMUX_VERSION.tar.gz" -o tmux.tar.gz
 tar -xf tmux.tar.gz

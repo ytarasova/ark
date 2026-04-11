@@ -2,17 +2,8 @@ export type SessionStatus =
   | "pending" | "ready" | "running" | "waiting"
   | "stopped" | "blocked" | "completed" | "failed" | "deleting" | "archived";
 
-export interface SessionUsage {
-  input_tokens?: number;
-  output_tokens?: number;
-  total_tokens?: number;
-  cache_read_input_tokens?: number;
-  total_cost?: number;
-}
-
 export interface SessionConfig {
   // Runtime
-  usage?: SessionUsage;
   turns?: number;
   model_override?: string;
   completion_summary?: string;

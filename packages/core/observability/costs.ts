@@ -42,21 +42,20 @@ export interface SessionCostSummary {
 
 /** Get cost info for a single session from UsageRecorder. */
 export function getSessionCost(app: AppContext, session: Session): SessionCostSummary {
-  const { cost, records } = app.usageRecorder.getSessionCost(session.id);
-  // Use the first record's model/tokens as a summary; multiple models per session possible
-  const first = records[0];
+  const agg = app.usageRecorder.getSessionCost(session.id);
+  const first = agg.records[0];
   const usage: TokenUsage | null = first ? {
-    input_tokens: records.reduce((s, r) => s + r.input_tokens, 0),
-    output_tokens: records.reduce((s, r) => s + r.output_tokens, 0),
-    cache_read_tokens: records.reduce((s, r) => s + (r.cache_read_tokens ?? 0), 0),
-    cache_write_tokens: records.reduce((s, r) => s + (r.cache_write_tokens ?? 0), 0),
+    input_tokens: agg.input_tokens,
+    output_tokens: agg.output_tokens,
+    cache_read_tokens: agg.cache_read_tokens,
+    cache_write_tokens: agg.cache_write_tokens,
   } : null;
   return {
     sessionId: session.id,
     summary: session.summary,
     model: first?.model ?? session.agent ?? null,
     usage,
-    cost,
+    cost: agg.cost,
   };
 }
 

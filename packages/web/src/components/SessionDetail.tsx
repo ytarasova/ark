@@ -118,6 +118,10 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
   const [verifyResult, setVerifyResult] = useState<any>(null);
   const [flowStages, setFlowStages] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [cost, setCost] = useState<{
+    cost: number; input_tokens: number; output_tokens: number;
+    cache_read_tokens: number; total_tokens: number;
+  } | null>(null);
 
   // Load todos
   useEffect(() => {
@@ -138,6 +142,12 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
     if (!sessionId) return;
     api.getSession(sessionId).then(setDetail);
   }, [sessionId]);
+
+  // Load session cost from usage_records
+  useEffect(() => {
+    if (!sessionId) { setCost(null); return; }
+    api.getSessionCost(sessionId).then(setCost).catch(() => setCost(null));
+  }, [sessionId, detail?.session?.updated_at]);
 
   // Load flow stages for pipeline visualization
   useEffect(() => {
@@ -397,39 +407,27 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         )}
 
         {/* Token Usage & Cost */}
-        {s.config?.usage && (
+        {cost && cost.total_tokens > 0 && (
           <div className="mb-5">
             <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Usage</h3>
             <Separator className="mb-2" />
             <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1.5 text-[13px]">
-              {s.config.usage.input_tokens != null && (
-                <>
-                  <span className="text-muted-foreground">Input tokens</span>
-                  <span className="text-card-foreground font-mono">{humanTokens(s.config.usage.input_tokens)}</span>
-                </>
-              )}
-              {s.config.usage.output_tokens != null && (
-                <>
-                  <span className="text-muted-foreground">Output tokens</span>
-                  <span className="text-card-foreground font-mono">{humanTokens(s.config.usage.output_tokens)}</span>
-                </>
-              )}
-              {s.config.usage.cache_read_input_tokens != null && (
+              <span className="text-muted-foreground">Input tokens</span>
+              <span className="text-card-foreground font-mono">{humanTokens(cost.input_tokens)}</span>
+              <span className="text-muted-foreground">Output tokens</span>
+              <span className="text-card-foreground font-mono">{humanTokens(cost.output_tokens)}</span>
+              {cost.cache_read_tokens > 0 && (
                 <>
                   <span className="text-muted-foreground">Cache read</span>
-                  <span className="text-card-foreground font-mono">{humanTokens(s.config.usage.cache_read_input_tokens)}</span>
+                  <span className="text-card-foreground font-mono">{humanTokens(cost.cache_read_tokens)}</span>
                 </>
               )}
-              {s.config.usage.total_tokens != null && (
-                <>
-                  <span className="text-muted-foreground">Total tokens</span>
-                  <span className="text-card-foreground font-mono">{humanTokens(s.config.usage.total_tokens)}</span>
-                </>
-              )}
-              {s.config.usage.total_cost != null && s.config.usage.total_cost > 0 && (
+              <span className="text-muted-foreground">Total tokens</span>
+              <span className="text-card-foreground font-mono">{humanTokens(cost.total_tokens)}</span>
+              {cost.cost > 0 && (
                 <>
                   <span className="text-muted-foreground">Cost</span>
-                  <span className="text-amber-400 font-mono">{fmtCost(s.config.usage.total_cost)}</span>
+                  <span className="text-amber-400 font-mono">{fmtCost(cost.cost)}</span>
                 </>
               )}
             </div>

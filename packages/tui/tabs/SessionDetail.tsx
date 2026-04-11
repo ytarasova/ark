@@ -8,26 +8,7 @@ import type { InkColor } from "../helpers/colors.js";
 import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter } from "../helpers/sessionFormatting.js";
-import { calculateCost, formatCost } from "../../core/observability/costs.js";
-
-/**
- * TUI-local cost computation from the legacy session.config.usage field.
- * The authoritative cost data lives in usage_records (server-side); this is
- * a lightweight display helper for the detail pane that only reads the
- * per-session payload the TUI already has.
- */
-function computeLocalSessionCost(session: Session): { cost: number; usage: any; model: string | null } {
-  const usage = (session.config as any)?.usage ?? null;
-  const model = ((session.config as any)?.model as string) ?? session.agent ?? null;
-  if (!usage) return { cost: 0, usage: null, model };
-  const cost = calculateCost({
-    input_tokens: usage.input_tokens ?? 0,
-    output_tokens: usage.output_tokens ?? 0,
-    cache_read_tokens: usage.cache_read_input_tokens ?? 0,
-    cache_write_tokens: usage.cache_creation_input_tokens ?? 0,
-  }, model);
-  return { cost, usage, model };
-}
+import { formatCost } from "../../core/observability/costs.js";
 import * as flow from "../../core/state/flow.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
@@ -207,7 +188,23 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
     if (!s) return 0;
     return 19200 + (parseInt(s.id.replace("s-", ""), 16) % 10000);
   }, [s?.id]);
-  const costInfo = useMemo(() => s ? computeLocalSessionCost(s) : null, [s?.id, s?.config]);
+  const [costInfo, setCostInfo] = useState<{
+    cost: number;
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_tokens: number;
+    total_tokens: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!s) { setCostInfo(null); return; }
+    ark.costsSession(s.id).then(r => setCostInfo({
+      cost: r.cost,
+      input_tokens: r.input_tokens,
+      output_tokens: r.output_tokens,
+      cache_read_tokens: r.cache_read_tokens,
+      total_tokens: r.total_tokens,
+    })).catch(() => setCostInfo(null));
+  }, [s?.id, s?.updated_at]);
 
   // Sort search results by timestamp
   const sortedSearchResults = useMemo(() => {
@@ -253,19 +250,12 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
     return counts;
   }, [sessions]);
 
-  const todayCost = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayIso = today.toISOString();
-    let total = 0;
-    for (const sess of sessions) {
-      if ((sess.updated_at ?? "") >= todayIso) {
-        const ci = computeLocalSessionCost(sess);
-        total += ci.cost;
-      }
-    }
-    return total;
-  }, [sessions]);
+  const [todayCost, setTodayCost] = useState(0);
+  useEffect(() => {
+    ark.dashboardSummary()
+      .then((d: any) => setTodayCost(d?.costs?.today ?? 0))
+      .catch(() => setTodayCost(0));
+  }, [sessions.length]);
 
   const [recentEvts, setRecentEvts] = useState<Event[]>([]);
   useEffect(() => {
@@ -442,8 +432,8 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
       )}
 
       {/* Token usage */}
-      {formatTokenDisplay(s) && (
-        <KeyValue label="Tokens">{formatTokenDisplay(s)}</KeyValue>
+      {formatTokenDisplay(costInfo) && (
+        <KeyValue label="Tokens">{formatTokenDisplay(costInfo)}</KeyValue>
       )}
       {costInfo && costInfo.cost > 0 && (
         <KeyValue label="Cost">{formatCost(costInfo.cost)}</KeyValue>

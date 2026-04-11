@@ -19,7 +19,7 @@ import type {
 
 /** Kill tmux sessions for zombie ark sessions (no DB record or terminal status). */
 async function cleanZombieSessions(app: AppContext): Promise<number> {
-  const { listArkSessionsAsync, killSessionAsync } = await import("../../core/tmux.js");
+  const { listArkSessionsAsync, killSessionAsync } = await import("../../core/infra/tmux.js");
   const tmuxSessions = await listArkSessionsAsync();
   let cleaned = 0;
   for (const ts of tmuxSessions) {

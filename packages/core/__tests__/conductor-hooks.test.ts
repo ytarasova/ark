@@ -189,11 +189,10 @@ describe("Conductor /hooks/status endpoint", () => {
     expect(updated!.error).toContain("max_output_tokens");
   });
 
-  it("Stop with transcript_path stores token usage on session config", async () => {
+  it("Stop with transcript_path records token usage in usage_records", async () => {
     const session = getApp().sessions.create({ summary: "test" });
     getApp().sessions.update(session.id, { status: "running" });
 
-    // Write a fake transcript
     const { writeFileSync: wf } = await import("fs");
     const { join: j } = await import("path");
     const transcriptPath = j(getCtx().arkDir, "transcript-stop.jsonl");
@@ -207,15 +206,13 @@ describe("Conductor /hooks/status endpoint", () => {
       transcript_path: transcriptPath,
     });
 
-    const updated = getApp().sessions.get(session.id);
-    const config = typeof updated!.config === "string" ? JSON.parse(updated!.config) : updated!.config;
-    expect(config.usage).toBeDefined();
-    expect(config.usage.input_tokens).toBe(3000);
-    expect(config.usage.output_tokens).toBe(1300);
-    expect(config.usage.total_tokens).toBe(12450);
+    const agg = getApp().usageRecorder.getSessionCost(session.id);
+    expect(agg.input_tokens).toBe(3000);
+    expect(agg.output_tokens).toBe(1300);
+    expect(agg.cache_read_tokens).toBe(8000);
   });
 
-  it("SessionEnd with transcript_path stores final token usage", async () => {
+  it("SessionEnd with transcript_path records final token usage", async () => {
     const session = getApp().sessions.create({ summary: "test" });
     getApp().sessions.update(session.id, { status: "running" });
 
@@ -230,10 +227,9 @@ describe("Conductor /hooks/status endpoint", () => {
       reason: "prompt_input_exit",
     });
 
-    const updated = getApp().sessions.get(session.id);
-    const config = typeof updated!.config === "string" ? JSON.parse(updated!.config) : updated!.config;
-    expect(config.usage).toBeDefined();
-    expect(config.usage.input_tokens).toBe(500);
+    const agg = getApp().usageRecorder.getSessionCost(session.id);
+    expect(agg.input_tokens).toBe(500);
+    expect(agg.output_tokens).toBe(200);
   });
 
   it("hook without transcript_path skips usage tracking", async () => {
@@ -242,9 +238,8 @@ describe("Conductor /hooks/status endpoint", () => {
 
     await postHook(session.id, { hook_event_name: "Stop" });
 
-    const updated = getApp().sessions.get(session.id);
-    const config = typeof updated!.config === "string" ? JSON.parse(updated!.config) : updated!.config;
-    expect(config.usage).toBeUndefined();
+    const agg = getApp().usageRecorder.getSessionCost(session.id);
+    expect(agg.records.length).toBe(0);
   });
 
   it("UserPromptSubmit does not override completed status", async () => {

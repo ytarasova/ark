@@ -355,7 +355,7 @@ export class AppContext {
     let db: IDatabase;
     const dbUrl = this.config.databaseUrl;
     if (dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
-      const { PostgresAdapter } = await import("./database-postgres.js");
+      const { PostgresAdapter } = await import("./database/postgres.js");
       db = new PostgresAdapter(dbUrl);
     } else {
       const rawDb = new Database(this.config.dbPath);
@@ -555,7 +555,7 @@ export class AppContext {
 
     // 10. Detect orphaned sessions (crashed while running)
     await safeAsync("boot: detect orphaned sessions", async () => {
-      const { findOrphanedSessions } = await import("./checkpoint.js");
+      const { findOrphanedSessions } = await import("./session/checkpoint.js");
       const orphaned = findOrphanedSessions(this);
       if (orphaned.length > 0) {
         this._orphanedSessions = orphaned;
@@ -589,7 +589,7 @@ export class AppContext {
 
     // 14. Clean up logs on boot (non-blocking)
     safeAsync("boot: cleanup logs", async () => {
-      const { cleanupLogs } = await import("./log-manager.js");
+      const { cleanupLogs } = await import("./observability/log-manager.js");
       cleanupLogs(this);
     });
 
@@ -607,7 +607,7 @@ export class AppContext {
             if (sid) {
               const session = this.sessions.get(sid);
               if (!session || !["running", "waiting"].includes(session.status)) {
-                const { removeHooksConfig } = await import("./claude.js");
+                const { removeHooksConfig } = await import("./claude/claude.js");
                 removeHooksConfig(cwd);
               }
             }
@@ -618,7 +618,7 @@ export class AppContext {
 
     // 16. Detect stale running sessions (tmux died while TUI was closed)
     await safeAsync("boot: detect stale sessions", async () => {
-      const { sessionExistsAsync } = await import("./tmux.js");
+      const { sessionExistsAsync } = await import("./infra/tmux.js");
       const running = this.sessions.list({ status: "running" });
       for (const s of running) {
         if (s.session_id && !(await sessionExistsAsync(s.session_id))) {

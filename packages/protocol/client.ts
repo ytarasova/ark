@@ -480,6 +480,11 @@ export class ArkClient {
 
   async costsSession(sessionId: string): Promise<{
     cost: number;
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_tokens: number;
+    cache_write_tokens: number;
+    total_tokens: number;
     records: Array<{
       id: number; session_id: string; tenant_id: string; model: string; provider: string;
       runtime: string | null; agent_role: string | null;

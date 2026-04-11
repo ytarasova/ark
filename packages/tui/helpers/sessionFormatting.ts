@@ -7,11 +7,17 @@ import { humanTokens } from "../helpers.js";
 /** Accepts a full Session or a partial object (for tests that pass bare `{}`). */
 type SessionLike = { config?: Partial<SessionConfig> };
 
-/** Format token usage into a display string, or null if no usage data. */
-export function formatTokenDisplay(session: SessionLike): string | null {
-  const u = session.config?.usage;
-  if (!u) return null;
-  return `${humanTokens(u.total_tokens ?? 0)} (in:${humanTokens(u.input_tokens ?? 0)} out:${humanTokens(u.output_tokens ?? 0)} cache:${humanTokens(u.cache_read_input_tokens ?? 0)})`;
+export interface TokenTotals {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  total_tokens: number;
+}
+
+/** Format token totals (from usage_records aggregation) into a display string. */
+export function formatTokenDisplay(totals: TokenTotals | null): string | null {
+  if (!totals || totals.total_tokens === 0) return null;
+  return `${humanTokens(totals.total_tokens)} (in:${humanTokens(totals.input_tokens)} out:${humanTokens(totals.output_tokens)} cache:${humanTokens(totals.cache_read_tokens)})`;
 }
 
 export interface FileLink {

@@ -318,7 +318,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/export", async (params) => {
     const { sessionId, filePath } = extract<{ sessionId: string; filePath?: string }>(params, ["sessionId"]);
-    const { exportSession, exportSessionToFile } = await import("../../core/session-share.js");
+    const { exportSession, exportSessionToFile } = await import("../../core/session/share.js");
     if (filePath) {
       const ok = exportSessionToFile(app, sessionId, filePath);
       return { ok, filePath };

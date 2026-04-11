@@ -91,6 +91,10 @@ export const api = {
 
   // Costs
   getCosts: () => rpc<{ costs: any[]; total: number }>("costs/read").then(r => ({ sessions: r.costs, total: r.total })),
+  getSessionCost: (id: string) => rpc<{
+    cost: number; input_tokens: number; output_tokens: number;
+    cache_read_tokens: number; cache_write_tokens: number; total_tokens: number;
+  }>("costs/session", { sessionId: id }),
   exportCosts: (format: string) => rpc<any>("cost/export", { format }),
 
   // Search

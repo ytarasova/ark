@@ -114,7 +114,7 @@ export async function processReviewFeedback(
 
     // Advance the review gate
     try {
-      const { approveReviewGate } = await import("./services/session-orchestration.js");
+      const { approveReviewGate } = await import("../services/session-orchestration.js");
       await approveReviewGate(app, session.id);
     } catch { /* gate may already be advanced */ }
     return;
@@ -146,7 +146,7 @@ export async function processReviewFeedback(
   const channelPort = app.sessions.channelPort(session.id);
   const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
   const delivered = await safeAsync(`pr-poller: deliverToChannel for ${session.id}`, async () => {
-    const { deliverToChannel } = await import("./conductor.js");
+    const { deliverToChannel } = await import("../conductor/conductor.js");
     await deliverToChannel(session, channelPort, steerPayload);
   });
   if (delivered) return;

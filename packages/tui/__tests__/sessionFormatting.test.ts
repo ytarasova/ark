@@ -11,24 +11,18 @@ import {
 } from "../helpers/sessionFormatting.js";
 
 describe("formatTokenDisplay", () => {
-  it("returns null for sessions without usage", () => {
-    expect(formatTokenDisplay({})).toBeNull();
-    expect(formatTokenDisplay({ config: {} })).toBeNull();
-    expect(formatTokenDisplay({ config: { usage: null } })).toBeNull();
+  it("returns null for missing totals or zero tokens", () => {
+    expect(formatTokenDisplay(null)).toBeNull();
+    expect(formatTokenDisplay({ total_tokens: 0, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0 })).toBeNull();
   });
 
-  it("formats tokens correctly with cost", () => {
-    const session = {
-      config: {
-        usage: {
-          total_tokens: 150000,
-          input_tokens: 100000,
-          output_tokens: 50000,
-          cache_read_input_tokens: 80000,
-        },
-      },
-    };
-    const result = formatTokenDisplay(session)!;
+  it("formats tokens correctly", () => {
+    const result = formatTokenDisplay({
+      total_tokens: 150000,
+      input_tokens: 100000,
+      output_tokens: 50000,
+      cache_read_tokens: 80000,
+    })!;
     expect(result).toContain("150.0K");
     expect(result).toContain("in:100.0K");
     expect(result).toContain("out:50.0K");
@@ -36,32 +30,23 @@ describe("formatTokenDisplay", () => {
   });
 
   it("handles zero cache tokens", () => {
-    const session = {
-      config: {
-        usage: {
-          total_tokens: 5000,
-          input_tokens: 3000,
-          output_tokens: 2000,
-        },
-      },
-    };
-    const result = formatTokenDisplay(session)!;
+    const result = formatTokenDisplay({
+      total_tokens: 5000,
+      input_tokens: 3000,
+      output_tokens: 2000,
+      cache_read_tokens: 0,
+    })!;
     expect(result).toContain("5.0K");
     expect(result).toContain("cache:0");
   });
 
   it("handles large token counts", () => {
-    const session = {
-      config: {
-        usage: {
-          total_tokens: 2500000,
-          input_tokens: 2000000,
-          output_tokens: 500000,
-          cache_read_input_tokens: 1500000,
-        },
-      },
-    };
-    const result = formatTokenDisplay(session)!;
+    const result = formatTokenDisplay({
+      total_tokens: 2500000,
+      input_tokens: 2000000,
+      output_tokens: 500000,
+      cache_read_tokens: 1500000,
+    })!;
     expect(result).toContain("2.5M");
     expect(result).toContain("in:2.0M");
   });

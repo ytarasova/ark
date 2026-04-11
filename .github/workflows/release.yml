@@ -116,7 +116,7 @@ jobs:
       - name: Install build deps
         run: |
           apk add --no-cache build-base libevent-dev libevent-static \
-            ncurses-dev ncurses-static curl tar file
+            ncurses-dev ncurses-static byacc bison curl tar file
 
       - name: Build static tmux
         env:

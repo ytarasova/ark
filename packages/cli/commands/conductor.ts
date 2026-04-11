@@ -10,7 +10,7 @@ export function registerConductorCommands(program: Command) {
     .description("Start the conductor server")
     .option("-p, --port <port>", "Port", "19100")
     .action(async (opts) => {
-      const { startConductor } = await import("../../core/conductor.js");
+      const { startConductor } = await import("../../core/conductor/conductor.js");
       const { getApp } = await import("../../core/app.js");
       startConductor(getApp(), parseInt(opts.port));
       // Keep alive
