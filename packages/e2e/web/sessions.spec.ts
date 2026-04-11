@@ -180,39 +180,36 @@ test("clone session via fork button", async () => {
 
 // -- Archive and restore session ----------------------------------------------
 
-// Gap: pre-existing test that fails with "Target page, context or
-// browser has been closed" mid-run under the full suite. The click
-// chain on Archive / Restore hits an unstable state that drops the
-// browser context. Needs investigation -- possibly a modal/overlay
-// interaction that closes the tab, or a timing race on the reload.
-// Skip here keeps the suite green; the CRUD round-trip is still
-// covered by the schedules.spec.ts archive/delete tests.
-test.skip("archive and restore session (pre-existing browser-close flake)", async () => {
-  // Create a session and mark it completed so archive is available
-  const createData = await ws.rpc("session/start", { summary: "E2E archive test", repo: ws.env.workdir, flow: "bare" });
-  const sessionId = createData.session?.id;
-  expect(sessionId).toBeTruthy();
+test("session/archive and session/restore transition status via RPC", async () => {
+  // Rewrite: drive the full complete -> archive -> restore chain
+  // through RPCs rather than UI clicks. The old UI flow was flaky
+  // under suite pressure (browser context would close mid-click on
+  // the Archive button). The RPC layer is the real integration
+  // boundary we care about -- the UI is just a button wiring it up.
+  const createData = await ws.rpc<{ session: { id: string } }>("session/start", {
+    summary: "E2E archive test",
+    repo: ws.env.workdir,
+    flow: "bare",
+  });
+  const sessionId = createData.session.id;
 
-  // Complete the session via RPC so archive button shows
+  // Complete -> archive requires status in {completed, stopped, failed}.
   await ws.rpc("session/complete", { sessionId });
+  const completed = await ws.rpc<{ session: { status: string } }>("session/read", { sessionId });
+  expect(["completed", "ready"]).toContain(completed.session.status);
 
-  // Reload and click into the completed session
-  await page.reload();
-  await page.waitForSelector("nav", { timeout: 10_000 });
-  await goToSessions();
-  await page.locator("text=E2E archive test").first().click();
-  await expect(page.locator("text=Details").first()).toBeVisible({ timeout: 5_000 });
+  // Archive.
+  const archived = await ws.rpc<{ ok: boolean }>("session/archive", { sessionId });
+  expect(archived.ok).toBe(true);
+  const afterArchive = await ws.rpc<{ session: { status: string } }>("session/read", { sessionId });
+  expect(afterArchive.session.status).toBe("archived");
 
-  // Archive
-  await page.locator('button:has-text("Archive")').click();
-  await expect(page.locator('button:has-text("Restore")')).toBeVisible({ timeout: 5_000 });
-
-  // Restore
-  await page.locator('button:has-text("Restore")').click();
-
-  // After restore, Archive button should reappear (session goes back to completed)
-  await expect(page.locator('button:has-text("Archive")')).toBeVisible({ timeout: 5_000 });
-
-  // Close panel
-  await page.keyboard.press("Escape");
+  // Restore.
+  const restored = await ws.rpc<{ ok: boolean }>("session/restore", { sessionId });
+  expect(restored.ok).toBe(true);
+  const afterRestore = await ws.rpc<{ session: { status: string } }>("session/read", { sessionId });
+  // Restore flips back to whatever the pre-archive status was (or
+  // `ready`/`completed`). The assertion is that it is NOT still
+  // archived.
+  expect(afterRestore.session.status).not.toBe("archived");
 });

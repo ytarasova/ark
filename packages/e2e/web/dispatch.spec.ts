@@ -114,38 +114,35 @@ test("stop session changes status", async () => {
 
 // -- Restart session ----------------------------------------------------------
 
-// Gap: the full dispatch -> stop -> resume round-trip depends on the
-// session actually reaching a "running" status, which requires the real
-// Claude Code binary + API creds to be available in the test env. When
-// neither is present, session/dispatch errors out synchronously BEFORE
-// the status row transitions, and waitForStatus hangs on the initial
-// `ready`. The other dispatch tests in this file accept "failed" as a
-// valid outcome so they pass under the same constraint; this one does
-// not because the middle `session/resume` step has no observable result
-// without a live agent. Unskip once we have a stub runtime fixture.
-test.skip("restart stopped session (requires real agent runtime)", async () => {
+test("session/resume transitions a stopped session back to ready", async () => {
+  // Pure state-machine test: sessionService.resume() just sets status
+  // back to `ready` (it does NOT auto-dispatch, per services/session.ts
+  // line 125). So we can exercise the full stop -> resume -> ready
+  // round-trip without a real Claude binary. Seeding the `stopped`
+  // state directly via sqlite3 avoids the real-agent requirement of
+  // the dispatch pathway.
   const id = await createSession("E2E restart test");
 
-  // Dispatch then stop
-  await ws.rpc("session/dispatch", { sessionId: id });
-  const startStatus = await waitForStatus(id, ["running", "waiting", "failed", "stopped"], 30_000);
+  // Flip status to stopped via the DB (no real tmux needed). The ark
+  // server's _detectStaleState() only scans `running` rows, so a
+  // `stopped` row survives across boot.
+  const { execFileSync } = await import("node:child_process");
+  execFileSync("sqlite3", [
+    `${ws.env.app.arkDir}/ark.db`,
+    `UPDATE sessions SET status='stopped' WHERE id='${id}'`,
+  ], { stdio: ["ignore", "pipe", "pipe"] });
 
-  if (startStatus === "running" || startStatus === "waiting") {
-    await ws.rpc("session/stop", { sessionId: id });
-    await waitForStatus(id, ["stopped", "failed"], 15_000);
-  }
+  // Confirm the seed landed.
+  const before = await ws.rpc<{ session: { status: string } }>("session/read", { sessionId: id });
+  expect(before.session.status).toBe("stopped");
 
-  // Now restart via RPC
-  await ws.rpc("session/resume", { sessionId: id });
+  // Resume -- handler path: session/resume -> sessionService.resume
+  // -> sessions.update({ status: "ready" }).
+  const result = await ws.rpc<{ ok: boolean }>("session/resume", { sessionId: id });
+  expect(result.ok).toBe(true);
 
-  // Wait for it to start again or fail
-  const restartStatus = await waitForStatus(id, ["running", "waiting", "failed", "stopped"], 30_000);
-  expect(["running", "waiting", "failed", "stopped"]).toContain(restartStatus);
-
-  // Cleanup
-  if (restartStatus === "running" || restartStatus === "waiting") {
-    await ws.rpc("session/stop", { sessionId: id });
-  }
+  const after = await ws.rpc<{ session: { status: string } }>("session/read", { sessionId: id });
+  expect(after.session.status).toBe("ready");
 });
 
 // -- Verify dispatch shows in UI ----------------------------------------------
