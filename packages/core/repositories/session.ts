@@ -34,6 +34,7 @@ interface SessionRow {
   attached_by: string | null;
   config: string;
   user_id: string | null;
+  tenant_id: string;
   created_at: string;
   updated_at: string;
 }

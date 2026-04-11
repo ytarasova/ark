@@ -106,7 +106,7 @@ function recordSessionUsage(
 
     app.usageRecorder.record({
       sessionId: session.id,
-      tenantId: (session as any).tenant_id ?? "default",
+      tenantId: session.tenant_id ?? "default",
       userId: session.user_id ?? "system",
       model,
       provider,

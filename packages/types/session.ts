@@ -51,6 +51,8 @@ export interface Session {
   config: SessionConfig;
   /** User who created this session (multi-user mode). */
   user_id: string | null;
+  /** Tenant scope (multi-tenant mode). Defaults to "default" in single-tenant deployments. */
+  tenant_id: string;
   created_at: string;
   updated_at: string;
 }
