@@ -91,7 +91,7 @@ export class TenantPolicyManager {
   getPolicy(tenantId: string): TenantComputePolicy | null {
     const row = this.db.prepare(
       "SELECT * FROM tenant_policies WHERE tenant_id = ?"
-    ).get(tenantId) as any;
+    ).get(tenantId) as TenantPolicyRow | undefined;
     return row ? this._hydrateRow(row) : null;
   }
 
@@ -168,7 +168,7 @@ export class TenantPolicyManager {
   listPolicies(): TenantComputePolicy[] {
     const rows = this.db.prepare(
       "SELECT * FROM tenant_policies ORDER BY tenant_id"
-    ).all() as any[];
+    ).all() as TenantPolicyRow[];
     return rows.map(r => this._hydrateRow(r));
   }
 
@@ -242,7 +242,7 @@ export class TenantPolicyManager {
 
   // ── Internal ────────────────────────────────────────────────────────────
 
-  private _hydrateRow(row: any): TenantComputePolicy {
+  private _hydrateRow(row: TenantPolicyRow): TenantComputePolicy {
     let allowedProviders: string[] = [];
     let computePools: ComputePoolRef[] = [];
     try { allowedProviders = JSON.parse(row.allowed_providers); } catch { /* default */ }
@@ -263,4 +263,19 @@ export class TenantPolicyManager {
       tensorzero_enabled: row.tensorzero_enabled == null ? null : !!row.tensorzero_enabled,
     };
   }
+}
+
+interface TenantPolicyRow {
+  tenant_id: string;
+  allowed_providers: string;
+  default_provider: string;
+  max_concurrent_sessions: number;
+  max_cost_per_day_usd: number | null;
+  compute_pools: string;
+  router_enabled: number | null;
+  router_required: number | null;
+  router_policy: string | null;
+  auto_index: number | null;
+  auto_index_required: number | null;
+  tensorzero_enabled: number | null;
 }
