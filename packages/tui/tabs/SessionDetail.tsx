@@ -9,7 +9,7 @@ import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter } from "../helpers/sessionFormatting.js";
 import { formatCost } from "../../core/observability/costs.js";
-import * as flow from "../../core/state/flow.js";
+import type { StageDefinition } from "../../core/state/flow.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { Link } from "../components/Link.js";
@@ -195,6 +195,11 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
     cache_read_tokens: number;
     total_tokens: number;
   } | null>(null);
+  const [flowStages, setFlowStages] = useState<StageDefinition[]>([]);
+  useEffect(() => {
+    if (!s?.flow) { setFlowStages([]); return; }
+    ark.flowRead(s.flow).then(f => setFlowStages(f.stages ?? [])).catch(() => setFlowStages([]));
+  }, [s?.flow]);
   useEffect(() => {
     if (!s) { setCostInfo(null); return; }
     ark.costsSession(s.id).then(r => setCostInfo({
@@ -403,27 +408,23 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
       {s.group_name && <KeyValue label="Group">{s.group_name}</KeyValue>}
 
       {/* Flow pipeline */}
-      {s.flow && s.stage && (() => {
-        const stages = flow.getStages(s.flow);
-        if (stages.length <= 1) return null;
-        return (
-          <Box>
-            <Text dimColor>{"  "}</Text>
-            {stages.map((st, idx) => {
-              const isCurrent = st.name === s.stage;
-              const isPast = stages.findIndex(x => x.name === s.stage) > idx;
-              return (
-                <React.Fragment key={st.name}>
-                  {idx > 0 && <Text dimColor>{" > "}</Text>}
-                  <Text color={isCurrent ? theme.accent : isPast ? theme.running : undefined} bold={isCurrent} dimColor={!isCurrent && !isPast}>
-                    {isCurrent ? `[${st.name}]` : st.name}
-                  </Text>
-                </React.Fragment>
-              );
-            })}
-          </Box>
-        );
-      })()}
+      {s.flow && s.stage && flowStages.length > 1 && (
+        <Box>
+          <Text dimColor>{"  "}</Text>
+          {flowStages.map((st, idx) => {
+            const isCurrent = st.name === s.stage;
+            const isPast = flowStages.findIndex(x => x.name === s.stage) > idx;
+            return (
+              <React.Fragment key={st.name}>
+                {idx > 0 && <Text dimColor>{" > "}</Text>}
+                <Text color={isCurrent ? theme.accent : isPast ? theme.running : undefined} bold={isCurrent} dimColor={!isCurrent && !isPast}>
+                  {isCurrent ? `[${st.name}]` : st.name}
+                </Text>
+              </React.Fragment>
+            );
+          })}
+        </Box>
+      )}
 
       {s.pr_url && (
         <KeyValue label="PR">

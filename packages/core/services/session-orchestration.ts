@@ -198,9 +198,9 @@ export function startSession(app: AppContext, opts: {
   }
 
   // Set first stage
-  const firstStage = flow.getFirstStage(mergedOpts.flow ?? "default");
+  const firstStage = flow.getFirstStage(app,mergedOpts.flow ?? "default");
   if (firstStage) {
-    const action = flow.getStageAction(mergedOpts.flow ?? "default", firstStage);
+    const action = flow.getStageAction(app,mergedOpts.flow ?? "default", firstStage);
     app.sessions.update(session.id, { stage: firstStage, status: "ready" });
     app.events.log(session.id, "stage_ready", {
       stage: firstStage, actor: "system",
@@ -213,7 +213,7 @@ export function startSession(app: AppContext, opts: {
       agent: opts.agent ?? undefined,
     });
     if (firstStage) {
-      const stageAction = flow.getStageAction(mergedOpts.flow ?? "default", firstStage);
+      const stageAction = flow.getStageAction(app,mergedOpts.flow ?? "default", firstStage);
       emitStageSpanStart(session.id, { stage: firstStage, agent: stageAction.agent, gate: "auto" });
     }
   }
@@ -312,7 +312,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   } catch { /* skip guard on error */ }
 
   // Check if fork stage
-  const stageDef = flow.getStage(session.flow, stage);
+  const stageDef = flow.getStage(app,session.flow, stage);
   if (stageDef?.type === "fork") {
     return dispatchFork(app, sessionId, stageDef);
   }
@@ -321,7 +321,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     return dispatchFanOut(app, sessionId, stageDef);
   }
 
-  const action = flow.getStageAction(session.flow, stage);
+  const action = flow.getStageAction(app,session.flow, stage);
   if (action.type !== "agent") {
     return { ok: false, message: `Stage '${stage}' is ${action.type}, not agent` };
   }
@@ -483,7 +483,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   if (!stage) return { ok: false, message: "No current stage. The session may have completed its flow." };
 
   if (!force) {
-    const { canProceed, reason } = flow.evaluateGate(flowName, stage, session);
+    const { canProceed, reason } = flow.evaluateGate(app,flowName, stage, session);
     if (!canProceed) return { ok: false, message: reason };
   }
 
@@ -507,8 +507,8 @@ export async function advance(app: AppContext, sessionId: string, force = false)
         app.sessions.update(sessionId, { stage: graphNextStage, status: "ready" });
         app.events.log(sessionId, "stage_advanced", { actor: "system", stage: graphNextStage, data: { via: "graph-flow", successors } });
         emitStageSpanEnd(sessionId, { status: "completed" });
-        const graphAction = flow.getStageAction(flowName, graphNextStage);
-        const graphStageDef = flow.getStage(flowName, graphNextStage);
+        const graphAction = flow.getStageAction(app,flowName, graphNextStage);
+        const graphStageDef = flow.getStage(app,flowName, graphNextStage);
         emitStageSpanStart(sessionId, { stage: graphNextStage, agent: graphAction?.agent, gate: graphStageDef?.gate });
         saveCheckpoint(app, sessionId);
         return { ok: true, message: `Advanced to ${graphNextStage} (graph-flow)` };
@@ -516,7 +516,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
     }
   } catch { /* graph flow not applicable, fall through to linear */ }
 
-  const nextStage = flow.getNextStage(flowName, stage);
+  const nextStage = flow.getNextStage(app,flowName, stage);
   if (!nextStage) {
     // Flow complete -- persist final stage completion
     try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
@@ -556,7 +556,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
   try { setCurrentStage(app, sessionId, nextStage, flowName); } catch { /* skip */ }
 
-  const nextAction = flow.getStageAction(flowName, nextStage);
+  const nextAction = flow.getStageAction(app,flowName, nextStage);
   app.sessions.update(sessionId, { stage: nextStage, status: "ready", error: null });
   app.events.log(sessionId, "stage_ready", {
     stage: nextStage, actor: "system",
@@ -568,7 +568,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   });
 
   emitStageSpanEnd(sessionId, { status: "completed" });
-  const nextStageDef = flow.getStage(flowName, nextStage);
+  const nextStageDef = flow.getStage(app,flowName, nextStage);
   emitStageSpanStart(sessionId, { stage: nextStage, agent: nextAction?.agent, gate: nextStageDef?.gate });
 
   // Checkpoint after advancing to new stage
@@ -671,7 +671,7 @@ export async function runVerification(app: AppContext, sessionId: string): Promi
 
   // Determine verify scripts from flow stage + repo config
   const stageVerify = session.stage && session.flow
-    ? flow.getStage(session.flow, session.stage)?.verify
+    ? flow.getStage(app,session.flow, session.stage)?.verify
     : undefined;
   const repoConfig = session.workdir ? loadRepoConfig(session.workdir) : {};
   const scripts: string[] = stageVerify ?? repoConfig.verify ?? [];
@@ -759,7 +759,7 @@ export async function complete(app: AppContext, sessionId: string, opts?: { forc
   if (!opts?.force) {
     const hasTodos = app.todos.list(sessionId).length > 0;
     const stageVerify = session.stage && session.flow
-      ? flow.getStage(session.flow, session.stage)?.verify
+      ? flow.getStage(app,session.flow, session.stage)?.verify
       : undefined;
     const repoVerify = session.workdir ? loadRepoConfig(session.workdir).verify : undefined;
     const hasScripts = (stageVerify ?? repoVerify ?? []).length > 0;
@@ -1371,13 +1371,13 @@ async function _launchAgentTmux(app: AppContext,
 }
 
 /** Build the task header: agent role, stage description, and reporting instructions. */
-function formatTaskHeader(session: Session, stage: string, agentName: string): string[] {
+function formatTaskHeader(app: AppContext, session: Session, stage: string, agentName: string): string[] {
   const parts: string[] = [];
   const isBare = session.flow === "bare";
 
   // Get resolved stage with substituted variables
   const vars = buildSessionVars(sessionAsVars(session));
-  const resolved = resolveFlow(session.flow, vars);
+  const resolved = resolveFlow(app, session.flow, vars);
   const stageDef = resolved?.stages.find(s => s.name === stage);
 
   // If stage has a task template, use it as the primary prompt
@@ -1441,7 +1441,7 @@ async function appendPreviousStageContext(app: AppContext, session: Session): Pr
 }
 
 async function buildTaskWithHandoff(app: AppContext, session: Session, stage: string, agentName: string): Promise<string> {
-  const header = formatTaskHeader(session, stage, agentName);
+  const header = formatTaskHeader(app, session, stage, agentName);
   const context = await appendPreviousStageContext(app, session);
 
   // Apply message filter if agent config specifies one
@@ -1895,7 +1895,7 @@ export function applyHookStatus(app: AppContext,
   const result: HookStatusResult = { events: [] };
 
   // Check if this session uses manual gate (interactive - user controls lifecycle)
-  const stageDef = session.stage ? flow.getStage(session.flow, session.stage) : null;
+  const stageDef = session.stage ? flow.getStage(app,session.flow, session.stage) : null;
   const isManualGate = stageDef?.gate === "manual";
 
   const statusMap: Record<string, string> = {
@@ -2102,7 +2102,7 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
       };
 
       // Check gate type -- manual gates keep session running (user decides when done)
-      const stageDef = flow.getStage(session.flow, session.stage ?? "");
+      const stageDef = flow.getStage(app,session.flow, session.stage ?? "");
       const isManualGate = stageDef?.gate === "manual";
 
       if (isManualGate) {
@@ -2219,7 +2219,7 @@ export function fanOut(app: AppContext,
     });
     // Set first stage so child is dispatchable
     const childFlow = task.flow ?? "bare";
-    const firstStage = flow.getFirstStage(childFlow);
+    const firstStage = flow.getFirstStage(app,childFlow);
     app.sessions.update(child.id, {
       parent_id: parentId,
       fork_group: forkGroup,
@@ -2276,7 +2276,7 @@ export function spawnSubagent(app: AppContext, parentId: string, opts: {
   app.sessions.update(session.id, { agent: agentName, parent_id: parentId });
 
   // Set first stage so the subagent is dispatchable
-  const firstStage = flow.getFirstStage("quick");
+  const firstStage = flow.getFirstStage(app,"quick");
   if (firstStage) {
     app.sessions.update(session.id, { stage: firstStage, status: "ready" });
   }

@@ -281,7 +281,7 @@ describe("StageDefinition verify field", () => {
   });
 
   it("returns null for nonexistent flow/stage", () => {
-    const stage = getStageDefinition("nonexistent-flow", "nonexistent-stage");
+    const stage = getStageDefinition(getApp(), "nonexistent-flow", "nonexistent-stage");
     expect(stage).toBeNull();
   });
 

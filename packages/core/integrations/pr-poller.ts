@@ -174,7 +174,7 @@ export async function pollPRReviews(app: AppContext, opts?: PRPollerOptions): Pr
     if (!["running", "waiting", "ready", "blocked"].includes(s.status)) continue;
 
     // Only poll sessions in review-gated stages
-    const stageDef = s.stage ? flow.getStage(s.flow, s.stage) : null;
+    const stageDef = s.stage ? flow.getStage(app, s.flow, s.stage) : null;
     if (stageDef?.gate !== "review") continue;
 
     // Cooldown: skip if checked within last 60 seconds

@@ -61,12 +61,12 @@ describe("fan-out E2E", () => {
   });
 
   test("DAG flow validation passes for dag-parallel", () => {
-    const stages = getStages("dag-parallel");
+    const stages = getStages(app, "dag-parallel");
     expect(() => validateDAG(stages)).not.toThrow();
   });
 
   test("DAG flow ready stages resolve correctly through all phases", () => {
-    const stages = getStages("dag-parallel");
+    const stages = getStages(app, "dag-parallel");
 
     // Initially only plan is ready
     const ready0 = getReadyStages(stages, []);

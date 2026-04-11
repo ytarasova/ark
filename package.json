@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-cost-explorer": "^3.1014.0",
+    "awilix": "^13.0.3",
     "@aws-sdk/client-ec2": "^3.1014.0",
     "@aws-sdk/credential-providers": "^3.1014.0",
     "@kubernetes/client-node": "^1.4.0",
@@ -61,6 +62,7 @@
     "react-dom": "^19.2.4",
     "recharts": "^3.8.1",
     "redis": "^5.11.0",
+    "strip-json-comments": "^5.0.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
     "vite": "^8.0.7",

@@ -596,7 +596,7 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
     const advResult = await session.advance(_app, sessionId);
     const updated = (result.shouldAutoDispatch && advResult.ok) ? _app.sessions.get(sessionId) : null;
     if (updated?.status === "ready" && updated.stage) {
-      const nextAction = flow.getStageAction(updated.flow, updated.stage);
+      const nextAction = flow.getStageAction(_app, updated.flow, updated.stage);
       if (nextAction.type === "agent" || nextAction.type === "fork") {
         session.dispatch(_app, sessionId).catch(err => {
           logError("conductor", `auto-dispatch failed for ${sessionId}: ${err?.message ?? err}`);

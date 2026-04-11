@@ -4,10 +4,14 @@
  * Flows are declarative YAML: ordered stages with gates (auto/manual/condition).
  * Stages are either agent tasks or built-in actions (create PR, merge, etc.).
  * Fork stages split into parallel children.
+ *
+ * All exported functions accept an AppContext so no caller needs to reach
+ * for getApp(). The TUI's remote-capable render paths should fetch flow
+ * definitions via the Ark JSON-RPC client instead of calling these directly.
  */
 
 import { substituteVars } from "../template.js";
-import { getApp } from "../app.js";
+import type { AppContext } from "../app.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,7 +20,7 @@ export interface StageDefinition {
   type?: "agent" | "action" | "fork" | "fan_out";
   agent?: string;
   action?: string;
-  task?: string;  // Template for agent task prompt — supports {variable} substitution
+  task?: string;  // Template for agent task prompt - supports {variable} substitution
   gate: "auto" | "manual" | "condition" | "review";
   autonomy?: "full" | "execute" | "edit" | "read-only";
   on_failure?: string;
@@ -39,32 +43,30 @@ export interface FlowDefinition {
 // ── Stage navigation ────────────────────────────────────────────────────────
 
 /** Load a flow by name via the AppContext store. */
-function loadFlow(name: string): FlowDefinition | null {
-  try { return getApp().flows.get(name); } catch { return null; }
-}
-// TODO: Migrate getStages/getStage/etc. to accept app as parameter, then remove getApp() here
-
-
-export function getStages(flowName: string): StageDefinition[] {
-  return loadFlow(flowName)?.stages ?? [];
+function loadFlow(app: AppContext, name: string): FlowDefinition | null {
+  try { return app.flows.get(name); } catch { return null; }
 }
 
-export function getStage(flowName: string, stageName: string): StageDefinition | null {
-  return getStages(flowName).find((s) => s.name === stageName) ?? null;
+export function getStages(app: AppContext, flowName: string): StageDefinition[] {
+  return loadFlow(app, flowName)?.stages ?? [];
+}
+
+export function getStage(app: AppContext, flowName: string, stageName: string): StageDefinition | null {
+  return getStages(app, flowName).find((s) => s.name === stageName) ?? null;
 }
 
 /** Alias for getStage - retrieve a single stage definition by flow and stage name. */
-export function getStageDefinition(flowName: string, stageName: string): StageDefinition | null {
-  return getStage(flowName, stageName);
+export function getStageDefinition(app: AppContext, flowName: string, stageName: string): StageDefinition | null {
+  return getStage(app, flowName, stageName);
 }
 
-export function getFirstStage(flowName: string): string | null {
-  const stages = getStages(flowName);
+export function getFirstStage(app: AppContext, flowName: string): string | null {
+  const stages = getStages(app, flowName);
   return stages[0]?.name ?? null;
 }
 
-export function getNextStage(flowName: string, currentStage: string): string | null {
-  const stages = getStages(flowName);
+export function getNextStage(app: AppContext, flowName: string, currentStage: string): string | null {
+  const stages = getStages(app, flowName);
   const idx = stages.findIndex((s) => s.name === currentStage);
   return idx >= 0 && idx + 1 < stages.length ? stages[idx + 1].name : null;
 }
@@ -72,9 +74,9 @@ export function getNextStage(flowName: string, currentStage: string): string | n
 // ── Gate evaluation ─────────────────────────────────────────────────────────
 
 export function evaluateGate(
-  flowName: string, stageName: string, session: { error?: string | null },
+  app: AppContext, flowName: string, stageName: string, session: { error?: string | null },
 ): { canProceed: boolean; reason: string } {
-  const stage = getStage(flowName, stageName);
+  const stage = getStage(app, flowName, stageName);
   if (!stage) return { canProceed: false, reason: `Stage '${stageName}' not found` };
 
   switch (stage.gate) {
@@ -105,8 +107,8 @@ export interface StageAction {
   optional?: boolean;
 }
 
-export function getStageAction(flowName: string, stageName: string): StageAction {
-  const stage = getStage(flowName, stageName);
+export function getStageAction(app: AppContext, flowName: string, stageName: string): StageAction {
+  const stage = getStage(app, flowName, stageName);
   if (!stage) return { type: "unknown" };
 
   if (stage.type === "fork" || stage.type === "fan_out") {
@@ -206,8 +208,8 @@ export function getReadyStages(
 // ── Template substitution ────────────────────────────────────────────────────
 
 /** Resolve a flow by substituting {variables} in stage fields. */
-export function resolveFlow(flowName: string, vars: Record<string, string>): FlowDefinition | null {
-  const flow = loadFlow(flowName);
+export function resolveFlow(app: AppContext, flowName: string, vars: Record<string, string>): FlowDefinition | null {
+  const flow = loadFlow(app, flowName);
   if (!flow) return null;
 
   return {

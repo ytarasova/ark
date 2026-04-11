@@ -104,7 +104,7 @@ describe("review gate blocking", () => {
     expect(session.stage).toBe("review-stage");
 
     // Gate blocks
-    const gateResult = evaluateGate("block-flow", "review-stage", {});
+    const gateResult = evaluateGate(getApp(), "block-flow", "review-stage", {});
     expect(gateResult.canProceed).toBe(false);
 
     // Normal advance blocked

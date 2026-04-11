@@ -57,7 +57,7 @@ describe("E2E: flow YAML autonomy through resolveFlow", () => {
     expect(raw!.stages[1].autonomy).toBe("full");
 
     // resolveFlow preserves autonomy after variable substitution
-    const resolved = resolveFlow("review-pipeline", { ticket: "PROJ-42" });
+    const resolved = resolveFlow(getApp(),"review-pipeline", { ticket: "PROJ-42" });
     expect(resolved).not.toBeNull();
     expect(resolved!.stages[0].autonomy).toBe("read-only");
     expect(resolved!.stages[0].task).toBe("Review PROJ-42");
@@ -76,7 +76,7 @@ describe("E2E: flow YAML autonomy through resolveFlow", () => {
       ],
     });
 
-    const resolved = resolveFlow("tiered-flow", { ticket: "X" });
+    const resolved = resolveFlow(getApp(),"tiered-flow", { ticket: "X" });
     expect(resolved!.stages[0].autonomy).toBe("read-only");
     expect(resolved!.stages[1].autonomy).toBe("edit");
     expect(resolved!.stages[2].autonomy).toBe("execute");
@@ -91,7 +91,7 @@ describe("E2E: flow YAML autonomy through resolveFlow", () => {
       ],
     });
 
-    const resolved = resolveFlow("no-autonomy", {});
+    const resolved = resolveFlow(getApp(),"no-autonomy", {});
     expect(resolved!.stages[0].autonomy).toBeUndefined();
   });
 });
@@ -282,7 +282,7 @@ describe("E2E: full autonomy pipeline", () => {
     });
 
     const vars = buildSessionVars({ id: "s-pipe", ticket: "PIPE-1", repo: "/app" });
-    const flow = resolveFlow("full-pipeline", vars);
+    const flow = resolveFlow(getApp(),"full-pipeline", vars);
     expect(flow).not.toBeNull();
 
     // Stage 0: read-only

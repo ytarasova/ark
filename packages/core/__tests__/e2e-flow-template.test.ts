@@ -60,7 +60,7 @@ describe("Flow templating E2E", () => {
       stage: "implement", flow: "templated",
     });
 
-    const resolved = resolveFlow("templated", vars);
+    const resolved = resolveFlow(getApp(),"templated", vars);
     expect(resolved).not.toBeNull();
     expect(resolved!.stages[0].task).toBe("Implement PROJ-456: Add auth in /home/dev/app");
     expect(resolved!.stages[1].task).toBe("Review PROJ-456 changes");
@@ -88,7 +88,7 @@ describe("Flow templating E2E", () => {
     });
 
     const vars = buildSessionVars({ id: "s-1", ticket: "X" });
-    const resolved = resolveFlow("no-task", vars);
+    const resolved = resolveFlow(getApp(),"no-task", vars);
     expect(resolved!.stages[0].task).toBeUndefined();
   });
 
@@ -101,7 +101,7 @@ describe("Flow templating E2E", () => {
     });
 
     const vars = buildSessionVars({ id: "s-1", ticket: "DEPLOY-1" });
-    const resolved = resolveFlow("failure-tmpl", vars);
+    const resolved = resolveFlow(getApp(),"failure-tmpl", vars);
     expect(resolved!.stages[0].on_failure).toBe("notify(DEPLOY-1)");
   });
 
@@ -115,7 +115,7 @@ describe("Flow templating E2E", () => {
     });
 
     const vars = buildSessionVars({ id: "s-1", ticket: "FEAT-10", branch: "main" });
-    const resolved = resolveFlow("desc-tmpl", vars);
+    const resolved = resolveFlow(getApp(),"desc-tmpl", vars);
     expect(resolved!.description).toBe("Pipeline for FEAT-10 on main");
   });
 
@@ -128,7 +128,7 @@ describe("Flow templating E2E", () => {
     });
 
     const vars = buildSessionVars({ id: "s-1", ticket: "T-1" });
-    const resolved = resolveFlow("unknown-vars", vars);
+    const resolved = resolveFlow(getApp(),"unknown-vars", vars);
     expect(resolved!.stages[0].task).toBe("Do T-1 with {custom_var}");
   });
 

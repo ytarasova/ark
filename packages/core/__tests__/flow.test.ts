@@ -125,11 +125,11 @@ describe("listFlows", () => {
 
 describe("getStages", () => {
   it("returns empty array for unknown flow", () => {
-    expect(getStages("nonexistent")).toEqual([]);
+    expect(getStages(getApp(),"nonexistent")).toEqual([]);
   });
 
   it("returns all stages for a known flow", () => {
-    const stages = getStages("default");
+    const stages = getStages(getApp(),"default");
     const names = stages.map((s) => s.name);
     expect(names).toEqual([
       "intake", "plan", "audit", "implement", "verify", "pr", "review", "close", "retro",
@@ -141,15 +141,15 @@ describe("getStages", () => {
 
 describe("getStage", () => {
   it("returns null for unknown flow", () => {
-    expect(getStage("nonexistent", "plan")).toBeNull();
+    expect(getStage(getApp(),"nonexistent", "plan")).toBeNull();
   });
 
   it("returns null for unknown stage name", () => {
-    expect(getStage("default", "nonexistent-stage")).toBeNull();
+    expect(getStage(getApp(),"default", "nonexistent-stage")).toBeNull();
   });
 
   it("returns the named stage with correct properties", () => {
-    const stage = getStage("default", "implement");
+    const stage = getStage(getApp(),"default", "implement");
     expect(stage).not.toBeNull();
     expect(stage!.name).toBe("implement");
     expect(stage!.agent).toBe("implementer");
@@ -161,11 +161,11 @@ describe("getStage", () => {
 
 describe("getFirstStage", () => {
   it("returns null for unknown flow", () => {
-    expect(getFirstStage("nonexistent")).toBeNull();
+    expect(getFirstStage(getApp(),"nonexistent")).toBeNull();
   });
 
   it("returns the first stage name", () => {
-    expect(getFirstStage("default")).toBe("intake");
+    expect(getFirstStage(getApp(),"default")).toBe("intake");
   });
 
   it("returns first stage of a user flow", () => {
@@ -176,7 +176,7 @@ describe("getFirstStage", () => {
         { name: "beta", agent: "b", gate: "manual" },
       ],
     });
-    expect(getFirstStage("my-flow")).toBe("alpha");
+    expect(getFirstStage(getApp(),"my-flow")).toBe("alpha");
   });
 });
 
@@ -184,20 +184,20 @@ describe("getFirstStage", () => {
 
 describe("getNextStage", () => {
   it("returns the next stage name", () => {
-    expect(getNextStage("default", "intake")).toBe("plan");
-    expect(getNextStage("default", "plan")).toBe("audit");
+    expect(getNextStage(getApp(),"default", "intake")).toBe("plan");
+    expect(getNextStage(getApp(),"default", "plan")).toBe("audit");
   });
 
   it("returns null at the last stage", () => {
-    expect(getNextStage("default", "retro")).toBeNull();
+    expect(getNextStage(getApp(),"default", "retro")).toBeNull();
   });
 
   it("returns null for unknown current stage", () => {
-    expect(getNextStage("default", "nonexistent")).toBeNull();
+    expect(getNextStage(getApp(),"default", "nonexistent")).toBeNull();
   });
 
   it("returns null for unknown flow", () => {
-    expect(getNextStage("nonexistent", "plan")).toBeNull();
+    expect(getNextStage(getApp(),"nonexistent", "plan")).toBeNull();
   });
 });
 
@@ -205,24 +205,24 @@ describe("getNextStage", () => {
 
 describe("evaluateGate", () => {
   it("auto gate passes without error", () => {
-    const result = evaluateGate("default", "implement", {});
+    const result = evaluateGate(getApp(),"default", "implement", {});
     expect(result.canProceed).toBe(true);
     expect(result.reason).toContain("auto");
   });
 
   it("auto gate passes with explicit null error", () => {
-    const result = evaluateGate("default", "implement", { error: null });
+    const result = evaluateGate(getApp(),"default", "implement", { error: null });
     expect(result.canProceed).toBe(true);
   });
 
   it("auto gate fails when session has error", () => {
-    const result = evaluateGate("default", "implement", { error: "build failed" });
+    const result = evaluateGate(getApp(),"default", "implement", { error: "build failed" });
     expect(result.canProceed).toBe(false);
     expect(result.reason).toContain("build failed");
   });
 
   it("manual gate always blocks", () => {
-    const result = evaluateGate("default", "plan", {});
+    const result = evaluateGate(getApp(),"default", "plan", {});
     expect(result.canProceed).toBe(false);
     expect(result.reason).toContain("manual");
   });
@@ -232,7 +232,7 @@ describe("evaluateGate", () => {
       name: "cond-flow",
       stages: [{ name: "check", agent: "validator", gate: "condition" }],
     });
-    const result = evaluateGate("cond-flow", "check", {});
+    const result = evaluateGate(getApp(),"cond-flow", "check", {});
     expect(result.canProceed).toBe(true);
     expect(result.reason).toContain("condition");
   });
@@ -242,7 +242,7 @@ describe("evaluateGate", () => {
       name: "review-flow",
       stages: [{ name: "await-pr", agent: "reviewer", gate: "review" }],
     });
-    const result = evaluateGate("review-flow", "await-pr", {});
+    const result = evaluateGate(getApp(),"review-flow", "await-pr", {});
     expect(result.canProceed).toBe(false);
   });
 
@@ -251,18 +251,18 @@ describe("evaluateGate", () => {
       name: "review-flow2",
       stages: [{ name: "await-pr", agent: "reviewer", gate: "review" }],
     });
-    const result = evaluateGate("review-flow2", "await-pr", {});
+    const result = evaluateGate(getApp(),"review-flow2", "await-pr", {});
     expect(result.reason).toContain("awaiting PR approval");
   });
 
   it("returns canProceed false for unknown stage", () => {
-    const result = evaluateGate("default", "nonexistent", {});
+    const result = evaluateGate(getApp(),"default", "nonexistent", {});
     expect(result.canProceed).toBe(false);
     expect(result.reason).toContain("not found");
   });
 
   it("returns canProceed false for unknown flow", () => {
-    const result = evaluateGate("nonexistent", "plan", {});
+    const result = evaluateGate(getApp(),"nonexistent", "plan", {});
     expect(result.canProceed).toBe(false);
   });
 });
@@ -271,23 +271,23 @@ describe("evaluateGate", () => {
 
 describe("getStageAction", () => {
   it("returns type 'unknown' for missing flow", () => {
-    const action = getStageAction("nonexistent", "plan");
+    const action = getStageAction(getApp(),"nonexistent", "plan");
     expect(action.type).toBe("unknown");
   });
 
   it("returns type 'unknown' for missing stage", () => {
-    const action = getStageAction("default", "nonexistent");
+    const action = getStageAction(getApp(),"default", "nonexistent");
     expect(action.type).toBe("unknown");
   });
 
   it("returns agent type with agent name", () => {
-    const action = getStageAction("default", "plan");
+    const action = getStageAction(getApp(),"default", "plan");
     expect(action.type).toBe("agent");
     expect(action.agent).toBe("spec-planner");
   });
 
   it("returns action type with action name", () => {
-    const action = getStageAction("default", "pr");
+    const action = getStageAction(getApp(),"default", "pr");
     expect(action.type).toBe("action");
     expect(action.action).toBe("create_pr");
   });
@@ -297,7 +297,7 @@ describe("getStageAction", () => {
       name: "fork-flow",
       stages: [{ name: "split", type: "fork", gate: "auto" }],
     });
-    const action = getStageAction("fork-flow", "split");
+    const action = getStageAction(getApp(),"fork-flow", "split");
     expect(action.type).toBe("fork");
     expect(action.agent).toBe("implementer");
     expect(action.strategy).toBe("plan");
@@ -316,7 +316,7 @@ describe("getStageAction", () => {
         max_parallel: 8,
       }],
     });
-    const action = getStageAction("fork-custom", "split");
+    const action = getStageAction(getApp(),"fork-custom", "split");
     expect(action.type).toBe("fork");
     expect(action.agent).toBe("builder");
     expect(action.strategy).toBe("file");
@@ -324,12 +324,12 @@ describe("getStageAction", () => {
   });
 
   it("includes optional field when present", () => {
-    const action = getStageAction("default", "audit");
+    const action = getStageAction(getApp(),"default", "audit");
     expect(action.optional).toBe(true);
   });
 
   it("on_failure and optional are undefined when not set", () => {
-    const action = getStageAction("default", "pr");
+    const action = getStageAction(getApp(),"default", "pr");
     expect(action.on_failure).toBeUndefined();
     expect(action.optional).toBeUndefined();
   });
@@ -347,7 +347,7 @@ describe("resolveFlow", () => {
       ],
     });
 
-    const flow = resolveFlow("task-flow", { ticket: "PROJ-1", summary: "Fix bug", repo: "/code" });
+    const flow = resolveFlow(getApp(),"task-flow", { ticket: "PROJ-1", summary: "Fix bug", repo: "/code" });
     expect(flow).not.toBeNull();
     expect(flow!.stages[0].task).toBe("Plan work for PROJ-1: Fix bug");
     expect(flow!.stages[1].task).toBe("Implement PROJ-1 in /code");
@@ -360,7 +360,7 @@ describe("resolveFlow", () => {
       stages: [{ name: "s1", agent: "a", gate: "auto" }],
     });
 
-    const flow = resolveFlow("desc-flow", { ticket: "T-1", branch: "main" });
+    const flow = resolveFlow(getApp(),"desc-flow", { ticket: "T-1", branch: "main" });
     expect(flow!.description).toBe("Flow for T-1 on main");
   });
 
@@ -372,7 +372,7 @@ describe("resolveFlow", () => {
       ],
     });
 
-    const flow = resolveFlow("fail-flow", { ticket: "BUG-99" });
+    const flow = resolveFlow(getApp(),"fail-flow", { ticket: "BUG-99" });
     expect(flow!.stages[0].on_failure).toBe("notify(BUG-99)");
   });
 
@@ -385,7 +385,7 @@ describe("resolveFlow", () => {
       ],
     });
 
-    const flow = resolveFlow("plain-flow", { ticket: "X-1" });
+    const flow = resolveFlow(getApp(),"plain-flow", { ticket: "X-1" });
     expect(flow).not.toBeNull();
     expect(flow!.stages[0].task).toBeUndefined();
     expect(flow!.stages[0].on_failure).toBeUndefined();
@@ -394,7 +394,7 @@ describe("resolveFlow", () => {
   });
 
   it("returns null for unknown flow", () => {
-    expect(resolveFlow("nonexistent", { ticket: "X-1" })).toBeNull();
+    expect(resolveFlow(getApp(),"nonexistent", { ticket: "X-1" })).toBeNull();
   });
 
   it("stage task field appears in loaded flow definition", () => {

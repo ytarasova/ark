@@ -165,7 +165,7 @@ describe("flow autonomy field", () => {
       ],
     });
 
-    const flow = resolveFlow("resolve-autonomy", { ticket: "PROJ-1" });
+    const flow = resolveFlow(getApp(), "resolve-autonomy", { ticket: "PROJ-1" });
     expect(flow).not.toBeNull();
     expect(flow!.stages[0].autonomy).toBe("edit");
     expect(flow!.stages[0].task).toBe("Plan PROJ-1");
