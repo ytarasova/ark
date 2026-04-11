@@ -381,19 +381,18 @@ jobs:
           path: dist/bin/ark-${{ matrix.name }}
 
   # Smoke-test each platform's tarball.
-  # Same matrix shape as `package` so the expansion is unambiguous.
   smoke-test:
     needs: package
     strategy:
       fail-fast: false
       matrix:
-        name: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
+        include:
+          - { name: darwin-arm64, runner: macos-14 }
+          - { name: darwin-x64, runner: macos-13 }
+          - { name: linux-arm64, runner: ubuntu-24.04-arm }
+          - { name: linux-x64, runner: ubuntu-latest }
 
-    runs-on: >-
-      ${{ matrix.name == 'darwin-arm64' && 'macos-14'
-       || matrix.name == 'darwin-x64'   && 'macos-13'
-       || matrix.name == 'linux-arm64'  && 'ubuntu-24.04-arm'
-       || 'ubuntu-latest' }}
+    runs-on: ${{ matrix.runner }}
     name: smoke-test (${{ matrix.name }})
     timeout-minutes: 5
 
