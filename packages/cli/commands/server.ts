@@ -25,7 +25,7 @@ export function registerServerCommands(program: Command) {
 
         const config = loadConfig();
         const webPort = parseInt(opts.port) || 8420;
-        (config as any).port = webPort;
+        (config as { port?: number }).port = webPort;
 
         console.log(chalk.cyan("Starting Ark hosted control plane..."));
         const { stop } = await startHostedServer(config);

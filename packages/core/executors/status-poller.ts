@@ -43,7 +43,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
           data: { reason: "agent process exited", exitCode: (status as { exitCode?: number }).exitCode },
         });
 
-        logInfo("status-poller" as any, `${sessionId} -> ${newStatus}`);
+        logInfo("session", `status-poller: ${sessionId} -> ${newStatus}`);
 
         // Advance flow for multi-stage pipelines (same as Claude hook path)
         if (newStatus === "completed") {

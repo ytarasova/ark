@@ -70,7 +70,11 @@ export class DbResourceStore<T extends { name: string }> {
 
   save(name: string, resource: T): void {
     const ts = new Date().toISOString();
-    const { _source, _path, ...data } = resource as any;
+    // Strip synthetic fields before serialising. `_source` / `_path` are
+    // markers the file-backed store adds so callers can see which tier a
+    // resource came from; they have no business in the DB row.
+    const { _source: _s, _path: _p, ...data } = resource as T & { _source?: string; _path?: string };
+    void _s; void _p;
     const content = YAML.stringify(data);
 
     this.db.prepare(`
@@ -90,8 +94,10 @@ export class DbResourceStore<T extends { name: string }> {
   /** Export all resources as YAML (for file-backed export). */
   exportAll(): Array<{ name: string; yaml: string }> {
     return this.list().map(r => {
-      const { _source, _path, ...data } = r as any;
-      return { name: (r as any).name, yaml: YAML.stringify(data) };
+      const rec = r as T & { name: string; _source?: string; _path?: string };
+      const { _source: _s, _path: _p, ...data } = rec;
+      void _s; void _p;
+      return { name: rec.name, yaml: YAML.stringify(data) };
     });
   }
 
