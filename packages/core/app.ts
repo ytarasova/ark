@@ -337,7 +337,26 @@ export class AppContext {
     // Auto-register as global singleton (used by flow.ts loadFlow fallback)
     if (!_app) _app = this;
 
-    // 1. Ensure directories
+    this._initFilesystem();
+    const db = await this._openDatabase();
+    await this._initSchema(db);
+    this._seedComputeTemplates(db);
+    this._apiKeys = new ApiKeyManager(db);
+    this._registerContainer(db);
+    await this._registerComputeProviders();
+    this._wireServices();
+    await this._startOptionalServices();
+    this._startMaintenance();
+    await this._detectStaleState();
+
+    track("app_boot");
+    this.phase = "ready";
+  }
+
+  // ── Boot helpers (split out from the original 308-line boot()) ────────────
+
+  /** Step 1: ensure ark directories exist and configure module-level paths. */
+  private _initFilesystem(): void {
     for (const dir of [
       this.config.arkDir,
       this.config.tracksDir,
@@ -346,25 +365,26 @@ export class AppContext {
     ]) {
       mkdirSync(dir, { recursive: true });
     }
-
-    // 1b. Configure module-level state with the resolved arkDir
     setLogArkDir(this.config.arkDir);
     setProfilesArkDir(this.config.arkDir);
+  }
 
-    // 2. Open database -- Postgres for hosted deployments, SQLite for local
-    let db: IDatabase;
+  /** Step 2: open the underlying SQLite or Postgres database. */
+  private async _openDatabase(): Promise<IDatabase> {
     const dbUrl = this.config.databaseUrl;
     if (dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
       const { PostgresAdapter } = await import("./database/postgres.js");
-      db = new PostgresAdapter(dbUrl);
-    } else {
-      const rawDb = new Database(this.config.dbPath);
-      rawDb.run("PRAGMA journal_mode = WAL");
-      rawDb.run("PRAGMA busy_timeout = 5000");
-      db = new BunSqliteAdapter(rawDb);
+      return new PostgresAdapter(dbUrl);
     }
+    const rawDb = new Database(this.config.dbPath);
+    rawDb.run("PRAGMA journal_mode = WAL");
+    rawDb.run("PRAGMA busy_timeout = 5000");
+    return new BunSqliteAdapter(rawDb);
+  }
 
-    // 3. Initialize schema (new column names: ticket, summary, flow)
+  /** Step 3: initialize schema for the chosen DB engine and seed local compute. */
+  private async _initSchema(db: IDatabase): Promise<void> {
+    const dbUrl = this.config.databaseUrl;
     const isPostgres = !!(dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://")));
     if (isPostgres) {
       const { initPostgresSchema, seedLocalComputePostgres } = await import("./repositories/schema-postgres.js");
@@ -374,26 +394,26 @@ export class AppContext {
       initRepoSchema(db);
       seedLocalCompute(db);
     }
+  }
 
-    // 3a. Seed compute templates from config.yaml
-    if (this.config.computeTemplates?.length) {
-      const tmplRepo = new ComputeTemplateRepository(db);
-      for (const tmpl of this.config.computeTemplates) {
-        if (!tmplRepo.get(tmpl.name)) {
-          tmplRepo.create({
-            name: tmpl.name,
-            description: tmpl.description,
-            provider: tmpl.provider as any,
-            config: tmpl.config,
-          });
-        }
+  /** Step 3a: copy compute templates from config.yaml into the DB on first boot. */
+  private _seedComputeTemplates(db: IDatabase): void {
+    if (!this.config.computeTemplates?.length) return;
+    const tmplRepo = new ComputeTemplateRepository(db);
+    for (const tmpl of this.config.computeTemplates) {
+      if (!tmplRepo.get(tmpl.name)) {
+        tmplRepo.create({
+          name: tmpl.name,
+          description: tmpl.description,
+          provider: tmpl.provider as any,
+          config: tmpl.config,
+        });
       }
     }
+  }
 
-    // 3b. Initialize API key manager
-    this._apiKeys = new ApiKeyManager(db);
-
-    // 3b. Register all dependencies in the container
+  /** Step 3b: register all repositories, services, stores, and registries in the DI container. */
+  private _registerContainer(db: IDatabase): void {
     const storeBaseDir = join(fileURLToPath(import.meta.url), "..", "..", "..");
     const pricingRegistry = new PricingRegistry();
 
@@ -427,19 +447,18 @@ export class AppContext {
       transcriptParsers: asValue(this.createTranscriptParserRegistry()),
     });
 
-    // 3c. Non-blocking remote price refresh (best-effort)
+    // Non-blocking remote price refresh
     pricingRegistry.refreshFromRemote().catch(() => {});
+  }
 
-    // 4. Register compute providers
+  /** Step 4: register every compute provider available in the current install. */
+  private async _registerComputeProviders(): Promise<void> {
     await safeAsync("boot: load compute providers", async () => {
       const compute = await import("../compute/index.js");
-      // Initialize compute registry with this AppContext
       compute.setComputeApp(this);
-      // Legacy providers (backward compat -- same names: "local", "ec2", "docker")
       const providers = [
         new compute.LocalProvider(),
         new compute.DockerProvider(),
-        // ArkD-backed providers (new: "devcontainer", "firecracker", "ec2-docker", etc.)
         new compute.LocalDevcontainerProvider(),
         new compute.LocalFirecrackerProvider(),
         new compute.RemoteDockerProvider(),
@@ -451,7 +470,7 @@ export class AppContext {
         this.registerProvider(p);
       }
 
-      // E2B provider (optional -- only if e2b SDK is available)
+      // Optional providers (skip if their SDK isn't installed)
       try {
         const { E2BProvider } = await import("../compute/providers/e2b.js");
         const e2b = new E2BProvider();
@@ -459,7 +478,6 @@ export class AppContext {
         this.registerProvider(e2b);
       } catch { /* e2b SDK not installed */ }
 
-      // Kubernetes providers (optional -- only if @kubernetes/client-node is available)
       try {
         const { K8sProvider, KataProvider } = await import("../compute/providers/k8s.js");
         const k8s = new K8sProvider();
@@ -470,30 +488,27 @@ export class AppContext {
         this.registerProvider(kata);
       } catch { /* @kubernetes/client-node not installed */ }
     });
+  }
 
-    // 4b. Wire SessionService with AppContext
+  /** Step 5: wire services and the global event bus. */
+  private _wireServices(): void {
     this.sessionService.setApp(this);
-
-    // 5. Wire provider resolver for session.ts
     setProviderResolver((session: Session) => this.resolveProvider(session));
 
-    // 5b. Register executors
     registerExecutor(claudeCodeExecutor);
     registerExecutor(subprocessExecutor);
     registerExecutor(cliAgentExecutor);
 
-    // 6. Set up event bus
     this._eventBus = eventBus;
     this._eventBus.clear();
 
-    // 6b. Configure OTLP exporter
     configureOtlp(this.config.otlp);
-
-    // 6c. Store rollback config for conductor webhook handler
     this.rollbackConfig = this.config.rollback;
     configureTelemetry(this.config.telemetry);
+  }
 
-    // 6d. Optionally start TensorZero gateway
+  /** Step 6: optionally start TensorZero, the LLM router, and the conductor. */
+  private async _startOptionalServices(): Promise<void> {
     if (this.config.tensorZero?.enabled && !this.options.skipConductor) {
       await safeAsync("boot: start TensorZero", async () => {
         const { TensorZeroManager } = await import("./router/tensorzero.js");
@@ -510,7 +525,6 @@ export class AppContext {
       });
     }
 
-    // 6e. Optionally auto-start LLM Router
     if (this.config.router?.enabled && this.config.router.autoStart && !this.options.skipConductor) {
       await safeAsync("boot: start router", async () => {
         const { loadRouterConfig, startRouter } = await import("../router/index.js");
@@ -535,37 +549,24 @@ export class AppContext {
       });
     }
 
-    // 7. Optionally start conductor (dynamic import to avoid circular deps)
     if (!this.options.skipConductor) {
       await safeAsync("boot: start conductor", async () => {
         const { startConductor } = await import("./conductor/conductor.js");
         this.conductor = startConductor(this, this.config.conductorPort, { quiet: true });
       });
     }
+  }
 
-    // 8. Optionally start metrics poller
+  /** Step 7: start polling/maintenance loops and signal handlers. */
+  private _startMaintenance(): void {
     if (!this.options.skipMetrics) {
       this.metricsPoller = this._startMetricsPoller();
     }
-
-    // 9. Register signal handlers
     if (!this.options.skipSignals) {
       this._registerSignalHandlers();
     }
 
-    // 10. Detect orphaned sessions (crashed while running)
-    await safeAsync("boot: detect orphaned sessions", async () => {
-      const { findOrphanedSessions } = await import("./session/checkpoint.js");
-      const orphaned = findOrphanedSessions(this);
-      if (orphaned.length > 0) {
-        this._orphanedSessions = orphaned;
-        for (const s of orphaned) {
-          logWarn("session", `Orphaned session detected: ${s.id} (status: ${s.status}, stage: ${s.stage})`);
-        }
-      }
-    });
-
-    // 11. Purge expired soft-deletes every 30s
+    // Purge expired soft-deletes every 30s
     this._purgeInterval = setInterval(() => {
       try {
         const deleted = this.sessions.listDeleted();
@@ -579,44 +580,52 @@ export class AppContext {
       } catch { /* container may be disposed during shutdown */ }
     }, 30_000);
 
-    // 12. Update tmux status bar every 5s
+    // tmux status bar every 5s
     this._tmuxStatusInterval = setInterval(() => {
       updateTmuxStatusBar(this);
     }, 5_000);
 
-    // 13. Start notification daemon (if bridge config exists)
     this._notifyDaemon = startNotifyDaemon(this);
 
-    // 14. Clean up logs on boot (non-blocking)
+    // Log cleanup is fire-and-forget
     safeAsync("boot: cleanup logs", async () => {
       const { cleanupLogs } = await import("./observability/log-manager.js");
       cleanupLogs(this);
     });
+  }
 
-    // 15. Clean up stale hook configs in cwd
-    await safeAsync("boot: cleanup stale hooks", async () => {
-      const cwd = process.cwd();
-      const settingsPath = join(cwd, ".claude", "settings.local.json");
-      if (existsSync(settingsPath)) {
-        try {
-          const content = JSON.parse(readFileSync(settingsPath, "utf-8"));
-          const cmd = content?.hooks?.Stop?.[0]?.hooks?.[0]?.command ?? "";
-          if (cmd.includes("ark-status")) {
-            const match = cmd.match(/session=([^'&\s]+)/);
-            const sid = match?.[1];
-            if (sid) {
-              const session = this.sessions.get(sid);
-              if (!session || !["running", "waiting"].includes(session.status)) {
-                const { removeHooksConfig } = await import("./claude/claude.js");
-                removeHooksConfig(cwd);
-              }
-            }
-          }
-        } catch { /* ignore parse errors */ }
+  /** Step 8: detect orphaned/stale sessions and stale .claude/settings.local.json. */
+  private async _detectStaleState(): Promise<void> {
+    await safeAsync("boot: detect orphaned sessions", async () => {
+      const { findOrphanedSessions } = await import("./session/checkpoint.js");
+      const orphaned = findOrphanedSessions(this);
+      if (orphaned.length > 0) {
+        this._orphanedSessions = orphaned;
+        for (const s of orphaned) {
+          logWarn("session", `Orphaned session detected: ${s.id} (status: ${s.status}, stage: ${s.stage})`);
+        }
       }
     });
 
-    // 16. Detect stale running sessions (tmux died while TUI was closed)
+    await safeAsync("boot: cleanup stale hooks", async () => {
+      const cwd = process.cwd();
+      const settingsPath = join(cwd, ".claude", "settings.local.json");
+      if (!existsSync(settingsPath)) return;
+      try {
+        const content = JSON.parse(readFileSync(settingsPath, "utf-8"));
+        const cmd = content?.hooks?.Stop?.[0]?.hooks?.[0]?.command ?? "";
+        if (!cmd.includes("ark-status")) return;
+        const match = cmd.match(/session=([^'&\s]+)/);
+        const sid = match?.[1];
+        if (!sid) return;
+        const session = this.sessions.get(sid);
+        if (!session || !["running", "waiting"].includes(session.status)) {
+          const { removeHooksConfig } = await import("./claude/claude.js");
+          removeHooksConfig(cwd);
+        }
+      } catch { /* settings.local.json may be malformed; safe to skip */ }
+    });
+
     await safeAsync("boot: detect stale sessions", async () => {
       const { sessionExistsAsync } = await import("./infra/tmux.js");
       const running = this.sessions.list({ status: "running" });
@@ -631,11 +640,6 @@ export class AppContext {
         }
       }
     });
-
-    // 17. Telemetry: track app boot
-    track("app_boot");
-
-    this.phase = "ready";
   }
 
   // ── Shutdown ───────────────────────────────────────────────────────────

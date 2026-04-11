@@ -8,6 +8,7 @@
 import { join } from "path";
 import { homedir } from "os";
 import { existsSync, readFileSync } from "fs";
+import YAML from "yaml";
 import type { RouterConfig, ProviderConfig, ModelConfig, RoutingPolicy } from "./types.js";
 
 // ── Default model pool ───────────────────────────────────────────────────────
@@ -79,8 +80,6 @@ function loadYamlConfig(arkDir: string): Record<string, unknown> {
   const configPath = join(arkDir, "router.yaml");
   if (!existsSync(configPath)) return {};
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const YAML = require("yaml");
     return (YAML.parse(readFileSync(configPath, "utf-8")) ?? {}) as Record<string, unknown>;
   } catch {
     return {};
