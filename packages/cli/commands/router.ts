@@ -107,8 +107,22 @@ export function registerRouterCommands(program: Command) {
           process.exit(1);
         }
 
-        const health = await healthResp.json() as any;
-        const stats = await statsResp.json() as any;
+        const health = await healthResp.json() as {
+          uptime_ms: number;
+          providers?: string[];
+          models: number;
+        };
+        const stats = await statsResp.json() as {
+          total_requests: number;
+          routed_requests: number;
+          passthrough_requests: number;
+          errors: number;
+          fallbacks: number;
+          avg_classification_ms?: number;
+          avg_routing_ms?: number;
+          total_cost_usd?: number;
+          requests_by_model?: Record<string, number>;
+        };
 
         console.log(chalk.bold("LLM Router Status\n"));
         console.log(`  Status:     ${chalk.green("running")}`);
@@ -163,7 +177,13 @@ export function registerRouterCommands(program: Command) {
           process.exit(1);
         }
 
-        const costs = await resp.json() as any[];
+        const costs = await resp.json() as Array<{
+          key: string;
+          request_count: number;
+          total_input_tokens: number;
+          total_output_tokens: number;
+          total_cost_usd: number;
+        }>;
 
         if (!costs || costs.length === 0) {
           console.log(chalk.dim("No cost data yet."));
