@@ -53,11 +53,35 @@ function extractPathSegment(path: string, index: number): string | null {
   return path.split("/")[index] ?? null;
 }
 
+/**
+ * Extract tenant id from an inbound HTTP request.
+ * Priority:
+ *   1. Authorization Bearer header in the format `ark_<tenantId>_<secret>`
+ *   2. `X-Ark-Tenant-Id` header (direct)
+ *   3. `"default"` fallback (local single-tenant mode)
+ */
+function extractTenantId(req: Request): string {
+  const auth = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (auth) {
+    const match = /^Bearer\s+ark_([^_]+)_/i.exec(auth);
+    if (match && match[1]) return match[1];
+  }
+  const hdr = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
+  if (hdr) return hdr;
+  return "default";
+}
+
+/** Return a tenant-scoped AppContext view for this request. */
+function appForRequest(req: Request): AppContext {
+  return _app.forTenant(extractTenantId(req));
+}
+
 // ── Route handlers ──────────────────────────────────────────────────────────
 
 async function handleChannelReport(req: Request, sessionId: string): Promise<Response> {
   const report = (await req.json()) as OutboundMessage;
-  await handleReport(sessionId, report);
+  const scoped = appForRequest(req);
+  await handleReport(scoped, sessionId, report);
   return Response.json({ status: "ok" });
 }
 
@@ -67,9 +91,10 @@ async function handleAgentRelay(req: Request): Promise<Response> {
     target: string;
     message: string;
   };
-  const targetSession = _app.sessions.get(target);
+  const scoped = appForRequest(req);
+  const targetSession = scoped.sessions.get(target);
   if (targetSession) {
-    const channelPort = _app.sessions.channelPort(target);
+    const channelPort = scoped.sessions.channelPort(target);
     const payload = { type: "steer", message, from, sessionId: target };
     await deliverToChannel(targetSession as Session, channelPort, payload);
   }
@@ -400,6 +425,12 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
 /**
  * Deliver a message to a session's channel, using arkd if available.
  * Falls back to direct HTTP to the channel port for local sessions.
+ *
+ * Uses the module-level `_app` for compute lookup. In multi-tenant mode,
+ * compute records are tenant-scoped and the caller is responsible for
+ * passing sessions from a correctly scoped AppContext; compute lookup here
+ * intentionally uses the root `_app` since compute names are typically
+ * scoped identically.
  */
 export async function deliverToChannel(
   targetSession: Session,
@@ -408,7 +439,8 @@ export async function deliverToChannel(
 ): Promise<void> {
   // Try arkd delivery first (works for both local and remote)
   const computeName = targetSession.compute_name || "local";
-  const compute = _app.computes.get(computeName);
+  const tenantApp = targetSession.tenant_id ? _app.forTenant(targetSession.tenant_id) : _app;
+  const compute = tenantApp.computes.get(computeName);
   const provider = compute ? getProvider(compute.provider) : null;
   if (provider?.getArkdUrl) {
     try {
@@ -567,18 +599,18 @@ function handleTenantPolicyList(): Response {
 
 // ── Report handling ─────────────────────────────────────────────────────────
 
-async function handleReport(sessionId: string, report: OutboundMessage): Promise<void> {
+async function handleReport(app: AppContext, sessionId: string, report: OutboundMessage): Promise<void> {
   // Delegate business logic to session.ts
-  const result = session.applyReport(_app, sessionId, report);
+  const result = session.applyReport(app, sessionId, report);
 
   // Log events
   for (const evt of result.logEvents ?? []) {
-    _app.events.log(sessionId, evt.type, evt.opts);
+    app.events.log(sessionId, evt.type, evt.opts);
   }
 
   // Store message for TUI chat view
   if (result.message) {
-    _app.messages.send(sessionId, result.message.role, result.message.content, result.message.type);
+    app.messages.send(sessionId, result.message.role, result.message.content, result.message.type);
   }
 
   // Emit bus events
@@ -588,40 +620,40 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
   // Apply store updates
   if (Object.keys(result.updates).length > 0) {
-    _app.sessions.update(sessionId, result.updates);
+    app.sessions.update(sessionId, result.updates);
   }
 
   // Handle advance + auto-dispatch for completed reports
   if (result.shouldAdvance) {
-    const advResult = await session.advance(_app, sessionId);
-    const updated = (result.shouldAutoDispatch && advResult.ok) ? _app.sessions.get(sessionId) : null;
+    const advResult = await session.advance(app, sessionId);
+    const updated = (result.shouldAutoDispatch && advResult.ok) ? app.sessions.get(sessionId) : null;
     if (updated?.status === "ready" && updated.stage) {
-      const nextAction = flow.getStageAction(_app, updated.flow, updated.stage);
+      const nextAction = flow.getStageAction(app, updated.flow, updated.stage);
       if (nextAction.type === "agent" || nextAction.type === "fork") {
-        session.dispatch(_app, sessionId).catch(err => {
+        session.dispatch(app, sessionId).catch(err => {
           logError("conductor", `auto-dispatch failed for ${sessionId}: ${err?.message ?? err}`);
         });
       } else if (nextAction.type === "action") {
         // Auto-execute action stages with verification enforcement
         safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
-          const verify = await session.runVerification(_app, sessionId);
+          const verify = await session.runVerification(app, sessionId);
           if (!verify.ok) {
             logWarn("conductor", `action stage blocked by verification for ${sessionId}: ${verify.message}`);
-            _app.sessions.update(sessionId, {
+            app.sessions.update(sessionId, {
               status: "blocked",
               breakpoint_reason: `Verification failed: ${verify.message.slice(0, 200)}`,
             });
             sendOSNotification("Ark: Verification failed", `${updated.summary ?? sessionId} - ${verify.message.slice(0, 100)}`);
             return;
           }
-          await session.executeAction(_app, sessionId, nextAction.action ?? "");
+          await session.executeAction(app, sessionId, nextAction.action ?? "");
         });
       }
     }
   }
 
   // OS notification on stage completion or failure
-  const finalSession = _app.sessions.get(sessionId);
+  const finalSession = app.sessions.get(sessionId);
   if (finalSession && (report.type === "completed" || report.type === "error")) {
     const notifyTitle = report.type === "completed" ? "Stage completed" : "Session failed";
     const notifyBody = `${finalSession.summary ?? sessionId} - ${finalSession.stage ?? ""}`;
@@ -630,21 +662,21 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
   // PR URL detection (agent-provided)
   if (result.prUrl) {
-    _app.sessions.update(sessionId, { pr_url: result.prUrl });
-    _app.events.log(sessionId, "pr_detected", {
+    app.sessions.update(sessionId, { pr_url: result.prUrl });
+    app.events.log(sessionId, "pr_detected", {
       actor: "agent",
       data: { pr_url: result.prUrl },
     });
   }
 
   // Index session completion in knowledge graph (best-effort)
-  if (report.type === "completed" && _app.knowledge) {
+  if (report.type === "completed" && app.knowledge) {
     try {
       const { indexSessionCompletion } = await import("../knowledge/indexer.js");
-      const s = _app.sessions.get(sessionId);
+      const s = app.sessions.get(sessionId);
       const changedFiles = ((report as Record<string, unknown>).filesChanged as string[] | undefined) ?? [];
       indexSessionCompletion(
-        _app.knowledge,
+        app.knowledge,
         sessionId,
         s?.summary ?? "",
         "completed",
@@ -655,7 +687,7 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
   // Auto-create PR on completion (when session has a git remote and no PR yet)
   if (report.type === "completed" && !result.prUrl) {
-    const s = _app.sessions.get(sessionId);
+    const s = app.sessions.get(sessionId);
     if (s && !s.pr_url && s.config?.github_url && s.branch) {
       // Check repo config for auto_pr override (defaults to true)
       const { loadRepoConfig } = await import("../repo-config.js");
@@ -664,7 +696,7 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
 
       if (autoPR) {
         safeAsync(`auto-pr: ${sessionId}`, async () => {
-          const prResult = await session.createWorktreePR(_app, sessionId, {
+          const prResult = await session.createWorktreePR(app, sessionId, {
             title: s.summary ?? undefined,
           });
           if (prResult.ok && prResult.pr_url) {

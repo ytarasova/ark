@@ -26,6 +26,14 @@ const ARKD_URL = DEFAULT_ARKD_URL;
 // Fallback: if no arkd available, try conductor directly
 const CONDUCTOR_URL = DEFAULT_CONDUCTOR_URL;
 const HTTP_PORT = parseInt(process.env.ARK_CHANNEL_PORT ?? "0");
+const TENANT_ID = process.env.ARK_TENANT_ID;
+
+/** Build outbound headers, including tenant id when known. */
+function outboundHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (TENANT_ID) headers["X-Ark-Tenant-Id"] = TENANT_ID;
+  return headers;
+}
 
 // ── MCP Server with channel capability ──────────────────────────────────────
 
@@ -139,7 +147,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     try {
       await fetch(`${ARKD_URL}/channel/${SESSION_ID}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: outboundHeaders(),
         body: JSON.stringify(report),
       });
     } catch {
@@ -147,7 +155,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       try {
         await fetch(`${CONDUCTOR_URL}/api/channel/${SESSION_ID}`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: outboundHeaders(),
           body: JSON.stringify(report),
         });
       } catch { /* report delivery is best-effort */ }
@@ -166,14 +174,14 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     try {
       await fetch(`${ARKD_URL}/channel/relay`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: outboundHeaders(),
         body: JSON.stringify(relayPayload),
       });
     } catch {
       try {
         await fetch(`${CONDUCTOR_URL}/api/relay`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: outboundHeaders(),
           body: JSON.stringify(relayPayload),
         });
       } catch { /* relay fallback is best-effort */ }

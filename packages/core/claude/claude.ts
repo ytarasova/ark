@@ -100,18 +100,20 @@ export function shellQuoteArgs(claudeArgs: string[]): string {
 
 export function channelMcpConfig(
   sessionId: string, stage: string, channelPort: number,
-  opts?: { conductorUrl?: string },
+  opts?: { conductorUrl?: string; tenantId?: string },
 ): Record<string, unknown> {
   const bunPath = join(homedir(), ".bun", "bin", "bun");
+  const env: Record<string, string> = {
+    ARK_SESSION_ID: sessionId,
+    ARK_STAGE: stage,
+    ARK_CHANNEL_PORT: String(channelPort),
+    ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
+  };
+  if (opts?.tenantId) env.ARK_TENANT_ID = opts.tenantId;
   return {
     command: bunPath,
     args: [join(__dirname, "channel.ts")],
-    env: {
-      ARK_SESSION_ID: sessionId,
-      ARK_STAGE: stage,
-      ARK_CHANNEL_PORT: String(channelPort),
-      ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
-    },
+    env,
   };
 }
 

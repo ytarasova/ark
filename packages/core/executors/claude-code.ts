@@ -47,6 +47,16 @@ export const claudeCodeExecutor: Executor = {
     // Channel config + launcher
     const channelPort = app.sessions.channelPort(session.id);
     const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
+    // Inject tenant id into the channel process env so outbound relay/report
+    // requests carry X-Ark-Tenant-Id for multi-tenant scoping in the conductor.
+    if (channelConfig && typeof channelConfig === "object") {
+      const env = (channelConfig as Record<string, unknown>).env as Record<string, string> | undefined;
+      if (env) {
+        env.ARK_TENANT_ID = session.tenant_id ?? "default";
+      } else {
+        (channelConfig as Record<string, unknown>).env = { ARK_TENANT_ID: session.tenant_id ?? "default" };
+      }
+    }
     const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir });
 
     // Status hooks + permissions allow-list
