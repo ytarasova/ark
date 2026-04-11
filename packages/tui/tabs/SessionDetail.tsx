@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
 import type { Session, Event, SearchResult } from "../../core/index.js";
@@ -9,7 +9,6 @@ import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter } from "../helpers/sessionFormatting.js";
 import { formatCost } from "../../core/observability/costs.js";
-import type { StageDefinition } from "../../core/state/flow.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { Link } from "../components/Link.js";
@@ -18,6 +17,7 @@ import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
 import { useAgentOutput } from "../hooks/useAgentOutput.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useArkClient } from "../hooks/useArkClient.js";
+import { useSessionDetailData } from "../hooks/useSessionDetailData.js";
 import { matchesHotkey } from "../../core/hotkeys.js";
 
 export interface SessionActions {
@@ -51,33 +51,15 @@ export interface SessionDetailProps {
 export function SessionDetail({ session: s, sessions, pane, searchMode, searchQuery, searchResults, onSearchToggle, onSearchQueryChange, onSearchSubmit, onTodoChange, actions, onOverlay }: SessionDetailProps) {
   const theme = getTheme();
   const ark = useArkClient();
-  const [events, setEvents] = useState<Event[]>([]);
-  const [conversation, setConversation] = useState<{ role: string; content: string; timestamp: string }[]>([]);
-  const [todos, setTodos] = useState<any[]>([]);
+  const { events, conversation, todos, cost: costInfo, flowStages, refreshTodos } = useSessionDetailData(s, onTodoChange);
   const [todoSel, setTodoSel] = useState(0);
   const [todoAddMode, setTodoAddMode] = useState(false);
   const [todoAddText, setTodoAddText] = useState("");
-
-  useEffect(() => {
-    if (!s) { setEvents([]); return; }
-    ark.sessionEvents(s.id, 50).then(setEvents).catch(() => setEvents([]));
-  }, [s?.id, s?.status]);
-
-  useEffect(() => {
-    if (!s) { setTodos([]); return; }
-    ark.todoList(s.id).then(r => setTodos(r.todos ?? [])).catch(() => setTodos([]));
-  }, [s?.id, s?.status]);
 
   // Keep todoSel in bounds when todos change
   useEffect(() => {
     if (todoSel >= todos.length) setTodoSel(Math.max(0, todos.length - 1));
   }, [todos.length]);
-
-  const refreshTodos = useCallback(() => {
-    if (!s) return;
-    ark.todoList(s.id).then(r => setTodos(r.todos ?? [])).catch(() => {});
-    onTodoChange?.();
-  }, [s?.id, onTodoChange]);
 
   // Todo CRUD input handler (right pane, not in search or todo-add mode)
   useInput((input, key) => {
@@ -173,43 +155,11 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
     }
   });
 
-  // Load conversation history from Claude transcript (local sessions only)
-  // Remote sessions don't have local transcripts — their conversation is in channel messages
-  useEffect(() => {
-    if (!s) { setConversation([]); return; }
-    // Only load FTS5 conversation for sessions with a local claude_session_id
-    // Remote sessions would match wrong transcripts (e.g. our own session mentioning the ID)
-    if (!s.claude_session_id) { setConversation([]); return; }
-    ark.sessionConversation(s.claude_session_id, 100).then(setConversation).catch(() => setConversation([]));
-  }, [s?.id, s?.claude_session_id, s?.status]);
-
   // Channel port is deterministic: 19200 + (parseInt(id.replace("s-",""),16) % 10000)
   const channelPort = useMemo(() => {
     if (!s) return 0;
     return 19200 + (parseInt(s.id.replace("s-", ""), 16) % 10000);
   }, [s?.id]);
-  const [costInfo, setCostInfo] = useState<{
-    cost: number;
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_tokens: number;
-    total_tokens: number;
-  } | null>(null);
-  const [flowStages, setFlowStages] = useState<StageDefinition[]>([]);
-  useEffect(() => {
-    if (!s?.flow) { setFlowStages([]); return; }
-    ark.flowRead(s.flow).then(f => setFlowStages(f.stages ?? [])).catch(() => setFlowStages([]));
-  }, [s?.flow]);
-  useEffect(() => {
-    if (!s) { setCostInfo(null); return; }
-    ark.costsSession(s.id).then(r => setCostInfo({
-      cost: r.cost,
-      input_tokens: r.input_tokens,
-      output_tokens: r.output_tokens,
-      cache_read_tokens: r.cache_read_tokens,
-      total_tokens: r.total_tokens,
-    })).catch(() => setCostInfo(null));
-  }, [s?.id, s?.updated_at]);
 
   // Sort search results by timestamp
   const sortedSearchResults = useMemo(() => {
