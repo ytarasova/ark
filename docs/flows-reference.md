@@ -216,6 +216,36 @@ Full field reference for flow definition files.
 | `wait_flow` | Waits for CI check suites to complete |
 | `close_ticket` | Closes the associated ticket |
 
+### Verify Gates
+
+The `verify` field on any stage lists shell scripts (e.g., `npm test`, `npm run lint`) that MUST pass before the agent can report the stage as complete. If any script fails, completion is blocked and the agent is automatically steered to fix the failure. Verify scripts can also be declared at the repo level via `.ark.yaml` as a default for all stages.
+
+Todos (user-added checklist items via `ark session todo add`) also block completion. Use `--force` to override either gate.
+
+```yaml
+stages:
+  - name: implement
+    agent: implementer
+    gate: auto
+    verify:
+      - "npm test"
+      - "npm run lint"
+```
+
+### Fail-loopback (Retry on Failure)
+
+The `on_failure` field on a stage controls what happens when the agent reports a failure. Use `retry(N)` to automatically retry the stage up to N times with error context injected into the agent's next turn:
+
+```yaml
+stages:
+  - name: implement
+    agent: implementer
+    gate: auto
+    on_failure: "retry(3)"    # retry up to 3 times, max
+```
+
+Other values: `notify` (notify via bridge and pause), omitted (stop on failure).
+
 ---
 
 ## Managing Flows

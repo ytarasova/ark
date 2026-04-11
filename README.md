@@ -2,13 +2,13 @@
 
 **The orchestration layer for AI coding agents.** Manage sessions, workflows, and compute so your agents ship code -- not just write it.
 
-AI coding agents are powerful but ephemeral. They spin up, do work, and vanish -- leaving you to manage context, coordinate stages, track costs, and wire up infrastructure yourself. Ark handles all of that. Define a task, pick a workflow, and Ark drives your agents through a full SDLC pipeline -- intake, planning, audit, execution, verification, close, and retro -- across local machines, containers, cloud VMs, or Kubernetes pods. It works with any CLI coding tool: Claude Code, OpenAI Codex, Google Gemini CLI, Aider, or your own.
+AI coding agents are powerful but ephemeral. They spin up, do work, and vanish -- leaving you to manage context, coordinate stages, track costs, and wire up infrastructure yourself. Ark handles all of that. Define a task, pick a workflow, and Ark drives your agents through a full SDLC pipeline -- intake, planning, audit, execution, verification, close, and retro -- across local machines, containers, cloud VMs, or Kubernetes pods. It works with any CLI coding tool: Claude Code, OpenAI Codex, Google Gemini CLI, or your own.
 
 ## Prerequisites
 
 - [Bun](https://bun.sh) (runtime)
 - [tmux](https://github.com/tmux/tmux) (session management)
-- At least one CLI coding agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-cli), [Codex](https://github.com/openai/codex), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Aider](https://aider.chat), etc.)
+- At least one CLI coding agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-cli), [Codex](https://github.com/openai/codex), [Gemini CLI](https://github.com/google-gemini/gemini-cli))
 
 ## Installation
 
@@ -45,15 +45,20 @@ ark search "authentication"
 | Feature | Description | Docs |
 |---------|-------------|------|
 | **Sessions** | Full lifecycle management -- create, dispatch, stop, resume, fork, clone, export/import | [Guide](docs/guide.md#sessions) |
-| **Multi-Runtime Support** | 4 runtimes (Claude/Codex/Gemini/Aider) with runtime/role separation -- any agent role on any LLM backend | [CLAUDE.md](CLAUDE.md#runtimes) |
+| **Multi-Runtime Support** | 4 runtimes (Claude, Claude Max subscription, Codex, Gemini) with runtime/role separation -- any agent role on any LLM backend | [CLAUDE.md](CLAUDE.md#runtimes) |
 | **SDLC Flows** | DAG-based multi-stage pipelines with fan-out, auto-join, verification gates, and 12 specialized agents | [Guide](docs/guide.md#flows--agents) |
-| **Knowledge Graph** | Unified knowledge across codebase, sessions, memories, and learnings via Axon indexer | [Guide](docs/guide.md#knowledge-graph) |
-| **LLM Router** | OpenAI-compatible proxy with 3 routing policies, circuit breakers, and cost tracking | [Guide](docs/guide.md#llm-router) |
+| **Knowledge Graph** | Unified knowledge across codebase, sessions, memories, and learnings via ops-codegraph (33 languages via tree-sitter, native Rust engine) | [Guide](docs/guide.md#knowledge-graph) |
+| **LLM Router** | OpenAI-compatible proxy with 3 routing policies, circuit breakers, and cost tracking. Injects `ANTHROPIC_BASE_URL`/`OPENAI_BASE_URL` into executors at dispatch | [Guide](docs/guide.md#llm-router) |
+| **TensorZero Gateway** | Optional Rust LLM gateway backing the Router. Starts as sidecar, native binary, or Docker container. Unified request/response handling across providers | [Guide](docs/guide.md#llm-router) |
+| **Compute Templates** | Named compute presets in `~/.ark/config.yaml` under `compute_templates:`. CLI: `ark compute template list|show|create|delete`, `ark compute create --from-template <name>` | [Guide](docs/guide.md#compute) |
+| **Multi-Tenant Control Plane** | API key auth, tenant scoping on all entities, role-based access (admin/member/viewer), tenant integration policies (router_required, auto_index_required, tensorzero_enabled), DB-backed resource stores | [Guide](docs/guide.md#control-plane) |
+| **Auto-Index on Dispatch** | Local mode honors `knowledge.auto_index` config. Remote compute (arkd) ALWAYS indexes via `/codegraph/index` endpoint | [Guide](docs/guide.md#knowledge-graph) |
+| **Runtime Billing Modes** | `api` (per-token pricing), `subscription` (e.g. Claude Max $200/mo, tokens recorded for rate limits), `free`. Polymorphic transcript parsers per runtime | [CLAUDE.md](CLAUDE.md#runtimes) |
 | **Dashboard** | Fleet status overview with cost charts (Recharts), budget tracking, and recent activity | [CLI](docs/cli-reference.md#ark-dashboard) |
 | **TUI Dashboard** | 9-tab terminal UI with keyboard-driven navigation, search, status filters | [TUI Reference](docs/tui-reference.md) |
 | **Web Dashboard** | Browser-based session management with SSE live updates, token auth, read-only mode | [Guide](docs/guide.md#web-dashboard) |
 | **Desktop App** | Electron wrapper around the web dashboard -- native menus, system tray, local-first | -- |
-| **7 Compute Providers** | Local, Docker, DevContainer, Firecracker, EC2+ArkD, E2B (managed sandbox), K8s+Kata | [Guide](docs/guide.md#compute) |
+| **Compute Providers** | Local, Docker, DevContainer, Firecracker, EC2 + arkd (base/docker/devcontainer/firecracker), E2B (managed sandbox), K8s, K8s+Kata | [Guide](docs/guide.md#compute) |
 | **Git Worktrees** | Automatic branch isolation per session, diff preview, merge + auto-PR in one command | [Guide](docs/guide.md#git-worktrees) |
 | **Skills & Recipes** | Reusable prompt fragments and session templates with three-tier resolution | [Guide](docs/guide.md#skills--recipes) |
 | **Cost Tracking** | Automatic token usage collection, per-model pricing, budget limits, cost export | [Guide](docs/guide.md#cost-tracking) |
@@ -73,12 +78,17 @@ ark search "authentication"
 packages/
   cli/        Commander.js CLI entry point (ark command)
   core/       Sessions, store, flows, agents, channels, conductor, search (FTS5),
-              costs, knowledge graph, auth, tenant policies, scheduler, SSE bus
-    knowledge/  Knowledge graph store, indexer, context builder, MCP tools, export/import
+              costs, knowledge graph, auth, tenant policies, scheduler, SSE bus,
+              TranscriptParserRegistry, PricingRegistry, UsageRecorder
+    knowledge/  Knowledge graph store, indexer (ops-codegraph), context builder, MCP tools, export/import
     services/   SessionService, ComputeService, HistoryService + orchestration
-    repositories/  SQL CRUD (Session, Compute, Event, Message, Todo)
-    stores/     Resource stores (Flow, Skill, Agent, Recipe, Runtime) -- three-tier
-  compute/    7 providers: local, docker, devcontainer, firecracker, ec2, e2b, k8s+kata
+    repositories/  SQL CRUD (Session, Compute, ComputeTemplate, Event, Message, Todo)
+    stores/     Resource stores (Flow, Skill, Agent, Recipe, Runtime) -- three-tier file-backed,
+                or DbResourceStore (resource_definitions table) in hosted mode
+    runtimes/   Polymorphic transcript parsers (claude, codex, gemini)
+    router/     TensorZero lifecycle manager
+  compute/    11 providers: local, docker, devcontainer, firecracker, ec2 (+arkd variants),
+              e2b, k8s, k8s-kata
   arkd/       Universal agent daemon -- HTTP server on every compute target
   router/     LLM Router -- OpenAI-compatible proxy with routing policies
   tui/        React + Ink terminal dashboard (9 tabs)
@@ -92,7 +102,7 @@ packages/
 agents/       12 agent definitions (ticket-intake, spec-planner, plan-auditor,
               implementer, task-implementer, verifier, reviewer, documenter,
               closer, retro, planner, worker)
-runtimes/     4 runtime definitions (claude, codex, gemini, aider)
+runtimes/     4 runtime definitions (claude, claude-max, codex, gemini)
 flows/        9 flow definitions (default, quick, bare, parallel, fan-out,
               pr-review, dag-parallel, islc, islc-quick)
 skills/       7 builtin skills (code-review, plan-audit, sanity-gate,
@@ -146,14 +156,18 @@ The Helm chart deploys: control plane, worker pool, PostgreSQL, Redis, Ingress.
 
 | Path | Purpose |
 |------|---------|
-| `~/.ark/ark.db` | SQLite database (WAL mode) -- local mode |
-| `~/.ark/config.yaml` | User configuration |
+| `~/.ark/ark.db` | SQLite database (WAL mode) -- local mode. Tenant-scoped tables: sessions, compute, compute_templates, compute_pools, events, messages, todos, groups, schedules, usage_records, resource_definitions, knowledge, knowledge_edges |
+| `~/.ark/config.yaml` | User configuration (router, knowledge, tensorzero, compute_templates, auth) |
 | `~/.ark/tracks/` | Launcher scripts per session |
 | `~/.ark/worktrees/` | Git worktrees for isolated sessions |
 | `~/.ark/skills/` | Global skill definitions |
 | `~/.ark/recipes/` | Global recipe definitions |
 | `~/.ark/profiles.json` | Profile definitions |
 | `~/.ark/bridge.json` | Messaging bridge config (Telegram/Slack/Discord) |
+| `.codegraph/graph.db` | ops-codegraph index (per-repo). Ingested into `knowledge`/`knowledge_edges` tables |
+| `~/.claude/projects/` | Claude Code transcripts (JSONL) -- parsed by ClaudeTranscriptParser |
+| `~/.codex/sessions/` | Codex transcripts (JSONL) -- parsed by CodexTranscriptParser (cwd-matched) |
+| `~/.gemini/tmp/` | Gemini transcripts (JSONL) -- parsed by GeminiTranscriptParser (projectHash-matched) |
 
 ## License
 

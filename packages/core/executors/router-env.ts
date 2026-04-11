@@ -27,7 +27,7 @@ export function buildRouterEnv(config: ArkConfig, opts: RouterEnvOpts): Record<s
   if (opts.mode === "claude") {
     env.ANTHROPIC_BASE_URL = routerUrl;
   } else {
-    // openai mode: set both -- codex/aider/etc. use OPENAI_BASE_URL,
+    // openai mode: set both -- codex and similar tools use OPENAI_BASE_URL,
     // but some tools also respect ANTHROPIC_BASE_URL
     env.OPENAI_BASE_URL = `${routerUrl}/v1`;
     env.ANTHROPIC_BASE_URL = routerUrl;

@@ -41,7 +41,7 @@ ark session start [ticket] [options]
 | `--claude-session <id>` | Create from an existing Claude Code session | -- |
 | `--recipe <name>` | Create session from a recipe template | -- |
 | `--agent <name>` | Agent override | -- |
-| `--runtime <name>` | Runtime override (e.g., codex, gemini, aider) | -- |
+| `--runtime <name>` | Runtime override: `claude`, `claude-max`, `codex`, or `gemini` | -- |
 | `--remote-repo <url>` | Git URL to clone on compute target (no local repo needed) | -- |
 
 Examples:
@@ -571,7 +571,11 @@ ark costs --limit 50
 
 ## ark costs-sync
 
-Backfill cost data from Claude transcripts. Scans transcripts and populates cost fields for sessions that are missing them.
+Backfill cost data from agent transcripts. Scans transcripts from all supported runtimes (Claude Code, OpenAI Codex, Google Gemini) via the polymorphic `TranscriptParserRegistry` and writes one row per turn into the `usage_records` table.
+
+The backfill picks the right parser per session by inspecting the session's runtime: `ClaudeTranscriptParser` reads `~/.claude/projects/<slug>/<sessionId>.jsonl`, `CodexTranscriptParser` reads `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (matched by cwd), `GeminiTranscriptParser` reads `~/.gemini/tmp/<projectHash>/chats/session-*.jsonl`.
+
+Each record carries a `cost_mode` (`api`, `subscription`, or `free`) inherited from the runtime's billing config -- so `claude-max` turns keep the token counts with `cost_usd = 0`, while `claude`/`codex`/`gemini` API turns get per-token pricing from the `PricingRegistry` (300+ models, LiteLLM JSON).
 
 ```
 ark costs-sync
@@ -1064,9 +1068,10 @@ ark compute create <name> [options]
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--provider <type>` | Provider type: docker, ec2 | `local` |
+| `--provider <type>` | Provider type: `local`, `docker`, `devcontainer`, `firecracker`, `ec2`, `ec2-docker`, `ec2-devcontainer`, `ec2-firecracker`, `e2b`, `k8s`, `k8s-kata` | `local` |
+| `--from-template <template>` | Create from a named compute template (see `ark compute template`) | -- |
 
-**EC2 options:**
+**EC2 options** (applies to `ec2`, `ec2-docker`, `ec2-devcontainer`, `ec2-firecracker`):
 
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -1077,7 +1082,7 @@ ark compute create <name> [options]
 | `--subnet-id <id>` | Subnet ID | -- |
 | `--tag <key=value>` | Tag (repeatable) | -- |
 
-**Docker options:**
+**Docker / devcontainer options:**
 
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -1088,7 +1093,79 @@ ark compute create <name> [options]
 ```bash
 ark compute create my-ec2 --provider ec2 --size m --region us-east-1
 ark compute create my-docker --provider docker --image node:20
-ark compute create my-dev --provider docker --devcontainer
+ark compute create my-dev --provider devcontainer
+ark compute create my-fc --provider firecracker
+ark compute create my-ec2-fc --provider ec2-firecracker --size l
+ark compute create my-e2b --provider e2b
+ark compute create my-k8s --provider k8s
+ark compute create my-kata --provider k8s-kata
+ark compute create my-box --from-template gpu-large
+```
+
+When `--from-template` is set, Ark loads the named template from `~/.ark/config.yaml` (under `compute_templates:`) and uses its provider + config as the base. Any additional flags on the command line override the template defaults.
+
+### ark compute template
+
+Manage named compute templates -- preset provider configurations that `ark compute create --from-template` can consume.
+
+Templates are defined in `~/.ark/config.yaml` under `compute_templates:` (see the Configuration reference), and can also be created from the CLI. In hosted/control-plane mode, templates are stored per-tenant in the `compute_templates` database table.
+
+#### ark compute template list
+
+List all defined compute templates.
+
+```
+ark compute template list
+```
+
+```bash
+ark compute template list
+```
+
+#### ark compute template show
+
+Show a template's full configuration.
+
+```
+ark compute template show <name>
+```
+
+```bash
+ark compute template show gpu-large
+```
+
+#### ark compute template create
+
+Create a new compute template.
+
+```
+ark compute template create <name> --provider <type> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--provider <type>` | Provider type (same list as `compute create`) | required |
+| `--size <size>` | Instance size (EC2-family providers) | -- |
+| `--region <region>` | AWS region (EC2-family) | -- |
+| `--image <image>` | Docker image (docker/devcontainer) | -- |
+| `--set <key=value>` | Set arbitrary config key (repeatable) | -- |
+
+```bash
+ark compute template create gpu-large --provider ec2 --size xxl --region us-west-2
+ark compute template create sandbox --provider docker --image node:20
+ark compute template create isolated --provider ec2-firecracker --size l
+```
+
+#### ark compute template delete
+
+Delete a compute template.
+
+```
+ark compute template delete <name>
+```
+
+```bash
+ark compute template delete gpu-large
 ```
 
 ### ark compute list
@@ -1392,7 +1469,20 @@ ark init
 
 ## ark arkd
 
-Start the ArkD universal agent daemon.
+Start the ArkD universal agent daemon. ArkD is a stateless HTTP server (`packages/arkd/server.ts`, ~800 lines) that runs on every compute target -- local machine, Docker container, EC2 instance, K8s pod, Firecracker micro-VM -- and exposes one uniform API for agent lifecycle, file ops, metrics, and channel relay.
+
+**Why it exists:** Without arkd, the conductor would need to shell into each compute via SSH for every operation (slow, auth-fragile, provider-specific). With arkd, the conductor talks HTTP to `http://<compute-ip>:19300` regardless of how or where the compute was provisioned.
+
+**Responsibilities:**
+- Agent lifecycle (launch/kill/status) via tmux
+- File ops (read/write/list) on the remote target
+- Process execution with sandbox
+- System metrics (CPU/memory/disk/uptime)
+- Port probing
+- Channel relay (agent report -> arkd -> conductor at :19100)
+- Docker container ops (list/exec)
+- Codegraph indexing at `POST /codegraph/index` (runs `codegraph build` locally, parses `.codegraph/graph.db`, and returns nodes/edges to the conductor)
+- Optional bearer-token auth via the `ARK_ARKD_TOKEN` env var
 
 ```
 ark arkd [options]
@@ -1400,9 +1490,11 @@ ark arkd [options]
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-p, --port <port>` | Port | `19300` |
+| `-p, --port <port>` | Port (env: `ARK_ARKD_PORT`) | `19300` |
 | `--hostname <host>` | Bind address | `0.0.0.0` |
 | `--conductor-url <url>` | Conductor URL for channel relay | `http://localhost:19100` |
+
+Override the URL seen by the rest of Ark with `ARK_ARKD_URL` (defaults to `http://localhost:19300`). Local providers target `http://localhost:19300`, remote providers target `http://<compute-ip>:19300`. Docker/devcontainer images bake arkd in so it starts on container boot; EC2 installs it via cloud-init as a systemd service; K8s runs it as a sidecar container in the agent pod.
 
 ```bash
 ark arkd
@@ -1506,23 +1598,49 @@ ark pr status https://github.com/org/repo/pull/123
 
 ## ark mcp-proxy
 
-Internal command: bridge stdin/stdout to a pooled MCP socket.
+Bridge a Claude Code MCP client over stdio to a pooled MCP server reachable at a Unix domain socket.
 
 ```
 ark mcp-proxy <socket-path>
 ```
 
-This is used internally by the MCP socket pooling system. You do not need to call it directly.
+When MCP socket pooling is enabled (`mcp_pool.enabled: true` in `~/.ark/config.yaml`), each pooled MCP server runs as a single long-lived process and exposes a socket at `/tmp/ark-mcp-<name>.sock`. Session `.mcp.json` entries reference the pool via:
+
+```json
+{
+  "mcpServers": {
+    "knowledge-graph": {
+      "command": "ark",
+      "args": ["mcp-proxy", "/tmp/ark-mcp-knowledge-graph.sock"]
+    }
+  }
+}
+```
+
+`ark mcp-proxy` is the stdio-to-socket shim that Claude Code spawns. It is normally wired up automatically -- you only call it by hand when testing a custom `.mcp.json`. Pooling cuts memory roughly 85-90% versus the default one-process-per-session-per-MCP model.
+
+```bash
+ark mcp-proxy /tmp/ark-mcp-knowledge-graph.sock
+```
 
 ---
 
 ## ark channel
 
-Run the MCP channel server (used by remote agents). Internal command.
+Run the ark-channel MCP server for a session. Each Ark session gets one channel server, spawned over stdio by the agent runtime (Claude Code, Codex, Gemini). The channel server implements the official Claude Code `claude/channel` capability:
+
+- Inbound: `notifications/claude/channel` events (human steering flows from conductor -> arkd -> ark-channel -> agent)
+- Outbound MCP tools:
+  - `report` -- agent reports progress, completion, error, or question
+  - `send_to_agent` -- agent messages another agent (for handoff and fan-out coordination)
+
+**Port allocation is deterministic.** Each channel server opens an HTTP port for inbound traffic using the formula `19200 + (hash(sessionId) % 10000)` -- so the same session always gets the same port and two concurrent sessions almost never collide. This is normally invoked by the executor; you only call it by hand when debugging the MCP wiring.
 
 ```
 ark channel
 ```
+
+See also `ark arkd`, which relays channel reports from ark-channel back to the conductor at `:19100`.
 
 ---
 
@@ -1902,13 +2020,23 @@ ark router start [options]
 | `-p, --port <port>` | Listen port | `8430` |
 | `--policy <policy>` | Routing policy: quality, balanced, cost | `balanced` |
 | `--config <path>` | Path to router config YAML | -- |
+| `--tensorzero` | Enable TensorZero backend (Rust gateway, Apache 2.0) | -- |
+| `--tensorzero-url <url>` | URL of an already-running TensorZero gateway (skips auto-start) | -- |
+| `--tensorzero-port <port>` | Port for the auto-started TensorZero gateway | `3000` |
 
 ```bash
 ark router start
 ark router start --port 9000 --policy cost
+ark router start --tensorzero                                     # auto-start TensorZero sidecar
+ark router start --tensorzero --tensorzero-port 3030              # auto-start on custom port
+ark router start --tensorzero-url http://tensorzero.internal:3000 # reuse an external gateway
 ```
 
 Requires at least one API key env var: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY`.
+
+When `--tensorzero` is set, the router's TensorZero lifecycle manager starts the gateway for you. It tries three strategies in order: (1) detect an already-running sidecar at the configured URL, (2) launch the native `tensorzero` Rust binary if it is on `PATH`, (3) fall back to running it in Docker. The config file (`tensorzero.toml`) is generated on the fly from your API key env vars.
+
+When `router.enabled` + `router.auto_start` + `tensorZero.enabled` are all true in `~/.ark/config.yaml`, Ark starts both the router and TensorZero automatically at boot -- no manual `ark router start` needed.
 
 ### ark router status
 

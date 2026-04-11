@@ -1,9 +1,0 @@
-name: aider
-description: "Aider AI pair programming"
-type: cli-agent
-command: ["aider", "--yes-always"]
-task_delivery: stdin
-models:
-  - id: sonnet
-    label: "Claude Sonnet (via Aider)"
-default_model: sonnet

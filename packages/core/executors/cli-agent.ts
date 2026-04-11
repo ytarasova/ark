@@ -2,7 +2,7 @@
  * Generic CLI agent executor -- runs any CLI coding tool in tmux.
  *
  * Supports any agent that accepts tasks via stdin, file, or CLI args.
- * Examples: codex, gemini-cli, aider, cursor-agent, opencode, pi, amp.
+ * Examples: codex, gemini-cli, opencode, pi, amp, or any custom CLI tool.
  *
  * Agent YAML:
  *   runtime: cli-agent

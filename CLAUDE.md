@@ -1,6 +1,6 @@
 # Ark
 
-Autonomous agent ecosystem. Orchestrates AI coding agents through DAG-based SDLC flows with 7 compute providers, unified knowledge graph, LLM router, and multi-tenant control plane.
+Autonomous agent ecosystem. Orchestrates AI coding agents through DAG-based SDLC flows with 11 compute providers, unified knowledge graph (ops-codegraph indexer), LLM router + optional TensorZero gateway, and multi-tenant control plane. Supports Claude Code, Codex, and Gemini CLI runtimes with per-token (`api`), `subscription`, and `free` billing modes. Bun + tmux only -- no Python dependencies.
 
 ## Commands
 
@@ -28,13 +28,17 @@ ark arkd              # start the arkd daemon (--port 19300, --conductor-url htt
 packages/
   cli/       → Commander.js CLI entry (ark command)
   core/      → Sessions, store, flows, agents, channels, conductor, search (FTS5), app context, config
-    knowledge/     → Knowledge graph store, indexer, context builder, MCP tools, export/import
-    repositories/  → SQL CRUD (SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository)
+    knowledge/     → Knowledge graph store, indexer (ops-codegraph), context builder, MCP tools, export/import
+    repositories/  → SQL CRUD (SessionRepository, ComputeRepository, ComputeTemplateRepository, EventRepository, MessageRepository, TodoRepository)
     services/      → Business logic (SessionService, ComputeService, HistoryService) + orchestration
-    stores/        → Resource stores (FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore) -- file-backed, three-tier resolution
+    stores/        → Resource stores (FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore) -- file-backed three-tier resolution
+    stores/db-resource-store.ts → DB-backed variant for hosted mode (resource_definitions table, tenant-scoped)
+    runtimes/      → Polymorphic transcript parsers: claude/parser.ts, codex/parser.ts, gemini/parser.ts
+    observability/costs.ts → PricingRegistry, UsageRecorder (cost_mode: api/subscription/free)
+    router/tensorzero.ts → TensorZero lifecycle manager (sidecar/native/Docker)
     auth.ts        → Multi-tenant auth middleware (API key-based)
     api-keys.ts    → API key manager (create, validate, revoke, rotate)
-    tenant-policy.ts → Tenant compute policies (provider limits, cost caps)
+    tenant-policy.ts → Tenant policies: compute limits, cost caps, integration toggles (router_enabled/required, auto_index/required, router_policy, tensorzero_enabled)
     hosted.ts      → Hosted mode entry point (worker registry, scheduler, SSE bus)
     worker-registry.ts → Worker registration and health checking
     scheduler.ts   → Session scheduler with tenant policy enforcement
@@ -43,9 +47,9 @@ packages/
     database.ts    → IDatabase abstraction interface
     database-sqlite.ts → SQLite adapter (local mode, bun:sqlite)
     database-postgres.ts → PostgreSQL adapter (hosted mode)
-  compute/   → 7 providers: local, docker, devcontainer, firecracker, ec2+arkd, e2b, k8s+kata
-  arkd/      → Universal agent daemon - HTTP server on every compute target
-  router/    → LLM Router -- OpenAI-compatible proxy with routing policies, circuit breakers
+  compute/   → 11 providers: local, docker, devcontainer, firecracker, ec2, ec2-docker, ec2-devcontainer, ec2-firecracker, e2b, k8s, k8s-kata
+  arkd/      → Universal agent daemon - HTTP server on every compute target (includes /codegraph/index endpoint)
+  router/    → LLM Router -- OpenAI-compatible proxy with routing policies, circuit breakers, optional TensorZero backend
   server/    → JSON-RPC handlers (delegate to services + stores via AppContext)
   protocol/  → ArkClient (typed JSON-RPC client)
   tui/       → React + Ink terminal dashboard
@@ -54,12 +58,12 @@ packages/
   types/     → Domain interfaces (Session, Compute, Event, Message, Tenant, etc.)
 agents/      → 12 agent definitions (ticket-intake, spec-planner, plan-auditor, implementer,
                task-implementer, verifier, reviewer, documenter, closer, retro, planner, worker)
-runtimes/    → 4 runtime definitions (claude, codex, gemini, aider)
+runtimes/    → 4 runtime definitions (claude, claude-max, codex, gemini)
 flows/       → 9 flow definitions (default, quick, bare, parallel, fan-out, pr-review, dag-parallel, islc, islc-quick)
 skills/      → 7 builtin skills (code-review, plan-audit, sanity-gate, security-scan, self-review, spec-extraction, test-writing)
 recipes/     → 8 recipe templates (quick-fix, feature-build, code-review, fix-bug, new-feature, ideate, islc, islc-quick)
 mcp-configs/ → MCP config stubs (Atlassian, GitHub, Linear, Figma)
-.infra/      → Dockerfile, docker-compose, Helm chart
+.infra/      → Dockerfile, docker-compose (includes tensorzero service), Helm chart
 ```
 
 No workspaces config - packages are coordinated manually via relative imports.
@@ -174,7 +178,9 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 
 | Path | Purpose |
 |------|---------|
-| `~/.ark/ark.db` | SQLite database (WAL mode, 5s busy timeout) -- includes knowledge graph tables |
+| `~/.ark/ark.db` | SQLite database (WAL mode, 5s busy timeout). Tenant-scoped tables: sessions, compute, compute_templates, compute_pools, events, messages, todos, groups, schedules, usage_records, resource_definitions, knowledge, knowledge_edges. FTS5: transcript_index |
+| `~/.ark/config.yaml` | User config: router, knowledge, tensorzero, compute_templates, default_compute, budgets, auth |
+| `~/.ark/tensorzero/` | Generated `tensorzero.toml` + runtime files (when TensorZero enabled) |
 | `~/.ark/tracks/<sessionId>/` | Launcher scripts, channel configs |
 | `~/.ark/worktrees/<sessionId>/` | Git worktrees for isolated sessions |
 | `~/.ark/skills/` | Global skill definitions (user tier for SkillStore) |
@@ -182,7 +188,10 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 | `~/.ark/flows/` | Global flow definitions (user tier for FlowStore) |
 | `~/.ark/agents/` | Global agent definitions (user tier for AgentStore) |
 | `~/.ark/runtimes/` | Global runtime definitions (user tier for RuntimeStore) |
-| `~/.claude/projects/` | Claude Code session transcripts (JSONL) - read by search and import |
+| `.codegraph/graph.db` | Per-repo ops-codegraph index. Ingested into `knowledge`/`knowledge_edges` tables by the indexer |
+| `~/.claude/projects/` | Claude Code transcripts (JSONL) -- parsed by ClaudeTranscriptParser (exact path via session.claude_session_id) |
+| `~/.codex/sessions/` | Codex transcripts (JSONL) -- parsed by CodexTranscriptParser (cwd-matched to session.workdir) |
+| `~/.gemini/tmp/` | Gemini transcripts (JSONL) -- parsed by GeminiTranscriptParser (projectHash = sha256(workdir)) |
 | `.claude/settings.local.json` | Per-session hook config (written at dispatch, cleaned on stop) |
 
 **Note:** The old `~/.ark/memories.json` and `~/.ark/LEARNINGS.md` files are no longer used. Memory and learnings are now stored as nodes in the knowledge graph (in `ark.db`).
@@ -223,7 +232,11 @@ ark session start --repo . --summary "Fix bug" --agent worker --runtime gemini -
 
 Runtimes define HOW an agent runs. Three-tier resolution: `runtimes/` (builtin) > `~/.ark/runtimes/` (global) > `.ark/runtimes/` (project).
 
-**Built-in runtimes:** `claude` (Claude Code), `codex` (OpenAI Codex CLI), `gemini` (Google Gemini CLI), `aider` (Aider).
+**Built-in runtimes:**
+- `claude` -- Claude Code, `api` billing, transcript parser: claude
+- `claude-max` -- Claude Code with Max subscription, `subscription` billing, $200/mo plan, transcript parser: claude
+- `codex` -- OpenAI Codex CLI, `api` billing, default model gpt-5-codex, transcript parser: codex
+- `gemini` -- Google Gemini CLI, `api` billing, transcript parser: gemini
 
 Create `runtimes/<name>.yaml`:
 ```yaml
@@ -236,11 +249,33 @@ models:
   - id: default
     label: "Default Model"
 default_model: default
+billing:
+  mode: api         # api | subscription | free
+  plan: claude-max-200           # optional, subscription only
+  cost_per_month: 200            # optional, subscription only
+  transcript_parser: claude      # claude | codex | gemini
 ```
+
+**Billing modes:**
+- `api` -- per-token pricing resolved via `PricingRegistry` (300+ models via LiteLLM JSON)
+- `subscription` -- `cost_usd=0`; tokens still recorded in `usage_records` for rate-limit tracking
+- `free` -- `cost_usd=0`, no rate tracking
+
+The `cost_mode` column on `usage_records` records the mode that applied at record time.
 
 CLI: `ark runtime list`, `ark runtime show <name>`.
 
-At dispatch, runtime config (type, command, task_delivery, env) is merged with agent config. Agent-level values take precedence.
+At dispatch, runtime config (type, command, task_delivery, env, billing) is merged with agent config. Agent-level values take precedence.
+
+## Transcript Parsers
+
+`TranscriptParserRegistry` lives on `AppContext` and dispatches to polymorphic per-runtime parsers in `packages/core/runtimes/<name>/parser.ts`. Workdir-based session identification (not "latest by mtime"):
+
+- **ClaudeTranscriptParser** -- exact path `~/.claude/projects/<slug>/<session>.jsonl` via `session.claude_session_id`
+- **CodexTranscriptParser** -- scans `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`, matches `session_meta.cwd` to `session.workdir`
+- **GeminiTranscriptParser** -- scans `~/.gemini/tmp/<slug>/chats/session-*.jsonl`, matches `projectHash = sha256(workdir)` against the file's first line
+
+Parser output feeds `UsageRecorder` to build universal usage records regardless of runtime.
 
 ## Executor System
 
@@ -249,7 +284,7 @@ Agents dispatch through pluggable executors. The runtime's `type` field selects 
 **Built-in executors:**
 - `claude-code` (default) -- launches Claude Code in tmux with hooks + MCP channel
 - `subprocess` -- spawns any command as a child process
-- `cli-agent` -- runs any CLI tool (codex, gemini, aider, etc.) in tmux with worktree isolation
+- `cli-agent` -- runs any CLI tool (codex, gemini, etc.) in tmux with worktree isolation
 
 **Executor interface:** 5 methods -- `launch`, `kill`, `status`, `send`, `capture`. Defined in `packages/core/executor.ts`.
 
@@ -263,6 +298,8 @@ env:
 ```
 
 Executors are registered at boot in `app.ts`. The registry is in `packages/core/executor.ts`.
+
+**Router URL injection.** When `router.enabled` is true in config, executors inject `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` into the agent's environment at dispatch so all LLM calls flow Router → TensorZero (if enabled) → Provider. This is transparent to the agent binary.
 
 ## Adding a Flow
 
@@ -416,13 +453,16 @@ Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/h
 ## Architecture Boundaries
 
 - **`packages/types/`** - All domain interfaces (`Session`, `Compute`, `Event`, `Message`, `TenantContext`, etc.). Single source of truth. No logic, no dependencies. Imported by every other package.
-- **`repositories/`** - SQL CRUD behind typed classes. Column whitelists prevent injection. `SessionRepository`, `ComputeRepository`, `EventRepository`, `MessageRepository`, `TodoRepository`. Access via `app.sessions`, `app.computes`, `app.todos`, etc.
-- **`stores/`** - File-backed resource stores with three-tier resolution (builtin > global/user > project). `FlowStore`, `SkillStore`, `AgentStore`, `RecipeStore`, `RuntimeStore`. Access via `app.flows`, `app.skills`, `app.agents`, `app.recipes`, `app.runtimes`. Each store has `list()`, `get()`, `save()`, `delete()` methods.
-- **`knowledge/`** - Knowledge graph. `KnowledgeStore` (nodes + edges in SQLite), `indexer.ts` (codebase indexing), `context.ts` (context builder for agent prompts), `mcp.ts` (MCP tool handler), `export.ts` (markdown export/import). Access via `app.knowledge`.
+- **`repositories/`** - SQL CRUD behind typed classes. Column whitelists prevent injection. `SessionRepository`, `ComputeRepository`, `ComputeTemplateRepository`, `EventRepository`, `MessageRepository`, `TodoRepository`. Access via `app.sessions`, `app.computes`, `app.computeTemplates`, `app.todos`, etc.
+- **`stores/`** - Resource stores with three-tier file resolution (builtin > global/user > project). `FlowStore`, `SkillStore`, `AgentStore`, `RecipeStore`, `RuntimeStore`. Access via `app.flows`, `app.skills`, `app.agents`, `app.recipes`, `app.runtimes`. Each store has `list()`, `get()`, `save()`, `delete()` methods. `DbResourceStore` is a drop-in hosted-mode variant reading from the tenant-scoped `resource_definitions` table.
+- **`runtimes/<name>/parser.ts`** - Polymorphic transcript parsers (`ClaudeTranscriptParser`, `CodexTranscriptParser`, `GeminiTranscriptParser`). Registered in `TranscriptParserRegistry` on AppContext. Workdir-based session identification.
+- **`observability/costs.ts`** - `PricingRegistry` (300+ models via LiteLLM JSON) and `UsageRecorder`. Emits `usage_records` rows with `cost_mode` (api/subscription/free).
+- **`router/tensorzero.ts`** - TensorZero lifecycle manager (sidecar/native/Docker). Generates `tensorzero.toml` from provider API keys. Auto-starts when `router.auto_start` + `tensorZero.enabled`.
+- **`knowledge/`** - Knowledge graph. `KnowledgeStore` (nodes + edges in SQLite, tenant-scoped), `indexer.ts` (codebase indexing via ops-codegraph), `context.ts` (context builder for agent prompts), `mcp.ts` (MCP tool handler), `export.ts` (markdown export/import). Access via `app.knowledge`.
 - **`database.ts` / `database-sqlite.ts` / `database-postgres.ts`** - `IDatabase` abstraction. SQLite for local, PostgreSQL for hosted. All repositories and stores use `IDatabase`, not raw bun:sqlite.
-- **`auth.ts` + `api-keys.ts`** - Multi-tenant auth middleware. API key validation, tenant context extraction, role-based access control (admin/member/viewer).
-- **`tenant-policy.ts`** - Tenant compute policies (allowed providers, max sessions, cost caps). `TenantPolicyManager` uses `IDatabase`.
-- **`hosted.ts`** - Hosted mode entry point. Boots AppContext with worker registry, session scheduler, tenant policies, optional Redis SSE bus, optional LLM router.
+- **`auth.ts` + `api-keys.ts`** - Multi-tenant auth middleware. API key format `ark_<tenantId>_<secret>`. API key validation, tenant context extraction, role-based access control (admin/member/viewer).
+- **`tenant-policy.ts`** - Tenant policies. Compute (allowed providers, max sessions, cost caps, compute pools) and integrations (`router_enabled`/`required`, `auto_index`/`required`, `router_policy`, `tensorzero_enabled`). `getEffectiveIntegrationSettings()` merges tenant policy with global config. `TenantPolicyManager` uses `IDatabase`.
+- **`hosted.ts`** - Hosted mode entry point. Boots AppContext with worker registry, session scheduler, tenant policies, DB-backed resource stores, optional Redis SSE bus, optional LLM router + TensorZero.
 - **`packages/router/`** - LLM Router. OpenAI-compatible `/v1/chat/completions` proxy. 3 routing policies (quality/balanced/cost), circuit breakers, request classification, cost tracking. Separate from the server `Router` class (which is the JSON-RPC method dispatcher).
 - **`services/session.ts`** - `SessionService` facade. Owns simple lifecycle (start, stop, resume, complete, pause, delete). Delegates complex ops to `session-orchestration.ts` via dynamic import.
 - **`services/session-orchestration.ts`** - All orchestration: dispatch, advance, fork, clone, spawn, fan-out, handoff, worktree ops, hook status, report handling. Every exported function takes `app: AppContext` as its first argument -- no `getApp()` calls.
@@ -441,15 +481,64 @@ Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/h
 The knowledge graph (`packages/core/knowledge/`) provides a unified view of codebase structure, session history, memories, and learnings.
 
 **Components:**
-- **KnowledgeStore** (`store.ts`) - Node/edge storage in SQLite. Nodes have type (file, symbol, session, memory, learning, skill, recipe, agent), label, content, and metadata. Edges have relationship types (depends_on, imports, modified_by, etc.).
-- **Indexer** (`indexer.ts`) - Indexes a codebase using ops-codegraph (@optave/codegraph) -- 33 languages via tree-sitter, native Rust engine. Reads .codegraph/graph.db and maps nodes/edges into Ark's tenant-scoped knowledge store. Also runs git co-change analysis.
-- **Context Builder** (`context.ts`) - Builds relevant knowledge context for agent prompts at dispatch time.
-- **MCP Tools** (`mcp.ts`) - MCP tool handler for agent queries against the knowledge graph.
+- **KnowledgeStore** (`store.ts`) - Node/edge storage in SQLite (tenant-scoped via `tenant_id` on `knowledge` and `knowledge_edges` tables). Nodes have type (file, symbol, session, memory, learning, skill, recipe, agent), label, content, and metadata. Edges have relationship types (depends_on, imports, modified_by, etc.).
+- **Indexer** (`indexer.ts`) - Indexes a codebase using ops-codegraph (`@optave/codegraph`) -- 33 languages via tree-sitter (WASM), native Rust engine. Runs `codegraph build` to produce `.codegraph/graph.db`, then ingests nodes/edges into Ark's tenant-scoped knowledge store. Also runs git co-change analysis. Installed via `bun add @optave/codegraph` or `npm install -g @optave/codegraph` -- no Python dependency.
+- **Context Builder** (`context.ts`) - Builds relevant knowledge context for agent prompts at dispatch time (token-budgeted, 2000 tokens max).
+- **MCP Tools** (`mcp.ts`) - MCP tool handler for agent queries against the knowledge graph (knowledge/search, knowledge/context, knowledge/impact, knowledge/history, knowledge/remember, knowledge/recall).
 - **Export/Import** (`export.ts`) - Markdown export/import for portability.
 
 **CLI:** `ark knowledge search`, `ark knowledge index`, `ark knowledge stats`, `ark knowledge remember`, `ark knowledge recall`, `ark knowledge export`, `ark knowledge import`, `ark knowledge ingest`.
 
-**Prerequisite:** The indexer uses codegraph (npm install -g @optave/codegraph) for codebase parsing. 33 languages supported via tree-sitter.
+**Prerequisite:** Install ops-codegraph globally (`npm install -g @optave/codegraph`) or as a dependency (`bun add @optave/codegraph`). 33 languages supported via tree-sitter.
+
+**Auto-index on dispatch.** Local mode honors `knowledge.auto_index` in `~/.ark/config.yaml`. Remote compute (via arkd) ALWAYS indexes via the arkd `/codegraph/index` endpoint regardless of config -- the control plane needs centralized knowledge for all workers.
+
+## Compute Templates
+
+Named compute presets defined in `~/.ark/config.yaml` under `compute_templates:`. Persisted per-tenant in the `compute_templates` table (`ComputeTemplateRepository`).
+
+```yaml
+compute_templates:
+  fast-docker:
+    provider: docker
+    config:
+      image: node:20
+      cpu: 4
+      memory: 8g
+  heavy-ec2:
+    provider: ec2-firecracker
+    config:
+      instance_type: c6i.4xlarge
+      region: us-east-1
+```
+
+**CLI:**
+```bash
+ark compute template list
+ark compute template show <name>
+ark compute template create <name> --provider docker --config '...'
+ark compute template delete <name>
+ark compute create --from-template fast-docker    # provision from preset
+```
+
+## TensorZero Integration
+
+Optional Rust LLM gateway (Apache 2.0) that sits behind the LLM Router as a unified provider. Config under `tensorZero:` key in `~/.ark/config.yaml`:
+
+```yaml
+tensorZero:
+  enabled: true
+  port: 3000
+  config_dir: ~/.ark/tensorzero
+  auto_start: true
+```
+
+**Lifecycle manager:** `packages/core/router/tensorzero.ts` starts TensorZero in one of three modes (tried in order):
+1. **Sidecar detect** -- reuse an already-running TensorZero instance
+2. **Native binary** -- spawn the `tensorzero-gateway` binary if installed
+3. **Docker fallback** -- run the official Docker image
+
+Config (`tensorzero.toml`) is generated from configured provider API keys at boot. When `router.auto_start` and `tensorZero.enabled` are both true, TensorZero auto-starts with the router. Once enabled, all LLM traffic flows `agent → Router → TensorZero → Provider`.
 
 ## Control Plane (Hosted Mode)
 
@@ -457,9 +546,12 @@ The knowledge graph (`packages/core/knowledge/`) provides a unified view of code
 
 - **Worker Registry** (`worker-registry.ts`) - Workers register via HTTP, health-checked every 60s, stale workers pruned after 90s.
 - **Session Scheduler** (`scheduler.ts`) - Assigns sessions to available workers, respects tenant policies.
-- **Tenant Policies** (`tenant-policy.ts`) - Per-tenant: allowed providers, default provider, max concurrent sessions, daily cost cap, compute pools.
+- **Tenant Policies** (`tenant-policy.ts`) - Per-tenant. Compute limits: allowed providers, default provider, max concurrent sessions, daily cost cap, compute pools. Integration toggles: `router_enabled`, `router_required`, `router_policy` (quality/balanced/cost), `auto_index`, `auto_index_required`, `tensorzero_enabled`. `getEffectiveIntegrationSettings()` merges tenant policy with global config -- tenant `_required` flags override global opt-outs.
 - **SSE Bus** - In-memory (`sse-bus.ts`) or Redis-backed (`sse-redis.ts`) for multi-instance deployments.
 - **IDatabase** - `database-postgres.ts` for hosted mode (connection string via `DATABASE_URL`).
+- **DB-backed resource stores** - In hosted mode, `DbResourceStore` reads agents/flows/skills/recipes/runtimes from the tenant-scoped `resource_definitions` table instead of the filesystem. Local mode still uses file-backed stores.
+
+**Tenant scoping.** Every entity table has `tenant_id`: sessions, compute, compute_templates, compute_pools, events, messages, todos, groups, schedules, usage_records, resource_definitions, knowledge, knowledge_edges. Sessions also have `user_id`. Create a tenant-scoped view with `app.forTenant(tenantId)` -- returns an `AppContext` where all repo/store queries are auto-filtered.
 
 Start hosted mode: `ark server start --hosted`.
 
@@ -481,7 +573,9 @@ The LLM Router (`packages/router/`) is an OpenAI-compatible proxy that routes re
 - **3 Routing Policies:** `quality` (prefer best model), `balanced` (optimize cost/quality), `cost` (minimize cost)
 - **Circuit Breakers:** Per-provider failure tracking with automatic fallback
 - **Request Classification:** Classifies prompt complexity to select appropriate model tier
-- **Cost Tracking:** Per-request cost accumulation with model/provider breakdown
+- **Cost Tracking:** `onUsage` callback wired to `UsageRecorder` for per-request cost accumulation
+- **TensorZero backend (optional):** when `tensorZero.enabled` is true, the router routes matched requests through TensorZero instead of calling provider APIs directly. Flow: `agent → Router → TensorZero → Provider`.
+- **Executor URL injection:** when `router.enabled` is true, executors set `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` in the agent's environment at dispatch so all LLM calls flow through the router transparently.
 
 Start: `ark router start [--port 8430] [--policy balanced]`
 Status: `ark router status`

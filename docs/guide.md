@@ -1,1681 +1,1084 @@
 # Ark User Guide
 
-Ark orchestrates AI coding agents through DAG-based SDLC workflows. You define the workflow, Ark manages the agents -- across local machines, containers, cloud VMs, or Kubernetes pods.
+Ark is an autonomous agent ecosystem. It orchestrates AI coding agents through DAG-based SDLC flows on top of 11 compute providers, with a unified knowledge graph, an LLM router, universal cost tracking, and a multi-tenant control plane.
 
-## Quickstart (60 seconds)
+This guide covers every user-visible concept. Start at the top for the 60-second quickstart, then dive into whichever section you need.
 
-### Install
+## Table of Contents
 
-```bash
-# Prerequisites: Bun, tmux, Claude CLI
-brew install tmux
-curl -fsSL https://bun.sh/install | bash
-
-# Install Ark
-# Clone the Ark repository
-git clone <ark-repo-url>
-cd ark && make install
-```
-
-### Fix a bug
-
-```bash
-ark session start --repo . --summary "Fix the login timeout bug" --dispatch --attach
-```
-
-That's it. Ark creates a session, assigns an agent, launches it in tmux, and attaches you to watch it work. The agent reads your codebase, writes code, runs tests, and commits.
-
-### Build a feature (multi-stage)
-
-```bash
-ark session start --repo . --summary "Add OAuth2 login" --flow default --dispatch
-```
-
-The `default` flow runs: plan > implement > PR > review > merge. Each stage uses a specialized agent. Gates between stages let you review before the next agent starts.
-
-### Use the dashboard
-
-```bash
-ark tui    # Terminal dashboard (9 tabs, keyboard-driven)
-ark web    # Web dashboard (browser-based, SSE live updates)
-make desktop  # Desktop app (Electron, native window)
-```
-
-### Use a recipe template
-
-```bash
-ark recipe list                                          # See available templates
-ark session start --recipe quick-fix --repo . --dispatch # One-command session from template
-```
-
-### Check Prerequisites
-
-```bash
-ark doctor    # verifies Bun, tmux, git, Claude CLI are installed and working
-```
-
-`ark doctor` checks each prerequisite and reports pass/fail with version info. Run it after a fresh install or when something seems off.
-
-### Initialize a Repository
-
-```bash
-ark init      # interactive setup: prereq check, auth check, .ark.yaml creation
-```
-
-`ark init` walks you through first-time setup in a repo: verifies prerequisites (like `doctor`), checks Claude auth, and creates an `.ark.yaml` config file with your preferred defaults (flow, agent, compute, etc.).
+1. Quickstart
+2. Sessions
+3. Flows
+4. Agents and Runtimes
+5. Skills
+6. Recipes
+7. Compute
+8. Compute Templates
+9. Knowledge Graph
+10. Cost Tracking
+11. LLM Router
+12. Auth and Multi-Tenancy
+13. Git Worktrees
+14. Search
+15. Dashboards (CLI, TUI, Web)
+16. Knowledge Export and Import
+17. MCP Integration
+18. Remote Client Mode
+19. Control Plane (Hosted Mode)
+20. Deployment
 
 ---
 
-## Sessions
+## 1. Quickstart
 
-Sessions are the core unit of work in Ark. Each session tracks a task through one or more flow stages, with an assigned agent working in an isolated environment.
-
-### Creating Sessions
+Sixty seconds from zero to a running agent.
 
 ```bash
-# Basic session
-ark session start --repo . --summary "Fix login bug"
+# 1. Install
+git clone https://github.com/your-org/ark.git
+cd ark
+make install          # bun install + symlink `ark` to /usr/local/bin
 
-# With a specific flow
-ark session start --repo . --summary "Add API endpoints" --flow quick
+# 2. Verify
+ark --version
+ark agent list        # shows 12 builtin agents
+ark flow list         # shows 9 builtin flows
 
-# From a recipe template
-ark session start --recipe quick-fix --repo . --dispatch
+# 3. Start a session from a recipe and dispatch it
+ark session start \
+  --recipe quick-fix \
+  --repo . \
+  --summary "Add a README badge for build status" \
+  --dispatch
 
-# From an existing Claude Code session
-ark session start --claude-session abc123 --flow bare
+# 4. Watch it work
+ark tui               # interactive dashboard
+# or
+ark session list
+ark session events <sessionId>
 ```
 
-### Dispatching Agents
+You now have:
+- a git worktree at `~/.ark/worktrees/<sessionId>/`
+- a tmux session (`ark-s-<id>`) running Claude Code inside it
+- an MCP channel, knowledge context injected into the prompt, and hook-based status reporting
+- events streaming to the CLI, TUI, and Web dashboards
 
-Dispatching launches the assigned agent for the current flow stage:
+Requirements: bun, tmux, git, and (for auto-PR) the `gh` CLI. Ark is bun-only -- it uses `bun:sqlite`, `Bun.serve`, and Bun FFI.
+
+---
+
+## 2. Sessions
+
+A session is the unit of work in Ark. Each session has a repo, a summary, an agent or flow, a compute target, a git worktree, and a lifecycle.
+
+### Lifecycle operations
+
+| Command | What it does |
+|---------|--------------|
+| `ark session start` | Creates the session row and worktree. Does not launch the agent. |
+| `ark session dispatch <id>` | Launches the agent executor in tmux (or remote via arkd). |
+| `ark session advance <id>` | Moves a flow to the next stage. |
+| `ark session complete <id>` | Marks stage/session complete. Runs verify gates. |
+| `ark session pause <id>` | Pauses a running session. |
+| `ark session resume <id>` | Resumes a paused session. |
+| `ark session stop <id>` | Kills the tmux session and cleans hooks. |
+| `ark session fork <id>` | Spawns N child sessions from a parent (fan-out). |
+| `ark session clone <id>` | Duplicates a session with the same config. |
+| `ark session handoff <id>` | Transfers control to another agent/runtime. |
+| `ark session archive <id>` | Hides from default list without deleting. |
+| `ark session delete <id>` | Removes session, worktree, and events. |
+| `ark session interrupt <id>` | Sends Ctrl+C to the running agent (tmux stays up). |
+
+Sessions use a `status` field with states: `pending`, `dispatched`, `running`, `busy`, `idle`, `paused`, `completed`, `error`, `archived`.
+
+### Start and dispatch examples
 
 ```bash
-# Dispatch separately
-ark session dispatch s-a1b2c3
+# One-shot: start + dispatch in a single command
+ark session start \
+  --repo . \
+  --summary "Fix flaky test in session.test.ts" \
+  --agent implementer \
+  --flow quick \
+  --dispatch
 
-# Or dispatch on creation
-ark session start --repo . --summary "Task" --dispatch
+# Start first, configure, then dispatch
+ark session start --repo . --summary "Add auth middleware"
+ark session update <id> --agent implementer --compute docker
+ark session dispatch <id>
+
+# Start on a specific runtime (override the agent default)
+ark session start --repo . --summary "Refactor router" \
+  --agent implementer --runtime codex --dispatch
+
+# Start from a recipe
+ark session start --recipe feature-build --repo . --dispatch
 ```
 
-When dispatched, Ark:
-1. Resolves the agent definition for the current stage
-2. Builds the task prompt with context (PLAN.md, git log, prior stages)
-3. Generates a launcher script at `~/.ark/tracks/<sessionId>/`
-4. Spawns a tmux session running the agent
-5. The agent connects back to the conductor for status reporting
-
-### Stopping and Resuming
+### Flow control
 
 ```bash
-ark session stop s-a1b2c3      # Stop a running session
-ark session resume s-a1b2c3    # Resume a stopped session
-ark session pause s-a1b2c3 --reason "Waiting for review"
+# Advance to next stage (manual gate)
+ark session advance <id>
+
+# Mark stage complete (runs verify gates)
+ark session complete <id>
+
+# Force complete (skip verify -- use sparingly)
+ark session complete <id> --force
+
+# Run verify gates without completing
+ark session verify <id>
+
+# Add a human todo that must be checked before completion
+ark session todo add <id> "Update the CHANGELOG"
+ark session todo list <id>
 ```
 
-### Interrupting Agents
+### Fan-out and children
 
-Interrupt a running agent without killing its tmux session. The agent pauses (receives Ctrl+C) and can be re-engaged:
+Fan-out decomposes a task into N parallel child sessions. The parent waits for all children to complete.
 
 ```bash
-ark session interrupt s-a1b2c3    # Pause the agent
-ark session send s-a1b2c3 "Continue with the API layer"  # Re-engage
+ark session fork <parentId> --count 4 --summaries "feature A,feature B,feature C,feature D"
+ark session join <parentId>     # block until children finish
 ```
 
-In the TUI, press `I` to interrupt the selected session.
+The `fan-out` and `dag-parallel` builtin flows are wired for this pattern. Parent auto-joins when the last child hits `completed`.
 
-### Forking (Conversation Branching)
-
-Fork creates a copy of a session with its own identity, useful for exploring alternative approaches:
+### Interrupt, archive, delete
 
 ```bash
-ark session fork s-a1b2c3 --task "Try approach B" --dispatch
-```
-
-For parallel decomposition (parent waits for children):
-
-```bash
-ark session spawn s-parent "Subtask 1"
-ark session spawn s-parent "Subtask 2"
-ark session join s-parent          # Wait for all children
-```
-
-### Deleting with Undo
-
-Deletion is soft by default with a 90-second undo window:
-
-```bash
-ark session delete s-a1b2c3
-# Output: Session deleted (undo available for 90s)
-
-ark session undelete s-a1b2c3    # Restore within 90s
-```
-
-In the TUI, press `x` to delete, then `Ctrl+Z` to undo.
-
-### Archiving Sessions
-
-Archive completed sessions for long-term reference without deleting them:
-
-```bash
-ark session archive s-a1b2c3     # Archive (hidden from default list)
-ark session restore s-a1b2c3     # Restore to stopped status
-ark session list --archived       # Show archived sessions
-```
-
-In the TUI, press `Z` to archive/restore.
-
-### Session Output
-
-View what the agent is currently doing:
-
-```bash
-ark session output s-a1b2c3           # Last 30 lines
-ark session output s-a1b2c3 -n 100    # Last 100 lines
-```
-
-### Sending Messages
-
-Send a message to a running agent:
-
-```bash
-ark session send s-a1b2c3 "Focus on the API layer first"
-```
-
-### Session Sharing (Export/Import)
-
-```bash
-ark session export s-a1b2c3 session-backup.json
-ark session import session-backup.json
-```
-
-### Session Groups
-
-Organize sessions into named groups:
-
-```bash
-ark session group s-a1b2c3 backend
-ark session list --group backend
+ark session interrupt <id>      # Ctrl+C into the agent, keep tmux alive
+ark session archive <id>        # hide from `list`
+ark session archive <id> --restore
+ark session delete <id>         # hard delete (worktree + rows)
 ```
 
 ---
 
-## TUI Dashboard
+## 3. Flows
 
-Launch with `ark tui`. The dashboard has 9 tabs, switched with number keys `1`-`9`:
+A flow is a DAG of stages. Each stage has an agent, a gate type, optional verify scripts, and optional dependencies. Flows live in `flows/definitions/*.yaml` and follow the same three-tier resolution as other resources (builtin, `~/.ark/flows/`, `.ark/flows/`).
 
-| # | Tab | Purpose |
-|---|-----|---------|
-| 1 | Sessions | Session list, detail pane, dispatch/stop/fork |
-| 2 | Agents | Browse and manage agent definitions |
-| 3 | Flows | Flow definitions and stage visualization |
-| 4 | Compute | Compute resource lifecycle management |
-| 5 | History | Claude Code session discovery and import |
-| 6 | Memory | Cross-session memory store |
-| 7 | Tools | MCP Servers, Commands, Skills, Recipes, Context |
-| 8 | Schedules | Recurring cron-based sessions |
-| 9 | Costs | Per-session token usage and cost tracking |
+### Builtin flows (9)
 
-### Session List Navigation
-
-| Key | Action |
-|-----|--------|
-| `j/k` | Move up/down |
-| `g/G` | Jump to top/bottom |
-| `f/b` | Page forward/back |
-| `Tab` | Toggle between list and detail pane |
-
-### Session Actions
-
-| Key | Action |
-|-----|--------|
-| `I` | Interrupt running agent |
-| `V` | Run verification |
-| `Z` | Archive/restore session |
-| `W` | Worktree finish overlay (with diff preview) |
-
-### Status Filters
-
-Quickly filter the session list by status:
-
-| Key | Filter |
-|-----|--------|
-| `!` | Running sessions only |
-| `@` | Waiting sessions only |
-| `#` | Stopped sessions only |
-| `$` | Failed sessions only |
-| `0` | Clear filter (show all) |
-
-### Fuzzy Search
-
-Press `/` to open fuzzy search. Type to filter sessions by name, summary, or ID. Use `Ctrl+j/k` to navigate results, `Enter` to select, `Esc` to cancel.
-
-### MCP Manager
-
-Press `M` on any session to open the MCP server manager. Toggle servers on/off with `Space`, apply with `Enter`.
-
-### Fork Sessions
-
-Press `f` on any session to fork it. Enter a task description for the forked session.
-
-### Session Replay
-
-Press `r` on a completed/stopped/failed session to open the replay view. Step through the session timeline event by event with `j/k`.
-
-See the [TUI Reference](tui-reference.md) for the complete keyboard shortcut table.
-
----
-
-## Desktop App
-
-Ark ships as an Electron desktop app that wraps the Web UI in a native window.
-
-### Running
-
-```bash
-make desktop                         # Build web + launch Electron app
-```
-
-### Building for Distribution
-
-```bash
-make desktop-build                   # Package for macOS/Windows/Linux
-```
-
-This produces distributable binaries in `packages/desktop/out/`:
-- macOS: `.dmg` and `.zip`
-- Windows: `.exe` (NSIS installer) and `.zip`
-- Linux: `.AppImage` and `.deb`
-
-### How it works
-
-The desktop app boots the Ark web server (`ark web`) as a child process on a free port, then opens a BrowserWindow. All features work identically to the browser-based dashboard. The native window provides:
-- macOS traffic light controls with hidden title bar
-- Native menu bar (Edit, View, Window)
-- External links open in the system browser
-- Dark background matches the Ark theme
-
-### Prerequisites
-
-```bash
-make desktop-install                 # Install Electron + electron-builder
-```
-
-Requires: Bun, Git, `ark` on PATH (`make install`).
-
----
-
-## Web Dashboard
-
-### Starting
-
-```bash
-ark web                              # Default: http://localhost:8420
-ark web --port 9000                  # Custom port
-ark web --read-only                  # No mutations allowed
-ark web --token my-secret-token      # Require Bearer token auth
-```
-
-### Views
-
-The web dashboard provides a full-featured browser UI with these pages (accessible from the sidebar):
-
-| View | Purpose |
+| Name | Purpose |
 |------|---------|
-| **Sessions** | Session list with status indicators, detail panel, and all lifecycle actions |
-| **Agents** | Browse agent definitions, view configs, and manage custom agents |
-| **Tools** | MCP servers, commands, skills, recipes, and context management |
-| **Flows** | Flow definitions with stage visualization and gate configuration |
-| **History** | Claude Code session discovery, search, and import into Ark |
-| **Compute** | Compute resource provisioning and lifecycle (local, Docker, EC2) |
-| **Costs** | Per-session and aggregate token usage with budget tracking |
-| **Schedules** | Cron-based recurring session management (create, enable/disable, delete) |
-| **Memory** | Cross-session persistent memory -- add, search, and delete memories |
-| **Settings** | Dashboard and system configuration |
+| `bare` | Single stage -- just run one agent. |
+| `quick` | Plan plus implement, no review. |
+| `default` | Plan, audit, implement, verify, review, document, close. |
+| `parallel` | Independent stages that run in parallel. |
+| `fan-out` | Parent dispatches N child sessions then joins. |
+| `dag-parallel` | DAG with explicit `depends_on` edges. |
+| `pr-review` | Review-only flow targeting a PR diff. |
+| `islc` | Full ISLC loop (Intake, Spec, Landing, Close). |
+| `islc-quick` | Condensed ISLC for small tickets. |
 
-### Session Interactions
+### YAML structure
 
-From the Sessions view, you can perform the full session lifecycle:
+```yaml
+name: default
+description: Plan, audit, implement, verify, review, document, close
+stages:
+  - name: plan
+    agent: spec-planner
+    gate: manual              # manual | auto | condition
+  - name: audit
+    agent: plan-auditor
+    depends_on: [plan]
+    gate: auto
+  - name: implement
+    agent: implementer
+    depends_on: [audit]
+    gate: auto
+    verify:
+      - "bun test"
+      - "bun run lint"
+    on_failure: "retry(3)"    # fail-loopback: retry with error context injected
+  - name: review
+    agent: reviewer
+    depends_on: [implement]
+    gate: auto
+  - name: document
+    agent: documenter
+    depends_on: [review]
+    gate: auto
+  - name: close
+    agent: closer
+    depends_on: [document]
+    gate: auto
+```
 
-- **Create**: open the New Session modal to configure repo, summary, flow, agent, and compute
-- **Dispatch / Stop / Restart**: launch, halt, or restart agents on selected sessions
-- **Send messages**: type messages to running agents in the detail panel
-- **Interrupt**: send Ctrl+C to pause a running agent without killing the tmux session
-- **Pause / Advance / Complete**: control flow stage progression
-- **Fork**: create a branched copy of a session with a new task description
-- **Archive / Restore**: archive completed sessions or restore them
-
-### Diff Preview and PR Creation
-
-The Sessions detail panel includes a diff preview that shows the git diff stat for the session's worktree branch. From there you can:
-
-- Review changed files before merging
-- Create a GitHub PR directly from the web UI
-- Merge the worktree branch into your target branch
-
-### Cost Tracking
-
-The Costs view shows:
-
-- Per-session token breakdown (input, output, cache read, cache write)
-- Cost per session calculated from per-model pricing
-- Aggregate totals across all sessions
-- Budget usage against configured daily/weekly/monthly limits
-
-### Memory Sidebar
-
-The Memory view lets you manage persistent cross-session knowledge:
-
-- Add new memories with tags, scope, and importance
-- Search existing memories by keyword
-- Delete individual memories or clear by scope
-
-### Live Updates
-
-The dashboard uses Server-Sent Events (SSE) for real-time updates -- no polling. Session status changes, new events, and agent progress are pushed to the browser as they happen.
-
-### Access Control
-
-- **Token auth**: pass `--token <secret>` to require a `Bearer` token on all requests. Clients must send `Authorization: Bearer <secret>` headers.
-- **Read-only mode**: pass `--read-only` to disable all mutation endpoints. The dashboard becomes a monitoring-only view.
-
-### Desktop App
-
-The Electron desktop app (`make desktop`) wraps this same web UI in a native window. All views and interactions are identical -- see the [Desktop App](#desktop-app) section for native-specific details.
-
----
-
-## Cost Tracking
-
-Ark automatically collects token usage from Claude sessions and calculates costs using per-model pricing.
-
-### Pricing (per million tokens)
-
-| Model | Input | Output | Cache Read | Cache Write |
-|-------|-------|--------|------------|-------------|
-| Opus | $15.00 | $75.00 | $1.50 | $18.75 |
-| Sonnet | $3.00 | $15.00 | $0.30 | $3.75 |
-| Haiku | $0.80 | $4.00 | $0.08 | $1.00 |
-
-### CLI Cost Summary
+Key fields:
+- `gate`: `manual` blocks until `ark session advance`, `auto` moves on when the agent reports completion, `condition` uses a predicate expression.
+- `verify`: list of shell commands that must exit 0 before completion. Agents that report done while verify fails are steered back to fix it. Use `ark session complete --force` to bypass.
+- `on_failure: retry(N)`: fail-loopback. Re-dispatches the stage with the failure context injected, up to N retries.
+- `depends_on`: list of prior stage names for DAG ordering. Enables parallel execution of stages with no ordering constraint.
+- Fan-out stages wait for all their spawned children before the parent advances (auto-join on child completion).
 
 ```bash
-ark costs                # Show cost summary across all sessions
-ark costs --limit 50     # Show more sessions
+ark flow list
+ark flow show default
+ark session start --flow dag-parallel --repo . --summary "..." --dispatch
 ```
-
-### Cost Budgets
-
-Set spending limits in `~/.ark/config.yaml`:
-
-```yaml
-budgets:
-  dailyLimit: 50       # USD per day
-  weeklyLimit: 200     # USD per week
-  monthlyLimit: 500    # USD per month
-```
-
-When a budget limit is approached or exceeded, Ark warns before dispatching.
-
-### TUI Costs Tab
-
-Press `9` in the TUI to view the Costs tab, which shows per-session cost breakdown and aggregate totals.
 
 ---
 
-## Flows & Agents
+## 4. Agents and Runtimes
 
-### Agent Definitions
+Ark cleanly separates the role of an agent from the tool that runs it.
 
-Agents are defined in YAML files with three-tier resolution:
-1. **Project**: `.ark/agents/<name>.yaml` in the repo
-2. **Global**: `~/.ark/agents/<name>.yaml`
-3. **Builtin**: `agents/<name>.yaml` shipped with Ark
+- **Agent** (role): what the agent does. System prompt, tools, skills, max turns, permission mode.
+- **Runtime** (tool): how the agent runs. LLM backend, CLI command, model catalog, task delivery, billing mode.
+
+At dispatch, agent config and runtime config are merged. Agent-level values take precedence over runtime defaults. You can override the runtime on the CLI with `--runtime`.
+
+### Agents (12 builtin roles)
+
+| Role | Purpose |
+|------|---------|
+| `ticket-intake` | Parse tickets, extract requirements. |
+| `spec-planner` | Write the spec/plan. |
+| `plan-auditor` | Audit a plan before implementation. |
+| `planner` | General planning role. |
+| `implementer` | Write code for a spec. |
+| `task-implementer` | Implement a single task (fan-out child). |
+| `verifier` | Run and interpret verification. |
+| `reviewer` | Structured code review (P0-P3 JSON output). |
+| `documenter` | Update docs. |
+| `closer` | Final checks, PR/merge. |
+| `retro` | Post-session retrospective and learnings. |
+| `worker` | Generic task runner (fan-out child). |
+
+```bash
+ark agent list
+ark agent show implementer
+```
+
+### Agent YAML
 
 ```yaml
-# agents/my-agent.yaml
-name: my-agent
-description: What this agent does
-model: opus          # opus | sonnet | haiku
+# agents/implementer.yaml
+name: implementer
+description: Implements a plan into working code
+runtime: claude             # default runtime; override with --runtime
+model: sonnet               # opus | sonnet | haiku (claude models)
 max_turns: 200
 system_prompt: |
-  You are working on {repo}. Task: {summary}
-  Ticket: {ticket}. Branch: {branch}
+  You are working on {repo} (branch {branch}).
+  Ticket: {ticket}
+  Task: {summary}
+  Workdir: {workdir}
+  Write minimal, correct code. Run tests before claiming done.
+skills: [test-writing, self-review, sanity-gate]
 tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch]
-mcp_servers: []
-skills: [code-review]
-memories: []
-permission_mode: bypassPermissions
-env:
-  CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80"
-```
-
-Template variables `{ticket}`, `{summary}`, `{workdir}`, `{repo}`, and `{branch}` are substituted at dispatch time. See the [Agents Reference](agents-reference.md) for complete field documentation.
-
-### Runtime/Role Separation
-
-Agents define WHAT an agent does (role, prompt, skills, tools). Runtimes define HOW it runs (LLM backend, CLI command). Any agent role can run on any runtime:
-
-```bash
-# Default: implementer role on claude runtime
-ark session start --repo . --summary "Fix bug" --agent implementer --dispatch
-
-# Override: implementer role on codex runtime
-ark session start --repo . --summary "Fix bug" --agent implementer --runtime codex --dispatch
-
-# Override: worker role on gemini runtime
-ark session start --repo . --summary "Fix bug" --agent worker --runtime gemini --dispatch
-```
-
-### Builtin Runtimes
-
-| Runtime | Type | Description |
-|---------|------|-------------|
-| `claude` | claude-code | Claude Code CLI (default) |
-| `codex` | cli-agent | OpenAI Codex CLI |
-| `gemini` | cli-agent | Google Gemini CLI |
-| `aider` | cli-agent | Aider pair programming |
-
-```bash
-ark runtime list                    # List all runtimes
-ark runtime show claude             # Show runtime details
-```
-
-### Builtin Agents
-
-| Agent | Role | Purpose |
-|-------|------|---------|
-| `planner` | Planning | Creates PLAN.md with architecture and implementation strategy |
-| `implementer` | Execution | Writes code, tests, and commits |
-| `reviewer` | Review | Reviews code changes for quality, correctness, and security |
-| `documenter` | Documentation | Updates documentation based on code changes |
-| `worker` | General | General-purpose agent with no predefined system prompt |
-| `ticket-intake` | Intake | Processes tickets, runs sanity gate, extracts spec |
-| `spec-planner` | Planning | Decomposes spec into subtasks with implementation strategy |
-| `plan-auditor` | Audit | Audits plan coverage against spec requirements |
-| `task-implementer` | Execution | Implements individual subtasks from a plan |
-| `verifier` | Verification | Runs tests, security scan, code quality, AC validation |
-| `closer` | Close | Creates PRs, transitions tickets, publishes notes |
-| `retro` | Retrospective | Analyses workflow run, generates improvement recommendations |
-
-See the [Agents Reference](agents-reference.md) for full details on each agent.
-
-### Managing Agents
-
-```bash
-ark agent list                    # List all agents (builtin + custom)
-ark agent show implementer        # Show agent details
-ark agent create my-agent         # Create new agent (opens editor)
-ark agent edit my-agent           # Edit agent definition
-ark agent copy implementer fast   # Copy agent for customization
-ark agent delete my-agent         # Delete a custom agent
-```
-
-### Executor System
-
-Agents dispatch through pluggable executors. The `runtime` field selects which executor launches the agent:
-
-- `claude-code` (default) -- launches Claude Code in tmux with hooks + MCP channel
-- `cli-agent` -- runs any CLI tool (Codex, Gemini, Aider, etc.) in tmux with worktree isolation
-- `subprocess` -- spawns any command as a child process
-
-```yaml
-# Custom subprocess agent
-name: my-linter
-runtime: subprocess
-command: ["node", "scripts/lint.js"]
-env:
-  TARGET: "{workdir}"
-```
-
-```bash
-ark agent list    # Shows all agents with their runtime type
-```
-
-### CLI Agent (Multi-Tool Orchestration)
-
-Ark can orchestrate any CLI coding tool, not just Claude. The `cli-agent` runtime launches arbitrary CLI tools in tmux with worktree isolation, the same way it launches Claude Code.
-
-**Builtin CLI agents:**
-
-| Agent | Tool | Description |
-|-------|------|-------------|
-| `codex-worker` | OpenAI Codex CLI | Full-auto Codex agent |
-| `gemini-worker` | Google Gemini CLI | Gemini coding agent |
-| `aider-worker` | Aider | Aider chat-based coding |
-| `generic-cli` | Any CLI | Generic wrapper for custom tools |
-
-**Example agent YAML:**
-
-```yaml
-name: codex-worker
-description: OpenAI Codex CLI coding agent
-runtime: cli-agent
-command: ["codex", "--approval-mode", "full-auto"]
-task_delivery: arg       # how the task is sent to the CLI tool
-model: o4-mini
-max_turns: 200
-system_prompt: ""
-tools: []
 permission_mode: bypassPermissions
 env: {}
 ```
 
-**Task delivery modes** control how Ark passes the task to the CLI tool:
+Template variables substituted at dispatch time: `{ticket}`, `{summary}`, `{repo}`, `{branch}`, `{workdir}`.
 
-| Mode | Behavior | Example |
-|------|----------|---------|
-| `stdin` | Pipes the task via cat to stdin | `echo "task" \| codex` |
-| `file` | Writes task to a temp file and passes the path | `codex --task /tmp/task.txt` |
-| `arg` | Appends the task as the last CLI argument (default) | `codex "Fix the login bug"` |
+### Runtimes (3 tools + 1 subscription variant)
 
-**Usage:**
+| Name | Tool | Billing | Transcript parser |
+|------|------|---------|-------------------|
+| `claude` | Claude Code CLI | api (per token) | claude |
+| `claude-max` | Claude Code (Max sub) | subscription ($200/mo flat) | claude |
+| `codex` | OpenAI Codex CLI | api | codex (default model: gpt-5-codex) |
+| `gemini` | Google Gemini CLI | api | gemini |
 
 ```bash
-# Use a builtin CLI agent
-ark session start --repo . --summary "Fix the bug" --agent codex-worker --dispatch
+ark runtime list
+ark runtime show codex
 
-# Or define your own
-ark agent create my-tool    # set runtime: cli-agent in the YAML
+# Override runtime at dispatch time
+ark session start --repo . --summary "Port module" \
+  --agent implementer --runtime codex --dispatch
+
+ark session start --repo . --summary "UI polish" \
+  --agent worker --runtime gemini --dispatch
+
+# Use Max subscription (zero per-token cost tracked, tokens still recorded)
+ark session start --repo . --summary "Big refactor" \
+  --agent implementer --runtime claude-max --dispatch
 ```
 
-CLI agents get the same worktree isolation, session tracking, and lifecycle management as Claude Code agents. The only difference is the executor that launches them.
-
-### Flow Definitions
-
-Flows define multi-stage workflows:
+### Runtime YAML
 
 ```yaml
-# flows/definitions/my-flow.yaml
-name: my-flow
-description: Custom workflow
-stages:
-  - name: plan
-    agent: planner
-    gate: manual          # manual | auto | condition
-    on_failure: retry(3)  # retry up to 3 times on failure
-    artifacts: [PLAN.md]
-  - name: implement
-    agent: implementer
-    gate: auto
-```
-
-### Verification Gates
-
-Flow stages can require verification scripts to pass before completion:
-
-```yaml
-stages:
-  - name: implement
-    agent: implementer
-    gate: auto
-    verify:
-      - "npm test"
-      - "npm run lint"
-```
-
-The agent cannot complete the stage until all verify scripts pass. Failed verification steers the agent to fix the issue.
-
-### Todos
-
-Add checklists that block stage completion:
-
-```bash
-ark session todo add s-a1b2c3 "Write migration docs"
-ark session todo list s-a1b2c3
-ark session todo done s-a1b2c3 1          # Toggle todo #1
-ark session verify s-a1b2c3               # Run verification manually
-ark session complete s-a1b2c3             # Blocked if todos/scripts fail
-ark session complete s-a1b2c3 --force     # Override verification
-```
-
-Todos are shown in the TUI detail panel. Press `V` to run verification.
-
-### Builtin Flows
-
-| Flow | Stages | Use Case |
-|------|--------|----------|
-| `default` | intake > plan > audit > implement > verify > pr > review > close > retro | Full SDLC pipeline |
-| `islc` | ticket-intake > plan > audit > execute[fan_out] > verify > close > retro | Full ISLC with fan-out execution |
-| `islc-quick` | implement > verify > close | Quick ISLC variant |
-| `quick` | implement > pr > build > merge | Fast implementation |
-| `bare` | work | Single-agent, no gates |
-| `parallel` | plan > implement[fork] > review > pr > merge | Parallel workstreams |
-| `fan-out` | plan > execute[fan_out] > review | Task decomposition |
-| `pr-review` | plan > implement > review[PR] > merge | PR review workflow |
-| `dag-parallel` | plan > implement + test > integrate > review > pr | DAG-based parallel execution |
-
-See the [Flows Reference](flows-reference.md) for detailed stage definitions, gate types, and YAML field documentation.
-
-### Managing Flows
-
-```bash
-ark flow list              # List all flows
-ark flow show default      # Show flow stages and gates
-```
-
----
-
-## Skills & Recipes
-
-### Skills
-
-Skills are reusable prompt fragments injected into agent system prompts at dispatch time. Three-tier resolution (highest priority first):
-
-1. **Project**: `.ark/skills/<name>.md` in the repo
-2. **Global**: `~/.ark/skills/<name>.md`
-3. **Builtin**: `skills/<name>.md` shipped with Ark
-
-Attach skills to agents via the `skills` field in agent YAML:
-
-```yaml
-skills: [code-review, test-writing]
-```
-
-```bash
-ark skill list              # List available skills
-ark skill show code-review  # Show skill content
-```
-
-### Creating and Deleting Skills
-
-```bash
-# Create a skill inline
-ark skill create my-skill -d "Review checklist" -p "Always check for..."
-
-# Create from a YAML file
-ark skill create --from my-skill.yaml
-
-# Create a project-scoped skill (saved to .ark/skills/)
-ark skill create my-skill -d "..." -p "..." --scope project --tags "review,quality"
-
-# Delete a skill (global or project scope -- cannot delete builtins)
-ark skill delete my-skill
-ark skill delete my-skill --scope project
-```
-
-### Skill Extraction
-
-When a session completes its flow, Ark automatically analyzes the conversation transcript for reusable patterns -- multi-step procedures, repeated methodology, and structured approaches. High-confidence candidates (scored >= 0.6) are saved as global skills with names like `extracted-<sessionId>-0`. This is best-effort and runs silently; extraction failures never block session completion.
-
-### Recipes
-
-Recipes are session templates with variables. Same three-tier resolution as skills.
-
-```bash
-ark recipe list                           # List available recipes
-ark recipe show quick-fix                 # Show recipe details
-ark session start --recipe quick-fix --repo . --dispatch
-```
-
-Builtin recipes: `quick-fix`, `feature-build`, `code-review`, `fix-bug`, `new-feature`.
-
-### Creating and Deleting Recipes
-
-```bash
-# Create from a YAML file
-ark recipe create --from my-recipe.yaml
-
-# Create from an existing session (captures its flow, agent, repo, summary as a template)
-ark recipe create --from-session s-a1b2c3 --name my-recipe
-
-# Project-scoped recipe
-ark recipe create --from my-recipe.yaml --scope project
-
-# Delete a recipe (cannot delete builtins)
-ark recipe delete my-recipe
-ark recipe delete my-recipe --scope project
-```
-
----
-
-## Git Worktrees
-
-When dispatching a session, Ark automatically creates a git worktree so the agent works on an isolated branch without affecting your working directory.
-
-### Worktree Lifecycle
-
-```bash
-ark worktree list                             # List sessions with active worktrees
-
-ark worktree finish s-a1b2c3                  # Merge + remove worktree + delete session
-ark worktree finish s-a1b2c3 --into develop   # Merge into specific branch
-ark worktree finish s-a1b2c3 --no-merge       # Remove worktree without merging
-ark worktree finish s-a1b2c3 --keep-branch    # Keep branch after merge
-```
-
-Worktrees are stored at `~/.ark/worktrees/<sessionId>/`.
-
-### Diff Preview
-
-Preview changes before merging:
-
-```bash
-ark worktree diff s-a1b2c3                    # Show diff stat
-ark worktree diff s-a1b2c3 --base develop     # Compare against specific branch
-```
-
-In the TUI, press `W` to see the worktree finish overlay with diff preview.
-
-### Creating Pull Requests
-
-Create a GitHub PR from a session's worktree branch:
-
-```bash
-ark worktree pr s-a1b2c3                      # Push branch + create PR
-ark worktree pr s-a1b2c3 --title "My PR"      # Custom title
-ark worktree pr s-a1b2c3 --draft              # Create as draft
-ark worktree finish s-a1b2c3 --pr             # Finish worktree and create PR
-```
-
-**Auto-PR**: When an agent completes and the repo has a git remote, Ark automatically pushes the branch and creates a PR. Disable per-repo with `auto_pr: false` in `.ark.yaml`.
-
----
-
-## Compute
-
-Ark supports 7 compute providers for running agents.
-
-### Local Provider
-
-The default. Runs agents in tmux sessions on your machine. No provisioning needed.
-
-### Docker Provider
-
-```bash
-ark compute create my-docker --provider docker --image ubuntu:22.04
-ark compute create my-dev --provider docker --devcontainer
-ark compute provision my-docker
-```
-
-Options:
-- `--image <image>`: Docker image (default: `ubuntu:22.04`)
-- `--devcontainer`: Use devcontainer.json from project
-- `--volume <mount>`: Extra volume mount (repeatable)
-
-### EC2 Provider
-
-```bash
-ark compute create my-ec2 --provider ec2 --size m --region us-east-1 --profile yt
-ark compute provision my-ec2
-```
-
-Size options:
-
-| Size | vCPU | RAM |
-|------|------|-----|
-| `xs` | 2 | 8 GB |
-| `s` | 4 | 16 GB |
-| `m` | 8 | 32 GB |
-| `l` | 16 | 64 GB |
-| `xl` | 32 | 128 GB |
-| `xxl` | 48 | 192 GB |
-| `xxxl` | 64 | 256 GB |
-
-Additional options: `--arch` (x64/arm), `--region`, `--profile` (AWS profile), `--subnet-id`, `--tag key=value`.
-
-### E2B Provider
-
-Managed Firecracker sandboxes via the [E2B](https://e2b.dev) SDK. Sub-second boot, full isolation.
-
-```bash
-ark compute create my-e2b --provider e2b
-ark compute provision my-e2b
-```
-
-Requires `E2B_API_KEY` environment variable. Options:
-- `--template <name>`: E2B sandbox template (default: `base`)
-- `--timeout <seconds>`: Sandbox timeout (default: 3600)
-
-### Kubernetes Provider
-
-Run agents in Kubernetes pods. Supports vanilla pods and Kata Containers with Firecracker microVM isolation.
-
-```bash
-# Standard K8s pod
-ark compute create my-k8s --provider k8s
-
-# Kata Container with Firecracker isolation
-ark compute create my-kata --provider k8s-kata
-```
-
-Options:
-- `--namespace <ns>`: Kubernetes namespace (default: `ark`)
-- `--image <image>`: Container image (default: `ubuntu:22.04`)
-- `--runtime-class <class>`: RuntimeClassName (default: `kata-fc` for k8s-kata)
-
-### Compute Lifecycle
-
-```bash
-ark compute list                    # List all compute resources
-ark compute status my-ec2           # Show status + metrics
-ark compute metrics my-ec2          # Detailed metrics (CPU, MEM, DISK, NET)
-ark compute start my-ec2            # Start stopped compute
-ark compute stop my-ec2             # Stop running compute
-ark compute destroy my-ec2          # Tear down infrastructure
-ark compute delete my-ec2           # Remove from database
-ark compute ssh my-ec2              # SSH into remote compute
-ark compute sync my-ec2             # Sync environment files to compute
-ark compute update my-ec2 --size l  # Update configuration
-```
-
----
-
-## Conductor
-
-The conductor is an HTTP server (port 19100) that coordinates agent sessions. It receives status reports from agents via hooks, relays messages through channels, and manages session lifecycle.
-
-### Starting the Conductor
-
-The TUI starts the conductor automatically. For standalone use:
-
-```bash
-ark conductor start                 # Start on default port 19100
-ark conductor start --port 19200    # Custom port
-```
-
-### Learning System
-
-The conductor tracks recurring patterns during orchestration. After a pattern occurs 3 times, it is promoted from a learning to a policy.
-
-```bash
-ark conductor learnings             # Show all learnings and policies
-ark conductor learn "Always run tests before merge" "Catches regressions early"
-```
-
-Learnings are stored in `~/.ark/conductor/`.
-
----
-
-## Protocol Server
-
-Ark includes a JSON-RPC 2.0 server that provides a standard interface for all clients.
-
-### Starting the server
-
-```bash
-ark server start              # WebSocket on port 19400
-ark server start --stdio      # JSONL over stdin/stdout (for embedding)
-ark server start --port 9000  # Custom WebSocket port
-```
-
-The TUI and CLI embed the server in-process automatically -- you only need to start it explicitly for external clients (IDE extensions, custom dashboards).
-
-### Protocol
-
-The server exposes 80+ methods covering sessions, agents, flows, skills, recipes, compute, search, memory, and costs. Clients connect via WebSocket and receive push notifications for session state changes.
-
-See `packages/protocol/types.ts` for the full method list.
-
----
-
-## Messaging Bridges
-
-Connect Ark to external messaging platforms for remote monitoring and control.
-
-### Setup
-
-Create `~/.ark/bridge.json`:
-
-```json
-{
-  "telegram": {
-    "botToken": "123456:ABC-DEF...",
-    "chatId": "12345678"
-  },
-  "slack": {
-    "webhookUrl": "https://hooks.slack.com/services/T00/B00/xxx"
-  },
-  "discord": {
-    "webhookUrl": "https://discord.com/api/webhooks/..."
-  }
-}
-```
-
-You can configure one or more platforms. Only the ones with credentials will be activated.
-
-### Telegram Setup
-
-1. Create a bot with [@BotFather](https://t.me/BotFather) and get the bot token
-2. Get your chat ID (send a message to your bot, then check `https://api.telegram.org/bot<token>/getUpdates`)
-3. Add `botToken` and `chatId` to `~/.ark/bridge.json`
-
-### Slack Setup
-
-1. Create an [Incoming Webhook](https://api.slack.com/messaging/webhooks) in your Slack workspace
-2. Add the `webhookUrl` to `~/.ark/bridge.json`
-
-### Discord Setup
-
-1. Create a webhook in your Discord channel settings (Integrations > Webhooks)
-2. Add the `webhookUrl` to `~/.ark/bridge.json`
-
-### Using the Bridge
-
-```bash
-ark conductor bridge                  # Start the bridge (listens for commands)
-ark conductor notify "Deploy done"    # Send a one-off notification
-```
-
-The bridge responds to commands sent via chat:
-- `/status` or `status` -- summary of running sessions
-- `/sessions` or `sessions` -- list recent sessions
-
----
-
-## Profiles
-
-Profiles provide isolated session namespaces, useful for separating work contexts or multiple Claude accounts.
-
-### Managing Profiles
-
-```bash
-ark profile list                          # List all profiles
-ark profile create work "Work projects"   # Create a profile
-ark profile delete old-profile            # Delete a profile
-```
-
-### Using Profiles
-
-```bash
-ark -p work session list                  # List sessions in work profile
-ark -p work session start --repo . --summary "Task"
-```
-
-Sessions in a profile are scoped via a group name prefix, so they do not appear in other profiles.
-
----
-
-## MCP Socket Pooling
-
-By default, each Claude session spawns its own MCP server processes. With socket pooling, MCP servers run as long-lived daemons with Unix socket connections, shared across sessions. This reduces memory usage by 85-90%.
-
-### How It Works
-
-1. Ark starts each configured MCP server once as a background process
-2. The server listens on a Unix socket at `~/.ark/mcp-pool-<name>.sock`
-3. Sessions use `ark mcp-proxy <socket>` as their MCP command, which bridges stdin/stdout to the shared socket
-
-### The Proxy
-
-```bash
-ark mcp-proxy /path/to/socket     # Internal command used by pooled MCP configs
-```
-
-This is an internal command -- you do not call it directly. Ark writes the proxy config into `.mcp.json` automatically when pooling is active.
-
----
-
-## Configuration
-
-Ark reads configuration from `~/.ark/config.yaml`. Open it with:
-
-```bash
-ark config                    # Opens in $EDITOR
-ark config --path             # Print the config file path
-```
-
-See the [Configuration Reference](configuration.md) for all options.
-
-### Per-Repository Config
-
-Create `.ark.yaml` (or `.ark.yml` or `ark.yaml`) in your repo root:
-
-```yaml
-flow: quick
-group: my-team
-compute: my-ec2
-agent: implementer
+# runtimes/codex.yaml
+name: codex
+description: OpenAI Codex CLI
+type: cli-agent             # claude-code | cli-agent | subprocess
+command: ["codex", "--auto"]
+task_delivery: stdin        # stdin | file | arg
+billing_mode: api           # api | subscription | free
+transcript_parser: codex    # selects CodexTranscriptParser
+models:
+  - id: gpt-5-codex
+    label: "GPT-5 Codex"
+  - id: gpt-5
+    label: "GPT-5"
+default_model: gpt-5-codex
 env:
-  CUSTOM_VAR: "value"
+  OPENAI_API_KEY: "${OPENAI_API_KEY}"
 ```
 
-These defaults are used when starting sessions in that repository. CLI flags override repo config values.
+Three executor types are registered at boot:
+- `claude-code` -- launches Claude Code in tmux with hooks and an MCP channel.
+- `cli-agent` -- any other CLI tool in tmux, with worktree isolation.
+- `subprocess` -- generic child process, no tmux.
+
+Each executor implements 5 methods: `launch`, `kill`, `status`, `send`, `capture`.
 
 ---
 
-## Knowledge Graph
+## 5. Skills
 
-Ark maintains a unified knowledge graph that spans your codebase, session history, memories, and learnings. This replaces the old `memories.json` and `LEARNINGS.md` files -- all knowledge is now stored as nodes and edges in the database.
+Skills are reusable prompt fragments. They are markdown files injected into an agent's system prompt when attached.
 
-### Node Types
+### Builtin skills (7)
 
-| Type | Description |
-|------|-------------|
-| `file` | Source files indexed from a codebase |
-| `symbol` | Functions, classes, types extracted during indexing |
-| `session` | Session history (linked to files modified) |
-| `memory` | Persistent knowledge (replaces old memory system) |
-| `learning` | Learnings from session runs (replaces old learnings system) |
-| `skill` | Skill definitions |
-| `recipe` | Recipe definitions |
-| `agent` | Agent definitions |
+| Skill | Purpose |
+|-------|---------|
+| `code-review` | Structured review checklist. |
+| `plan-audit` | Checks a plan against a spec. |
+| `sanity-gate` | Quick sanity check before completion. |
+| `security-scan` | Security-focused review. |
+| `self-review` | Self-critique prior to reporting done. |
+| `spec-extraction` | Extract requirements from a ticket. |
+| `test-writing` | TDD guidance for writing tests. |
+
+### Three-tier resolution
+
+Skills resolve in priority order:
+
+1. Project: `.ark/skills/<name>.md` in the repo
+2. Global: `~/.ark/skills/<name>.md`
+3. Builtin: `skills/<name>.md` shipped with Ark
+
+A project-level skill with the same name overrides a global or builtin one.
+
+### Attaching to agents
+
+```yaml
+# agents/reviewer.yaml
+name: reviewer
+runtime: claude
+skills: [code-review, security-scan, self-review]
+```
+
+At dispatch, each listed skill's markdown content is inlined into the agent's system prompt.
 
 ### CLI
 
 ```bash
-ark knowledge search "authentication"                 # Search all node types
-ark knowledge search "auth" --types file,symbol       # Filter by type
-ark knowledge index --repo .                          # Index codebase into graph
-ark knowledge index --repo . --incremental            # Only re-index changed files
-ark knowledge stats                                   # Show node/edge counts
-ark knowledge remember "Always run tests first"       # Store a memory node
-ark knowledge recall "testing"                        # Search memories + learnings
-ark knowledge export --dir ./export                   # Export as markdown
-ark knowledge import --dir ./export                   # Import from markdown
-ark knowledge ingest docs/                            # Index a directory
-```
-
-### Memory Commands (Backward-Compatible)
-
-The `ark memory` commands still work and now store into the knowledge graph:
-
-```bash
-ark memory list                                       # List memory nodes
-ark memory add "API uses OAuth2" --scope project      # Add a memory
-ark memory recall "authentication"                    # Search memories
-ark memory forget <id>                                # Delete a memory
-```
-
-### How Knowledge Works at Dispatch
-
-At dispatch time, the context builder queries the knowledge graph for nodes relevant to the session summary and injects them into the agent's task prompt. This includes:
-- Memories matching the task description
-- Learnings from prior sessions on the same repo
-- Relevant file/symbol information (if the repo is indexed)
-
-Agents can also query the knowledge graph during execution via MCP tools.
-
-### Indexing Prerequisites
-
-The codebase indexer works at the file level by default. For symbol-level extraction (functions, classes, imports), [Axon](https://github.com/axon-ai/axon) must be available. Run `ark doctor` to check.
-
-### TUI
-
-Press `Y` in the Sessions tab to open the Memory Manager. The Memory tab (6) also shows knowledge stats and allows browsing/adding/deleting memories.
-
-### Web Dashboard
-
-The web dashboard includes a Memory view accessible from the sidebar. Add, search, and delete memories from the browser.
-
----
-
-## Search
-
-### Session Search
-
-Search across session metadata, events, and messages:
-
-```bash
-ark search "authentication"                    # Basic search
-ark search "auth" --transcripts                # Also search Claude transcripts
-ark search "auth" --index --transcripts        # Rebuild index first, then search
-ark search "auth" --limit 50                   # More results
-```
-
-### Global Conversation Search
-
-Search across all Claude Code conversations on disk (not just Ark sessions):
-
-```bash
-ark search-all "database migration"            # Search all conversations
-ark search-all "error" --days 30               # Last 30 days only
-ark search-all "refactor" --limit 50           # More results
-```
-
-### Hybrid Search
-
-Use `--hybrid` to search across memory, knowledge, and transcripts simultaneously. Results are deduplicated and re-ranked by Claude Haiku for relevance (requires `ANTHROPIC_API_KEY`):
-
-```bash
-ark search "authentication" --hybrid           # Unified search with LLM re-ranking
-ark search "auth" --hybrid --limit 30          # More results
-```
-
-Each result shows its source (`memory`, `knowledge`, or `transcript`) and a relevance score. Without an API key, results are returned in score order without LLM re-ranking.
-
-### FTS5 Index
-
-For fast transcript search, build the full-text search index:
-
-```bash
-ark index                                      # Build/rebuild the FTS5 index
-```
-
-The index is stored in `~/.ark/ark.db` and speeds up transcript searches significantly.
-
----
-
-## Headless / CI Mode
-
-Run sessions non-interactively for CI/CD pipelines:
-
-```bash
-ark exec --repo . --summary "Run linter" --flow bare
-ark exec --repo . --summary "Fix tests" --flow bare --timeout 300
-ark exec --repo . --summary "Task" --output json    # JSON output
-```
-
-Options:
-- `--autonomy <level>`: `full`, `execute`, `edit`, `read-only`
-- `--output <format>`: `text` or `json`
-- `--timeout <seconds>`: `0` for unlimited
-
-The process exits with the session's exit code.
-
----
-
-## Sandboxed Sessions
-
-Run one-shot sandboxed sessions that auto-clean up:
-
-```bash
-ark try "Run the test suite and fix any failures"
-ark try "Refactor the auth module" --image node:20
-```
-
-The session is automatically deleted when it finishes. If Docker is not available, runs without sandboxing.
-
----
-
-## Scheduled Sessions
-
-Create recurring sessions on a cron schedule:
-
-```bash
-ark schedule add --cron "0 2 * * *" --summary "Nightly tests" --repo . --flow bare
-ark schedule list
-ark schedule enable sched-abc123
-ark schedule disable sched-abc123
-ark schedule delete sched-abc123
+ark skill list
+ark skill show code-review
 ```
 
 ---
 
-## Use Cases
+## 6. Recipes
 
-### Quick bug fix
+Recipes are session templates with variables. They let you quick-launch a common configuration.
 
-The fastest path from bug report to fix:
+### Builtin recipes (8)
 
-```bash
-ark session start --repo . --summary "Fix: users can't log in when session expires" --flow bare --dispatch --attach
-```
+| Recipe | Purpose |
+|--------|---------|
+| `quick-fix` | Small bug fix with minimal flow. |
+| `fix-bug` | Bug fix with audit and review. |
+| `feature-build` | Full feature development loop. |
+| `new-feature` | Alias for feature-build with different defaults. |
+| `code-review` | Review-only session targeting an existing branch/PR. |
+| `ideate` | Brainstorming and spec drafting. |
+| `islc` | Full ISLC (Intake/Spec/Landing/Close) pipeline. |
+| `islc-quick` | Shortened ISLC. |
 
-Single agent, no gates, auto-attach. Watch it work, detach when satisfied.
-
-### Feature development with review
-
-Multi-stage flow with human checkpoints:
-
-```bash
-ark session start --repo . --summary "Add rate limiting to API" --flow default --dispatch
-```
-
-The agent plans first (creates PLAN.md), then implements, creates a PR, and waits for review. You approve each gate in the TUI before the next stage starts.
-
-### Parallel task decomposition
-
-Break a large task into parallel workstreams:
+### CLI
 
 ```bash
-# Parent session
-ark session start --repo . --summary "Migrate to new auth system" --flow bare
-# Spawn parallel children
-ark session spawn s-parent "Migrate user model"
-ark session spawn s-parent "Migrate API middleware"
-ark session spawn s-parent "Migrate tests"
-# Wait for all to complete
-ark session join s-parent
+ark recipe list
+ark recipe show quick-fix
+ark session start --recipe quick-fix --repo . \
+  --summary "Fix off-by-one in pager" --dispatch
 ```
 
-### Code review
-
-Use the review-focused flow:
+### Creating a recipe from an existing session
 
 ```bash
-ark session start --repo . --summary "Review PR #142" --flow pr-review --dispatch
+ark recipe from-session <sessionId> --name my-recipe --save
 ```
 
-The reviewer agent produces structured JSON feedback with P0-P3 severity levels.
+Recipes resolve three-tier like skills: `.ark/recipes/` > `~/.ark/recipes/` > `recipes/`.
 
-### CI/CD automation
+---
 
-Run headless in a CI pipeline:
+## 7. Compute
+
+Ark supports 11 compute providers across four isolation modes. Each provider launches an agent either directly (local) or via the universal `arkd` daemon on the remote target.
+
+### Provider matrix
+
+| Mode | Provider | Isolation | When to use |
+|------|----------|-----------|-------------|
+| Local | `local` | None (git worktree only) | Fastest, trusted code. |
+| Local isolated | `docker` | Docker container | Isolate deps from host. |
+| Local isolated | `devcontainer` | VS Code devcontainer | Reuse existing devcontainer. |
+| Local isolated | `firecracker` | Firecracker micro-VM | Strong isolation on a laptop. |
+| Remote via arkd | `ec2` | EC2 instance + arkd | Offload compute to cloud. |
+| Remote via arkd | `ec2-docker` | EC2 + docker-in-docker | Cloud plus container isolation. |
+| Remote via arkd | `ec2-devcontainer` | EC2 + devcontainer | Cloud devcontainer. |
+| Remote via arkd | `ec2-firecracker` | EC2 + Firecracker | Cloud plus VM isolation. |
+| Managed | `e2b` | E2B managed sandbox | Hands-off managed sandbox. |
+| Cluster | `k8s` | Kubernetes Pod | Existing k8s fleet. |
+| Cluster | `k8s-kata` | K8s with Kata VM runtime | Hardware-isolated pods. |
+
+Remote providers all run the `arkd` daemon on port 19300. The daemon is stateless and handles agent lifecycle, file ops, metrics, channel relay, and the `/codegraph/index` endpoint for remote knowledge indexing.
+
+### Isolation guidance
+
+- `local`: fastest, no sandbox. Only for code you trust and day-to-day work on your own machine.
+- `docker` / `devcontainer`: dependency isolation without VM overhead. Good default for CI-like runs.
+- `firecracker` / `ec2-firecracker` / `k8s-kata`: VM-grade isolation for untrusted input, multi-tenant, or regulated workloads.
+- `ec2-*`: offload compute, free up your laptop, share big instances across sessions.
+- `e2b`: managed sandbox with no ops overhead.
+
+### CLI
 
 ```bash
-ark exec --repo . --summary "Run linter and fix violations" --flow bare --timeout 300
+ark compute list
+ark compute show <id>
+ark compute create --provider docker --name my-sandbox
+ark compute create --provider ec2-firecracker --region us-west-2
+ark compute start <id>
+ark compute stop <id>
+ark compute clean <id>
+ark compute delete <id>
 ```
 
-Exits with the session's exit code. Use `--output json` for machine-readable results.
+### Selecting a compute at dispatch
 
-### Custom subprocess agent
+```bash
+ark session start --repo . --summary "..." --compute docker --dispatch
+ark session start --repo . --summary "..." --compute ec2-firecracker --dispatch
+```
 
-Run any command as an Ark agent (no Claude needed):
+If no compute is specified, the session uses the `default_compute` field from `~/.ark/config.yaml`, falling back to `local`.
+
+---
+
+## 8. Compute Templates
+
+Compute templates are named presets in `~/.ark/config.yaml`. They let you define a one-line name instead of re-typing provider and config every time.
+
+### Define in config
 
 ```yaml
-# agents/my-linter.yaml
-name: my-linter
-runtime: subprocess
-command: ["node", "scripts/lint-and-fix.js"]
-env:
-  TARGET: "{workdir}"
+# ~/.ark/config.yaml
+compute_templates:
+  fast-local:
+    provider: docker
+    config:
+      image: ark/sandbox:latest
+      memory_gb: 8
+      cpus: 4
+  heavy-cloud:
+    provider: ec2-firecracker
+    config:
+      region: us-west-2
+      instance_type: c6a.4xlarge
+      vcpus: 16
+      memory_gb: 32
+  review-sandbox:
+    provider: e2b
+    config:
+      template: ark-sandbox
 ```
+
+### CLI
 
 ```bash
-ark session start --repo . --summary "Lint pass" --agent my-linter --dispatch
+ark compute template list
+ark compute template show fast-local
+ark compute template create heavy-cloud \
+  --provider ec2-firecracker \
+  --config '{"region":"us-west-2"}'
+ark compute template delete fast-local
+
+# Use at compute creation time
+ark compute create --from-template heavy-cloud
+
+# Or directly at session dispatch
+ark session start --repo . --summary "..." \
+  --compute-template heavy-cloud --dispatch
 ```
 
-### Remote compute (EC2)
-
-Run agents on powerful cloud machines:
-
-```bash
-ark compute create gpu-box --provider ec2 --size xl --region us-east-1
-ark compute provision gpu-box
-ark session start --repo . --summary "Train model" --compute gpu-box --dispatch
-```
-
-### Scheduled nightly tasks
-
-Automate recurring work:
-
-```bash
-ark schedule add --cron "0 2 * * *" --summary "Nightly test suite" --repo . --flow bare
-```
+Compute templates are tenant-scoped in hosted mode and stored in the `compute_templates` table.
 
 ---
 
-## Issue Watching
+## 9. Knowledge Graph
 
-Automatically create sessions from GitHub issues with a specific label:
+Ark has a unified knowledge graph that stores codebase structure, session history, memories, learnings, skills, recipes, and agents -- all as nodes and edges in SQLite (or Postgres in hosted mode). The tables are `knowledge` and `knowledge_edges`, tenant-scoped.
 
-```bash
-ark watch --label ark --dispatch                    # Watch for 'ark' labeled issues
-ark watch --label ark --dispatch --interval 30000   # Poll every 30s
-```
+### Indexer: ops-codegraph
 
----
-
-## Authentication
-
-Set up Claude authentication for local and remote compute:
+The indexer is [@optave/codegraph](https://www.npmjs.com/package/@optave/codegraph) -- a TypeScript plus native Rust engine using tree-sitter WASM. It supports 33 languages out of the box and does not require Python.
 
 ```bash
-ark auth                           # Local auth setup (runs claude setup-token)
-ark auth --host my-ec2             # Run setup-token on a remote compute
+npm install -g @optave/codegraph
+# or let Ark pick it up as a local npm dependency
 ```
 
-The OAuth token is saved to `~/.ark/claude-oauth-token` and picked up automatically by dispatch.
+Ark reads `.codegraph/graph.db` after indexing and maps nodes and edges into its own `knowledge` table. A git co-change pass then adds co-modification edges.
 
----
+### Auto-index on dispatch
 
-## OTLP Observability
-
-Ark can export session and stage lifecycle as OpenTelemetry traces to any OTLP HTTP collector. No OpenTelemetry SDK is required -- Ark posts OTLP JSON directly.
-
-### Configuration
-
-Add an `otlp:` block to `~/.ark/config.yaml`:
+- **Local compute**: honors `knowledge.auto_index` in `~/.ark/config.yaml`. Skip entirely with `auto_index: false`.
+- **Remote compute**: always indexes via the arkd `/codegraph/index` endpoint. There is no way to skip it remotely -- the remote filesystem is the only place the indexer can see the code.
 
 ```yaml
-otlp:
-  enabled: true
-  endpoint: "http://localhost:4318/v1/traces"
-  headers:
-    Authorization: "Bearer my-token"
+# ~/.ark/config.yaml
+knowledge:
+  auto_index: true         # local dispatches index the repo
+  incremental_index: true  # only re-index changed files
 ```
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `enabled` | yes | Set to `true` to activate trace export |
-| `endpoint` | yes | OTLP HTTP endpoint (e.g., Jaeger, Grafana Tempo, Honeycomb) |
-| `headers` | no | Extra HTTP headers (auth tokens, API keys) |
+### MCP tools for agents
 
-### What gets traced
+When an agent runs, it gets 6 MCP tools against the knowledge store:
 
-- **Session span**: one span per session lifecycle (start to completion/failure), tagged with session ID, flow, repo, agent, token counts, and cost.
-- **Stage spans**: child spans nested under the session span, one per flow stage (plan, implement, review, etc.), tagged with agent and gate type.
+| Tool | Purpose |
+|------|---------|
+| `knowledge/search` | Full-text search over nodes (files, symbols, sessions, memories). |
+| `knowledge/context` | Build a token-budgeted context bundle for a question. |
+| `knowledge/impact` | Find impact/blast radius of changing a file or symbol. |
+| `knowledge/history` | Session and edit history for a file. |
+| `knowledge/remember` | Save a memory node. |
+| `knowledge/recall` | Retrieve memories (by query or label). |
 
-Spans are buffered and flushed every 30 seconds. Export is fire-and-forget -- collector failures do not affect session execution.
+### Context injection at dispatch
+
+At dispatch time, Ark builds a token-budgeted context bundle from the knowledge graph (max around 2000 tokens) and injects it into the agent's system prompt. This gives the agent immediate situational awareness without inflating the prompt.
+
+### CLI
+
+```bash
+ark knowledge search "auth middleware"
+ark knowledge index <repo>
+ark knowledge stats
+ark knowledge remember "Router port is 8430" --tags router,ports
+ark knowledge recall "router port"
+ark knowledge ingest <path>
+ark knowledge export --out ~/notes
+ark knowledge import ~/notes
+```
 
 ---
 
-## Auto-Rollback
+## 10. Cost Tracking
 
-Ark can monitor merged PRs for CI failures and automatically create revert PRs when checks fail.
+Ark has universal cost tracking across every runtime. Every LLM call is recorded via a transcript parser or router callback, priced through a local registry, and written to the `usage_records` table.
 
-### Configuration
+### Components
 
-Add a `rollback:` block to `~/.ark/config.yaml`:
+- **PricingRegistry** -- 300+ models with per-token prices, loaded from the LiteLLM public JSON. Lazy-refreshed.
+- **UsageRecorder** -- appends rows to `usage_records` with input/output tokens, cost, session, user, tenant, model, provider, runtime, agent.
+- **TranscriptParserRegistry** -- polymorphic parsers per runtime.
+
+Per-runtime transcript parsers:
+
+| Parser | Location |
+|--------|----------|
+| `ClaudeTranscriptParser` | `~/.claude/projects/<slug>/<session>.jsonl` (exact path resolved from session id) |
+| `CodexTranscriptParser` | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (matched by cwd) |
+| `GeminiTranscriptParser` | `~/.gemini/tmp/<slug>/chats/session-*.jsonl` (matched by projectHash) |
+
+### cost_mode column
+
+Each usage row has a `cost_mode`:
+
+| Mode | Meaning |
+|------|---------|
+| `api` | Per-token cost from PricingRegistry. |
+| `subscription` | Flat-rate plan -- `cost_usd = 0`, tokens still recorded for rate-limit tracking. |
+| `free` | `cost_usd = 0`. |
+
+`claude-max` is the canonical subscription runtime (Claude Max $200/month). Its tokens feed dashboards but never add to the cost ledger.
+
+### CLI
+
+```bash
+ark costs                       # summary with charts
+ark costs --session <id>
+ark costs --tenant acme
+ark costs --by model
+ark costs --by runtime
+ark costs --by agent
+ark costs --since 7d
+ark costs-sync                  # rescan transcripts and fill gaps
+ark costs-export --format csv --out costs.csv
+```
+
+Attribution works across session, user, tenant, model, provider, runtime, and agent dimensions.
+
+### Budgets
+
+Set daily, weekly, and monthly limits in `~/.ark/config.yaml`. When a limit is hit, new dispatches are blocked until the window rolls over (admins can override).
 
 ```yaml
-rollback:
-  enabled: true
-  timeout: 600          # seconds to wait for CI to complete (default: 600)
-  on_timeout: rollback  # "rollback" or "ignore" when CI doesn't finish in time
-  auto_merge: false     # auto-merge the revert PR (default: false)
-  health_url: null      # optional HTTP URL to check after CI passes
-```
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `enabled` | `false` | Activate post-merge monitoring |
-| `timeout` | `600` | Seconds to wait for check suites to complete |
-| `on_timeout` | `"ignore"` | Action when CI times out: `"rollback"` creates a revert PR, `"ignore"` does nothing |
-| `auto_merge` | `false` | Whether to auto-merge the generated revert PR |
-| `health_url` | `null` | HTTP endpoint to probe after all CI checks pass. A non-2xx response triggers rollback |
-
-### How it works
-
-After a session's merge stage completes, Ark polls GitHub check suites on the merge commit SHA every 30 seconds. If any check suite fails, Ark:
-
-1. Creates a `revert-<branch>` branch
-2. Opens a revert PR titled "Revert: <original PR title>" with the list of failed checks
-3. Logs a `rollback` event on the session
-4. Optionally stops the session
-
-If `health_url` is set, Ark also probes that URL after all CI checks pass. A failed health check triggers the same revert flow.
-
----
-
-## Guardrails
-
-Ark evaluates every tool call against a set of pattern-based guardrail rules before execution. This protects against dangerous commands that an agent might attempt.
-
-### Default Rules
-
-The following patterns are blocked by default:
-
-| Tool | Pattern | Action |
-|------|---------|--------|
-| Bash | `rm -rf /` (excluding `/tmp`) | Block |
-| Bash | `DROP TABLE` / `DROP DATABASE` | Block |
-| Bash | Fork bombs | Block |
-| Bash | `mkfs`, `fdisk`, `dd if=` | Block |
-| Bash | `git push --force` / `git push -f` | Block |
-| Read/Write | `.env` files | Warn |
-| Read/Write | Files named `credentials` | Warn |
-
-**Block** prevents the tool call entirely. **Warn** allows it but logs a warning event.
-
-### How it works
-
-Guardrails are enforced via the `PreToolUse` hook in `.claude/settings.local.json`, which Ark writes at dispatch time. When Claude attempts a tool call, the hook serializes the tool input to JSON and matches each rule's regex against it. The first matching rule determines the action. If no rule matches, the call is allowed.
-
-### Custom Rules
-
-Custom guardrail rules can be added alongside the defaults. They follow the same format:
-
-```typescript
-{ tool: "Bash", pattern: "curl.*\\|.*sh", action: "block" }
+budgets:
+  daily_usd: 25
+  weekly_usd: 100
+  monthly_usd: 300
+  warn_at_percent: 80
 ```
 
 ---
 
-## Prompt Injection Guard
+## 11. LLM Router
 
-Ark scans task summaries and user messages for prompt injection attempts using heuristic pattern matching.
+The LLM Router (`packages/router/`) is an OpenAI-compatible HTTP proxy that routes requests across providers with policies, circuit breakers, and an optional TensorZero backend.
 
-### When it runs
-
-- **At dispatch time**: the session's task summary is scanned. High-severity detections block dispatch entirely.
-- **At send time**: messages sent to running agents via `ark session send` are scanned. High-severity detections block the message. Lower-severity detections are logged as warnings but the message is still delivered.
-
-### Detection patterns
-
-The guard checks for common injection techniques:
-
-- "Ignore previous instructions" / "Disregard your rules" (high severity)
-- "You are now a different..." / "Forget everything" (high severity)
-- Fake system prompt tags like `[SYSTEM]` or `system: you are` (medium/high)
-- "Pretend you are..." / "Reveal your system prompt" (medium)
-- Instruction extraction attempts (low)
-
-This is a lightweight heuristic layer, not a security boundary. It catches common patterns but is not exhaustive.
-
----
-
-## Testing
-
-Tests use `bun:test`. Always run with `make test` -- never call `bun test` directly (concurrency flags matter and `make test` handles them correctly).
-
-### Critical: never run tests in parallel
-
-Tests share SQLite databases and hardcoded network ports (19100, 19200, 19300). Running tests in parallel causes port collisions and database corruption. Always use `make test`:
-
-```bash
-make test                                                  # all tests, sequential
-make test-file F=packages/core/__tests__/session.test.ts   # single file
-```
-
-### Test isolation
-
-Every test must create and clean up its own context to avoid leaking state. Use `AppContext.forTest()` (preferred):
-
-```ts
-import { AppContext, setApp, clearApp } from "../app.js";
-
-let app: AppContext;
-beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
-afterAll(async () => { await app?.shutdown(); clearApp(); });
-```
-
-Access repos directly: `app.sessions.create(...)`, `app.events.log(...)`.
-Call orchestration functions with `app` as first argument: `dispatch(app, sessionId)`, `fanOut(app, parentId, opts)`.
-
-The legacy `withTestContext()` helper still works in existing tests but is being phased out.
-
-### E2E tests
-
-CLI and TUI E2E tests import from `dist/`. Build first with `make dev` or `tsc`.
-
----
-
-## LLM Router
-
-The LLM Router is an OpenAI-compatible proxy that routes `/v1/chat/completions` requests across multiple LLM providers (Anthropic, OpenAI, Google).
-
-### Starting
-
-```bash
-ark router start                            # Default: port 8430, balanced policy
-ark router start --port 9000                # Custom port
-ark router start --policy cost              # Minimize cost
-ark router start --policy quality           # Prefer best model
-```
-
-### Routing Policies
+### Policies
 
 | Policy | Behavior |
 |--------|----------|
-| `quality` | Always routes to the highest-quality available model |
-| `balanced` | Classifies prompt complexity and picks appropriate model tier |
-| `cost` | Minimizes cost by preferring cheaper models |
+| `quality` | Prefer the best model for each request class. |
+| `balanced` | Trade off cost and quality. Default. |
+| `cost` | Minimize cost. |
 
-### Usage
+Each request is classified (complexity, length, tool calls) and routed to an appropriate model tier. Circuit breakers track per-provider failure rates and fail over to the next provider automatically. Cascade mode retries progressively stronger models on failure. Per-provider adapters normalize the request and response shape.
 
-Point any OpenAI-compatible client at the router:
+### TensorZero backend (optional)
 
-```bash
-curl http://localhost:8430/v1/chat/completions \
-  -d '{"model":"auto","messages":[{"role":"user","content":"hello"}]}'
+TensorZero is an open-source Rust LLM gateway (Apache 2.0). When enabled, Ark generates a `tensorzero.toml` from your API keys and starts TensorZero in one of three modes:
+
+1. Detect an existing sidecar on the configured port.
+2. Start the native TensorZero binary if installed.
+3. Fall back to Docker.
+
+`packages/core/router/tensorzero.ts` is the lifecycle manager. Auto-start happens on boot when both `router.auto_start` and `tensorzero.enabled` are true.
+
+### Injection into executors
+
+When the router is enabled, executors inject `ANTHROPIC_BASE_URL` and `OPENAI_BASE_URL` (and provider variants) into the agent's environment. Every LLM call from the agent then flows: Agent -> Router -> (TensorZero) -> Provider. An `onUsage` callback feeds the `UsageRecorder`.
+
+### Config
+
+```yaml
+# ~/.ark/config.yaml
+router:
+  enabled: true
+  url: http://localhost:8430
+  policy: balanced
+  auto_start: true
+
+tensorzero:
+  enabled: true
+  port: 3000
+  config_dir: ~/.ark/tensorzero
+  auto_start: true
 ```
-
-Use `model: "auto"` for automatic routing, or specify a model directly for passthrough.
-
-### Monitoring
-
-```bash
-ark router status                           # Health, uptime, provider status, request stats
-ark router costs                            # Cost breakdown by model
-ark router costs --group-by provider        # Cost breakdown by provider
-```
-
-The router includes circuit breakers that automatically fall back to healthy providers when a provider fails.
-
-### Configuration
-
-The router auto-detects providers from environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`). Advanced configuration via `~/.ark/router.yaml` or `--config` flag.
-
----
-
-## Dashboard
-
-Fleet-level overview of all sessions, costs, and system health.
 
 ### CLI
 
 ```bash
-ark dashboard                               # Colored terminal output
-ark dashboard --json                        # Machine-readable JSON
+ark router start --port 8430 --policy balanced
+ark router status
+ark router costs
 ```
 
-Shows:
-- Fleet status (running/waiting/stopped/failed/completed counts)
-- Cost summary (today/week/month with model breakdown)
-- Budget progress bar
-- Recent activity (last 8 events across all sessions)
-- System health (conductor, router)
+---
+
+## 12. Auth and Multi-Tenancy
+
+Ark is multi-tenant from the ground up. All entities are tenant-scoped: sessions, compute, events, messages, todos, groups, schedules, compute pools, compute templates, usage records, resource definitions, knowledge, knowledge edges.
+
+### API keys
+
+Format: `ark_<tenantId>_<secret>`. Example: `ark_acme_9f8a7b...`.
+
+```bash
+ark auth key create --tenant acme --role admin --label "CI key"
+ark auth key list
+ark auth key revoke <keyId>
+ark auth key rotate <keyId>
+```
+
+### Roles
+
+| Role | Permissions |
+|------|-------------|
+| `admin` | Full access, manage keys, set policies. |
+| `member` | Start/stop sessions, read all tenant data. |
+| `viewer` | Read-only. |
+
+### Tenant policies
+
+`TenantPolicyManager` enforces per-tenant rules:
+
+```yaml
+# applied via `ark tenant policy set --tenant acme --file policy.yaml`
+allowed_providers: [local, docker, ec2-firecracker]
+default_provider: docker
+max_concurrent_sessions: 20
+daily_cost_cap_usd: 200
+compute_pools: [pool-fast, pool-gpu]
+
+# integration enforcement
+router_required: true
+auto_index_required: true
+router_policy: balanced
+tensorzero_enabled: true
+```
+
+When `router_required` is on, dispatches fail unless the router is up. `auto_index_required` forces knowledge indexing for every dispatch (local and remote). `router_policy` locks the router policy for the tenant. `tensorzero_enabled` requires TensorZero to be the active backend.
+
+### Sessions have user_id
+
+Every session carries both `tenant_id` and `user_id`. Cost attribution, quotas, and audit all work per-user within a tenant.
+
+### Tenant-scoped app context
+
+```ts
+const appAcme = app.forTenant("acme");
+appAcme.sessions.list();                     // only acme sessions
+appAcme.computes.list();                     // only acme compute
+appAcme.knowledge.search("auth middleware"); // only acme knowledge
+```
+
+---
+
+## 13. Git Worktrees
+
+Every session gets its own git worktree at `~/.ark/worktrees/<sessionId>/` on a branch named after the session. This keeps work isolated and reviewable.
+
+### Workflow
+
+```bash
+# Dispatch creates the worktree automatically
+ark session start --repo . --summary "..." --dispatch
+
+# See a diff stat
+ark worktree diff <sessionId>
+
+# Finish the session: merge or open a PR
+ark worktree finish <sessionId>      # interactive: merge, PR, or discard
+ark worktree merge <sessionId>       # merge into base branch
+ark worktree pr <sessionId>          # push and create a PR via `gh`
+```
+
+The TUI has a `W` shortcut that opens a worktree overlay with a diff preview. It tracks which files you have already reviewed and flags any files modified since your last review.
+
+### Auto-PR
+
+When an agent completes and the repo has a git remote, Ark auto-pushes the branch and creates a PR via `gh pr create`. Disable per-repo with `auto_pr: false` in `.ark.yaml`.
+
+---
+
+## 14. Search
+
+Ark ships a FTS5 full-text search index across sessions, events, messages, and Claude Code transcripts.
+
+```bash
+ark search "race condition in scheduler"
+ark search "auth middleware" --transcripts   # also scan ~/.claude/projects JSONL
+ark search "pager bug" --index               # rebuild the FTS5 index
+ark index                                    # alias for --index
+```
+
+Search uses FTS5 when the `transcript_index` virtual table exists, and falls back to file scanning only when the table is absent. If you see unexpectedly empty results on an existing DB, run `ark index` to build the FTS table.
+
+---
+
+## 15. Dashboards (CLI, TUI, Web)
+
+Ark has three UI surfaces and a desktop shell. Surface parity is a hard rule -- every feature that exists in one surface must exist in the others.
+
+### CLI
+
+```bash
+ark dashboard           # top-like summary dashboard
+ark session list
+ark session events <id>
+ark costs
+ark compute list
+```
+
+Seventeen command modules cover sessions, compute, flows, skills, recipes, agents, runtimes, auth, router, knowledge, search, worktree, history, todo, config, tenant, and costs.
+
+### TUI
+
+```bash
+ark tui
+make tui                # same, via Makefile
+```
+
+React plus Ink terminal dashboard with 9 tabs: Sessions, Flows, Compute, History, Tools, Knowledge, Costs, Dashboard, Settings. Smart polling, SSE updates, overlay-driven forms, full keyboard navigation. Keybindings live in the status bar, not inside panels.
+
+Common shortcuts:
+
+| Key | Action |
+|-----|--------|
+| `1-9` | Switch tabs |
+| `j/k` | Navigate rows |
+| `n` | New session |
+| `Enter` | Dispatch/restart |
+| `s` | Stop session |
+| `I` | Interrupt agent |
+| `t` | Talk to session |
+| `a` | Attach tmux |
+| `V` | Run verification |
+| `W` | Worktree overlay |
+| `Z` | Archive/restore |
+| `q` | Quit |
 
 ### Web
 
-The web dashboard includes a Dashboard page (first item in the sidebar) with:
-- Fleet status cards
-- Cost charts (Recharts bar/pie charts)
-- Budget usage visualization
-- Recent activity timeline
+```bash
+ark web                 # starts Vite dev server
+make web-build          # production build
+```
+
+Vite + React + shadcn/ui. SSE live updates, Recharts cost dashboard, widget grid, session detail pages.
+
+### Desktop
+
+```bash
+make desktop            # launches Electron wrapper
+make desktop-build      # packages for distribution
+```
 
 ---
 
-## Remote Client Mode
+## 16. Knowledge Export and Import
 
-CLI, TUI, and Web can connect to a remote Ark server instead of running locally. This enables a hosted control plane architecture where agents run on remote workers.
-
-### Usage
+Memories and learnings live in the knowledge graph, not in plain files. Ark provides a portable markdown format for backup, sharing, and cross-machine sync.
 
 ```bash
-# Via flags
-ark --server https://ark.company.com --token ark_default_xxx session list
-ark tui --server https://ark.company.com --token ark_default_xxx
+# Export all memories and learnings as markdown files
+ark knowledge export --out ~/notes/ark
 
-# Via environment variables
+# Directory layout: one .md file per memory, YAML front matter for metadata
+# ~/notes/ark/memory-<id>.md
+# ---
+# id: mem_01
+# tags: [router, ports]
+# created: 2026-04-01
+# ---
+# Router port is 8430
+
+# Import back (idempotent by id)
+ark knowledge import ~/notes/ark
+```
+
+Export and import are tenant-scoped in hosted mode. The old `~/.ark/memories.json` and `~/.ark/LEARNINGS.md` files are no longer used -- memories are nodes in the knowledge graph.
+
+---
+
+## 17. MCP Integration
+
+Ark ships stub MCP server configs for four vendors: Atlassian (Jira/Confluence), GitHub, Linear, and Figma. These live in `mcp-configs/` and get merged into the agent's MCP server list at dispatch.
+
+```bash
+ls mcp-configs/
+# atlassian.json  figma.json  github.json  linear.json
+```
+
+### MCP socket pooling
+
+Spawning one MCP server process per agent is memory-expensive. Ark pools MCP server sockets and shares a single server process across agents on the same compute target. In measurements this drops memory use by 85-90 percent compared to per-agent spawning.
+
+The pool is transparent -- agents see a normal MCP server and Ark routes requests through the shared socket.
+
+---
+
+## 18. Remote Client Mode
+
+The CLI, TUI, and Web can all connect to a remote Ark server instead of running locally. They open a WebSocket `ArkClient` and delegate every operation.
+
+```bash
+# Env vars
 export ARK_SERVER=https://ark.company.com
-export ARK_TOKEN=ark_default_xxx
+export ARK_TOKEN=ark_default_9f8a7b...
+
 ark session list
 ark tui
+ark web
+
+# Or pass flags explicitly
+ark --server https://ark.company.com --token ark_default_xxx session list
+ark tui --server https://ark.company.com --token ark_default_xxx
 ```
 
-When remote mode is active, the CLI creates a WebSocket `ArkClient` to the remote server instead of booting a local AppContext. All commands work the same way -- the protocol is transparent.
+When remote mode is active, the CLI does not boot a local AppContext -- all state lives on the server.
 
-### Web Proxy Mode
+---
 
-The web dashboard can proxy to a remote server:
+## 19. Control Plane (Hosted Mode)
+
+`ark server start --hosted` boots Ark as a multi-tenant control plane.
+
+### What changes in hosted mode
+
+| Subsystem | Local mode | Hosted mode |
+|-----------|------------|-------------|
+| Database | SQLite (`~/.ark/ark.db`) | Postgres (`DATABASE_URL`) |
+| Resource stores | File-backed (`~/.ark/skills/`, etc.) | DB-backed (`DbResourceStore`, `resource_definitions` table) |
+| SSE bus | In-memory | Redis (`REDIS_URL`) |
+| Auth | Not enforced | API keys required |
+| Workers | Single machine | Worker registry + scheduler |
+| Tenants | Single `default` tenant | Multi-tenant with policies |
+
+### Worker registry and scheduler
+
+Workers register with the control plane via HTTP. The registry health-checks them every 60s and prunes stale workers after 90s. The session scheduler assigns new sessions to available workers, respecting tenant policies (allowed providers, max concurrency, cost caps, compute pools).
+
+### Start
 
 ```bash
-ark web --server https://ark.company.com --token xxx
+DATABASE_URL=postgres://ark:secret@localhost:5432/ark \
+REDIS_URL=redis://localhost:6379/0 \
+ark server start --hosted --port 19100
+```
+
+### Tenant setup
+
+```bash
+ark tenant create acme --name "Acme Corp"
+ark auth key create --tenant acme --role admin --label "bootstrap"
+ark tenant policy set --tenant acme --file policy.yaml
 ```
 
 ---
 
-## Control Plane
+## 20. Deployment
 
-Ark can run as a hosted multi-tenant control plane for teams.
+### Dockerfile
 
-### Starting
-
-```bash
-ark server start --hosted
-```
-
-This boots:
-- AppContext with PostgreSQL backend (set `DATABASE_URL`)
-- Worker registry (workers register via HTTP)
-- Session scheduler (assigns sessions to workers)
-- Tenant policy manager
-- Redis SSE bus (set `REDIS_URL` for multi-instance)
-- LLM router (if configured)
-
-### Tenant Policies
-
-Control per-tenant compute access:
+The single Dockerfile in `.infra/Dockerfile` builds a bun-based image containing Ark, tmux, git, and the `gh` CLI. It is used for both the control plane and workers.
 
 ```bash
-ark tenant policy set acme --providers k8s,e2b --max-sessions 20 --max-cost 100
-ark tenant policy get acme
-ark tenant policy list
-ark tenant policy delete acme
+docker build -f .infra/Dockerfile -t ark:latest .
+docker run --rm -it -p 19100:19100 ark:latest ark server start --hosted
 ```
 
-### Auth
+### docker-compose
 
-Create and manage API keys for tenants:
+`docker-compose.yaml` in `.infra/` brings up the full hosted stack.
+
+```yaml
+services:
+  ark:         # control plane (:19100)
+  postgres:    # hosted DB
+  redis:       # SSE bus
+  tensorzero:  # optional LLM gateway
+  worker-1:    # arkd worker
+  worker-2:    # arkd worker
+```
 
 ```bash
-ark auth create-key --tenant acme --name "CI pipeline" --role member
-ark auth list-keys --tenant acme
-ark auth revoke-key ak-abcd1234
-ark auth rotate-key ak-abcd1234
+cd .infra && docker compose up -d
 ```
 
-Roles: `admin` (full access), `member` (read + write), `viewer` (read only).
+Ark auto-creates tables, starts the router and TensorZero (if enabled), and registers workers.
 
----
+### Helm chart
 
-## Deployment
+`.infra/helm/ark/` is a production Helm chart with:
 
-### Docker
+- Separate deployments for control plane and workers
+- Postgres and Redis sub-charts (or external via values)
+- Horizontal Pod Autoscaler on the scheduler
+- Kata Containers runtime class for `k8s-kata` sessions
+- Firecracker support via a privileged daemonset
+- Ingress with TLS
 
 ```bash
-docker build -t ark .
-docker-compose up -d          # Ark + PostgreSQL + Redis
+helm install ark .infra/helm/ark \
+  --set postgres.external=true \
+  --set postgres.url=postgres://... \
+  --set redis.external=true \
+  --set redis.url=redis://... \
+  --set router.enabled=true \
+  --set tensorzero.enabled=true
 ```
 
-### Helm (Kubernetes)
-
-```bash
-helm install ark .infra/helm/ark -f .infra/helm/ark/values-production.yaml
-```
-
-The Helm chart deploys:
-- Control plane (deployment + service)
-- Worker pool (deployment + service)
-- PostgreSQL (StatefulSet)
-- Redis (deployment)
-- Ingress
-
-Production values include Kata/Firecracker runtime class for worker pod isolation.
-
-### MCP Config Stubs
-
-Pre-configured MCP server templates are available in `mcp-configs/`:
-- `atlassian.json` -- Jira/Confluence integration
-- `github.json` -- GitHub API integration
-- `linear.json` -- Linear issue tracker
-- `figma.json` -- Figma design files
-
-Copy these into your project's `.mcp.json` or session config to give agents access to external tools.
-
----
-
-## Environment Variables
+### Environment variables
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `ARK_CONDUCTOR_PORT` | `19100` | Conductor HTTP server port |
-| `ARK_CONDUCTOR_URL` | `http://localhost:19100` | Conductor URL |
-| `ARK_ARKD_URL` | `http://localhost:19300` | ArkD daemon URL |
-| `ARK_ARKD_PORT` | `19300` | ArkD daemon port |
-| `ARK_CHANNEL_PORT` | auto-assigned | Per-session MCP channel port |
-| `ARK_SESSION_ID` | -- | Set in channel context |
-| `ARK_STAGE` | -- | Current flow stage in channel |
-| `ARK_PROFILE` | `default` | Active profile name |
-| `ARK_SERVER` | -- | Remote Ark server URL (enables remote client mode) |
-| `ARK_TOKEN` | -- | API key for remote server authentication |
-| `DATABASE_URL` | -- | PostgreSQL connection URL (hosted mode) |
-| `REDIS_URL` | -- | Redis URL for SSE bus (hosted mode) |
-| `ARK_TEST_DIR` | -- | Temp directory for test isolation |
-| `ANTHROPIC_API_KEY` | -- | Required for LLM router Anthropic provider |
-| `OPENAI_API_KEY` | -- | Required for LLM router OpenAI provider |
-| `GOOGLE_API_KEY` | -- | Required for LLM router Google provider |
-| `E2B_API_KEY` | -- | Required for E2B compute provider |
+| `ARK_CONDUCTOR_PORT` | `19100` | Conductor HTTP port. |
+| `ARK_CONDUCTOR_URL` | `http://localhost:19100` | Conductor URL for channels. |
+| `ARK_ARKD_URL` | `http://localhost:19300` | arkd daemon URL. |
+| `ARK_ARKD_PORT` | `19300` | arkd daemon port. |
+| `ARK_CHANNEL_PORT` | auto | Per-session MCP channel port. |
+| `ARK_SERVER` | - | Remote Ark server URL (remote client mode). |
+| `ARK_TOKEN` | - | API key for remote server. |
+| `DATABASE_URL` | - | Postgres URL (hosted mode). |
+| `REDIS_URL` | - | Redis URL (hosted SSE bus). |
+| `ARK_TEST_DIR` | - | Temp dir for test isolation. |
+
+---
+
+## Appendix: Key file locations
+
+| Path | Purpose |
+|------|---------|
+| `~/.ark/ark.db` | SQLite database (local mode). Includes knowledge graph tables. |
+| `~/.ark/worktrees/<sessionId>/` | Session git worktrees. |
+| `~/.ark/tracks/<sessionId>/` | Launcher scripts, channel configs. |
+| `~/.ark/skills/` | Global user skills. |
+| `~/.ark/recipes/` | Global user recipes. |
+| `~/.ark/flows/` | Global user flows. |
+| `~/.ark/agents/` | Global user agents. |
+| `~/.ark/runtimes/` | Global user runtimes. |
+| `~/.ark/config.yaml` | User config (router, knowledge, tensorzero, compute templates, budgets). |
+| `~/.ark/logs/` | Structured JSONL logs. |
+| `.ark/` | Per-repo project config, skills, recipes, flows, agents, runtimes. |
+| `.ark.yaml` | Per-repo config (auto_pr, default verify scripts). |
+| `.claude/settings.local.json` | Hook config written at dispatch, cleaned on stop. |
+| `~/.claude/projects/` | Claude Code JSONL transcripts. |
+| `~/.codex/sessions/` | Codex JSONL transcripts. |
+| `~/.gemini/tmp/` | Gemini JSONL transcripts. |
+
+## Appendix: Common tasks cheat sheet
+
+```bash
+# Start a quick fix session
+ark session start --recipe quick-fix --repo . --summary "..." --dispatch
+
+# Run a feature build on a remote Firecracker VM
+ark session start --recipe feature-build --repo . \
+  --summary "Add SSO" --compute ec2-firecracker --dispatch
+
+# Fan-out 4 children for independent subtasks
+ark session fork <parentId> --count 4 --summaries "a,b,c,d"
+
+# Swap runtime to Codex for one session
+ark session start --repo . --summary "Refactor parser" \
+  --agent implementer --runtime codex --dispatch
+
+# Use Max subscription (no per-token cost)
+ark session start --repo . --summary "Long refactor" \
+  --agent implementer --runtime claude-max --dispatch
+
+# Inspect costs
+ark costs --by runtime --since 7d
+ark costs-export --format csv --out last-week.csv
+
+# Check router health
+ark router status
+
+# Connect to a hosted server
+ark --server https://ark.company.com --token ark_default_xxx tui
+```
+
+---
+
+That is the full tour. Every concept is documented here: sessions, flows, agents, runtimes, skills, recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/TUI/Web/Desktop, knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.

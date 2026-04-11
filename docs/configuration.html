@@ -54,6 +54,24 @@
         </tbody>
       </table>
 
+      <h2>Local vs Hosted Mode</h2>
+      <p>Ark runs in one of two deployment modes. Most config keys apply to both, but a few are mode-specific.</p>
+      <table>
+        <thead>
+          <tr><th>Aspect</th><th>Local (default)</th><th>Hosted control plane</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Entry point</td><td><code>ark tui</code>, <code>ark cli</code>, <code>ark web</code></td><td><code>ark server start --hosted</code></td></tr>
+          <tr><td>Database</td><td>SQLite at <code>~/.ark/ark.db</code></td><td>PostgreSQL via <code>DATABASE_URL</code></td></tr>
+          <tr><td>Stores</td><td>File-backed three-tier (builtin &gt; <code>~/.ark/...</code> &gt; <code>.ark/...</code>)</td><td>DB-backed <code>DbResourceStore</code>, tenant-scoped</td></tr>
+          <tr><td>SSE bus</td><td>In-memory</td><td>Redis via <code>REDIS_URL</code></td></tr>
+          <tr><td>Auth</td><td>None (single user, tenant = <code>"default"</code>)</td><td>API keys required, roles admin/member/viewer</td></tr>
+          <tr><td>Tenants / Users</td><td>1 / 1</td><td>Many / many (tracked via <code>user_id</code> on sessions)</td></tr>
+          <tr><td>Scheduler</td><td>None</td><td><code>WorkerRegistry</code> + <code>SessionScheduler</code></td></tr>
+          <tr><td>Config source</td><td><code>~/.ark/config.yaml</code></td><td>Env vars + per-tenant DB rows</td></tr>
+        </tbody>
+      </table>
+
       <!-- ── config.yaml ──────────────────────────────────────────────────── -->
       <h2>~/.ark/config.yaml</h2>
       <p>The main configuration file. Open it with <code>ark config</code> (creates a default if missing).</p>
@@ -171,20 +189,79 @@
       <h3>Router</h3>
       <pre><code><span class="yaml-key">router</span>:
   <span class="yaml-key">enabled</span>: <span class="yaml-value">false</span>
+  <span class="yaml-key">url</span>: <span class="yaml-value">http://localhost:8430</span>
   <span class="yaml-key">port</span>: <span class="yaml-value">8430</span>
-  <span class="yaml-key">policy</span>: <span class="yaml-value">balanced</span>     <span class="yaml-comment"># quality | balanced | cost</span></code></pre>
-      <p>Configure the LLM router. Providers are auto-detected from env vars (<code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>GOOGLE_API_KEY</code>).</p>
+  <span class="yaml-key">policy</span>: <span class="yaml-value">balanced</span>     <span class="yaml-comment"># quality | balanced | cost</span>
+  <span class="yaml-key">auto_start</span>: <span class="yaml-value">false</span>   <span class="yaml-comment"># start router automatically at boot</span></code></pre>
+      <p>Configure the LLM router. Providers are auto-detected from env vars (<code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>GOOGLE_API_KEY</code>). When <code>enabled</code>, the router URL is injected into agent executors via <code>ANTHROPIC_BASE_URL</code> (Claude Code runtimes) or <code>OPENAI_BASE_URL</code> (Codex / OpenAI-compatible runtimes) -- agents call the router instead of the provider directly, and the router records every turn through its <code>onUsage</code> callback into the <code>usage_records</code> table.</p>
 
-      <h3>Auth</h3>
+      <h3>TensorZero Gateway</h3>
+      <pre><code><span class="yaml-key">tensorZero</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">false</span>
+  <span class="yaml-key">port</span>: <span class="yaml-value">3000</span>
+  <span class="yaml-key">config_dir</span>: <span class="yaml-value">~/.ark/tensorzero</span>
+  <span class="yaml-key">auto_start</span>: <span class="yaml-value">false</span></code></pre>
+      <p>Optional Rust-based OpenAI-compatible gateway (Apache 2.0) that the router delegates to. When <code>enabled</code> + <code>router.auto_start</code> are both on, the lifecycle manager tries three strategies in order: detect an existing sidecar, launch the native <code>tensorzero</code> binary, or fall back to Docker. The <code>tensorzero.toml</code> config is generated on the fly from the provider API keys in your environment.</p>
+
+      <h3>Knowledge Graph</h3>
+      <pre><code><span class="yaml-key">knowledge</span>:
+  <span class="yaml-key">auto_index</span>: <span class="yaml-value">true</span>       <span class="yaml-comment"># index repo automatically on dispatch</span>
+  <span class="yaml-key">incremental_index</span>: <span class="yaml-value">true</span></code></pre>
+      <p>Local compute honors the <code>auto_index</code> flag. Remote compute (Docker, EC2, K8s, Firecracker, E2B) <strong>always</strong> indexes via <code>POST /codegraph/index</code> on the remote arkd daemon regardless of config. The indexer is <a href="https://www.npmjs.com/package/@optave/codegraph"><code>ops-codegraph</code></a> (<code>@optave/codegraph</code>) -- a TypeScript + Rust native tool that parses 33 languages via tree-sitter WASM, no Python dependency. Install with <code>bun add @optave/codegraph</code> or <code>npm install -g @optave/codegraph</code>. The command is <code>codegraph build</code>.</p>
+
+      <h3>MCP Socket Pooling</h3>
+      <pre><code><span class="yaml-key">mcp_pool</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">false</span>
+  <span class="yaml-key">autoStart</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">poolAll</span>: <span class="yaml-value">false</span>
+  <span class="yaml-key">excludeMcps</span>: <span class="yaml-value">[]</span></code></pre>
+      <p>Share one MCP server process across all sessions instead of spawning N sessions &times; M MCP servers. Each pooled server exposes a socket at <code>/tmp/ark-mcp-&lt;name&gt;.sock</code>; sessions reference it via <code>{"command": "ark", "args": ["mcp-proxy", "/tmp/ark-mcp-&lt;name&gt;.sock"]}</code>. Cuts MCP memory roughly 85-90%. Use <code>excludeMcps</code> to keep stateful servers per-session.</p>
+
+      <h3>Compute Templates</h3>
+      <pre><code><span class="yaml-key">compute_templates</span>:
+  <span class="yaml-key">gpu-large</span>:
+    <span class="yaml-key">provider</span>: <span class="yaml-value">ec2</span>
+    <span class="yaml-key">config</span>:
+      <span class="yaml-key">size</span>: <span class="yaml-value">xxl</span>
+      <span class="yaml-key">region</span>: <span class="yaml-value">us-west-2</span>
+  <span class="yaml-key">sandbox</span>:
+    <span class="yaml-key">provider</span>: <span class="yaml-value">docker</span>
+    <span class="yaml-key">config</span>:
+      <span class="yaml-key">image</span>: <span class="yaml-value">node:20</span>
+  <span class="yaml-key">isolated</span>:
+    <span class="yaml-key">provider</span>: <span class="yaml-value">ec2-firecracker</span>
+    <span class="yaml-key">config</span>:
+      <span class="yaml-key">size</span>: <span class="yaml-value">l</span></code></pre>
+      <p>Named presets for <code>ark compute create --from-template &lt;name&gt;</code>. Provider values: <code>local</code>, <code>docker</code>, <code>devcontainer</code>, <code>firecracker</code>, <code>ec2</code>, <code>ec2-docker</code>, <code>ec2-devcontainer</code>, <code>ec2-firecracker</code>, <code>e2b</code>, <code>k8s</code>, <code>k8s-kata</code>. In hosted mode, templates live in the tenant-scoped <code>compute_templates</code> DB table and are managed via <code>ark compute template create/list/show/delete</code>.</p>
+
+      <h3>Auth (Multi-Tenant)</h3>
       <pre><code><span class="yaml-key">auth</span>:
   <span class="yaml-key">enabled</span>: <span class="yaml-value">false</span>
   <span class="yaml-key">apiKeyEnabled</span>: <span class="yaml-value">false</span></code></pre>
-      <p>Multi-tenant authentication. Disabled by default for local use. Enable for hosted mode.</p>
+      <p>Required for hosted mode, optional for local use. API key format: <code>ark_&lt;tenantId&gt;_&lt;secret&gt;</code>. The tenant ID is encoded in the key so routing is lookup-free; only the <code>&lt;secret&gt;</code> is hashed. Roles: <code>admin</code> (full tenant control), <code>member</code> (create and operate sessions/compute), <code>viewer</code> (read-only). Manage via <code>ark auth create-key</code>, <code>ark auth list-keys</code>, <code>ark auth revoke-key</code>, <code>ark auth rotate-key</code>.</p>
+      <p>When auth is off, everything behaves as a single-user install under tenant <code>"default"</code> with <code>admin</code> role. When auth is on, every tenant-owned entity is filtered by its <code>tenant_id</code> column: sessions, compute, events, messages, todos, groups, schedules, compute_pools, compute_templates, usage_records, resource_definitions, knowledge, knowledge_edges.</p>
+
+      <h3>Tenant Policies</h3>
+      <p>Hosted mode enforces per-tenant policies via <code>TenantPolicyManager</code>. Fields include <code>allowed_providers</code>, <code>default_provider</code>, <code>max_sessions</code>, <code>max_cost_per_day</code>, plus integration enforcement flags:</p>
+      <ul>
+        <li><code>router_required</code> -- force all traffic through the LLM router (block direct provider env vars)</li>
+        <li><code>auto_index_required</code> -- force <code>knowledge.auto_index</code> on regardless of user config</li>
+        <li><code>router_policy</code> -- lock the router policy to <code>quality</code>, <code>balanced</code>, or <code>cost</code></li>
+        <li><code>tensorzero_enabled</code> -- force TensorZero backend on for this tenant</li>
+      </ul>
+      <pre><code>ark tenant policy set acme \
+  --providers k8s,e2b,ec2 \
+  --default-provider k8s \
+  --max-sessions 20 \
+  --max-cost 100</code></pre>
 
       <h3>Database</h3>
       <pre><code><span class="yaml-key">database_url</span>: <span class="yaml-value">null</span>    <span class="yaml-comment"># PostgreSQL for hosted mode</span>
 <span class="yaml-key">redis_url</span>: <span class="yaml-value">null</span>       <span class="yaml-comment"># Redis for SSE bus</span></code></pre>
       <p>Set <code>DATABASE_URL</code> for PostgreSQL (hosted mode). Set <code>REDIS_URL</code> for multi-instance SSE. Both default to local (SQLite, in-memory bus).</p>
+
+      <h3>Channels</h3>
+      <p>Each Ark session spawns an <code>ark-channel</code> MCP server over stdio. The channel opens an HTTP port for inbound traffic at <code>19200 + (hash(sessionId) % 10000)</code> -- deterministic per session, so restarts reuse the same port. Reports flow agent -&gt; ark-channel (stdio) -&gt; arkd (<code>:19300</code>) -&gt; conductor (<code>:19100</code>). Port 19100 is hardcoded; 19300 (arkd) is configurable via <code>ARK_ARKD_PORT</code> / <code>ARK_ARKD_URL</code>.</p>
 
       <!-- ── bridge.json ──────────────────────────────────────────────────── -->
       <h2>~/.ark/bridge.json</h2>
@@ -260,7 +337,37 @@
 <span class="yaml-key">env</span>:
   <span class="yaml-key">CLAUDE_AUTOCOMPACT_PCT_OVERRIDE</span>: <span class="yaml-value">"80"</span></code></pre>
       <p>Template variables substituted at dispatch: <code>{ticket}</code>, <code>{summary}</code>, <code>{workdir}</code>, <code>{repo}</code>, <code>{branch}</code>.</p>
-      <p>Built-in agents: <code>planner</code>, <code>implementer</code>, <code>reviewer</code>, <code>documenter</code>, <code>worker</code>, <code>codex-worker</code>, <code>gemini-worker</code>, <code>aider-worker</code>.</p>
+      <p>Built-in agents (12 roles): <code>closer</code>, <code>documenter</code>, <code>implementer</code>, <code>plan-auditor</code>, <code>planner</code>, <code>retro</code>, <code>reviewer</code>, <code>spec-planner</code>, <code>task-implementer</code>, <code>ticket-intake</code>, <code>verifier</code>, <code>worker</code>. Built-in runtimes: <code>claude</code>, <code>claude-max</code>, <code>codex</code>, <code>gemini</code>. Any role can be mapped to any runtime at dispatch with <code>--runtime</code>.</p>
+
+      <!-- ── Runtime YAML ────────────────────────────────────────────────── -->
+      <h2>Runtime YAML</h2>
+      <p>Runtime definitions live in <code>runtimes/&lt;name&gt;.yaml</code> (builtin), <code>.ark/runtimes/&lt;name&gt;.yaml</code> (project), or <code>~/.ark/runtimes/&lt;name&gt;.yaml</code> (global). Built-in runtimes: <code>claude</code>, <code>claude-max</code>, <code>codex</code>, <code>gemini</code>.</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">claude-max</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"Claude Code on Max subscription"</span>
+<span class="yaml-key">type</span>: <span class="yaml-value">claude-code</span>
+<span class="yaml-key">models</span>:
+  - <span class="yaml-key">id</span>: <span class="yaml-value">opus</span>
+    <span class="yaml-key">label</span>: <span class="yaml-value">"Claude Opus"</span>
+<span class="yaml-key">default_model</span>: <span class="yaml-value">opus</span>
+<span class="yaml-key">billing</span>:
+  <span class="yaml-key">mode</span>: <span class="yaml-value">subscription</span>          <span class="yaml-comment"># api | subscription | free</span>
+  <span class="yaml-key">plan</span>: <span class="yaml-value">claude-max</span>
+  <span class="yaml-key">cost_per_month</span>: <span class="yaml-value">200</span>
+  <span class="yaml-key">transcript_parser</span>: <span class="yaml-value">claude</span></code></pre>
+      <p>The <code>billing</code> section tells the <code>UsageRecorder</code> how to account for token usage. Each row in <code>usage_records</code> carries a <code>cost_mode</code> column mirroring the runtime's mode:</p>
+      <table>
+        <thead>
+          <tr><th>Mode</th><th><code>cost_usd</code> per row</th><th>Tokens recorded</th><th>Example runtimes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>api</code></td><td>Per-token from <code>PricingRegistry</code> (300+ models, LiteLLM JSON)</td><td>Yes</td><td><code>claude</code>, <code>codex</code>, <code>gemini</code></td></tr>
+          <tr><td><code>subscription</code></td><td><code>0</code> (monthly cost amortized separately)</td><td>Yes (for rate-limit tracking)</td><td><code>claude-max</code> ($200/mo)</td></tr>
+          <tr><td><code>free</code></td><td><code>0</code></td><td>Yes</td><td>Local or zero-cost runtimes</td></tr>
+        </tbody>
+      </table>
+      <p>The <code>transcript_parser</code> field is used by the polymorphic <code>TranscriptParserRegistry</code> and <code>ark costs-sync</code> to pick the right backend: <code>ClaudeTranscriptParser</code> reads <code>~/.claude/projects/&lt;slug&gt;/&lt;sessionId&gt;.jsonl</code>, <code>CodexTranscriptParser</code> reads <code>~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl</code> (cwd-matched), <code>GeminiTranscriptParser</code> reads <code>~/.gemini/tmp/&lt;projectHash&gt;/chats/session-*.jsonl</code>.</p>
+      <p>CLI: <code>ark runtime list</code>, <code>ark runtime show &lt;name&gt;</code>. Override an agent's default runtime at dispatch with <code>--runtime</code>:</p>
+      <pre><code><span class="prompt">$</span> ark session start --repo . --summary "Fix bug" --agent implementer --runtime codex --dispatch</code></pre>
 
       <!-- ── Flow YAML ────────────────────────────────────────────────────── -->
       <h2>Flow YAML</h2>
@@ -319,7 +426,8 @@
           <tr><td><code>ARK_CONDUCTOR_URL</code></td><td><code>http://localhost:19100</code></td><td>Conductor URL (fallback if arkd unavailable)</td></tr>
           <tr><td><code>ARK_ARKD_URL</code></td><td><code>http://localhost:19300</code></td><td>ArkD URL -- channel reports go here first</td></tr>
           <tr><td><code>ARK_ARKD_PORT</code></td><td><code>19300</code></td><td>ArkD daemon port</td></tr>
-          <tr><td><code>ARK_CHANNEL_PORT</code></td><td>auto</td><td>Per-session MCP channel port</td></tr>
+          <tr><td><code>ARK_ARKD_TOKEN</code></td><td>--</td><td>Optional bearer token for authenticating against ArkD</td></tr>
+          <tr><td><code>ARK_CHANNEL_PORT</code></td><td>auto</td><td>Per-session MCP channel port (<code>19200 + (hash(sessionId) % 10000)</code>)</td></tr>
           <tr><td><code>ARK_SESSION_ID</code></td><td>--</td><td>Set in channel context</td></tr>
           <tr><td><code>ARK_STAGE</code></td><td>--</td><td>Current flow stage in channel</td></tr>
           <tr><td><code>ARK_PROFILE</code></td><td><code>default</code></td><td>Active profile name</td></tr>
@@ -357,6 +465,8 @@
           <tr><td><code>~/.ark/recipes/</code></td><td>Global recipe definitions</td></tr>
           <tr><td><code>~/.ark/agents/</code></td><td>Global agent definitions</td></tr>
           <tr><td><code>~/.ark/flows/</code></td><td>Global flow definitions</td></tr>
+          <tr><td><code>~/.ark/runtimes/</code></td><td>Global runtime definitions</td></tr>
+          <tr><td><code>~/.ark/tensorzero/</code></td><td>Generated TensorZero config (when enabled)</td></tr>
           <tr><td><code>~/.ark/logs/</code></td><td>Log files</td></tr>
           <tr><td><code>~/.ark/conductor/</code></td><td>Conductor learnings and policies</td></tr>
           <tr><td><code>~/.claude/projects/</code></td><td>Claude Code session transcripts (read by search/import)</td></tr>

@@ -297,7 +297,7 @@
     <div class="logo">ark</div>
     <p class="tagline">
       <strong>Autonomous agent ecosystem.</strong><br>
-      Orchestrate AI coding agents through DAG-based SDLC flows with 7 compute providers.
+      Orchestrate AI coding agents through DAG-based SDLC flows with 11 compute providers.
     </p>
 
     <div class="features">
@@ -306,9 +306,12 @@
       <span class="pill purple">LLM router</span>
       <span class="pill">4 runtimes</span>
       <span class="pill green">12 agents</span>
-      <span class="pill purple">7 compute providers</span>
-      <span class="pill">TUI + web + desktop</span>
-      <span class="pill green">multi-tenancy</span>
+      <span class="pill purple">11 compute providers</span>
+      <span class="pill">compute templates</span>
+      <span class="pill green">TensorZero gateway</span>
+      <span class="pill purple">multi-tenant control plane</span>
+      <span class="pill">billing modes</span>
+      <span class="pill green">TUI + web + desktop</span>
       <span class="pill purple">fan-out / auto-join</span>
       <span class="pill">cost tracking</span>
       <span class="pill green">Helm chart</span>
@@ -364,23 +367,33 @@
         </div>
         <div class="card">
           <div class="icon">&#9889;</div>
-          <h3>7 Compute Providers</h3>
-          <p>Local, Docker, DevContainer, Firecracker, EC2, E2B sandboxes, and Kubernetes with Kata Containers.</p>
+          <h3>11 Compute Providers</h3>
+          <p>Local, Docker, DevContainer, Firecracker, EC2, EC2+Docker/DevContainer/Firecracker, E2B sandboxes, Kubernetes, and K8s with Kata Containers.</p>
         </div>
         <div class="card">
           <div class="icon">&#128269;</div>
           <h3>Knowledge Graph</h3>
-          <p>Unified knowledge across codebase, sessions, memories, and learnings. Axon-powered indexing.</p>
+          <p>Unified knowledge across codebase, sessions, memories, and learnings. ops-codegraph indexing, 33 languages via tree-sitter.</p>
         </div>
         <div class="card">
           <div class="icon">&#128274;</div>
-          <h3>Multi-Runtime</h3>
-          <p>4 runtimes (Claude, Codex, Gemini, Aider). 12 specialized agents. Any role on any LLM backend.</p>
+          <h3>Multi-Runtime + Billing Modes</h3>
+          <p>4 runtimes (Claude, Claude Max, Codex, Gemini). 12 specialized agents. API or subscription billing, per-runtime cost tracking.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128295;</div>
+          <h3>Compute Templates</h3>
+          <p>Named presets for compute creation. One YAML entry spins up any provider with pinned size/region/image.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128640;</div>
+          <h3>TensorZero Gateway</h3>
+          <p>Optional Rust-based OpenAI-compatible gateway. Auto-started by the router for circuit breakers, fallbacks, and observability.</p>
         </div>
         <div class="card">
           <div class="icon">&#128232;</div>
-          <h3>Control Plane</h3>
-          <p>Multi-tenant hosted mode with API keys, tenant policies, worker registry, Helm chart deployment.</p>
+          <h3>Multi-Tenant Control Plane</h3>
+          <p>Hosted mode with API keys, tenant policies, integration enforcement (router_required, auto_index_required), worker registry, Helm chart.</p>
         </div>
       </div>
     </div>

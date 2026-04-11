@@ -113,7 +113,7 @@ Runs OpenAI Codex CLI in full-auto mode.
 | Runtime | `cli-agent` |
 | Command | `codex --approval-mode full-auto` |
 | Task delivery | `arg` (task appended as CLI argument) |
-| Model | `o4-mini` |
+| Model | `gpt-5-codex` |
 | Max turns | 200 |
 
 **Prerequisite**: `codex` CLI must be installed and authenticated.
@@ -131,20 +131,6 @@ Runs Google Gemini CLI.
 | Max turns | 200 |
 
 **Prerequisite**: `gemini` CLI must be installed and authenticated.
-
-### aider-worker
-
-Runs Aider AI pair programming tool.
-
-| Field | Value |
-|-------|-------|
-| Runtime | `cli-agent` |
-| Command | `aider --yes-always --no-git` |
-| Task delivery | `arg` (task appended as CLI argument) |
-| Model | `aider` |
-| Max turns | 200 |
-
-**Prerequisite**: `aider` must be installed (`pip install aider-chat`).
 
 ### generic-cli
 
@@ -164,6 +150,37 @@ Template for wrapping any CLI tool as an Ark agent. Copy and customize for your 
 ark agent copy generic-cli my-tool
 # Edit to set your tool's command, task_delivery mode, etc.
 ```
+
+---
+
+## Runtime Overrides
+
+Agents declare a default runtime in their YAML (via the `runtime` field), but you can override it at dispatch time with the `--runtime` flag:
+
+```bash
+# Run implementer on its default runtime (claude)
+ark session start --repo . --summary "Fix bug" --agent implementer --dispatch
+
+# Override: run implementer on codex
+ark session start --repo . --summary "Fix bug" --agent implementer --runtime codex --dispatch
+
+# Override: run implementer on gemini
+ark session start --repo . --summary "Fix bug" --agent implementer --runtime gemini --dispatch
+```
+
+Built-in runtimes: `claude`, `claude-max`, `codex`, `gemini`. At dispatch, runtime config (type, command, task_delivery, env) is merged with agent config. Agent-level values take precedence.
+
+## Runtime Billing Modes and Cost Tracking
+
+Each runtime declares a `billing` section that controls how its usage is recorded in the `usage_records` table:
+
+| Mode | `cost_usd` | Tokens recorded | Typical use |
+|------|------------|-----------------|-------------|
+| `api` | Per-token from PricingRegistry (300+ models, LiteLLM JSON) | Yes | `claude`, `codex`, `gemini` billed per request |
+| `subscription` | `0` (fixed monthly) | Yes (for rate-limit tracking) | `claude-max` ($200/mo Max plan) |
+| `free` | `0` | Yes | Local or zero-cost runtimes |
+
+Regardless of cost mode, transcript-based token counts are always captured via the polymorphic `TranscriptParserRegistry` (Claude, Codex, Gemini parsers). The `cost_mode` column on each `usage_records` row records which mode was active, so dashboards can separate real API spend from subscription seats without losing usage volume.
 
 ---
 

@@ -13,6 +13,26 @@ Ark uses several configuration files:
 | `.ark.yaml` (repo root) | Per-repository defaults | User |
 | `~/.ark/router.yaml` | LLM router configuration (optional) | User |
 
+## Local vs Hosted Mode
+
+Ark runs in one of two deployment modes and the scope of each config key depends on which mode is active.
+
+| Aspect | Local (default) | Hosted control plane |
+|--------|-----------------|----------------------|
+| Entry point | `ark tui`, `ark cli`, `ark web` | `ark server start --hosted` |
+| Database | SQLite at `~/.ark/ark.db` | PostgreSQL via `DATABASE_URL` |
+| Stores (flows/agents/skills/recipes/runtimes) | File-backed, three-tier (builtin > `~/.ark/...` > `.ark/...`) | DB-backed `DbResourceStore`, tenant-scoped rows in `resource_definitions` |
+| SSE bus | In-memory | Redis via `REDIS_URL` |
+| Auth | None (single user, tenant = `"default"`) | API keys required (`auth.enabled: true`), roles: `admin`/`member`/`viewer` |
+| Tenants | 1 | Many |
+| Users | 1 | Many (tracked via `user_id` on sessions) |
+| Scheduler | None | `WorkerRegistry` + `SessionScheduler` |
+| Cost tracking | Session-level | Tenant + user + session |
+| Config source | `~/.ark/config.yaml` | Env vars + per-tenant DB rows |
+| Compute templates | `~/.ark/config.yaml` under `compute_templates:` | Per-tenant `compute_templates` table |
+
+Unless noted otherwise, config keys in `~/.ark/config.yaml` apply to **both** modes. Hosted mode additionally reads env vars (`DATABASE_URL`, `REDIS_URL`, `ANTHROPIC_API_KEY`, ...) and tenant policy rows from the DB.
+
 ## ~/.ark/config.yaml
 
 The main configuration file. Open it with `ark config` (creates a default if missing).
@@ -273,26 +293,64 @@ Theme colors:
 
 ### Router Configuration
 
-Configure the LLM router (used by `ark router start` and hosted mode):
+Configure the LLM router (used by `ark router start`, the TUI, and hosted mode).
 
 ```yaml
 router:
   enabled: false
+  url: http://localhost:8430
   port: 8430
   policy: balanced     # quality | balanced | cost
+  auto_start: false
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable LLM router in hosted mode |
-| `port` | number | `8430` | Router listen port |
+| `enabled` | boolean | `false` | Enable LLM router for this Ark instance |
+| `url` | string | `http://localhost:8430` | Base URL that executors should target |
+| `port` | number | `8430` | Router listen port (used when auto-starting) |
 | `policy` | string | `balanced` | Default routing policy: `quality`, `balanced`, or `cost` |
+| `auto_start` | boolean | `false` | Start the router automatically on Ark boot (TUI, CLI, or control plane) |
 
 Providers are auto-detected from environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`). Advanced provider configuration can be placed in `~/.ark/router.yaml`.
 
+**URL injection into executors.** When `router.enabled` is true, the claude-code and cli-agent executors transparently set the appropriate base URL env var on agent processes:
+
+- `ANTHROPIC_BASE_URL` for Claude Code (`claude`, `claude-max` runtimes)
+- `OPENAI_BASE_URL` for Codex and any OpenAI-compatible runtime
+
+Agents call the router instead of the provider directly. The router records usage via an `onUsage` callback that writes into the `usage_records` table, respecting each runtime's `cost_mode` (`api`, `subscription`, `free`).
+
+### TensorZero Gateway
+
+TensorZero is an optional Rust-based OpenAI-compatible gateway (Apache 2.0) that the router can delegate to. Enable it to get production-grade circuit breakers, per-request fallbacks, and observability in front of your model providers.
+
+```yaml
+tensorZero:
+  enabled: false
+  port: 3000
+  config_dir: ~/.ark/tensorzero
+  auto_start: false
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable TensorZero as the router's backend |
+| `port` | number | `3000` | Port to bind the gateway to (used on auto-start) |
+| `config_dir` | string | `~/.ark/tensorzero` | Directory for the generated `tensorzero.toml` and any model configs |
+| `auto_start` | boolean | `false` | Launch TensorZero at boot when `router.auto_start` is also true |
+
+At boot, the TensorZero lifecycle manager (`packages/core/router/tensorzero.ts`) tries three strategies in order:
+
+1. **Sidecar detect** -- probe `http://localhost:<port>/health`; if it responds, reuse it.
+2. **Native binary** -- launch the `tensorzero` Rust binary if it is on `PATH`.
+3. **Docker fallback** -- run the official TensorZero image via Docker.
+
+The `tensorzero.toml` config is generated on the fly from the provider API keys in your environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`), so you normally don't need to touch `config_dir` unless you want to pin custom model families.
+
 ### Auth Configuration
 
-Configure multi-tenant authentication (for hosted mode):
+Configure multi-tenant authentication. Required for hosted mode, optional for local mode.
 
 ```yaml
 auth:
@@ -303,9 +361,138 @@ auth:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `enabled` | boolean | `false` | Enable auth middleware |
-| `apiKeyEnabled` | boolean | `false` | Enable API key validation |
+| `apiKeyEnabled` | boolean | `false` | Enable API key validation for all requests |
 
-When auth is disabled (default for local use), all requests get the "default" tenant context with admin role.
+When auth is disabled (the default for local use), all requests get the `"default"` tenant context with `admin` role and everything behaves as a single-user install.
+
+When auth is enabled, the control plane expects an API key on every incoming request.
+
+**API key format:** `ark_<tenantId>_<secret>`
+
+The key encodes its tenant ID in the middle segment so the middleware can route it without a DB lookup; the `<secret>` is the only part that is hashed in the database. Keys are managed via `ark auth create-key`, `ark auth list-keys`, `ark auth revoke-key`, and `ark auth rotate-key`.
+
+**Roles:**
+
+| Role | Description |
+|------|-------------|
+| `admin` | Full tenant control -- sessions, compute, policies, keys, billing |
+| `member` | Create and operate sessions and compute; cannot manage tenant policy or other users' keys |
+| `viewer` | Read-only: list sessions, view events, watch logs; no mutations |
+
+Roles are assigned per API key and checked at the JSON-RPC handler layer.
+
+**Tenant scoping.** Every tenant-owned entity carries a `tenant_id` column: sessions, compute, events, messages, todos, groups, schedules, compute_pools, compute_templates, usage_records, resource_definitions, knowledge, knowledge_edges. `AppContext.forTenant(tenantId)` returns a tenant-scoped view that rewrites queries with the tenant id -- no handler needs to remember to filter manually.
+
+### Tenant Policies
+
+Hosted mode enforces per-tenant policies via the `TenantPolicyManager`. Policies live in the DB (one row per tenant) and are edited with `ark tenant policy set`.
+
+```bash
+ark tenant policy set acme \
+  --providers k8s,e2b,ec2 \
+  --default-provider k8s \
+  --max-sessions 20 \
+  --max-cost 100
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `allowed_providers` | string[] | Compute providers this tenant may use |
+| `default_provider` | string | Provider to use when a session does not specify one |
+| `max_sessions` | number | Maximum concurrent sessions for the tenant |
+| `max_cost_per_day` | number | Daily USD cap (enforced against `usage_records`) |
+| `compute_pools` | string[] | Compute pools the tenant is allowed to schedule into |
+| `router_required` | boolean | Force all traffic through the LLM router (block direct provider env vars) |
+| `auto_index_required` | boolean | Force `knowledge.auto_index: true` regardless of user config |
+| `router_policy` | string | Lock the router policy (`quality`, `balanced`, or `cost`) for this tenant |
+| `tensorzero_enabled` | boolean | Force TensorZero backend on for this tenant |
+
+The `router_required`, `auto_index_required`, `router_policy`, and `tensorzero_enabled` fields are integration enforcement flags: the scheduler refuses to dispatch a session whose runtime/config would bypass them.
+
+### Knowledge Graph
+
+Configure the codebase indexer and the unified knowledge graph.
+
+```yaml
+knowledge:
+  auto_index: true        # run the indexer automatically at session dispatch
+  incremental_index: true # only re-index files changed since last run
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `auto_index` | boolean | `true` | Index the repo automatically when a session is dispatched |
+| `incremental_index` | boolean | `true` | Skip files whose mtime is older than the last index run |
+
+**Auto-index behavior:**
+
+- **Local compute** honors the `auto_index` flag. Set it to `false` to skip indexing and shave a second or two off dispatch.
+- **Remote compute** (Docker, EC2, K8s, Firecracker, E2B) **always** indexes via `POST /codegraph/index` on the remote arkd daemon, regardless of config. The conductor ships the results back over HTTP into Ark's tenant-scoped `knowledge` + `knowledge_edges` tables. This guarantees every dispatched session has a fresh graph even when the operator disabled local indexing.
+
+**Indexer backend:** Ark uses [ops-codegraph](https://www.npmjs.com/package/@optave/codegraph) (`@optave/codegraph`) -- a TypeScript + Rust native indexer that parses 33 languages via tree-sitter WASM. No Python dependency. Install with:
+
+```bash
+bun add @optave/codegraph        # per-project
+npm install -g @optave/codegraph # system-wide
+```
+
+The indexer runs `codegraph build` in the repo, reads the resulting `.codegraph/graph.db`, and streams nodes + edges into the knowledge store.
+
+### MCP Socket Pooling
+
+Shared MCP server processes across sessions. Without pooling each session spawns its own copy of every MCP server (knowledge-graph, filesystem, context7, playwright, ...); with N sessions and M MCP servers that is N*M processes, which blows up memory fast. Pooling runs one MCP process per server and multiplexes all sessions through a Unix domain socket.
+
+```yaml
+mcp_pool:
+  enabled: false
+  autoStart: true
+  poolAll: false
+  excludeMcps: []
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Turn pooling on |
+| `autoStart` | boolean | `true` | Start the pool at Ark boot when `enabled` is true |
+| `poolAll` | boolean | `false` | Pool every MCP server found across session configs. When `false`, only servers explicitly wired through `ark mcp-proxy` are pooled |
+| `excludeMcps` | string[] | `[]` | Names of MCP servers to keep as per-session processes (e.g., servers with per-session state) |
+
+When pooling is enabled, each pooled server exposes a socket at `/tmp/ark-mcp-<name>.sock`. Sessions reference it via `{"command": "ark", "args": ["mcp-proxy", "/tmp/ark-mcp-<name>.sock"]}` in their `.mcp.json`. A `SocketProxy` wraps the single MCP process and accepts multi-client connections; the pool also monitors health and auto-restarts dead servers. In practice this cuts MCP memory by ~85-90%.
+
+### Compute Templates
+
+Named presets for `ark compute create --from-template <name>`. Define reusable provider configurations in `~/.ark/config.yaml`:
+
+```yaml
+compute_templates:
+  gpu-large:
+    provider: ec2
+    config:
+      size: xxl
+      region: us-west-2
+      arch: x64
+  sandbox:
+    provider: docker
+    config:
+      image: node:20
+  isolated:
+    provider: ec2-firecracker
+    config:
+      size: l
+      region: us-east-1
+  k8s-pool:
+    provider: k8s-kata
+    config:
+      namespace: ark-workers
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `<name>` | object | Template name -- used as `--from-template <name>` |
+| `<name>.provider` | string | Provider type (same list as `ark compute create`): `local`, `docker`, `devcontainer`, `firecracker`, `ec2`, `ec2-docker`, `ec2-devcontainer`, `ec2-firecracker`, `e2b`, `k8s`, `k8s-kata` |
+| `<name>.config` | object | Provider-specific config dict merged into the resulting compute |
+
+In hosted mode, templates live in the `compute_templates` DB table (tenant-scoped) and are created via `ark compute template create`. In local mode they can be edited directly in `~/.ark/config.yaml` or managed via the same CLI.
 
 ### Database Configuration
 
@@ -320,6 +507,16 @@ redis_url: null       # Redis URL for SSE bus (multi-instance deployments)
 | `redis_url` | string \| null | `null` | Redis connection string for SSE bus. When null, uses in-memory bus |
 
 Can also be set via `DATABASE_URL` and `REDIS_URL` environment variables.
+
+### Channels
+
+Every Ark session spawns an ark-channel MCP server over stdio (see `ark channel` in the CLI reference). Each channel opens an HTTP port for inbound traffic using a deterministic offset from the session id:
+
+```
+channel_port = 19200 + (hash(sessionId) % 10000)
+```
+
+So the port is stable across restarts and two live sessions almost never collide. The channel reports flow agent -> ark-channel (stdio) -> arkd HTTP (`:19300`) -> conductor HTTP (`:19100`). Port 19100 (conductor) is hardcoded; port 19300 (arkd) is the default and can be overridden with `ARK_ARKD_PORT` / `ARK_ARKD_URL`; the per-session channel port is computed and cannot be overridden.
 
 ---
 
@@ -518,7 +715,7 @@ See the [Agents Reference](agents-reference.md) for detailed documentation of al
 
 ### Runtime YAML
 
-Runtime definitions live in `runtimes/<name>.yaml` (builtin), `.ark/runtimes/<name>.yaml` (project), or `~/.ark/runtimes/<name>.yaml` (global).
+Runtime definitions live in `runtimes/<name>.yaml` (builtin), `.ark/runtimes/<name>.yaml` (project), or `~/.ark/runtimes/<name>.yaml` (global). Built-in runtimes: `claude`, `claude-max`, `codex`, `gemini`.
 
 ```yaml
 name: my-runtime
@@ -530,6 +727,9 @@ models:
   - id: default
     label: "Default Model"
 default_model: default
+billing:
+  mode: api            # api | subscription | free
+  transcript_parser: claude
 env:
   CUSTOM_VAR: "value"
 ```
@@ -545,10 +745,68 @@ env:
 | `default_model` | string | Default model id |
 | `permission_mode` | string | Permission mode override |
 | `env` | object | Environment variables |
+| `billing` | object | Billing + cost tracking config (see below) |
 
 CLI: `ark runtime list`, `ark runtime show <name>`.
 
 At dispatch, runtime config is merged with agent config. The `--runtime` flag on `ark session start` overrides the agent's default runtime.
+
+#### Billing Section
+
+Every runtime declares a `billing` block that tells the `UsageRecorder` how to account for its token usage. Each row in the `usage_records` table carries a `cost_mode` column that mirrors the runtime's billing mode.
+
+```yaml
+# runtimes/claude.yaml (API billing)
+billing:
+  mode: api
+  transcript_parser: claude
+```
+
+```yaml
+# runtimes/claude-max.yaml (Claude Max subscription, $200/mo)
+billing:
+  mode: subscription
+  plan: claude-max
+  cost_per_month: 200
+  transcript_parser: claude
+```
+
+```yaml
+# runtimes/codex.yaml
+billing:
+  mode: api
+  transcript_parser: codex
+```
+
+```yaml
+# runtimes/gemini.yaml
+billing:
+  mode: api
+  transcript_parser: gemini
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | string | `api`, `subscription`, or `free`. Controls how `cost_usd` is computed per turn |
+| `plan` | string | Human-readable plan label (e.g., `claude-max`, `openai-plus`) |
+| `cost_per_month` | number | Fixed monthly price for subscription plans (used for amortization reports) |
+| `transcript_parser` | string | Which `TranscriptParserRegistry` backend to use: `claude`, `codex`, or `gemini` |
+
+**Cost modes:**
+
+| Mode | `cost_usd` on each row | Tokens recorded | Example runtimes |
+|------|------------------------|-----------------|------------------|
+| `api` | Per-token from `PricingRegistry` (300+ models via LiteLLM JSON) | Yes | `claude`, `codex`, `gemini` |
+| `subscription` | `0` (fixed monthly, amortized separately) | Yes (for rate-limit tracking) | `claude-max` |
+| `free` | `0` | Yes | Local or zero-cost runtimes |
+
+The transcript parser is picked polymorphically via the `TranscriptParserRegistry`:
+
+- `ClaudeTranscriptParser` reads `~/.claude/projects/<slug>/<sessionId>.jsonl` (exact path from session id)
+- `CodexTranscriptParser` reads `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (matched by cwd)
+- `GeminiTranscriptParser` reads `~/.gemini/tmp/<projectHash>/chats/session-*.jsonl`
+
+`ark costs-sync` uses the same registry for backfills.
 
 ### runtime Field (in Agent YAML)
 
@@ -585,6 +843,8 @@ When `runtime` is omitted the agent runs in the local environment (same machine,
 | `~/.ark/recipes/` | Global recipe definitions |
 | `~/.ark/agents/` | Global agent definitions |
 | `~/.ark/flows/` | Global flow definitions |
+| `~/.ark/runtimes/` | Global runtime definitions |
+| `~/.ark/tensorzero/` | Generated TensorZero config (when enabled) |
 | `~/.ark/logs/` | Log files |
 | `~/.ark/conductor/` | Conductor learnings and policies |
 | `~/.claude/projects/` | Claude Code session transcripts (read by search/import) |
@@ -599,7 +859,8 @@ When `runtime` is omitted the agent runs in the local environment (same machine,
 | `ARK_CONDUCTOR_URL` | `http://localhost:19100` | Conductor URL (fallback if arkd unavailable) |
 | `ARK_ARKD_URL` | `http://localhost:19300` | ArkD URL -- channel reports go here first |
 | `ARK_ARKD_PORT` | `19300` | ArkD daemon port |
-| `ARK_CHANNEL_PORT` | auto-assigned | Per-session MCP channel port |
+| `ARK_ARKD_TOKEN` | -- | Optional bearer token for authenticating against ArkD |
+| `ARK_CHANNEL_PORT` | auto-assigned | Per-session MCP channel port (`19200 + (hash(sessionId) % 10000)`) |
 | `ARK_SESSION_ID` | -- | Set in channel context |
 | `ARK_STAGE` | -- | Current flow stage in channel |
 | `ARK_SERVER` | -- | Remote Ark server URL (enables remote client mode) |

@@ -176,7 +176,7 @@
           <tr><td>Runtime</td><td><code>cli-agent</code></td></tr>
           <tr><td>Command</td><td><code>codex --approval-mode full-auto</code></td></tr>
           <tr><td>Task delivery</td><td><code>arg</code> (task appended as CLI argument)</td></tr>
-          <tr><td>Model</td><td><code>o4-mini</code></td></tr>
+          <tr><td>Model</td><td><code>gpt-5-codex</code></td></tr>
           <tr><td>Max turns</td><td>200</td></tr>
         </tbody>
       </table>
@@ -200,24 +200,6 @@
       </table>
       <div class="callout info">
         <p><strong>Prerequisite</strong>: <code>gemini</code> CLI must be installed and authenticated.</p>
-      </div>
-
-      <h3>aider-worker</h3>
-      <p>Runs Aider AI pair programming tool.</p>
-      <table>
-        <thead>
-          <tr><th>Field</th><th>Value</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Runtime</td><td><code>cli-agent</code></td></tr>
-          <tr><td>Command</td><td><code>aider --yes-always --no-git</code></td></tr>
-          <tr><td>Task delivery</td><td><code>arg</code> (task appended as CLI argument)</td></tr>
-          <tr><td>Model</td><td><code>aider</code></td></tr>
-          <tr><td>Max turns</td><td>200</td></tr>
-        </tbody>
-      </table>
-      <div class="callout info">
-        <p><strong>Prerequisite</strong>: <code>aider</code> must be installed (<code>pip install aider-chat</code>).</p>
       </div>
 
       <h3>generic-cli</h3>
@@ -296,18 +278,19 @@
       <p>Runtimes define HOW an agent runs (LLM backend, CLI command). Agents define WHAT to do. Any agent role can run on any runtime.</p>
       <table>
         <thead>
-          <tr><th>Runtime</th><th>Type</th><th>Description</th></tr>
+          <tr><th>Runtime</th><th>Type</th><th>Billing</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>claude</code></td><td>claude-code</td><td>Claude Code CLI (default)</td></tr>
-          <tr><td><code>codex</code></td><td>cli-agent</td><td>OpenAI Codex CLI</td></tr>
-          <tr><td><code>gemini</code></td><td>cli-agent</td><td>Google Gemini CLI</td></tr>
-          <tr><td><code>aider</code></td><td>cli-agent</td><td>Aider pair programming</td></tr>
+          <tr><td><code>claude</code></td><td>claude-code</td><td>api</td><td>Claude Code CLI, pay-per-token via API</td></tr>
+          <tr><td><code>claude-max</code></td><td>claude-code</td><td>subscription ($200/mo)</td><td>Claude Code on the Max subscription, tokens recorded but <code>cost_usd = 0</code> per turn</td></tr>
+          <tr><td><code>codex</code></td><td>cli-agent</td><td>api</td><td>OpenAI Codex CLI, default model <code>gpt-5-codex</code></td></tr>
+          <tr><td><code>gemini</code></td><td>cli-agent</td><td>api</td><td>Google Gemini CLI</td></tr>
         </tbody>
       </table>
       <pre><code><span class="prompt">$</span> ark runtime list                        <span class="yaml-comment"># List available runtimes</span>
 <span class="prompt">$</span> ark runtime show claude                 <span class="yaml-comment"># Show runtime details</span>
 <span class="prompt">$</span> ark session start --agent implementer --runtime codex --dispatch  <span class="yaml-comment"># Override runtime</span></code></pre>
+      <p>Each runtime declares a <code>billing</code> block (<code>mode</code>, <code>plan</code>, <code>cost_per_month</code>, <code>transcript_parser</code>) that controls how its usage is written into the <code>usage_records</code> table. Modes: <code>api</code> (per-token via <code>PricingRegistry</code>), <code>subscription</code> (cost 0, tokens still recorded), <code>free</code> (cost 0). Transcript parsers (<code>claude</code>, <code>codex</code>, <code>gemini</code>) are selected polymorphically via the <code>TranscriptParserRegistry</code>, which <code>ark costs-sync</code> also uses for backfills.</p>
 
       <div class="doc-footer">
         <a href="workflows.html">&larr; Workflows</a>

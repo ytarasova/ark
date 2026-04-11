@@ -37,18 +37,41 @@
   <div class="page-layout">
     <main class="content">
       <h1>Compute Providers</h1>
-      <p class="subtitle">Run agents on local tmux, Docker, EC2, E2B sandboxes, or Kubernetes pods.</p>
+      <p class="subtitle">Run agents on local tmux, Docker, devcontainers, Firecracker VMs, EC2, E2B sandboxes, or Kubernetes pods.</p>
 
       <h2>Overview</h2>
-      <p>Ark supports seven compute providers. Each provider handles how agent sessions are launched, monitored, and cleaned up. The <code>local</code> provider is always available; others require additional setup.</p>
-      <p>Providers declare their own <strong>isolation modes</strong>:</p>
+      <p>Ark supports <strong>11 compute providers</strong> across 4 modes: local worktree, local with isolation, remote via arkd, and managed/cluster. Each provider handles how agent sessions are launched, monitored, and cleaned up. The <code>local</code> provider is always available; others require additional setup.</p>
+      <p><strong>Local (worktree, no isolation):</strong></p>
       <ul>
-        <li><strong>Local</strong>: worktree (git worktree per session) or inplace (use repo directly)</li>
-        <li><strong>EC2</strong>: inplace (remote workspace)</li>
-        <li><strong>Docker</strong>: container (isolated container per session)</li>
-        <li><strong>E2B</strong>: sandbox (managed Firecracker microVM via E2B SDK)</li>
-        <li><strong>K8s</strong>: pod (Kubernetes pod) or kata (Kata Container with Firecracker microVM)</li>
+        <li><code>local</code> -- git worktree per session in <code>~/.ark/worktrees/</code></li>
       </ul>
+      <p><strong>Local with isolation:</strong></p>
+      <ul>
+        <li><code>docker</code> -- one container per session</li>
+        <li><code>devcontainer</code> -- uses the repo's <code>.devcontainer</code> config</li>
+        <li><code>firecracker</code> -- local Firecracker micro-VM per session</li>
+      </ul>
+      <p><strong>Remote via arkd (EC2 + universal agent daemon on the instance):</strong></p>
+      <ul>
+        <li><code>ec2</code> -- base EC2 instance, agents run directly via arkd</li>
+        <li><code>ec2-docker</code> -- EC2 with docker-in-docker for container isolation</li>
+        <li><code>ec2-devcontainer</code> -- EC2 + devcontainer-based isolation</li>
+        <li><code>ec2-firecracker</code> -- EC2 host running Firecracker micro-VMs per session</li>
+      </ul>
+      <p><strong>Managed / cluster:</strong></p>
+      <ul>
+        <li><code>e2b</code> -- managed Firecracker sandboxes via the E2B SDK</li>
+        <li><code>k8s</code> -- vanilla Kubernetes pod</li>
+        <li><code>k8s-kata</code> -- Kubernetes with Kata Container runtime (Firecracker-backed)</li>
+      </ul>
+      <p>Every remote target (Docker, EC2, K8s, Firecracker) runs <a href="cli.html#ark-arkd"><code>arkd</code></a> on port 19300, so the conductor always talks the same HTTP API regardless of where the compute lives.</p>
+
+      <h2>Compute Templates</h2>
+      <p>Define named presets for any provider in <code>~/.ark/config.yaml</code> under <code>compute_templates:</code>, then create computes from them:</p>
+      <pre><code>ark compute template list
+ark compute template create gpu-large --provider ec2 --size xxl --region us-west-2
+ark compute create my-box --from-template gpu-large</code></pre>
+      <p>In hosted mode, templates live in the <code>compute_templates</code> DB table and are tenant-scoped.</p>
 
       <h2>Local Provider</h2>
       <p>The default. Agents run in local tmux sessions. No setup required beyond having tmux installed.</p>

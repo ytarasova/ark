@@ -264,7 +264,7 @@
         <tbody>
           <tr><td><code>claude-code</code></td><td>Default. Launches Claude Code in a tmux session with hooks and an MCP channel for bidirectional messaging.</td></tr>
           <tr><td><code>subprocess</code></td><td>Spawns any command as a child process. Suitable for scripts, linters, and build tools.</td></tr>
-          <tr><td><code>cli-agent</code></td><td>Runs any CLI coding tool (codex, gemini, aider, etc.) in tmux with worktree isolation, the same way Claude Code agents run.</td></tr>
+          <tr><td><code>cli-agent</code></td><td>Runs any CLI coding tool (codex, gemini, etc.) in tmux with worktree isolation, the same way Claude Code agents run.</td></tr>
         </tbody>
       </table>
 
@@ -286,9 +286,8 @@
           <tr><th>Agent</th><th>Tool</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>codex-worker</code></td><td>OpenAI Codex CLI</td><td>Full-auto Codex coding agent</td></tr>
+          <tr><td><code>codex-worker</code></td><td>OpenAI Codex CLI</td><td>Full-auto Codex coding agent (default model <code>gpt-5-codex</code>)</td></tr>
           <tr><td><code>gemini-worker</code></td><td>Google Gemini CLI</td><td>Gemini coding agent</td></tr>
-          <tr><td><code>aider-worker</code></td><td>Aider</td><td>Aider chat-based coding</td></tr>
           <tr><td><code>generic-cli</code></td><td>Any CLI</td><td>Generic wrapper for custom tools</td></tr>
         </tbody>
       </table>
@@ -299,7 +298,7 @@
 <span class="yaml-key">runtime</span>: <span class="yaml-value">cli-agent</span>
 <span class="yaml-key">command</span>: <span class="yaml-value">["codex", "--approval-mode", "full-auto"]</span>
 <span class="yaml-key">task_delivery</span>: <span class="yaml-value">arg</span>       <span class="yaml-comment"># stdin | file | arg (default)</span>
-<span class="yaml-key">model</span>: <span class="yaml-value">o4-mini</span>
+<span class="yaml-key">model</span>: <span class="yaml-value">gpt-5-codex</span>
 <span class="yaml-key">max_turns</span>: <span class="yaml-value">200</span>
 <span class="yaml-key">system_prompt</span>: <span class="yaml-value">""</span>
 <span class="yaml-key">tools</span>: <span class="yaml-value">[]</span>

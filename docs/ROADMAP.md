@@ -1,7 +1,22 @@
 # Ark Platform Roadmap
 
-> Last updated: 2026-04-10 (end of session)
-> Tests: 2580 pass, 0 fail, 0 lint errors, 0 process leaks
+> Last updated: 2026-04-11
+> Tests: 2630 pass, 0 fail, 0 lint errors, 0 process leaks
+>
+> **Recent completions (not yet reflected in the tables below):**
+> - TensorZero gateway integrated (lifecycle manager, sidecar/native/Docker modes, cost feed-back)
+> - LLM Router wired into executor dispatch flow (ANTHROPIC_BASE_URL / OPENAI_BASE_URL injection)
+> - Axon replaced by ops-codegraph (@optave/codegraph, TypeScript + Rust, 33 languages, no Python)
+> - Codebase auto-index on dispatch (local config-gated, remote ALWAYS via arkd /codegraph/index)
+> - Aider runtime dropped. Active runtimes: claude, claude-max, codex, gemini
+> - Polymorphic transcript parsers (Claude/Codex/Gemini) via TranscriptParserRegistry + DI
+> - Workdir-based session identification (no "latest by mtime" hacks)
+> - cost_mode column (api/subscription/free) in usage_records
+> - Compute templates (CLI + TUI + Web + RPC, tenant-scoped)
+> - Full multi-tenant entity scoping (user_id on sessions, tenant_id on groups/schedules/pools)
+> - DB-backed resource stores for control plane mode (DbResourceStore, resource_definitions table)
+> - Tenant integration policies (router_required, auto_index_required, router_policy, tensorzero_enabled)
+> - Token-budgeted context injection (~2000 tokens max)
 
 ---
 
