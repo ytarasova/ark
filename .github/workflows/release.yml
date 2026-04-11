@@ -276,7 +276,6 @@ jobs:
   # logic falls back gracefully.
   package:
     needs: [build-ark, vendor-tmux-darwin, vendor-tmux-linux, vendor-codegraph, build-web]
-    if: always() && needs.build-ark.result == 'success' && needs.build-web.result == 'success'
     strategy:
       fail-fast: false
       matrix:
