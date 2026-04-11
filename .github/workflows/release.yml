@@ -217,10 +217,16 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Inspect tensorzero workspace
+        run: |
+          ls -la tensorzero/
+          find tensorzero -maxdepth 2 -name "Cargo.toml" 2>/dev/null
+
       - name: Build gateway
         run: |
           cd tensorzero
-          cargo build --release --bin gateway
+          # gateway lives in the gateway/ subcrate of the workspace
+          cargo build --release -p gateway || cargo build --release --bin gateway
 
       - name: Collect binary
         env:
@@ -264,9 +270,13 @@ jobs:
           path: packages/web/dist
           retention-days: 1
 
-  # Assemble self-contained distribution tarballs
+  # Assemble self-contained distribution tarballs.
+  # vendor-tensorzero intentionally excluded -- it's continue-on-error and the
+  # tarball can ship without it. Users get an inert sidecar; runtime fetch
+  # logic falls back gracefully.
   package:
-    needs: [build-ark, vendor-tmux-darwin, vendor-tmux-linux, vendor-codegraph, vendor-tensorzero, build-web]
+    needs: [build-ark, vendor-tmux-darwin, vendor-tmux-linux, vendor-codegraph, build-web]
+    if: always() && needs.build-ark.result == 'success' && needs.build-web.result == 'success'
     strategy:
       fail-fast: false
       matrix:

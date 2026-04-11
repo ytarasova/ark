@@ -87,8 +87,12 @@ build_darwin() {
   (
     cd "$WORK/tmux-$TMUX_VERSION"
     # Use system ncurses (present on all macOS). Statically link libevent.
+    # --disable-utf8proc avoids the macOS-specific configure error that
+    # tmux 3.5+ raises when neither --enable-utf8proc nor --disable-utf8proc
+    # is given on Darwin.
     ./configure \
       --prefix="$WORK/tmux-out" \
+      --disable-utf8proc \
       CFLAGS="-I$WORK/deps/include" \
       LDFLAGS="-L$WORK/deps/lib" \
       LIBS="-lresolv" \
