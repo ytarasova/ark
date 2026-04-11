@@ -26,7 +26,8 @@
     "files": [
       "main.js",
       "preload.js",
-      "icon.png"
+      "icon.png",
+      "icon.icns"
     ],
     "extraResources": [
       {
@@ -40,7 +41,7 @@
         "dmg",
         "zip"
       ],
-      "icon": "icon.png"
+      "icon": "icon.icns"
     },
     "win": {
       "target": [

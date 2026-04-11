@@ -490,6 +490,15 @@ jobs:
       - name: Install Electron dependencies
         run: cd packages/desktop && npm install
 
+      - name: Sync desktop version from root package.json
+        shell: bash
+        run: |
+          root_version=$(jq -r .version package.json)
+          tmp=$(mktemp)
+          jq --arg v "$root_version" '.version = $v' packages/desktop/package.json > "$tmp"
+          mv "$tmp" packages/desktop/package.json
+          echo "desktop version -> $root_version"
+
       - name: Build Electron app
         env:
           BUILD_FLAG: ${{ matrix.build-flag }}
@@ -499,6 +508,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ark-desktop-${{ matrix.name }}
+          if-no-files-found: error
           path: |
             packages/desktop/out/*.dmg
             packages/desktop/out/*.zip
