@@ -128,8 +128,8 @@ export class Provider {
   // ── OpenAI adapter (passthrough) ───────────────────────────────────────────
 
   private async completeOpenAI(request: ChatCompletionRequest, modelId: string): Promise<ChatCompletionResponse> {
-    const body = { ...request, model: modelId, stream: false };
-    delete (body as any).routing;
+    const body: Record<string, unknown> = { ...request, model: modelId, stream: false };
+    delete body.routing;
 
     const resp = await this.fetchWithTimeout(`${this.config.base_url}/v1/chat/completions`, {
       method: "POST",
@@ -146,8 +146,8 @@ export class Provider {
   }
 
   private async *streamOpenAI(request: ChatCompletionRequest, modelId: string): AsyncGenerator<ChatCompletionChunk> {
-    const body = { ...request, model: modelId, stream: true };
-    delete (body as any).routing;
+    const body: Record<string, unknown> = { ...request, model: modelId, stream: true };
+    delete body.routing;
 
     const resp = await this.fetchWithTimeout(`${this.config.base_url}/v1/chat/completions`, {
       method: "POST",
