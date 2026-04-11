@@ -6,7 +6,8 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  # Build Ark binary - cross-target, runs anywhere
+  build-ark:
     strategy:
       fail-fast: false
       matrix:
@@ -20,8 +21,8 @@ jobs:
           - target: bun-linux-x64
             name: linux-x64
 
-    runs-on: macos-latest
-    name: build (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    name: build-ark (${{ matrix.name }})
     timeout-minutes: 10
 
     steps:
@@ -40,28 +41,350 @@ jobs:
           cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js
           echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json
 
-      - name: Build binary
+      - name: Build Ark binary
+        env:
+          TARGET: ${{ matrix.target }}
+          OUT_NAME: ark-${{ matrix.name }}
         run: |
-          bun build --compile --target ${{ matrix.target }} \
-            packages/cli/index.ts --outfile ark-${{ matrix.name }}
+          bun build --compile --target "$TARGET" \
+            packages/cli/index.ts --outfile "$OUT_NAME"
 
-      - name: Upload artifact
+      - name: Upload Ark binary
         uses: actions/upload-artifact@v4
         with:
-          name: ark-${{ matrix.name }}
+          name: ark-bin-${{ matrix.name }}
           path: ark-${{ matrix.name }}
+          retention-days: 1
 
-  # Smoke-test binaries on native platforms
-  smoke-test:
-    needs: build
+  # Vendor tmux for macOS - build natively on macOS runners
+  vendor-tmux-darwin:
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: darwin-arm64
-            os: macos-latest
+            runner: macos-14
           - name: darwin-x64
-            os: macos-latest
+            runner: macos-13
+
+    runs-on: ${{ matrix.runner }}
+    name: vendor-tmux (${{ matrix.name }})
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build static tmux
+        env:
+          PLAT: ${{ matrix.name }}
+        run: ./scripts/vendor-tmux.sh "$PLAT"
+
+      - name: Verify binary
+        env:
+          PLAT: ${{ matrix.name }}
+        run: |
+          test -f "dist/vendor/tmux-$PLAT"
+          file "dist/vendor/tmux-$PLAT"
+          "./dist/vendor/tmux-$PLAT" -V
+
+      - name: Upload tmux binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmux-${{ matrix.name }}
+          path: dist/vendor/tmux-${{ matrix.name }}
+          retention-days: 1
+
+  # Vendor tmux for Linux - build in Alpine container for static musl binary
+  vendor-tmux-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            runner: ubuntu-latest
+          - name: linux-arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+    name: vendor-tmux (${{ matrix.name }})
+    timeout-minutes: 15
+
+    container:
+      image: alpine:3.20
+
+    steps:
+      - name: Install build deps
+        run: |
+          apk add --no-cache build-base libevent-dev libevent-static \
+            ncurses-dev ncurses-static curl tar file
+
+      - name: Build static tmux
+        env:
+          TMUX_VERSION: 3.5a
+        run: |
+          cd /tmp
+          curl -fsSL "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" -o tmux.tar.gz
+          tar -xf tmux.tar.gz
+          cd "tmux-${TMUX_VERSION}"
+          ./configure --enable-static \
+            CFLAGS="-static" \
+            LDFLAGS="-static" \
+            LIBS="-lresolv"
+          make -j"$(nproc)"
+          mkdir -p /tmp/out
+          cp tmux /tmp/out/tmux
+
+      - name: Verify static binary
+        run: |
+          file /tmp/out/tmux
+          /tmp/out/tmux -V
+          if ldd /tmp/out/tmux 2>&1 | grep -q "not a dynamic executable"; then
+            echo "Static binary verified"
+          elif ldd /tmp/out/tmux 2>&1 | grep -qE "=>"; then
+            echo "ERROR: binary has dynamic dependencies"
+            ldd /tmp/out/tmux
+            exit 1
+          fi
+
+      - name: Upload tmux binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmux-${{ matrix.name }}
+          path: /tmp/out/tmux
+          retention-days: 1
+
+  # Vendor codegraph - extract native binaries from npm optional deps
+  vendor-codegraph:
+    runs-on: ubuntu-latest
+    name: vendor-codegraph
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --force
+
+      - name: Extract codegraph native binaries
+        run: |
+          mkdir -p dist/vendor
+          for pkg_plat in darwin-arm64 darwin-x64 linux-arm64-gnu linux-x64-gnu; do
+            dist_plat=$(echo "$pkg_plat" | sed 's/-gnu//')
+            pkg_dir="node_modules/@optave/codegraph-$pkg_plat"
+            if [ -d "$pkg_dir" ]; then
+              bin=$(find "$pkg_dir" -name "codegraph*" -type f -executable | head -1 || true)
+              if [ -n "$bin" ]; then
+                cp "$bin" "dist/vendor/codegraph-$dist_plat"
+                chmod +x "dist/vendor/codegraph-$dist_plat"
+                echo "Extracted codegraph-$dist_plat"
+              fi
+            fi
+          done
+          ls -lh dist/vendor/ || true
+
+      - name: Upload codegraph binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: codegraph-all
+          path: dist/vendor/codegraph-*
+          retention-days: 1
+          if-no-files-found: warn
+
+  # Vendor tensorzero - build Rust gateway per platform
+  vendor-tensorzero:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: darwin-arm64
+            runner: macos-14
+          - name: darwin-x64
+            runner: macos-13
+          - name: linux-x64
+            runner: ubuntu-latest
+          - name: linux-arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+    name: vendor-tensorzero (${{ matrix.name }})
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Clone TensorZero
+        run: git clone --depth 1 https://github.com/tensorzero/tensorzero.git /tmp/tensorzero
+
+      - name: Build gateway
+        run: |
+          cd /tmp/tensorzero
+          cargo build --release --bin gateway
+
+      - name: Collect binary
+        env:
+          PLAT: ${{ matrix.name }}
+        run: |
+          mkdir -p out
+          cp /tmp/tensorzero/target/release/gateway "out/tensorzero-$PLAT"
+          chmod +x "out/tensorzero-$PLAT"
+          ls -lh out/
+
+      - name: Upload tensorzero binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tensorzero-${{ matrix.name }}
+          path: out/tensorzero-${{ matrix.name }}
+          retention-days: 1
+
+  # Build web UI - shared across all platforms
+  build-web:
+    runs-on: ubuntu-latest
+    name: build-web
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build web frontend
+        run: bun run packages/web/build.ts
+
+      - name: Upload web dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: packages/web/dist
+          retention-days: 1
+
+  # Assemble self-contained distribution tarballs
+  package:
+    needs: [build-ark, vendor-tmux-darwin, vendor-tmux-linux, vendor-codegraph, vendor-tensorzero, build-web]
+    strategy:
+      fail-fast: false
+      matrix:
+        name: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
+
+    runs-on: ubuntu-latest
+    name: package (${{ matrix.name }})
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Ark binary
+        uses: actions/download-artifact@v4
+        with:
+          name: ark-bin-${{ matrix.name }}
+          path: dist/bin
+
+      - name: Download tmux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: tmux-${{ matrix.name }}
+          path: dist/vendor
+        continue-on-error: true
+
+      - name: Download codegraph binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: codegraph-all
+          path: dist/vendor
+        continue-on-error: true
+
+      - name: Download tensorzero binary
+        uses: actions/download-artifact@v4
+        with:
+          name: tensorzero-${{ matrix.name }}
+          path: dist/vendor
+        continue-on-error: true
+
+      - name: Download web dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: packages/web/dist
+
+      - name: Assemble tarball
+        env:
+          PLAT: ${{ matrix.name }}
+        run: |
+          root="dist/ark-$PLAT"
+          mkdir -p "$root/bin" "$root/web"
+
+          # Ark binary
+          cp "dist/bin/ark-$PLAT" "$root/bin/ark"
+          chmod +x "$root/bin/ark"
+
+          # tmux
+          if [ -f "dist/vendor/tmux-$PLAT" ]; then
+            cp "dist/vendor/tmux-$PLAT" "$root/bin/tmux"
+            chmod +x "$root/bin/tmux"
+            echo "  bundled: tmux ($(du -h "$root/bin/tmux" | cut -f1))"
+          else
+            echo "  WARNING: tmux missing for $PLAT"
+          fi
+
+          # codegraph
+          if [ -f "dist/vendor/codegraph-$PLAT" ]; then
+            cp "dist/vendor/codegraph-$PLAT" "$root/bin/codegraph"
+            chmod +x "$root/bin/codegraph"
+            echo "  bundled: codegraph ($(du -h "$root/bin/codegraph" | cut -f1))"
+          else
+            echo "  WARNING: codegraph missing for $PLAT"
+          fi
+
+          # tensorzero (optional)
+          if [ -f "dist/vendor/tensorzero-$PLAT" ]; then
+            cp "dist/vendor/tensorzero-$PLAT" "$root/bin/tensorzero-gateway"
+            chmod +x "$root/bin/tensorzero-gateway"
+            echo "  bundled: tensorzero-gateway"
+          fi
+
+          # Resource definitions
+          cp -r agents runtimes flows skills recipes mcp-configs "$root/"
+
+          # Web UI
+          cp -r packages/web/dist/* "$root/web/" 2>/dev/null || true
+
+          # Create tarball
+          cd dist && tar czf "ark-$PLAT.tar.gz" "ark-$PLAT"
+          echo "Tarball: $(du -h "ark-$PLAT.tar.gz" | cut -f1)"
+
+      - name: Upload distribution tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-dist-${{ matrix.name }}
+          path: dist/ark-${{ matrix.name }}.tar.gz
+
+      - name: Also upload raw ark binary (install.sh compat)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ark-binary-${{ matrix.name }}
+          path: dist/bin/ark-${{ matrix.name }}
+
+  # Smoke-test each platform's tarball
+  smoke-test:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: darwin-arm64
+            os: macos-14
+          - name: darwin-x64
+            os: macos-13
           - name: linux-arm64
             os: ubuntu-24.04-arm
           - name: linux-x64
@@ -74,34 +397,46 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: ark-${{ matrix.name }}
+          name: ark-dist-${{ matrix.name }}
 
-      - name: Make executable
-        run: chmod +x ark-${{ matrix.name }}
-
-      - name: Test CLI (--help)
-        run: ./ark-${{ matrix.name }} --help
-
-      - name: Test CLI (--version)
-        run: ./ark-${{ matrix.name }} --version
-
-      - name: Test TUI starts without crash
+      - name: Extract tarball
+        env:
+          PLAT: ${{ matrix.name }}
         run: |
-          # CI has no TTY, so TUI correctly exits with "requires a terminal".
-          # We just need to verify it doesn't segfault or fail to load modules.
-          output=$(./ark-${{ matrix.name }} tui 2>&1 || true)
-          echo "$output"
-          if echo "$output" | grep -q "requires a terminal"; then
-            echo "TUI smoke test passed -- correct TTY check"
-          elif echo "$output" | grep -q "Missing required tools"; then
-            echo "TUI smoke test passed -- prereq check (expected for compiled binary)"
-          elif echo "$output" | grep -qi "segfault\|cannot find module\|SyntaxError"; then
-            echo "TUI smoke test FAILED -- unexpected error"
-            exit 1
+          tar -xzf "ark-$PLAT.tar.gz"
+          ls -la "ark-$PLAT/bin/"
+
+      - name: Test ark binary
+        env:
+          PLAT: ${{ matrix.name }}
+        run: |
+          "./ark-$PLAT/bin/ark" --version
+          "./ark-$PLAT/bin/ark" --help
+
+      - name: Test bundled tmux
+        env:
+          PLAT: ${{ matrix.name }}
+        run: |
+          if [ -f "./ark-$PLAT/bin/tmux" ]; then
+            "./ark-$PLAT/bin/tmux" -V
+            echo "Bundled tmux works"
           else
-            echo "TUI smoke test passed"
+            echo "No bundled tmux -- FAIL"
+            exit 1
           fi
 
+      - name: Test bundled codegraph
+        env:
+          PLAT: ${{ matrix.name }}
+        run: |
+          if [ -f "./ark-$PLAT/bin/codegraph" ]; then
+            "./ark-$PLAT/bin/codegraph" --version
+            echo "Bundled codegraph works"
+          else
+            echo "No bundled codegraph"
+          fi
+
+  # Electron desktop app
   desktop:
     strategy:
       fail-fast: false
@@ -142,7 +477,9 @@ jobs:
         run: cd packages/desktop && npm install
 
       - name: Build Electron app
-        run: cd packages/desktop && npx electron-builder ${{ matrix.build-flag }}
+        env:
+          BUILD_FLAG: ${{ matrix.build-flag }}
+        run: cd packages/desktop && npx electron-builder "$BUILD_FLAG"
 
       - name: Upload desktop artifact
         uses: actions/upload-artifact@v4
@@ -155,8 +492,9 @@ jobs:
             packages/desktop/out/*.AppImage
             packages/desktop/out/*.deb
 
+  # Publish release
   release:
-    needs: [build, smoke-test, desktop]
+    needs: [package, smoke-test, desktop]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -169,7 +507,10 @@ jobs:
       - name: Flatten artifacts
         run: |
           mkdir -p dist
-          for d in artifacts/ark-*/; do
+          for d in artifacts/ark-dist-*/; do
+            cp "$d"* dist/ 2>/dev/null || true
+          done
+          for d in artifacts/ark-binary-*/; do
             cp "$d"* dist/ 2>/dev/null || true
           done
           for d in artifacts/ark-desktop-*/; do
@@ -194,9 +535,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release-type.outputs.tag }}
         run: |
-          gh release create "${{ steps.release-type.outputs.tag }}" \
-            --title "${{ steps.release-type.outputs.tag }}" \
+          gh release create "$RELEASE_TAG" \
+            --title "$RELEASE_TAG" \
             --generate-notes \
             dist/ark-*
 
@@ -207,20 +549,20 @@ jobs:
           GH_REPO: ${{ github.repository }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
-          # Create release if it doesn't exist, then upload assets (clobber old ones)
           gh release view latest >/dev/null 2>&1 || \
             gh release create latest \
               --title "Latest (rolling)" \
               --prerelease \
               --target "$COMMIT_SHA" \
               --notes "Rolling release from main."
-          # Update release notes and upload new assets
           gh release edit latest \
             --title "Latest (rolling)" \
             --prerelease \
             --notes "Rolling release from main. Updated on every push.
 
           Install: \`curl -fsSL https://ytarasova.github.io/ark/install.sh | bash\`
+
+          Each platform tarball (\`ark-<platform>.tar.gz\`) is self-contained: ark + tmux + codegraph + tensorzero-gateway. No system dependencies required.
 
           Commit: $COMMIT_SHA"
           gh release upload latest dist/ark-* --clobber

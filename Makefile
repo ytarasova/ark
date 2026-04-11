@@ -152,11 +152,12 @@ package-cli: build-web ## Build self-contained CLI bundles for macOS + Linux (4 
 	  echo "  dist/ark-$$plat.tar.gz ($$(du -h dist/ark-$$plat.tar.gz | cut -f1))"; \
 	done
 
-vendor-tmux: ## Download/compile tmux for all platforms
+vendor-tmux: ## Build static tmux binaries (native platform; cross-platform in CI)
 	@mkdir -p dist/vendor
-	@echo "  tmux: checking for pre-built binaries..."
-	@# For now, skip vendor -- users have tmux. Will add static builds in CI.
-	@echo "  tmux: skipped (install separately: brew install tmux)"
+	@echo "  tmux: building static binaries..."
+	@for plat in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do \
+	  ./scripts/vendor-tmux.sh $$plat || echo "  tmux-$$plat: skipped"; \
+	done
 
 vendor-codegraph: ## Extract codegraph native binaries from npm packages
 	@mkdir -p dist/vendor

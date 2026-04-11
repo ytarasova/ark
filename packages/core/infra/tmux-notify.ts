@@ -8,6 +8,7 @@
 
 import type { AppContext } from "../app.js";
 import { execFileSync } from "child_process";
+import { tmuxBin } from "./tmux.js";
 
 /** Update tmux status bar with waiting session indicators. */
 export function updateTmuxStatusBar(app: AppContext): void {
@@ -17,7 +18,7 @@ export function updateTmuxStatusBar(app: AppContext): void {
 
     if (waiting.length === 0) {
       // Clear the status
-      execFileSync("tmux", ["set-option", "-g", "status-left", ""], { stdio: "ignore" });
+      execFileSync(tmuxBin(), ["set-option", "-g", "status-left", ""], { stdio: "ignore" });
       return;
     }
 
@@ -27,7 +28,7 @@ export function updateTmuxStatusBar(app: AppContext): void {
     });
 
     const bar = `#[fg=yellow,bold]⚡ ${entries.join(" ")} `;
-    execFileSync("tmux", ["set-option", "-g", "status-left", bar], { stdio: "ignore" });
+    execFileSync(tmuxBin(), ["set-option", "-g", "status-left", bar], { stdio: "ignore" });
   } catch {
     // tmux not available or not in tmux — silently ignore
   }
@@ -36,6 +37,6 @@ export function updateTmuxStatusBar(app: AppContext): void {
 /** Clear the tmux status bar. */
 export function clearTmuxStatusBar(): void {
   try {
-    execFileSync("tmux", ["set-option", "-g", "status-left", ""], { stdio: "ignore" });
+    execFileSync(tmuxBin(), ["set-option", "-g", "status-left", ""], { stdio: "ignore" });
   } catch { /* ignore */ }
 }

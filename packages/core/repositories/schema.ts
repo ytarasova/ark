@@ -32,8 +32,6 @@ export function initSchema(db: IDatabase): void {
       updated_at TEXT NOT NULL
     );
 
-    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       track_id TEXT NOT NULL,
@@ -176,6 +174,7 @@ export function initSchema(db: IDatabase): void {
   // ALTER TABLE ADD COLUMN is safe to run -- SQLite errors if column exists,
   // so we catch and ignore.
   migrateAddColumn(db, "sessions", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
+  migrateAddColumn(db, "sessions", "user_id", "TEXT");
   migrateAddColumn(db, "events", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
   migrateAddColumn(db, "compute", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
   migrateAddColumn(db, "messages", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
@@ -189,6 +188,7 @@ export function initSchema(db: IDatabase): void {
 
   // Tenant indexes
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_compute_tenant ON compute(tenant_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_messages_tenant ON messages(tenant_id)");

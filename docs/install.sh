@@ -54,7 +54,8 @@ case "$ARCH" in
   *)             error "Unsupported architecture: $ARCH. Ark supports x64 and arm64." ;;
 esac
 
-BINARY="ark-${OS}-${ARCH}"
+PLATFORM="${OS}-${ARCH}"
+TARBALL="ark-${PLATFORM}.tar.gz"
 info "Detected platform: ${OS}/${ARCH}"
 
 # ── Preflight checks ────────────────────────────────────────────────────────
@@ -63,39 +64,43 @@ if ! command -v git &>/dev/null; then
   warn "git not found - some features (worktrees, cloning) won't work."
 fi
 
-if ! command -v tmux &>/dev/null; then
-  warn "tmux not found - required for running agent sessions."
-  if [ "$OS" = "darwin" ]; then
-    warn "Install it: brew install tmux"
-  else
-    warn "Install it: sudo apt install tmux (or your package manager)"
-  fi
-fi
+# Note: tmux is NOT a prerequisite anymore -- it's bundled in the tarball.
 
-# ── Download binary ─────────────────────────────────────────────────────────
+# ── Download and extract self-contained tarball ─────────────────────────────
 
 info "Installing Ark ($VERSION) to $INSTALL_DIR..."
 
-DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$BINARY"
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$TARBALL"
 
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-info "Downloading $BINARY..."
+info "Downloading $TARBALL (self-contained: ark + tmux + codegraph + tensorzero)..."
 if command -v curl &>/dev/null; then
-  curl -fsSL -o "$TMPDIR/ark" "$DOWNLOAD_URL" || error "Download failed. Check version '$VERSION' exists at https://github.com/$REPO/releases"
+  curl -fsSL -o "$TMPDIR/ark.tar.gz" "$DOWNLOAD_URL" || error "Download failed. Check version '$VERSION' exists at https://github.com/$REPO/releases"
 elif command -v wget &>/dev/null; then
-  wget -q -O "$TMPDIR/ark" "$DOWNLOAD_URL" || error "Download failed. Check version '$VERSION' exists."
+  wget -q -O "$TMPDIR/ark.tar.gz" "$DOWNLOAD_URL" || error "Download failed. Check version '$VERSION' exists."
 else
   error "Neither curl nor wget found."
 fi
 
-chmod +x "$TMPDIR/ark"
+info "Extracting..."
+tar -xzf "$TMPDIR/ark.tar.gz" -C "$TMPDIR" || error "Extraction failed"
 
 # ── Install ─────────────────────────────────────────────────────────────────
 
-mkdir -p "$BIN_DIR"
-mv "$TMPDIR/ark" "$BIN_DIR/ark"
+mkdir -p "$INSTALL_DIR"
+# Copy bin/ (ark + tmux + codegraph + tensorzero), agents/, flows/, etc.
+cp -R "$TMPDIR/ark-$PLATFORM"/* "$INSTALL_DIR/"
+chmod +x "$BIN_DIR/ark" "$BIN_DIR/tmux" "$BIN_DIR/codegraph" 2>/dev/null || true
+chmod +x "$BIN_DIR/tensorzero-gateway" 2>/dev/null || true
+
+info "Installed:"
+for bin in ark tmux codegraph tensorzero-gateway; do
+  if [ -x "$BIN_DIR/$bin" ]; then
+    info "  $BIN_DIR/$bin"
+  fi
+done
 
 # ── PATH setup ──────────────────────────────────────────────────────────────
 

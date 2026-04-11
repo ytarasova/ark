@@ -6,17 +6,25 @@ AI coding agents are powerful but ephemeral. They spin up, do work, and vanish -
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) (runtime)
-- [tmux](https://github.com/tmux/tmux) (session management)
+- macOS (arm64 or x64) or Linux (arm64 or x64)
+- `git` (for worktree-based session isolation)
 - At least one CLI coding agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-cli), [Codex](https://github.com/openai/codex), [Gemini CLI](https://github.com/google-gemini/gemini-cli))
+
+The install script downloads a self-contained tarball that bundles **ark** + **tmux** + **codegraph** (knowledge indexer) + **tensorzero-gateway** (optional LLM router backend). No package manager, no runtime installs required.
+
+If you're installing from source via `make install`, you also need [Bun](https://bun.sh) and a system `tmux` because the source path doesn't vendor anything.
 
 ## Installation
 
 ```bash
-make install    # bun install + symlink ark to /usr/local/bin
+# Self-contained tarball (recommended)
+curl -fsSL https://ytarasova.github.io/ark/install.sh | bash
+
+# Or from source
+make install    # requires Bun + tmux pre-installed
 ```
 
-Run `ark doctor` to verify your environment (Bun version, tmux, agent CLIs, database).
+Run `ark doctor` to verify your environment.
 
 ## Quick Start
 

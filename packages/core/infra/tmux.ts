@@ -10,11 +10,32 @@
 
 import { execFile, execFileSync, spawn } from "child_process";
 import { promisify } from "util";
-import { writeFileSync, mkdirSync, chmodSync, unlinkSync } from "fs";
-import { join } from "path";
+import { writeFileSync, mkdirSync, chmodSync, unlinkSync, existsSync } from "fs";
+import { join, dirname } from "path";
 import { tmpdir } from "os";
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Resolve the tmux binary. Prefers:
+ *   1. Vendored tmux next to the ark binary (self-contained install)
+ *   2. tmux on PATH (system install)
+ * Cached per-process.
+ */
+let _tmuxBin: string | null = null;
+export function tmuxBin(): string {
+  if (_tmuxBin) return _tmuxBin;
+  const arkBin = process.argv[0];
+  if (arkBin) {
+    const vendored = join(dirname(arkBin), "tmux");
+    if (existsSync(vendored)) {
+      _tmuxBin = vendored;
+      return vendored;
+    }
+  }
+  _tmuxBin = "tmux";
+  return "tmux";
+}
 
 /** Ark tmux config: Ctrl+Q to detach, mouse, big history */
 const ARK_TMUX_CONF = `
@@ -45,7 +66,7 @@ export interface TmuxSession {
 /** Check if tmux is available (sync — one-shot startup check) */
 export function hasTmux(): boolean {
   try {
-    execFileSync("tmux", ["-V"], { stdio: "pipe" });
+    execFileSync(tmuxBin(), ["-V"], { stdio: "pipe" });
     return true;
   } catch {
     return false;
@@ -55,7 +76,7 @@ export function hasTmux(): boolean {
 /** Check if a tmux session exists (sync — fast guard) */
 export function sessionExists(name: string): boolean {
   try {
-    execFileSync("tmux", ["has-session", "-t", name], { stdio: "pipe" });
+    execFileSync(tmuxBin(), ["has-session", "-t", name], { stdio: "pipe" });
     return true;
   } catch {
     return false;
@@ -65,7 +86,7 @@ export function sessionExists(name: string): boolean {
 /** Check if a tmux session exists (async) */
 export async function sessionExistsAsync(name: string): Promise<boolean> {
   try {
-    await execFileAsync("tmux", ["has-session", "-t", name], { encoding: "utf-8" });
+    await execFileAsync(tmuxBin(), ["has-session", "-t", name], { encoding: "utf-8" });
     return true;
   } catch {
     return false;
@@ -75,7 +96,7 @@ export async function sessionExistsAsync(name: string): Promise<boolean> {
 /** Kill a tmux session (sync — fast, used in cleanup) */
 export function killSession(name: string): boolean {
   try {
-    execFileSync("tmux", ["kill-session", "-t", name], { stdio: "pipe" });
+    execFileSync(tmuxBin(), ["kill-session", "-t", name], { stdio: "pipe" });
     return true;
   } catch {
     return false;
@@ -85,7 +106,7 @@ export function killSession(name: string): boolean {
 /** Kill a tmux session (async) */
 export function killSessionAsync(name: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const cp = spawn("tmux", ["kill-session", "-t", name], { stdio: "pipe" });
+    const cp = spawn(tmuxBin(), ["kill-session", "-t", name], { stdio: "pipe" });
     cp.on("close", (code) => resolve(code === 0));
     cp.on("error", () => resolve(false));
   });
@@ -99,7 +120,7 @@ export async function createSessionAsync(name: string, command: string, opts?: {
 }): Promise<void> {
   await killSessionAsync(name);
   const conf = ensureTmuxConf(opts?.arkDir ?? join(tmpdir(), "ark"));
-  await execFileAsync("tmux", [
+  await execFileAsync(tmuxBin(), [
     "-f", conf,
     "new-session", "-d", "-s", name,
     "-x", String(opts?.width ?? 220),
@@ -116,13 +137,13 @@ export async function createSessionWithSendKeysAsync(name: string, command: stri
 }): Promise<void> {
   await killSessionAsync(name);
   const conf = ensureTmuxConf(opts?.arkDir ?? join(tmpdir(), "ark"));
-  await execFileAsync("tmux", [
+  await execFileAsync(tmuxBin(), [
     "-f", conf,
     "new-session", "-d", "-s", name,
     "-x", String(opts?.width ?? 220),
     "-y", String(opts?.height ?? 50),
   ]);
-  await execFileAsync("tmux", ["send-keys", "-t", name, command, "Enter"]);
+  await execFileAsync(tmuxBin(), ["send-keys", "-t", name, command, "Enter"]);
 }
 
 /** Capture pane output (async) */
@@ -133,7 +154,7 @@ export async function capturePaneAsync(name: string, opts?: {
   try {
     const args = ["capture-pane", "-t", name, "-p", "-S", `-${opts?.lines ?? 50}`];
     if (opts?.ansi) args.splice(4, 0, "-e");
-    const { stdout } = await execFileAsync("tmux", args, { encoding: "utf-8" });
+    const { stdout } = await execFileAsync(tmuxBin(), args, { encoding: "utf-8" });
     return stdout;
   } catch {
     return "";
@@ -145,9 +166,9 @@ export async function sendTextAsync(name: string, text: string): Promise<void> {
   const tmpFile = join(tmpdir(), `.ark-msg-${Date.now()}.txt`);
   writeFileSync(tmpFile, text);
   try {
-    await execFileAsync("tmux", ["load-buffer", "-b", "ark-msg", tmpFile]);
-    await execFileAsync("tmux", ["paste-buffer", "-b", "ark-msg", "-t", name]);
-    await execFileAsync("tmux", ["send-keys", "-t", name, "Enter"]);
+    await execFileAsync(tmuxBin(), ["load-buffer", "-b", "ark-msg", tmpFile]);
+    await execFileAsync(tmuxBin(), ["paste-buffer", "-b", "ark-msg", "-t", name]);
+    await execFileAsync(tmuxBin(), ["send-keys", "-t", name, "Enter"]);
   } finally {
     try { unlinkSync(tmpFile); } catch { /* ignore */ }
   }
@@ -155,7 +176,7 @@ export async function sendTextAsync(name: string, text: string): Promise<void> {
 
 /** Send keys to a tmux session (async) */
 export async function sendKeysAsync(name: string, ...keys: string[]): Promise<void> {
-  await execFileAsync("tmux", ["send-keys", "-t", name, ...keys]);
+  await execFileAsync(tmuxBin(), ["send-keys", "-t", name, ...keys]);
 }
 
 /** Get the attach command for a session */
@@ -175,7 +196,7 @@ export function attachCommand(name: string, opts?: {
 /** List all ark tmux sessions (async) */
 export async function listArkSessionsAsync(): Promise<TmuxSession[]> {
   try {
-    const { stdout } = await execFileAsync("tmux", ["list-sessions", "-F", "#{session_name}"], {
+    const { stdout } = await execFileAsync(tmuxBin(), ["list-sessions", "-F", "#{session_name}"], {
       encoding: "utf-8",
     });
     return stdout.split("\n")

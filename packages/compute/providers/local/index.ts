@@ -130,7 +130,7 @@ export class LocalProvider implements ComputeProvider {
 
   getAttachCommand(_compute: Compute, session: Session): string[] {
     if (!session.session_id) return [];
-    return ["tmux", "attach", "-t", session.session_id];
+    return [tmux.tmuxBin(), "attach", "-t", session.session_id];
   }
 
   buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {

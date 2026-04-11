@@ -3,6 +3,7 @@
  */
 
 import { execFileSync } from "child_process";
+import { tmuxBin } from "./infra/tmux.js";
 
 export interface PrereqResult {
   name: string;
@@ -25,11 +26,12 @@ export function checkPrereqs(): PrereqResult[] {
   }
 
   check("bun", ["--version"], true, "curl -fsSL https://bun.sh/install | bash");
-  check("tmux", ["-V"], true, "brew install tmux");
+  // Prefer the bundled tmux next to the ark binary; fall back to PATH if not present.
+  check(tmuxBin(), ["-V"], true, "The tarball should include tmux. Reinstall via install.sh, or: brew install tmux");
   check("git", ["--version"], true, "brew install git");
   check("claude", ["--version"], false, "npm install -g @anthropic-ai/claude-code");
   check("gh", ["--version"], false, "brew install gh (optional - needed for PR creation)");
-  check("codegraph", ["--version"], false, "npm install -g @optave/codegraph (optional - needed for knowledge graph codebase indexing)");
+  check("codegraph", ["--version"], false, "bundled with ark (optional - needed for knowledge graph codebase indexing)");
 
   return results;
 }

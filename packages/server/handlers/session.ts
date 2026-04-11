@@ -32,7 +32,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/start", async (params, notify) => {
     const opts = extract<SessionStartParams>(params, []);
-    const session = app.sessionService.start(opts);
+    // Use orchestration startSession which resolves first stage and sets status=ready.
+    // SessionService.start() is a stripped-down helper that doesn't wire the flow.
+    const { startSession } = await import("../../core/services/session-orchestration.js");
+    const session = startSession(app, opts);
     notify("session/created", { session });
     return { session };
   });

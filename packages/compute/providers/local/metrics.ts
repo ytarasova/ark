@@ -6,6 +6,7 @@
 
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { tmuxBin } from "../../../core/infra/tmux.js";
 import type {
   ComputeSnapshot,
   ComputeMetrics,
@@ -118,7 +119,7 @@ async function getUptime(): Promise<string> {
 // ── Tmux sessions ───────────────────────────────────────────────────────────
 
 async function getTmuxSessions(): Promise<ComputeSession[]> {
-  const listOut = await run("tmux", ["list-sessions"]);
+  const listOut = await run(tmuxBin(), ["list-sessions"]);
   if (!listOut) return [];
 
   const sessions: ComputeSession[] = [];
@@ -132,7 +133,7 @@ async function getTmuxSessions(): Promise<ComputeSession[]> {
     const attached = line.includes("(attached)");
     const status = attached ? "attached" : "detached";
 
-    const panePid = await run("tmux", [
+    const panePid = await run(tmuxBin(), [
       "list-panes",
       "-t",
       name,
@@ -170,7 +171,7 @@ async function getTmuxSessions(): Promise<ComputeSession[]> {
           }
         }
 
-        const paneDir = await run("tmux", [
+        const paneDir = await run(tmuxBin(), [
           "display-message",
           "-t",
           name,
