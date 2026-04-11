@@ -50,6 +50,25 @@ export interface HarnessOpts {
   rows?: number;
   /** Extra env vars to merge on top of the isolated baseline. */
   env?: Record<string, string>;
+  /**
+   * Pre-allocated ARK_TEST_DIR. When provided, the harness reuses it
+   * instead of creating a fresh temp dir -- useful for tests that need
+   * to seed state via `runArkCli` BEFORE the TUI opens the DB (otherwise
+   * SQLite rejects the second connection with "database is locked").
+   * Pattern:
+   *
+   *   const arkDir = mkTempArkDir();
+   *   seedSession(arkDir, { summary: "demo" });
+   *   const harness = await startHarness({ arkDir });
+   *
+   * The harness does NOT delete a caller-provided arkDir on stop().
+   */
+  arkDir?: string;
+}
+
+/** Allocate a fresh temp ARK_TEST_DIR. Caller is responsible for cleanup. */
+export function mkTempArkDir(): string {
+  return mkdtempSync(join(tmpdir(), `ark-tui-e2e-${randomUUID().slice(0, 8)}-`));
 }
 
 export interface Harness {
@@ -196,12 +215,19 @@ export async function startHarness(opts: HarnessOpts = {}): Promise<Harness> {
   const rows = opts.rows ?? 32;
 
   const harnessId = randomUUID().slice(0, 8);
-  const arkDir = mkdtempSync(join(tmpdir(), `ark-tui-e2e-${harnessId}-`));
+  // Accept a caller-allocated arkDir for seed-before-boot workflows;
+  // otherwise allocate one and track ownership so stop() cleans up.
+  const arkDir = opts.arkDir ?? mkdtempSync(join(tmpdir(), `ark-tui-e2e-${harnessId}-`));
+  const arkDirOwnedByHarness = opts.arkDir === undefined;
   const tmuxTmpDir = mkdtempSync(join(tmpdir(), `ark-tui-e2e-tmux-${harnessId}-`));
 
+  // Ark reads ARK_TEST_DIR (not ARK_DIR) to redirect its state root.
+  // See packages/core/config.ts:104 -- process.env.ARK_TEST_DIR is the
+  // recognized knob. Using the wrong name silently falls back to
+  // ~/.ark, which means the harness would pollute the user's real DB.
   const env: Record<string, string> = {
     ...process.env,
-    ARK_DIR: arkDir,
+    ARK_TEST_DIR: arkDir,
     TMUX_TMPDIR: tmuxTmpDir,
     TERM: "xterm-256color",
     COLORTERM: "truecolor",
@@ -315,7 +341,9 @@ export async function startHarness(opts: HarnessOpts = {}): Promise<Harness> {
       new Promise<void>((res) => httpServer.close(() => res())),
       new Promise<void>((res) => setTimeout(res, 2000)),
     ]);
-    try { rmSync(arkDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    if (arkDirOwnedByHarness) {
+      try { rmSync(arkDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
     try { rmSync(tmuxTmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
   };
 

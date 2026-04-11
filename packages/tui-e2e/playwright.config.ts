@@ -20,8 +20,13 @@ export default defineConfig({
   timeout: 60_000,
   globalTimeout: 300_000,
   retries: 0,
-  // TUI tests own a pty each -- modest parallelism is fine.
-  workers: process.env.CI ? 2 : 4,
+  // Serialized. Each test owns its own ARK_TEST_DIR + TMUX_TMPDIR so on
+  // paper they are parallel-safe, but the shared `ark` binary spawns
+  // sub-bun processes that occasionally trip on each other's tmux state
+  // when more than one test runs at a time. workers=1 is a deliberate
+  // correctness choice; reinvestigate if suite wall-time becomes a
+  // problem.
+  workers: 1,
   reporter: process.env.CI ? "list" : [["list"], ["html", { open: "never" }]],
   use: {
     headless: true,
