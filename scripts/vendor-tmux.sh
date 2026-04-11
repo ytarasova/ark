@@ -73,9 +73,9 @@ build_darwin() {
     cd "$WORK/libevent-$LIBEVENT_VERSION"
     ./configure --prefix="$WORK/deps" --enable-static --disable-shared \
       --disable-openssl --disable-samples --disable-debug-mode \
-      >/dev/null 2>&1 || error "libevent configure failed"
-    make -j"$(sysctl -n hw.ncpu)" >/dev/null 2>&1 || error "libevent build failed"
-    make install >/dev/null 2>&1
+      || error "libevent configure failed"
+    make -j"$(sysctl -n hw.ncpu)" || error "libevent build failed"
+    make install
   )
 
   info "Downloading tmux $TMUX_VERSION..."
@@ -92,8 +92,8 @@ build_darwin() {
       CFLAGS="-I$WORK/deps/include" \
       LDFLAGS="-L$WORK/deps/lib" \
       LIBS="-lresolv" \
-      >/dev/null 2>&1 || error "tmux configure failed"
-    make -j"$(sysctl -n hw.ncpu)" >/dev/null 2>&1 || error "tmux build failed"
+      || error "tmux configure failed"
+    make -j"$(sysctl -n hw.ncpu)" || error "tmux build failed"
   )
 
   # Verify the binary only depends on system libs (libSystem + libutil + libncurses)
@@ -127,7 +127,7 @@ build_linux() {
   local BUILD_SCRIPT
   BUILD_SCRIPT=$(cat <<'EOF'
 set -eu
-apk add --no-cache build-base libevent-dev libevent-static ncurses-dev ncurses-static byacc bison curl tar
+apk add --no-cache build-base libevent-dev libevent-static ncurses-dev ncurses-static bison curl tar
 cd /tmp
 curl -fsSL "https://github.com/tmux/tmux/releases/download/TMUX_VERSION/tmux-TMUX_VERSION.tar.gz" -o tmux.tar.gz
 tar -xf tmux.tar.gz

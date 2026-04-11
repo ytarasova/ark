@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "bun:test";
 import { NotifyDaemon } from "../infra/notify-daemon.js";
 import { Bridge } from "../integrations/bridge.js";
-import { withTestContext } from "./test-helpers.js";
+import { withTestContext, waitFor } from "./test-helpers.js";
 import { getApp } from "../app.js";
 
 withTestContext();
@@ -51,52 +51,54 @@ describe("NotifyDaemon", () => {
   });
 
   it("polls sessions without crashing when sessions exist", async () => {
+    let polls = 0;
     const bridge = new Bridge({});
     daemon = new NotifyDaemon(getApp(), bridge, {
-      activeIntervalMs: 50,
-      waitingIntervalMs: 50,
-      idleIntervalMs: 50,
+      activeIntervalMs: 20,
+      waitingIntervalMs: 20,
+      idleIntervalMs: 20,
+      onPoll: () => { polls++; },
     });
 
-    // Create sessions in various states
     const s1 = getApp().sessions.create({ summary: "running-test" });
     getApp().sessions.update(s1.id, { status: "running" });
     const s2 = getApp().sessions.create({ summary: "waiting-test" });
     getApp().sessions.update(s2.id, { status: "waiting" });
 
     daemon.start();
-    // Let it poll once
-    await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => polls >= 1, { timeout: 2000, message: "expected at least one poll" });
     daemon.stop();
   });
 
   it("detects status transitions on subsequent polls", async () => {
     const notifications: string[] = [];
     const bridge = new Bridge({});
-    // Override notify to track calls
     bridge.notify = async (text: string) => { notifications.push(text); };
 
+    let polls = 0;
     daemon = new NotifyDaemon(getApp(), bridge, {
-      activeIntervalMs: 30,
-      waitingIntervalMs: 30,
-      idleIntervalMs: 30,
+      activeIntervalMs: 20,
+      waitingIntervalMs: 20,
+      idleIntervalMs: 20,
+      onPoll: () => { polls++; },
     });
 
     const s = getApp().sessions.create({ summary: "transition-test" });
     getApp().sessions.update(s.id, { status: "running" });
 
     daemon.start();
-    // First poll establishes baseline
-    await new Promise(r => setTimeout(r, 60));
+    // Wait for the baseline poll to land
+    await waitFor(() => polls >= 1, { timeout: 2000 });
 
-    // Now transition to waiting — next poll should notify
+    // Transition -> wait until at least one more poll observes it
     getApp().sessions.update(s.id, { status: "waiting" });
-    await new Promise(r => setTimeout(r, 60));
+    await waitFor(
+      () => notifications.some(n => n.includes("transition-test")),
+      { timeout: 2000, message: "expected a transition notification" },
+    );
 
     daemon.stop();
-    // Should have at least one notification about the transition
     expect(notifications.length).toBeGreaterThanOrEqual(1);
-    expect(notifications.some(n => n.includes("transition-test"))).toBe(true);
   });
 
   it("does not notify on initial poll (no previous status)", async () => {
@@ -104,19 +106,20 @@ describe("NotifyDaemon", () => {
     const bridge = new Bridge({});
     bridge.notify = async (text: string) => { notifications.push(text); };
 
+    let polls = 0;
     daemon = new NotifyDaemon(getApp(), bridge, {
-      activeIntervalMs: 30,
-      waitingIntervalMs: 30,
-      idleIntervalMs: 30,
+      activeIntervalMs: 20,
+      waitingIntervalMs: 20,
+      idleIntervalMs: 20,
+      onPoll: () => { polls++; },
     });
 
     getApp().sessions.create({ summary: "no-initial-notify" });
 
     daemon.start();
-    await new Promise(r => setTimeout(r, 60));
+    await waitFor(() => polls >= 1, { timeout: 2000 });
     daemon.stop();
 
-    // No transitions detected on first poll
     expect(notifications.length).toBe(0);
   });
 });

@@ -14,9 +14,11 @@ export interface NotifyDaemonOptions {
   waitingIntervalMs?: number;
   /** Polling interval when all idle (ms). Default: 30000. */
   idleIntervalMs?: number;
+  /** Fired after each poll completes -- used by tests to eliminate timing races. */
+  onPoll?: () => void;
 }
 
-const DEFAULTS: Required<NotifyDaemonOptions> = {
+const DEFAULTS: Required<Omit<NotifyDaemonOptions, "onPoll">> = {
   activeIntervalMs: 3_000,
   waitingIntervalMs: 10_000,
   idleIntervalMs: 30_000,
@@ -25,7 +27,7 @@ const DEFAULTS: Required<NotifyDaemonOptions> = {
 export class NotifyDaemon {
   private app: AppContext;
   private bridge: Bridge;
-  private opts: Required<NotifyDaemonOptions>;
+  private opts: Required<Omit<NotifyDaemonOptions, "onPoll">> & { onPoll?: () => void };
   private lastStatuses = new Map<string, string>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
@@ -88,6 +90,7 @@ export class NotifyDaemon {
         : hasWaiting ? this.opts.waitingIntervalMs
         : this.opts.idleIntervalMs;
 
+      this.opts.onPoll?.();
       this.timer = setTimeout(() => this.poll(), interval);
     } catch (e: any) {
       console.error("notify-daemon: poll error:", e?.message ?? e);

@@ -116,7 +116,7 @@ jobs:
       - name: Install build deps
         run: |
           apk add --no-cache build-base libevent-dev libevent-static \
-            ncurses-dev ncurses-static byacc bison curl tar file
+            ncurses-dev ncurses-static bison curl tar file
 
       - name: Build static tmux
         env:
@@ -215,15 +215,17 @@ jobs:
     continue-on-error: true
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: tensorzero/tensorzero
+          path: tensorzero
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Clone TensorZero
-        run: git clone --depth 1 https://github.com/tensorzero/tensorzero.git /tmp/tensorzero
-
       - name: Build gateway
         run: |
-          cd /tmp/tensorzero
+          cd tensorzero
           cargo build --release --bin gateway
 
       - name: Collect binary
@@ -231,7 +233,7 @@ jobs:
           PLAT: ${{ matrix.name }}
         run: |
           mkdir -p out
-          cp /tmp/tensorzero/target/release/gateway "out/tensorzero-$PLAT"
+          cp tensorzero/target/release/gateway "out/tensorzero-$PLAT"
           chmod +x "out/tensorzero-$PLAT"
           ls -lh out/
 
