@@ -13,14 +13,14 @@ export interface RuntimeBilling {
   plan?: string;
   /** Fixed monthly cost in USD for this subscription */
   cost_per_month?: number;
-  /** Transcript parser to use: 'claude' | 'codex' | 'gemini' (defaults based on type) */
-  transcript_parser?: "claude" | "codex" | "gemini";
+  /** Transcript parser to use: 'claude' | 'codex' | 'gemini' | 'goose' (defaults based on type) */
+  transcript_parser?: "claude" | "codex" | "gemini" | "goose";
 }
 
 export interface RuntimeDefinition {
   name: string;
   description?: string;
-  type: "claude-code" | "cli-agent" | "subprocess";
+  type: "claude-code" | "cli-agent" | "subprocess" | "goose";
   command?: string[];
   task_delivery?: "stdin" | "file" | "arg";
   models?: Array<{ id: string; label: string }>;
@@ -49,6 +49,17 @@ export interface AgentDefinition {
   runtime?: string;
   command?: string[];
   task_delivery?: "stdin" | "file" | "arg";
+  /**
+   * Optional Goose recipe file path (native Goose YAML). When set, the goose
+   * executor dispatches `goose run --recipe <path> --params k=v` instead of
+   * text delivery. Path is resolved relative to the agent's workdir.
+   */
+  recipe?: string;
+  /**
+   * Optional list of Goose sub-recipe paths. Passed as `--sub-recipe <path>`
+   * flags alongside the main recipe. Only meaningful when `recipe` is set.
+   */
+  sub_recipes?: string[];
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }

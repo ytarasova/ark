@@ -35,9 +35,15 @@ export { instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecip
 // Executor
 export type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "./executor.js";
 export { registerExecutor, getExecutor, listExecutors, resetExecutors } from "./executor.js";
-export { claudeCodeExecutor } from "./executors/claude-code.js";
-export { subprocessExecutor } from "./executors/subprocess.js";
-export { cliAgentExecutor } from "./executors/cli-agent.js";
+export {
+  claudeCodeExecutor,
+  subprocessExecutor,
+  cliAgentExecutor,
+  gooseExecutor,
+  builtinExecutors,
+  loadPluginExecutors,
+} from "./executors/index.js";
+export { buildGooseCommand } from "./executors/goose.js";
 export { startStatusPoller, stopStatusPoller, stopAllPollers } from "./executors/status-poller.js";
 
 // Session launcher abstraction

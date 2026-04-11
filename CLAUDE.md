@@ -1,6 +1,6 @@
 # Ark
 
-Autonomous agent ecosystem. Orchestrates AI coding agents through DAG-based SDLC flows with 11 compute providers, unified knowledge graph (ops-codegraph indexer), LLM router + optional TensorZero gateway, and multi-tenant control plane. Supports Claude Code, Codex, and Gemini CLI runtimes with per-token (`api`), `subscription`, and `free` billing modes. Bun + tmux only -- no Python dependencies.
+Autonomous agent ecosystem. Orchestrates AI coding agents through DAG-based SDLC flows with 11 compute providers, unified knowledge graph (ops-codegraph indexer), LLM router + optional TensorZero gateway, and multi-tenant control plane. Supports Claude Code, Codex, Gemini CLI, and Goose (Block / AAIF) runtimes with per-token (`api`), `subscription`, and `free` billing modes. Bun + tmux only -- no Python dependencies.
 
 ## Commands
 
@@ -58,7 +58,7 @@ packages/
   types/     → Domain interfaces (Session, Compute, Event, Message, Tenant, etc.)
 agents/      → 12 agent definitions (ticket-intake, spec-planner, plan-auditor, implementer,
                task-implementer, verifier, reviewer, documenter, closer, retro, planner, worker)
-runtimes/    → 4 runtime definitions (claude, claude-max, codex, gemini)
+runtimes/    → 5 runtime definitions (claude, claude-max, codex, gemini, goose)
 flows/       → 9 flow definitions (default, quick, bare, parallel, fan-out, pr-review, dag-parallel, islc, islc-quick)
 skills/      → 7 builtin skills (code-review, plan-audit, sanity-gate, security-scan, self-review, spec-extraction, test-writing)
 recipes/     → 8 recipe templates (quick-fix, feature-build, code-review, fix-bug, new-feature, ideate, islc, islc-quick)
@@ -235,14 +235,15 @@ Runtimes define HOW an agent runs. Three-tier resolution: `runtimes/` (builtin) 
 **Built-in runtimes:**
 - `claude` -- Claude Code, `api` billing, transcript parser: claude
 - `claude-max` -- Claude Code with Max subscription, `subscription` billing, $200/mo plan, transcript parser: claude
-- `codex` -- OpenAI Codex CLI, `api` billing, default model gpt-5-codex, transcript parser: codex
+- `codex` -- OpenAI Codex CLI, `api` billing, default model gpt-5-codex, transcript parser: codex. Binary vendored via `scripts/vendor-codex.sh`.
 - `gemini` -- Google Gemini CLI, `api` billing, transcript parser: gemini
+- `goose` -- Block / Linux Foundation AAIF Goose, `api` billing, transcript parser: goose. Native executor in `packages/core/executors/goose.ts` with recipe dispatch (`--recipe` / `--sub-recipe` / `--params`), channel MCP wired as `--with-extension`, router-injected `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL`, `--no-session` + `stream-json` output. Binary vendored via `scripts/vendor-goose.sh`.
 
 Create `runtimes/<name>.yaml`:
 ```yaml
 name: my-runtime
 description: "Custom LLM backend"
-type: cli-agent     # claude-code | cli-agent | subprocess
+type: cli-agent     # claude-code | cli-agent | subprocess | goose
 command: ["my-tool", "--auto"]
 task_delivery: arg  # stdin | file | arg
 models:
@@ -285,8 +286,11 @@ Agents dispatch through pluggable executors. The runtime's `type` field selects 
 - `claude-code` (default) -- launches Claude Code in tmux with hooks + MCP channel
 - `subprocess` -- spawns any command as a child process
 - `cli-agent` -- runs any CLI tool (codex, gemini, etc.) in tmux with worktree isolation
+- `goose` -- native Goose runtime with recipe dispatch, channel MCP via `--with-extension`, router-injected base URLs
 
 **Executor interface:** 5 methods -- `launch`, `kill`, `status`, `send`, `capture`. Defined in `packages/core/executor.ts`.
+
+**Discovery + plugins.** The built-in set lives in `packages/core/executors/index.ts` as `builtinExecutors: Executor[]`. `app.ts` loops this array at boot to register every built-in into both the module-level lookup (`registerExecutor`) and the Awilix container (under `executor:<name>`). Users can drop additional executor modules at `~/.ark/plugins/executors/*.js` (default export must be an `Executor`); `loadPluginExecutors(arkDir)` discovers them at boot via dynamic `import()` and registers them the same way. Failures in one plugin never block boot.
 
 **Adding a subprocess agent:**
 ```yaml

@@ -31,9 +31,7 @@ import { track, configureTelemetry } from "./observability/telemetry.js";
 import { logError, logWarn, setLogArkDir } from "./observability/structured-log.js";
 import { setProfilesArkDir } from "./state/profiles.js";
 import { registerExecutor } from "./executor.js";
-import { claudeCodeExecutor } from "./executors/claude-code.js";
-import { subprocessExecutor } from "./executors/subprocess.js";
-import { cliAgentExecutor } from "./executors/cli-agent.js";
+import { builtinExecutors, loadPluginExecutors } from "./executors/index.js";
 import { SessionRepository, ComputeRepository, ComputeTemplateRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
 import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "./stores/index.js";
@@ -512,9 +510,24 @@ export class AppContext {
     this.sessionService.setApp(this);
     setProviderResolver((session: Session) => this.resolveProvider(session));
 
-    registerExecutor(claudeCodeExecutor);
-    registerExecutor(subprocessExecutor);
-    registerExecutor(cliAgentExecutor);
+    // Built-in executors -- register into both the module-level lookup
+    // (for legacy getExecutor() call sites) and the Awilix container (for
+    // DI-based resolution under the `executor:<name>` key).
+    for (const ex of builtinExecutors) {
+      registerExecutor(ex);
+      this._container.register({ [`executor:${ex.name}`]: asValue(ex) });
+    }
+
+    // User-provided executor plugins from <arkDir>/plugins/executors/*.js.
+    // Best-effort: failures here never block boot, they just log.
+    loadPluginExecutors(this.config.arkDir, (msg) => logWarn("plugins", msg))
+      .then((plugins) => {
+        for (const ex of plugins) {
+          registerExecutor(ex);
+          this._container.register({ [`executor:${ex.name}`]: asValue(ex) });
+        }
+      })
+      .catch((e: any) => logWarn("plugins", `loadPluginExecutors failed: ${e?.message ?? e}`));
 
     this._eventBus = eventBus;
     this._eventBus.clear();

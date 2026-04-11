@@ -19,6 +19,10 @@ export interface LaunchOpts {
     permission_mode: string;
     env: Record<string, string>;
     command?: string[];
+    /** Optional goose recipe path (native YAML), handled by gooseExecutor. */
+    recipe?: string;
+    /** Optional goose sub-recipe paths, handled by gooseExecutor. */
+    sub_recipes?: string[];
   };
   task: string;
   claudeArgs?: string[];

@@ -138,7 +138,7 @@ package-cli: build-web ## Build self-contained CLI bundles for macOS + Linux (4 
 	$(BUN) build --compile --target bun-linux-x64    packages/cli/index.ts --outfile dist/bin/ark-linux-x64
 	@echo ""
 	@echo "Downloading vendored binaries..."
-	@$(MAKE) vendor-tmux vendor-tensorzero vendor-codegraph --no-print-directory
+	@$(MAKE) vendor-tmux vendor-tensorzero vendor-codegraph vendor-goose vendor-codex --no-print-directory
 	@echo ""
 	@echo "Creating distribution tarballs..."
 	@for plat in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do \
@@ -148,6 +148,8 @@ package-cli: build-web ## Build self-contained CLI bundles for macOS + Linux (4 
 	  if [ -f dist/vendor/tmux-$$plat ]; then cp dist/vendor/tmux-$$plat dist/ark-$$plat/bin/tmux; fi; \
 	  if [ -f dist/vendor/tensorzero-$$plat ]; then cp dist/vendor/tensorzero-$$plat dist/ark-$$plat/bin/tensorzero-gateway; fi; \
 	  if [ -f dist/vendor/codegraph-$$plat ]; then cp dist/vendor/codegraph-$$plat dist/ark-$$plat/bin/codegraph; fi; \
+	  if [ -f dist/vendor/goose-$$plat ]; then cp dist/vendor/goose-$$plat dist/ark-$$plat/bin/goose; fi; \
+	  if [ -f dist/vendor/codex-$$plat ]; then cp dist/vendor/codex-$$plat dist/ark-$$plat/bin/codex; fi; \
 	  cd dist && tar czf ark-$$plat.tar.gz ark-$$plat && cd ..; \
 	  echo "  dist/ark-$$plat.tar.gz ($$(du -h dist/ark-$$plat.tar.gz | cut -f1))"; \
 	done
@@ -177,6 +179,20 @@ vendor-codegraph: ## Extract codegraph native binaries from npm packages
 	  else \
 	    echo "  codegraph-$$dist_plat: npm package not installed (bun add $$pkg)"; \
 	  fi; \
+	done
+
+vendor-goose: ## Download goose binaries from block/goose GitHub releases
+	@mkdir -p dist/vendor
+	@echo "  goose: downloading release binaries..."
+	@for plat in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do \
+	  ./scripts/vendor-goose.sh $$plat || echo "  goose-$$plat: skipped"; \
+	done
+
+vendor-codex: ## Download codex binaries from openai/codex GitHub releases
+	@mkdir -p dist/vendor
+	@echo "  codex: downloading release binaries..."
+	@for plat in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do \
+	  ./scripts/vendor-codex.sh $$plat || echo "  codex-$$plat: skipped"; \
 	done
 
 vendor-tensorzero: ## Build TensorZero gateway from source for all platforms
