@@ -20,6 +20,18 @@ export interface WorkerNode {
   metadata: Record<string, unknown>;
 }
 
+interface WorkerRow {
+  id: string;
+  url: string;
+  status: WorkerNode["status"];
+  capacity: number;
+  active_sessions: number;
+  last_heartbeat: string;
+  compute_name: string | null;
+  tenant_id: string | null;
+  metadata: string | Record<string, unknown> | null;
+}
+
 export class WorkerRegistry {
   constructor(private db: IDatabase) {
     this.db.exec(`CREATE TABLE IF NOT EXISTS workers (
@@ -72,7 +84,7 @@ export class WorkerRegistry {
   /** List workers, optionally filtered by status and/or tenant. */
   list(opts?: { status?: string; tenantId?: string }): WorkerNode[] {
     let sql = "SELECT * FROM workers WHERE 1=1";
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     if (opts?.status) {
       sql += " AND status = ?";
@@ -84,14 +96,14 @@ export class WorkerRegistry {
     }
 
     sql += " ORDER BY active_sessions ASC";
-    const rows = this.db.prepare(sql).all(...params) as any[];
-    return rows.map(this.hydrateRow);
+    const rows = this.db.prepare(sql).all(...params) as WorkerRow[];
+    return rows.map(r => this.hydrateRow(r));
   }
 
   /** Get available (online, not at capacity) workers, optionally filtered. */
   getAvailable(opts?: { tenantId?: string; computeName?: string }): WorkerNode[] {
     let sql = "SELECT * FROM workers WHERE status = 'online' AND active_sessions < capacity";
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     if (opts?.tenantId) {
       sql += " AND (tenant_id = ? OR tenant_id IS NULL)";
@@ -103,8 +115,8 @@ export class WorkerRegistry {
     }
 
     sql += " ORDER BY active_sessions ASC";
-    const rows = this.db.prepare(sql).all(...params) as any[];
-    return rows.map(this.hydrateRow);
+    const rows = this.db.prepare(sql).all(...params) as WorkerRow[];
+    return rows.map(r => this.hydrateRow(r));
   }
 
   /** Get the least loaded online worker, or null if none available. */
@@ -112,7 +124,7 @@ export class WorkerRegistry {
     const row = this.db.prepare(
       `SELECT * FROM workers WHERE status = 'online' AND active_sessions < capacity
        ORDER BY (CAST(active_sessions AS REAL) / capacity) ASC LIMIT 1`
-    ).get() as any;
+    ).get() as WorkerRow | undefined;
     return row ? this.hydrateRow(row) : null;
   }
 
@@ -144,11 +156,11 @@ export class WorkerRegistry {
 
   /** Get a single worker by ID. */
   get(workerId: string): WorkerNode | null {
-    const row = this.db.prepare("SELECT * FROM workers WHERE id = ?").get(workerId) as any;
+    const row = this.db.prepare("SELECT * FROM workers WHERE id = ?").get(workerId) as WorkerRow | undefined;
     return row ? this.hydrateRow(row) : null;
   }
 
-  private hydrateRow(row: any): WorkerNode {
+  private hydrateRow(row: WorkerRow): WorkerNode {
     return {
       id: row.id,
       url: row.url,
