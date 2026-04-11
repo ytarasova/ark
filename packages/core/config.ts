@@ -1,6 +1,7 @@
 import { join } from "path";
 import { homedir } from "os";
 import { existsSync, readFileSync } from "fs";
+import YAML from "yaml";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ROUTER_URL } from "./constants.js";
 import type { AuthConfig } from "./auth/index.js";
 
@@ -93,9 +94,6 @@ function loadYamlConfig(arkDir: string): Record<string, unknown> {
   const configPath = join(arkDir, "config.yaml");
   if (!existsSync(configPath)) return {};
   try {
-    // Lazy import YAML to avoid loading it when not needed (test mode)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const YAML = require("yaml");
     return (YAML.parse(readFileSync(configPath, "utf-8")) ?? {}) as Record<string, unknown>;
   } catch {
     return {};

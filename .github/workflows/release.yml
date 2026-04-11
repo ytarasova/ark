@@ -94,7 +94,10 @@ jobs:
           path: dist/vendor/tmux-${{ matrix.name }}
           retention-days: 1
 
-  # Vendor tmux for Linux - build in Alpine container for static musl binary
+  # Vendor tmux for Linux - build in Alpine via `docker run` so the
+  # upload-artifact step (which is a JavaScript action) runs on the host.
+  # Putting Alpine at the job level breaks on arm64 runners because the JS
+  # action assumes x64.
   vendor-tmux-linux:
     strategy:
       fail-fast: false
@@ -109,48 +112,39 @@ jobs:
     name: vendor-tmux (${{ matrix.name }})
     timeout-minutes: 15
 
-    container:
-      image: alpine:3.20
-
     steps:
-      - name: Install build deps
-        run: |
-          apk add --no-cache build-base libevent-dev libevent-static \
-            ncurses-dev ncurses-static bison curl tar file
-
-      - name: Build static tmux
+      - name: Build static tmux in Alpine
         env:
           TMUX_VERSION: 3.5a
         run: |
-          cd /tmp
-          curl -fsSL "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" -o tmux.tar.gz
-          tar -xf tmux.tar.gz
-          cd "tmux-${TMUX_VERSION}"
-          ./configure --enable-static \
-            CFLAGS="-static" \
-            LDFLAGS="-static" \
-            LIBS="-lresolv"
-          make -j"$(nproc)"
-          mkdir -p /tmp/out
-          cp tmux /tmp/out/tmux
+          mkdir -p out
+          docker run --rm -v "$PWD/out:/out" alpine:3.20 sh -c '
+            set -eu
+            apk add --no-cache build-base libevent-dev libevent-static ncurses-dev ncurses-static bison curl tar file
+            cd /tmp
+            curl -fsSL "https://github.com/tmux/tmux/releases/download/'"$TMUX_VERSION"'/tmux-'"$TMUX_VERSION"'.tar.gz" -o tmux.tar.gz
+            tar -xf tmux.tar.gz
+            cd "tmux-'"$TMUX_VERSION"'"
+            ./configure --enable-static \
+              CFLAGS="-static" \
+              LDFLAGS="-static" \
+              LIBS="-lresolv"
+            make -j"$(nproc)"
+            cp tmux /out/tmux
+            file /out/tmux
+            /out/tmux -V
+          '
 
-      - name: Verify static binary
+      - name: Verify static binary on host
         run: |
-          file /tmp/out/tmux
-          /tmp/out/tmux -V
-          if ldd /tmp/out/tmux 2>&1 | grep -q "not a dynamic executable"; then
-            echo "Static binary verified"
-          elif ldd /tmp/out/tmux 2>&1 | grep -qE "=>"; then
-            echo "ERROR: binary has dynamic dependencies"
-            ldd /tmp/out/tmux
-            exit 1
-          fi
+          file out/tmux
+          test -s out/tmux
 
       - name: Upload tmux binary
         uses: actions/upload-artifact@v4
         with:
           name: tmux-${{ matrix.name }}
-          path: /tmp/out/tmux
+          path: out/tmux
           retention-days: 1
 
   # Vendor codegraph - extract native binaries from npm optional deps

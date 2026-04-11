@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { subprocessExecutor } from "../executors/subprocess.js";
+import { waitFor } from "./test-helpers.js";
 
 let app: AppContext;
 beforeEach(async () => { if (app) { await app.shutdown(); clearApp(); } app = AppContext.forTest(); setApp(app); await app.boot(); });
@@ -33,8 +34,9 @@ describe("subprocess executor", () => {
     expect(result.ok).toBe(true);
     expect(result.handle).toBeTruthy();
 
-    // Wait for process to finish
-    await Bun.sleep(500);
+    // Wait for process to actually exit, not a fixed sleep
+    await waitFor(async () => (await subprocessExecutor.status(result.handle)).state === "completed",
+      { timeout: 5000, message: "echo subprocess never completed" });
 
     const output = await subprocessExecutor.capture(result.handle);
     expect(output).toContain("hello executor");
@@ -59,7 +61,8 @@ describe("subprocess executor", () => {
       task: "noop",
     });
 
-    await Bun.sleep(500);
+    await waitFor(async () => (await subprocessExecutor.status(result.handle)).state === "completed",
+      { timeout: 5000, message: "true subprocess never completed" });
     const status = await subprocessExecutor.status(result.handle);
     expect(status.state).toBe("completed");
     if (status.state === "completed") {
@@ -86,7 +89,8 @@ describe("subprocess executor", () => {
       task: "will fail",
     });
 
-    await Bun.sleep(500);
+    await waitFor(async () => (await subprocessExecutor.status(result.handle)).state === "failed",
+      { timeout: 5000, message: "false subprocess never failed" });
     const status = await subprocessExecutor.status(result.handle);
     expect(status.state).toBe("failed");
   });
@@ -119,7 +123,10 @@ describe("subprocess executor", () => {
     expect(statusBefore.state).toBe("running");
 
     await subprocessExecutor.kill(result.handle);
-    await Bun.sleep(200);
+    await waitFor(async () => {
+      const s = (await subprocessExecutor.status(result.handle)).state;
+      return s === "completed" || s === "failed" || s === "not_found";
+    }, { timeout: 5000, message: "killed subprocess never exited" });
 
     const statusAfter = await subprocessExecutor.status(result.handle);
     expect(["completed", "failed", "not_found"]).toContain(statusAfter.state);
