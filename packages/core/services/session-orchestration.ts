@@ -7,7 +7,7 @@
 
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
 
@@ -1195,6 +1195,19 @@ export async function setupSessionWorktree(
   // Trust worktree for Claude
   log("Configuring Claude trust + channel...");
   claude.trustWorktree(workdir, effectiveWorkdir);
+
+  // Persist an ABSOLUTE workdir on the session row. The previous behaviour
+  // left session.workdir as null/"." when the user passed --repo ".", which
+  // tripped the transcript parser into resolving an empty path against the
+  // parent process cwd and attributing the wrong jsonl file. Resolving here
+  // (against the dispatching process cwd, NOT the agent cwd) gives every
+  // downstream observer (parser, status poller, web UI) an unambiguous
+  // absolute path. Idempotent: skip the write if the row already matches.
+  const persisted = resolve(effectiveWorkdir);
+  if (session.workdir !== persisted) {
+    app.sessions.update(session.id, { workdir: persisted });
+    (session as { workdir: string | null }).workdir = persisted;
+  }
 
   return effectiveWorkdir;
 }

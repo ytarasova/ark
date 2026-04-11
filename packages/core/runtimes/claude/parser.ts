@@ -68,8 +68,16 @@ export class ClaudeTranscriptParser implements TranscriptParser {
    * Claude: if the caller provides a sessionIdLookup (to find Ark's
    * session.claude_session_id for this workdir), use the exact path.
    * Otherwise fall back to the latest jsonl file in the matching project dir.
+   *
+   * Fail-safe on empty workdir: returning null here is critical because
+   * an empty string would otherwise be `resolve()`d to the caller's cwd,
+   * which silently attributes the WRONG transcript file to this session.
+   * Observed in the wild on s-a62043: an empty workdir field on the
+   * sessions row caused ~$185 of phantom cost from another session's
+   * transcript to land on the child session.
    */
   findForSession(opts: FindOpts): string | null {
+    if (!opts.workdir || opts.workdir.trim() === "") return null;
     const slug = encodeProjectSlug(opts.workdir);
     const projectDir = join(this.projectsDir, slug);
     if (!existsSync(projectDir)) return null;
