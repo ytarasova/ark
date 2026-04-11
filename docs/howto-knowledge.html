@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How-To: Knowledge Graph - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>How-To: Knowledge Graph and Codebase Indexing</h1>
+      <p class="subtitle">Index your codebase and let agents query it.</p>
+
+      <h2>What is the knowledge graph?</h2>
+      <p>The knowledge graph is a unified store of everything Ark knows about your project and its history. It is a single SQLite-or-Postgres structure with typed nodes and typed edges. Every node has a type, a label, optional content, metadata, and a tenant scope. Every edge has a source node, a destination node, and a relationship type.</p>
+      <p>Node types currently used:</p>
+      <ul>
+        <li><strong>file</strong> -- a source file in the repo.</li>
+        <li><strong>symbol</strong> -- a function, class, method, or type declaration.</li>
+        <li><strong>session</strong> -- a historical Ark session with summary and outcome.</li>
+        <li><strong>memory</strong> -- user- or agent-written note (see <a href="howto-memories.html">Memories</a>).</li>
+        <li><strong>learning</strong> -- a lesson extracted from a retrospective.</li>
+        <li><strong>skill</strong> -- a reusable prompt fragment.</li>
+        <li><strong>recipe</strong> -- a session template.</li>
+        <li><strong>agent</strong> -- an agent role definition.</li>
+      </ul>
+      <p>Edge types include <code>imports</code>, <code>calls</code>, <code>contains</code>, <code>depends_on</code>, <code>co_changes</code>, <code>modified_by</code>, and more. Together they form a graph that any agent can traverse through MCP tools.</p>
+
+      <div class="callout info">
+        <p>This replaces the old pile of standalone systems (<code>memory.ts</code>, <code>learnings.ts</code>, <code>hybrid-search.ts</code>, <code>knowledge.ts</code>) with one unified graph. If you read older docs, ignore them.</p>
+      </div>
+
+      <h2>Indexing your codebase</h2>
+      <p>The indexer is <a href="https://www.npmjs.com/package/@optave/codegraph">@optave/codegraph</a> -- an npm package written in TypeScript around a native Rust engine with tree-sitter bindings for 33 languages (WASM grammars). There is no Python dependency. This replaces the earlier Axon-based indexer.</p>
+
+      <h3>Full index</h3>
+      <pre><code><span class="prompt">$</span> cd ~/my-repo
+<span class="prompt">$</span> ark knowledge index</code></pre>
+      <p>This runs <code>codegraph build</code> under the hood, produces <code>.codegraph/graph.db</code>, reads it, and ingests the nodes and edges into Ark's tenant-scoped <code>knowledge</code> and <code>knowledge_edges</code> tables in <code>~/.ark/ark.db</code>.</p>
+
+      <h3>Incremental re-index</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge index <span class="flag">--incremental</span></code></pre>
+      <p>Only re-processes files that changed since the last index. Much faster than a full rebuild on a large codebase.</p>
+
+      <h3>Stats</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge stats
+nodes: 14,823
+  file:    2,104
+  symbol:  12,411
+  session: 187
+  memory:  98
+  learning: 23
+edges:  41,889
+  imports:     18,203
+  calls:       12,502
+  contains:    8,940
+  co_changes:  2,244</code></pre>
+      <p>Use this to confirm the index landed successfully and see the shape of your graph.</p>
+
+      <h2>Automatic indexing</h2>
+      <p>Enable auto-index in <code>~/.ark/config.yaml</code>:</p>
+      <pre><code><span class="yaml-key">knowledge</span>:
+  <span class="yaml-key">auto_index</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">incremental_index</span>: <span class="yaml-value">true</span></code></pre>
+      <ul>
+        <li><strong>Local mode</strong> -- honors this config. On first dispatch per repo, runs a full index. On subsequent dispatches, runs incremental. Turn it off if you prefer to index manually.</li>
+        <li><strong>Remote compute (arkd)</strong> -- always indexes via the arkd <code>/codegraph/index</code> endpoint, regardless of config. The control plane needs centralized knowledge for all workers, so this behavior is not opt-out.</li>
+      </ul>
+      <div class="callout warn">
+        <p>On a huge codebase the first index can take minutes. Consider running <code>ark knowledge index</code> manually once before your first dispatch so the auto-index step is fast.</p>
+      </div>
+
+      <h2>Querying from the CLI</h2>
+      <h3>Search</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge search <span class="string">"auth"</span>
+&#x2192; file: src/auth/index.ts
+&#x2192; symbol: refreshAuthToken (src/auth/refresh.ts)
+&#x2192; session: "Fix auth token refresh bug" (completed 2026-03-20)
+&#x2192; memory: Auth token refresh logic is in src/auth/refresh.ts...</code></pre>
+
+      <h3>Stats</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge stats</code></pre>
+
+      <h3>Context around a target</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge context <span class="flag">--file</span> src/auth.ts</code></pre>
+      <p>Shows related files (imports, imported by), contained symbols, past sessions that touched the file, and any memories or learnings attached.</p>
+
+      <h2>Agent MCP tools (6 tools)</h2>
+      <p>Agents query the knowledge graph at runtime through six MCP tools:</p>
+      <table>
+        <thead>
+          <tr><th>Tool</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>knowledge/search</code></td><td>Fuzzy text search across all node types.</td></tr>
+          <tr><td><code>knowledge/context</code></td><td>Get related nodes around a target (imports, calls, co-changes).</td></tr>
+          <tr><td><code>knowledge/impact</code></td><td>"What breaks if I change this file?" -- traverses reverse dependency edges.</td></tr>
+          <tr><td><code>knowledge/history</code></td><td>Past sessions that modified a given file, with their summaries and outcomes.</td></tr>
+          <tr><td><code>knowledge/remember</code></td><td>Write a memory. See <a href="howto-memories.html">Memories</a>.</td></tr>
+          <tr><td><code>knowledge/recall</code></td><td>Read memories matching a query.</td></tr>
+        </tbody>
+      </table>
+      <p>Example transcript of an agent using <code>knowledge/search</code> mid-session:</p>
+      <pre><code>assistant: I need to understand how auth tokens are refreshed.
+           Let me search the knowledge graph first.
+
+tool_use: knowledge/search("auth token refresh")
+
+tool_result:
+  - file: src/auth/refresh.ts (imports: jwt, crypto)
+  - symbol: refreshAuthToken (defined in src/auth/refresh.ts:42)
+  - session s-0x1a3: "Fix expired token retry" (completed 2026-02-11)
+  - memory: "Auth token refresh logic is in src/auth/refresh.ts, not auth/index.ts"
+
+assistant: Good -- there is a memory telling me to look in src/auth/refresh.ts,
+           and I can see the main function is refreshAuthToken at line 42.
+           Let me read that file.</code></pre>
+
+      <h2>Context injection at dispatch</h2>
+      <p>Before an agent's first turn, Ark builds a <strong>knowledge context block</strong> and prepends it to the system prompt. The context builder (<code>packages/core/knowledge/context.ts</code>) does this:</p>
+      <ol>
+        <li>Queries the graph for nodes relevant to the session's <code>summary</code> and <code>ticket</code>.</li>
+        <li>Ranks results by a combination of text relevance, importance (for memories), and recency.</li>
+        <li>Packs the top N hits into the prompt until the token budget (~2000 tokens) is reached.</li>
+        <li>Wraps the block in delimiters so the agent knows it's context and not instruction.</li>
+      </ol>
+      <p>This means the agent starts with project awareness. It does not need to blindly grep the codebase on its first turn -- the most relevant files, symbols, past sessions, and memories are already in front of it.</p>
+
+      <h2>Indexer prerequisite</h2>
+      <p>Install <code>@optave/codegraph</code> either globally or as a repo dependency:</p>
+      <pre><code><span class="comment"># Option A: per-repo (recommended)</span>
+<span class="prompt">$</span> bun add @optave/codegraph
+
+<span class="comment"># Option B: global</span>
+<span class="prompt">$</span> npm install <span class="flag">-g</span> @optave/codegraph</code></pre>
+      <p>The binary lives at <code>node_modules/.bin/codegraph</code> (per-repo) or on <code>$PATH</code> (global). Ark finds it automatically.</p>
+      <p>Supported languages via tree-sitter grammars: TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, Swift, C, C++, C#, Ruby, PHP, Elixir, Erlang, Haskell, OCaml, Scala, Clojure, Lua, Bash, SQL, YAML, TOML, JSON, HTML, CSS, Vue, Svelte, Markdown, GraphQL, Protobuf, and a few more -- 33 in total.</p>
+
+      <h2>Worked example</h2>
+      <p>Index a repo, dispatch a session, and observe the knowledge context flowing into the agent's prompt.</p>
+      <pre><code><span class="comment"># 1. Install the indexer if you haven't</span>
+<span class="prompt">$</span> cd ~/my-repo
+<span class="prompt">$</span> bun add @optave/codegraph
+
+<span class="comment"># 2. Build the index</span>
+<span class="prompt">$</span> ark knowledge index
+indexing ~/my-repo...
+  parsed 2104 files
+  extracted 12411 symbols
+  computed 2244 co-change edges
+wrote 14823 nodes, 41889 edges to ~/.ark/ark.db
+
+<span class="comment"># 3. Sanity-check</span>
+<span class="prompt">$</span> ark knowledge stats
+
+<span class="comment"># 4. Dispatch a session that benefits from context</span>
+<span class="prompt">$</span> ark session start <span class="flag">--repo</span> . \
+    <span class="flag">--summary</span> <span class="string">"Refactor auth module for token rotation"</span> \
+    <span class="flag">--dispatch</span> <span class="flag">--attach</span>
+
+<span class="comment"># The agent's system prompt now contains the top ~2000 tokens</span>
+<span class="comment"># of relevant context: auth files, related symbols, past sessions,</span>
+<span class="comment"># and any memories you wrote about auth.</span></code></pre>
+
+      <h2>Co-change analysis</h2>
+      <p>Ark augments the raw codegraph output with git history. For every pair of files that frequently change in the same commit, Ark writes a <code>co_changes</code> edge with a weight equal to the number of shared commits. This captures implicit coupling that the static graph cannot see -- for example, a test file and its target, or two services in a monorepo that move in lockstep.</p>
+      <p>Co-change edges power the <code>knowledge/impact</code> MCP tool and give a more accurate "blast radius" than dependency edges alone. If an agent touches a file with heavy co-change weights, it knows to look at the coupled files before calling the work done.</p>
+
+      <h2>Remote indexing via ArkD</h2>
+      <p>When compute is remote (EC2, K8s pod, Firecracker VM, etc.), the repo lives on the remote target. The flow is:</p>
+      <ol>
+        <li>Conductor POSTs to arkd's <code>/codegraph/index</code> endpoint with <code>{ repoPath, incremental }</code>.</li>
+        <li>ArkD on the remote target runs <code>codegraph build</code> against <code>repoPath</code>.</li>
+        <li>ArkD parses <code>.codegraph/graph.db</code> on the remote target.</li>
+        <li>ArkD streams nodes and edges back to the conductor over HTTP.</li>
+        <li>The conductor writes them into the control-plane knowledge store, tenant-scoped to the session's tenant.</li>
+      </ol>
+      <p>This is why remote indexing is not opt-out in hosted mode -- without the arkd round-trip, the control plane would have no way to build the graph, and agents running on remote compute would lose the knowledge context benefit.</p>
+
+      <h2>Export and import</h2>
+      <p>You can export the non-codebase nodes (memories, learnings) to Markdown:</p>
+      <pre><code><span class="prompt">$</span> ark knowledge export <span class="flag">--type</span> memory &gt; memories.md
+<span class="prompt">$</span> ark knowledge export <span class="flag">--type</span> learning &gt; learnings.md</code></pre>
+      <p>And import them back:</p>
+      <pre><code><span class="prompt">$</span> ark knowledge import memories.md</code></pre>
+      <p>Code nodes (file, symbol) are not exported -- those come from the indexer and are rebuildable.</p>
+
+      <h2>Command reference</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ark knowledge index</code></td><td>Full codebase index. Runs ops-codegraph and ingests into Ark.</td></tr>
+          <tr><td><code>ark knowledge index --incremental</code></td><td>Re-index only changed files.</td></tr>
+          <tr><td><code>ark knowledge search &lt;query&gt;</code></td><td>Full-text search across all nodes.</td></tr>
+          <tr><td><code>ark knowledge stats</code></td><td>Node and edge counts by type.</td></tr>
+          <tr><td><code>ark knowledge context --file &lt;path&gt;</code></td><td>Show related context around a file.</td></tr>
+          <tr><td><code>ark knowledge remember "..."</code></td><td>Write a memory node.</td></tr>
+          <tr><td><code>ark knowledge recall &lt;query&gt;</code></td><td>Search memory nodes only.</td></tr>
+          <tr><td><code>ark knowledge export [--type ...]</code></td><td>Export memories and learnings to Markdown.</td></tr>
+          <tr><td><code>ark knowledge import &lt;file&gt;</code></td><td>Import a Markdown file into the graph.</td></tr>
+          <tr><td><code>ark knowledge ingest</code></td><td>Ingest a pre-built <code>.codegraph/graph.db</code> without rebuilding.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="doc-footer">
+        <a href="howto-memories.html">&larr; Memories</a>
+        <a href="howto-costs.html">Cost Tracking &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ark vs Goose - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Ark vs Goose from Block</h1>
+      <p class="subtitle">How Ark differs from Block's Goose AI agent framework.</p>
+
+      <h2>TL;DR</h2>
+      <p>Ark is an <strong>orchestration platform</strong>. Goose is a <strong>standalone agent runner</strong>. Ark manages many sessions across many compute targets in parallel, with DAG-based SDLC flows, a unified knowledge graph, universal cost tracking, a multi-tenant control plane, and a pluggable runtime layer that can drive Claude Code, Codex, Gemini CLI, or any subprocess. Goose runs a single coding agent at a time on your local machine using recipe-based configuration. Both are useful; they solve different problems at different scales.</p>
+
+      <div class="callout info">
+        <p>Goose is open source from Block (the company behind Square and Cash App). It is a good tool for individual developers. Ark is aimed at teams and platforms that need to orchestrate many agents across many compute targets with shared cost, knowledge, and policy state.</p>
+      </div>
+
+      <h2>Summary table</h2>
+      <table>
+        <thead>
+          <tr><th>Feature</th><th>Ark</th><th>Goose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Runtime language</td><td>Bun + TypeScript</td><td>Python</td></tr>
+          <tr><td>Agents per session</td><td>Many (fan-out, DAG stages)</td><td>One</td></tr>
+          <tr><td>Sessions in parallel</td><td>Unlimited (scheduler in hosted mode)</td><td>One (process per agent)</td></tr>
+          <tr><td>DAG / multi-stage flows</td><td>Yes, with <code>depends_on</code>, parallel stages, fail-loopback</td><td>No, linear recipe execution</td></tr>
+          <tr><td>Fan-out with auto-join</td><td>Yes (<code>ark session fork</code> / <code>join</code>)</td><td>No</td></tr>
+          <tr><td>Compute providers</td><td>11 (local, Docker, devcontainer, Firecracker, EC2, K8s, E2B)</td><td>Local only</td></tr>
+          <tr><td>Git worktree isolation</td><td>Automatic per session</td><td>Manual</td></tr>
+          <tr><td>Auto PR creation</td><td>Yes (<code>gh pr create</code> on completion)</td><td>No</td></tr>
+          <tr><td>Knowledge graph</td><td>Yes, unified (code + sessions + memories + learnings)</td><td>No</td></tr>
+          <tr><td>Codebase indexing</td><td><code>@optave/codegraph</code>, 33 languages, auto on dispatch</td><td>No</td></tr>
+          <tr><td>Cost tracking</td><td>Universal (all runtimes, all providers, 300+ models, 3 modes)</td><td>Limited / manual</td></tr>
+          <tr><td>LLM Router</td><td>Built in, 3 policies, optional TensorZero backend</td><td>No (direct to provider)</td></tr>
+          <tr><td>Multi-tenant</td><td>Yes (tenant_id on every entity, API keys, policies)</td><td>No</td></tr>
+          <tr><td>Multi-user</td><td>Yes (user_id on sessions, roles)</td><td>No (single local user)</td></tr>
+          <tr><td>Billing modes</td><td><code>api</code>, <code>subscription</code>, <code>free</code></td><td>API only</td></tr>
+          <tr><td>Web dashboard</td><td>Yes (Vite + React + shadcn/ui + SSE)</td><td>No (CLI + TUI)</td></tr>
+          <tr><td>TUI dashboard</td><td>Yes (React + Ink, 9 tabs, theme-driven)</td><td>Yes (basic)</td></tr>
+          <tr><td>Transcript parsers</td><td>Polymorphic per runtime (Claude, Codex, Gemini)</td><td>N/A</td></tr>
+          <tr><td>MCP socket pooling</td><td>Yes (85-90% memory reduction)</td><td>No</td></tr>
+          <tr><td>Control plane</td><td>Yes (<code>ark server --hosted</code>, worker registry, scheduler)</td><td>No</td></tr>
+          <tr><td>Self-hosting</td><td>Docker-compose + Helm chart (untested end-to-end)</td><td>Local install</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Architecture differences</h2>
+      <p>A few specific architectural decisions enable the features that Goose does not have.</p>
+
+      <h3>Runtime / role separation</h3>
+      <p>Ark decouples <strong>what</strong> an agent does (its role -- planner, implementer, reviewer, etc.) from <strong>how</strong> it runs (its runtime -- Claude Code, Codex CLI, Gemini CLI, or any subprocess). Agent YAML specifies the role; runtime YAML specifies the backend. The same <code>implementer</code> role can run on Claude on one session and on Codex on the next with a single <code>--runtime</code> flag:</p>
+      <pre><code><span class="prompt">$</span> ark session start <span class="flag">--summary</span> <span class="string">"Fix bug"</span> <span class="flag">--agent</span> implementer <span class="flag">--runtime</span> claude
+<span class="prompt">$</span> ark session start <span class="flag">--summary</span> <span class="string">"Fix bug"</span> <span class="flag">--agent</span> implementer <span class="flag">--runtime</span> codex
+<span class="prompt">$</span> ark session start <span class="flag">--summary</span> <span class="string">"Fix bug"</span> <span class="flag">--agent</span> implementer <span class="flag">--runtime</span> gemini</code></pre>
+      <p>Goose binds the agent to its LLM provider directly. Swapping backends means editing the recipe or reinstalling.</p>
+
+      <h3>Compute provider abstraction</h3>
+      <p>Ark's <code>ComputeService</code> provisions a session's execution environment through a typed interface. The same session definition can run locally, in Docker, in a devcontainer, in a Firecracker VM, on EC2, or in a K8s pod -- with no code change. You set <code>--compute k8s</code> and the scheduler handles the rest. Goose runs on the local machine, full stop.</p>
+
+      <h3>Universal agent daemon (ArkD)</h3>
+      <p>Every compute target runs ArkD, a stateless HTTP server on port 19300. That means Ark does not need SSH or provider-specific transport to talk to remote compute. The conductor talks HTTP to ArkD; ArkD launches, observes, and reports back. Goose has no equivalent -- there is no remote compute to manage.</p>
+
+      <h3>DI-based AppContext</h3>
+      <p>Ark is built around an Awilix dependency injection container. <code>AppContext</code> is the root: services, repositories, stores, and the knowledge graph all resolve from it. This enables two things:</p>
+      <ul>
+        <li><strong>Tenant scoping.</strong> <code>app.forTenant(tenantId)</code> creates a scoped view of the same codebase for a different tenant. No globals, no leaks.</li>
+        <li><strong>Testability.</strong> Every orchestration function takes <code>app: AppContext</code> as its first argument. Test isolation is a per-function concern, not a global state problem.</li>
+      </ul>
+      <p>Goose is a single-user app and does not need this. But when you start thinking about multi-tenant hosting, this architecture is what lets you do it safely.</p>
+
+      <h2>Migrating from Goose</h2>
+      <p>A Goose recipe maps reasonably cleanly onto an Ark recipe plus agent plus flow. The concepts line up:</p>
+      <table>
+        <thead>
+          <tr><th>Goose concept</th><th>Ark equivalent</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Recipe (YAML preset)</td><td>Recipe (YAML preset in <code>recipes/</code>)</td></tr>
+          <tr><td>Tools (MCP or built-in)</td><td>MCP integrations + executor tool lists</td></tr>
+          <tr><td>Provider configuration</td><td>Runtime YAML (<code>runtimes/claude.yaml</code>, etc.)</td></tr>
+          <tr><td>Single-stage execution</td><td><code>bare</code> flow -- single stage, one agent</td></tr>
+          <tr><td>Multi-step recipes</td><td><code>default</code> flow or custom flow with <code>depends_on</code></td></tr>
+          <tr><td>Local execution</td><td>Local compute provider (the default)</td></tr>
+        </tbody>
+      </table>
+      <p>A one-shot Goose recipe "read the README and add a CONTRIBUTING.md" becomes this Ark recipe:</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">add-contributing</span>
+<span class="yaml-key">flow</span>: <span class="yaml-value">bare</span>
+<span class="yaml-key">agent</span>: <span class="yaml-value">documenter</span>
+<span class="yaml-key">summary</span>: <span class="yaml-value">"Read README and write a CONTRIBUTING.md file"</span>
+<span class="yaml-key">compute</span>: <span class="yaml-value">local</span></code></pre>
+      <p>Dispatch with <code>ark session start --recipe add-contributing --repo . --dispatch</code>. You get the same "run a coding agent on my local machine" behavior, plus session tracking, cost recording, and a worktree you can preview with <code>ark worktree diff</code>.</p>
+
+      <h2>When to use Ark vs Goose</h2>
+      <h3>Use Goose if</h3>
+      <ul>
+        <li>You are a single developer running one agent at a time.</li>
+        <li>Everything is local. You do not need remote compute.</li>
+        <li>You do not need multi-stage SDLC flows (plan -&gt; audit -&gt; implement -&gt; review).</li>
+        <li>You do not need cost tracking across many models or users.</li>
+        <li>You are comfortable with a Python dependency tree.</li>
+        <li>You want something minimal and easy to hack on.</li>
+      </ul>
+
+      <h3>Use Ark if</h3>
+      <ul>
+        <li>You want to run many sessions in parallel.</li>
+        <li>You have multi-stage SDLC flows: plan, audit, implement, verify, review, document.</li>
+        <li>You need to run agents on remote compute (EC2, K8s, Firecracker, E2B).</li>
+        <li>You are a team or an enterprise hosting agents for many users.</li>
+        <li>You need multi-tenant isolation, API keys, per-tenant policies, and cost caps.</li>
+        <li>You want universal cost tracking across Claude, Codex, Gemini, and subscription plans.</li>
+        <li>You want a knowledge graph that spans code + sessions + memories.</li>
+        <li>You want a TUI, a Web dashboard, and a Desktop app for the same control plane.</li>
+        <li>You prefer a Bun runtime with no Python dependency.</li>
+      </ul>
+
+      <h2>Goose interop (future)</h2>
+      <p>Ark's <code>cli-agent</code> executor can run any CLI tool as a subprocess inside a tmux session with worktree isolation and MCP channel wiring. That means Ark could theoretically drive Goose as one of its runtimes, treating each Goose invocation as an Ark session with all the control-plane benefits wrapped around it (cost tracking, worktree, auto-PR, fan-out, knowledge injection).</p>
+      <p>This is not currently wired -- we have not built a <code>runtimes/goose.yaml</code> entry -- but the executor and runtime system are designed for exactly this. If you want to use Goose recipes alongside Ark flows, file an issue and we will add a builtin runtime for it.</p>
+
+      <h2>Honest caveats</h2>
+      <ul>
+        <li>Ark is bigger and more complex than Goose. If you do not need the orchestration layer, it is overkill.</li>
+        <li>Ark's hosted mode (Postgres, Redis, Helm chart) is written but not fully integration-tested end-to-end yet. See the <a href="roadmap.html">roadmap</a> for current status.</li>
+        <li>Ark requires tmux and Bun. Goose is pip-installable. If your environment does not have tmux, Ark will not run.</li>
+        <li>Goose has had more time in the wild and its Python runtime may be more familiar to some teams.</li>
+      </ul>
+
+      <h2>Summary</h2>
+      <p>Pick the tool that matches your scale. Goose is a good single-user coding agent runner. Ark is a platform for orchestrating many agents across many compute targets with shared state. If you start with Goose and outgrow it, Ark's concepts are a superset -- your mental model transfers over, and the <code>bare</code> flow gives you a one-stage "run an agent" baseline that looks a lot like a Goose recipe.</p>
+
+      <div class="doc-footer">
+        <a href="roadmap.html">&larr; Roadmap</a>
+        <a href="architecture.html">Architecture &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

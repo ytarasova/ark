@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roadmap - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .pill.done { background: #1a4d2e; color: #52c86e; }
+    .pill.partial { background: #4d3c1a; color: #f5c25e; }
+    .pill.not-built { background: #4d1a1a; color: #e56060; }
+    .camp-bar {
+      display: inline-block;
+      height: 8px;
+      border-radius: 4px;
+      background: #38bdf8;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Roadmap</h1>
+      <p class="subtitle">What's built, what's in flight, what's next.</p>
+
+      <div class="callout info">
+        <p><strong>Last updated:</strong> 2026-04-11. Tests: 2630 pass, 0 fail, 0 lint errors, 0 process leaks.</p>
+      </div>
+
+      <h2>Recent completions</h2>
+      <p>Items that shipped in the last cycle and are not yet reflected in the status tables below:</p>
+      <ul>
+        <li>TensorZero gateway integrated (lifecycle manager, sidecar/native/Docker modes, cost feed-back).</li>
+        <li>LLM Router wired into executor dispatch flow (<code>ANTHROPIC_BASE_URL</code> / <code>OPENAI_BASE_URL</code> injection).</li>
+        <li>Axon replaced by ops-codegraph (<code>@optave/codegraph</code>, TypeScript + Rust, 33 languages, no Python dependency).</li>
+        <li>Codebase auto-index on dispatch -- local honors config, remote always indexes via arkd <code>/codegraph/index</code>.</li>
+        <li>Aider runtime dropped. Active runtimes: claude, claude-max, codex, gemini.</li>
+        <li>Polymorphic transcript parsers (Claude/Codex/Gemini) via TranscriptParserRegistry and DI.</li>
+        <li>Workdir-based session identification (no "latest by mtime" hacks).</li>
+        <li><code>cost_mode</code> column (api/subscription/free) in <code>usage_records</code>.</li>
+        <li>Compute templates (CLI + TUI + Web + RPC, tenant-scoped).</li>
+        <li>Full multi-tenant entity scoping: <code>user_id</code> on sessions, <code>tenant_id</code> on groups/schedules/pools.</li>
+        <li>DB-backed resource stores for control plane mode (<code>DbResourceStore</code>, <code>resource_definitions</code> table).</li>
+        <li>Tenant integration policies (<code>router_required</code>, <code>auto_index_required</code>, <code>router_policy</code>, <code>tensorzero_enabled</code>).</li>
+        <li>Token-budgeted context injection (~2000 tokens max) from the knowledge graph.</li>
+      </ul>
+
+      <h2>What's Done</h2>
+      <p>Fully built, unit-tested, and integrated.</p>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Status</th><th>Details</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Awilix DI container</td><td><span class="pill done">done</span></td><td>All services, repos, stores resolve from AppContext. Zero <code>getApp()</code> in production code.</td></tr>
+          <tr><td>IDatabase abstraction</td><td><span class="pill done">done</span></td><td>SQLite adapter (local). Postgres adapter (hosted, sync-over-async -- see caveats).</td></tr>
+          <tr><td>Session orchestration</td><td><span class="pill done">done</span></td><td>Full lifecycle: start, dispatch, stop, resume, advance, complete, fork, clone, spawn, fan-out, handoff.</td></tr>
+          <tr><td>DAG flow engine</td><td><span class="pill done">done</span></td><td><code>depends_on</code>, parallel stages, auto-join on child completion, branch merge with conflict detection.</td></tr>
+          <tr><td>Knowledge graph</td><td><span class="pill done">done</span></td><td>Unified store (codebase + sessions + memories + learnings + skills). MCP tools. Context injection at dispatch. 79 tests.</td></tr>
+          <tr><td>Agent eval system</td><td><span class="pill done">done</span></td><td><code>evaluateSession</code>, <code>getAgentStats</code>, <code>detectDrift</code>. Auto-evaluates on session completion. 10 tests.</td></tr>
+          <tr><td>Universal cost tracking</td><td><span class="pill done">done</span></td><td>PricingRegistry (300+ models via LiteLLM JSON), UsageRecorder, multi-dim attribution. 28 tests.</td></tr>
+          <tr><td>Runtime/role separation</td><td><span class="pill done">done</span></td><td>Agents define roles. Runtimes define backends. 4 runtimes: Claude, Claude Max, Codex, Gemini. 12 agent roles.</td></tr>
+          <tr><td>Module reorganization</td><td><span class="pill done">done</span></td><td>91 flat files reorganized into 13 domain directories. Barrel exports. All imports updated.</td></tr>
+          <tr><td>SDLC flows</td><td><span class="pill done">done</span></td><td>7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 9 flow definitions.</td></tr>
+          <tr><td>Skills</td><td><span class="pill done">done</span></td><td>7 builtin: spec-extraction, sanity-gate, plan-audit, security-scan, self-review, code-review, test-writing.</td></tr>
+          <tr><td>Recipes</td><td><span class="pill done">done</span></td><td>8 templates: islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature.</td></tr>
+          <tr><td>CLI</td><td><span class="pill done">done</span></td><td>17 command modules. <code>dashboard/knowledge/eval/router/runtime/tenant/auth</code> all working.</td></tr>
+          <tr><td>Web UI</td><td><span class="pill done">done</span></td><td>Dashboard, Sessions, Agents, Flows, Compute, History, Knowledge, Tools, Schedules, Costs, Settings, Login. Recharts.</td></tr>
+          <tr><td>TUI</td><td><span class="pill done">done</span></td><td>9-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary. ASCII cost charts.</td></tr>
+          <tr><td>ESLint</td><td><span class="pill done">done</span></td><td>0 errors, 0 warnings. CI lint step.</td></tr>
+          <tr><td>Process leak prevention</td><td><span class="pill done">done</span></td><td>stopAll via provider, awaited dispatches, proper shutdown order.</td></tr>
+          <tr><td>Auth</td><td><span class="pill done">done</span></td><td>API keys (create/validate/revoke/rotate), <code>tenant_id</code> on all entities, per-tenant AppContext, auth middleware.</td></tr>
+          <tr><td>Session launcher</td><td><span class="pill done">done</span></td><td>Interface: TmuxLauncher, ContainerLauncher, ArkdLauncher. Orchestration uses <code>app.launcher.*</code>.</td></tr>
+          <tr><td>MCP config stubs</td><td><span class="pill done">done</span></td><td>Templates for Atlassian, GitHub, Linear, Figma.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Partial or Untested</h2>
+      <p>Code exists but is not integration-tested against real services, or is incomplete in important ways.</p>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Status</th><th>What's missing</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>LLM Router</td><td><span class="pill partial">partial</span></td><td>Full server with classifier, 3 policies, streaming, CLI. 30 unit tests. Never made a real provider API call.</td></tr>
+          <tr><td>Postgres adapter</td><td><span class="pill partial">partial</span></td><td>Implements <code>IDatabase</code>. Uses <code>Bun.sleepSync</code> spin loop. Never tested under concurrent load. Repos need async migration for real scale.</td></tr>
+          <tr><td>Redis SSE bus</td><td><span class="pill partial">partial</span></td><td><code>RedisSSEBus</code> implements <code>SSEBus</code> interface. Never tested against real Redis.</td></tr>
+          <tr><td>Compute: K8s</td><td><span class="pill partial">partial</span></td><td><code>K8sProvider</code> + <code>KataProvider</code> with pod creation, kill, metrics. Never tested against real cluster.</td></tr>
+          <tr><td>Compute: E2B</td><td><span class="pill partial">partial</span></td><td><code>E2BProvider</code> with sandbox creation. Never tested against real E2B API.</td></tr>
+          <tr><td>Compute: Firecracker</td><td><span class="pill partial">partial</span></td><td><code>LocalFirecrackerProvider</code> + <code>RemoteFirecrackerProvider</code>. Requires Linux with <code>/dev/kvm</code>.</td></tr>
+          <tr><td>Compute: Docker</td><td><span class="pill partial">partial</span></td><td>Works locally when Docker is running. Not tested in CI.</td></tr>
+          <tr><td>Compute: EC2 + ArkD</td><td><span class="pill partial">partial</span></td><td><code>RemoteArkdBase</code> with 4 isolation modes. Provisioning flow untested end-to-end.</td></tr>
+          <tr><td>Control plane</td><td><span class="pill partial">partial</span></td><td>Worker registry, scheduler, tenant policies, hosted entry point. 20 unit tests. Never deployed as a running service.</td></tr>
+          <tr><td>Remote client</td><td><span class="pill partial">partial</span></td><td><code>--server</code>/<code>--token</code> for CLI, TUI, Web. WebSocket transport. Never tested with a real remote server.</td></tr>
+          <tr><td>Auth middleware</td><td><span class="pill partial">partial</span></td><td>Token extraction, tenant scoping. Never tested with real multi-user sessions.</td></tr>
+          <tr><td>SDLC flow E2E</td><td><span class="pill partial">partial</span></td><td>Full pipeline defined with agents, skills, recipes. Never processed a real Jira ticket end-to-end.</td></tr>
+          <tr><td>OTLP observability</td><td><span class="pill partial">partial</span></td><td><code>otlp.ts</code> sends spans to OTLP/HTTP. Never tested against real Jaeger/Tempo/Honeycomb.</td></tr>
+          <tr><td>Cost: router feed-back</td><td><span class="pill partial">partial</span></td><td>Router has in-memory cost tracking. Wiring to <code>app.usageRecorder.record()</code> in progress.</td></tr>
+          <tr><td>Cost: non-Claude runtimes</td><td><span class="pill partial">partial</span></td><td>Transcript parsers for Codex and Gemini exist; end-to-end verification on real transcripts in progress.</td></tr>
+          <tr><td>Dashboard</td><td><span class="pill partial">partial</span></td><td>Web widget grid, TUI summary, CLI command. Data sources partially mocked.</td></tr>
+          <tr><td>Deployment</td><td><span class="pill partial">partial</span></td><td>Dockerfile, docker-compose, Helm chart. Never built or pushed image. Never <code>helm install</code>-ed.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Not Built</h2>
+      <p>Identified gaps where no code exists yet.</p>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Status</th><th>Why it matters</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Workflow persistence / recovery</td><td><span class="pill not-built">not built</span></td><td>Sessions that crash restart from stage start. No checkpoint/resume.</td></tr>
+          <tr><td>Temporal integration</td><td><span class="pill not-built">not built</span></td><td>Control plane needs durable workflow execution for crash recovery, retries, scheduling.</td></tr>
+          <tr><td>Task / Kanban board</td><td><span class="pill not-built">not built</span></td><td>No agent work queue. Sessions are execution units, not assignable tasks.</td></tr>
+          <tr><td>Security posture</td><td><span class="pill not-built">not built</span></td><td>No trust scoring, secret detection, injection logging, exec approval queue.</td></tr>
+          <tr><td>Audit trail</td><td><span class="pill not-built">not built</span></td><td>No immutable log of sensitive operations (login, dispatch, delete, config change).</td></tr>
+          <tr><td>Webhooks</td><td><span class="pill not-built">not built</span></td><td>No outbound event delivery (HMAC-signed, retry, circuit breaker).</td></tr>
+          <tr><td>Alert rules</td><td><span class="pill not-built">not built</span></td><td>No declarative alerting (entity/field/operator/value -&gt; action).</td></tr>
+          <tr><td>User management UI</td><td><span class="pill not-built">not built</span></td><td>No web panel for user CRUD. CLI-only via <code>ark auth</code>.</td></tr>
+          <tr><td>GitHub Issues sync</td><td><span class="pill not-built">not built</span></td><td>Auto-PR exists but no bidirectional issue import/tracking.</td></tr>
+          <tr><td>Standup reports</td><td><span class="pill not-built">not built</span></td><td>No auto-generated daily per-agent summaries.</td></tr>
+          <tr><td>i18n</td><td><span class="pill not-built">not built</span></td><td>English only. No translation framework.</td></tr>
+          <tr><td>Onboarding wizard</td><td><span class="pill not-built">not built</span></td><td>No first-run guided setup for new users.</td></tr>
+          <tr><td>Docker image published</td><td><span class="pill not-built">not built</span></td><td>No image in any registry. Can't <code>docker pull ark</code>.</td></tr>
+          <tr><td>CI/CD pipeline for Ark</td><td><span class="pill not-built">not built</span></td><td>GitHub Actions runs tests but doesn't build/publish artifacts.</td></tr>
+          <tr><td>Async Postgres repos</td><td><span class="pill not-built">not built</span></td><td>Repos use sync <code>IDatabase</code> methods. Postgres adapter uses <code>Bun.sleepSync</code> hack.</td></tr>
+          <tr><td>Higress gateway integration</td><td><span class="pill not-built">not built</span></td><td>Custom router works for dev. Enterprise needs CNCF-grade gateway.</td></tr>
+          <tr><td>Knowledge graph visualization</td><td><span class="pill not-built">not built</span></td><td>No visual rendering of the graph in web UI.</td></tr>
+          <tr><td>Live feed sidebar</td><td><span class="pill not-built">not built</span></td><td>No real-time event stream without leaving current view.</td></tr>
+          <tr><td>Boot sequence</td><td><span class="pill not-built">not built</span></td><td>No staged loading screen with progress.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Camps (priority buckets)</h2>
+
+      <h3>Camp 1: Integration Testing and Production Readiness</h3>
+      <p><span class="camp-bar" style="width: 220px;"></span><strong>Goal:</strong> Everything that exists actually works against real services. Nothing ships until it's proven.</p>
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Effort</th><th>Blocks</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Test LLM Router against real Anthropic/OpenAI/Google APIs</td><td>1-2 days</td><td>Router launch</td></tr>
+          <tr><td>Wire router cost feed-back to UsageRecorder</td><td>0.5 day</td><td>Accurate cost tracking</td></tr>
+          <tr><td>Verify non-Claude executor usage reporting (Codex/Gemini)</td><td>1-2 days</td><td>Universal cost tracking</td></tr>
+          <tr><td>Test MCP configs with real Jira, GitHub, Figma</td><td>1-2 days</td><td>SDLC flow</td></tr>
+          <tr><td>Test Postgres adapter under concurrent load</td><td>1 day</td><td>Hosted mode</td></tr>
+          <tr><td>Test Redis SSE bus against real Redis</td><td>0.5 day</td><td>Hosted mode</td></tr>
+          <tr><td>Test K8s provider against real cluster</td><td>1 day</td><td>K8s compute</td></tr>
+          <tr><td>Test E2B provider against real API</td><td>0.5 day</td><td>E2B compute</td></tr>
+          <tr><td>Deploy docker-compose, verify all services start</td><td>1 day</td><td>Hosted mode</td></tr>
+          <tr><td>Deploy Helm chart on K8s, verify</td><td>1 day</td><td>Production</td></tr>
+          <tr><td>Build and publish Docker image to registry</td><td>0.5 day</td><td>Deployment</td></tr>
+          <tr><td>End-to-end: real Jira ticket through full SDLC flow</td><td>2-3 days</td><td>"Send to dev" workflow</td></tr>
+          <tr><td>Test remote client mode (TUI/CLI to remote server)</td><td>1 day</td><td>Multi-user</td></tr>
+          <tr><td>Test ops-codegraph indexer with real large repo</td><td>0.5 day</td><td>Knowledge graph</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Camp 2: Workflow Persistence and Recovery</h3>
+      <p><span class="camp-bar" style="width: 160px;"></span><strong>Goal:</strong> Sessions survive crashes. Workflows are durable. Same interface local and hosted.</p>
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Effort</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Research: Temporal vs alternatives for control plane</td><td>1 day</td><td>Deep dive needed</td></tr>
+          <tr><td>Design <code>WorkflowEngine</code> interface (local + hosted backends)</td><td>1 day</td><td>Like <code>IDatabase</code> pattern</td></tr>
+          <tr><td>Local backend: event-sourced from events table</td><td>2-3 days</td><td>SQLite, no extra deps</td></tr>
+          <tr><td>Hosted backend: Temporal integration</td><td>3-5 days</td><td>Temporal SDK, Helm chart update</td></tr>
+          <tr><td>Checkpoint/resume: "you were on turn 47" context</td><td>1-2 days</td><td>Per-turn event logging</td></tr>
+          <tr><td>Crash recovery test suite</td><td>1-2 days</td><td>Kill mid-session, verify resume</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Camp 3: Agent Intelligence</h3>
+      <p><span class="camp-bar" style="width: 80px;"></span><strong>Goal:</strong> Agents get smarter over time. We can measure and improve performance.</p>
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Effort</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Rewrite eval system</td><td>2-3 days</td><td><span class="pill done">done</span></td></tr>
+          <tr><td>Universal cost tracking</td><td>2-3 days</td><td><span class="pill done">done</span></td></tr>
+          <tr><td>Trust scoring per agent (weighted success/failure)</td><td>1 day</td><td><span class="pill not-built">not started</span></td></tr>
+          <tr><td>Tool call latency instrumentation (p50/p95/p99)</td><td>1 day</td><td><span class="pill not-built">not started</span></td></tr>
+          <tr><td>Standup reports (auto-generated daily per agent)</td><td>1 day</td><td><span class="pill not-built">not started</span></td></tr>
+          <tr><td>Per-task automatic model routing (extend LLM Router)</td><td>1-2 days</td><td><span class="pill not-built">not started</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Camp 4: Dashboard and Visualization</h3>
+      <p><span class="camp-bar" style="width: 80px;"></span><strong>Goal:</strong> Operators see the full picture. All three surfaces aligned.</p>
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Effort</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Dashboard overview (Web/TUI/CLI)</td><td>1-2 days</td><td><span class="pill done">done</span></td></tr>
+          <tr><td>Cost charts (Recharts)</td><td>1 day</td><td><span class="pill done">done</span></td></tr>
+          <tr><td>Smart polling (pause when tab hidden)</td><td>0.5 day</td><td><span class="pill done">done</span></td></tr>
+          <tr><td>Live feed sidebar (Web)</td><td>1 day</td><td><span class="pill not-built">not started</span></td></tr>
+          <tr><td>Boot sequence with progress steps (Web)</td><td>0.5 day</td><td><span class="pill not-built">not started</span></td></tr>
+          <tr><td>Agent detail depth (memory/tasks/activity/eval tabs)</td><td>1-2 days</td><td><span class="pill not-built">not started</span></td></tr>
+          <tr><td>Session detail (inline diff viewer, cost breakdown, timeline)</td><td>1-2 days</td><td><span class="pill not-built">not started</span></td></tr>
+          <tr><td>Knowledge graph visualization (reagraph or similar)</td><td>2-3 days</td><td><span class="pill not-built">not started</span></td></tr>
+          <tr><td>Onboarding wizard (Web)</td><td>1 day</td><td><span class="pill not-built">not started</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Camp 5: Security and Compliance</h3>
+      <p><span class="camp-bar" style="width: 120px;"></span><strong>Goal:</strong> Enterprise-ready security posture. Audit everything.</p>
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Effort</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Audit trail (immutable log of sensitive operations)</td><td>1-2 days</td></tr>
+          <tr><td>Security posture score (composite 0-100)</td><td>1 day</td></tr>
+          <tr><td>Secret detection (scan tool I/O for API keys, tokens)</td><td>1 day</td></tr>
+          <tr><td>Injection attempt tracking</td><td>0.5 day</td></tr>
+          <tr><td>Exec approval queue (interactive approve/deny)</td><td>1-2 days</td></tr>
+          <tr><td>Trust scoring per agent</td><td>1 day</td></tr>
+          <tr><td>Security dashboard panel (Web + TUI)</td><td>1 day</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Camp 6: Integrations and Webhooks</h3>
+      <p><span class="camp-bar" style="width: 120px;"></span><strong>Goal:</strong> Ark connects to the tools teams already use.</p>
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Effort</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Outbound webhook system (HMAC-signed, retry, circuit breaker)</td><td>2-3 days</td></tr>
+          <tr><td>Declarative alert rules</td><td>1-2 days</td></tr>
+          <tr><td>GitHub Issues bidirectional sync</td><td>2-3 days</td></tr>
+          <tr><td>Slack commands + thread-based interaction</td><td>2-3 days</td></tr>
+          <tr><td>Linear integration</td><td>1-2 days</td></tr>
+          <tr><td>Webhook/alert management panels (Web + TUI)</td><td>1 day</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Camp 7: Task Management</h3>
+      <p><span class="camp-bar" style="width: 160px;"></span><strong>Goal:</strong> Agents have a work queue. Humans can assign, prioritize, and review.</p>
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Effort</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Task table (new schema, separate from sessions)</td><td>1 day</td></tr>
+          <tr><td>Kanban board UI (Web)</td><td>2-3 days</td></tr>
+          <tr><td>Task list view (TUI)</td><td>1 day</td></tr>
+          <tr><td><code>ark task create/list/assign/dispatch</code> CLI</td><td>1 day</td></tr>
+          <tr><td>Quality gate / Aegis review (agent-to-agent review)</td><td>2-3 days</td></tr>
+          <tr><td>Task &#x2192; session mapping</td><td>1 day</td></tr>
+          <tr><td>Task feedback rating + comments</td><td>1-2 days</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Camp 8: User Experience Polish</h3>
+      <p><span class="camp-bar" style="width: 120px;"></span><strong>Goal:</strong> Professional, polished product.</p>
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Effort</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Full user management UI (create/edit/delete users, roles)</td><td>1-2 days</td></tr>
+          <tr><td>Google / GitHub SSO</td><td>1-2 days</td></tr>
+          <tr><td>Access request workflow</td><td>1 day</td></tr>
+          <tr><td>i18n foundation</td><td>1-2 days</td></tr>
+          <tr><td>Natural language schedule parsing</td><td>1 day</td></tr>
+          <tr><td>Calendar view for schedules</td><td>1-2 days</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Camp 9: Architecture Hardening</h3>
+      <p><span class="camp-bar" style="width: 80px;"></span><strong>Goal:</strong> Codebase is production-grade and maintainable.</p>
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Effort</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Core module reorganization</td><td>3-5 days</td><td><span class="pill done">done</span></td></tr>
+          <tr><td>Delete old eval system</td><td>1-2 days</td><td><span class="pill done">done</span></td></tr>
+          <tr><td>Delete old knowledge systems</td><td>1-2 days</td><td><span class="pill done">done</span></td></tr>
+          <tr><td>Async repo layer for Postgres</td><td>3-5 days</td><td><span class="pill not-built">not started</span></td></tr>
+          <tr><td>CI/CD pipeline (build / test / publish)</td><td>1-2 days</td><td><span class="pill not-built">not started</span></td></tr>
+          <tr><td>Higress gateway integration (enterprise)</td><td>2-3 days</td><td><span class="pill not-built">not started</span></td></tr>
+        </tbody>
+      </table>
+
+      <h2>Key decisions</h2>
+      <ul>
+        <li><strong>Temporal for control plane workflow engine.</strong> Start with a local event-sourced engine, plan for Temporal hosted backend. Same <code>WorkflowEngine</code> interface.</li>
+        <li><strong>TensorZero replaces hand-rolled LLM provider adapters.</strong> Ark keeps routing intelligence (classifier, policies, sticky sessions, cost attribution). TensorZero handles API dispatch, retries, streaming, feedback optimization. Rust sidecar. Apache 2.0.</li>
+        <li><strong>ops-codegraph replaces Axon</strong> as the indexer. TypeScript + Rust, 33 languages, no Python dependency.</li>
+        <li><strong>Async Postgres repos</strong> are required for hosted scale. Camp 9 priority.</li>
+        <li><strong>Task board:</strong> Tasks sit above sessions. Creating a task does not dispatch -- dispatching a task creates a session.</li>
+      </ul>
+
+      <div class="doc-footer">
+        <a href="advanced.html">&larr; Advanced</a>
+        <a href="comparison-goose.html">vs Goose &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

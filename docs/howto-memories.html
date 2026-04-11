@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How-To: Memories - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>How-To: Working with Memories</h1>
+      <p class="subtitle">Store and recall knowledge across sessions.</p>
+
+      <h2>What are memories?</h2>
+      <p>Memories are persistent notes that survive across sessions. Once written, a memory becomes part of the knowledge graph and can be referenced by any agent on any future dispatch in the same scope. They are how you teach Ark things you do not want to repeat in every prompt -- coding conventions, architectural decisions, project-specific gotchas, debugging shortcuts.</p>
+      <p>Internally, a memory is a <code>memory:*</code> node in the <code>knowledge</code> table (tenant-scoped). Each memory has:</p>
+      <ul>
+        <li><strong>content</strong> -- the free-form text you want to remember.</li>
+        <li><strong>importance</strong> -- a float between <code>0.0</code> and <code>1.0</code>. Higher-importance memories win the context-budget lottery at dispatch time.</li>
+        <li><strong>scope</strong> -- <code>global</code> (available to every repo) or <code>project</code> (tied to one repo path).</li>
+        <li><strong>created_at</strong> -- timestamp of when the memory was written.</li>
+        <li><strong>metadata</strong> -- freeform JSON blob for tagging or extra fields.</li>
+      </ul>
+
+      <div class="callout info">
+        <p>The old <code>~/.ark/memories.json</code> and <code>~/.ark/LEARNINGS.md</code> files no longer exist. Everything lives in the knowledge graph alongside codebase structure, session history, skills, and recipes.</p>
+      </div>
+
+      <h2>Three ways to add memories</h2>
+
+      <h3>1. From an agent, via MCP</h3>
+      <p>While an agent is running, it can call the <code>knowledge/remember</code> MCP tool. This is the main way agents accumulate long-lived learning. For example, during a session an agent might write:</p>
+      <pre><code>knowledge/remember({
+  content: "Auth token refresh logic is in src/auth/refresh.ts, not auth/index.ts",
+  importance: 0.85,
+  scope: "project"
+})</code></pre>
+      <p>The memory is written to the graph immediately and becomes available to the next session in the same repo.</p>
+
+      <h3>2. From the CLI</h3>
+      <p>Write a memory manually with <code>ark knowledge remember</code>:</p>
+      <pre><code><span class="prompt">$</span> ark knowledge remember <span class="string">"Always prefer functional React components over class components"</span> \
+    <span class="flag">--importance</span> 0.9 <span class="flag">--scope</span> global</code></pre>
+      <p>This is useful for recording conventions before you start a new project, or for dropping in notes you have in an old README.</p>
+
+      <h3>3. Importing from Markdown</h3>
+      <p>If you have existing docs, design notes, or architecture decisions in Markdown, import them in one shot:</p>
+      <pre><code><span class="prompt">$</span> ark knowledge import notes.md</code></pre>
+      <p>Import/export round-trips with YAML front matter so you can version your memories in git if you want to.</p>
+
+      <h2>Recall and search</h2>
+      <p>Memories are searchable like any other knowledge node.</p>
+
+      <h3>Recall by fuzzy query</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge recall <span class="string">"auth token"</span>
+&#x2192; memory: Auth token refresh logic is in src/auth/refresh.ts... (importance 0.85)
+&#x2192; memory: Token rotation schedule lives in ops/rotate.yaml (importance 0.6)</code></pre>
+
+      <h3>Full-text search</h3>
+      <pre><code><span class="prompt">$</span> ark knowledge search <span class="string">"auth token"</span></code></pre>
+      <p>This runs against the FTS5 index and returns every matching knowledge node, not just memories.</p>
+
+      <h3>Automatic injection at dispatch</h3>
+      <p>When you dispatch a session, Ark queries the knowledge graph for nodes relevant to the task summary and injects the top hits into the agent's system prompt. Memories participate automatically, ranked by importance and relevance. The injection is token-budgeted to roughly 2000 tokens so a very large knowledge base will not blow out the context window.</p>
+      <p>The agent does not need to ask for memories -- they arrive as part of its initial context, tagged so it knows they came from the graph.</p>
+
+      <h2>Export to Markdown</h2>
+      <p>Export all memories to a Markdown file:</p>
+      <pre><code><span class="prompt">$</span> ark knowledge export <span class="flag">--type</span> memory &gt; memories.md</code></pre>
+      <p>Each memory becomes a Markdown section with YAML front matter:</p>
+      <pre><code>---
+type: memory
+importance: 0.9
+scope: global
+created_at: 2026-04-01T14:22:10Z
+---
+
+Always prefer functional React components over class components.</code></pre>
+      <p>You can edit the file and re-import it. The import is idempotent -- memories with the same content and scope are deduped.</p>
+
+      <h2>Scopes</h2>
+      <p>Memories come in two scopes:</p>
+      <ul>
+        <li><strong>global</strong> -- applies to every session you run, regardless of repo. Good for language-level conventions, personal style preferences, or universal "do not do X" rules.</li>
+        <li><strong>project</strong> -- tied to a specific repository. Good for architectural notes, "this weird thing exists for reason Y", or hard-won debugging shortcuts specific to a codebase.</li>
+      </ul>
+      <p>Project scope is inferred from the session's <code>repo</code> field at dispatch time. If an agent writes a memory with <code>scope: project</code>, it is attached to the current repo and will only surface in future sessions in that same repo.</p>
+
+      <h2>Worked example</h2>
+      <p>Let's teach Ark a convention, then verify the convention gets into the agent's prompt on the next dispatch.</p>
+      <pre><code><span class="comment"># 1. Write a memory from the CLI</span>
+<span class="prompt">$</span> ark knowledge remember \
+    <span class="string">"Always prefer functional React components over class components"</span> \
+    <span class="flag">--importance</span> 0.9 <span class="flag">--scope</span> global
+
+<span class="comment"># 2. Verify it landed in the graph</span>
+<span class="prompt">$</span> ark knowledge recall <span class="string">"functional components"</span>
+
+<span class="comment"># 3. Dispatch a new session</span>
+<span class="prompt">$</span> ark session start <span class="flag">--repo</span> . \
+    <span class="flag">--summary</span> <span class="string">"Add user profile page"</span> <span class="flag">--dispatch</span>
+
+<span class="comment"># 4. Attach and inspect the agent's system prompt</span>
+<span class="prompt">$</span> ark session attach &lt;session-id&gt;
+<span class="comment"># The memory is injected as part of the knowledge context block</span></code></pre>
+      <p>The agent will see the memory as part of its initial context and should naturally honor the convention when it writes the profile page component.</p>
+
+      <h2>Editing and deleting</h2>
+      <p>Memories are plain rows in the <code>knowledge</code> table. To replace one, write a new memory with the same content (the import step will dedupe) or rewrite it via a Markdown export/import cycle. To delete, remove it from the exported file and re-import with <code>--replace</code>, or drop the row directly via SQL in <code>~/.ark/ark.db</code>.</p>
+
+      <h2>Relationship to learnings</h2>
+      <p>"Learnings" are a special memory type -- notes an agent writes as post-mortems after a session. They go through the same <code>knowledge/remember</code> path but carry a <code>learning</code> tag in metadata so the <code>retro</code> agent can surface them during reviews. For the casual user, memories and learnings are the same thing -- just different tags on the same graph nodes.</p>
+
+      <h2>Multi-tenant note</h2>
+      <p>In hosted mode, memories are automatically tenant-scoped. The <code>knowledge</code> and <code>knowledge_edges</code> tables carry a <code>tenant_id</code> column, and every read/write goes through the tenant-scoped AppContext view. That means tenant A's memories are invisible to tenant B -- there is no global memory pool in hosted mode.</p>
+      <p>Per-user memories within a tenant are not currently separated: if two users on the same tenant write memories to the same project scope, they will both see each other's memories. This is intentional for team knowledge sharing, but worth knowing when onboarding new team members.</p>
+
+      <h2>Command reference</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ark knowledge remember "text"</code></td><td>Write a new memory. Flags: <code>--importance</code>, <code>--scope</code>.</td></tr>
+          <tr><td><code>ark knowledge recall &lt;query&gt;</code></td><td>Fuzzy search memories only.</td></tr>
+          <tr><td><code>ark knowledge search &lt;query&gt;</code></td><td>Full-text search across all knowledge nodes.</td></tr>
+          <tr><td><code>ark knowledge export --type memory</code></td><td>Export memories to Markdown with front matter.</td></tr>
+          <tr><td><code>ark knowledge import &lt;file&gt;</code></td><td>Import Markdown file as memories. Idempotent.</td></tr>
+          <tr><td><code>ark knowledge stats</code></td><td>Show node counts by type, including memories.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="doc-footer">
+        <a href="compute.html">&larr; Compute Providers</a>
+        <a href="howto-knowledge.html">Knowledge Graph &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

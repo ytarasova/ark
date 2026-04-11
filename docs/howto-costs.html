@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How-To: Cost Tracking - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>How-To: Cost Tracking and Budgets</h1>
+      <p class="subtitle">Track token usage, set budgets, manage subscription runtimes.</p>
+
+      <h2>Overview</h2>
+      <p>Ark tracks cost universally across all runtimes and providers. Every session produces usage records regardless of whether you are running Claude Code, Codex, or Gemini CLI, and regardless of whether you are paying per-token or on a flat subscription. The two moving parts are the <strong>PricingRegistry</strong> (prices for 300+ models via the LiteLLM JSON catalog) and the <strong>UsageRecorder</strong> (writes rows to the <code>usage_records</code> table).</p>
+      <p>Usage records carry multi-dimensional attribution: session, user, tenant, model, provider, runtime, and agent role. That means you can slice costs any way you want -- per model, per tenant, per agent role -- without having to write joins by hand.</p>
+
+      <h2>Three cost modes</h2>
+      <p>The <code>cost_mode</code> column on <code>usage_records</code> captures the billing mode that applied when the record was written:</p>
+      <table>
+        <thead>
+          <tr><th>Mode</th><th>Semantics</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>api</code></td><td>Per-token pricing resolved via <code>PricingRegistry</code>. <code>cost_usd</code> is the real dollar cost.</td><td>Claude API, OpenAI API, Gemini API.</td></tr>
+          <tr><td><code>subscription</code></td><td>Flat-rate plan. <code>cost_usd = 0</code> on each record, but tokens are still counted so you can watch rate-limit exposure.</td><td>Claude Max ($200/mo plan).</td></tr>
+          <tr><td><code>free</code></td><td>No cost, no rate tracking.</td><td>Local open-source models via a self-hosted gateway.</td></tr>
+        </tbody>
+      </table>
+      <p>A single tenant can have sessions running in all three modes simultaneously. Cost reports are mode-aware and will highlight the split.</p>
+
+      <h2>Runtime billing config</h2>
+      <p>Billing mode is declared per runtime in the runtime YAML. The built-in runtimes look like this:</p>
+      <pre><code><span class="comment"># runtimes/claude.yaml</span>
+<span class="yaml-key">name</span>: <span class="yaml-value">claude</span>
+<span class="yaml-key">type</span>: <span class="yaml-value">claude-code</span>
+<span class="yaml-key">billing</span>:
+  <span class="yaml-key">mode</span>: <span class="yaml-value">api</span>
+  <span class="yaml-key">transcript_parser</span>: <span class="yaml-value">claude</span>
+
+<span class="comment"># runtimes/claude-max.yaml</span>
+<span class="yaml-key">name</span>: <span class="yaml-value">claude-max</span>
+<span class="yaml-key">type</span>: <span class="yaml-value">claude-code</span>
+<span class="yaml-key">billing</span>:
+  <span class="yaml-key">mode</span>: <span class="yaml-value">subscription</span>
+  <span class="yaml-key">plan</span>: <span class="yaml-value">claude-max-200</span>
+  <span class="yaml-key">cost_per_month</span>: <span class="yaml-value">200</span>
+  <span class="yaml-key">transcript_parser</span>: <span class="yaml-value">claude</span>
+
+<span class="comment"># runtimes/codex.yaml</span>
+<span class="yaml-key">name</span>: <span class="yaml-value">codex</span>
+<span class="yaml-key">type</span>: <span class="yaml-value">cli-agent</span>
+<span class="yaml-key">billing</span>:
+  <span class="yaml-key">mode</span>: <span class="yaml-value">api</span>
+  <span class="yaml-key">transcript_parser</span>: <span class="yaml-value">codex</span>
+
+<span class="comment"># runtimes/gemini.yaml</span>
+<span class="yaml-key">name</span>: <span class="yaml-value">gemini</span>
+<span class="yaml-key">type</span>: <span class="yaml-value">cli-agent</span>
+<span class="yaml-key">billing</span>:
+  <span class="yaml-key">mode</span>: <span class="yaml-value">api</span>
+  <span class="yaml-key">transcript_parser</span>: <span class="yaml-value">gemini</span></code></pre>
+      <p>Override at dispatch with <code>--runtime</code>. For example, to run the <code>implementer</code> role on Claude Max instead of the default per-token Claude runtime:</p>
+      <pre><code><span class="prompt">$</span> ark session start <span class="flag">--repo</span> . <span class="flag">--summary</span> <span class="string">"Fix bug"</span> \
+    <span class="flag">--agent</span> implementer <span class="flag">--runtime</span> claude-max <span class="flag">--dispatch</span></code></pre>
+
+      <h2>How tokens are extracted</h2>
+      <p>Ark uses polymorphic transcript parsers, one per runtime, registered on the <code>TranscriptParserRegistry</code>. Each parser knows where its runtime stores conversation logs and how to identify the session deterministically by working directory (never "latest file by mtime").</p>
+      <ul>
+        <li><strong>ClaudeTranscriptParser</strong> -- reads the exact path <code>~/.claude/projects/&lt;slug&gt;/&lt;session&gt;.jsonl</code> via the stored <code>claude_session_id</code>.</li>
+        <li><strong>CodexTranscriptParser</strong> -- scans <code>~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl</code>, matches the <code>session_meta.payload.cwd</code> field to the session's <code>workdir</code>.</li>
+        <li><strong>GeminiTranscriptParser</strong> -- scans <code>~/.gemini/tmp/&lt;slug&gt;/chats/session-*.jsonl</code>, matches <code>projectHash = sha256(workdir)</code> against the file's first line.</li>
+      </ul>
+      <p>Each parser walks the JSONL, extracts token counts from the assistant turns, resolves model pricing, and feeds a <code>UsageRecorder.record()</code> call. The record is keyed by session, turn number, and timestamp so re-parsing is idempotent.</p>
+
+      <h2>Viewing costs</h2>
+      <h3>Per-session summary</h3>
+      <pre><code><span class="prompt">$</span> ark costs
+SESSION       MODEL                   IN        OUT     COST  MODE
+s-0x1a3       claude-sonnet-4-5   124,502    43,210   $2.31  api
+s-0x1c1       claude-opus-4-6      88,910    21,005   $5.68  api
+s-0x1d4       claude-sonnet-4-5    45,012    12,330   $0.00  subscription
+s-0x1d9       gpt-5-codex          60,100    18,902   $0.91  api
+TOTAL                                                 $8.90</code></pre>
+
+      <h3>Group by model</h3>
+      <pre><code><span class="prompt">$</span> ark costs <span class="flag">--by</span> model</code></pre>
+
+      <h3>Group by user or tenant (hosted mode)</h3>
+      <pre><code><span class="prompt">$</span> ark costs <span class="flag">--by</span> user
+<span class="prompt">$</span> ark costs <span class="flag">--by</span> tenant</code></pre>
+
+      <h3>Web dashboard</h3>
+      <p>The Web dashboard has a dedicated Costs page powered by Recharts. You get a pie chart of cost by model, a bar chart of cost per day, and a filterable table by session. The Dashboard page includes a summary widget.</p>
+
+      <h3>TUI dashboard</h3>
+      <p>The TUI dashboard (<code>ark tui</code>) shows ASCII cost charts on the Dashboard tab and a per-session cost column on the Sessions tab.</p>
+
+      <h2>Setting budgets</h2>
+      <p>Configure budgets in <code>~/.ark/config.yaml</code>:</p>
+      <pre><code><span class="yaml-key">budgets</span>:
+  <span class="yaml-key">dailyLimit</span>: <span class="yaml-value">50</span>
+  <span class="yaml-key">weeklyLimit</span>: <span class="yaml-value">200</span>
+  <span class="yaml-key">monthlyLimit</span>: <span class="yaml-value">500</span></code></pre>
+      <p>Ark warns at 80% of any limit and blocks new dispatches at 100%. You can run a manual check any time:</p>
+      <pre><code><span class="prompt">$</span> ark costs <span class="flag">--check-budget</span>
+today:   $12.40 / $50.00  (25%)   OK
+week:    $84.10 / $200.00 (42%)   OK
+month:  $412.80 / $500.00 (82%)   WARNING &#x2013; approaching limit</code></pre>
+
+      <h2>Backfilling historical sessions</h2>
+      <p>If you dispatched sessions before cost tracking existed, or ran Ark without the UsageRecorder wired, you can backfill:</p>
+      <pre><code><span class="prompt">$</span> ark costs-sync</code></pre>
+      <p>This scans transcripts for every known runtime in their canonical locations, matches them to sessions in <code>ark.db</code>, and writes any missing <code>usage_records</code> rows. It is idempotent -- sessions that already have records are skipped.</p>
+
+      <h2>Exporting</h2>
+      <pre><code><span class="prompt">$</span> ark costs-export <span class="flag">--format</span> csv &gt; costs.csv
+<span class="prompt">$</span> ark costs-export <span class="flag">--format</span> json &gt; costs.json</code></pre>
+      <p>CSV is useful for dropping into a spreadsheet or finance pipeline; JSON preserves nested attribution fields.</p>
+
+      <h2>Multi-tenant cost attribution</h2>
+      <p>In hosted mode, every <code>usage_records</code> row carries the <code>tenant_id</code> and <code>user_id</code> that originated the session, plus <code>model</code>, <code>provider</code>, <code>runtime</code>, and <code>agent_role</code>. This lets you answer questions like:</p>
+      <ul>
+        <li>"How much did tenant X spend this month?"</li>
+        <li>"Which user's sessions burned the most tokens yesterday?"</li>
+        <li>"What is the average cost per <code>planner</code> agent run vs <code>implementer</code>?"</li>
+        <li>"Which model gave us the best cost-per-successful-PR this week?"</li>
+      </ul>
+      <p>Per-tenant caps live in the tenant policy:</p>
+      <pre><code><span class="yaml-key">max_cost_per_day_usd</span>: <span class="yaml-value">100</span>
+<span class="yaml-key">max_cost_per_week_usd</span>: <span class="yaml-value">500</span>
+<span class="yaml-key">max_cost_per_month_usd</span>: <span class="yaml-value">2000</span></code></pre>
+      <p>These are enforced at dispatch time by the scheduler in hosted mode. A tenant that hits its daily cap will get a polite refusal on the next dispatch until the next window opens.</p>
+
+      <h2>Router cost tracking</h2>
+      <p>When the LLM Router is enabled, every request flowing through it carries an <code>onUsage</code> callback that is wired to the same <code>UsageRecorder</code>. That means a single dispatch produces usage records whether tokens come from transcript parsing or from the router's live feed. The router path is the preferred source for real-time tracking because transcript parsers run at session completion.</p>
+      <div class="callout warn">
+        <p>The router cost feed-back is tracked in the <a href="roadmap.html">roadmap</a>. Core wiring is in place; full end-to-end verification against real provider APIs is in Camp 1.</p>
+      </div>
+
+      <h2>Worked example</h2>
+      <pre><code><span class="comment"># 1. Run a few sessions on different runtimes</span>
+<span class="prompt">$</span> ark session start <span class="flag">--repo</span> . <span class="flag">--summary</span> <span class="string">"task 1"</span> \
+    <span class="flag">--runtime</span> claude <span class="flag">--dispatch</span>
+<span class="prompt">$</span> ark session start <span class="flag">--repo</span> . <span class="flag">--summary</span> <span class="string">"task 2"</span> \
+    <span class="flag">--runtime</span> claude-max <span class="flag">--dispatch</span>
+<span class="prompt">$</span> ark session start <span class="flag">--repo</span> . <span class="flag">--summary</span> <span class="string">"task 3"</span> \
+    <span class="flag">--runtime</span> codex <span class="flag">--dispatch</span>
+
+<span class="comment"># 2. Let them finish, then backfill in case live tracking missed anything</span>
+<span class="prompt">$</span> ark costs-sync
+
+<span class="comment"># 3. View overall costs</span>
+<span class="prompt">$</span> ark costs
+
+<span class="comment"># 4. Slice by model</span>
+<span class="prompt">$</span> ark costs <span class="flag">--by</span> model
+
+<span class="comment"># 5. Set a daily cap so the next one of these doesn't blow the budget</span>
+<span class="prompt">$</span> echo <span class="string">'budgets: { dailyLimit: 10 }'</span> &gt;&gt; ~/.ark/config.yaml
+<span class="prompt">$</span> ark costs <span class="flag">--check-budget</span></code></pre>
+
+      <h2>Command reference</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ark costs</code></td><td>Per-session cost summary.</td></tr>
+          <tr><td><code>ark costs --by model</code></td><td>Group costs by model.</td></tr>
+          <tr><td><code>ark costs --by user</code></td><td>Group by user (hosted mode).</td></tr>
+          <tr><td><code>ark costs --by tenant</code></td><td>Group by tenant (hosted mode).</td></tr>
+          <tr><td><code>ark costs --check-budget</code></td><td>Show budget status vs configured limits.</td></tr>
+          <tr><td><code>ark costs-sync</code></td><td>Backfill usage_records from transcripts.</td></tr>
+          <tr><td><code>ark costs-export --format csv</code></td><td>Export all records as CSV.</td></tr>
+          <tr><td><code>ark costs-export --format json</code></td><td>Export all records as JSON.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="doc-footer">
+        <a href="howto-knowledge.html">&larr; Knowledge Graph</a>
+        <a href="workflows.html">Workflows &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>
