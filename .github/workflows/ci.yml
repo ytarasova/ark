@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Build web frontend
+        # packages/core/__tests__/web.test.ts serves packages/web/dist/index.html.
+        # Locally `make test` depends on build-web; CI bypasses the Makefile,
+        # so we must build the web dist here or the web server test flakes.
+        run: cd packages/web && bunx --bun vite build --logLevel error
+
       - name: Lint
         # Use bunx --bun eslint to pin the version to whatever bun.lock
         # has installed. Plain `npx eslint` was pulling whatever ESLint
