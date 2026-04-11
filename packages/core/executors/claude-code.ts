@@ -49,8 +49,11 @@ export const claudeCodeExecutor: Executor = {
     const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
     const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir });
 
-    // Status hooks
-    claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts.autonomy });
+    // Status hooks + permissions allow-list
+    claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, {
+      autonomy: opts.autonomy,
+      agent: { tools: opts.agent.tools, mcp_servers: opts.agent.mcp_servers },
+    });
 
     // Build launch env from agent config + provider-specific env + router URL (if enabled)
     const { buildRouterEnv } = await import("./router-env.js");

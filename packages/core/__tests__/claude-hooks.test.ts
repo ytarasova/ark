@@ -4,7 +4,7 @@
 import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { writeHooksConfig, removeHooksConfig } from "../claude/claude.js";
+import { writeHooksConfig, removeHooksConfig, buildPermissionsAllow } from "../claude/claude.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
@@ -153,5 +153,153 @@ describe("removeHooksConfig", () => {
     expect(settings.hooks.Stop).toBeDefined();
     expect(settings.hooks.Stop.length).toBe(1);
     expect(settings.hooks.Stop[0].hooks[0].command).toBe("my-custom-hook.sh");
+  });
+});
+
+// ── buildPermissionsAllow unit tests ────────────────────────────────────────
+
+describe("buildPermissionsAllow", () => {
+  it("passes built-in tool names through unchanged", () => {
+    const allow = buildPermissionsAllow({ tools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep"] });
+    expect(allow).toEqual(["Bash", "Read", "Write", "Edit", "Glob", "Grep"]);
+  });
+
+  it("auto-adds wildcard for each declared MCP server when tools has no explicit entry", () => {
+    const allow = buildPermissionsAllow({
+      tools: ["Bash", "Read"],
+      mcp_servers: ["atlassian", "figma"],
+    });
+    expect(allow).toContain("Bash");
+    expect(allow).toContain("Read");
+    expect(allow).toContain("mcp__atlassian__*");
+    expect(allow).toContain("mcp__figma__*");
+  });
+
+  it("does not add implicit wildcard when tools already references that server", () => {
+    const allow = buildPermissionsAllow({
+      tools: ["Bash", "mcp__atlassian__getJiraIssue"],
+      mcp_servers: ["atlassian"],
+    });
+    expect(allow).toContain("mcp__atlassian__getJiraIssue");
+    expect(allow).not.toContain("mcp__atlassian__*");
+  });
+
+  it("respects explicit wildcards in tools without duplicating", () => {
+    const allow = buildPermissionsAllow({
+      tools: ["Bash", "mcp__atlassian__*"],
+      mcp_servers: ["atlassian"],
+    });
+    const atlassianEntries = allow.filter((t) => t.startsWith("mcp__atlassian__"));
+    expect(atlassianEntries).toEqual(["mcp__atlassian__*"]);
+  });
+
+  it("throws when tools references an undeclared MCP server", () => {
+    expect(() => buildPermissionsAllow({
+      tools: ["Bash", "mcp__github__createPullRequest"],
+      mcp_servers: ["atlassian"],
+    })).toThrow(/references MCP server 'github'/);
+  });
+
+  it("accepts inline-object mcp_servers entries", () => {
+    const allow = buildPermissionsAllow({
+      tools: ["Read"],
+      mcp_servers: [{ atlassian: { command: "uvx", args: ["mcp-atlassian"] } }],
+    });
+    expect(allow).toContain("mcp__atlassian__*");
+  });
+
+  it("strips path and extension from string mcp_servers entries", () => {
+    const allow = buildPermissionsAllow({
+      tools: ["Read"],
+      mcp_servers: ["/path/to/mcp-configs/atlassian.json"],
+    });
+    expect(allow).toContain("mcp__atlassian__*");
+  });
+
+  it("handles empty / missing fields gracefully", () => {
+    expect(buildPermissionsAllow({})).toEqual([]);
+    expect(buildPermissionsAllow({ tools: [] })).toEqual([]);
+    expect(buildPermissionsAllow({ mcp_servers: [] })).toEqual([]);
+  });
+});
+
+// ── writeHooksConfig: agent → permissions.allow integration ────────────────
+
+describe("writeHooksConfig with agent", () => {
+  it("writes permissions.allow from agent.tools when agent is provided", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+      agent: { tools: ["Bash", "Read", "Write"], mcp_servers: [] },
+    });
+    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions.allow).toEqual(["Bash", "Read", "Write"]);
+    expect(settings._ark?.managedAllow).toBe(true);
+  });
+
+  it("does not write permissions.allow when agent has no tools", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+      agent: { tools: [], mcp_servers: [] },
+    });
+    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions?.allow).toBeUndefined();
+  });
+
+  it("includes implicit mcp wildcards from declared servers", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+      agent: { tools: ["Bash"], mcp_servers: ["atlassian", "figma"] },
+    });
+    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions.allow).toContain("mcp__atlassian__*");
+    expect(settings.permissions.allow).toContain("mcp__figma__*");
+  });
+
+  it("coexists with autonomy-driven permissions.deny", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+      autonomy: "edit",
+      agent: { tools: ["Bash", "Read", "Write", "Edit"], mcp_servers: [] },
+    });
+    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions.allow).toEqual(["Bash", "Read", "Write", "Edit"]);
+    expect(settings.permissions.deny).toEqual(["Bash"]);
+  });
+
+  it("throws when agent tools reference an undeclared MCP server", () => {
+    expect(() => writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+      agent: { tools: ["mcp__github__createIssue"], mcp_servers: [] },
+    })).toThrow(/references MCP server 'github'/);
+  });
+
+  it("idempotent: rewriting with the same agent produces the same allow list", () => {
+    const agent = { tools: ["Bash", "Read"], mcp_servers: ["atlassian"] };
+    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { agent });
+    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { agent });
+    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
+    const allow = settings.permissions.allow;
+    expect(allow).toEqual(["Bash", "Read", "mcp__atlassian__*"]);
+  });
+});
+
+// ── removeHooksConfig: ark-managed permissions cleanup ────────────────────
+
+describe("removeHooksConfig with agent permissions", () => {
+  it("removes ark-managed allow list but preserves user allow entries added after", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+      agent: { tools: ["Bash", "Read"], mcp_servers: [] },
+    });
+    removeHooksConfig(getCtx().arkDir);
+    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions?.allow).toBeUndefined();
+    expect(settings._ark).toBeUndefined();
+  });
+
+  it("preserves user-added permissions.allow when ark never managed one", () => {
+    const claudeDir = join(getCtx().arkDir, ".claude");
+    mkdirSync(claudeDir, { recursive: true });
+    writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
+      permissions: { allow: ["UserTool"] },
+    }));
+    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    removeHooksConfig(getCtx().arkDir);
+    const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
+    expect(settings.permissions.allow).toEqual(["UserTool"]);
   });
 });

@@ -149,6 +149,70 @@ export function writeChannelConfig(
   return mcpConfigPath;
 }
 
+// ── Permissions from agent tools ────────────────────────────────────────────
+
+export interface AgentToolSpec {
+  tools?: string[];
+  mcp_servers?: (string | Record<string, unknown>)[];
+}
+
+/** Extract the set of MCP server names the agent explicitly declares. */
+function declaredMcpServers(agent: AgentToolSpec): Set<string> {
+  const out = new Set<string>();
+  for (const srv of agent.mcp_servers ?? []) {
+    if (srv && typeof srv === "object") {
+      for (const key of Object.keys(srv)) out.add(key);
+    } else if (typeof srv === "string") {
+      const base = srv.split("/").pop() ?? srv;
+      out.add(base.replace(/\.json$/, ""));
+    }
+  }
+  return out;
+}
+
+/** Extract server names referenced by explicit `mcp__<server>__<tool>` entries in agent.tools. */
+function explicitMcpServerRefs(tools: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const t of tools) {
+    const parts = t.split("__");
+    if (parts[0] === "mcp" && parts.length >= 3) out.add(parts[1]);
+  }
+  return out;
+}
+
+/**
+ * Build a Claude Code `permissions.allow` list from an agent's tool + MCP declarations.
+ *
+ * Rules:
+ *  1. Every entry in `agent.tools` is included as-is -- built-in names (Bash, Read, ...),
+ *     explicit MCP entries (`mcp__atlassian__getJiraIssue`), or wildcards (`mcp__atlassian__*`).
+ *  2. For each declared `mcp_servers` entry that has no explicit `mcp__<server>__` reference
+ *     in `agent.tools`, an implicit `mcp__<server>__*` wildcard is appended so existing
+ *     agents that only list servers keep working.
+ *  3. Any `mcp__<server>__*` entry in `agent.tools` that references a server NOT declared
+ *     in `agent.mcp_servers` is a configuration error and throws.
+ */
+export function buildPermissionsAllow(agent: AgentToolSpec): string[] {
+  const tools = agent.tools ?? [];
+  const declared = declaredMcpServers(agent);
+  const explicit = explicitMcpServerRefs(tools);
+
+  for (const name of explicit) {
+    if (!declared.has(name)) {
+      throw new Error(
+        `Agent tool entry 'mcp__${name}__*' references MCP server '${name}' ` +
+        `which is not declared in mcp_servers. Add '${name}' to mcp_servers or remove the tool entry.`,
+      );
+    }
+  }
+
+  const allow = [...tools];
+  for (const name of declared) {
+    if (!explicit.has(name)) allow.push(`mcp__${name}__*`);
+  }
+  return allow;
+}
+
 // ── Hook-based status config ────────────────────────────────────────────────
 
 const ARK_HOOK_MARKER = "# ark-status";
@@ -188,7 +252,7 @@ function filterOutArkHooks(hooks: Record<string, unknown[]>): void {
 
 export function writeHooksConfig(
   sessionId: string, conductorUrl: string, workdir: string,
-  opts?: { autonomy?: string },
+  opts?: { autonomy?: string; agent?: AgentToolSpec },
 ): string {
   const claudeDir = join(workdir, ".claude");
   mkdirSync(claudeDir, { recursive: true });
@@ -214,15 +278,35 @@ export function writeHooksConfig(
   }
   existing.hooks = existingHooks;
 
+  // Ark-managed state tracker
+  const arkMeta = (existing._ark ?? {}) as Record<string, unknown>;
+
+  // Build permissions.allow from agent.tools + declared mcp_servers (if agent provided).
+  // autonomy=full / --dangerously-skip-permissions is the explicit override: when set,
+  // Claude Code bypasses this list. The allow list is authoritative when bypass is off.
+  if (opts?.agent && (opts.agent.tools?.length ?? 0) > 0) {
+    const allow = buildPermissionsAllow(opts.agent);
+    const perms = (existing.permissions ?? {}) as Record<string, unknown>;
+    perms.allow = allow;
+    existing.permissions = perms;
+    arkMeta.managedAllow = true;
+  }
+
   // Add permission restrictions based on autonomy level
   if (opts?.autonomy === "edit") {
     const perms = (existing.permissions ?? {}) as Record<string, unknown>;
     perms.deny = ["Bash"];
     existing.permissions = perms;
+    arkMeta.managedDeny = true;
   } else if (opts?.autonomy === "read-only") {
     const perms = (existing.permissions ?? {}) as Record<string, unknown>;
     perms.deny = ["Bash", "Write", "Edit"];
     existing.permissions = perms;
+    arkMeta.managedDeny = true;
+  }
+
+  if (Object.keys(arkMeta).length > 0) {
+    existing._ark = arkMeta;
   }
 
   // Atomic write
@@ -241,10 +325,22 @@ export function removeHooksConfig(workdir: string): void {
   try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")); }
   catch (e: any) { console.error(`removeHooksConfig: failed to parse ${settingsPath}:`, e?.message ?? e); return; }
 
-  if (!settings.hooks || typeof settings.hooks !== "object") return;
+  const arkMeta = (settings._ark ?? {}) as Record<string, unknown>;
 
-  filterOutArkHooks(settings.hooks as Record<string, unknown[]>);
-  if (Object.keys(settings.hooks as object).length === 0) delete settings.hooks;
+  if (settings.hooks && typeof settings.hooks === "object") {
+    filterOutArkHooks(settings.hooks as Record<string, unknown[]>);
+    if (Object.keys(settings.hooks as object).length === 0) delete settings.hooks;
+  }
+
+  // Strip ark-managed permission entries, preserving anything the user added
+  if (settings.permissions && typeof settings.permissions === "object") {
+    const perms = settings.permissions as Record<string, unknown>;
+    if (arkMeta.managedAllow) delete perms.allow;
+    if (arkMeta.managedDeny) delete perms.deny;
+    if (Object.keys(perms).length === 0) delete settings.permissions;
+  }
+
+  delete settings._ark;
 
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 }

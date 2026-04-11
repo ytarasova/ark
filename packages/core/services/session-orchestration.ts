@@ -1309,8 +1309,11 @@ async function _launchAgentTmux(app: AppContext,
   const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
   const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir });
 
-  // Status hooks -- write .claude/settings.local.json for agent status detection
-  claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, { autonomy: opts?.autonomy });
+  // Status hooks + permissions allow-list -- write .claude/settings.local.json
+  claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, {
+    autonomy: opts?.autonomy,
+    agent: { tools: agent.tools, mcp_servers: agent.mcp_servers },
+  });
 
   // Build launch env from agent config + provider-specific env (e.g. auth tokens for remote)
   const launchEnv = { ...(agent.env ?? {}), ...(provider?.buildLaunchEnv(session) ?? {}) };
