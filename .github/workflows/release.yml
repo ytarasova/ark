@@ -384,7 +384,11 @@ jobs:
           name: ark-binary-${{ matrix.name }}
           path: dist/bin/ark-${{ matrix.name }}
 
-  # Smoke-test each platform's tarball.
+  # Smoke-test each platform's tarball. darwin-x64 is dropped here as well
+  # because the macos-13 runner queue saturation cancels the job before it
+  # can run, and a cancelled matrix instance cascades into the release job
+  # being skipped. darwin-x64 users still get a tarball; it just isn't
+  # runtime-verified in CI.
   smoke-test:
     needs: package
     strategy:
@@ -392,7 +396,6 @@ jobs:
       matrix:
         include:
           - { name: darwin-arm64, runner: macos-14 }
-          - { name: darwin-x64, runner: macos-13 }
           - { name: linux-arm64, runner: ubuntu-24.04-arm }
           - { name: linux-x64, runner: ubuntu-latest }
 
