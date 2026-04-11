@@ -272,11 +272,14 @@ export function initUsageSchema(db: IDatabase): void {
       cache_read_tokens INTEGER DEFAULT 0,
       cache_write_tokens INTEGER DEFAULT 0,
       cost_usd REAL NOT NULL DEFAULT 0,
+      cost_mode TEXT NOT NULL DEFAULT 'api',
       source TEXT NOT NULL DEFAULT 'transcript',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
+  migrateAddColumn(db, "usage_records", "cost_mode", "TEXT NOT NULL DEFAULT 'api'");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_records(session_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_cost_mode ON usage_records(cost_mode)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_tenant ON usage_records(tenant_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_user ON usage_records(user_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_records(model)");

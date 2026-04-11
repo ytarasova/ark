@@ -231,6 +231,31 @@ export function initPostgresSchema(db: IDatabase): void {
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_schedules_tenant ON schedules(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)`);
 
+  // Usage records table (cost tracking)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS usage_records (
+      id SERIAL PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      user_id TEXT NOT NULL DEFAULT 'system',
+      model TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      runtime TEXT,
+      agent_role TEXT,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens INTEGER DEFAULT 0,
+      cache_write_tokens INTEGER DEFAULT 0,
+      cost_usd REAL NOT NULL DEFAULT 0,
+      cost_mode TEXT NOT NULL DEFAULT 'api',
+      source TEXT NOT NULL DEFAULT 'transcript',
+      created_at TEXT NOT NULL DEFAULT (NOW()::TEXT)
+    )
+  `);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_records(session_id)`);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_usage_tenant ON usage_records(tenant_id)`);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_usage_cost_mode ON usage_records(cost_mode)`);
+
   // Compute pools table
   db.exec(`
     CREATE TABLE IF NOT EXISTS compute_pools (

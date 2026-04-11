@@ -4,6 +4,11 @@ type: cli-agent
 command: ["codex", "--approval-mode", "full-auto"]
 task_delivery: arg
 models:
+  - id: gpt-5-codex
+    label: "GPT-5 Codex"
   - id: o4-mini
     label: "O4 Mini"
-default_model: o4-mini
+default_model: gpt-5-codex
+billing:
+  mode: api
+  transcript_parser: codex

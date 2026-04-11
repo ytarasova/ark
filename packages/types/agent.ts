@@ -6,6 +6,17 @@ export interface SkillDefinition {
   _source?: "builtin" | "project" | "global";
 }
 
+export interface RuntimeBilling {
+  /** 'api' = per-token API pricing, 'subscription' = flat-rate plan, 'free' = no cost */
+  mode: "api" | "subscription" | "free";
+  /** Subscription plan name (e.g. 'claude-max-200', 'chatgpt-plus') -- for subscription mode */
+  plan?: string;
+  /** Fixed monthly cost in USD for this subscription */
+  cost_per_month?: number;
+  /** Transcript parser to use: 'claude' | 'codex' | 'gemini' (defaults based on type) */
+  transcript_parser?: "claude" | "codex" | "gemini";
+}
+
 export interface RuntimeDefinition {
   name: string;
   description?: string;
@@ -16,6 +27,8 @@ export interface RuntimeDefinition {
   default_model?: string;
   permission_mode?: string;
   env?: Record<string, string>;
+  /** Billing and cost tracking config. When omitted, defaults to { mode: 'api' }. */
+  billing?: RuntimeBilling;
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }

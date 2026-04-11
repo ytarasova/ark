@@ -26,6 +26,8 @@ export interface UsageRecord {
   created_at: string;
 }
 
+export type CostMode = "api" | "subscription" | "free";
+
 export interface RecordOpts {
   sessionId: string;
   tenantId?: string;
@@ -36,6 +38,8 @@ export interface RecordOpts {
   agentRole?: string;
   usage: TokenUsage;
   source?: string;
+  /** Billing mode: 'api' (per-token), 'subscription' (flat rate, cost_usd=0), 'free' (no cost). */
+  costMode?: CostMode;
 }
 
 export interface UsageSummaryRow {
@@ -63,11 +67,13 @@ export class UsageRecorder {
 
   /** Record a usage event. Called by executors, router, or transcript parser. */
   record(opts: RecordOpts): void {
-    const cost = this.pricing.calculateCost(opts.model, opts.usage);
+    const costMode = opts.costMode ?? "api";
+    // Subscription and free modes record zero cost (tokens still tracked for productivity/rate limits)
+    const cost = costMode === "api" ? this.pricing.calculateCost(opts.model, opts.usage) : 0;
     this.db.prepare(`
       INSERT INTO usage_records (session_id, tenant_id, user_id, model, provider, runtime, agent_role,
-        input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd, source)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd, cost_mode, source)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       opts.sessionId,
       opts.tenantId ?? this.tenantId,
@@ -81,6 +87,7 @@ export class UsageRecorder {
       opts.usage.cache_read_tokens ?? 0,
       opts.usage.cache_write_tokens ?? 0,
       cost,
+      costMode,
       opts.source ?? "api",
     );
   }

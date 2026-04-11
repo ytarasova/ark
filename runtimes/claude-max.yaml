@@ -1,5 +1,5 @@
-name: claude
-description: "Claude Code (Anthropic) - API billing"
+name: claude-max
+description: "Claude Code with Claude Max subscription (flat rate)"
 type: claude-code
 models:
   - id: opus
@@ -13,5 +13,7 @@ permission_mode: bypassPermissions
 env:
   CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80"
 billing:
-  mode: api
+  mode: subscription
+  plan: claude-max-200
+  cost_per_month: 200
   transcript_parser: claude

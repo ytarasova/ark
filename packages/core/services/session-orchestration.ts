@@ -84,6 +84,44 @@ function ingestRemoteIndex(app: AppContext, data: any, log: (msg: string) => voi
   log(`Remote index: ${addedFiles.size} files, ${(data.nodes ?? []).length} symbols`);
 }
 
+/**
+ * Record token usage from a session transcript into UsageRecorder.
+ * Resolves the runtime's billing mode (api/subscription/free) so that
+ * subscription-based runtimes get cost_usd=0 while still tracking tokens.
+ */
+function recordSessionUsage(
+  app: AppContext,
+  session: Session,
+  usage: { input_tokens: number; output_tokens: number; cache_read_tokens?: number; cache_write_tokens?: number },
+  provider: string,
+  source: string,
+): void {
+  if (!usage.input_tokens && !usage.output_tokens) return;
+  try {
+    const runtimeName = (session.config?.runtime as string | undefined) ?? session.agent ?? "claude";
+    const runtime = app.runtimes.get(runtimeName);
+    const billingMode = runtime?.billing?.mode ?? "api";
+    const model = (session.config?.model as string | undefined)
+      ?? runtime?.default_model
+      ?? "sonnet";
+
+    app.usageRecorder.record({
+      sessionId: session.id,
+      tenantId: (session as any).tenant_id ?? "default",
+      userId: session.user_id ?? "system",
+      model,
+      provider,
+      runtime: runtimeName,
+      agentRole: session.agent ?? undefined,
+      usage,
+      source,
+      costMode: billingMode,
+    });
+  } catch (e: any) {
+    logError("session", "usage record failed", { sessionId: session.id, error: String(e?.message ?? e) });
+  }
+}
+
 /** Convert a typed Session to a plain Record for template variable resolution. */
 function sessionAsVars(session: Session): Record<string, unknown> {
   const rec: Record<string, unknown> = {};
@@ -739,8 +777,51 @@ export async function complete(app: AppContext, sessionId: string, opts?: { forc
     data: { note: "Manually completed" },
   });
   app.messages.markRead(sessionId);
+
+  // Parse agent transcript for token usage (non-Claude agents).
+  // Claude usage is captured via hooks in applyHookStatus(); this handles codex/gemini.
+  parseNonClaudeTranscript(app, session);
+
   app.sessions.update(sessionId, { status: "ready", session_id: null });
   return await advance(app, sessionId, true);
+}
+
+/**
+ * Parse transcript for non-Claude agents on session completion.
+ * Finds the most recent session file for the agent's runtime and records usage.
+ */
+function parseNonClaudeTranscript(app: AppContext, session: Session): void {
+  try {
+    const runtimeName = (session.config?.runtime as string | undefined) ?? session.agent;
+    if (!runtimeName) return;
+    const runtime = app.runtimes.get(runtimeName);
+    const parserKind = runtime?.billing?.transcript_parser;
+    // Only handle codex/gemini here; claude is handled via hooks
+    if (parserKind !== "codex" && parserKind !== "gemini") return;
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { parseTranscript, findLatestCodexTranscript, findGeminiTranscript } = require("../observability/transcript-parsers.js");
+
+    let transcriptPath: string | null = null;
+    if (parserKind === "codex") {
+      // Find the most recent rollout file created since session started
+      const sessionStart = session.created_at ? new Date(session.created_at) : undefined;
+      transcriptPath = findLatestCodexTranscript(sessionStart);
+    } else if (parserKind === "gemini") {
+      // Gemini's session ID is usually in session.claude_session_id (misnomer -- stores any agent session ID)
+      const sid = session.claude_session_id;
+      if (sid) transcriptPath = findGeminiTranscript(sid);
+    }
+
+    if (!transcriptPath) return;
+
+    const result = parseTranscript(parserKind, transcriptPath);
+    if (result.usage.input_tokens > 0 || result.usage.output_tokens > 0) {
+      recordSessionUsage(app, session, result.usage, parserKind === "codex" ? "openai" : "google", "transcript");
+    }
+  } catch (e: any) {
+    logError("session", "non-Claude transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) });
+  }
 }
 
 export function pause(app: AppContext, sessionId: string, reason?: string): { ok: boolean; message: string } {
@@ -1905,6 +1986,13 @@ export function applyHookStatus(app: AppContext,
       const usage = parseTranscriptUsage(transcriptPath);
       if (usage.total_tokens > 0) {
         result.usage = usage;
+        // Also record to UsageRecorder for persistent multi-dimensional attribution
+        recordSessionUsage(app, session, {
+          input_tokens: usage.input_tokens,
+          output_tokens: usage.output_tokens,
+          cache_read_tokens: usage.cache_read_input_tokens,
+          cache_write_tokens: usage.cache_creation_input_tokens,
+        }, "claude", "transcript");
       }
     } catch (e: any) { logError("session", "transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) }); }
 
