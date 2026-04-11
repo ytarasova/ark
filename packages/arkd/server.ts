@@ -277,7 +277,7 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
 
           const dbPath = join(repoPath, ".codegraph", "graph.db");
           try {
-            const { Database } = require("bun:sqlite");
+            const { Database } = await import("bun:sqlite");
             const db = new Database(dbPath);
 
             const nodes = db.query("SELECT id, kind, name, file, line, end_line, visibility, exported, qualified_name FROM nodes").all();

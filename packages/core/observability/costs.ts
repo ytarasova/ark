@@ -1,18 +1,16 @@
 /**
- * Cost calculation from token usage.
+ * Cost calculation and backfill helpers.
  *
- * Delegates pricing to PricingRegistry for 300+ model support.
- * Maintains backward-compatible API for existing callers.
+ * Delegates pricing to PricingRegistry for 300+ model support. The canonical
+ * source of per-session cost is the usage_records table written by
+ * UsageRecorder during session completion; these functions operate on that
+ * data for display and export.
  */
 
-import type { TranscriptUsage } from "../claude/claude.js";
-import { parseTranscriptUsage } from "../claude/claude.js";
+import type { TokenUsage } from "./pricing.js";
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 import { PricingRegistry } from "./pricing.js";
-
-import { readdirSync, existsSync } from "fs";
-import { join } from "path";
 
 // Shared registry instance for standalone function calls
 const _registry = new PricingRegistry();
@@ -20,17 +18,10 @@ const _registry = new PricingRegistry();
 const DEFAULT_MODEL = "sonnet";
 
 /** Calculate cost in USD from token usage and model name. */
-export function calculateCost(usage: TranscriptUsage, model?: string | null): number {
+export function calculateCost(usage: TokenUsage, model?: string | null): number {
   const m = model ?? DEFAULT_MODEL;
-  const tokenUsage = {
-    input_tokens: usage.input_tokens,
-    output_tokens: usage.output_tokens,
-    cache_read_tokens: usage.cache_read_input_tokens,
-    cache_write_tokens: usage.cache_creation_input_tokens,
-  };
-  // Fall back to sonnet pricing for unrecognized model names (backward compat)
   const resolved = _registry.getPrice(m) ? m : DEFAULT_MODEL;
-  return _registry.calculateCost(resolved, tokenUsage);
+  return _registry.calculateCost(resolved, usage);
 }
 
 /** Format cost as string: "$1.23" or "<$0.01" */
@@ -41,31 +32,37 @@ export function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
-export interface SessionCost {
+export interface SessionCostSummary {
   sessionId: string;
   summary: string | null;
   model: string | null;
-  usage: TranscriptUsage | null;
+  usage: TokenUsage | null;
   cost: number;
 }
 
-/** Get cost info for a single session. */
-export function getSessionCost(session: Session): SessionCost {
-  const usage = session.config?.usage as TranscriptUsage | null ?? null;
-  const model = (session.config?.model as string) ?? session.agent ?? null;
-  const cost = usage ? calculateCost(usage, model) : 0;
+/** Get cost info for a single session from UsageRecorder. */
+export function getSessionCost(app: AppContext, session: Session): SessionCostSummary {
+  const { cost, records } = app.usageRecorder.getSessionCost(session.id);
+  // Use the first record's model/tokens as a summary; multiple models per session possible
+  const first = records[0];
+  const usage: TokenUsage | null = first ? {
+    input_tokens: records.reduce((s, r) => s + r.input_tokens, 0),
+    output_tokens: records.reduce((s, r) => s + r.output_tokens, 0),
+    cache_read_tokens: records.reduce((s, r) => s + (r.cache_read_tokens ?? 0), 0),
+    cache_write_tokens: records.reduce((s, r) => s + (r.cache_write_tokens ?? 0), 0),
+  } : null;
   return {
     sessionId: session.id,
     summary: session.summary,
-    model,
+    model: first?.model ?? session.agent ?? null,
     usage,
     cost,
   };
 }
 
 /** Get costs for all sessions, sorted by cost descending. */
-export function getAllSessionCosts(sessions: Session[]): { sessions: SessionCost[]; total: number } {
-  const costs = sessions.map(getSessionCost).filter(c => c.cost > 0);
+export function getAllSessionCosts(app: AppContext, sessions: Session[]): { sessions: SessionCostSummary[]; total: number } {
+  const costs = sessions.map(s => getSessionCost(app, s)).filter(c => c.cost > 0 || (c.usage?.input_tokens ?? 0) > 0);
   costs.sort((a, b) => b.cost - a.cost);
   const total = costs.reduce((sum, c) => sum + c.cost, 0);
   return { sessions: costs, total };
@@ -84,7 +81,7 @@ export interface BudgetStatus {
 }
 
 /** Check budget status against configured limits. */
-export function checkBudget(sessions: Session[], budgets: BudgetConfig): BudgetStatus {
+export function checkBudget(app: AppContext, sessions: Session[], budgets: BudgetConfig): BudgetStatus {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const weekStart = new Date(now.getTime() - now.getDay() * 86400000);
@@ -95,9 +92,9 @@ export function checkBudget(sessions: Session[], budgets: BudgetConfig): BudgetS
   const weeklySessions = sessions.filter(s => s.updated_at >= weekStart.toISOString());
   const monthlySessions = sessions.filter(s => s.updated_at >= monthStart);
 
-  const dailySpent = getAllSessionCosts(dailySessions).total;
-  const weeklySpent = getAllSessionCosts(weeklySessions).total;
-  const monthlySpent = getAllSessionCosts(monthlySessions).total;
+  const dailySpent = getAllSessionCosts(app, dailySessions).total;
+  const weeklySpent = getAllSessionCosts(app, weeklySessions).total;
+  const monthlySpent = getAllSessionCosts(app, monthlySessions).total;
 
   function bucket(spent: number, limit: number | undefined | null) {
     const lim = limit ?? null;
@@ -112,54 +109,64 @@ export function checkBudget(sessions: Session[], budgets: BudgetConfig): BudgetS
   };
 }
 
-/** Sync cost data from Claude transcripts into session configs. */
+/**
+ * Backfill usage_records from on-disk transcripts for sessions that don't
+ * have cost data yet. Uses the polymorphic TranscriptParserRegistry so it
+ * works across all runtimes (Claude, Codex, Gemini, ...).
+ */
 export function syncCosts(app: AppContext): { synced: number; skipped: number } {
   const sessions = app.sessions.list({ limit: 1000 });
   let synced = 0;
   let skipped = 0;
 
-  const claudeDir = join(process.env.HOME ?? "~", ".claude", "projects");
-  if (!existsSync(claudeDir)) return { synced: 0, skipped: 0 };
-
   for (const session of sessions) {
-    // Skip sessions that already have usage data
-    if ((session.config?.usage?.total_tokens ?? 0) > 0) { skipped++; continue; }
+    // Skip sessions that already have recorded usage
+    if (app.usageRecorder.getSessionCost(session.id).records.length > 0) {
+      skipped++;
+      continue;
+    }
+    if (!session.workdir) { skipped++; continue; }
 
-    // Try to find transcript by claude_session_id
-    if (!session.claude_session_id) { skipped++; continue; }
+    // Resolve the runtime + parser
+    const runtimeName = (session.config?.runtime as string | undefined) ?? session.agent ?? "claude";
+    const runtime = app.runtimes.get(runtimeName);
+    const kind = runtime?.billing?.transcript_parser ?? "claude";
+    const parser = app.transcriptParsers.get(kind);
+    if (!parser) { skipped++; continue; }
 
-    // Search for the transcript file
-    try {
-      const projects = readdirSync(claudeDir);
-      for (const project of projects) {
-        const projectDir = join(claudeDir, project);
-        try {
-          const files = readdirSync(projectDir).filter(f => f.endsWith(".jsonl"));
-          for (const file of files) {
-            if (file.includes(session.claude_session_id!)) {
-              const transcriptPath = join(projectDir, file);
-              const usage = parseTranscriptUsage(transcriptPath);
-              if (usage.total_tokens > 0) {
-                app.sessions.update(session.id, { config: { ...session.config, usage } });
-                synced++;
-              }
-              break;
-            }
-          }
-        } catch { continue; }
-      }
-    } catch { skipped++; }
+    const transcriptPath = parser.findForSession({
+      workdir: session.workdir,
+      startTime: session.created_at ? new Date(session.created_at) : undefined,
+    });
+    if (!transcriptPath) { skipped++; continue; }
+
+    const { usage, model } = parser.parse(transcriptPath);
+    if (usage.input_tokens === 0 && usage.output_tokens === 0) { skipped++; continue; }
+
+    const provider = kind === "claude" ? "anthropic" : kind === "codex" ? "openai" : kind === "gemini" ? "google" : kind;
+    app.usageRecorder.record({
+      sessionId: session.id,
+      model: model ?? (session.config?.model as string) ?? "unknown",
+      provider,
+      runtime: runtimeName,
+      agentRole: session.agent ?? undefined,
+      usage,
+      source: "backfill",
+      costMode: runtime?.billing?.mode ?? "api",
+    });
+    synced++;
   }
 
   return { synced, skipped };
 }
 
 /** Export cost data as CSV string. */
-export function exportCostsCsv(sessions: Session[]): string {
-  const costs = getAllSessionCosts(sessions);
+export function exportCostsCsv(app: AppContext, sessions: Session[]): string {
+  const costs = getAllSessionCosts(app, sessions);
   const lines = ["session_id,summary,model,cost_usd,input_tokens,output_tokens,cache_read,cache_write,total_tokens"];
   for (const c of costs.sessions) {
     const u = c.usage;
+    const total = u ? u.input_tokens + u.output_tokens + (u.cache_read_tokens ?? 0) + (u.cache_write_tokens ?? 0) : 0;
     lines.push([
       c.sessionId,
       `"${(c.summary ?? "").replace(/"/g, '""')}"`,
@@ -167,9 +174,9 @@ export function exportCostsCsv(sessions: Session[]): string {
       c.cost.toFixed(4),
       u?.input_tokens ?? 0,
       u?.output_tokens ?? 0,
-      u?.cache_read_input_tokens ?? 0,
-      u?.cache_creation_input_tokens ?? 0,
-      u?.total_tokens ?? 0,
+      u?.cache_read_tokens ?? 0,
+      u?.cache_write_tokens ?? 0,
+      total,
     ].join(","));
   }
   return lines.join("\n");

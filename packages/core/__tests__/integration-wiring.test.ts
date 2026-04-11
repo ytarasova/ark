@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test"
 import { AppContext, setApp, clearApp } from "../app.js";
 import { buildContext, formatContextAsMarkdown } from "../knowledge/context.js";
 import type { KnowledgeStore } from "../knowledge/store.js";
+import { TenantPolicyManager } from "../auth/tenant-policy.js";
 
 let app: AppContext;
 let store: KnowledgeStore;
@@ -128,7 +129,6 @@ describe("router config", () => {
 
 describe("tenant integration policies", () => {
   it("getEffectiveIntegrationSettings merges tenant + global", () => {
-    const { TenantPolicyManager } = require("../auth/tenant-policy.js");
     const mgr = new TenantPolicyManager(app.db);
 
     // Set a tenant policy with router required
@@ -167,7 +167,6 @@ describe("tenant integration policies", () => {
   });
 
   it("defaults to global config when no tenant policy", () => {
-    const { TenantPolicyManager } = require("../auth/tenant-policy.js");
     const mgr = new TenantPolicyManager(app.db);
 
     const settings = mgr.getEffectiveIntegrationSettings("no-policy-tenant", {

@@ -19,7 +19,7 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
 
   router.handle("costs/read", async () => {
     const sessions = app.sessions.list({ limit: 500 });
-    const { sessions: costs, total } = getAllSessionCosts(sessions);
+    const { sessions: costs, total } = getAllSessionCosts(app, sessions);
     return { costs, total };
   });
 

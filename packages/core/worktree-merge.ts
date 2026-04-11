@@ -26,7 +26,7 @@ export async function mergeChildBranches(
     try {
       const branch = execFileSync(
         "git", ["-C", childWorktree, "rev-parse", "--abbrev-ref", "HEAD"],
-        { encoding: "utf-8" },
+        { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
       ).trim();
       if (!branch || branch === "HEAD") continue;
 

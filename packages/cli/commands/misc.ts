@@ -281,7 +281,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
     .action(async (opts) => {
       const ark = await getArkClient();
       const sessions = await ark.sessionList({ limit: 500 });
-      const data = opts.format === "csv" ? core.exportCostsCsv(sessions) : JSON.stringify(core.getAllSessionCosts(sessions), null, 2);
+      const app = core.getApp();
+      const data = opts.format === "csv" ? core.exportCostsCsv(app, sessions) : JSON.stringify(core.getAllSessionCosts(app, sessions), null, 2);
       if (opts.output) {
         writeFileSync(opts.output, data);
         console.log(chalk.green(`Exported to ${opts.output}`));

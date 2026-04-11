@@ -109,12 +109,18 @@ export { buildReplay, type ReplayStep } from "./session/replay.js";
 export type { ToolDriver } from "./tool-driver.js";
 export { getToolDriver, listToolDrivers, registerToolDriver } from "./tools/registry.js";
 
-// Cost tracking (legacy -- per-session from transcript)
-export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, syncCosts, exportCostsCsv, type SessionCost, type BudgetConfig, type BudgetStatus } from "./observability/costs.js";
+// Cost helpers -- read from usage_records (written by UsageRecorder)
+export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, syncCosts, exportCostsCsv, type SessionCostSummary, type BudgetConfig, type BudgetStatus } from "./observability/costs.js";
 
 // Universal cost tracking (multi-runtime, multi-dimensional)
-export { PricingRegistry, type ModelPricing, type TokenUsage as PricingTokenUsage } from "./observability/pricing.js";
-export { UsageRecorder, type UsageRecord, type RecordOpts, type UsageSummaryRow, type DailyTrendRow } from "./observability/usage.js";
+export { PricingRegistry, type ModelPricing, type TokenUsage } from "./observability/pricing.js";
+export { UsageRecorder, type UsageRecord, type RecordOpts, type UsageSummaryRow, type DailyTrendRow, type CostMode } from "./observability/usage.js";
+
+// Runtime transcript parsers (polymorphic)
+export { TranscriptParserRegistry, type TranscriptParser, type ParseResult, type FindOpts } from "./runtimes/transcript-parser.js";
+export { ClaudeTranscriptParser } from "./runtimes/claude/parser.js";
+export { CodexTranscriptParser } from "./runtimes/codex/parser.js";
+export { GeminiTranscriptParser } from "./runtimes/gemini/parser.js";
 
 // Conductor learnings (migrated to KnowledgeStore -- kept as type re-exports for backward compat)
 // recordLearning, getLearnings, getPolicies removed -- use app.knowledge directly

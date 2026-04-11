@@ -8,7 +8,26 @@ import type { InkColor } from "../helpers/colors.js";
 import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
 import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter } from "../helpers/sessionFormatting.js";
-import { getSessionCost, formatCost } from "../../core/observability/costs.js";
+import { calculateCost, formatCost } from "../../core/observability/costs.js";
+
+/**
+ * TUI-local cost computation from the legacy session.config.usage field.
+ * The authoritative cost data lives in usage_records (server-side); this is
+ * a lightweight display helper for the detail pane that only reads the
+ * per-session payload the TUI already has.
+ */
+function computeLocalSessionCost(session: Session): { cost: number; usage: any; model: string | null } {
+  const usage = (session.config as any)?.usage ?? null;
+  const model = ((session.config as any)?.model as string) ?? session.agent ?? null;
+  if (!usage) return { cost: 0, usage: null, model };
+  const cost = calculateCost({
+    input_tokens: usage.input_tokens ?? 0,
+    output_tokens: usage.output_tokens ?? 0,
+    cache_read_tokens: usage.cache_read_input_tokens ?? 0,
+    cache_write_tokens: usage.cache_creation_input_tokens ?? 0,
+  }, model);
+  return { cost, usage, model };
+}
 import * as flow from "../../core/state/flow.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
@@ -188,7 +207,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
     if (!s) return 0;
     return 19200 + (parseInt(s.id.replace("s-", ""), 16) % 10000);
   }, [s?.id]);
-  const costInfo = useMemo(() => s ? getSessionCost(s) : null, [s?.id, s?.config]);
+  const costInfo = useMemo(() => s ? computeLocalSessionCost(s) : null, [s?.id, s?.config]);
 
   // Sort search results by timestamp
   const sortedSearchResults = useMemo(() => {
@@ -241,7 +260,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
     let total = 0;
     for (const sess of sessions) {
       if ((sess.updated_at ?? "") >= todayIso) {
-        const ci = getSessionCost(sess);
+        const ci = computeLocalSessionCost(sess);
         total += ci.cost;
       }
     }

@@ -29,13 +29,4 @@ export interface ToolDriver {
     channelName?: string;
     env?: Record<string, string>;
   }): { script: string; sessionId: string };
-
-  /** Parse transcript file for token usage (tool-specific format) */
-  parseUsage?(transcriptPath: string): {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens: number;
-    cache_creation_input_tokens: number;
-    total_tokens: number;
-  };
 }

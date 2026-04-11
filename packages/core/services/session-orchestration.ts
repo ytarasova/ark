@@ -20,7 +20,6 @@ import * as flow from "../state/flow.js";
 import type { FlowDefinition } from "../state/flow.js";
 import * as agentRegistry from "../agent/agent.js";
 import * as claude from "../claude/claude.js";
-import { parseTranscriptUsage } from "../claude/claude.js";
 import { getProvider } from "../../compute/index.js";
 
 export type SessionOpResult = { ok: true; sessionId: string } | { ok: false; message: string };
@@ -137,6 +136,7 @@ function resolveGitHubUrl(dir?: string | null): string | null {
   try {
     const remote = execFileSync("git", ["-C", dir, "remote", "get-url", "origin"], {
       encoding: "utf-8", timeout: 5_000,
+      stdio: ["ignore", "pipe", "pipe"],
     }).trim();
     // git@github.com:owner/repo.git -> https://github.com/owner/repo
     const sshMatch = remote.match(/git@github\.com:([^/]+\/[^.]+)/);
@@ -788,7 +788,8 @@ export async function complete(app: AppContext, sessionId: string, opts?: { forc
 
 /**
  * Parse transcript for non-Claude agents on session completion.
- * Finds the most recent session file for the agent's runtime and records usage.
+ * Resolves the parser via AppContext's TranscriptParserRegistry and uses
+ * workdir-based identification to find the exact file for this session.
  */
 function parseNonClaudeTranscript(app: AppContext, session: Session): void {
   try {
@@ -796,28 +797,28 @@ function parseNonClaudeTranscript(app: AppContext, session: Session): void {
     if (!runtimeName) return;
     const runtime = app.runtimes.get(runtimeName);
     const parserKind = runtime?.billing?.transcript_parser;
-    // Only handle codex/gemini here; claude is handled via hooks
-    if (parserKind !== "codex" && parserKind !== "gemini") return;
+    // Only handle non-Claude kinds here; Claude is handled via hooks in applyHookStatus
+    if (!parserKind || parserKind === "claude") return;
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { parseTranscript, findLatestCodexTranscript, findGeminiTranscript } = require("../observability/transcript-parsers.js");
-
-    let transcriptPath: string | null = null;
-    if (parserKind === "codex") {
-      // Find the most recent rollout file created since session started
-      const sessionStart = session.created_at ? new Date(session.created_at) : undefined;
-      transcriptPath = findLatestCodexTranscript(sessionStart);
-    } else if (parserKind === "gemini") {
-      // Gemini's session ID is usually in session.claude_session_id (misnomer -- stores any agent session ID)
-      const sid = session.claude_session_id;
-      if (sid) transcriptPath = findGeminiTranscript(sid);
+    const parser = app.transcriptParsers.get(parserKind);
+    if (!parser) {
+      logError("session", "no transcript parser registered", { sessionId: session.id, kind: parserKind });
+      return;
     }
 
+    const workdir = session.workdir;
+    if (!workdir) return;
+
+    const transcriptPath = parser.findForSession({
+      workdir,
+      startTime: session.created_at ? new Date(session.created_at) : undefined,
+    });
     if (!transcriptPath) return;
 
-    const result = parseTranscript(parserKind, transcriptPath);
+    const result = parser.parse(transcriptPath);
     if (result.usage.input_tokens > 0 || result.usage.output_tokens > 0) {
-      recordSessionUsage(app, session, result.usage, parserKind === "codex" ? "openai" : "google", "transcript");
+      const provider = parserKind === "codex" ? "openai" : parserKind === "gemini" ? "google" : parserKind;
+      recordSessionUsage(app, session, result.usage, provider, "transcript");
     }
   } catch (e: any) {
     logError("session", "non-Claude transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) });
@@ -1495,10 +1496,10 @@ async function setupWorktree(app: AppContext, repoPath: string, sessionId: strin
 
   const branchName = branch ?? `ark-${sessionId}`;
   try {
-    await execFileAsync("git", ["-C", repoPath, "worktree", "prune"], { encoding: "utf-8" });
+    await execFileAsync("git", ["-C", repoPath, "worktree", "prune"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
     // Try with new branch
     try {
-      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], { encoding: "utf-8" });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
       return wtPath;
     } catch (e: any) {
       if (!String(e).includes("already exists")) {
@@ -1507,7 +1508,7 @@ async function setupWorktree(app: AppContext, repoPath: string, sessionId: strin
     }
     // Try existing branch
     try {
-      await execFileAsync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], { encoding: "utf-8" });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
       return wtPath;
     } catch (e: any) {
       if (!String(e).includes("already checked out") && !String(e).includes("already exists")) {
@@ -1516,7 +1517,7 @@ async function setupWorktree(app: AppContext, repoPath: string, sessionId: strin
     }
     // Unique branch
     try {
-      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], { encoding: "utf-8" });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
       return wtPath;
     } catch (e: any) {
       logError("session", `setupWorktree: all strategies failed for ${sessionId}: ${e?.message ?? e}`);
@@ -1559,7 +1560,7 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
   let branch = session.branch;
   if (!branch && existsSync(wtDir)) {
     try {
-      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8" });
+      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
       branch = stdout.trim();
     } catch { /* ignore */ }
   }
@@ -1569,14 +1570,14 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
 
   try {
     // Get diff stat
-    const { stdout: stat } = await execFileAsync("git", ["-C", repo, "diff", "--stat", `${baseBranch}...${branch}`], { encoding: "utf-8" });
+    const { stdout: stat } = await execFileAsync("git", ["-C", repo, "diff", "--stat", `${baseBranch}...${branch}`], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
 
     // Get full diff (truncated to 50KB)
     const { stdout: fullDiff } = await execFileAsync("git", ["-C", repo, "diff", `${baseBranch}...${branch}`], { encoding: "utf-8", maxBuffer: 1024 * 1024 });
     const diff = fullDiff.length > 50_000 ? fullDiff.slice(0, 50_000) + "\n... (truncated)" : fullDiff;
 
     // Parse shortstat for counts
-    const { stdout: shortstat } = await execFileAsync("git", ["-C", repo, "diff", "--shortstat", `${baseBranch}...${branch}`], { encoding: "utf-8" });
+    const { stdout: shortstat } = await execFileAsync("git", ["-C", repo, "diff", "--shortstat", `${baseBranch}...${branch}`], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
     // "3 files changed, 42 insertions(+), 7 deletions(-)"
     const filesMatch = shortstat.match(/(\d+) files? changed/);
     const insMatch = shortstat.match(/(\d+) insertions?/);
@@ -1585,12 +1586,12 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
     // Track file hashes for re-review detection
     const modifiedSinceReview: string[] = [];
     try {
-      const { stdout: diffNames } = await execFileAsync("git", ["-C", repo, "diff", "--name-only", `${baseBranch}...${branch}`], { encoding: "utf-8" });
+      const { stdout: diffNames } = await execFileAsync("git", ["-C", repo, "diff", "--name-only", `${baseBranch}...${branch}`], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
       const files = diffNames.trim().split("\n").filter(Boolean);
       const fileHashes: Record<string, string> = {};
       for (const file of files) {
         try {
-          const { stdout: hash } = await execFileAsync("git", ["-C", repo, "rev-parse", `${branch}:${file}`], { encoding: "utf-8" });
+          const { stdout: hash } = await execFileAsync("git", ["-C", repo, "rev-parse", `${branch}:${file}`], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
           fileHashes[file] = hash.trim();
         } catch { /* file may have been deleted */ }
       }
@@ -1648,7 +1649,7 @@ export async function createWorktreePR(app: AppContext, sessionId: string, opts?
   let branch = session.branch;
   if (!branch && existsSync(wtDir)) {
     try {
-      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8" });
+      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
       branch = stdout.trim();
     } catch { /* ignore */ }
   }
@@ -1719,7 +1720,7 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
   let branch: string | null = session.branch;
   if (!branch && isWorktree) {
     try {
-      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8" });
+      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
       branch = stdout.trim();
     } catch { /* ignore */ }
   }
@@ -1740,7 +1741,7 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
     // Still cleanup worktree after PR creation
     if (isWorktree) {
       try {
-        await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], { encoding: "utf-8" });
+        await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
       } catch (e: any) {
         logError("session", `finishWorktree: remove worktree failed: ${e?.message ?? e}`);
       }
@@ -1754,12 +1755,12 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
   if (!opts?.noMerge) {
     try {
       // Checkout target branch in the main repo
-      await execFileAsync("git", ["-C", repo, "checkout", targetBranch], { encoding: "utf-8" });
+      await execFileAsync("git", ["-C", repo, "checkout", targetBranch], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
       // Merge the worktree branch
-      await execFileAsync("git", ["-C", repo, "merge", branch, "--no-edit"], { encoding: "utf-8" });
+      await execFileAsync("git", ["-C", repo, "merge", branch, "--no-edit"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
     } catch {
       // Abort merge on conflict to preserve state
-      try { await execFileAsync("git", ["-C", repo, "merge", "--abort"], { encoding: "utf-8" }); } catch { /* ignore */ }
+      try { await execFileAsync("git", ["-C", repo, "merge", "--abort"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }); } catch { /* ignore */ }
       return { ok: false, message: `Merge conflict: ${branch} into ${targetBranch}. Resolve manually. Worktree preserved.` };
     }
   }
@@ -1767,7 +1768,7 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
   // 3. Remove worktree
   if (isWorktree) {
     try {
-      await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], { encoding: "utf-8" });
+      await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
     } catch (e: any) {
       logError("session", `finishWorktree: remove worktree failed: ${e?.message ?? e}`);
     }
@@ -1776,10 +1777,10 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
   // 4. Delete branch (unless --keep-branch)
   if (!opts?.keepBranch && branch !== targetBranch) {
     try {
-      await execFileAsync("git", ["-C", repo, "branch", "-d", branch], { encoding: "utf-8" });
+      await execFileAsync("git", ["-C", repo, "branch", "-d", branch], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
     } catch {
       // Branch may not exist or not be fully merged -- try force delete
-      try { await execFileAsync("git", ["-C", repo, "branch", "-D", branch], { encoding: "utf-8" }); } catch { /* ignore */ }
+      try { await execFileAsync("git", ["-C", repo, "branch", "-D", branch], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }); } catch { /* ignore */ }
     }
   }
 
@@ -1873,8 +1874,14 @@ export interface HookStatusResult {
   updates?: Partial<Session>;
   /** Events to log */
   events?: Array<{ type: string; opts: { actor?: string; stage?: string; data?: Record<string, unknown> } }>;
-  /** Usage data parsed from transcript */
-  usage?: claude.TranscriptUsage;
+  /** Usage data parsed from transcript (Claude-shaped; kept for backward compat with existing callers) */
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_input_tokens: number;
+    cache_creation_input_tokens: number;
+    total_tokens: number;
+  };
   /** Transcript indexing info */
   indexTranscript?: { transcriptPath: string; sessionId: string };
 }
@@ -1983,16 +1990,20 @@ export function applyHookStatus(app: AppContext,
   const transcriptPath = payload.transcript_path as string | undefined;
   if (transcriptPath && (hookEvent === "Stop" || hookEvent === "SessionEnd")) {
     try {
-      const usage = parseTranscriptUsage(transcriptPath);
-      if (usage.total_tokens > 0) {
-        result.usage = usage;
-        // Also record to UsageRecorder for persistent multi-dimensional attribution
-        recordSessionUsage(app, session, {
-          input_tokens: usage.input_tokens,
-          output_tokens: usage.output_tokens,
-          cache_read_tokens: usage.cache_read_input_tokens,
-          cache_write_tokens: usage.cache_creation_input_tokens,
-        }, "claude", "transcript");
+      const parser = app.transcriptParsers.get("claude");
+      if (parser) {
+        const { usage } = parser.parse(transcriptPath);
+        const total = usage.input_tokens + usage.output_tokens + (usage.cache_read_tokens ?? 0) + (usage.cache_write_tokens ?? 0);
+        if (total > 0) {
+          result.usage = {
+            input_tokens: usage.input_tokens,
+            output_tokens: usage.output_tokens,
+            cache_read_input_tokens: usage.cache_read_tokens ?? 0,
+            cache_creation_input_tokens: usage.cache_write_tokens ?? 0,
+            total_tokens: total,
+          };
+          recordSessionUsage(app, session, usage, "anthropic", "transcript");
+        }
       }
     } catch (e: any) { logError("session", "transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) }); }
 
@@ -2346,7 +2357,7 @@ export async function cleanupWorktrees(app: AppContext): Promise<{ removed: numb
     const wtPath = join(app.config.worktreesDir, id);
     try {
       // Try git worktree remove first
-      await execFileAsync("git", ["worktree", "remove", wtPath, "--force"], { encoding: "utf-8" });
+      await execFileAsync("git", ["worktree", "remove", wtPath, "--force"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
       removed++;
     } catch {
       // Fallback: just remove the directory

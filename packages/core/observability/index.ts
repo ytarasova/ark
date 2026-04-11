@@ -1,4 +1,4 @@
-export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, syncCosts, exportCostsCsv, type SessionCost, type BudgetConfig, type BudgetStatus } from "./costs.js";
+export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, syncCosts, exportCostsCsv, type SessionCostSummary, type BudgetConfig, type BudgetStatus } from "./costs.js";
 export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponents, setLogArkDir, type LogComponent, type LogLevel } from "./structured-log.js";
 export { truncateLog, cleanupLogs, logDir, type LogManagerOptions } from "./log-manager.js";
 export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry, isTelemetryEnabled, configureTelemetry, resetTelemetry, type TelemetryEvent, type TelemetryConfig } from "./telemetry.js";

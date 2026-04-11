@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../hooks/useApi.js";
 import { useSmartPoll } from "../hooks/useSmartPoll.js";
-import { fmtCost, relTime } from "../util.js";
+import { fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card.js";
 import { StatusDot } from "./StatusDot.js";

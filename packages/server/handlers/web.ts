@@ -54,9 +54,9 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
     const { format } = extract<{ format?: string }>(p, []);
     const sessions = app.sessions.list({ limit: 500 });
     if (format === "csv") {
-      return { csv: exportCostsCsv(sessions) };
+      return { csv: exportCostsCsv(app, sessions) };
     }
-    return getAllSessionCosts(sessions);
+    return getAllSessionCosts(app, sessions);
   });
 
   // ── MCP attach/detach by directory (web-specific contract) ───────────────

@@ -37,6 +37,10 @@ import { cliAgentExecutor } from "./executors/cli-agent.js";
 import { SessionRepository, ComputeRepository, ComputeTemplateRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
 import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "./stores/index.js";
+import { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
+import { ClaudeTranscriptParser } from "./runtimes/claude/parser.js";
+import { CodexTranscriptParser } from "./runtimes/codex/parser.js";
+import { GeminiTranscriptParser } from "./runtimes/gemini/parser.js";
 import { DbResourceStore, initResourceDefinitionsTable } from "./stores/db-resource-store.js";
 import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore } from "./stores/index.js";
 import type { SessionLauncher } from "./session-launcher.js";
@@ -153,6 +157,10 @@ export class AppContext {
 
   get pricing(): PricingRegistry { return this._resolve("pricing"); }
   get usageRecorder(): UsageRecorder { return this._resolve("usageRecorder"); }
+
+  // ── Runtime transcript parsers ────────────────────────────────────────
+
+  get transcriptParsers(): TranscriptParserRegistry { return this._resolve("transcriptParsers"); }
 
   // ── TensorZero gateway ────────────────────────────────────────────────
 
@@ -414,6 +422,9 @@ export class AppContext {
       // Cost tracking
       pricing: asValue(pricingRegistry),
       usageRecorder: asValue(new UsageRecorder(db, pricingRegistry)),
+
+      // Runtime transcript parsers (polymorphic, one per agent tool)
+      transcriptParsers: asValue(this.createTranscriptParserRegistry()),
     });
 
     // 3c. Non-blocking remote price refresh (best-effort)
@@ -694,6 +705,28 @@ export class AppContext {
   }
 
   // ── Resource Store Factory ─────────────────────────────────────────────
+
+  /**
+   * Build the TranscriptParserRegistry with all known runtime parsers.
+   * To add a new runtime, create a parser class under packages/core/runtimes/<name>/parser.ts
+   * and register it here.
+   */
+  private createTranscriptParserRegistry(): TranscriptParserRegistry {
+    const registry = new TranscriptParserRegistry();
+    // Claude parser uses session.claude_session_id (set at launch via --session-id)
+    // to construct the exact transcript path. The sessionIdLookup bridges workdir
+    // back to that stored ID by querying the session repo.
+    registry.register(new ClaudeTranscriptParser(undefined, (workdir) => {
+      try {
+        const sessions = this.sessions.list({ limit: 50 });
+        const match = sessions.find(s => s.workdir === workdir && s.claude_session_id);
+        return match?.claude_session_id ?? null;
+      } catch { return null; }
+    }));
+    registry.register(new CodexTranscriptParser());
+    registry.register(new GeminiTranscriptParser());
+    return registry;
+  }
 
   private createResourceStores(db: IDatabase, storeBaseDir: string): Record<string, any> {
     const isHosted = !!this.config.databaseUrl;

@@ -26,7 +26,7 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
     let todayCost: number;
     let weekCost: number;
     let monthCost: number;
-    let byModel: Record<string, number> = {};
+    const byModel: Record<string, number> = {};
     let costSessions: any[];
 
     // Try usage_records first (universal tracking)
@@ -42,10 +42,10 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
       }
       costSessions = [];
     } else {
-      // Fall back to legacy session config-based costs
-      const legacy = getAllSessionCosts(sessions);
-      totalCost = legacy.total;
-      costSessions = legacy.sessions;
+      // Fall back to per-session cost lookup from UsageRecorder
+      const all = getAllSessionCosts(app, sessions);
+      totalCost = all.total;
+      costSessions = all.sessions;
       for (const c of costSessions) {
         const model = c.model ?? "unknown";
         byModel[model] = (byModel[model] ?? 0) + c.cost;
@@ -54,14 +54,14 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
       const todaySessions = sessions.filter(s => s.updated_at >= todayStart);
       const weekSessions = sessions.filter(s => s.updated_at >= weekStart.toISOString());
       const monthSessions = sessions.filter(s => s.updated_at >= monthStart);
-      todayCost = getAllSessionCosts(todaySessions).total;
-      weekCost = getAllSessionCosts(weekSessions).total;
-      monthCost = getAllSessionCosts(monthSessions).total;
+      todayCost = getAllSessionCosts(app, todaySessions).total;
+      weekCost = getAllSessionCosts(app, weekSessions).total;
+      monthCost = getAllSessionCosts(app, monthSessions).total;
     }
 
     // Budget info
     const budgets = app.config.budgets ?? {};
-    const budget = checkBudget(sessions, budgets);
+    const budget = checkBudget(app, sessions, budgets);
 
     // Recent events (last 10 across all sessions)
     const recentEvents: any[] = [];

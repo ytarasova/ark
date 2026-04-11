@@ -53,8 +53,4 @@ export class ClaudeDriver implements ToolDriver {
     });
     return { script: result.content, sessionId: result.claudeSessionId };
   }
-
-  parseUsage(transcriptPath: string) {
-    return claude.parseTranscriptUsage(transcriptPath);
-  }
 }
