@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { StatusBadge } from "./StatusDot.js";
 import { api } from "../hooks/useApi.js";
+import { useSessionDetailData } from "../hooks/useSessionDetailData.js";
 import { relTime, fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
@@ -104,79 +105,15 @@ function SessionActions({ session, onAction, onSend }: { session: any; onAction:
 }
 
 export function SessionDetail({ sessionId, onClose, onToast, readOnly }: SessionDetailProps) {
-  const [detail, setDetail] = useState<any>(null);
-  const [output, setOutput] = useState("");
-  const outputRef = useRef<HTMLDivElement>(null);
+  const { detail, setDetail, todos, setTodos, messages, flowStages, cost, output, outputRef } = useSessionDetailData(sessionId);
   const [diffData, setDiffData] = useState<any>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [showPRForm, setShowPRForm] = useState(false);
   const [prTitle, setPrTitle] = useState("");
   const [prDraft, setPrDraft] = useState(false);
   const [prUrl, setPrUrl] = useState<string | null>(null);
-  const [todos, setTodos] = useState<any[]>([]);
   const [newTodo, setNewTodo] = useState("");
   const [verifyResult, setVerifyResult] = useState<any>(null);
-  const [flowStages, setFlowStages] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [cost, setCost] = useState<{
-    cost: number; input_tokens: number; output_tokens: number;
-    cache_read_tokens: number; total_tokens: number;
-  } | null>(null);
-
-  // Load todos
-  useEffect(() => {
-    if (!sessionId) return;
-    api.getTodos(sessionId).then((data) => setTodos(Array.isArray(data) ? data : [])).catch(() => {});
-  }, [sessionId]);
-
-  // Load conversation messages
-  useEffect(() => {
-    if (!sessionId) return;
-    api.getMessages(sessionId)
-      .then((data) => setMessages(Array.isArray(data?.messages) ? data.messages : Array.isArray(data) ? data : []))
-      .catch(() => {});
-  }, [sessionId]);
-
-  // Load detail
-  useEffect(() => {
-    if (!sessionId) return;
-    api.getSession(sessionId).then(setDetail);
-  }, [sessionId]);
-
-  // Load session cost from usage_records
-  useEffect(() => {
-    if (!sessionId) { setCost(null); return; }
-    api.getSessionCost(sessionId).then(setCost).catch(() => setCost(null));
-  }, [sessionId, detail?.session?.updated_at]);
-
-  // Load flow stages for pipeline visualization
-  useEffect(() => {
-    if (!detail?.session?.flow) { setFlowStages([]); return; }
-    api.getFlowDetail(detail.session.flow)
-      .then((d: any) => setFlowStages(d.stages || []))
-      .catch(() => setFlowStages([]));
-  }, [detail?.session?.flow]);
-
-  // Poll output for running sessions
-  useEffect(() => {
-    if (!detail || !detail.session) return;
-    if (detail.session.status !== "running" && detail.session.status !== "waiting") return;
-    let active = true;
-    function poll() {
-      if (!active) return;
-      api.getOutput(sessionId)
-        .then((d) => { if (active && d.output) setOutput(d.output); })
-        .catch(() => {});
-    }
-    poll();
-    const iv = setInterval(poll, 2000);
-    return () => { active = false; clearInterval(iv); };
-  }, [detail?.session?.status, sessionId]);
-
-  // Auto-scroll output
-  useEffect(() => {
-    if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
-  }, [output]);
 
   async function handleAction(action: string) {
     try {
