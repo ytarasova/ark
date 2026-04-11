@@ -133,9 +133,10 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
 }
 
 /**
- * Get aggregate stats for an agent role.
+ * Get aggregate stats for an agent role, or across all agents when
+ * `agentRole` is omitted.
  */
-export function getAgentStats(app: AppContext, agentRole: string): {
+export function getAgentStats(app: AppContext, agentRole?: string): {
   totalSessions: number;
   completionRate: number;
   avgDurationMs: number;
@@ -146,7 +147,7 @@ export function getAgentStats(app: AppContext, agentRole: string): {
 } {
   const evalNodes = app.knowledge.listNodes({ type: "session" })
     .map(n => ({ node: n, meta: asEvalMeta(n.metadata) }))
-    .filter(({ meta }) => meta.eval && meta.agentRole === agentRole);
+    .filter(({ meta }) => meta.eval && (!agentRole || meta.agentRole === agentRole));
 
   if (evalNodes.length === 0) {
     return { totalSessions: 0, completionRate: 0, avgDurationMs: 0, avgCost: 0, avgTurns: 0, testPassRate: 0, prRate: 0 };
