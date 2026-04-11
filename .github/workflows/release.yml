@@ -426,6 +426,11 @@ jobs:
           if [ -f "./ark-$PLAT/bin/tmux" ]; then
             "./ark-$PLAT/bin/tmux" -V
             echo "Bundled tmux works"
+          elif [ "$PLAT" = "darwin-x64" ]; then
+            # darwin-x64 intentionally ships without a bundled tmux -- users
+            # `brew install tmux`. The release pipeline would otherwise fail
+            # on macos-13 Intel runner queue saturation.
+            echo "darwin-x64: no bundled tmux (expected)"
           else
             echo "No bundled tmux -- FAIL"
             exit 1
