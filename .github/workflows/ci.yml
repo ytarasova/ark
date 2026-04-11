@@ -28,7 +28,11 @@ jobs:
         run: bun install
 
       - name: Lint
-        run: npx eslint packages/ --max-warnings 50
+        # Use bunx --bun eslint to pin the version to whatever bun.lock
+        # has installed. Plain `npx eslint` was pulling whatever ESLint
+        # npx had cached (v10 on a fresh runner), which requires the new
+        # flat config and breaks instantly on this legacy repo.
+        run: bunx --bun eslint packages/ --max-warnings 50
 
       - name: Unit tests (excludes E2E and integration)
         run: |
@@ -154,6 +158,10 @@ jobs:
       - name: Install dependencies
         run: bun install
       - name: Install Playwright browsers
-        run: cd packages/e2e && npm install && npx playwright install chromium
+        # bunx --bun: the fixture (packages/e2e/fixtures/web-server.ts)
+        # uses Bun APIs (`import { spawn } from "bun"`, `import.meta.dir`,
+        # `Bun.sleep`) that the Node Playwright runner can't parse. Running
+        # Playwright under Bun makes the imports resolve.
+        run: cd packages/e2e && bun install && bunx --bun playwright install chromium
       - name: Run Web UI E2E tests
-        run: cd packages/e2e && npx playwright test
+        run: cd packages/e2e && bunx --bun playwright test
