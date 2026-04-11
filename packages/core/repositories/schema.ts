@@ -45,11 +45,14 @@ export function initSchema(db: IDatabase): void {
 
     CREATE INDEX IF NOT EXISTS idx_events_track ON events(track_id);
     CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
+    CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
     CREATE INDEX IF NOT EXISTS idx_sessions_repo ON sessions(repo);
     CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_name);
     CREATE INDEX IF NOT EXISTS idx_sessions_pr_url ON sessions(pr_url);
+    CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 
     CREATE TABLE IF NOT EXISTS compute (
       name TEXT PRIMARY KEY,
@@ -63,6 +66,7 @@ export function initSchema(db: IDatabase): void {
 
     CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider);
     CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status);
+    CREATE INDEX IF NOT EXISTS idx_compute_tenant ON compute(tenant_id);
 
     CREATE TABLE IF NOT EXISTS compute_templates (
       name TEXT NOT NULL,
@@ -87,6 +91,7 @@ export function initSchema(db: IDatabase): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_tenant ON messages(tenant_id);
 
     CREATE TABLE IF NOT EXISTS groups (
       name TEXT NOT NULL,
@@ -126,6 +131,8 @@ export function initSchema(db: IDatabase): void {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_todos_session ON todos(session_id);
+    CREATE INDEX IF NOT EXISTS idx_todos_tenant ON todos(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_groups_tenant ON groups(tenant_id);
 
     CREATE TABLE IF NOT EXISTS schedules (
       id TEXT PRIMARY KEY,
@@ -142,6 +149,7 @@ export function initSchema(db: IDatabase): void {
       user_id TEXT,
       created_at TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_schedules_tenant ON schedules(tenant_id);
 
     CREATE TABLE IF NOT EXISTS api_keys (
       id TEXT PRIMARY KEY,
@@ -155,10 +163,7 @@ export function initSchema(db: IDatabase): void {
     );
     CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
-  `);
 
-  // Resource definitions table (DB-backed stores for control plane)
-  db.exec(`
     CREATE TABLE IF NOT EXISTS resource_definitions (
       name TEXT NOT NULL,
       kind TEXT NOT NULL,
@@ -167,54 +172,13 @@ export function initSchema(db: IDatabase): void {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       PRIMARY KEY (name, kind, tenant_id)
-    )
+    );
   `);
 
-  // Migration: add tenant_id column to existing tables that lack it.
-  // ALTER TABLE ADD COLUMN is safe to run -- SQLite errors if column exists,
-  // so we catch and ignore.
-  migrateAddColumn(db, "sessions", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
-  migrateAddColumn(db, "sessions", "user_id", "TEXT");
-  migrateAddColumn(db, "events", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
-  migrateAddColumn(db, "compute", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
-  migrateAddColumn(db, "messages", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
-  migrateAddColumn(db, "todos", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
-
-  // Migrations for groups, schedules, compute_pools tenant columns
-  migrateAddColumn(db, "groups", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
-  migrateAddColumn(db, "schedules", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
-  migrateAddColumn(db, "schedules", "user_id", "TEXT");
-  migrateAddColumn(db, "compute_pools", "tenant_id", "TEXT NOT NULL DEFAULT 'default'");
-
-  // Tenant indexes
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_compute_tenant ON compute(tenant_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_messages_tenant ON messages(tenant_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_todos_tenant ON todos(tenant_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_groups_tenant ON groups(tenant_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_schedules_tenant ON schedules(tenant_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)");
-
-  // Ensure api_keys table exists for existing DBs (CREATE TABLE IF NOT EXISTS handles it)
-  safeExec(db, `
-    CREATE TABLE IF NOT EXISTS api_keys (
-      id TEXT PRIMARY KEY,
-      tenant_id TEXT NOT NULL,
-      key_hash TEXT NOT NULL,
-      name TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'member',
-      created_at TEXT NOT NULL,
-      last_used_at TEXT,
-      expires_at TEXT
-    )
-  `);
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)");
-
-  // Compute pools table
+  // Compute pools table (defined in its own module so the pool manager can
+  // re-run it when booted directly in tests).
   initPoolSchema(db);
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)");
 
   // Knowledge graph tables
   initKnowledgeSchema(db);
@@ -277,7 +241,6 @@ export function initUsageSchema(db: IDatabase): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
-  migrateAddColumn(db, "usage_records", "cost_mode", "TEXT NOT NULL DEFAULT 'api'");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_records(session_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_cost_mode ON usage_records(cost_mode)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_tenant ON usage_records(tenant_id)");
@@ -286,16 +249,7 @@ export function initUsageSchema(db: IDatabase): void {
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at)");
 }
 
-/** Add a column to a table if it doesn't already exist. Silently ignores duplicate column errors. */
-function migrateAddColumn(db: IDatabase, table: string, column: string, definition: string): void {
-  try {
-    db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
-  } catch {
-    // Column already exists -- expected for new databases or re-runs
-  }
-}
-
-/** Execute a SQL statement, ignoring errors (for idempotent migrations). */
+/** Execute a SQL statement, swallowing errors (for best-effort idempotent init). */
 function safeExec(db: IDatabase, sql: string): void {
   try {
     db.exec(sql);

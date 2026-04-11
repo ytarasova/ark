@@ -95,7 +95,7 @@ packages/protocol/                      → ArkClient (typed JSON-RPC client)
 
 ## Key Gotchas
 
-**FTS5 table needs manual creation on existing DBs.** The `transcript_index` FTS5 virtual table is in `initSchema()` but `CREATE VIRTUAL TABLE IF NOT EXISTS` only runs when the DB is first created. If you add new tables, existing `~/.ark/ark.db` files won't get them - run the SQL manually or delete the DB.
+**Schema is truncated -- no in-place migrations.** `packages/core/repositories/schema.ts` is the authoritative `CREATE TABLE` definition. There is no formal migration layer (pre-pilot, no production data worth preserving). If you change an existing column's type or rename one, the dev workflow is `rm ~/.ark/ark.db` -- all tables recreate from scratch on next boot. Adding new tables or columns with a `DEFAULT` is still transparent because every `CREATE TABLE` uses `IF NOT EXISTS`. A real migration system lands when the first pilot user has durable state worth preserving.
 
 **ARK_DIR resolved at call time.** `paths.ts` `ARK_DIR()` is a function that reads from AppContext config via `getApp()`. Use `AppContext.forTest()` for test isolation -- it creates a temp directory and sets up an isolated DB.
 
