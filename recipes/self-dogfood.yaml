@@ -1,0 +1,29 @@
+name: self-dogfood
+description: |
+  Dispatch an ark agent to work on the ark repo itself. Targets small,
+  scoped tasks (bug fixes, test additions, small features, docs).
+  Uses the bare flow + worker agent + claude runtime. Always runs from
+  the ark repo root so `repo: .` resolves correctly.
+
+  Not intended for large refactors or multi-stage SDLC work -- use
+  `islc` or `new-feature` for those.
+
+  Typical invocation:
+    ark session start --recipe self-dogfood \
+      --summary "fix the desktop .dmg release pipeline per Camp 8 Tier 1" \
+      --dispatch
+
+  Or via the Makefile shortcut:
+    make self TASK="fix the desktop .dmg release pipeline per Camp 8 Tier 1"
+
+  The agent runs inside an isolated git worktree, runs `make test`
+  locally to verify, and auto-creates a PR against main on completion.
+
+repo: "."
+flow: bare
+agent: worker
+
+variables:
+  - name: summary
+    description: What the agent should do -- scoped, concrete, one-sentence
+    required: true
