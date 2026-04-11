@@ -88,8 +88,15 @@ test-tui-e2e: ## Run TUI end-to-end tests via browser harness (xterm.js + real p
 	  node node_modules/@playwright/test/cli.js test
 
 test-web-e2e: build-web ## Run web end-to-end tests (Playwright against the web dashboard)
-	@cd packages/e2e && npx playwright install chromium --with-deps 2>/dev/null; \
-	  npx playwright test
+	@# `bunx --bun playwright test` runs Playwright under Bun, which is
+	@# required: fixtures/web-server.ts uses Bun APIs (`import { spawn }
+	@# from "bun"`, `import.meta.dir`, `Bun.sleep`) that Node can't parse.
+	@# Using `npx playwright test` here produces a misleading
+	@# "SyntaxError: Cannot use 'import.meta' outside a module" on every
+	@# spec file.
+	@cd packages/e2e && bun install --silent 2>/dev/null; \
+	  bunx --bun playwright install chromium --with-deps 2>/dev/null; \
+	  bunx --bun playwright test
 
 test-watch: ## Run unit tests in watch mode
 	$(BUN) test --watch

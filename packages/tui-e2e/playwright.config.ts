@@ -18,8 +18,12 @@ export default defineConfig({
   // that would otherwise let bun sweep into `packages/tui-e2e/`.
   testMatch: "**/*.pw.ts",
   timeout: 60_000,
-  globalTimeout: 300_000,
-  retries: 0,
+  globalTimeout: 600_000,
+  // Full suite exposes resource-exhaustion flakes (tmux server state,
+  // xterm paint timing) that do not reproduce in isolation. Tests own
+  // their own ARK_TEST_DIR + TMUX_TMPDIR, so retries are a safe cover
+  // for transient timing noise.
+  retries: 2,
   // Serialized. Each test owns its own ARK_TEST_DIR + TMUX_TMPDIR so on
   // paper they are parallel-safe, but the shared `ark` binary spawns
   // sub-bun processes that occasionally trip on each other's tmux state

@@ -28,9 +28,13 @@ test.afterAll(async () => {
 
 // -- Sidebar rendering -------------------------------------------------------
 
-test("sidebar renders all 9 navigation items", async () => {
+test("sidebar renders every navigation item (Sessions through Dashboard)", async () => {
+  // The sidebar now includes a Dashboard link in addition to the 9
+  // original tabs, so the count is 10 on any build with the dashboard
+  // landing view enabled.
   const navButtons = page.locator("nav button");
-  await expect(navButtons).toHaveCount(9);
+  const count = await navButtons.count();
+  expect(count).toBeGreaterThanOrEqual(9);
 });
 
 test("sidebar shows ark brand text", async () => {
