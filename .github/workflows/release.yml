@@ -271,11 +271,13 @@ jobs:
           retention-days: 1
 
   # Assemble self-contained distribution tarballs.
-  # vendor-tensorzero intentionally excluded -- it's continue-on-error and the
-  # tarball can ship without it. Users get an inert sidecar; runtime fetch
-  # logic falls back gracefully.
+  # The package job depends only on the strictly required builds (build-ark
+  # and build-web). vendor-tmux/codegraph/tensorzero artifacts are downloaded
+  # with continue-on-error so a partial vendor matrix (e.g. one runner queue
+  # cancellation) doesn't block the whole release. The corresponding bundle
+  # ships without that optional binary; runtime fallbacks handle the gap.
   package:
-    needs: [build-ark, vendor-tmux-darwin, vendor-tmux-linux, vendor-codegraph, build-web]
+    needs: [build-ark, build-web]
     strategy:
       fail-fast: false
       matrix:
