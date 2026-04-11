@@ -36,6 +36,7 @@ import { SessionRepository, ComputeRepository, ComputeTemplateRepository, EventR
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
 import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "./stores/index.js";
 import { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
+import { createPluginRegistry, type PluginRegistry } from "./plugins/registry.js";
 import { ClaudeTranscriptParser } from "./runtimes/claude/parser.js";
 import { CodexTranscriptParser } from "./runtimes/codex/parser.js";
 import { GeminiTranscriptParser } from "./runtimes/gemini/parser.js";
@@ -159,6 +160,10 @@ export class AppContext {
   // ── Runtime transcript parsers ────────────────────────────────────────
 
   get transcriptParsers(): TranscriptParserRegistry { return this._resolve("transcriptParsers"); }
+
+  // ── Plugin registry (executors, compute providers, transcript parsers) ──
+
+  get pluginRegistry(): PluginRegistry { return this._resolve("pluginRegistry"); }
 
   // ── TensorZero gateway ────────────────────────────────────────────────
 
@@ -460,6 +465,10 @@ export class AppContext {
 
       // Runtime transcript parsers (polymorphic, one per agent tool)
       transcriptParsers: asValue(this.createTranscriptParserRegistry()),
+
+      // Plugin registry -- canonical source for extensible collections
+      // (executors today; compute providers, runtimes, transcript parsers in Phase 2)
+      pluginRegistry: asValue(createPluginRegistry()),
     });
 
     // Non-blocking remote price refresh
@@ -510,12 +519,13 @@ export class AppContext {
     this.sessionService.setApp(this);
     setProviderResolver((session: Session) => this.resolveProvider(session));
 
-    // Built-in executors -- register into both the module-level lookup
-    // (for legacy getExecutor() call sites) and the Awilix container (for
-    // DI-based resolution under the `executor:<name>` key).
+    // Built-in executors -- register into the PluginRegistry (authoritative)
+    // and the module-level legacy map (for call sites without an AppContext,
+    // e.g. older tests). Both see the same instances.
+    const pluginRegistry = this.pluginRegistry;
     for (const ex of builtinExecutors) {
+      pluginRegistry.register({ kind: "executor", name: ex.name, impl: ex, source: "builtin" });
       registerExecutor(ex);
-      this._container.register({ [`executor:${ex.name}`]: asValue(ex) });
     }
 
     // User-provided executor plugins from <arkDir>/plugins/executors/*.js.
@@ -523,8 +533,8 @@ export class AppContext {
     loadPluginExecutors(this.config.arkDir, (msg) => logWarn("plugins", msg))
       .then((plugins) => {
         for (const ex of plugins) {
+          pluginRegistry.register({ kind: "executor", name: ex.name, impl: ex, source: "user" });
           registerExecutor(ex);
-          this._container.register({ [`executor:${ex.name}`]: asValue(ex) });
         }
       })
       .catch((e: any) => logWarn("plugins", `loadPluginExecutors failed: ${e?.message ?? e}`));

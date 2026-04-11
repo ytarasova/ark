@@ -18,7 +18,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
 
   const interval = setInterval(async () => {
     try {
-      const executor = getExecutor(executorName);
+      const executor = app.pluginRegistry.executor(executorName) ?? getExecutor(executorName);
       if (!executor) { stopStatusPoller(sessionId); return; }
 
       const status = await executor.status(handle);

@@ -44,6 +44,10 @@ export {
   loadPluginExecutors,
 } from "./executors/index.js";
 export { buildGooseCommand } from "./executors/goose.js";
+
+// Plugin registry -- canonical source for extensible collections
+export type { PluginRegistry, PluginEntry, PluginKind, PluginKindMap, PluginSource } from "./plugins/registry.js";
+export { createPluginRegistry } from "./plugins/registry.js";
 export { startStatusPoller, stopStatusPoller, stopAllPollers } from "./executors/status-poller.js";
 
 // Session launcher abstraction

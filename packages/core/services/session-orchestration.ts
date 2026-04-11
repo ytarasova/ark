@@ -416,9 +416,10 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     } catch { /* skip repo map on error */ }
   }
 
-  // Resolve executor -- use resolved runtime type (from RuntimeStore merge), fall back to agent.runtime, then claude-code
+  // Resolve executor -- use resolved runtime type (from RuntimeStore merge), fall back to agent.runtime, then claude-code.
+  // Reads through app.pluginRegistry, the canonical source for extensible collections.
   const runtime = agent._resolved_runtime_type ?? agent.runtime ?? "claude-code";
-  const executor = getExecutor(runtime);
+  const executor = app.pluginRegistry.executor(runtime) ?? getExecutor(runtime);
   if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
 
   // Build claude args (only for claude-code executor)

@@ -347,6 +347,49 @@ All three are the same binary with different config. No separate builds.
 
 **Pilot (Camp 0) scope:** **IN, optional**. If the pilot user needs anything heavier than local docker, they get an Ark token and federated compute instead of setting up AWS. If local docker is enough, this is deferred.
 
+### Camp 13: Plugin Platform (Registry, Discovery, Sandboxing)
+
+**Goal:** Every extensible collection in Ark (executors, compute providers, runtimes, transcript parsers, flows, skills, recipes, agents) flows through a single `PluginRegistry`. External plugin authors can ship typed plugins with a manifest, versioning, hot reload, and optional sandboxing.
+
+**Phase 1 (DONE, 2026-04-11):** `PluginRegistry` as a first-class Awilix service (`packages/core/plugins/registry.ts`). Executors register into it at boot; `session-orchestration` and `status-poller` resolve executors via `app.pluginRegistry.executor(name)`. Legacy `registerExecutor` / `getExecutor` module API stays public as a compat mirror for non-app call sites (tests). `builtinExecutors: Executor[]` in `packages/core/executors/index.ts` remains the source-of-truth array; adding a new executor still means touching exactly one barrel file.
+
+**Phase 2 (next, ~3-4 days):** Unification. Port compute providers, runtimes, transcript parsers, and the file-backed stores (flows, skills, recipes, agents) to register into `PluginRegistry`. Existing stores become thin read adapters that query the registry instead of owning their own maps. Three-tier source resolution (`builtin` → `user` → `project` / `tenant`) lives in ONE place instead of five. `getProvider(name)` in `packages/compute/` becomes `app.pluginRegistry.get("compute-provider", name)`.
+
+| Task | Effort | Notes |
+|------|--------|-------|
+| Extend `PluginKindMap` with `compute-provider`, `runtime`, `transcript-parser`, `flow`, `skill`, `recipe`, `agent` | 0.5 day | Type surface only; no behavior change. |
+| Port compute providers | 1 day | `packages/compute/index.ts` populates `pluginRegistry` at boot; `getProvider(name)` becomes a shim. Tenant policy still gates which providers a tenant can use. |
+| Port transcript parsers | 0.5 day | `TranscriptParserRegistry` becomes a read adapter over `pluginRegistry`. |
+| Port runtime / flow / skill / recipe / agent stores | 1 day each | Existing `FileFlowStore` / `FileSkillStore` / etc. become ingestion paths that push entries into the registry on boot + on file-watcher events. |
+| Single three-tier resolver (`builtin` → `user` → `project` / `tenant`) | 0.5 day | Extract the resolution logic into a helper that every store uses. |
+| Tests + migration notes | 0.5 day | Full suite green; behaviour identical from the user's POV. |
+
+**Phase 3 (future, ~2-3 days): plugin contract + hot reload + versioning.**
+
+| Task | Effort | Notes |
+|------|--------|-------|
+| Plugin manifest schema (`PluginManifest`) | 0.5 day | `{ name, kind, version, apiVersion, capabilities[], dependencies?, signature? }`. Exported alongside the impl: `export const manifest = {...}; export default impl;`. |
+| `apiVersion` gating at load time | 0.5 day | Loader compares `manifest.apiVersion` to Ark's current plugin API version. Mismatches warn + skip instead of loading. Ark semver drifts independently from plugin semver. |
+| Hot reload (file-watcher) | 1 day | `~/.ark/plugins/**` watched via chokidar-style API. On change: call `onUnload?()` on the old impl, unregister, fresh `import()` of the new module, re-register. Stateless plugins (executors, providers) are safe; stateful ones must declare `onUnload`. |
+| CLI: `ark plugin install/remove/list/upgrade` | 1 day | Thin wrapper over filesystem ops + the registry. Install = download + place in `~/.ark/plugins/<kind>/`; list = iterate registry entries by source; upgrade = re-fetch against manifest. |
+| Tenant policy gate | 0.5 day | `tenant.plugin_policy: { allow: ["builtin"] | ["builtin", "signed"] | ["*"] }`. Enforced before the loader touches disk in hosted mode. |
+
+**Phase 4 (future, 2-4 days): plugin sandboxing.**
+
+**Why this matters.** A plugin in Ark is arbitrary JS/TS code the user downloaded from somewhere. In local mode it has the same permissions as `ark` itself, which is effectively the user's shell -- fine for trusted plugins. In hosted mode we CANNOT allow tenant A's plugin to read tenant B's filesystem, spawn arbitrary commands, or exfiltrate secrets.
+
+**The four mechanisms, in increasing strictness:**
+
+1. **Capability-based API surface (primary layer, ships as default).** Plugins don't get global access to `fs`, `child_process`, or `net`. They receive a `PluginContext` object at `initialize()` containing only the capabilities their manifest declared: `context.readWorkdir(path)`, `context.spawnAgent(cmd)`, `context.log(msg)`, etc. Direct `import { readFileSync } from "fs"` is still legal, but the plugin has no way to call it with a meaningful path because the worktree location comes from `context`, not globals. Soft isolation: a determined plugin can still `require("fs")` and guess paths, but innocent plugins are provably safe and malicious ones have to go out of their way.
+
+2. **Bun Workers (secondary layer, opt-in for hosted mode).** Hosted Ark spawns each plugin in `new Worker(pluginPath)` with structured-clone `postMessage` between worker and main. The plugin sees a worker-scoped `self`, can't touch the main process's memory, and its stdout/stderr/log pipe through a controlled channel. Full Node APIs are still present inside the worker but it has no file descriptors from the main process. Kill-on-timeout if the worker hangs. Cost: ~10-20ms per plugin call. Acceptable for infrequent ops.
+
+3. **Child process isolation (strongest, opt-in per tenant).** Plugins marked `trust: low` in the manifest spawn as a child process with `sandbox-exec` (macOS) / `bwrap` (Linux) constraints: no outbound network, read-only rootfs except a bounded workdir, `no-new-privileges`. ~50-100ms per call. Defeats even malicious plugins.
+
+4. **Tenant policy gate (control plane, enforced at install time).** Before the loader touches a plugin module, `tenant.plugin_policy` is consulted: `allow: ["builtin"]` (no user plugins at all), `allow: ["builtin", "signed"]` (only plugins whose manifest matches a known signature allow-list), `allow: ["*"]` (anything -- local mode default). The policy is the first gate; sandboxing is the second.
+
+**Phase 4 ships #1 + #4 as the default and makes #2 / #3 available as per-tenant opt-ins.** Hosted mode can require #2 for any non-builtin plugin. Phase 4 is deferred until external plugin authors are a real use case; until then, built-in + trusted-user plugins are fine without sandboxing.
+
 ### Camp 9: Architecture Hardening
 
 **Goal:** Codebase is production-grade and maintainable.
@@ -370,6 +413,7 @@ Camp 1: Integration Testing      ████████████   Prove wh
 Camp 10: Dev-Env + Pre-Eng       ██████████     Unblocks Claude-at-fleet, non-engineer adoption
 Camp 11: Multi-Repo Support      ██████████     Real work crosses repos; lands after pilot closes first bug
 Camp 12: Federated Compute       ██████████     Unblocks pilot: local client + remote compute via token, no AWS creds on user laptops
+Camp 13: Plugin Platform         ████████       Phase 1 DONE (registry + DI); Phases 2-4 (unify stores, manifest/versioning/hot-reload, sandboxing)
 Camp 2: Workflow Persistence     ████████       Temporal + crash recovery
 Camp 3: Agent Intelligence       ████           Partially done (evals, costs done; trust, latency remain)
 Camp 4: Dashboard & Viz          ████           Partially done (dashboard, charts done; live feed, graph viz remain)
