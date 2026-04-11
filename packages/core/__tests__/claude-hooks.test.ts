@@ -4,7 +4,7 @@
 import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { writeHooksConfig, removeHooksConfig, buildPermissionsAllow } from "../claude/claude.js";
+import { writeHooksConfig, removeHooksConfig, buildPermissionsAllow, buildToolHints } from "../claude/claude.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
@@ -279,6 +279,58 @@ describe("writeHooksConfig with agent", () => {
 });
 
 // ── removeHooksConfig: ark-managed permissions cleanup ────────────────────
+
+// ── buildToolHints unit tests ───────────────────────────────────────────────
+
+describe("buildToolHints", () => {
+  it("returns empty string when agent has no tools and no mcp_servers", () => {
+    expect(buildToolHints({})).toBe("");
+    expect(buildToolHints({ tools: [] })).toBe("");
+    expect(buildToolHints({ tools: [], mcp_servers: [] })).toBe("");
+  });
+
+  it("lists built-in tools in the Built-in section", () => {
+    const hint = buildToolHints({ tools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep"] });
+    expect(hint).toContain("## Available tools");
+    expect(hint).toContain("**Built-in:** Bash, Read, Write, Edit, Glob, Grep");
+  });
+
+  it("lists declared MCP servers with their call prefix", () => {
+    const hint = buildToolHints({ tools: ["Read"], mcp_servers: ["atlassian", "figma"] });
+    expect(hint).toContain("**MCP servers:**");
+    expect(hint).toContain("`atlassian` -- call via `mcp__atlassian__<toolName>`");
+    expect(hint).toContain("`figma` -- call via `mcp__figma__<toolName>`");
+  });
+
+  it("surfaces explicitly-granted MCP tools in their own section", () => {
+    const hint = buildToolHints({
+      tools: ["Read", "mcp__atlassian__getJiraIssue", "mcp__atlassian__addCommentToJiraIssue"],
+      mcp_servers: ["atlassian"],
+    });
+    expect(hint).toContain("**Specific MCP tools granted:** mcp__atlassian__getJiraIssue, mcp__atlassian__addCommentToJiraIssue");
+  });
+
+  it("wildcards like mcp__atlassian__* do not appear in the Specific section", () => {
+    const hint = buildToolHints({
+      tools: ["Read", "mcp__atlassian__*"],
+      mcp_servers: ["atlassian"],
+    });
+    expect(hint).not.toContain("**Specific MCP tools granted:**");
+  });
+
+  it("always includes the do-not-probe instruction when any tools are declared", () => {
+    const hint = buildToolHints({ tools: ["Bash"] });
+    expect(hint).toContain("Do not probe, list, or ask which tools exist");
+  });
+
+  it("accepts inline-object mcp_servers entries and extracts the server name", () => {
+    const hint = buildToolHints({
+      tools: ["Read"],
+      mcp_servers: [{ atlassian: { command: "uvx", args: ["mcp-atlassian"] } }],
+    });
+    expect(hint).toContain("`atlassian` -- call via `mcp__atlassian__<toolName>`");
+  });
+});
 
 describe("removeHooksConfig with agent permissions", () => {
   it("removes ark-managed allow list but preserves user allow entries added after", () => {

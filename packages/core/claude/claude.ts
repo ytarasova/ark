@@ -213,6 +213,47 @@ export function buildPermissionsAllow(agent: AgentToolSpec): string[] {
   return allow;
 }
 
+/**
+ * Build a prompt-hint section telling the agent which tools and MCP servers
+ * are available, so it does not waste turns probing or listing tools.
+ *
+ * This is the *primary* channel for `agent.tools` / `agent.mcp_servers` --
+ * the settings.local.json `permissions.allow` list is defense-in-depth and
+ * only takes effect when --dangerously-skip-permissions is off. The prompt
+ * hint runs in every dispatch regardless of autonomy.
+ */
+export function buildToolHints(agent: AgentToolSpec): string {
+  const tools = agent.tools ?? [];
+  const declared = declaredMcpServers(agent);
+
+  if (tools.length === 0 && declared.size === 0) return "";
+
+  const builtinNames = tools.filter((t) => !t.startsWith("mcp__"));
+  const explicitMcpTools = tools.filter((t) => t.startsWith("mcp__") && !t.endsWith("__*"));
+
+  const sections: string[] = ["## Available tools", ""];
+
+  if (builtinNames.length > 0) {
+    sections.push(`**Built-in:** ${builtinNames.join(", ")}`);
+  }
+
+  if (declared.size > 0) {
+    const serverLines = [...declared].map((name) => `- \`${name}\` -- call via \`mcp__${name}__<toolName>\``);
+    sections.push("", "**MCP servers:**", ...serverLines);
+  }
+
+  if (explicitMcpTools.length > 0) {
+    sections.push("", `**Specific MCP tools granted:** ${explicitMcpTools.join(", ")}`);
+  }
+
+  sections.push(
+    "",
+    "Call these tools directly when the task requires them. Do not probe, list, or ask which tools exist -- the list above is authoritative.",
+  );
+
+  return sections.join("\n");
+}
+
 // ── Hook-based status config ────────────────────────────────────────────────
 
 const ARK_HOOK_MARKER = "# ark-status";

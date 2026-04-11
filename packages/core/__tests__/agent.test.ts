@@ -606,7 +606,11 @@ describe("buildClaudeArgs", () => {
   it("includes --append-system-prompt from agent", () => {
     const args = buildClaudeArgs(baseAgent);
     expect(args).toContain("--append-system-prompt");
-    expect(args[args.indexOf("--append-system-prompt") + 1]).toBe("Be helpful.");
+    const prompt = args[args.indexOf("--append-system-prompt") + 1];
+    // Base system_prompt first, then the injected tool hints block.
+    expect(prompt.startsWith("Be helpful.")).toBe(true);
+    expect(prompt).toContain("## Available tools");
+    expect(prompt).toContain("**Built-in:** Bash, Read");
   });
 
   it("passes --session-id from opts", () => {

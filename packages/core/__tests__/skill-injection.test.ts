@@ -94,3 +94,60 @@ describe("skill injection via buildClaudeArgs", () => {
     expect(systemPromptArg).toContain("Use conventional commits");
   });
 });
+
+describe("tool hints injection via buildClaudeArgs", () => {
+  it("injects built-in tool list into the system prompt", () => {
+    const agent = makeAgent({
+      name: "hints-builtin",
+      tools: ["Bash", "Read", "Write", "Edit"],
+      mcp_servers: [],
+    });
+    getApp().agents.save(agent.name, agent, "global");
+
+    const promptArg = buildClaudeArgs(agent, { app: getApp() }).join(" ");
+    expect(promptArg).toContain("## Available tools");
+    expect(promptArg).toContain("**Built-in:** Bash, Read, Write, Edit");
+    expect(promptArg).toContain("Do not probe, list, or ask which tools exist");
+  });
+
+  it("injects MCP server list with call prefix when servers are declared", () => {
+    const agent = makeAgent({
+      name: "hints-mcp",
+      tools: ["Read"],
+      mcp_servers: ["atlassian", "figma"],
+    });
+    getApp().agents.save(agent.name, agent, "global");
+
+    const promptArg = buildClaudeArgs(agent, { app: getApp() }).join(" ");
+    expect(promptArg).toContain("**MCP servers:**");
+    expect(promptArg).toContain("mcp__atlassian__");
+    expect(promptArg).toContain("mcp__figma__");
+  });
+
+  it("keeps the base system_prompt above the tool hints block", () => {
+    const agent = makeAgent({
+      name: "hints-order",
+      system_prompt: "You are a developer working on foo.",
+      tools: ["Bash"],
+    });
+    getApp().agents.save(agent.name, agent, "global");
+
+    const promptArg = buildClaudeArgs(agent, { app: getApp() }).join(" ");
+    const baseIdx = promptArg.indexOf("You are a developer working on foo");
+    const hintsIdx = promptArg.indexOf("## Available tools");
+    expect(baseIdx).toBeGreaterThan(-1);
+    expect(hintsIdx).toBeGreaterThan(baseIdx);
+  });
+
+  it("does not inject a hints block when the agent declares no tools or servers", () => {
+    const agent = makeAgent({
+      name: "hints-none",
+      tools: [],
+      mcp_servers: [],
+    });
+    getApp().agents.save(agent.name, agent, "global");
+
+    const promptArg = buildClaudeArgs(agent, { app: getApp() }).join(" ");
+    expect(promptArg).not.toContain("## Available tools");
+  });
+});

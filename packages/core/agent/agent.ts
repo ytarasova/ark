@@ -141,6 +141,14 @@ export function buildClaudeArgs(agent: AgentDefinition, opts?: {
 }): string[] {
   let systemPrompt = agent.system_prompt;
 
+  // Tool hints: tell the agent what's available so it doesn't probe around.
+  // Runs regardless of autonomy -- the permissions.allow list is defense-in-depth
+  // but hints are how the agent actually knows what to call.
+  const toolHints = claude.buildToolHints({ tools: agent.tools, mcp_servers: agent.mcp_servers });
+  if (toolHints) {
+    systemPrompt += "\n\n" + toolHints;
+  }
+
   // Inject skill prompts into system prompt
   if (agent.skills?.length && opts?.app) {
     const skillPrompts = agent.skills
