@@ -158,6 +158,31 @@ The orchestration platform for AI-powered software development. Manages the full
 
 ### Camp 1: Integration Testing & Production Readiness
 
+**2026-04-11 update -- TUI e2e harness rewritten.** The legacy
+`packages/e2e/tui/` harness (nested tmux + heuristic region parsing)
+was deprecated. Its replacement is `packages/tui-e2e/`: a real pty
+(node-pty) spawns `ark tui`, pipes stdin/stdout through a WebSocket
+into `xterm.js` rendered by headless Chromium via Playwright. Tests
+drive the TUI with `page.keyboard.press()` and read back actual
+rendered cells via `window.__arkBuffer()`, so screenshots, video
+capture, and pixel-level regressions are all available. Each harness
+instance owns an isolated `ARK_DIR` + `TMUX_TMPDIR` so Playwright
+workers are parallel-safe.
+
+Makefile targets:
+
+- `make test-tui-e2e` -- TUI browser harness (Playwright under Node)
+- `make test-web-e2e` -- web dashboard e2e (existing `packages/e2e/`)
+- `make test-e2e` -- both
+
+**Follow-up:** port the 6 legacy TuiDriver tests (`dispatch`, `sessions`,
+`session-crud`, `talk`, `tabs`, `worktree`) from `packages/e2e/tui.deprecated/`
+into `packages/tui-e2e/tests/*.pw.ts` using the new `startHarness` /
+`waitForText` / `pressKey` / `readTerminal` helpers. Delete each legacy
+file as its port lands. Once the deprecated dir is empty, delete
+`packages/e2e/fixtures/tui-driver.ts` entirely.
+
+
 **Goal:** Everything that exists actually works against real services. Nothing ships until it's proven.
 
 | Task | Effort | Blocks |

@@ -80,19 +80,16 @@ test: build-web ## Run all unit tests (sequential -- never parallel)
 test-file: ## Run a single test: make test-file F=packages/core/__tests__/foo.test.ts
 	$(BUN) test $(F) --concurrency 1
 
-test-e2e: build-web ## Run all E2E tests (web + TUI, sequential)
-	cd packages/e2e && npx playwright install chromium --with-deps 2>/dev/null; npx playwright test
-	$(BUN) test packages/e2e/tui --concurrency 1
+test-e2e: test-tui-e2e test-web-e2e ## Run all end-to-end tests (TUI browser harness + web Playwright)
 
-test-e2e-fast: build-web ## Run fast-tier E2E only (CI-safe, no tmux dispatch)
-	cd packages/e2e && npx playwright test --grep-invert "dispatch"
-	$(BUN) test packages/e2e/tui/tabs.test.ts packages/e2e/tui/sessions.test.ts packages/e2e/tui/session-crud.test.ts packages/e2e/tui/talk.test.ts --concurrency 1
+test-tui-e2e: ## Run TUI end-to-end tests via browser harness (xterm.js + real pty + real tmux)
+	@cd packages/tui-e2e && npm install --silent 2>/dev/null && \
+	  node node_modules/@playwright/test/cli.js install chromium 2>/dev/null; \
+	  node node_modules/@playwright/test/cli.js test
 
-test-e2e-web: build-web ## Run web E2E tests only (Playwright)
-	cd packages/e2e && npx playwright install chromium --with-deps 2>/dev/null; npx playwright test
-
-test-e2e-tui: ## Run TUI E2E tests only (tmux)
-	$(BUN) test packages/e2e/tui --concurrency 1
+test-web-e2e: build-web ## Run web end-to-end tests (Playwright against the web dashboard)
+	@cd packages/e2e && npx playwright install chromium --with-deps 2>/dev/null; \
+	  npx playwright test
 
 test-watch: ## Run unit tests in watch mode
 	$(BUN) test --watch
