@@ -12,7 +12,7 @@
  *   GET  /health               -- health check
  */
 
-import type { ChatCompletionRequest, ChatCompletionResponse, RouterConfig, RoutingDecision, ModelConfig } from "./types.js";
+import type { ChatCompletionRequest, ChatCompletionResponse, ChatCompletionChunk, RouterConfig, RoutingDecision, ModelConfig } from "./types.js";
 import { classify } from "./classifier.js";
 import { RoutingEngine } from "./engine.js";
 import { Dispatcher, TensorZeroDispatcher } from "./dispatch.js";
@@ -315,7 +315,7 @@ function handleStreamingRoute(
         for await (const chunk of dispatcher.dispatchStream(request, decision)) {
           // Add routing metadata to the first chunk
           if (firstChunk) {
-            (chunk as any).routing = decision;
+            (chunk as ChatCompletionChunk & { routing?: unknown }).routing = decision;
             firstChunk = false;
           }
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
@@ -476,7 +476,7 @@ function handleStreamingTZ(
       try {
         for await (const chunk of tzDispatcher.stream(request, decision)) {
           if (firstChunk) {
-            (chunk as any).routing = decision;
+            (chunk as ChatCompletionChunk & { routing?: unknown }).routing = decision;
             firstChunk = false;
           }
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));

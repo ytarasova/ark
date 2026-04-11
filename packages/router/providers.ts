@@ -281,8 +281,11 @@ export class Provider {
         body.tool_choice = { type: "auto" };
       } else if (request.tool_choice === "none") {
         body.tool_choice = { type: "none" };
-      } else if (typeof request.tool_choice === "object" && (request.tool_choice as any).function?.name) {
-        body.tool_choice = { type: "tool", name: (request.tool_choice as any).function.name };
+      } else if (typeof request.tool_choice === "object") {
+        const tc = request.tool_choice as { function?: { name?: string } };
+        if (tc.function?.name) {
+          body.tool_choice = { type: "tool", name: tc.function.name };
+        }
       }
     }
 
@@ -309,7 +312,8 @@ export class Provider {
       }
     }
 
-    const finishReason = resp.stop_reason === "end_turn" ? "stop"
+    const finishReason: "stop" | "length" | "tool_calls" =
+      resp.stop_reason === "end_turn" ? "stop"
       : resp.stop_reason === "tool_use" ? "tool_calls"
       : resp.stop_reason === "max_tokens" ? "length"
       : "stop";
@@ -326,7 +330,7 @@ export class Provider {
           content: textContent || null,
           ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
         },
-        finish_reason: finishReason as any,
+        finish_reason: finishReason,
       }],
       usage: {
         prompt_tokens: resp.usage?.input_tokens ?? 0,
@@ -561,7 +565,8 @@ export class Provider {
   private fromGeminiResponse(resp: any, modelId: string): ChatCompletionResponse {
     const candidate = resp.candidates?.[0];
     const text = candidate?.content?.parts?.[0]?.text ?? "";
-    const finishReason = candidate?.finishReason === "STOP" ? "stop"
+    const finishReason: "stop" | "length" =
+      candidate?.finishReason === "STOP" ? "stop"
       : candidate?.finishReason === "MAX_TOKENS" ? "length"
       : "stop";
 
@@ -575,7 +580,7 @@ export class Provider {
       choices: [{
         index: 0,
         message: { role: "assistant", content: text },
-        finish_reason: finishReason as any,
+        finish_reason: finishReason,
       }],
       usage: {
         prompt_tokens: usage.promptTokenCount ?? 0,
