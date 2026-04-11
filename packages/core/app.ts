@@ -417,21 +417,38 @@ export class AppContext {
     const storeBaseDir = join(fileURLToPath(import.meta.url), "..", "..", "..");
     const pricingRegistry = new PricingRegistry();
 
+    // Construct repositories eagerly so we can register them as values.
+    // asClass(...) used to work here, but `bun build --compile` minifies
+    // constructor parameter names which breaks awilix's name-based DI
+    // resolution -- the compiled binary fails with
+    // "AppContext not booted -- sessionService not available" because
+    // SessionService(constructor(a, b, c)) can't be matched against the
+    // cradle. Constructing eagerly side-steps that entirely.
+    const sessions = new SessionRepository(db);
+    const computes = new ComputeRepository(db);
+    const computeTemplates = new ComputeTemplateRepository(db);
+    const events = new EventRepository(db);
+    const messages = new MessageRepository(db);
+    const todos = new TodoRepository(db);
+    const sessionService = new SessionService(sessions, events, messages);
+    const computeService = new ComputeService(computes);
+    const historyService = new HistoryService(db);
+
     this._container.register({
       db: asValue(db),
 
       // Repositories
-      sessions: asClass(SessionRepository).singleton(),
-      computes: asClass(ComputeRepository).singleton(),
-      computeTemplates: asClass(ComputeTemplateRepository).singleton(),
-      events: asClass(EventRepository).singleton(),
-      messages: asClass(MessageRepository).singleton(),
-      todos: asClass(TodoRepository).singleton(),
+      sessions: asValue(sessions),
+      computes: asValue(computes),
+      computeTemplates: asValue(computeTemplates),
+      events: asValue(events),
+      messages: asValue(messages),
+      todos: asValue(todos),
 
       // Services
-      sessionService: asClass(SessionService).singleton(),
-      computeService: asClass(ComputeService).singleton(),
-      historyService: asClass(HistoryService).singleton(),
+      sessionService: asValue(sessionService),
+      computeService: asValue(computeService),
+      historyService: asValue(historyService),
 
       // Resource stores: file-backed for local mode, DB-backed for hosted/control plane
       ...this.createResourceStores(db, storeBaseDir),
