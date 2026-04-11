@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Multi-Tenancy and Multi-User - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Multi-Tenancy and Multi-User</h1>
+      <p class="subtitle">Running Ark as a hosted control plane with multiple tenants and users.</p>
+
+      <h2>Overview</h2>
+      <p>Ark ships with a single codebase that runs in two modes:</p>
+      <ul>
+        <li><strong>Local single-user mode</strong> -- the default. SQLite, file-backed stores, no auth, everything in <code>~/.ark/</code>.</li>
+        <li><strong>Hosted / control plane mode</strong> -- PostgreSQL, DB-backed stores, API-key auth, worker registry, session scheduler, tenant policies.</li>
+      </ul>
+      <p>The mode is selected by configuration: set <code>DATABASE_URL</code> to a Postgres connection string and Ark boots in hosted mode. Everything else -- repositories, services, stores, executors -- is shared between modes.</p>
+
+      <h2>Local mode (default)</h2>
+      <ul>
+        <li>Single user (you).</li>
+        <li>Single tenant (<code>default</code>).</li>
+        <li>SQLite at <code>~/.ark/ark.db</code> in WAL mode with a 5-second busy timeout.</li>
+        <li>File-backed stores under <code>~/.ark/agents/</code>, <code>~/.ark/flows/</code>, <code>~/.ark/skills/</code>, <code>~/.ark/recipes/</code>, <code>~/.ark/runtimes/</code>.</li>
+        <li>Three-tier resolution for resources: <code>builtin</code> &gt; <code>global</code> (<code>~/.ark/</code>) &gt; <code>project</code> (<code>.ark/</code> in repo).</li>
+        <li>No authentication.</li>
+        <li>Cost tracking is local only (session-level rows in <code>usage_records</code>).</li>
+        <li>Conductor runs under the TUI; the CLI skips the conductor and writes directly to the DB.</li>
+      </ul>
+      <p>Start locally:</p>
+      <pre><code>$ ark tui
+$ ark session start --repo . --summary <span class="yaml-value">"Fix bug"</span> --agent implementer --dispatch</code></pre>
+
+      <h2>Hosted / control plane mode</h2>
+      <ul>
+        <li>Many tenants, many users per tenant.</li>
+        <li>PostgreSQL via <code>DATABASE_URL</code>.</li>
+        <li>Redis via <code>REDIS_URL</code> for the multi-instance SSE bus.</li>
+        <li>API-key authentication is required (<code>auth.enabled: true</code>).</li>
+        <li>DB-backed stores: <code>DbResourceStore</code> reads agents, flows, skills, recipes, and runtimes from the tenant-scoped <code>resource_definitions</code> table.</li>
+        <li>Worker registry and session scheduler (<code>hosted.ts</code>) distribute sessions across a pool of workers.</li>
+        <li>Tenant policies enforce allowed providers, max concurrent sessions, daily cost caps, and integration settings (router, auto-index, TensorZero).</li>
+        <li>Per-tenant <code>AppContext</code> via <code>app.forTenant(tenantId)</code> gives scoped repository and store views.</li>
+      </ul>
+      <p>Start hosted mode:</p>
+      <pre><code>$ ark server start --hosted
+<span class="comment"># or via docker-compose</span>
+$ docker-compose -f .infra/docker-compose.yaml up -d</code></pre>
+
+      <h2>Comparison</h2>
+      <table>
+        <thead>
+          <tr><th>Aspect</th><th>Local</th><th>Control plane</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Database</td><td>SQLite</td><td>PostgreSQL</td></tr>
+          <tr><td>Stores</td><td>Files (three-tier)</td><td>DB (tenant-scoped rows)</td></tr>
+          <tr><td>Auth</td><td>None</td><td>API keys + roles</td></tr>
+          <tr><td>Users</td><td>1 (you)</td><td>Many</td></tr>
+          <tr><td>Tenants</td><td>1 (<code>default</code>)</td><td>Many</td></tr>
+          <tr><td>SSE bus</td><td>In-memory</td><td>Redis-backed</td></tr>
+          <tr><td>Compute</td><td>Local / Docker / EC2</td><td>Full pool, scheduled</td></tr>
+          <tr><td>Cost tracking</td><td>Session-level</td><td>Tenant + user + session</td></tr>
+          <tr><td>Scheduler</td><td>None</td><td>WorkerRegistry + SessionScheduler</td></tr>
+          <tr><td>Config location</td><td><code>~/.ark/config.yaml</code></td><td>Env vars + per-tenant DB rows</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Tenant scoping</h2>
+      <p>Every entity table in Ark has a <code>tenant_id</code> column. Sessions also have a <code>user_id</code>. Tenant-scoped tables:</p>
+      <ul>
+        <li><code>sessions</code></li>
+        <li><code>compute</code>, <code>compute_templates</code>, <code>compute_pools</code></li>
+        <li><code>events</code>, <code>messages</code>, <code>todos</code></li>
+        <li><code>groups</code>, <code>schedules</code></li>
+        <li><code>usage_records</code></li>
+        <li><code>resource_definitions</code></li>
+        <li><code>knowledge</code>, <code>knowledge_edges</code></li>
+      </ul>
+      <p>Creating a tenant-scoped view:</p>
+      <pre><code><span class="yaml-key">const</span> scoped = app.forTenant(tenantId);
+<span class="comment">// All queries on scoped.sessions, scoped.computes, etc.</span>
+<span class="comment">// are automatically filtered by tenant_id.</span>
+<span class="yaml-key">const</span> rows = scoped.sessions.list();</code></pre>
+      <p>RPC handlers extract tenant context from the API key and operate on a scoped AppContext. Cross-tenant access is impossible at the repository layer unless you explicitly go through the unscoped root context.</p>
+
+      <h2>Authentication</h2>
+      <p>API keys use the format <code>ark_&lt;tenantId&gt;_&lt;secret&gt;</code>. The <code>ApiKeyManager</code> stores SHA-256 hashes of the secret in the <code>api_keys</code> table.</p>
+      <p><strong>Roles:</strong></p>
+      <ul>
+        <li><strong>admin</strong> -- manage tenant policies, API keys, and all sessions within the tenant.</li>
+        <li><strong>member</strong> -- create and manage their own sessions.</li>
+        <li><strong>viewer</strong> -- read-only access.</li>
+      </ul>
+      <p><strong>CLI commands:</strong></p>
+      <pre><code>$ ark auth setup
+$ ark auth create-key <span class="yaml-value">&lt;name&gt;</span> --role member
+$ ark auth list-keys
+$ ark auth revoke <span class="yaml-value">&lt;id&gt;</span>
+$ ark auth rotate <span class="yaml-value">&lt;id&gt;</span></code></pre>
+      <p><code>ApiKeyManager.validate(key)</code> returns a <code>TenantContext { tenantId, userId, role }</code>. Remote clients pass their key via the <code>ARK_TOKEN</code> environment variable or the <code>--token</code> flag.</p>
+
+      <h2>Tenant policies</h2>
+      <p>Policies are stored per-tenant in the <code>tenant_policies</code> table and managed by <code>TenantPolicyManager</code>.</p>
+      <p><strong>Compute policy:</strong></p>
+      <ul>
+        <li><code>allowed_providers</code> -- whitelist of compute providers this tenant may use.</li>
+        <li><code>default_provider</code> -- provider used when the user doesn't specify one.</li>
+        <li><code>max_concurrent_sessions</code> -- hard cap on active sessions per tenant.</li>
+        <li><code>max_cost_per_day_usd</code> -- daily cost cap; sessions are rejected when exceeded.</li>
+        <li><code>compute_pools</code> -- named pools of preconfigured compute resources.</li>
+      </ul>
+      <p><strong>Integration policy:</strong></p>
+      <ul>
+        <li><code>router_enabled</code> / <code>router_required</code> -- whether the LLM Router is used and whether the tenant can opt out.</li>
+        <li><code>router_policy</code> -- <code>quality</code> / <code>balanced</code> / <code>cost</code>.</li>
+        <li><code>auto_index</code> / <code>auto_index_required</code> -- whether knowledge indexing runs at dispatch and whether the tenant can opt out.</li>
+        <li><code>tensorzero_enabled</code> -- whether LLM calls route through TensorZero.</li>
+      </ul>
+      <p><code>getEffectiveIntegrationSettings(tenantId, globalConfig)</code> merges the tenant policy with the global config fallback. The <code>_required</code> flags override global opt-outs so a tenant can enforce settings even when the global default is off.</p>
+
+      <h2>Worker registry and scheduler</h2>
+      <ul>
+        <li><strong>WorkerRegistry</strong> (<code>worker-registry.ts</code>) -- workers register with the control plane via HTTP, are health-checked every 60 seconds, and pruned after 90 seconds of staleness.</li>
+        <li><strong>SessionScheduler</strong> (<code>scheduler.ts</code>) -- assigns new sessions to available workers, respects tenant policies (provider whitelist, max concurrent, cost cap), and routes work to compute pools when configured.</li>
+        <li><strong>SSE bus</strong> -- relays session and event updates across control-plane instances via Redis so dashboards show live updates regardless of which node holds the websocket.</li>
+      </ul>
+
+      <h2>DB-backed resource stores</h2>
+      <p>In hosted mode, agents, flows, skills, recipes, and runtimes live in the tenant-scoped <code>resource_definitions</code> table. <code>DbResourceStore&lt;T&gt;</code> implements the same interface as the file-backed stores (<code>list</code>, <code>get</code>, <code>save</code>, <code>delete</code>), but reads and writes rows instead of files.</p>
+      <p>Local mode continues to use file-backed three-tier resolution (<code>builtin</code> &gt; <code>global</code> &gt; <code>project</code>). You can export a local resource set to a tenant and back for portability.</p>
+
+      <h2>Multi-user session tracking</h2>
+      <p>Sessions carry a <code>user_id</code> populated from the API key's owner. Dashboards can filter and aggregate by user:</p>
+      <pre><code>$ ark session list --user <span class="yaml-value">alice</span>
+$ ark cost summary --group-by user_id</code></pre>
+      <p>Cost breakdowns roll up per user per tenant, so you can see which team member spent what over any time window.</p>
+
+      <h2>Deployment</h2>
+      <p><strong>Docker Compose</strong> (<code>.infra/docker-compose.yaml</code>) brings up the full stack: Ark server, workers, PostgreSQL, Redis, and TensorZero.</p>
+      <pre><code>$ docker-compose -f .infra/docker-compose.yaml up -d</code></pre>
+      <p><strong>Kubernetes</strong> (<code>.infra/helm/ark/</code>) ships a Helm chart with optional Kata and Firecracker support for secure compute isolation:</p>
+      <pre><code>$ helm install ark .infra/helm/ark -f .infra/helm/ark/values-production.yaml</code></pre>
+
+      <h2>Configuration reference</h2>
+      <table>
+        <thead>
+          <tr><th>Variable</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>DATABASE_URL</code></td><td>PostgreSQL connection string. Setting this triggers hosted mode.</td></tr>
+          <tr><td><code>REDIS_URL</code></td><td>Redis URL for the SSE bus in multi-instance deployments.</td></tr>
+          <tr><td><code>ARK_AUTH_ENABLED</code></td><td>Set to <code>true</code> to require API keys on every request.</td></tr>
+          <tr><td><code>ARK_SERVER</code></td><td>Remote Ark server URL for CLI / TUI / Web clients.</td></tr>
+          <tr><td><code>ARK_TOKEN</code></td><td>API key for remote server authentication.</td></tr>
+        </tbody>
+      </table>
+      <p><code>~/.ark/config.yaml</code> can also enable auth globally:</p>
+      <pre><code><span class="yaml-key">auth</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">true</span>
+<span class="yaml-key">databaseUrl</span>: <span class="yaml-value">postgres://...</span>
+<span class="yaml-key">redisUrl</span>: <span class="yaml-value">redis://...</span></code></pre>
+
+      <div class="doc-footer">
+        <a href="arkd.html">&larr; ArkD Daemon</a>
+        <a href="agents-reference.html">Agents Reference &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

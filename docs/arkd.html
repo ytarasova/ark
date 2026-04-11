@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ArkD - Universal Agent Daemon</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>ArkD - Universal Agent Daemon</h1>
+      <p class="subtitle">HTTP daemon that runs on every compute target, bridging the control plane and the agents.</p>
+
+      <h2>What is ArkD?</h2>
+      <p>ArkD is a stateless HTTP server that runs on every compute target Ark dispatches to. It exposes a single HTTP API for agent lifecycle, file operations, process execution, metrics, and channel relay. The daemon listens on port <code>19300</code> by default and provides identical endpoints regardless of whether the target is your laptop, a Docker container, a devcontainer, an EC2 instance, a Firecracker micro-VM, or a Kubernetes pod sidecar.</p>
+      <p>Source: <code>packages/arkd/server.ts</code>.</p>
+
+      <h2>Why ArkD exists</h2>
+      <p>Without ArkD, the control plane would have to shell into every compute target over SSH to launch agents, read files, run commands, or report status. That approach is slow, auth-fragile, and platform-specific -- each provider would need its own transport layer.</p>
+      <p>Instead, every compute target runs arkd. The conductor and the rest of the control plane talk to arkd over HTTP. The same API works whether the compute is local, Docker, EC2, Kubernetes, or Firecracker. One transport, one protocol, every target.</p>
+
+      <h2>Responsibilities</h2>
+      <ul>
+        <li><strong>Agent lifecycle</strong> -- launch, kill, and query status of agents running in tmux sessions on the target.</li>
+        <li><strong>File operations</strong> -- read, write, and list files on the target filesystem.</li>
+        <li><strong>Process execution</strong> -- run commands via <code>exec</code>, optionally inside a sandbox.</li>
+        <li><strong>System metrics</strong> -- CPU, memory, disk, uptime. Used by the dashboard and compute health checks.</li>
+        <li><strong>Port probing</strong> -- check which ports are listening on the target.</li>
+        <li><strong>Channel relay</strong> -- accept channel reports from agents and forward them to the conductor at <code>http://&lt;conductor&gt;:19100</code>.</li>
+        <li><strong>Docker container ops</strong> -- list and exec into Docker containers on the target (used by docker-in-docker compute modes).</li>
+        <li><strong>Codegraph indexing</strong> -- POST <code>/codegraph/index</code> runs <code>codegraph build</code> locally on the target, reads <code>.codegraph/graph.db</code>, and returns nodes and edges to the conductor.</li>
+        <li><strong>Bearer token auth</strong> -- when <code>ARK_ARKD_TOKEN</code> is set, all requests must include a matching <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
+      </ul>
+
+      <h2>Deployment modes</h2>
+      <ul>
+        <li><strong>Local machine</strong> -- start with <code>ark arkd</code>, or let the TUI auto-start it on demand.</li>
+        <li><strong>Docker / devcontainer</strong> -- arkd is baked into the image and starts automatically when the container boots.</li>
+        <li><strong>EC2 instance</strong> -- installed via cloud-init on first boot, started as a systemd service.</li>
+        <li><strong>Kubernetes pod</strong> -- runs as a sidecar container next to the agent container.</li>
+        <li><strong>Firecracker micro-VM</strong> -- baked into the micro-VM image, starts on boot.</li>
+      </ul>
+      <p>In every case, the conductor reaches arkd at <code>http://&lt;target-ip&gt;:19300</code>. Local providers use <code>http://localhost:19300</code>.</p>
+
+      <h2>Channel relay</h2>
+      <p>Ark uses arkd as the HTTP bridge between agents and the conductor. The data flow:</p>
+      <ol>
+        <li>The session agent posts reports to the <code>ark-channel</code> MCP server, which runs inside the agent process over stdio.</li>
+        <li><code>ark-channel</code> forwards the report to arkd via HTTP on port 19300.</li>
+        <li>ArkD relays the report to the conductor at <code>http://&lt;conductor&gt;:19100</code>.</li>
+      </ol>
+      <p>This is why every compute target runs arkd. It gives the control plane a single HTTP endpoint per target (port 19300) regardless of how many sessions are active on it. Direct agent-to-conductor connections would not work through NAT, firewalls, or cross-cloud routing.</p>
+      <div class="callout info">
+        <p>Human steering (from TUI or Web) flows in the reverse direction: conductor -&gt; arkd -&gt; ark-channel -&gt; agent MCP notification.</p>
+      </div>
+
+      <h2>Codegraph endpoint</h2>
+      <p>The <code>/codegraph/index</code> endpoint powers the auto-index-on-dispatch flow for remote compute. When a session is dispatched to a remote target, the control plane calls this endpoint to build a knowledge graph on the remote machine before the agent starts working.</p>
+      <p><strong>Request body:</strong></p>
+      <pre><code><span class="yaml-key">repoPath</span>: <span class="yaml-value">string</span>
+<span class="yaml-key">incremental</span>: <span class="yaml-value">boolean (optional)</span></code></pre>
+      <p><strong>What it does:</strong></p>
+      <ol>
+        <li>Runs <code>codegraph build</code> in the repo path on the remote target.</li>
+        <li>Reads the resulting <code>.codegraph/graph.db</code> via <code>bun:sqlite</code>.</li>
+        <li>Returns <code>{ ok: true, nodes: [...], edges: [...], files: N, symbols: N }</code> to the conductor.</li>
+        <li>The conductor ingests the nodes and edges into the tenant-scoped <code>knowledge</code> and <code>knowledge_edges</code> tables.</li>
+      </ol>
+      <p>Remote indexing always runs this endpoint regardless of the <code>knowledge.auto_index</code> config flag. The control plane needs centralized knowledge for all workers so downstream agents can query a consistent graph. Local mode honors the config flag.</p>
+
+      <h2>Starting ArkD</h2>
+      <pre><code><span class="comment"># default port 19300, default conductor http://localhost:19100</span>
+$ ark arkd
+
+<span class="comment"># custom port</span>
+$ ark arkd --port 8080
+
+<span class="comment"># set conductor URL (useful when running in a container or remote host)</span>
+$ ark arkd --conductor-url http://conductor.local:19100</code></pre>
+      <p><strong>Environment variables:</strong></p>
+      <ul>
+        <li><code>ARK_ARKD_PORT</code> -- listen port (default <code>19300</code>)</li>
+        <li><code>ARK_ARKD_URL</code> -- arkd base URL used by channel.ts and executors (default <code>http://localhost:19300</code>)</li>
+        <li><code>ARK_ARKD_TOKEN</code> -- bearer token required on all incoming requests when set</li>
+        <li><code>ARK_CONDUCTOR_URL</code> -- conductor URL arkd relays to (default <code>http://localhost:19100</code>)</li>
+      </ul>
+
+      <h2>HTTP API reference</h2>
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>GET</td><td><code>/health</code></td><td>Liveness / readiness check</td></tr>
+          <tr><td>POST</td><td><code>/exec</code></td><td>Execute a shell command</td></tr>
+          <tr><td>POST</td><td><code>/agent/launch</code></td><td>Launch an agent via tmux</td></tr>
+          <tr><td>POST</td><td><code>/agent/kill</code></td><td>Kill a running agent</td></tr>
+          <tr><td>GET</td><td><code>/agent/status/:id</code></td><td>Query agent status</td></tr>
+          <tr><td>POST</td><td><code>/files/read</code></td><td>Read a file</td></tr>
+          <tr><td>POST</td><td><code>/files/write</code></td><td>Write a file</td></tr>
+          <tr><td>GET</td><td><code>/files/list</code></td><td>List directory contents</td></tr>
+          <tr><td>GET</td><td><code>/metrics</code></td><td>System metrics (CPU, memory, disk, uptime)</td></tr>
+          <tr><td>GET</td><td><code>/ports/probe</code></td><td>Probe listening ports</td></tr>
+          <tr><td>POST</td><td><code>/channel/report</code></td><td>Relay a channel report from an agent to the conductor</td></tr>
+          <tr><td>POST</td><td><code>/codegraph/index</code></td><td>Run codegraph build and return nodes and edges</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Ports reference</h2>
+      <table>
+        <thead>
+          <tr><th>Service</th><th>Port</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Conductor</td><td><code>19100</code></td><td>Hardcoded. HTTP server for hook status and channel relay.</td></tr>
+          <tr><td>ArkD</td><td><code>19300</code></td><td>Default. Universal agent daemon on every compute target.</td></tr>
+          <tr><td>Channel</td><td><code>19200 + (hash(sessionId) % 10000)</code></td><td>Deterministic per-session channel port.</td></tr>
+          <tr><td>Router</td><td><code>8430</code></td><td>Default. LLM Router OpenAI-compatible proxy.</td></tr>
+          <tr><td>TensorZero</td><td><code>3000</code></td><td>Default. Optional LLM gateway behind the router.</td></tr>
+          <tr><td>Web UI</td><td><code>8420</code></td><td>Default. Vite-based web dashboard.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="doc-footer">
+        <a href="architecture.html">&larr; Architecture</a>
+        <a href="multi-tenancy.html">Multi-Tenancy &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

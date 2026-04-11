@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Architecture - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Architecture</h1>
+      <p class="subtitle">How Ark's components fit together.</p>
+
+      <h2>Overview</h2>
+      <p>Ark runs in two deployment modes from a single codebase:</p>
+      <ul>
+        <li><strong>Local single-user mode</strong> -- SQLite, file-backed stores, no auth, everything in <code>~/.ark/</code>.</li>
+        <li><strong>Hosted / control plane mode</strong> -- PostgreSQL, DB-backed stores, API-key auth, worker registry, tenant policies, scheduler.</li>
+      </ul>
+      <p>The mode is determined by config: set <code>DATABASE_URL</code> to a Postgres connection string to enable hosted mode. See <a href="multi-tenancy.html">Multi-Tenancy</a> for deployment details.</p>
+
+      <h2>Core components</h2>
+      <ul>
+        <li><strong>AppContext</strong> -- central root, built on an Awilix DI container. Wires repositories, services, stores, knowledge, conductor, and config. Created at CLI startup (without conductor) or TUI startup (with conductor).</li>
+        <li><strong>IDatabase abstraction</strong> -- <code>database.ts</code> defines the interface, <code>database-sqlite.ts</code> implements it for <code>bun:sqlite</code> (local), <code>database-postgres.ts</code> implements it for PostgreSQL (hosted). All repositories and stores use <code>IDatabase</code>, never raw bun:sqlite.</li>
+        <li><strong>Repositories</strong> -- SQL CRUD behind typed classes: <code>SessionRepository</code>, <code>ComputeRepository</code>, <code>ComputeTemplateRepository</code>, <code>EventRepository</code>, <code>MessageRepository</code>, <code>TodoRepository</code>. Column whitelists prevent injection. Accessed via <code>app.sessions</code>, <code>app.computes</code>, etc.</li>
+        <li><strong>Services</strong> -- <code>SessionService</code> (lifecycle facade), <code>ComputeService</code>, <code>HistoryService</code>, and <code>session-orchestration.ts</code> for dispatch, advance, fork, clone, spawn, fan-out, handoff, worktree ops, and report handling. Every orchestration function takes <code>app: AppContext</code> as its first argument -- no global state.</li>
+        <li><strong>Stores</strong> -- Resource stores with three-tier file resolution (<code>builtin</code> &gt; <code>global</code> &gt; <code>project</code>): <code>FlowStore</code>, <code>SkillStore</code>, <code>AgentStore</code>, <code>RecipeStore</code>, <code>RuntimeStore</code>. Hosted mode swaps in <code>DbResourceStore</code> which reads from the tenant-scoped <code>resource_definitions</code> table.</li>
+        <li><strong>KnowledgeStore</strong> -- Unified graph of nodes (files, symbols, sessions, memories, learnings, skills, recipes, agents) and edges (depends_on, imports, modified_by, etc.). Stored in the tenant-scoped <code>knowledge</code> and <code>knowledge_edges</code> tables.</li>
+        <li><strong>PricingRegistry + UsageRecorder</strong> -- 300+ model prices via LiteLLM JSON. Every assistant turn produces a <code>usage_records</code> row with <code>cost_mode</code> (api / subscription / free).</li>
+        <li><strong>TranscriptParserRegistry</strong> -- Polymorphic per-runtime transcript parsers on AppContext.</li>
+        <li><strong>TenantPolicyManager, ApiKeyManager</strong> -- Multi-tenant auth and policy enforcement. Used in hosted mode.</li>
+      </ul>
+
+      <h2>Executors</h2>
+      <p>Agents dispatch through pluggable executors. The runtime <code>type</code> field selects which executor launches the agent:</p>
+      <ul>
+        <li><strong>claude-code</strong> (default) -- Claude Code in tmux with hooks and an MCP channel.</li>
+        <li><strong>subprocess</strong> -- spawns any command as a child process.</li>
+        <li><strong>cli-agent</strong> -- runs any CLI tool (Codex, Gemini CLI, etc.) in tmux with worktree isolation.</li>
+      </ul>
+      <p>Executors are registered at boot in <code>app.ts</code>. The registry interface is defined in <code>packages/core/executor.ts</code> with five methods: <code>launch</code>, <code>kill</code>, <code>status</code>, <code>send</code>, <code>capture</code>.</p>
+      <p>When the router is enabled, executors inject <code>ANTHROPIC_BASE_URL</code> and <code>OPENAI_BASE_URL</code> into the agent's environment at dispatch via the <code>router-env.ts</code> helper. All LLM calls transparently flow Router -&gt; (TensorZero -&gt;) Provider.</p>
+
+      <h2>Conductor</h2>
+      <p>The conductor is the central HTTP server on port <code>19100</code>. Responsibilities:</p>
+      <ul>
+        <li>Receive hook status reports (busy, idle, error, done) from Claude Code agents.</li>
+        <li>Relay channel reports between agents and humans.</li>
+        <li>Serve the GitHub webhook endpoint for PR review monitoring.</li>
+      </ul>
+      <p>The conductor receives its <code>AppContext</code> at construction via <code>startConductor(app, port)</code> -- no <code>getApp()</code> calls. It delegates hook-status and report handling to <code>session-orchestration.ts</code>. The CLI skips the conductor; the TUI runs it.</p>
+
+      <h2>ArkD</h2>
+      <p>ArkD is the universal agent daemon. A stateless HTTP server on port <code>19300</code> that runs on every compute target (local, Docker, devcontainer, EC2, K8s pod sidecar, Firecracker micro-VM). It handles agent lifecycle, file ops, exec, metrics, channel relay, and codegraph indexing.</p>
+      <p>See <a href="arkd.html">ArkD Daemon</a> for the full endpoint reference and deployment details.</p>
+
+      <h2>MCP socket pooling</h2>
+      <p><strong>Problem:</strong> Each Ark session runs multiple agents, and each agent has multiple MCP servers (knowledge graph, filesystem, context7, playwright, etc.). Without pooling, N sessions x M MCP servers = N*M processes. Five sessions x six MCP servers = 30 processes. Memory blows up fast.</p>
+      <p><strong>Solution:</strong> A <code>SocketProxy</code> wraps a single MCP process per server name and accepts multi-client connections over a unix domain socket at <code>/tmp/ark-mcp-&lt;name&gt;.sock</code>. Client sessions connect via:</p>
+      <pre><code>{
+  <span class="yaml-key">"command"</span>: <span class="yaml-value">"ark"</span>,
+  <span class="yaml-key">"args"</span>: [<span class="yaml-value">"mcp-proxy"</span>, <span class="yaml-value">"/tmp/ark-mcp-&lt;name&gt;.sock"</span>]
+}</code></pre>
+      <p>Health monitoring and auto-restart keep the pooled processes alive. Result: 85-90% memory reduction in practice.</p>
+      <p><strong>Config</strong> (under <code>mcp_pool:</code> in <code>~/.ark/config.yaml</code>):</p>
+      <pre><code><span class="yaml-key">mcp_pool</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">autoStart</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">poolAll</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">excludeMcps</span>: [<span class="yaml-value">"filesystem"</span>]</code></pre>
+
+      <h2>Channels</h2>
+      <p>Ark uses the official Claude Code <code>claude/channel</code> protocol for bidirectional agent communication.</p>
+      <ul>
+        <li><strong>Inbound:</strong> <code>notifications/claude/channel</code> events show up inside the agent as <code>&lt;channel source="ark" ...&gt;</code> tags.</li>
+        <li><strong>Outbound:</strong> two MCP tools on the <code>ark-channel</code> server: <code>report</code> (progress, completion, error, question) and <code>send_to_agent</code> (cross-agent messaging for handoffs and fan-out).</li>
+      </ul>
+      <p>Data flow:</p>
+      <ol>
+        <li>Session dispatch writes <code>.mcp.json</code> with an <code>ark-channel</code> entry and a deterministic port <code>19200 + (hash(sessionId) % 10000)</code>.</li>
+        <li>Claude Code spawns <code>ark-channel</code> over stdio.</li>
+        <li>Agent reports go via ark-channel -&gt; arkd (HTTP) -&gt; conductor (HTTP).</li>
+        <li>Human steering from TUI or Web goes via conductor -&gt; arkd -&gt; ark-channel -&gt; agent MCP notification.</li>
+      </ol>
+      <p>The reason agents do not talk to the conductor directly is that agents run on potentially remote compute. Going through arkd gives the control plane one HTTP endpoint (port 19300) per compute target, regardless of how many sessions are on it.</p>
+
+      <h2>Compute providers</h2>
+      <p>Ark supports 11 compute providers across four categories:</p>
+      <ul>
+        <li><strong>Local (worktree, no isolation)</strong> -- <code>local</code>.</li>
+        <li><strong>Local with isolation</strong> -- <code>docker</code>, <code>devcontainer</code>, <code>firecracker</code>.</li>
+        <li><strong>Remote via arkd (EC2 + arkd daemon)</strong> -- <code>ec2</code>, <code>ec2-docker</code>, <code>ec2-devcontainer</code>, <code>ec2-firecracker</code>.</li>
+        <li><strong>Managed / cluster</strong> -- <code>e2b</code>, <code>k8s</code>, <code>k8s-kata</code>.</li>
+      </ul>
+      <p>See <a href="compute.html">Compute Providers</a> for a full breakdown.</p>
+
+      <h2>Transcript parsers</h2>
+      <p>Ark parses agent transcripts to produce universal usage records regardless of runtime. <code>TranscriptParserRegistry</code> lives on AppContext and dispatches to polymorphic per-runtime parsers in <code>packages/core/runtimes/&lt;name&gt;/parser.ts</code>.</p>
+      <p>All three parsers use workdir-based session identification rather than "latest by mtime":</p>
+      <ul>
+        <li><strong>ClaudeTranscriptParser</strong> -- exact path <code>~/.claude/projects/&lt;slug&gt;/&lt;session&gt;.jsonl</code> via <code>session.claude_session_id</code>.</li>
+        <li><strong>CodexTranscriptParser</strong> -- scans <code>~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl</code>, matches <code>session_meta.payload.cwd</code> to <code>session.workdir</code>.</li>
+        <li><strong>GeminiTranscriptParser</strong> -- scans <code>~/.gemini/tmp/&lt;slug&gt;/chats/session-*.jsonl</code>, matches <code>projectHash = sha256(workdir)</code> against the file's first line.</li>
+      </ul>
+      <p>Parser output feeds <code>UsageRecorder</code> which writes a row to <code>usage_records</code> with the effective <code>cost_mode</code>.</p>
+
+      <h2>LLM Router and TensorZero</h2>
+      <p>The LLM Router (<code>packages/router/</code>) is an OpenAI-compatible HTTP proxy with three routing policies (<code>quality</code>, <code>balanced</code>, <code>cost</code>), circuit breakers, request classification, and cost tracking via an <code>onUsage</code> callback wired to <code>UsageRecorder</code>.</p>
+      <p>TensorZero is an optional Rust LLM gateway (Apache 2.0) that sits behind the router as a unified provider. The lifecycle manager in <code>packages/core/router/tensorzero.ts</code> starts TensorZero in one of three modes, tried in order: sidecar detect (reuse running instance), native binary (spawn <code>tensorzero-gateway</code>), Docker fallback.</p>
+      <p>Config (<code>tensorzero.toml</code>) is generated from configured provider API keys at boot. When <code>router.auto_start</code> and <code>tensorZero.enabled</code> are both true, TensorZero auto-starts with the router. Flow: agent -&gt; Router -&gt; TensorZero -&gt; Provider.</p>
+      <p>Executors inject <code>ANTHROPIC_BASE_URL</code> and <code>OPENAI_BASE_URL</code> into the agent's environment at dispatch so the agent binary is unaware anything has changed.</p>
+
+      <h2>Knowledge graph and ops-codegraph</h2>
+      <p>Ark's knowledge graph is a unified store of codebase structure, session history, memories, and learnings. The indexer is powered by <code>@optave/codegraph</code> -- a Rust engine with tree-sitter WASM bindings for 33 languages. No Python dependency.</p>
+      <p>The indexer runs <code>codegraph build</code> to produce <code>.codegraph/graph.db</code>, then ingests the nodes and edges into Ark's tenant-scoped <code>knowledge</code> and <code>knowledge_edges</code> tables. It also runs git co-change analysis.</p>
+      <p>Auto-index on dispatch:</p>
+      <ul>
+        <li><strong>Local compute</strong> -- honors <code>knowledge.auto_index</code> in <code>~/.ark/config.yaml</code>.</li>
+        <li><strong>Remote compute</strong> -- always indexes via the arkd <code>/codegraph/index</code> endpoint. The control plane needs centralized knowledge for all workers.</li>
+      </ul>
+      <p>Agents query the graph through six MCP tools: <code>knowledge/search</code>, <code>knowledge/context</code>, <code>knowledge/impact</code>, <code>knowledge/history</code>, <code>knowledge/remember</code>, <code>knowledge/recall</code>.</p>
+
+      <h2>Event bus and SSE bus</h2>
+      <ul>
+        <li><strong>Event bus</strong> -- in-memory pub/sub for repositories and services to publish domain events.</li>
+        <li><strong>SSE bus</strong> -- Server-Sent Events for live updates to the Web dashboard. <code>sse-bus.ts</code> is the in-memory implementation used locally; <code>sse-redis.ts</code> is the Redis-backed variant used in hosted mode for multi-instance deployments.</li>
+      </ul>
+
+      <h2>Ports reference</h2>
+      <table>
+        <thead>
+          <tr><th>Service</th><th>Port</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Conductor</td><td><code>19100</code></td><td>Hardcoded. HTTP server for hook status and channel relay.</td></tr>
+          <tr><td>ArkD</td><td><code>19300</code></td><td>Default. Universal agent daemon on every compute target.</td></tr>
+          <tr><td>Channel</td><td><code>19200 + (hash(sessionId) % 10000)</code></td><td>Deterministic per-session channel port.</td></tr>
+          <tr><td>Router</td><td><code>8430</code></td><td>Default. LLM Router OpenAI-compatible proxy.</td></tr>
+          <tr><td>TensorZero</td><td><code>3000</code></td><td>Default. Optional LLM gateway behind the router.</td></tr>
+          <tr><td>Web UI</td><td><code>8420</code></td><td>Default. Vite-based web dashboard.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Key decisions</h2>
+      <ul>
+        <li><strong>Dependency injection over globals</strong> -- AppContext is the root; every function takes it explicitly. No <code>getApp()</code> calls in new code.</li>
+        <li><strong>IDatabase abstraction</strong> -- same repositories and stores for SQLite (local) and Postgres (hosted). No ORM.</li>
+        <li><strong>Polymorphism for parsers and executors</strong> -- runtime-specific behavior lives in dedicated classes registered on AppContext.</li>
+        <li><strong>ArkD as universal daemon</strong> -- one HTTP API for every compute target. No SSH, no platform-specific transport.</li>
+        <li><strong>MCP socket pooling</strong> -- share MCP processes across sessions, unix sockets, 85-90% memory reduction.</li>
+        <li><strong>Workdir-based transcript identification</strong> -- no "latest by mtime" races. Each runtime has a deterministic way to map a session to its transcript file.</li>
+      </ul>
+
+      <div class="doc-footer">
+        <a href="advanced.html">&larr; Advanced</a>
+        <a href="arkd.html">ArkD Daemon &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>
