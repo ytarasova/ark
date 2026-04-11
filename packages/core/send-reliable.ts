@@ -77,8 +77,9 @@ export async function sendReliable(
 
       // Check for paste marker (message stuck in composer)
       if (hasPasteMarker(content)) {
-        // Nudge with Enter to submit the pasted text
-        await tmux.sendTextAsync(sessionName, "");
+        // Nudge with a bare Enter to submit the pasted text.
+        // Avoid re-entering the full load/paste pipeline via sendTextAsync("").
+        await tmux.sendKeysAsync(sessionName, "Enter");
         continue;
       }
 
