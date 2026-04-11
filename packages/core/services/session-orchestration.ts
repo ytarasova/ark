@@ -244,7 +244,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   try {
     const scheduler = app.scheduler;
     // Scheduler is available -- we are in hosted mode
-    const tenantId = (session.config as any)?.tenantId ?? "default";
+    const tenantId = session.tenant_id ?? "default";
     log(`Scheduling session for tenant: ${tenantId}`);
     try {
       const worker = await scheduler.schedule(session, tenantId);
@@ -284,7 +284,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
       const updated = app.sessions.get(sessionId);
       if (updated) {
         // Copy updated fields into session reference for the rest of dispatch
-        (session as any).workdir = updated.workdir;
+        (session as { workdir: string | null }).workdir = updated.workdir;
       }
       log(`Cloned remote repo to ${tmpDir}`);
       app.events.log(sessionId, "remote_repo_cloned", {
@@ -352,11 +352,11 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   if (session.repo) {
     const repoPath = session.workdir ?? session.repo;
     const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
-    const computeIp = (compute?.config as any)?.ip as string | undefined;
+    const computeIp = compute?.config?.ip as string | undefined;
 
     if (computeIp) {
       // Remote compute -- ALWAYS index via arkd (control plane needs centralized knowledge)
-      const arkdPort = ((compute?.config as any)?.arkd_port as number) ?? 19300;
+      const arkdPort = (compute?.config?.arkd_port as number | undefined) ?? 19300;
       const arkdUrl = `http://${computeIp}:${arkdPort}`;
       try {
         log("Indexing codebase on remote...");
@@ -366,7 +366,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
           body: JSON.stringify({ repoPath, incremental: true }),
         });
         if (resp.ok) {
-          const data = await resp.json() as any;
+          const data = await resp.json() as { ok?: boolean; files?: number; symbols?: number; error?: string };
           ingestRemoteIndex(app, data, log);
         }
       } catch (e: any) {

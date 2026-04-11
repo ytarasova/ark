@@ -533,7 +533,7 @@ async function handleTenantPolicySet(req: Request, tenantId: string): Promise<Re
       default_provider: (body.default_provider as string) ?? "k8s",
       max_concurrent_sessions: (body.max_concurrent_sessions as number) ?? 10,
       max_cost_per_day_usd: (body.max_cost_per_day_usd as number | null) ?? null,
-      compute_pools: (body.compute_pools as any[]) ?? [],
+      compute_pools: (body.compute_pools as Array<{ pool_id: string; weight?: number }>) ?? [],
     });
     logInfo("conductor", `Tenant policy set for: ${tenantId}`);
     return Response.json({ status: "ok", tenant_id: tenantId });
@@ -642,7 +642,7 @@ async function handleReport(sessionId: string, report: OutboundMessage): Promise
     try {
       const { indexSessionCompletion } = await import("../knowledge/indexer.js");
       const s = _app.sessions.get(sessionId);
-      const changedFiles = ((report as any).filesChanged as string[]) ?? [];
+      const changedFiles = ((report as Record<string, unknown>).filesChanged as string[] | undefined) ?? [];
       indexSessionCompletion(
         _app.knowledge,
         sessionId,
