@@ -278,13 +278,15 @@ jobs:
           retention-days: 1
 
   # Assemble self-contained distribution tarballs.
-  # The package job depends only on the strictly required builds (build-ark
-  # and build-web). vendor-tmux/codegraph/tensorzero artifacts are downloaded
-  # with continue-on-error so a partial vendor matrix (e.g. one runner queue
-  # cancellation) doesn't block the whole release. The corresponding bundle
-  # ships without that optional binary; runtime fallbacks handle the gap.
+  # We `needs:` the vendor jobs so package waits for them, but use
+  # `if: !cancelled() && needs.build-ark.result == 'success'` so a partial
+  # vendor failure (e.g. one matrix instance gets cancelled because of runner
+  # queue saturation) doesn't skip the whole package job. The download-artifact
+  # steps for individual vendors are continue-on-error, so a missing artifact
+  # produces a tarball without that vendor binary instead of failing the build.
   package:
-    needs: [build-ark, build-web]
+    needs: [build-ark, build-web, vendor-tmux-darwin, vendor-tmux-linux, vendor-codegraph]
+    if: ${{ !cancelled() && needs.build-ark.result == 'success' && needs.build-web.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
