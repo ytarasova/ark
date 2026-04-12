@@ -6,6 +6,8 @@
  * first, falling back to the documented default.
  */
 
+import { join } from "path";
+
 /** Default conductor URL (env: ARK_CONDUCTOR_URL) */
 export const DEFAULT_CONDUCTOR_URL = process.env.ARK_CONDUCTOR_URL || "http://localhost:19100";
 
@@ -29,3 +31,6 @@ export const DEFAULT_ROUTER_URL = process.env.ARK_ROUTER_URL || "http://localhos
 
 /** Docker host conductor URL (for devcontainer/docker dispatch) */
 export const DOCKER_CONDUCTOR_URL = "http://host.docker.internal:19100";
+
+/** Absolute path to the channel MCP server script (packages/core/conductor/channel.ts). */
+export const CHANNEL_SCRIPT_PATH = join(import.meta.dir, "conductor", "channel.ts");

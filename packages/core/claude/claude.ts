@@ -10,13 +10,9 @@ import { randomUUID } from "crypto";
 import { existsSync, readFileSync, writeFileSync, symlinkSync, mkdirSync, renameSync } from "fs";
 import { join, resolve } from "path";
 import { homedir } from "os";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
 
 import * as tmux from "../infra/tmux.js";
-import { DEFAULT_CONDUCTOR_URL, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { DEFAULT_CONDUCTOR_URL, DEFAULT_CHANNEL_BASE_URL, CHANNEL_SCRIPT_PATH } from "../constants.js";
 
 // ── Model mapping ────────────────────────────────────────────────────────────
 
@@ -112,7 +108,7 @@ export function channelMcpConfig(
   if (opts?.tenantId) env.ARK_TENANT_ID = opts.tenantId;
   return {
     command: bunPath,
-    args: [join(import.meta.dir, "..", "conductor", "channel.ts")],
+    args: [CHANNEL_SCRIPT_PATH],
     env,
   };
 }

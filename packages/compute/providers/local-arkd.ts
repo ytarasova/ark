@@ -10,8 +10,7 @@
  */
 
 import { existsSync, rmSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { join } from "path";
 import { homedir } from "os";
 import { ArkdBackedProvider } from "./arkd-backed.js";
 import { safeAsync } from "../../core/safe.js";
@@ -21,9 +20,7 @@ import {
 import type {
   Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
 } from "../types.js";
-import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL } from "../../core/constants.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL, CHANNEL_SCRIPT_PATH } from "../../core/constants.js";
 
 // ── Shared local base ───────────────────────────────────────────────────────
 
@@ -49,7 +46,7 @@ abstract class LocalArkdBase extends ArkdBackedProvider {
   buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
     return {
       command: join(homedir(), ".bun", "bin", "bun"),
-      args: [join(__dirname, "../../core/conductor/channel.ts")],
+      args: [CHANNEL_SCRIPT_PATH],
       env: {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
