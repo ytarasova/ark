@@ -21,6 +21,7 @@ import type { ComputeTemplateRepository } from "./repositories/compute-template.
 import type { EventRepository } from "./repositories/event.js";
 import type { MessageRepository } from "./repositories/message.js";
 import type { TodoRepository } from "./repositories/todo.js";
+import type { ArtifactRepository } from "./repositories/artifact.js";
 import type { SessionService } from "./services/session.js";
 import type { ComputeService } from "./services/compute.js";
 import type { HistoryService } from "./services/history.js";
@@ -52,6 +53,7 @@ export interface Cradle {
   events: EventRepository;
   messages: MessageRepository;
   todos: TodoRepository;
+  artifacts: ArtifactRepository;
 
   // Services
   sessionService: SessionService;

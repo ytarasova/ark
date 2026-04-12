@@ -718,6 +718,24 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     });
   }
 
+  // Persist structured artifacts for queryable tracking
+  try {
+    const r = report as unknown as Record<string, unknown>;
+    if (result.prUrl) {
+      app.artifacts.add(sessionId, "pr", [result.prUrl]);
+    }
+    if (Array.isArray(r.filesChanged) && r.filesChanged.length > 0) {
+      app.artifacts.add(sessionId, "file", r.filesChanged as string[]);
+    }
+    if (Array.isArray(r.commits) && r.commits.length > 0) {
+      app.artifacts.add(sessionId, "commit", r.commits as string[]);
+    }
+    const s = app.sessions.get(sessionId);
+    if (s?.branch && report.type === "completed") {
+      app.artifacts.add(sessionId, "branch", [s.branch]);
+    }
+  } catch { /* best-effort artifact tracking */ }
+
   // Index session completion in knowledge graph (best-effort)
   if (report.type === "completed" && app.knowledge) {
     try {

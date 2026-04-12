@@ -185,6 +185,9 @@ export function initSchema(db: IDatabase): void {
 
   // Usage records table (universal cost tracking)
   initUsageSchema(db);
+
+  // Session artifacts table (queryable artifact tracking)
+  initArtifactSchema(db);
 }
 
 export function initKnowledgeSchema(db: IDatabase): void {
@@ -247,6 +250,23 @@ export function initUsageSchema(db: IDatabase): void {
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_user ON usage_records(user_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_records(model)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at)");
+}
+
+export function initArtifactSchema(db: IDatabase): void {
+  safeExec(db, `
+    CREATE TABLE IF NOT EXISTS session_artifacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      value TEXT NOT NULL,
+      metadata TEXT DEFAULT '{}',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_session ON session_artifacts(session_id)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_type_value ON session_artifacts(type, value)");
+  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_tenant ON session_artifacts(tenant_id)");
 }
 
 /** Execute a SQL statement, swallowing errors (for best-effort idempotent init). */
