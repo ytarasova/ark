@@ -8,6 +8,7 @@ import {
   buildFileLinks,
   buildCommitLinks,
   stripAnsiAndFilter,
+  formatDuration,
   getColumnWidths,
   fitText,
   shortId,
@@ -180,6 +181,54 @@ describe("stripAnsiAndFilter", () => {
   it("handles empty input", () => {
     expect(stripAnsiAndFilter("")).toEqual([]);
     expect(stripAnsiAndFilter("  \n  \n  ")).toEqual([]);
+  });
+});
+
+describe("formatDuration", () => {
+  it("returns empty string for null input", () => {
+    expect(formatDuration(null)).toBe("");
+    expect(formatDuration(null, null)).toBe("");
+  });
+
+  it("returns empty string for invalid date", () => {
+    expect(formatDuration("not-a-date")).toBe("");
+  });
+
+  it("formats seconds", () => {
+    const from = new Date(Date.now() - 30_000).toISOString();
+    const result = formatDuration(from);
+    expect(result).toBe("30s");
+  });
+
+  it("formats minutes and seconds", () => {
+    const from = new Date(Date.now() - 125_000).toISOString(); // 2m 5s
+    const result = formatDuration(from);
+    expect(result).toBe("2m 5s");
+  });
+
+  it("formats hours and minutes", () => {
+    const from = new Date(Date.now() - 3_900_000).toISOString(); // 1h 5m
+    const result = formatDuration(from);
+    expect(result).toBe("1h 5m");
+  });
+
+  it("formats days and hours", () => {
+    const from = new Date(Date.now() - 90_000_000).toISOString(); // 1d 1h
+    const result = formatDuration(from);
+    expect(result).toBe("1d 1h");
+  });
+
+  it("formats duration between two timestamps", () => {
+    const from = "2026-01-01T00:00:00Z";
+    const to = "2026-01-01T01:30:00Z"; // 1h 30m
+    const result = formatDuration(from, to);
+    expect(result).toBe("1h 30m");
+  });
+
+  it("handles zero duration", () => {
+    const now = new Date().toISOString();
+    const result = formatDuration(now, now);
+    expect(result).toBe("0s");
   });
 });
 
