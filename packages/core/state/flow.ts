@@ -43,10 +43,18 @@ export interface StageDefinition {
   subtasks?: { name: string; task: string }[];
 }
 
+export interface FlowEdgeDefinition {
+  from: string;
+  to: string;
+  condition?: string;  // JS expression evaluated against session data
+  label?: string;
+}
+
 export interface FlowDefinition {
   name: string;
   description?: string;
   stages: StageDefinition[];
+  edges?: FlowEdgeDefinition[];
 }
 
 // ── Stage navigation ────────────────────────────────────────────────────────
