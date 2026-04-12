@@ -41,6 +41,19 @@ import type {
   IndexStatsResult,
 } from "../types/index.js";
 
+/** Replay step returned by session/replay -- mirrors core/session/replay.ts */
+export interface ReplayStep {
+  index: number;
+  timestamp: string;
+  elapsed: string;
+  type: string;
+  stage: string | null;
+  actor: string | null;
+  summary: string;
+  detail: string | null;
+  data: Record<string, unknown> | null;
+}
+
 export class ArkClient {
   private transport: Transport;
   private idCounter = 0;
@@ -578,6 +591,11 @@ export class ArkClient {
 
   async sessionExport(sessionId: string, filePath?: string): Promise<{ ok: boolean; filePath?: string; data?: any }> {
     return this.rpc<{ ok: boolean; filePath?: string; data?: any }>("session/export", { sessionId, filePath });
+  }
+
+  async sessionReplay(sessionId: string): Promise<ReplayStep[]> {
+    const { steps } = await this.rpc<{ steps: ReplayStep[] }>("session/replay", { sessionId });
+    return steps;
   }
 
   // ── Memory ─────────────────────────────────────────────────────────────────

@@ -344,4 +344,13 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const artifacts = app.artifacts.query(q as any);
     return { artifacts };
   });
+
+  // ── Replay ──────────────────────────────────────────────────────────────────
+
+  router.handle("session/replay", async (params) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const { buildReplay } = await import("../../core/session/replay.js");
+    const steps = buildReplay(app, sessionId);
+    return { steps };
+  });
 }

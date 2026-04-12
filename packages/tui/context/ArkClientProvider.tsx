@@ -3,8 +3,8 @@ import { ArkClientContext } from "../hooks/useArkClient.js";
 import { ArkClient } from "../../protocol/client.js";
 import { ArkServer } from "../../server/index.js";
 import { registerAllHandlers } from "../../server/register.js";
-import { getApp } from "../../core/app.js";
 import { createWebSocketTransport } from "../../protocol/transport.js";
+import type { AppContext } from "../../core/app.js";
 import type { Transport } from "../../protocol/transport.js";
 import type { JsonRpcMessage } from "../../protocol/types.js";
 
@@ -34,9 +34,11 @@ interface Props {
   serverUrl?: string;
   /** Auth token for remote server. */
   token?: string;
+  /** AppContext for local in-process mode. Passed explicitly -- no getApp() calls. */
+  app?: AppContext;
 }
 
-export function ArkClientProvider({ children, onReady, serverUrl, token }: Props) {
+export function ArkClientProvider({ children, onReady, serverUrl, token, app }: Props) {
   const [client, setClient] = useState<ArkClient | null>(null);
   const serverRef = useRef<ArkServer | null>(null);
 
@@ -58,10 +60,10 @@ export function ArkClientProvider({ children, onReady, serverUrl, token }: Props
         .catch((err) => {
           console.error(`Failed to connect to remote server: ${err.message}`);
         });
-    } else {
-      // Local mode: in-process server
+    } else if (app) {
+      // Local mode: in-process server backed by the provided AppContext
       const server = new ArkServer();
-      registerAllHandlers(server.router, getApp());
+      registerAllHandlers(server.router, app);
       serverRef.current = server;
 
       const { clientTransport, serverTransport } = createInMemoryPair();
@@ -72,10 +74,13 @@ export function ArkClientProvider({ children, onReady, serverUrl, token }: Props
         setClient(ark);
         onReady?.();
       });
+    } else {
+      console.error("ArkClientProvider: either serverUrl or app must be provided");
+      return;
     }
 
     return () => { ark.close(); };
-  }, [serverUrl]);
+  }, [serverUrl, app]);
 
   if (!client) return null;
 

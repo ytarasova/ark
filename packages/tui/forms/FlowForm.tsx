@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
-import { getApp } from "../../core/app.js";
 import type { FlowDefinition, StageDefinition } from "../../core/index.js";
 import { useFormNavigation } from "../components/form/useFormNavigation.js";
 import { FormTextField } from "../components/form/FormTextField.js";
 import { FormSelectField } from "../components/form/FormSelectField.js";
 import { submitForm } from "./submitForm.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 interface FlowFormProps {
@@ -29,6 +29,7 @@ const SCOPE_CHOICES = [
 
 export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
   const theme = getTheme();
+  const ark = useArkClient();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [scope, setScope] = useState<"global" | "project">(projectRoot ? "project" : "global");
@@ -40,9 +41,10 @@ export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
   const [stageCursor, setStageCursor] = useState(0);
   const [stageField, setStageField] = useState<"name" | "agent" | "gate">("name");
 
-  const agents = React.useMemo(() => {
-    try { return getApp().agents.list(projectRoot).map(a => a.name); } catch { return []; }
-  }, [projectRoot]);
+  const [agents, setAgents] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    ark.agentList().then(list => setAgents(list.map(a => a.name))).catch(() => setAgents([]));
+  }, [ark]);
 
   const _agentChoices = React.useMemo(() => [
     { label: "(none)", value: "" },
@@ -78,8 +80,8 @@ export function FlowForm({ onDone, asyncState, projectRoot }: FlowFormProps) {
     };
 
     submitForm({
-      create: () => {
-        getApp().flows.save(flowDef.name, flowDef, scope);
+      create: async () => {
+        await ark.flowCreate({ name: flowDef.name, description: flowDef.description, stages: flowDef.stages, scope });
       },
       onDone,
       asyncState,

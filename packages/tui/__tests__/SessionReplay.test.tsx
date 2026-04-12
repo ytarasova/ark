@@ -1,48 +1,23 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { SessionReplay } from "../tabs/SessionReplay.js";
+import { ArkClientProvider } from "../context/ArkClientProvider.js";
 import type { Session } from "../../core/index.js";
-import { withTestContext } from "../../core/__tests__/test-helpers.js";
+import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { startSession } from "../../core/services/session-orchestration.js";
+import { waitFor } from "../../core/__tests__/test-helpers.js";
 
-withTestContext();
-
-// Mock core module - buildReplay returns test data
-const mockSteps = [
-  {
-    index: 0,
-    timestamp: "2026-01-01T00:00:00Z",
-    elapsed: "00:00:00",
-    type: "session_created",
-    stage: null,
-    actor: "user",
-    summary: "Created with flow:default - Test task",
-    detail: "flow: default\nsummary: Test task",
-    data: { flow: "default", summary: "Test task" },
-  },
-  {
-    index: 1,
-    timestamp: "2026-01-01T00:00:03Z",
-    elapsed: "00:00:03",
-    type: "stage_started",
-    stage: "plan",
-    actor: "planner",
-    summary: "Started plan with agent:planner",
-    detail: "stage: plan\nagent: planner",
-    data: { stage: "plan", agent: "planner" },
-  },
-  {
-    index: 2,
-    timestamp: "2026-01-01T00:01:42Z",
-    elapsed: "00:01:42",
-    type: "agent_completed",
-    stage: "plan",
-    actor: "planner",
-    summary: "Completed - 3 files changed, 0 commits",
-    detail: "files_changed: 3\ncommits: 0",
-    data: { files_changed: 3, commits: 0 },
-  },
-];
+let app: AppContext;
+beforeAll(async () => {
+  app = AppContext.forTest();
+  setApp(app);
+  await app.boot();
+});
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 function makeSession(overrides?: Partial<Session>): Session {
   return {
@@ -74,15 +49,24 @@ function makeSession(overrides?: Partial<Session>): Session {
   };
 }
 
-// We test the component rendering with mocked data via a wrapper
-// The actual core.buildReplay is tested in core/__tests__/replay.test.ts
+/** Render with ArkClientProvider and wait for RPC client to be ready. */
+async function renderReplay(session: Session) {
+  let ready = false;
+  const result = render(
+    <ArkClientProvider app={app} onReady={() => { ready = true; }}>
+      <SessionReplay session={session} onClose={() => {}} />
+    </ArkClientProvider>,
+  );
+  await waitFor(() => ready);
+  return result;
+}
 
 describe("SessionReplay", () => {
-  it("renders session header with id and flow", () => {
+  it("renders session header with id and flow", async () => {
     const session = makeSession();
-    const { lastFrame, unmount } = render(
-      <SessionReplay session={session} onClose={() => {}} />,
-    );
+    const { lastFrame, unmount } = await renderReplay(session);
+    // Wait for async render
+    await waitFor(() => (lastFrame() ?? "").includes("s-abc123"));
     const frame = lastFrame()!;
     expect(frame).toContain("s-abc123");
     expect(frame).toContain("default");
@@ -90,24 +74,26 @@ describe("SessionReplay", () => {
     unmount();
   });
 
-  it("renders the separator line", () => {
+  it("renders the separator line", async () => {
     const session = makeSession();
-    const { lastFrame, unmount } = render(
-      <SessionReplay session={session} onClose={() => {}} />,
-    );
+    const { lastFrame, unmount } = await renderReplay(session);
+    await waitFor(() => (lastFrame() ?? "").includes("━"));
     const frame = lastFrame()!;
-    // Should contain the unicode separator
     expect(frame).toContain("━");
     unmount();
   });
 
-  it("shows step count with event count label", () => {
-    const session = makeSession();
-    const { lastFrame, unmount } = render(
-      <SessionReplay session={session} onClose={() => {}} />,
-    );
+  it("shows event count in header for session with events", async () => {
+    // Create a real session with events so replay returns data
+    const s = startSession(app, { summary: "replay-test", repo: ".", flow: "bare" });
+    app.events.log(s.id, "session_created", { data: { summary: "replay-test" } });
+    app.events.log(s.id, "stage_started", { data: { stage: "plan", agent: "planner" } });
+
+    const session = makeSession({ id: s.id, summary: "replay-test", flow: "bare" });
+    const { lastFrame, unmount } = await renderReplay(session);
+    // Wait for the RPC call to complete and steps to render
+    await waitFor(() => (lastFrame() ?? "").includes("events"));
     const frame = lastFrame()!;
-    // Header shows "N events"
     expect(frame).toContain("events");
     unmount();
   });

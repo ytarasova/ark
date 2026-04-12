@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
-import { buildReplay, getApp } from "../../core/index.js";
 import type { Session } from "../../core/index.js";
+import { useArkClient } from "../hooks/useArkClient.js";
+import type { ReplayStep } from "../../protocol/client.js";
 import { eventTypeColor } from "../helpers/colors.js";
 import { ScrollBox } from "../components/ScrollBox.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
@@ -15,7 +16,11 @@ export interface SessionReplayProps {
 /** Replay overlay - step through a session's event timeline */
 export function SessionReplay({ session, onClose }: SessionReplayProps) {
   const theme = getTheme();
-  const steps = useMemo(() => buildReplay(getApp(), session.id), [session.id]);
+  const ark = useArkClient();
+  const [steps, setSteps] = useState<ReplayStep[]>([]);
+  useEffect(() => {
+    ark.sessionReplay(session.id).then(setSteps).catch(() => setSteps([]));
+  }, [session.id]);
   const [sel, setSel] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [searchMode, setSearchMode] = useState(false);

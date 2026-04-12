@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Box, useApp, useInput, useStdout } from "ink";
 import { execFile } from "child_process";
+import { join } from "path";
 import { useArkClient } from "./hooks/useArkClient.js";
 import { useArkStore } from "./hooks/useArkStore.js";
 import { useAsync } from "./hooks/useAsync.js";
@@ -26,21 +27,25 @@ import { CostsTab, getCostsHints } from "./tabs/CostsTab.js";
 import { SchedulesTab, getSchedulesHints } from "./tabs/SchedulesTab.js";
 import { MemoryManager, getMemoryHints } from "./components/MemoryManager.js";
 import { loadUiState, saveUiState } from "../core/state/ui-state.js";
-import { useAppContext } from "./context/AppProvider.js";
 import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
 import { HelpOverlay } from "./components/HelpOverlay.js";
 import { TABS } from "./components/TabBar.js";
 
-export function App() {
+interface AppProps {
+  /** Path to the Ark data directory, used for UI state persistence. */
+  arkDir?: string;
+}
+
+export function App({ arkDir }: AppProps) {
   return (
     <FocusProvider>
-      <AppInner />
+      <AppInner arkDir={arkDir} />
     </FocusProvider>
   );
 }
 
-function AppInner() {
+function AppInner({ arkDir: arkDirProp }: { arkDir?: string }) {
   const { exit } = useApp();
   const ark = useArkClient();
   const store = useArkStore();
@@ -51,8 +56,7 @@ function AppInner() {
   const historyAsync = useAsync(store.refresh);
   const computeAsync = useAsync(store.refresh);
 
-  const appCtx = useAppContext();
-  const arkDir = appCtx.config.arkDir;
+  const arkDir = arkDirProp ?? join(process.env.HOME ?? "/tmp", ".ark");
 
   // Restore persisted tab on mount
   const savedState = useMemo(() => loadUiState(arkDir), [arkDir]);

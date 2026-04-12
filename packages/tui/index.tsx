@@ -6,7 +6,6 @@ import { join } from "path";
 import { AppContext, setApp } from "../core/app.js";
 import { loadConfig } from "../core/config.js";
 import { App } from "./App.js";
-import { AppProvider } from "./context/AppProvider.js";
 import { ArkClientProvider } from "./context/ArkClientProvider.js";
 
 // ── Resolve remote mode ────────────────────────────────────────────────────
@@ -15,15 +14,18 @@ const remoteToken = process.env.ARK_TUI_TOKEN || process.env.ARK_TOKEN;
 const isRemote = !!remoteServerUrl;
 
 // ── Boot application ────────────────────────────────────────────────────────
+// In local mode, boot AppContext (conductor + DB + services) as the daemon
+// backend. The TUI itself is a pure client -- all data flows through ArkClient
+// RPC calls, never direct getApp()/AppContext access from components.
 let app: AppContext | null = null;
+const config = loadConfig();
 if (!isRemote) {
-  app = new AppContext(loadConfig());
+  app = new AppContext(config);
   setApp(app);
   await app.boot();
 }
 
 // ── Logging ─────────────────────────────────────────────────────────────────
-const config = app?.config ?? loadConfig();
 const logDir = config.logDir ?? join(process.env.HOME ?? "/tmp", ".ark", "logs");
 try { mkdirSync(logDir, { recursive: true }); } catch { /* log dir may already exist */ }
 const LOG_FILE = join(logDir, "tui.log");
@@ -60,22 +62,15 @@ if (!process.stdin.isTTY) {
 
 try { process.stdin.setRawMode(true); process.stdin.setRawMode(false); } catch { /* stdin may not be a TTY */ }
 
+// ── Resolve arkDir for UI state persistence ─────────────────────────────────
+const arkDir = config.arkDir ?? join(process.env.HOME ?? "/tmp", ".ark");
+
 // ── Render ──────────────────────────────────────────────────────────────────
 try {
-  // In remote mode we use a minimal AppContext (no conductor, no metrics)
-  // but AppProvider still needs an AppContext value for components that read config.
-  let appForProvider = app;
-  if (!appForProvider) {
-    appForProvider = new AppContext(loadConfig(), { skipConductor: true, skipMetrics: true });
-    await appForProvider.boot();
-  }
-
   const { waitUntilExit } = render(
-    <AppProvider app={appForProvider}>
-      <ArkClientProvider serverUrl={remoteServerUrl} token={remoteToken}>
-        <App />
-      </ArkClientProvider>
-    </AppProvider>,
+    <ArkClientProvider serverUrl={remoteServerUrl} token={remoteToken} app={app ?? undefined}>
+      <App arkDir={arkDir} />
+    </ArkClientProvider>,
     { patchConsole: false, exitOnCtrlC: true },
   );
   log("INFO", "TUI rendered");

@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
-import { getApp } from "../../core/app.js";
 import type { AgentDefinition } from "../../core/index.js";
 import { useFormNavigation } from "../components/form/useFormNavigation.js";
 import { FormTextField } from "../components/form/FormTextField.js";
 import { FormSelectField } from "../components/form/FormSelectField.js";
 import { submitForm } from "./submitForm.js";
 import { useToolSelection } from "../hooks/useToolSelection.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 import { openExternalEditor } from "../helpers/openExternalEditor.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
@@ -43,6 +43,7 @@ const TOOL_OPTIONS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearc
 
 export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormProps) {
   const theme = getTheme();
+  const ark = useArkClient();
   const isEdit = !!agent;
 
   const [name, setName] = useState(agent?.name ?? "");
@@ -104,8 +105,8 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
     const saveScope = isEdit ? (agent!._source as "project" | "global") : scope;
 
     submitForm({
-      create: () => {
-        getApp().agents.save(agentDef.name, agentDef as AgentDefinition, saveScope, saveScope === "project" ? projectRoot : undefined);
+      create: async () => {
+        await ark.agentSave(agentDef as AgentDefinition, { scope: saveScope, update: isEdit });
       },
       onDone,
       asyncState,
