@@ -132,6 +132,20 @@ export function initSchema(db: IDatabase): void {
     );
     CREATE INDEX IF NOT EXISTS idx_todos_session ON todos(session_id);
     CREATE INDEX IF NOT EXISTS idx_todos_tenant ON todos(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS artifacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      value TEXT NOT NULL,
+      metadata TEXT,
+      stage TEXT,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_artifacts_session ON artifacts(session_id);
+    CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type);
+    CREATE INDEX IF NOT EXISTS idx_artifacts_tenant ON artifacts(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_groups_tenant ON groups(tenant_id);
 
     CREATE TABLE IF NOT EXISTS schedules (

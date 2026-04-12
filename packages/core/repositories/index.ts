@@ -4,4 +4,5 @@ export { ComputeTemplateRepository } from "./compute-template.js";
 export { EventRepository } from "./event.js";
 export { MessageRepository } from "./message.js";
 export { TodoRepository } from "./todo.js";
+export { ArtifactRepository } from "./artifact.js";
 export { initSchema, seedLocalCompute } from "./schema.js";

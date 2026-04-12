@@ -32,7 +32,7 @@ import { logError, logWarn, setLogArkDir } from "./observability/structured-log.
 import { setProfilesArkDir } from "./state/profiles.js";
 import { registerExecutor } from "./executor.js";
 import { builtinExecutors, loadPluginExecutors } from "./executors/index.js";
-import { SessionRepository, ComputeRepository, ComputeTemplateRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
+import { SessionRepository, ComputeRepository, ComputeTemplateRepository, EventRepository, MessageRepository, TodoRepository, ArtifactRepository } from "./repositories/index.js";
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
 import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "./stores/index.js";
 import { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
@@ -130,6 +130,7 @@ export class AppContext {
   get events(): EventRepository { return this._resolve("events"); }
   get messages(): MessageRepository { return this._resolve("messages"); }
   get todos(): TodoRepository { return this._resolve("todos"); }
+  get artifacts(): ArtifactRepository { return this._resolve("artifacts"); }
 
   private _apiKeys: ApiKeyManager | null = null;
 
@@ -255,6 +256,8 @@ export class AppContext {
     scopedMessages.setTenant(tenantId);
     const scopedTodos = new TodoRepository(db);
     scopedTodos.setTenant(tenantId);
+    const scopedArtifacts = new ArtifactRepository(db);
+    scopedArtifacts.setTenant(tenantId);
 
     const scopedKnowledge = new KnowledgeStore(db);
     scopedKnowledge.setTenant(tenantId);
@@ -272,6 +275,7 @@ export class AppContext {
     Object.defineProperty(scoped, "events", { get: () => scopedEvents, configurable: true });
     Object.defineProperty(scoped, "messages", { get: () => scopedMessages, configurable: true });
     Object.defineProperty(scoped, "todos", { get: () => scopedTodos, configurable: true });
+    Object.defineProperty(scoped, "artifacts", { get: () => scopedArtifacts, configurable: true });
     Object.defineProperty(scoped, "knowledge", { get: () => scopedKnowledge, configurable: true });
     Object.defineProperty(scoped, "usageRecorder", { get: () => scopedUsage, configurable: true });
 
@@ -433,6 +437,7 @@ export class AppContext {
     const events = new EventRepository(db);
     const messages = new MessageRepository(db);
     const todos = new TodoRepository(db);
+    const artifacts = new ArtifactRepository(db);
     const sessionService = new SessionService(sessions, events, messages);
     const computeService = new ComputeService(computes);
     const historyService = new HistoryService(db);
@@ -447,6 +452,7 @@ export class AppContext {
       events: asValue(events),
       messages: asValue(messages),
       todos: asValue(todos),
+      artifacts: asValue(artifacts),
 
       // Services
       sessionService: asValue(sessionService),

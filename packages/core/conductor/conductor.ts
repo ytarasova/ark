@@ -709,6 +709,12 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     sendOSNotification(`Ark: ${notifyTitle}`, notifyBody);
   }
 
+  // Persist artifacts from the report
+  if (result.artifacts?.length) {
+    const s = app.sessions.get(sessionId);
+    app.artifacts.addMany(sessionId, result.artifacts, { stage: s?.stage ?? undefined });
+  }
+
   // PR URL detection (agent-provided)
   if (result.prUrl) {
     app.sessions.update(sessionId, { pr_url: result.prUrl });

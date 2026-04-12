@@ -172,6 +172,23 @@ export function initPostgresSchema(db: IDatabase): void {
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_todos_session ON todos(session_id)`);
 
+  // Artifacts table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS artifacts (
+      id SERIAL PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      value TEXT NOT NULL,
+      metadata TEXT,
+      stage TEXT,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_artifacts_session ON artifacts(session_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type)`);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_artifacts_tenant ON artifacts(tenant_id)`);
+
   // Schedules table
   db.exec(`
     CREATE TABLE IF NOT EXISTS schedules (

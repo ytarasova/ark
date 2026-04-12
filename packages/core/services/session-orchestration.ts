@@ -2217,6 +2217,8 @@ export interface ReportResult {
   message?: { role: MessageRole; content: string; type: MessageType };
   /** PR URL detected from report */
   prUrl?: string;
+  /** Artifacts to persist (commits, files, PRs, branches). */
+  artifacts?: Array<{ type: "commit" | "file" | "pr" | "branch"; value: string; metadata?: Record<string, unknown> }>;
 }
 
 /**
@@ -2281,6 +2283,23 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
         filesChanged: rr.filesChanged as string[] | undefined,
         commits: rr.commits as string[] | undefined,
       };
+
+      // Extract artifacts from completion report
+      const artifacts: ReportResult["artifacts"] = [];
+      if (Array.isArray(rr.filesChanged)) {
+        for (const f of rr.filesChanged as string[]) {
+          artifacts.push({ type: "file", value: f });
+        }
+      }
+      if (Array.isArray(rr.commits)) {
+        for (const c of rr.commits as string[]) {
+          artifacts.push({ type: "commit", value: c });
+        }
+      }
+      if (rr.pr_url) {
+        artifacts.push({ type: "pr", value: rr.pr_url as string });
+      }
+      if (artifacts.length > 0) result.artifacts = artifacts;
 
       // Hard enforcement: reject completion if no new commits exist for the current stage.
       // Uses stage_start_sha (recorded at dispatch) for per-stage verification.
@@ -2396,6 +2415,18 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
         result.updates.status = "running";
         result.updates.breakpoint_reason = null;
       }
+      // Extract artifacts from progress reports (files/PR may arrive incrementally)
+      const pr = report as unknown as Record<string, unknown>;
+      const progressArtifacts: ReportResult["artifacts"] = [];
+      if (Array.isArray(pr.filesChanged)) {
+        for (const f of pr.filesChanged as string[]) {
+          progressArtifacts.push({ type: "file", value: f });
+        }
+      }
+      if (pr.pr_url) {
+        progressArtifacts.push({ type: "pr", value: pr.pr_url as string });
+      }
+      if (progressArtifacts.length > 0) result.artifacts = progressArtifacts;
       break;
     }
   }
