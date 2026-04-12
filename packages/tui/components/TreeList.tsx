@@ -114,9 +114,7 @@ export function TreeList<T>({
         rows.push(
           <Box key={`item-${flatIndex}`} flexDirection="column">
             {isSel ? (
-              renderColoredRow
-                ? <Text bold backgroundColor={theme.highlight}><Text color={theme.accent}>{">"}</Text>{" "}{renderColoredRow(item)}</Text>
-                : <ListRow selected>{`> ${renderRow(item, true)}`}</ListRow>
+              <ListRow selected>{`> ${renderRow(item, true)}`}</ListRow>
             ) : (
               renderColoredRow
                 ? renderColoredRow(item)
