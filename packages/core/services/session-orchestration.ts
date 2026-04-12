@@ -1927,6 +1927,10 @@ export interface HookStatusResult {
   events?: Array<{ type: string; opts: { actor?: string; stage?: string; data?: Record<string, unknown> } }>;
   /** Transcript indexing info */
   indexTranscript?: { transcriptPath: string; sessionId: string };
+  /** Whether to call advance() after applying updates (auto-gate SessionEnd fallback) */
+  shouldAdvance?: boolean;
+  /** Whether to auto-dispatch next stage after advance */
+  shouldAutoDispatch?: boolean;
 }
 
 /**
@@ -1949,14 +1953,25 @@ export function applyHookStatus(app: AppContext,
   const stageDef = session.stage ? flow.getStage(app,session.flow, session.stage) : null;
   const isManualGate = stageDef?.gate === "manual";
 
+  const isAutoGate = stageDef && stageDef.gate !== "manual";
+
   const statusMap: Record<string, string> = {
     SessionStart: "running",
     UserPromptSubmit: "running",
     StopFailure: isManualGate ? "running" : "failed",
-    SessionEnd: isManualGate ? "running" : "completed",
+    // Auto-gate SessionEnd: set "ready" so advance() can route to next stage or complete
+    // Manual-gate: stay running. No stage defined: fall back to "completed".
+    SessionEnd: isManualGate ? "running" : isAutoGate ? "ready" : "completed",
   };
 
   let newStatus = statusMap[hookEvent];
+
+  // Auto-gate SessionEnd fallback: trigger advance so the flow can progress
+  // (handles case where agent finished but channel report was unavailable)
+  if (hookEvent === "SessionEnd" && isAutoGate && session.status === "running") {
+    result.shouldAdvance = true;
+    result.shouldAutoDispatch = true;
+  }
 
   // Don't override terminal status -- late hooks can fire after session is done or manually stopped
   if (newStatus && session.status === "completed" && newStatus !== "completed") {

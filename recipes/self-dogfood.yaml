@@ -20,7 +20,7 @@ description: |
   locally to verify, and auto-creates a PR against main on completion.
 
 repo: "."
-flow: bare
+flow: autonomous
 agent: worker
 
 variables:
