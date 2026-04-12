@@ -70,17 +70,20 @@ describe("getOverlayHints", () => {
     ]);
   });
 
-  it("talk overlay returns Enter:send and Esc:close", () => {
+  it("talk overlay returns Tab:scroll/type, Enter:send, and Esc:close", () => {
     const hints = getOverlayHints("talk");
-    expect(hints).toHaveLength(2);
+    expect(hints).toHaveLength(3);
+    expect(hasLabel(hints, "scroll/type")).toBe(true);
     expect(hasLabel(hints, "send")).toBe(true);
     expect(hasLabel(hints, "close")).toBe(true);
   });
 
-  it("inbox overlay returns Esc:close", () => {
+  it("inbox overlay returns Tab:scroll/type, Enter:send, @:mention, and Esc:close", () => {
     const hints = getOverlayHints("inbox");
-    expect(hints).toHaveLength(1);
-    expect(hasKey(hints, "Esc")).toBe(true);
+    expect(hints).toHaveLength(4);
+    expect(hasLabel(hints, "scroll/type")).toBe(true);
+    expect(hasLabel(hints, "send")).toBe(true);
+    expect(hasLabel(hints, "mention")).toBe(true);
     expect(hasLabel(hints, "close")).toBe(true);
   });
 
@@ -233,6 +236,26 @@ describe("statusGroupLabel", () => {
   it("maps unknown statuses to 'Other'", () => {
     expect(statusGroupLabel("unknown")).toBe("Other");
     expect(statusGroupLabel("")).toBe("Other");
+  });
+});
+
+describe("getSessionHints combined filter + groupByStatus", () => {
+  it("both statusFilter and groupByStatus active: shows clear-filter and ungroup hints", () => {
+    const hints = getSessionHints(null, { statusFilter: "running", groupByStatus: true });
+    expect(hasLabel(hints, "clear filter")).toBe(true);
+    expect(hasLabel(hints, "ungroup")).toBe(true);
+  });
+
+  it("both statusFilter and groupByStatus active with selection: all hints present", () => {
+    const session = { status: "running" } as Session;
+    const hints = getSessionHints(session, { statusFilter: "running", groupByStatus: true });
+    const labels = extractHintLabels(hints).map(h => h.label);
+    // clear filter first
+    expect(labels[0]).toBe("clear filter");
+    // ungroup hint present
+    expect(hasLabel(hints, "ungroup")).toBe(true);
+    // session-level hints still present
+    expect(hasLabel(hints, "attach")).toBe(true);
   });
 });
 

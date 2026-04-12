@@ -107,6 +107,35 @@ describe("TreeList", () => {
     unmount();
   });
 
+  it("groupSort controls group header ordering", () => {
+    const statusItems = [
+      { id: "r1", name: "Run1", group: "Running" },
+      { id: "s1", name: "Stop1", group: "Stopped" },
+      { id: "w1", name: "Wait1", group: "Waiting" },
+    ];
+    // Custom sort: Running=0, Waiting=1, Stopped=2
+    const order: Record<string, number> = { Running: 0, Waiting: 1, Stopped: 2 };
+    const { lastFrame, unmount } = render(
+      <TreeList
+        items={statusItems}
+        groupBy={(i) => i.group}
+        groupSort={(a, b) => (order[a] ?? 9) - (order[b] ?? 9)}
+        renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
+        sel={0}
+      />
+    );
+    const frame = lastFrame()!;
+    // Running should come before Waiting, Waiting before Stopped
+    const runIdx = frame.indexOf("Running");
+    const waitIdx = frame.indexOf("Waiting");
+    const stopIdx = frame.indexOf("Stopped");
+    expect(runIdx).toBeLessThan(waitIdx);
+    expect(waitIdx).toBeLessThan(stopIdx);
+    // sel=0 should select first item in first group (Running -> Run1)
+    expect(frame).toContain("> Run1");
+    unmount();
+  });
+
   it("empty groups between items don't break selection", () => {
     const items = [
       { id: "c", name: "Charlie", group: "c-group" },

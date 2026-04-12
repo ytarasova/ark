@@ -156,6 +156,18 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   const hasOverlay = formOverlay || overlay;
   const { sel, setSel } = useListNavigation(filteredTopLevel.length, { active: pane === "left" && !hasOverlay });
 
+  // Sticky selection: when groupByStatus toggles, keep the same session
+  // selected by finding its new index in the reordered list.
+  const stickySelRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (stickySelRef.current) {
+      const id = stickySelRef.current;
+      stickySelRef.current = null;
+      const newIdx = filteredTopLevel.findIndex(s => s.id === id);
+      if (newIdx >= 0) setSel(newIdx);
+    }
+  }, [filteredTopLevel]);
+
   // Push/pop focus when overlay opens/closes
   const prevOverlayRef = useRef<Overlay>(null);
   useEffect(() => {
@@ -187,6 +199,17 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   // Memoize group list -- depends on sessions (groups derived from session group_names + groups table)
   const [groups, setGroups] = useState<any[]>([]);
   useEffect(() => { ark.groupList().then(setGroups); }, [sessions.length]);
+
+  // Memoize groupBy and groupSort callbacks so TreeList's useMemo doesn't
+  // recalculate on every render when groupByStatus hasn't changed.
+  const groupByFn = useMemo(
+    () => groupByStatus ? (s: Session) => statusGroupLabel(s.status) : (s: Session) => s.group_name ?? "",
+    [groupByStatus],
+  );
+  const groupSortFn = useMemo(
+    () => groupByStatus ? ((a: string, b: string) => (STATUS_GROUP_ORDER[a] ?? 9) - (STATUS_GROUP_ORDER[b] ?? 9)) : undefined,
+    [groupByStatus],
+  );
 
   const actions = useSessionActions(asyncState, status.show);
   const _groupActions = useGroupActions(asyncState);
@@ -257,7 +280,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
     // filtered, so Esc never feels broken regardless of state.
     if (key.escape) {
       if (confirmation.pending) { confirmation.cancel(); status.clear(); return; }
-      if (hasActiveSessionFilters({ statusFilter })) {
+      if (hasActiveSessionFilters({ statusFilter, groupByStatus })) {
         clearAllFilters();
         status.show("Filters cleared");
       }
@@ -300,6 +323,9 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
       return;
     }
     if (matchesHotkey("groupByStatus", input, key)) {
+      // Store current session ID so the useEffect below can restore
+      // selection after the reorder.
+      stickySelRef.current = selected?.id ?? null;
       setGroupByStatus(v => !v);
       return;
     }
@@ -464,14 +490,14 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
     <Box flexDirection="column" flexGrow={1}>
       <SplitPane
         focus={overlay === "talk" || overlay === "inbox" ? "right" : pane}
-        leftTitle={statusFilter ? `Sessions [${statusFilter}]` : groupByStatus ? "Sessions [by status]" : "Sessions"}
+        leftTitle={statusFilter && groupByStatus ? `Sessions [${statusFilter}, by status]` : statusFilter ? `Sessions [${statusFilter}]` : groupByStatus ? "Sessions [by status]" : "Sessions"}
         rightTitle="Details"
         left={
           <TreeList
             items={filteredTopLevel}
-            groupBy={groupByStatus ? (s => statusGroupLabel(s.status)) : (s => s.group_name ?? "")}
+            groupBy={groupByFn}
             emptyGroups={groupByStatus ? undefined : groups}
-            groupSort={groupByStatus ? ((a, b) => (STATUS_GROUP_ORDER[a] ?? 9) - (STATUS_GROUP_ORDER[b] ?? 9)) : undefined}
+            groupSort={groupSortFn}
             renderRow={(s) => {
               const cols = process.stdout.columns ?? 120;
               const summaryWidth = cols > 140 ? 45 : cols > 100 ? 30 : 20;
