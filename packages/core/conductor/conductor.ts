@@ -23,7 +23,6 @@ declare const Bun: {
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 import * as session from "../services/session-orchestration.js";
-import * as flow from "../state/flow.js";
 import { eventBus } from "../hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../../compute/index.js";
@@ -34,7 +33,7 @@ import { pollIssues } from "../integrations/issue-poller.js";
 import { ArkdClient } from "../../arkd/client.js";
 import { safeAsync } from "../safe.js";
 import { addEntry } from "../ledger.js";
-import { logError, logInfo, logWarn } from "../observability/structured-log.js";
+import { logError, logInfo } from "../observability/structured-log.js";
 import { sendOSNotification } from "../notify.js";
 import { watchMergedPR, type RollbackConfig } from "../integrations/rollback.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
@@ -173,29 +172,10 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
   // Auto-advance for SessionEnd fallback on auto-gate sessions
   if (result.shouldAdvance) {
-    const advResult = await session.advance(app, sessionId);
-    const updated = (result.shouldAutoDispatch && advResult.ok) ? app.sessions.get(sessionId) : null;
-    if (updated?.status === "ready" && updated.stage) {
-      const nextAction = flow.getStageAction(app, updated.flow, updated.stage);
-      if (nextAction.type === "agent" || nextAction.type === "fork") {
-        session.dispatch(app, sessionId).catch(err => {
-          logError("conductor", `auto-dispatch failed for ${sessionId}: ${err?.message ?? err}`);
-        });
-      } else if (nextAction.type === "action") {
-        safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
-          const verify = await session.runVerification(app, sessionId);
-          if (!verify.ok) {
-            logWarn("conductor", `action stage blocked by verification for ${sessionId}: ${verify.message}`);
-            app.sessions.update(sessionId, {
-              status: "blocked",
-              breakpoint_reason: `Verification failed: ${verify.message.slice(0, 200)}`,
-            });
-            return;
-          }
-          await session.executeAction(app, sessionId, nextAction.action ?? "");
-        });
-      }
-    }
+    await session.advanceAndDispatch(app, sessionId, {
+      autoDispatch: result.shouldAutoDispatch,
+      verify: false,  // Hook-based SessionEnd fallback skips pre-advance verification
+    });
   }
 
   // Index transcript
@@ -651,54 +631,12 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     app.sessions.update(sessionId, result.updates);
   }
 
-  // Handle advance + auto-dispatch for completed reports
+  // Handle advance + auto-dispatch for completed reports via orchestrator-mediated handoff
   if (result.shouldAdvance) {
-    // Run stage verification (verify scripts + todos) before advancing from the current stage.
-    // This ensures verify scripts defined on agent stages (e.g. implement) are enforced
-    // before the flow moves to the next stage -- not just before action stages.
-    const preAdvSession = app.sessions.get(sessionId);
-    if (preAdvSession?.stage && preAdvSession?.flow) {
-      const stageDef = flow.getStage(app, preAdvSession.flow, preAdvSession.stage);
-      if (stageDef?.verify?.length || app.todos.list(sessionId).some(t => !t.done)) {
-        const verify = await session.runVerification(app, sessionId);
-        if (!verify.ok) {
-          logWarn("conductor", `stage advance blocked by verification for ${sessionId}/${preAdvSession.stage}: ${verify.message}`);
-          app.sessions.update(sessionId, {
-            status: "blocked",
-            breakpoint_reason: `Verification failed before advancing: ${verify.message.slice(0, 200)}`,
-          });
-          app.messages.send(sessionId, "system", `Advance blocked: verification failed for stage '${preAdvSession.stage}'. ${verify.message}`, "error");
-          sendOSNotification("Ark: Verification failed", `${preAdvSession.summary ?? sessionId} - ${verify.message.slice(0, 100)}`);
-          return;
-        }
-      }
-    }
-
-    const advResult = await session.advance(app, sessionId);
-    const updated = (result.shouldAutoDispatch && advResult.ok) ? app.sessions.get(sessionId) : null;
-    if (updated?.status === "ready" && updated.stage) {
-      const nextAction = flow.getStageAction(app, updated.flow, updated.stage);
-      if (nextAction.type === "agent" || nextAction.type === "fork") {
-        session.dispatch(app, sessionId).catch(err => {
-          logError("conductor", `auto-dispatch failed for ${sessionId}: ${err?.message ?? err}`);
-        });
-      } else if (nextAction.type === "action") {
-        // Auto-execute action stages with verification enforcement
-        safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
-          const verify = await session.runVerification(app, sessionId);
-          if (!verify.ok) {
-            logWarn("conductor", `action stage blocked by verification for ${sessionId}: ${verify.message}`);
-            app.sessions.update(sessionId, {
-              status: "blocked",
-              breakpoint_reason: `Verification failed: ${verify.message.slice(0, 200)}`,
-            });
-            sendOSNotification("Ark: Verification failed", `${updated.summary ?? sessionId} - ${verify.message.slice(0, 100)}`);
-            return;
-          }
-          await session.executeAction(app, sessionId, nextAction.action ?? "");
-        });
-      }
-    }
+    await session.advanceAndDispatch(app, sessionId, {
+      autoDispatch: result.shouldAutoDispatch,
+      verify: true,  // Channel reports run pre-advance verification
+    });
   }
 
   // OS notification on stage completion or failure

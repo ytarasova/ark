@@ -39,6 +39,7 @@ import { detectHandoff } from "../handoff.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
 import { logError, logWarn } from "../observability/structured-log.js";
 import { recordEvent } from "../observability.js";
+import { sendOSNotification } from "../notify.js";
 import { track } from "../observability/telemetry.js";
 import { emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../observability/otlp.js";
 import { detectInjection } from "../session/prompt-guard.js";
@@ -594,6 +595,111 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   saveCheckpoint(app, sessionId);
 
   return { ok: true, message: `Advanced to ${nextStage}` };
+}
+
+// ── Orchestrator-mediated stage handoff ──────────────────────────────────────
+
+export interface AdvanceAndDispatchResult {
+  ok: boolean;
+  message: string;
+  /** The action taken: advanced, dispatched, blocked, completed, or skipped */
+  action: "advanced" | "dispatched" | "blocked" | "completed" | "skipped" | "error";
+}
+
+/**
+ * Orchestrator-mediated stage handoff: verify -> advance -> dispatch.
+ *
+ * Single entry point for the full stage handoff flow. Called by the conductor
+ * after applyReport or applyHookStatus sets shouldAdvance=true. Consolidates
+ * the verify-advance-dispatch logic that was previously duplicated across
+ * handleReport and handleHookStatus in the conductor.
+ *
+ * Steps:
+ *   1. Pre-advance verification (verify scripts + todos) for the current stage
+ *   2. advance() to move to the next stage
+ *   3. Auto-dispatch the next stage if shouldAutoDispatch is set (agent/fork/action)
+ */
+export async function advanceAndDispatch(
+  app: AppContext,
+  sessionId: string,
+  opts?: {
+    /** Whether to auto-dispatch the next stage after advance. Default: true */
+    autoDispatch?: boolean;
+    /** Whether to run pre-advance verification. Default: true */
+    verify?: boolean;
+  },
+): Promise<AdvanceAndDispatchResult> {
+  const shouldAutoDispatch = opts?.autoDispatch !== false;
+  const shouldVerify = opts?.verify !== false;
+
+  // Step 1: Pre-advance verification
+  if (shouldVerify) {
+    const preAdvSession = app.sessions.get(sessionId);
+    if (preAdvSession?.stage && preAdvSession?.flow) {
+      const stageDef = flow.getStage(app, preAdvSession.flow, preAdvSession.stage);
+      const hasTodos = app.todos.list(sessionId).some(t => !t.done);
+      if (stageDef?.verify?.length || hasTodos) {
+        const verifyResult = await runVerification(app, sessionId);
+        if (!verifyResult.ok) {
+          logWarn("orchestration", `stage advance blocked by verification for ${sessionId}/${preAdvSession.stage}: ${verifyResult.message}`);
+          app.sessions.update(sessionId, {
+            status: "blocked",
+            breakpoint_reason: `Verification failed before advancing: ${verifyResult.message.slice(0, 200)}`,
+          });
+          app.messages.send(sessionId, "system", `Advance blocked: verification failed for stage '${preAdvSession.stage}'. ${verifyResult.message}`, "error");
+          sendOSNotification("Ark: Verification failed", `${preAdvSession.summary ?? sessionId} - ${verifyResult.message.slice(0, 100)}`);
+          return { ok: false, message: verifyResult.message, action: "blocked" };
+        }
+      }
+    }
+  }
+
+  // Step 2: Advance to next stage
+  const advResult = await advance(app, sessionId, true);
+  if (!advResult.ok) {
+    return { ok: false, message: advResult.message, action: "error" };
+  }
+
+  // Check if the flow completed (no more stages)
+  const updated = app.sessions.get(sessionId);
+  if (!updated || updated.status === "completed") {
+    return { ok: true, message: "Flow completed", action: "completed" };
+  }
+
+  // Step 3: Auto-dispatch if requested and next stage is ready
+  if (!shouldAutoDispatch || updated.status !== "ready" || !updated.stage) {
+    return { ok: true, message: advResult.message, action: "advanced" };
+  }
+
+  const nextAction = flow.getStageAction(app, updated.flow, updated.stage);
+
+  if (nextAction.type === "agent" || nextAction.type === "fork") {
+    // Dispatch agent/fork stages asynchronously (fire-and-forget for the caller)
+    dispatch(app, sessionId).catch(err => {
+      logError("orchestration", `auto-dispatch failed for ${sessionId}: ${err?.message ?? err}`);
+    });
+    return { ok: true, message: `Advanced to ${updated.stage}, dispatching`, action: "dispatched" };
+  }
+
+  if (nextAction.type === "action") {
+    // Execute action stages with verification enforcement
+    safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
+      const verifyResult = await runVerification(app, sessionId);
+      if (!verifyResult.ok) {
+        logWarn("orchestration", `action stage blocked by verification for ${sessionId}: ${verifyResult.message}`);
+        app.sessions.update(sessionId, {
+          status: "blocked",
+          breakpoint_reason: `Verification failed: ${verifyResult.message.slice(0, 200)}`,
+        });
+        sendOSNotification("Ark: Verification failed", `${updated.summary ?? sessionId} - ${verifyResult.message.slice(0, 100)}`);
+        return;
+      }
+      await executeAction(app, sessionId, nextAction.action ?? "");
+    });
+    return { ok: true, message: `Advanced to ${updated.stage}, executing action`, action: "dispatched" };
+  }
+
+  return { ok: true, message: advResult.message, action: "advanced" };
 }
 
 export async function stop(app: AppContext, sessionId: string, opts?: { force?: boolean }): Promise<{ ok: boolean; message: string }> {
