@@ -14,6 +14,33 @@ import { setupE2E, type E2EEnv } from "./app.js";
 
 const ARK_BIN = join(import.meta.dir, "..", "..", "..", "ark");
 
+// Track every spawned server so we can reap orphans on host exit.
+// Without this, a Playwright worker that dies mid-test leaks `ark web`
+// subprocesses to launchd (they survive as immortal zombies until the
+// box reboots -- we've seen 100+ accumulate over a day of flaky runs).
+const LIVE_SERVERS = new Set<Subprocess>();
+let exitHookInstalled = false;
+
+function killServer(proc: Subprocess): void {
+  try { proc.kill("SIGKILL"); } catch { /* already gone */ }
+  LIVE_SERVERS.delete(proc);
+}
+
+function installExitHook(): void {
+  if (exitHookInstalled) return;
+  exitHookInstalled = true;
+  const reap = () => {
+    for (const proc of LIVE_SERVERS) {
+      try { proc.kill("SIGKILL"); } catch { /* already gone */ }
+    }
+    LIVE_SERVERS.clear();
+  };
+  process.on("exit", reap);
+  process.on("SIGINT", () => { reap(); process.exit(130); });
+  process.on("SIGTERM", () => { reap(); process.exit(143); });
+  process.on("uncaughtException", (err) => { reap(); throw err; });
+}
+
 export interface WebServerEnv {
   port: number;
   baseUrl: string;
@@ -49,6 +76,7 @@ async function pollReady(baseUrl: string, timeoutMs = 20_000): Promise<void> {
 }
 
 export async function setupWebServer(): Promise<WebServerEnv> {
+  installExitHook();
   const env = await setupE2E();
 
   // Build web frontend
@@ -75,11 +103,12 @@ export async function setupWebServer(): Promise<WebServerEnv> {
     stdout: "pipe",
     stderr: "pipe",
   });
+  LIVE_SERVERS.add(serverProcess);
 
   try {
     await pollReady(baseUrl);
   } catch (err) {
-    serverProcess.kill();
+    killServer(serverProcess);
     await env.teardown();
     throw err;
   }
@@ -109,7 +138,17 @@ export async function setupWebServer(): Promise<WebServerEnv> {
     rpc,
     rpcRaw,
     teardown: async () => {
-      serverProcess.kill();
+      // SIGTERM first for a clean shutdown, then SIGKILL after 500ms if the
+      // subprocess is hung mid-boot or ignoring signals.
+      try { serverProcess.kill("SIGTERM"); } catch { /* already gone */ }
+      const killed = await Promise.race([
+        serverProcess.exited.then(() => true),
+        new Promise<false>(r => setTimeout(() => r(false), 500)),
+      ]);
+      if (!killed) {
+        try { serverProcess.kill("SIGKILL"); } catch { /* already gone */ }
+      }
+      LIVE_SERVERS.delete(serverProcess);
       await env.teardown();
     },
   };

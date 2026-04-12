@@ -35,6 +35,27 @@ import { randomUUID } from "node:crypto";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Track every pty we spawn so we can reap orphans if the test host
+// dies before stop() runs. Without this, a killed Playwright worker
+// leaves `ark tui` + tmux processes reparented to launchd forever.
+const LIVE_PTYS = new Set<IPty>();
+let exitHookInstalled = false;
+
+function installExitHook(): void {
+  if (exitHookInstalled) return;
+  exitHookInstalled = true;
+  const reap = () => {
+    for (const pty of LIVE_PTYS) {
+      try { pty.kill("SIGKILL"); } catch { /* already gone */ }
+    }
+    LIVE_PTYS.clear();
+  };
+  process.on("exit", reap);
+  process.on("SIGINT", () => { reap(); process.exit(130); });
+  process.on("SIGTERM", () => { reap(); process.exit(143); });
+  process.on("uncaughtException", (err) => { reap(); throw err; });
+}
+
 // ── Harness options ─────────────────────────────────────────────────────────
 
 export interface HarnessOpts {
@@ -209,6 +230,7 @@ function pageHtml(_port: number, cols: number, rows: number): string {
 // ── Harness lifecycle ───────────────────────────────────────────────────────
 
 export async function startHarness(opts: HarnessOpts = {}): Promise<Harness> {
+  installExitHook();
   const arkBin = resolveArkBin(opts.arkBin);
   const args = opts.args ?? ["tui"];
   const cols = opts.cols ?? 120;
@@ -242,6 +264,7 @@ export async function startHarness(opts: HarnessOpts = {}): Promise<Harness> {
     cwd: arkDir,
     env,
   });
+  LIVE_PTYS.add(pty);
 
   let buffer = "";
   pty.onData((data) => {
@@ -324,6 +347,7 @@ export async function startHarness(opts: HarnessOpts = {}): Promise<Harness> {
     stopped = true;
     // Kill the pty hard so tmux + agents + children all go away.
     try { pty.kill("SIGKILL"); } catch { /* already dead */ }
+    LIVE_PTYS.delete(pty);
     // Forcibly terminate every live WebSocket so the http server's
     // connection count drops to zero and httpServer.close() can resolve.
     for (const ws of activeSockets) {
