@@ -1,12 +1,17 @@
 # Ark Platform Roadmap
 
-> Last updated: 2026-04-11 (second pass)
+> Last updated: 2026-04-11 (third pass -- tenant hardening + leak reap)
 > Unit tests: 2724 pass, 0 fail, 0 lint errors, 0 process leaks
 > E2E tests: 89 TUI (`packages/tui-e2e/`) + 78 web (`packages/e2e/web/`) = **167 passing, 0 skipped, 0 failed**
 >
 > **2026-04-10 decision (Foundry 2.0 review meeting):** Ark selected as the company-wide dev-workflow orchestrator -- the layer ABOVE tools like Goose / Claude Code / Codex, not a replacement. Framed as "the foundry" (control plane) with those tools as "the machines." First hand-out to early adopters targeted for the week of 2026-04-13. See **Camp 0: Early Adopter Ship** below.
 >
 > **2026-04-11 session shipped on `main`:**
+> - **Multi-tenant channel hardening** -- conductor `/api/channel/<sessionId>`, `/api/relay`, and `/hooks/status` all extract tenant via `Authorization: Bearer ark_<tid>_*` or `X-Ark-Tenant-Id` and route through `app.forTenant()`. `ARK_TENANT_ID` is injected into the channel MCP subprocess at dispatch, propagated through arkd's channel relay, and included in the hook curl POST. Closes the cross-tenant channel exposure flagged in the security audit (commits `e80ac4d`, `08d3329`). Unblocks hosted multi-tenant rollout.
+> - **`ark session send` reliability** -- paste-buffer race + empty-string retry fixed in `tmux.sendTextAsync` / `send-reliable.ts`. 50ms paste-flush delay before `send-keys Enter`; retry nudge uses a direct `sendKeysAsync("Enter")` instead of re-entering the paste pipeline. Unblocks the Camp 0 self-dogfood loop (`make self TASK=...`).
+> - **Worker agent auto-start** -- `agents/worker.yaml` now has a `{summary}`-templated system prompt so `--dispatch --summary "..."` kicks off work immediately instead of idling. Removes the friction on ark-on-ark dogfooding.
+> - **CI web build before unit tests** -- `.github/workflows/ci.yml` now runs `bunx --bun vite build` between `bun install` and the unit-test step, matching what `make test` does locally. Fixes the `web server > starts and serves dashboard HTML` flake that was only failing in CI (root cause: `packages/web/dist/index.html` never existed on the runner).
+> - **E2E fixture leak reaper** -- `packages/e2e/fixtures/web-server.ts` and `packages/tui-e2e/server.ts` now track every spawned subprocess in a module-level `Set` and install a single `process.on('exit'|'SIGINT'|'SIGTERM'|'uncaughtException')` reaper that SIGKILLs everything on host death. Web fixture `teardown()` additionally escalates SIGTERM → 500ms grace → SIGKILL. Kills the "Playwright worker dies mid-test, ark web gets reparented to launchd forever" class of leak (we found 138 orphans at ~24 MB each -- 3.3 GB reclaimed on the fix session).
 > - Goose as first-class runtime (`runtimes/goose.yaml` + native executor with recipe dispatch, channel MCP via `--with-extension`, router-injected base URLs, vendored binary + freshness manifest)
 > - Executor barrel + plugin discovery (`packages/core/executors/index.ts` -- `builtinExecutors` array, `loadPluginExecutors` for `~/.ark/plugins/executors/*.js`)
 > - PluginRegistry (Camp 13 Phase 1) -- typed DI-native lookup context, executors flow through Awilix
@@ -148,6 +153,10 @@ The orchestration platform for AI-powered software development. Manages the full
 - PluginRegistry as a first-class Awilix service (Camp 13 Phase 1) -- all executors flow through it; extension point is ready for compute providers + stores in Phase 2
 - Full end-to-end test suite: 89 TUI tests + 78 web tests, 0 skips, 0 failures, covers real flow progression, real cost aggregation, CRUD round-trips, and dispatch state transitions (see Camp 1 below for the full story)
 - Schema cleanup -- removed in-place migration dead code now that there is no production data to preserve
+- Multi-tenant channel + hook hardening -- `/api/channel`, `/api/relay`, `/hooks/status` all tenant-scoped via `X-Ark-Tenant-Id` extraction and `app.forTenant()` routing. Unblocks hosted multi-tenant rollout (audit-flagged gap closed)
+- Session send paste-buffer race fix + worker agent `{summary}` auto-start -- `make self TASK="..."` and `ark session send` both now work end-to-end without human intervention. Closes the ark-on-ark dogfood loop
+- CI web build before unit tests -- fixes the one consistent CI flake (`web server > starts and serves dashboard HTML`) that was blocking admin-free merges
+- E2E fixture subprocess reaper -- `process.on('exit'|'SIGINT'|'SIGTERM'|'uncaughtException')` cleanup in both `packages/e2e/fixtures/web-server.ts` and `packages/tui-e2e/server.ts`. Kills the "Playwright worker dies mid-test → orphaned `ark web` reparented to launchd forever" leak (found 138 orphans / 3.3 GB in the wild)
 
 **Candidate "in scope" for the first hand-out** (builder trio to confirm):
 - Local docker compute with worktree isolation (no AWS creds required on the user's laptop)
