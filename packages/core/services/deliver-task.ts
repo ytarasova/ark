@@ -86,7 +86,7 @@ export async function deliverInitialPrompt(
     // after the timeout and let sendReliable do its own readiness gating.
     const tmux = await import("../infra/tmux.js");
     const deadline = Date.now() + (opts?.readyTimeoutMs ?? 45_000);
-    const workingMarkers = ["ctrl+o to expand", "esc to interrupt"];
+    const idleMarkers = ["bypass permissions", "remote control active", "shift+tab to cycle"];
     let ready = false;
     while (Date.now() < deadline) {
       // Bail early if the session was stopped/deleted while we were polling.
@@ -98,7 +98,7 @@ export async function deliverInitialPrompt(
       }
       try {
         const pane = await tmux.capturePaneAsync(tmuxName, { lines: 40 });
-        if (workingMarkers.some(m => pane.toLowerCase().includes(m))) {
+        if (idleMarkers.some(m => pane.toLowerCase().includes(m))) {
           ready = true;
           break;
         }
