@@ -42,6 +42,8 @@ export interface GooseCommandOpts {
   params?: Record<string, string>;
   /** Default to `goose`, override for bundled binary paths in tests. */
   binaryPath?: string;
+  /** When true, pass `-s` so goose stays alive after delivering the task (manual gate). */
+  interactive?: boolean;
 }
 
 /**
@@ -62,6 +64,11 @@ export function buildGooseCommand(opts: GooseCommandOpts): string[] {
   if (opts.channelExtension) {
     const extCmd = [opts.channelExtension.command, ...opts.channelExtension.args].join(" ");
     args.push("--with-extension", extCmd);
+  }
+
+  // Interactive mode: -s keeps goose alive after task delivery (manual gate).
+  if (opts.interactive) {
+    args.push("-s");
   }
 
   // Recipe delivery takes precedence over text delivery
@@ -126,6 +133,8 @@ export const gooseExecutor: Executor = {
     };
 
     // Build the goose command argv
+    // Interactive mode (-s): keep goose alive when autonomy is not "full" (manual gate).
+    const interactive = opts.autonomy !== undefined && opts.autonomy !== "full";
     const argv = buildGooseCommand({
       agent: opts.agent,
       task: opts.task,
@@ -135,6 +144,7 @@ export const gooseExecutor: Executor = {
         args: (channelCfg.args as string[]) ?? [],
       },
       params: recipeParams,
+      interactive,
     });
 
     // Env: router + channel + agent env merged. Router injects
