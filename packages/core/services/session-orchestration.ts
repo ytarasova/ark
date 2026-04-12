@@ -220,6 +220,63 @@ export function startSession(app: AppContext, opts: {
   return app.sessions.get(session.id)!;
 }
 
+/**
+ * Resolve compute for a stage that specifies a compute_template.
+ * Looks up the template from DB, then config. If a matching compute
+ * already exists (named "<template>"), reuses it; otherwise provisions one.
+ * Returns the compute name to use, or null if no template specified / not found.
+ */
+export function resolveComputeForStage(
+  app: AppContext,
+  stageDef: flow.StageDefinition | null,
+  sessionId: string,
+  log: (msg: string) => void = () => {},
+): string | null {
+  if (!stageDef?.compute_template) return null;
+
+  const templateName = stageDef.compute_template;
+
+  // Resolve template: DB first, then config
+  let tmpl = app.computeTemplates.get(templateName);
+  if (!tmpl) {
+    const cfgTmpl = (app.config.computeTemplates ?? []).find(t => t.name === templateName);
+    if (cfgTmpl) {
+      tmpl = {
+        name: cfgTmpl.name,
+        description: cfgTmpl.description,
+        provider: cfgTmpl.provider as import("../../types/index.js").ComputeProviderName,
+        config: cfgTmpl.config,
+      };
+    }
+  }
+
+  if (!tmpl) {
+    log(`Compute template '${templateName}' not found, using session default`);
+    return null;
+  }
+
+  // Check if a compute with the template name already exists
+  const existing = app.computes.get(templateName);
+  if (existing) {
+    log(`Using existing compute '${templateName}' from template`);
+    return templateName;
+  }
+
+  // Provision a new compute from the template
+  log(`Provisioning compute '${templateName}' from template`);
+  app.computes.create({
+    name: templateName,
+    provider: tmpl.provider,
+    config: tmpl.config,
+  });
+  app.events.log(sessionId, "compute_provisioned_from_template", {
+    actor: "system",
+    data: { template: templateName, provider: tmpl.provider },
+  });
+
+  return templateName;
+}
+
 export async function dispatch(app: AppContext, sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<{ ok: boolean; message: string }> {
   const log = opts?.onLog ?? (() => {});
   const session = app.sessions.get(sessionId);
@@ -313,6 +370,14 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
 
   // Check if fork stage
   const stageDef = flow.getStage(app,session.flow, stage);
+
+  // Resolve per-stage compute template override
+  const stageCompute = resolveComputeForStage(app, stageDef, sessionId, log);
+  if (stageCompute) {
+    app.sessions.update(sessionId, { compute_name: stageCompute });
+    (session as { compute_name: string | null }).compute_name = stageCompute;
+  }
+
   if (stageDef?.type === "fork") {
     return dispatchFork(app, sessionId, stageDef);
   }
