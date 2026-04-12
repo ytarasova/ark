@@ -500,9 +500,16 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
             emptyGroups={groupByStatus ? undefined : groups}
             groupSort={groupSortFn}
             renderRow={(s) => {
-              // SplitPane left is 30% width minus border+padding (~4 chars)
+              // Must match renderColoredRow width exactly
               const cols = Math.floor((process.stdout.columns ?? 120) * 0.3) - 4;
-              return formatSessionRow(s, cols, unreadCounts.get(s.id) ?? 0);
+              const icon = ICON[s.status] ?? "?";
+              const age = ago(s.updated_at ?? s.created_at);
+              const unread = unreadCounts.get(s.id) ?? 0;
+              const badge = unread > 0 ? ` (${unread})` : "";
+              const reserved = 5 + age.length + badge.length;
+              const summaryWidth = Math.max(cols - reserved, 8);
+              const summary = fitText(sessionLabel(s), summaryWidth);
+              return `${icon} ${summary} ${age}${badge}`;
             }}
             renderColoredRow={(s) => {
               // SplitPane left is 30% width minus border+padding (~4 chars)
