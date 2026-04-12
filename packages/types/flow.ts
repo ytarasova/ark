@@ -48,6 +48,17 @@ export interface StageDefinition {
   on_failure?: string;
   optional?: boolean;
   model?: string;
+  /** Scripts that must pass before stage completion. */
+  verify?: string[];
+  /**
+   * Runtime isolation mode for this stage.
+   * - "fresh" (default): each stage gets a fresh runtime -- no --resume from prior stage.
+   *   Context is passed structurally via task prompt (PLAN.md, git log, events).
+   * - "continue": preserve the previous stage's claude_session_id so the next
+   *   dispatch resumes the same conversation. Useful for stages that refine
+   *   the same agent's output (e.g. review -> fixup).
+   */
+  isolation?: "fresh" | "continue";
   // Fork-specific
   strategy?: string;
   max_parallel?: number;

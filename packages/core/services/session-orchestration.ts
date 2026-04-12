@@ -523,8 +523,17 @@ export async function advance(app: AppContext, sessionId: string, force = false)
         // Persist flow state before advancing
         try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
         try { setCurrentStage(app, sessionId, graphNextStage, flowName); } catch { /* skip */ }
-        app.sessions.update(sessionId, { stage: graphNextStage, status: "ready" });
-        app.events.log(sessionId, "stage_advanced", { actor: "system", stage: graphNextStage, data: { via: "graph-flow", successors } });
+
+        // Stage isolation: clear runtime handles so next stage gets a fresh runtime.
+        // If the next stage has isolation="continue", preserve claude_session_id for --resume.
+        const graphNextStageDef = flow.getStage(app, flowName, graphNextStage);
+        const graphIsolation = graphNextStageDef?.isolation ?? "fresh";
+        const graphSessionUpdates: Partial<Session> = { stage: graphNextStage, status: "ready", session_id: null };
+        if (graphIsolation === "fresh") {
+          graphSessionUpdates.claude_session_id = null;
+        }
+        app.sessions.update(sessionId, graphSessionUpdates);
+        app.events.log(sessionId, "stage_advanced", { actor: "system", stage: graphNextStage, data: { via: "graph-flow", successors, isolation: graphIsolation } });
         emitStageSpanEnd(sessionId, { status: "completed" });
         const graphAction = flow.getStageAction(app,flowName, graphNextStage);
         const graphStageDef = flow.getStage(app,flowName, graphNextStage);
@@ -576,18 +585,29 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   try { setCurrentStage(app, sessionId, nextStage, flowName); } catch { /* skip */ }
 
   const nextAction = flow.getStageAction(app,flowName, nextStage);
-  app.sessions.update(sessionId, { stage: nextStage, status: "ready", error: null });
+
+  // Stage isolation: clear runtime handles so next stage gets a fresh runtime.
+  // Default is "fresh" -- each stage starts with a clean slate.
+  // If the next stage has isolation="continue", preserve claude_session_id for --resume.
+  const nextStageDef = flow.getStage(app, flowName, nextStage);
+  const isolation = nextStageDef?.isolation ?? "fresh";
+  const sessionUpdates: Partial<Session> = { stage: nextStage, status: "ready", error: null, session_id: null };
+  if (isolation === "fresh") {
+    sessionUpdates.claude_session_id = null;
+  }
+  app.sessions.update(sessionId, sessionUpdates);
+
   app.events.log(sessionId, "stage_ready", {
     stage: nextStage, actor: "system",
     data: {
       from_stage: stage, to_stage: nextStage,
       stage_type: nextAction.type, stage_agent: nextAction.agent,
       forced: force,
+      isolation,
     },
   });
 
   emitStageSpanEnd(sessionId, { status: "completed" });
-  const nextStageDef = flow.getStage(app,flowName, nextStage);
   emitStageSpanStart(sessionId, { stage: nextStage, agent: nextAction?.agent, gate: nextStageDef?.gate });
 
   // Checkpoint after advancing to new stage
