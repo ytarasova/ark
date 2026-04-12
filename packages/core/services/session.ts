@@ -364,6 +364,14 @@ export class SessionService {
   }
 
   /**
+   * Rebase a session's branch onto the base branch.
+   */
+  async rebaseOntoBase(id: string, opts?: { base?: string }): Promise<SessionOpResult> {
+    const { rebaseOntoBase: legacyRebase } = await import("./session-orchestration.js");
+    return legacyRebase(this.app, id, opts);
+  }
+
+  /**
    * Create a GitHub PR from a session's worktree branch.
    */
   async createWorktreePR(id: string, opts?: { title?: string; body?: string; base?: string; draft?: boolean }): Promise<SessionOpResult & { pr_url?: string }> {

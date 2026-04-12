@@ -1802,10 +1802,67 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
   }
 }
 
+// ── Auto-rebase before PR ───────────────────────────────────────────────
+
+/**
+ * Rebase the session branch onto the base branch before PR creation.
+ * Fetches origin, then rebases onto origin/<base>. On conflict, aborts
+ * the rebase and returns an error -- the branch is left unchanged.
+ */
+export async function rebaseOntoBase(app: AppContext, sessionId: string, opts?: {
+  base?: string;
+}): Promise<{ ok: boolean; message: string }> {
+  const session = app.sessions.get(sessionId);
+  if (!session) return { ok: false, message: `Session ${sessionId} not found` };
+
+  const repo = session.repo;
+  if (!repo) return { ok: false, message: "Session has no repo" };
+
+  const wtDir = join(app.config.worktreesDir, sessionId);
+  const gitDir = existsSync(wtDir) ? wtDir : repo;
+  const base = opts?.base ?? DEFAULT_BASE_BRANCH;
+
+  try {
+    // Fetch latest from origin so rebase target is up to date
+    await execFileAsync("git", ["-C", gitDir, "fetch", "origin", base], {
+      encoding: "utf-8",
+      timeout: 30_000,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    // Rebase onto origin/<base>
+    await execFileAsync("git", ["-C", gitDir, "rebase", `origin/${base}`], {
+      encoding: "utf-8",
+      timeout: 60_000,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    app.events.log(sessionId, "rebase_completed", {
+      stage: session.stage ?? undefined,
+      actor: "system",
+      data: { base },
+    });
+
+    return { ok: true, message: `Rebased onto origin/${base}` };
+  } catch (e: any) {
+    // Abort the rebase to leave the branch in its original state
+    try {
+      await execFileAsync("git", ["-C", gitDir, "rebase", "--abort"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch { /* already clean */ }
+
+    logWarn("session", `rebaseOntoBase: rebase failed for ${sessionId}: ${e?.message ?? e}`);
+    return { ok: false, message: `Rebase failed: ${e?.message ?? e}` };
+  }
+}
+
 // ── Worktree PR creation ────────────────────────────────────────────────
 
 /**
  * Create a GitHub PR from a session's worktree branch.
+ * Optionally rebases onto the base branch first (controlled by repo config auto_rebase, default true).
  * Pushes the branch and creates the PR via gh CLI.
  */
 export async function createWorktreePR(app: AppContext, sessionId: string, opts?: {
@@ -1834,6 +1891,17 @@ export async function createWorktreePR(app: AppContext, sessionId: string, opts?
   const base = opts?.base ?? DEFAULT_BASE_BRANCH;
   const title = opts?.title ?? session.summary ?? `ark: ${sessionId}`;
   const body = opts?.body ?? `Session: ${sessionId}\nFlow: ${session.flow}\nAgent: ${session.agent ?? "default"}`;
+
+  // Auto-rebase onto base branch (unless disabled in repo config)
+  const repoConfig = session.workdir ? loadRepoConfig(session.workdir) : {};
+  if (repoConfig.auto_rebase !== false) {
+    const rebaseResult = await rebaseOntoBase(app, sessionId, { base });
+    if (!rebaseResult.ok) {
+      // Rebase failed (conflict) -- still proceed with PR creation without rebase.
+      // The PR will show merge conflicts on GitHub, which is preferable to blocking.
+      logWarn("session", `createWorktreePR: auto-rebase failed for ${sessionId}, proceeding without rebase: ${rebaseResult.message}`);
+    }
+  }
 
   try {
     // 1. Push branch
