@@ -69,6 +69,9 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const result = app.sessionService.complete(sessionId);
     if (!result.ok) throw new RpcError(result.message ?? "Complete failed", SESSION_NOT_FOUND);
+    // Advance the flow after completing the stage -- without this, sessions
+    // get stuck at "ready" instead of progressing to the next stage or "completed".
+    await app.sessionService.advance(sessionId, true);
     const session = app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
