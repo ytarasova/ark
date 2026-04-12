@@ -622,9 +622,11 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
             />
         }
       />
-      {status.message && (
+      {(status.message || confirmation.status.message) && (
         <Box>
-          <Text color={theme.accent}>{` ${status.message}`}</Text>
+          <Text color={confirmation.pending === "delete" ? "red" : theme.accent}>
+            {` ${confirmation.status.message ?? status.message}`}
+          </Text>
         </Box>
       )}
     </Box>
