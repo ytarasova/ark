@@ -54,7 +54,7 @@ export function registerSessionCommands(program: Command) {
         const rp = resolve(repo);
         if (existsSync(rp)) {
           workdir = rp;
-          if (repo === "." || repo === "./") repo = basename(rp);
+          repo = basename(rp);
         }
       }
 

@@ -117,7 +117,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
     if (!existsSync(rp)) return;
     if (!existsSync(resolvePath(rp, ".git"))) return;
     const workdir = rp;
-    if (repo === "." || repo === "./") repo = basename(rp);
+    repo = basename(rp);
     addRecentRepo(repoPath);
 
     // Sanitize name: alphanumeric, dash, underscore only

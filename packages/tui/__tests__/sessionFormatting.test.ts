@@ -9,6 +9,7 @@ import {
   buildCommitLinks,
   stripAnsiAndFilter,
   formatDuration,
+  formatRepoName,
   getColumnWidths,
   fitText,
   shortId,
@@ -233,6 +234,44 @@ describe("formatDuration", () => {
   });
 });
 
+// ── formatRepoName ─────────────────────────────────────────────────────────
+
+describe("formatRepoName", () => {
+  it("returns null for null input", () => {
+    expect(formatRepoName(null)).toBeNull();
+  });
+
+  it("returns simple name as-is", () => {
+    expect(formatRepoName("ark")).toBe("ark");
+    expect(formatRepoName("my-repo")).toBe("my-repo");
+  });
+
+  it("extracts basename from absolute path", () => {
+    expect(formatRepoName("/Users/paytmlabs/Projects/ark")).toBe("ark");
+    expect(formatRepoName("/home/user/repos/my-project")).toBe("my-project");
+  });
+
+  it("extracts basename from relative path", () => {
+    expect(formatRepoName("./my-repo")).toBe("my-repo");
+    expect(formatRepoName("repos/my-project")).toBe("my-project");
+  });
+
+  it("handles trailing slashes", () => {
+    expect(formatRepoName("/Users/user/project/")).toBe("project");
+    expect(formatRepoName("/Users/user/project///")).toBe("project");
+  });
+
+  it("extracts name from git URL", () => {
+    expect(formatRepoName("https://github.com/org/my-repo.git")).toBe("my-repo");
+    expect(formatRepoName("https://github.com/org/my-repo")).toBe("my-repo");
+    expect(formatRepoName("git@github.com:org/my-repo.git")).toBe("my-repo");
+  });
+
+  it("handles Windows-style paths", () => {
+    expect(formatRepoName("C:\\Users\\dev\\project")).toBe("project");
+  });
+});
+
 // ── Session list row formatting ─────────────────────────────────────────────
 
 describe("getColumnWidths", () => {
@@ -301,8 +340,8 @@ describe("sessionLabel", () => {
     expect(sessionLabel({ summary: null, ticket: "JIRA-123", repo: "/repo" })).toBe("JIRA-123");
   });
 
-  it("falls back to repo", () => {
-    expect(sessionLabel({ summary: null, ticket: null, repo: "/my/repo" })).toBe("/my/repo");
+  it("falls back to formatted repo name", () => {
+    expect(sessionLabel({ summary: null, ticket: null, repo: "/my/repo" })).toBe("repo");
   });
 
   it("returns placeholder when all null", () => {

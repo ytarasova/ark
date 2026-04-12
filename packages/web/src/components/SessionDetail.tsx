@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StatusBadge } from "./StatusDot.js";
 import { api } from "../hooks/useApi.js";
 import { useSessionDetailData } from "../hooks/useSessionDetailData.js";
-import { relTime, fmtCost } from "../util.js";
+import { relTime, fmtCost, formatRepoName } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
@@ -298,7 +298,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly, chatOpen,
             <span className="text-muted-foreground">Stage</span>
             <span className="text-card-foreground break-all">{s.stage || "-"}</span>
             <span className="text-muted-foreground">Repo</span>
-            <span className="text-card-foreground break-all">{s.repo || "-"}</span>
+            <span className="text-card-foreground break-all">{formatRepoName(s.repo)}</span>
             <span className="text-muted-foreground">Branch</span>
             <span className="text-card-foreground break-all">{s.branch || "-"}</span>
             <span className="text-muted-foreground">Group</span>

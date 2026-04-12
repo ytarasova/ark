@@ -166,6 +166,19 @@ export function buildStageTimeline(input: StageTimelineInput): StageTimelineEntr
   });
 }
 
+/** Extract a friendly repository name from a path or URL. Returns null for null input. */
+export function formatRepoName(repo: string | null): string | null {
+  if (!repo) return null;
+  // Already a simple name (no path separators)?
+  if (!repo.includes("/") && !repo.includes("\\")) return repo;
+  // Git URL: extract name, strip .git suffix
+  const urlMatch = repo.match(/\/([^/]+?)(?:\.git)?$/);
+  if (urlMatch) return urlMatch[1];
+  // Local path: extract basename
+  const parts = repo.replace(/[\\/]+$/, "").split(/[\\/]/);
+  return parts[parts.length - 1] || repo;
+}
+
 // ── Session list row formatting ─────────────────────────────────────────────
 
 /** Compute responsive column widths based on terminal width. */
@@ -189,7 +202,7 @@ export function shortId(id: string): string {
 
 /** Get the best display text for a session in a list row. */
 export function sessionLabel(s: Pick<Session, "summary" | "ticket" | "repo">): string {
-  return s.summary ?? s.ticket ?? s.repo ?? "(no summary)";
+  return s.summary ?? s.ticket ?? formatRepoName(s.repo) ?? "(no summary)";
 }
 
 /** Format a session row as a plain string for ListRow highlight matching. */
