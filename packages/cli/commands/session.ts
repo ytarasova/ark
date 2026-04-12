@@ -1,9 +1,10 @@
-import type { Command } from "commander";
+import { type Command, Option } from "commander";
 import chalk from "chalk";
 import { resolve, basename } from "path";
 import { existsSync } from "fs";
 import { execSync } from "child_process";
 import * as core from "../../core/index.js";
+import { SESSION_STATUSES } from "../../types/index.js";
 import { runVerification } from "../../core/services/session-orchestration.js";
 import { getArkClient } from "./_shared.js";
 import { sanitizeSummary } from "../helpers.js";
@@ -153,7 +154,7 @@ export function registerSessionCommands(program: Command) {
 
   session.command("list")
     .description("List all sessions")
-    .option("-s, --status <status>", "Filter by status")
+    .addOption(new Option("-s, --status <status>", "Filter by status").choices(SESSION_STATUSES as unknown as string[]))
     .option("-r, --repo <repo>", "Filter by repo")
     .option("-g, --group <group>", "Filter by group")
     .option("--archived", "Include archived sessions")

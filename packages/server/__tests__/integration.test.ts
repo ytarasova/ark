@@ -127,6 +127,69 @@ describe("end-to-end: server + client", () => {
     client.close();
   });
 
+  it("session list filters by status", async () => {
+    const { client } = createInMemoryPair();
+    await client.initialize();
+
+    // Create two sessions
+    const s1 = await client.sessionStart({ summary: "status-test-1", repo: ".", flow: "bare" });
+    const s2 = await client.sessionStart({ summary: "status-test-2", repo: ".", flow: "bare" });
+
+    // Mark s1 as completed via update
+    await client.sessionUpdate(s1.id, { status: "completed" });
+
+    // List with status=completed should return only s1
+    const completed = await client.sessionList({ status: "completed" });
+    expect(completed.some((s: any) => s.id === s1.id)).toBe(true);
+    expect(completed.some((s: any) => s.id === s2.id)).toBe(false);
+
+    // List with status=ready should return s2 (not s1) -- startSession sets status to "ready"
+    const ready = await client.sessionList({ status: "ready" });
+    expect(ready.some((s: any) => s.id === s2.id)).toBe(true);
+    expect(ready.some((s: any) => s.id === s1.id)).toBe(false);
+
+    // Clean up
+    await client.sessionDelete(s1.id);
+    await client.sessionDelete(s2.id);
+    client.close();
+  });
+
+  it("session list without status returns all non-archived sessions", async () => {
+    const { client } = createInMemoryPair();
+    await client.initialize();
+
+    const s1 = await client.sessionStart({ summary: "all-test-1", repo: ".", flow: "bare" });
+    const s2 = await client.sessionStart({ summary: "all-test-2", repo: ".", flow: "bare" });
+    await client.sessionUpdate(s1.id, { status: "running" });
+
+    // List without filter should include both
+    const all = await client.sessionList();
+    expect(all.some((s: any) => s.id === s1.id)).toBe(true);
+    expect(all.some((s: any) => s.id === s2.id)).toBe(true);
+
+    // Clean up
+    await client.sessionDelete(s1.id);
+    await client.sessionDelete(s2.id);
+    client.close();
+  });
+
+  it("session list filters by repo", async () => {
+    const { client } = createInMemoryPair();
+    await client.initialize();
+
+    const s1 = await client.sessionStart({ summary: "repo-test-1", repo: "my/repo-a", flow: "bare" });
+    const s2 = await client.sessionStart({ summary: "repo-test-2", repo: "my/repo-b", flow: "bare" });
+
+    const filtered = await client.sessionList({ repo: "my/repo-a" });
+    expect(filtered.some((s: any) => s.id === s1.id)).toBe(true);
+    expect(filtered.some((s: any) => s.id === s2.id)).toBe(false);
+
+    // Clean up
+    await client.sessionDelete(s1.id);
+    await client.sessionDelete(s2.id);
+    client.close();
+  });
+
   it("resource queries work", async () => {
     const { client } = createInMemoryPair();
     await client.initialize();

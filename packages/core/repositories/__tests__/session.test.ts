@@ -5,6 +5,7 @@ import type { IDatabase } from "../../database.js";
 import { SessionRepository } from "../session.js";
 import { initSchema } from "../schema.js";
 import type { SessionStatus, SessionConfig } from "../../../types/index.js";
+import { SESSION_STATUSES } from "../../../types/index.js";
 
 let db: IDatabase;
 let repo: SessionRepository;
@@ -88,6 +89,15 @@ describe("SessionRepository", () => {
     const running = repo.list({ status: "running" });
     expect(running.length).toBe(1);
     expect(running[0].id).toBe(s1.id);
+  });
+
+  it("list filters by each user-facing status", () => {
+    for (const status of SESSION_STATUSES) {
+      const s = repo.create({});
+      repo.update(s.id, { status: status as SessionStatus });
+      const filtered = repo.list({ status: status as SessionStatus });
+      expect(filtered.some(r => r.id === s.id)).toBe(true);
+    }
   });
 
   it("list filters by repo", () => {
