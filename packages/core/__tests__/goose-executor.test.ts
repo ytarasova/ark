@@ -164,6 +164,39 @@ describe("buildGooseCommand", () => {
     });
     expect(argv).not.toContain("--params");
   });
+
+  it("passes -s when interactive is true (manual gate)", () => {
+    const argv = buildGooseCommand({
+      agent: makeAgent(),
+      task: "Fix the tests",
+      sessionId: "s-1",
+      interactive: true,
+    });
+    expect(argv).toContain("-s");
+    // Still delivers the task via -t
+    expect(argv).toContain("-t");
+    expect(argv[argv.indexOf("-t") + 1]).toBe("Fix the tests");
+  });
+
+  it("omits -s when interactive is false or unset (auto gate)", () => {
+    const argv = buildGooseCommand({
+      agent: makeAgent(),
+      task: "Run and exit",
+      sessionId: "s-1",
+      interactive: false,
+    });
+    expect(argv).not.toContain("-s");
+  });
+
+  it("includes -t with the task text for auto-start dispatch", () => {
+    const argv = buildGooseCommand({
+      agent: makeAgent(),
+      task: "Implement the feature end-to-end",
+      sessionId: "s-42",
+    });
+    expect(argv).toContain("-t");
+    expect(argv[argv.indexOf("-t") + 1]).toBe("Implement the feature end-to-end");
+  });
 });
 
 // ── Plugin discovery ──────────────────────────────────────────────────────
