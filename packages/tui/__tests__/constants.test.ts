@@ -7,7 +7,7 @@ import { ICON, COLOR, getStatusColor } from "../constants.js";
 
 const ALL_STATUSES = [
   "running", "ready", "pending", "stopped",
-  "waiting", "blocked", "completed", "failed",
+  "waiting", "blocked", "completed", "failed", "archived",
 ];
 
 describe("ICON constant", () => {
@@ -49,8 +49,12 @@ describe("ICON constant", () => {
     expect(ICON.failed).toBe("✖");
   });
 
-  it("has exactly 8 entries", () => {
-    expect(Object.keys(ICON).length).toBe(8);
+  it("has entries for all statuses including archived", () => {
+    expect(Object.keys(ICON).length).toBe(9);
+  });
+
+  it("archived icon is small square", () => {
+    expect(ICON.archived).toBe("▫");
   });
 
   it("all icon values are single characters", () => {
@@ -99,8 +103,12 @@ describe("COLOR constant", () => {
     expect(COLOR.failed).toBe("red");
   });
 
-  it("has exactly 8 entries", () => {
-    expect(Object.keys(COLOR).length).toBe(8);
+  it("archived color is gray", () => {
+    expect(COLOR.archived).toBe("gray");
+  });
+
+  it("has entries for all statuses including archived", () => {
+    expect(Object.keys(COLOR).length).toBe(9);
   });
 
   it("all color values are non-empty strings", () => {

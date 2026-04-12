@@ -8,7 +8,14 @@ import {
   buildFileLinks,
   buildCommitLinks,
   stripAnsiAndFilter,
+  getColumnWidths,
+  fitText,
+  shortId,
+  sessionLabel,
+  formatSessionRow,
+  formatChildRow,
 } from "../helpers/sessionFormatting.js";
+import type { Session } from "../../types/index.js";
 
 describe("formatTokenDisplay", () => {
   it("returns null for missing totals or zero tokens", () => {
@@ -173,5 +180,171 @@ describe("stripAnsiAndFilter", () => {
   it("handles empty input", () => {
     expect(stripAnsiAndFilter("")).toEqual([]);
     expect(stripAnsiAndFilter("  \n  \n  ")).toEqual([]);
+  });
+});
+
+// ── Session list row formatting ─────────────────────────────────────────────
+
+describe("getColumnWidths", () => {
+  it("returns wide columns for large terminals", () => {
+    const w = getColumnWidths(160);
+    expect(w.summary).toBe(42);
+    expect(w.id).toBe(8);
+    expect(w.stage).toBe(12);
+  });
+
+  it("returns medium columns for mid-size terminals", () => {
+    const w = getColumnWidths(120);
+    expect(w.summary).toBe(28);
+    expect(w.id).toBe(8);
+    expect(w.stage).toBe(10);
+  });
+
+  it("returns narrow columns for small terminals", () => {
+    const w = getColumnWidths(80);
+    expect(w.summary).toBe(20);
+    expect(w.id).toBe(0);
+    expect(w.stage).toBe(0);
+  });
+});
+
+describe("fitText", () => {
+  it("pads short text to width", () => {
+    expect(fitText("hello", 10)).toBe("hello     ");
+  });
+
+  it("truncates long text with ellipsis", () => {
+    const result = fitText("a very long summary text", 10);
+    expect(result.length).toBe(10);
+    expect(result).toBe("a very lo\u2026");
+  });
+
+  it("returns exact text when equal to width", () => {
+    expect(fitText("12345", 5)).toBe("12345");
+  });
+
+  it("returns empty string when width is 0", () => {
+    expect(fitText("anything", 0)).toBe("");
+  });
+});
+
+describe("shortId", () => {
+  it("strips s- prefix and truncates to 6 chars", () => {
+    expect(shortId("s-abc123def")).toBe("abc123");
+  });
+
+  it("handles short IDs", () => {
+    expect(shortId("s-ab")).toBe("ab");
+  });
+
+  it("handles IDs without prefix", () => {
+    expect(shortId("xyz789abc")).toBe("xyz789");
+  });
+});
+
+describe("sessionLabel", () => {
+  it("returns summary when available", () => {
+    expect(sessionLabel({ summary: "Fix bug", ticket: "T-1", repo: "/repo" })).toBe("Fix bug");
+  });
+
+  it("falls back to ticket", () => {
+    expect(sessionLabel({ summary: null, ticket: "JIRA-123", repo: "/repo" })).toBe("JIRA-123");
+  });
+
+  it("falls back to repo", () => {
+    expect(sessionLabel({ summary: null, ticket: null, repo: "/my/repo" })).toBe("/my/repo");
+  });
+
+  it("returns placeholder when all null", () => {
+    expect(sessionLabel({ summary: null, ticket: null, repo: null })).toBe("(no summary)");
+  });
+});
+
+function makeSession(overrides: Partial<Session> = {}): Session {
+  return {
+    id: "s-abc123",
+    ticket: null,
+    summary: "Fix a bug",
+    repo: "/repo",
+    branch: "main",
+    compute_name: null,
+    session_id: null,
+    claude_session_id: null,
+    stage: "implement",
+    status: "running",
+    flow: "default",
+    agent: "implementer",
+    workdir: "/repo",
+    pr_url: null,
+    pr_id: null,
+    error: null,
+    parent_id: null,
+    fork_group: null,
+    group_name: null,
+    breakpoint_reason: null,
+    attached_by: null,
+    config: {},
+    user_id: null,
+    tenant_id: "default",
+    created_at: new Date(Date.now() - 300000).toISOString(), // 5m ago
+    updated_at: new Date(Date.now() - 60000).toISOString(),  // 1m ago
+    ...overrides,
+  };
+}
+
+describe("formatSessionRow", () => {
+  it("includes icon, summary, id, stage, and age", () => {
+    const row = formatSessionRow(makeSession(), 120, 0);
+    expect(row).toContain("\u25CF"); // running icon
+    expect(row).toContain("Fix a bug");
+    expect(row).toContain("abc123");
+    expect(row).toContain("implement");
+  });
+
+  it("includes unread badge when count > 0", () => {
+    const row = formatSessionRow(makeSession(), 120, 3);
+    expect(row).toContain("(3)");
+  });
+
+  it("omits unread badge when count is 0", () => {
+    const row = formatSessionRow(makeSession(), 120, 0);
+    expect(row).not.toContain("(0)");
+  });
+
+  it("uses updated_at for age", () => {
+    const s = makeSession({
+      created_at: new Date(Date.now() - 86400000).toISOString(), // 1d ago
+      updated_at: new Date(Date.now() - 120000).toISOString(),   // 2m ago
+    });
+    const row = formatSessionRow(s, 120, 0);
+    expect(row).toContain("2m");
+    expect(row).not.toContain("1d");
+  });
+
+  it("hides id and stage columns on narrow terminals", () => {
+    const row = formatSessionRow(makeSession(), 80, 0);
+    expect(row).not.toContain("abc123");
+  });
+});
+
+describe("formatChildRow", () => {
+  it("includes icon, label, and age", () => {
+    const child = makeSession({ summary: "Child task", status: "completed" });
+    const row = formatChildRow(child);
+    expect(row).toContain("\u2714"); // completed icon
+    expect(row).toContain("Child task");
+  });
+
+  it("truncates long child summaries", () => {
+    const child = makeSession({ summary: "A very long child summary that should be truncated at 24 chars" });
+    const row = formatChildRow(child);
+    // Summary should be at most 24 chars
+    expect(row.indexOf("A very long child summar")).toBeGreaterThanOrEqual(0);
+  });
+
+  it("shows (fork) for children without summary", () => {
+    const child = makeSession({ summary: null });
+    const row = formatChildRow(child);
+    expect(row).toContain("(fork)");
   });
 });
