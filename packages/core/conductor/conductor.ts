@@ -146,6 +146,25 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
     app.sessions.update(sessionId, result.updates);
   }
 
+  // On-failure retry loop: if the stage has on_failure: "retry(N)", attempt retry + re-dispatch
+  if (result.shouldRetry && result.newStatus === "failed") {
+    const retryResult = session.retryWithContext(app, sessionId, {
+      maxRetries: result.retryMaxRetries,
+    });
+    if (retryResult.ok) {
+      logInfo("conductor", `on_failure retry (hook) triggered for ${sessionId}: ${retryResult.message}`);
+      eventBus.emit("hook_status", sessionId, {
+        data: { event, status: "ready", retry: true, ...payload } as Record<string, unknown>,
+      });
+      session.dispatch(app, sessionId).catch(err => {
+        logError("conductor", `on_failure retry dispatch (hook) failed for ${sessionId}: ${err?.message ?? err}`);
+      });
+      return Response.json({ status: "ok", mapped: "retry" });
+    }
+    // Max retries exhausted -- fall through to normal failure handling
+    logWarn("conductor", `on_failure retry (hook) exhausted for ${sessionId}: ${retryResult.message}`);
+  }
+
   // Emit to event bus
   if (result.newStatus) {
     eventBus.emit("hook_status", sessionId, {
@@ -642,6 +661,22 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
       sendOSNotification("Ark: Verification failed", `${s?.summary ?? sessionId} - ${handoff.message.slice(0, 100)}`);
       return;
     }
+  }
+
+  // On-failure retry loop: if the stage has on_failure: "retry(N)", attempt retry + re-dispatch
+  if (result.shouldRetry) {
+    const retryResult = session.retryWithContext(app, sessionId, {
+      maxRetries: result.retryMaxRetries,
+    });
+    if (retryResult.ok) {
+      logInfo("conductor", `on_failure retry triggered for ${sessionId}: ${retryResult.message}`);
+      session.dispatch(app, sessionId).catch(err => {
+        logError("conductor", `on_failure retry dispatch failed for ${sessionId}: ${err?.message ?? err}`);
+      });
+      return; // Retry in progress -- skip failure notification
+    }
+    // Max retries exhausted -- fall through to normal failure handling
+    logWarn("conductor", `on_failure retry exhausted for ${sessionId}: ${retryResult.message}`);
   }
 
   // OS notification on stage completion or failure
