@@ -112,7 +112,7 @@ export function channelMcpConfig(
   if (opts?.tenantId) env.ARK_TENANT_ID = opts.tenantId;
   return {
     command: bunPath,
-    args: [join(__dirname, "channel.ts")],
+    args: [join(__dirname, "..", "conductor", "channel.ts")],
     env,
   };
 }
