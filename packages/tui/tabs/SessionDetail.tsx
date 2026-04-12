@@ -7,7 +7,7 @@ import { getStatusColor } from "../helpers/colors.js";
 import type { InkColor } from "../helpers/colors.js";
 import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
-import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter, sanitizeForTerminal, formatDuration } from "../helpers/sessionFormatting.js";
+import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter, sanitizeForTerminal, formatDuration, buildStageTimeline } from "../helpers/sessionFormatting.js";
 import { formatCost } from "../../core/observability/costs.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
@@ -370,24 +370,56 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
         <KeyValue label="Duration">{formatDuration(s.created_at, s.updated_at)}</KeyValue>
       )}
 
-      {/* Flow pipeline */}
-      {s.flow && s.stage && flowStages.length > 1 && (
-        <Box>
-          <Text dimColor>{"  "}</Text>
-          {flowStages.map((st, idx) => {
-            const isCurrent = st.name === s.stage;
-            const isPast = flowStages.findIndex(x => x.name === s.stage) > idx;
-            return (
-              <React.Fragment key={st.name}>
-                {idx > 0 && <Text dimColor>{" > "}</Text>}
-                <Text color={isCurrent ? theme.accent : isPast ? theme.running : undefined} bold={isCurrent} dimColor={!isCurrent && !isPast}>
-                  {isCurrent ? `[${st.name}]` : st.name}
+      {/* Stage Timeline */}
+      {s.flow && flowStages.length > 1 && (() => {
+        const timeline = buildStageTimeline({
+          stages: flowStages,
+          events,
+          currentStage: s.stage,
+          sessionStatus: s.status,
+        });
+        if (timeline.length === 0) return null;
+
+        const STAGE_ICON: Record<string, string> = {
+          completed: "\u2713",
+          running: "\u25CF",
+          failed: "\u2715",
+          pending: "\u25CB",
+        };
+        const STAGE_COLOR: Record<string, string | undefined> = {
+          completed: theme.running,
+          running: theme.accent,
+          failed: theme.error,
+          pending: undefined,
+        };
+
+        return (
+          <>
+            <Text> </Text>
+            <SectionHeader title="Stage Timeline" />
+            {timeline.map((entry) => (
+              <Box key={entry.name}>
+                <Text>{"  "}</Text>
+                <Text color={STAGE_COLOR[entry.status]}>{STAGE_ICON[entry.status]}</Text>
+                <Text color={STAGE_COLOR[entry.status]} bold={entry.status === "running"}>
+                  {` ${entry.name.padEnd(16)}`}
                 </Text>
-              </React.Fragment>
-            );
-          })}
-        </Box>
-      )}
+                <Text dimColor>{(entry.agent ?? "").padEnd(16)}</Text>
+                {entry.duration ? (
+                  <Text color={entry.status === "running" ? theme.waiting : undefined} dimColor={entry.status !== "running"}>
+                    {entry.duration}
+                  </Text>
+                ) : (
+                  <Text dimColor>{"--"}</Text>
+                )}
+                {entry.startedAt && (
+                  <Text dimColor>{`  ${hms(entry.startedAt).slice(0, 5)}`}</Text>
+                )}
+              </Box>
+            ))}
+          </>
+        );
+      })()}
 
       {s.pr_url && (
         <KeyValue label="PR">
