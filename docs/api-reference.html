@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API Reference - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <a href="environment.html">Environment</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="router.html">LLM Router</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <a href="runtimes-reference.html">Runtimes</a>
+      <a href="api-reference.html">API Reference</a>
+      <div class="section-title">Development</div>
+      <a href="development.html">Contributing</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>API Reference</h1>
+      <p class="subtitle">JSON-RPC 2.0 protocol, ArkClient, and remote mode.</p>
+
+      <h2>Overview</h2>
+      <p>Ark exposes a JSON-RPC 2.0 API for all operations. The same API powers the CLI, TUI, Web dashboard, and remote clients. The protocol version is <strong>0.8.0</strong>.</p>
+      <p>Source: <code>packages/server/</code> (handlers), <code>packages/protocol/</code> (client).</p>
+
+      <h2>Transport Layers</h2>
+      <table>
+        <thead><tr><th>Transport</th><th>Use Case</th><th>Encoding</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Stdio</strong></td><td>Local CLI and TUI</td><td>JSONL (JSON + newline)</td></tr>
+          <tr><td><strong>WebSocket</strong></td><td>Remote clients, Web dashboard</td><td>JSON-RPC over WS (optional Bearer token auth)</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Remote Mode</h2>
+      <p>Connect to a remote Ark server instead of running locally:</p>
+      <pre><code><span class="comment"># Via CLI flags</span>
+<span class="prompt">$</span> ark --server https://ark.company.com --token ark_default_xxx session list
+
+<span class="comment"># Via environment variables</span>
+<span class="prompt">$</span> export ARK_SERVER=https://ark.company.com
+<span class="prompt">$</span> export ARK_TOKEN=ark_default_xxx
+<span class="prompt">$</span> ark session list
+
+<span class="comment"># TUI in remote mode</span>
+<span class="prompt">$</span> ark tui --server https://ark.company.com --token ark_default_xxx</code></pre>
+      <p>When remote mode is active, the CLI creates a WebSocket <code>ArkClient</code> to the remote server instead of booting a local <code>AppContext</code>.</p>
+
+      <h2>ArkClient</h2>
+      <p>The typed JSON-RPC client that wraps the transport layer. All UI surfaces use <code>ArkClient</code> for communication.</p>
+
+      <h3>Initialization</h3>
+      <pre><code><span class="keyword">import</span> { ArkClient, createWebSocketTransport } <span class="keyword">from</span> <span class="string">"@ark/protocol"</span>;
+
+<span class="keyword">const</span> { transport, ready } = createWebSocketTransport(
+  <span class="string">"wss://ark.company.com"</span>,
+  { token: <span class="string">"ark_default_xxx"</span> }
+);
+<span class="keyword">await</span> ready;
+
+<span class="keyword">const</span> client = <span class="keyword">new</span> ArkClient(transport);
+<span class="keyword">await</span> client.initialize({ subscribe: [<span class="string">"session/*"</span>] });</code></pre>
+
+      <h3>Subscriptions</h3>
+      <p>Subscribe to real-time notifications using patterns:</p>
+      <ul>
+        <li><code>"**"</code> -- all notifications</li>
+        <li><code>"session/*"</code> -- all session-related notifications</li>
+        <li><code>"session/updated"</code> -- exact method match</li>
+      </ul>
+      <pre><code>client.on(<span class="string">"session/updated"</span>, (data) => {
+  console.log(<span class="string">"Session changed:"</span>, data.sessionId);
+});</code></pre>
+
+      <h2>Error Codes</h2>
+      <table>
+        <thead><tr><th>Code</th><th>Name</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>-32600</code></td><td>INVALID_REQUEST</td><td>Malformed JSON-RPC request</td></tr>
+          <tr><td><code>-32601</code></td><td>METHOD_NOT_FOUND</td><td>No handler for the requested method</td></tr>
+          <tr><td><code>-32602</code></td><td>INVALID_PARAMS</td><td>Missing or invalid parameters</td></tr>
+          <tr><td><code>-32603</code></td><td>INTERNAL_ERROR</td><td>Unexpected server error</td></tr>
+          <tr><td><code>-32001</code></td><td>NOT_INITIALIZED</td><td>Client not initialized (call <code>initialize</code> first)</td></tr>
+          <tr><td><code>-32002</code></td><td>SESSION_NOT_FOUND</td><td>Session ID does not exist</td></tr>
+          <tr><td><code>-32003</code></td><td>EXECUTOR_ERROR</td><td>Agent executor failed (launch, kill, etc.)</td></tr>
+          <tr><td><code>-32004</code></td><td>GATE_NOT_PENDING</td><td>Tried to approve a gate that is not pending</td></tr>
+          <tr><td><code>-32005</code></td><td>OVERLOADED</td><td>Server at capacity (too many concurrent sessions)</td></tr>
+        </tbody>
+      </table>
+
+      <h2>RPC Methods</h2>
+
+      <h3>Session Lifecycle</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>session/start</code></td><td>Create a new session with a summary, repo, flow, agent, and compute target</td></tr>
+          <tr><td><code>session/dispatch</code></td><td>Launch the agent for a session (creates worktree, starts tmux)</td></tr>
+          <tr><td><code>session/stop</code></td><td>Stop a running session (kills the agent process)</td></tr>
+          <tr><td><code>session/advance</code></td><td>Advance to the next flow stage (approve a pending gate)</td></tr>
+          <tr><td><code>session/complete</code></td><td>Mark a session as completed</td></tr>
+          <tr><td><code>session/delete</code></td><td>Delete a session and its associated data</td></tr>
+          <tr><td><code>session/pause</code></td><td>Pause a running session (agent can be resumed later)</td></tr>
+          <tr><td><code>session/resume</code></td><td>Resume a paused session</td></tr>
+          <tr><td><code>session/interrupt</code></td><td>Send Ctrl+C to the agent without killing the tmux session</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Session Queries</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>session/list</code></td><td>List sessions with optional filters (status, flow, agent)</td></tr>
+          <tr><td><code>session/read</code></td><td>Read full session details including current stage and events</td></tr>
+          <tr><td><code>session/update</code></td><td>Update session fields (summary, ticket, etc.)</td></tr>
+          <tr><td><code>session/search</code></td><td>Full-text search across session transcripts</td></tr>
+          <tr><td><code>session/search-conversation</code></td><td>Search within a specific session's conversation</td></tr>
+          <tr><td><code>session/output</code></td><td>Capture recent output from the agent's terminal</td></tr>
+          <tr><td><code>session/conversation</code></td><td>Get the full conversation history for a session</td></tr>
+          <tr><td><code>session/messages</code></td><td>Get messages exchanged between human and agent</td></tr>
+          <tr><td><code>session/events</code></td><td>Get events (status changes, stage transitions, errors)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Session Operations</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>session/fork</code></td><td>Fork a session into a child with its own worktree</td></tr>
+          <tr><td><code>session/clone</code></td><td>Clone a session with a new name</td></tr>
+          <tr><td><code>session/spawn</code></td><td>Spawn a new child session from a parent</td></tr>
+          <tr><td><code>session/fan-out</code></td><td>Decompose a task into N parallel child sessions</td></tr>
+          <tr><td><code>session/join</code></td><td>Wait for all child sessions to complete</td></tr>
+          <tr><td><code>session/handoff</code></td><td>Hand off a session to a different agent</td></tr>
+          <tr><td><code>session/archive</code></td><td>Archive a completed session (hidden from default list)</td></tr>
+          <tr><td><code>session/restore</code></td><td>Restore an archived session</td></tr>
+          <tr><td><code>session/undelete</code></td><td>Undelete a soft-deleted session</td></tr>
+          <tr><td><code>session/export</code></td><td>Export session data for portability</td></tr>
+          <tr><td><code>session/import</code></td><td>Import session data from an export</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Resources</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>agent/list</code></td><td>List all available agents (across all tiers)</td></tr>
+          <tr><td><code>agent/read</code></td><td>Read an agent definition</td></tr>
+          <tr><td><code>agent/create</code></td><td>Create a new agent definition</td></tr>
+          <tr><td><code>agent/update</code></td><td>Update an existing agent definition</td></tr>
+          <tr><td><code>agent/delete</code></td><td>Delete an agent definition</td></tr>
+          <tr><td><code>flow/list</code></td><td>List all available flows</td></tr>
+          <tr><td><code>flow/read</code></td><td>Read a flow definition</td></tr>
+          <tr><td><code>flow/create</code></td><td>Create a new flow definition</td></tr>
+          <tr><td><code>flow/delete</code></td><td>Delete a flow definition</td></tr>
+          <tr><td><code>skill/list</code></td><td>List all available skills</td></tr>
+          <tr><td><code>skill/read</code></td><td>Read a skill definition</td></tr>
+          <tr><td><code>skill/save</code></td><td>Create or update a skill</td></tr>
+          <tr><td><code>skill/delete</code></td><td>Delete a skill definition</td></tr>
+          <tr><td><code>recipe/list</code></td><td>List all available recipes</td></tr>
+          <tr><td><code>recipe/read</code></td><td>Read a recipe definition</td></tr>
+          <tr><td><code>recipe/use</code></td><td>Create a session from a recipe template</td></tr>
+          <tr><td><code>recipe/delete</code></td><td>Delete a recipe definition</td></tr>
+          <tr><td><code>runtime/list</code></td><td>List all available runtimes</td></tr>
+          <tr><td><code>runtime/read</code></td><td>Read a runtime definition</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Messaging and Gates</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>message/send</code></td><td>Send a message to a running agent (human steering)</td></tr>
+          <tr><td><code>message/markRead</code></td><td>Mark messages as read</td></tr>
+          <tr><td><code>gate/approve</code></td><td>Approve a pending gate to advance the flow</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Compute</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>compute/list</code></td><td>List compute targets</td></tr>
+          <tr><td><code>compute/read</code></td><td>Read compute target details</td></tr>
+          <tr><td><code>compute/create</code></td><td>Create a new compute target</td></tr>
+          <tr><td><code>compute/provision</code></td><td>Provision a compute target (start VM, container, etc.)</td></tr>
+          <tr><td><code>compute/start-instance</code></td><td>Start a stopped compute instance</td></tr>
+          <tr><td><code>compute/stop-instance</code></td><td>Stop a running compute instance</td></tr>
+          <tr><td><code>compute/delete</code></td><td>Delete a compute target</td></tr>
+          <tr><td><code>compute/ping</code></td><td>Health check a compute target's ArkD endpoint</td></tr>
+          <tr><td><code>compute/clean</code></td><td>Clean up compute resources</td></tr>
+          <tr><td><code>compute/template/list</code></td><td>List compute templates</td></tr>
+          <tr><td><code>compute/template/create</code></td><td>Create a compute template</td></tr>
+          <tr><td><code>compute/template/delete</code></td><td>Delete a compute template</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Costs and Metrics</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>costs/read</code></td><td>Read usage records with filters</td></tr>
+          <tr><td><code>costs/summary</code></td><td>Aggregated cost summary by model, provider, or session</td></tr>
+          <tr><td><code>costs/trend</code></td><td>Cost trend over time (daily, weekly, monthly)</td></tr>
+          <tr><td><code>costs/session</code></td><td>Cost breakdown for a specific session</td></tr>
+          <tr><td><code>costs/export</code></td><td>Export usage records as CSV</td></tr>
+          <tr><td><code>metrics/snapshot</code></td><td>Current system metrics (sessions, costs, compute)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Knowledge and History</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>knowledge/search</code></td><td>Search the knowledge graph</td></tr>
+          <tr><td><code>knowledge/stats</code></td><td>Knowledge graph statistics (nodes, edges, types)</td></tr>
+          <tr><td><code>knowledge/index</code></td><td>Index a codebase into the knowledge graph</td></tr>
+          <tr><td><code>history/list</code></td><td>List imported session history</td></tr>
+          <tr><td><code>history/import</code></td><td>Import session from transcript files</td></tr>
+          <tr><td><code>history/search</code></td><td>Search across session history</td></tr>
+          <tr><td><code>history/rebuild-fts</code></td><td>Rebuild the FTS5 search index</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Memory</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>memory/list</code></td><td>List all memories</td></tr>
+          <tr><td><code>memory/add</code></td><td>Add a new memory</td></tr>
+          <tr><td><code>memory/recall</code></td><td>Recall memories matching a query</td></tr>
+          <tr><td><code>memory/forget</code></td><td>Delete a specific memory</td></tr>
+          <tr><td><code>memory/clear</code></td><td>Clear all memories</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Worktrees and Git</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>worktree/list</code></td><td>List active worktrees</td></tr>
+          <tr><td><code>worktree/diff</code></td><td>View git diff stat for a session's worktree</td></tr>
+          <tr><td><code>worktree/create-pr</code></td><td>Push and create a GitHub PR from a worktree</td></tr>
+          <tr><td><code>worktree/finish</code></td><td>Merge worktree changes back to the base branch</td></tr>
+          <tr><td><code>worktree/cleanup</code></td><td>Clean up stale worktrees</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Configuration and Status</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>config/read</code></td><td>Read the current configuration</td></tr>
+          <tr><td><code>config/write</code></td><td>Write configuration values</td></tr>
+          <tr><td><code>status/get</code></td><td>Get server status (version, uptime, mode)</td></tr>
+          <tr><td><code>dashboard/summary</code></td><td>Dashboard summary data (session counts, costs, health)</td></tr>
+          <tr><td><code>initialize</code></td><td>Initialize the client connection (required first call)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Scheduling</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>schedule/list</code></td><td>List scheduled sessions</td></tr>
+          <tr><td><code>schedule/create</code></td><td>Create a scheduled/recurring session</td></tr>
+          <tr><td><code>schedule/delete</code></td><td>Delete a schedule</td></tr>
+          <tr><td><code>schedule/enable</code></td><td>Enable a disabled schedule</td></tr>
+          <tr><td><code>schedule/disable</code></td><td>Disable an active schedule</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Tools and MCP</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>tools/list</code></td><td>List configured MCP tools, commands, and skills</td></tr>
+          <tr><td><code>tools/read</code></td><td>Read a specific tool's configuration</td></tr>
+          <tr><td><code>tools/delete</code></td><td>Delete a tool configuration</td></tr>
+          <tr><td><code>mcp/attach</code></td><td>Attach an MCP server to a session</td></tr>
+          <tr><td><code>mcp/detach</code></td><td>Detach an MCP server from a session</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Authentication</h2>
+      <p>In hosted mode, API keys authenticate requests. Key format: <code>ark_&lt;tenantId&gt;_&lt;secret&gt;</code>.</p>
+      <p>Keys are managed via:</p>
+      <pre><code><span class="comment"># Create a new API key for a tenant</span>
+<span class="prompt">$</span> ark api-key create --tenant default --role admin
+
+<span class="comment"># List keys</span>
+<span class="prompt">$</span> ark api-key list
+
+<span class="comment"># Revoke a key</span>
+<span class="prompt">$</span> ark api-key revoke &lt;key-id&gt;</code></pre>
+      <p>Roles: <code>admin</code> (full access), <code>member</code> (session management), <code>viewer</code> (read-only).</p>
+
+      <h2>Parameter Validation</h2>
+      <p>All RPC handlers validate parameters at the boundary using <code>extract&lt;T&gt;()</code> from <code>packages/server/validate.ts</code>. Missing required parameters return <code>INVALID_PARAMS (-32602)</code>.</p>
+
+      <div class="doc-footer">
+        <a href="runtimes-reference.html">&larr; Runtimes</a>
+        <a href="development.html">Contributing &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

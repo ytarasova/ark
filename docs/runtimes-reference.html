@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Runtimes Reference - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <a href="environment.html">Environment</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="router.html">LLM Router</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <a href="runtimes-reference.html">Runtimes</a>
+      <a href="api-reference.html">API Reference</a>
+      <div class="section-title">Development</div>
+      <a href="development.html">Contributing</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Runtimes Reference</h1>
+      <p class="subtitle">Runtimes define HOW an agent runs -- the LLM backend, CLI command, billing mode, and transcript parser.</p>
+
+      <h2>Overview</h2>
+      <p>A runtime is separate from an agent. Agents define WHAT to do (role, prompt, skills). Runtimes define HOW to execute (CLI binary, model catalog, billing). This separation lets you run the same agent on different backends -- e.g. run your <code>implementer</code> agent on Claude Code, Codex, or Gemini without changing the agent definition.</p>
+      <p>Runtimes use three-tier resolution (highest priority first):</p>
+      <ol>
+        <li><strong>Project</strong>: <code>.ark/runtimes/</code> in your repo</li>
+        <li><strong>Global</strong>: <code>~/.ark/runtimes/</code></li>
+        <li><strong>Builtin</strong>: <code>runtimes/</code> shipped with Ark</li>
+      </ol>
+
+      <h2>Built-in Runtimes</h2>
+
+      <h3>claude</h3>
+      <p>The default runtime. Launches Claude Code via tmux with hooks and MCP channel integration.</p>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Type</td><td><code>claude-code</code></td></tr>
+          <tr><td>Models</td><td><code>opus</code>, <code>sonnet</code>, <code>haiku</code></td></tr>
+          <tr><td>Default model</td><td><code>sonnet</code></td></tr>
+          <tr><td>Billing mode</td><td><code>api</code> (per-token via PricingRegistry)</td></tr>
+          <tr><td>Transcript parser</td><td><code>claude</code></td></tr>
+          <tr><td>Permission mode</td><td><code>bypassPermissions</code></td></tr>
+          <tr><td>Environment</td><td><code>CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>claude-max</h3>
+      <p>Same as <code>claude</code> but uses the Claude Max subscription plan. Tokens are still tracked for rate-limit purposes but cost is $0 per token.</p>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Type</td><td><code>claude-code</code></td></tr>
+          <tr><td>Models</td><td><code>opus</code>, <code>sonnet</code>, <code>haiku</code></td></tr>
+          <tr><td>Default model</td><td><code>sonnet</code></td></tr>
+          <tr><td>Billing mode</td><td><code>subscription</code></td></tr>
+          <tr><td>Plan</td><td><code>claude-max-200</code> ($200/month)</td></tr>
+          <tr><td>Transcript parser</td><td><code>claude</code></td></tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        <strong>Note:</strong> Subscription mode sets <code>cost_usd=0</code> on usage records. Tokens are still recorded for rate-limit tracking and dashboard visibility.
+      </div>
+
+      <h3>codex</h3>
+      <p>OpenAI Codex CLI agent. Binary vendored via <code>scripts/vendor-codex.sh</code>.</p>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Type</td><td><code>cli-agent</code></td></tr>
+          <tr><td>Command</td><td><code>["codex", "--approval-mode", "full-auto"]</code></td></tr>
+          <tr><td>Models</td><td><code>gpt-5-codex</code> (default), <code>o4-mini</code></td></tr>
+          <tr><td>Task delivery</td><td><code>arg</code></td></tr>
+          <tr><td>Billing mode</td><td><code>api</code></td></tr>
+          <tr><td>Transcript parser</td><td><code>codex</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>gemini</h3>
+      <p>Google Gemini CLI agent.</p>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Type</td><td><code>cli-agent</code></td></tr>
+          <tr><td>Command</td><td><code>["gemini"]</code></td></tr>
+          <tr><td>Models</td><td><code>gemini-2.5-pro</code> (default), <code>gemini-2.5-flash</code></td></tr>
+          <tr><td>Task delivery</td><td><code>stdin</code></td></tr>
+          <tr><td>Billing mode</td><td><code>api</code></td></tr>
+          <tr><td>Transcript parser</td><td><code>gemini</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>goose</h3>
+      <p>Block / AAIF Goose agent. Binary vendored via <code>scripts/vendor-goose.sh</code>. Uses a native executor with recipe dispatch, MCP channel via <code>--with-extension</code>, and router-injected base URLs.</p>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Type</td><td><code>goose</code></td></tr>
+          <tr><td>Command</td><td><code>["goose", "run"]</code></td></tr>
+          <tr><td>Models</td><td><code>claude-sonnet-4-6</code>, <code>claude-opus-4-6</code>, <code>gpt-5-codex</code>, <code>gemini-2.5-pro</code></td></tr>
+          <tr><td>Task delivery</td><td><code>arg</code></td></tr>
+          <tr><td>Billing mode</td><td><code>api</code></td></tr>
+          <tr><td>Transcript parser</td><td><code>goose</code></td></tr>
+        </tbody>
+      </table>
+
+      <h2>Runtime YAML Schema</h2>
+      <p>Create a custom runtime at <code>~/.ark/runtimes/&lt;name&gt;.yaml</code> or <code>.ark/runtimes/&lt;name&gt;.yaml</code>:</p>
+      <pre><code><span class="yaml-key">name</span>: <span class="yaml-value">my-runtime</span>
+<span class="yaml-key">description</span>: <span class="yaml-value">"Custom LLM backend"</span>
+<span class="yaml-key">type</span>: <span class="yaml-value">cli-agent</span>       <span class="yaml-comment"># claude-code | cli-agent | subprocess | goose</span>
+<span class="yaml-key">command</span>: <span class="yaml-value">["my-tool", "--auto"]</span>
+<span class="yaml-key">task_delivery</span>: <span class="yaml-value">arg</span>    <span class="yaml-comment"># stdin | file | arg</span>
+<span class="yaml-key">models</span>:
+  - <span class="yaml-key">id</span>: <span class="yaml-value">default</span>
+    <span class="yaml-key">label</span>: <span class="yaml-value">"Default Model"</span>
+  - <span class="yaml-key">id</span>: <span class="yaml-value">fast</span>
+    <span class="yaml-key">label</span>: <span class="yaml-value">"Fast Model"</span>
+<span class="yaml-key">default_model</span>: <span class="yaml-value">default</span>
+<span class="yaml-key">billing</span>:
+  <span class="yaml-key">mode</span>: <span class="yaml-value">api</span>             <span class="yaml-comment"># api | subscription | free</span>
+  <span class="yaml-key">plan</span>: <span class="yaml-value">my-plan</span>         <span class="yaml-comment"># optional, subscription only</span>
+  <span class="yaml-key">cost_per_month</span>: <span class="yaml-value">200</span>   <span class="yaml-comment"># optional, subscription only</span>
+<span class="yaml-key">transcript_parser</span>: <span class="yaml-value">claude</span>  <span class="yaml-comment"># claude | codex | gemini</span>
+<span class="yaml-key">env</span>:
+  <span class="yaml-key">MY_VAR</span>: <span class="yaml-value">"value"</span></code></pre>
+
+      <h2>Schema Fields</h2>
+      <table>
+        <thead><tr><th>Field</th><th>Required</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>name</code></td><td>Yes</td><td>Unique runtime identifier</td></tr>
+          <tr><td><code>description</code></td><td>No</td><td>Human-readable description</td></tr>
+          <tr><td><code>type</code></td><td>Yes</td><td>Executor type: <code>claude-code</code>, <code>cli-agent</code>, <code>subprocess</code>, or <code>goose</code></td></tr>
+          <tr><td><code>command</code></td><td>For cli-agent/subprocess/goose</td><td>Array of command and arguments</td></tr>
+          <tr><td><code>task_delivery</code></td><td>For cli-agent</td><td>How to pass the task: <code>arg</code> (CLI argument), <code>stdin</code> (piped), or <code>file</code> (temp file)</td></tr>
+          <tr><td><code>models</code></td><td>No</td><td>Array of <code>{ id, label }</code> model definitions</td></tr>
+          <tr><td><code>default_model</code></td><td>No</td><td>Default model ID from the models array</td></tr>
+          <tr><td><code>billing.mode</code></td><td>No</td><td><code>api</code> (per-token), <code>subscription</code> (flat-rate), or <code>free</code></td></tr>
+          <tr><td><code>billing.plan</code></td><td>No</td><td>Plan name for subscription mode</td></tr>
+          <tr><td><code>billing.cost_per_month</code></td><td>No</td><td>Monthly cost for subscription mode</td></tr>
+          <tr><td><code>transcript_parser</code></td><td>No</td><td>Parser for reading agent transcripts: <code>claude</code>, <code>codex</code>, or <code>gemini</code></td></tr>
+          <tr><td><code>env</code></td><td>No</td><td>Environment variables injected at launch</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Executor Types</h2>
+      <p>The runtime's <code>type</code> field selects which executor launches the agent:</p>
+
+      <h3>claude-code</h3>
+      <p>The default executor for Claude Code. Manages tmux sessions, hooks configuration, MCP channel wiring, trust settings, and worktree isolation.</p>
+
+      <h3>cli-agent</h3>
+      <p>Generic CLI tool wrapper. Works with any command-line agent (Codex, Gemini CLI, custom tools). Supports three task delivery methods: pass the task as a CLI argument (<code>arg</code>), pipe it via stdin (<code>stdin</code>), or write it to a temp file (<code>file</code>).</p>
+
+      <h3>subprocess</h3>
+      <p>Direct subprocess spawning. Useful for non-interactive tools like linters, formatters, or build scripts.</p>
+
+      <h3>goose</h3>
+      <p>Native Goose runtime with recipe dispatch (<code>--recipe</code> / <code>--sub-recipe</code> / <code>--params</code>), MCP channel via <code>--with-extension</code>, router-injected <code>ANTHROPIC_BASE_URL</code> / <code>OPENAI_BASE_URL</code>, stateless mode (<code>--no-session</code>), and stream-JSON output.</p>
+
+      <h2>Billing Modes</h2>
+      <table>
+        <thead><tr><th>Mode</th><th>Cost Tracking</th><th>Token Recording</th><th>Use Case</th></tr></thead>
+        <tbody>
+          <tr><td><code>api</code></td><td>Per-token pricing via PricingRegistry (300+ models)</td><td>Yes</td><td>Pay-per-use API keys</td></tr>
+          <tr><td><code>subscription</code></td><td><code>cost_usd=0</code></td><td>Yes (for rate limits)</td><td>Flat-rate plans like Claude Max</td></tr>
+          <tr><td><code>free</code></td><td><code>cost_usd=0</code></td><td>No rate tracking</td><td>Free tiers, self-hosted models</td></tr>
+        </tbody>
+      </table>
+      <p>The <code>cost_mode</code> column on <code>usage_records</code> records the billing mode that applied at record time.</p>
+
+      <h2>Transcript Parsers</h2>
+      <p>Each runtime specifies a transcript parser that reads the agent's conversation history from its native log format. Parsers are registered in <code>TranscriptParserRegistry</code> on <code>AppContext</code>.</p>
+      <table>
+        <thead><tr><th>Parser</th><th>Source Path</th><th>Session Matching</th></tr></thead>
+        <tbody>
+          <tr><td><code>claude</code></td><td><code>~/.claude/projects/&lt;slug&gt;/&lt;session&gt;.jsonl</code></td><td>Exact path via <code>session.claude_session_id</code></td></tr>
+          <tr><td><code>codex</code></td><td><code>~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl</code></td><td>Matches <code>session_meta.cwd</code> to <code>session.workdir</code></td></tr>
+          <tr><td><code>gemini</code></td><td><code>~/.gemini/tmp/&lt;slug&gt;/chats/session-*.jsonl</code></td><td>Matches <code>projectHash = sha256(workdir)</code></td></tr>
+        </tbody>
+      </table>
+
+      <h2>Overriding Runtimes at Dispatch</h2>
+      <p>You can override an agent's default runtime at dispatch time using <code>--runtime</code>:</p>
+      <pre><code><span class="comment"># Use default runtime (claude) for implementer agent</span>
+<span class="prompt">$</span> ark session start --repo . --summary "Fix bug" --agent implementer --dispatch
+
+<span class="comment"># Override: run implementer on codex runtime</span>
+<span class="prompt">$</span> ark session start --repo . --summary "Fix bug" --agent implementer --runtime codex --dispatch
+
+<span class="comment"># Override: run worker on gemini runtime</span>
+<span class="prompt">$</span> ark session start --repo . --summary "Fix bug" --agent worker --runtime gemini --dispatch</code></pre>
+      <p>At dispatch, runtime config (type, command, task_delivery, env, billing) is merged with agent config. Agent-level values take precedence over runtime defaults.</p>
+
+      <h2>Router URL Injection</h2>
+      <p>When the LLM Router is enabled (<code>router.enabled: true</code> in config), executors automatically inject <code>ANTHROPIC_BASE_URL</code> and <code>OPENAI_BASE_URL</code> into the agent's environment at dispatch. This routes all LLM calls through the router transparently -- the agent binary has no awareness of the routing layer.</p>
+      <p>The injection flow: <code>agent &rarr; Router (:8430) &rarr; TensorZero (:3000, optional) &rarr; Provider API</code>.</p>
+
+      <h2>CLI Commands</h2>
+      <pre><code><span class="comment"># List all available runtimes</span>
+<span class="prompt">$</span> ark runtime list
+
+<span class="comment"># Show details of a specific runtime</span>
+<span class="prompt">$</span> ark runtime show claude
+
+<span class="comment"># Show details of the goose runtime</span>
+<span class="prompt">$</span> ark runtime show goose</code></pre>
+
+      <h2>Plugin Executors</h2>
+      <p>You can extend Ark with custom executor plugins. Drop a JavaScript module at <code>~/.ark/plugins/executors/&lt;name&gt;.js</code> that exports an <code>Executor</code> interface. Ark discovers and registers plugin executors at boot.</p>
+      <p>The executor interface requires 5 methods:</p>
+      <ul>
+        <li><code>launch(opts)</code> -- start an agent and return a handle</li>
+        <li><code>kill(handle)</code> -- stop a running agent</li>
+        <li><code>status(handle)</code> -- query agent state (running, idle, completed, failed, not_found)</li>
+        <li><code>send(handle, message)</code> -- send a message to a running agent</li>
+        <li><code>capture(handle, lines?)</code> -- capture recent output from the agent</li>
+      </ul>
+      <p>Plugin failures are silently skipped -- a broken plugin never blocks Ark boot.</p>
+
+      <div class="doc-footer">
+        <a href="recipes-reference.html">&larr; Recipes</a>
+        <a href="api-reference.html">API Reference &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

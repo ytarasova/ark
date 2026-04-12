@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLM Router - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <a href="environment.html">Environment</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="router.html">LLM Router</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <a href="runtimes-reference.html">Runtimes</a>
+      <a href="api-reference.html">API Reference</a>
+      <div class="section-title">Development</div>
+      <a href="development.html">Contributing</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>LLM Router</h1>
+      <p class="subtitle">OpenAI-compatible proxy that routes requests across multiple LLM providers with policy-based selection, circuit breakers, and cost tracking.</p>
+
+      <h2>Overview</h2>
+      <p>The LLM Router sits between your agents and LLM providers. It exposes an OpenAI-compatible <code>/v1/chat/completions</code> endpoint and intelligently routes each request to the best model based on your configured policy. When the router is enabled, executors automatically inject <code>ANTHROPIC_BASE_URL</code> and <code>OPENAI_BASE_URL</code> into agent environments so all LLM traffic flows through the router transparently.</p>
+      <p>Source: <code>packages/router/</code>. Default port: <code>8430</code>.</p>
+
+      <h2>Quick Start</h2>
+      <pre><code><span class="comment"># Start the router with default balanced policy</span>
+<span class="prompt">$</span> ark router start
+
+<span class="comment"># Start with a specific policy and port</span>
+<span class="prompt">$</span> ark router start --policy quality --port 8430
+
+<span class="comment"># Check router status</span>
+<span class="prompt">$</span> ark router status
+
+<span class="comment"># View accumulated costs</span>
+<span class="prompt">$</span> ark router costs</code></pre>
+
+      <h2>Routing Policies</h2>
+      <p>The router supports three routing policies that control how it selects a model for each request:</p>
+
+      <h3>quality</h3>
+      <p>Always selects the highest-quality model available. No cost optimization. Best for critical tasks where output quality matters most.</p>
+
+      <h3>balanced</h3>
+      <p>Selects the cheapest model that meets a quality floor (default: 0.8). Upgrades to higher-quality models when the request requires tools or complex reasoning. This is the default policy and a good starting point for most workloads.</p>
+
+      <h3>cost</h3>
+      <p>Minimizes cost aggressively. Selects the cheapest available model. Automatically upgrades when the request contains tool calls (since cheap models often struggle with tools). Best for high-volume, simple tasks.</p>
+
+      <h2>Request Classification</h2>
+      <p>Before routing, the classifier analyzes each request to determine its complexity. This informs the routing decision.</p>
+      <table>
+        <thead><tr><th>Signal</th><th>What it measures</th></tr></thead>
+        <tbody>
+          <tr><td>Message length</td><td>Longer prompts indicate more complex tasks</td></tr>
+          <tr><td>Turn count</td><td>Multi-turn conversations may need stronger models</td></tr>
+          <tr><td>Tool presence</td><td>Requests with tools need models that support them well</td></tr>
+          <tr><td>Code indicators</td><td>Code generation and analysis tasks</td></tr>
+          <tr><td>Reasoning indicators</td><td>Tasks requiring logical reasoning or planning</td></tr>
+        </tbody>
+      </table>
+      <p>The classifier outputs a complexity score (0-1), task type (<code>code</code>, <code>reasoning</code>, <code>extraction</code>, <code>generation</code>, <code>chat</code>), and difficulty level (<code>trivial</code>, <code>simple</code>, <code>moderate</code>, <code>complex</code>, <code>expert</code>).</p>
+
+      <h2>Model Pool</h2>
+      <p>The router maintains a pool of available models organized by tier:</p>
+      <table>
+        <thead><tr><th>Tier</th><th>Models</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Frontier</strong></td><td>Claude Opus, GPT-4.1</td></tr>
+          <tr><td><strong>Standard</strong></td><td>Claude Sonnet, GPT-4.1-mini, Gemini 2.5 Pro</td></tr>
+          <tr><td><strong>Economy</strong></td><td>Claude Haiku, GPT-4.1-nano, Gemini 2.5 Flash</td></tr>
+        </tbody>
+      </table>
+      <p>Configure the model pool in <code>~/.ark/config.yaml</code> under <code>router.models</code>. Each model entry specifies the provider, model ID, quality score, cost tier, and supported features (streaming, tools, vision).</p>
+
+      <h2>Circuit Breakers</h2>
+      <p>The router includes per-provider circuit breakers that prevent cascading failures:</p>
+      <ul>
+        <li><strong>Closed</strong> (normal): requests flow through. Failures are counted.</li>
+        <li><strong>Open</strong> (tripped): after 5 consecutive failures, the circuit opens. All requests to this provider fail immediately and are routed to alternatives.</li>
+        <li><strong>Half-open</strong> (recovery): after a 30-second cooldown, one test request is allowed through. If it succeeds, the circuit closes. If it fails, it re-opens.</li>
+      </ul>
+      <p>Circuit breakers ensure that a down provider does not block all agent work. The router automatically falls back to same-tier alternatives.</p>
+
+      <h2>Sticky Sessions</h2>
+      <p>For multi-turn conversations, the router uses sticky sessions to maintain model continuity. Once a model is selected for a session, subsequent requests in the same session go to the same model (or an equivalent). The session sticks for 1 hour (TTL: 3,600,000ms).</p>
+      <p>The router can also escalate within a sticky session -- if a conversation becomes more complex (e.g. the agent starts using tools), the router may upgrade to a higher-tier model mid-session.</p>
+
+      <h2>Cascade Mode</h2>
+      <p>In cascade mode, the router tries the cheapest model first. If the response quality is insufficient (based on heuristics), it re-routes to a higher-tier model. This provides aggressive cost optimization while maintaining a quality floor.</p>
+
+      <h2>Cost Tracking</h2>
+      <p>The router tracks per-request costs and feeds them into Ark's <code>UsageRecorder</code> via an <code>onUsage</code> callback. Costs are attributed by model, provider, and session. View accumulated costs with:</p>
+      <pre><code><span class="prompt">$</span> ark router costs</code></pre>
+      <p>The cost dashboard is also available in the TUI (Costs tab) and Web UI.</p>
+
+      <h2>Feedback Loop</h2>
+      <p>The router logs every routing decision for analysis. Per-model quality tracking uses Bayesian scoring to refine model selection over time. The feedback system maintains the last 10,000 decision records.</p>
+
+      <h2>TensorZero Integration</h2>
+      <p>When TensorZero is enabled, the router routes matched requests through the TensorZero gateway instead of calling provider APIs directly. TensorZero is an open-source Rust LLM gateway (Apache 2.0) that provides additional observability and experiment management.</p>
+
+      <h3>Configuration</h3>
+      <pre><code><span class="yaml-comment"># ~/.ark/config.yaml</span>
+<span class="yaml-key">tensorZero</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">port</span>: <span class="yaml-value">3000</span>
+  <span class="yaml-key">config_dir</span>: <span class="yaml-value">~/.ark/tensorzero</span>
+  <span class="yaml-key">auto_start</span>: <span class="yaml-value">true</span></code></pre>
+
+      <h3>Startup Sequence</h3>
+      <p>TensorZero starts in one of three modes (tried in order):</p>
+      <ol>
+        <li><strong>Sidecar detect</strong> -- reuse an already-running TensorZero instance on the configured port.</li>
+        <li><strong>Native binary</strong> -- spawn <code>tensorzero-gateway</code> if installed (e.g. next to the <code>ark</code> binary).</li>
+        <li><strong>Docker fallback</strong> -- run the official <code>tensorzero/gateway</code> Docker image.</li>
+      </ol>
+      <p>Config (<code>tensorzero.toml</code>) is auto-generated from your configured provider API keys at boot.</p>
+
+      <h3>Traffic Flow</h3>
+      <p>With TensorZero enabled, the full request path is:</p>
+      <pre><code>agent &rarr; Router (:8430) &rarr; TensorZero (:3000) &rarr; Provider API</code></pre>
+      <p>Without TensorZero, the router calls provider APIs directly:</p>
+      <pre><code>agent &rarr; Router (:8430) &rarr; Provider API</code></pre>
+
+      <h2>Configuration Reference</h2>
+      <pre><code><span class="yaml-comment"># ~/.ark/config.yaml</span>
+<span class="yaml-key">router</span>:
+  <span class="yaml-key">enabled</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">port</span>: <span class="yaml-value">8430</span>
+  <span class="yaml-key">policy</span>: <span class="yaml-value">balanced</span>          <span class="yaml-comment"># quality | balanced | cost</span>
+  <span class="yaml-key">quality_floor</span>: <span class="yaml-value">0.8</span>       <span class="yaml-comment"># 0-1, used by balanced policy</span>
+  <span class="yaml-key">auto_start</span>: <span class="yaml-value">true</span>
+  <span class="yaml-key">models</span>:
+    - <span class="yaml-key">provider</span>: <span class="yaml-value">anthropic</span>
+      <span class="yaml-key">model</span>: <span class="yaml-value">claude-opus-4-6</span>
+      <span class="yaml-key">tier</span>: <span class="yaml-value">frontier</span>
+    - <span class="yaml-key">provider</span>: <span class="yaml-value">anthropic</span>
+      <span class="yaml-key">model</span>: <span class="yaml-value">claude-sonnet-4-6</span>
+      <span class="yaml-key">tier</span>: <span class="yaml-value">standard</span>
+    - <span class="yaml-key">provider</span>: <span class="yaml-value">openai</span>
+      <span class="yaml-key">model</span>: <span class="yaml-value">gpt-4.1</span>
+      <span class="yaml-key">tier</span>: <span class="yaml-value">frontier</span>
+    <span class="yaml-comment"># ... more models</span></code></pre>
+
+      <h2>Tenant Policy Integration</h2>
+      <p>In hosted mode, tenant policies can control router behavior:</p>
+      <table>
+        <thead><tr><th>Policy</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>router_enabled</code></td><td>Whether the tenant can use the router</td></tr>
+          <tr><td><code>router_required</code></td><td>Force all traffic through the router (overrides agent opt-out)</td></tr>
+          <tr><td><code>router_policy</code></td><td>Override routing policy for the tenant (quality/balanced/cost)</td></tr>
+          <tr><td><code>tensorzero_enabled</code></td><td>Whether TensorZero is available for this tenant</td></tr>
+        </tbody>
+      </table>
+      <p>Use <code>getEffectiveIntegrationSettings()</code> to merge tenant policy with global config -- tenant <code>_required</code> flags override global opt-outs.</p>
+
+      <div class="doc-footer">
+        <a href="arkd.html">&larr; ArkD Daemon</a>
+        <a href="multi-tenancy.html">Multi-Tenancy &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

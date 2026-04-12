@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contributing - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <a href="environment.html">Environment</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="router.html">LLM Router</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <a href="runtimes-reference.html">Runtimes</a>
+      <a href="api-reference.html">API Reference</a>
+      <div class="section-title">Development</div>
+      <a href="development.html">Contributing</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Contributing</h1>
+      <p class="subtitle">Development setup, project structure, testing patterns, and code style.</p>
+
+      <h2>Prerequisites</h2>
+      <ul>
+        <li><a href="https://bun.sh">Bun</a> -- runtime and package manager (required, Node.js will not work)</li>
+        <li><code>tmux</code> -- session multiplexer for running agents</li>
+        <li><code>git</code> -- for worktree-based session isolation</li>
+        <li><code>gh</code> (optional) -- GitHub CLI for auto-PR creation</li>
+      </ul>
+      <div class="callout warn">
+        <strong>Bun-only.</strong> Ark uses <code>bun:sqlite</code>, <code>Bun.serve()</code>, <code>Bun.sleep()</code>, and Bun FFI. It will not run under Node.js.
+      </div>
+
+      <h2>Setup</h2>
+      <pre><code><span class="prompt">$</span> git clone https://github.com/ytarasova/ark.git
+<span class="prompt">$</span> cd ark
+<span class="prompt">$</span> make install   <span class="comment"># bun install + symlink ark to /usr/local/bin</span></code></pre>
+
+      <h2>Development Workflow</h2>
+      <pre><code><span class="comment"># Hot-reload: TypeScript watch + web dev server</span>
+<span class="prompt">$</span> make dev
+
+<span class="comment"># Run the TUI from source</span>
+<span class="prompt">$</span> make tui
+
+<span class="comment"># Launch just the web dev server (needs separate ark web on :8420)</span>
+<span class="prompt">$</span> make dev-web
+
+<span class="comment"># Launch the Electron desktop app</span>
+<span class="prompt">$</span> make desktop</code></pre>
+
+      <h2>Project Structure</h2>
+      <pre><code>packages/
+  cli/       <span class="comment">Commander.js CLI entry (ark command)</span>
+  core/      <span class="comment">Sessions, store, flows, agents, channels, conductor, search</span>
+    knowledge/     <span class="comment">Knowledge graph store, indexer, context builder, MCP tools</span>
+    repositories/  <span class="comment">SQL CRUD (SessionRepository, EventRepository, etc.)</span>
+    services/      <span class="comment">Business logic (SessionService, ComputeService)</span>
+    stores/        <span class="comment">Resource stores (FlowStore, SkillStore, AgentStore, etc.)</span>
+    runtimes/      <span class="comment">Polymorphic transcript parsers per runtime</span>
+    executors/     <span class="comment">Pluggable executors (claude-code, cli-agent, goose, subprocess)</span>
+    observability/ <span class="comment">PricingRegistry, UsageRecorder</span>
+    router/        <span class="comment">TensorZero lifecycle manager</span>
+  compute/   <span class="comment">11 providers: local, docker, ec2, firecracker, k8s, etc.</span>
+  arkd/      <span class="comment">Universal agent daemon (HTTP server on every compute target)</span>
+  router/    <span class="comment">LLM Router (OpenAI-compatible proxy)</span>
+  server/    <span class="comment">JSON-RPC handlers</span>
+  protocol/  <span class="comment">ArkClient (typed JSON-RPC client)</span>
+  tui/       <span class="comment">React + Ink terminal dashboard</span>
+  web/       <span class="comment">Vite-based web dashboard</span>
+  desktop/   <span class="comment">Electron shell wrapping the web dashboard</span>
+  types/     <span class="comment">Domain interfaces (Session, Compute, Event, etc.)</span>
+agents/      <span class="comment">12 agent definitions (YAML)</span>
+runtimes/    <span class="comment">5 runtime definitions (YAML)</span>
+flows/       <span class="comment">10 flow definitions (YAML)</span>
+skills/      <span class="comment">7 builtin skills (Markdown)</span>
+recipes/     <span class="comment">8 recipe templates (YAML)</span></code></pre>
+
+      <h2>Module Layers</h2>
+      <p>From bottom to top:</p>
+      <ol>
+        <li><code>packages/types/</code> -- Domain interfaces. No logic, no dependencies.</li>
+        <li><code>database.ts</code> / <code>database-sqlite.ts</code> / <code>database-postgres.ts</code> -- <code>IDatabase</code> abstraction.</li>
+        <li><code>repositories/</code> -- SQL CRUD behind typed classes. Column whitelists prevent injection.</li>
+        <li><code>stores/</code> -- Resource stores with three-tier file resolution.</li>
+        <li><code>services/session.ts</code> -- Lifecycle facade: start, stop, resume, complete, pause, delete.</li>
+        <li><code>services/session-orchestration.ts</code> -- All orchestration (dispatch, advance, fork, fan-out).</li>
+        <li><code>app.ts</code> -- <code>AppContext</code> wires everything together. Boot/shutdown lifecycle.</li>
+        <li><code>conductor.ts</code> -- HTTP server (:19100), hook status, channel relay.</li>
+      </ol>
+
+      <h2>Key Entry Points</h2>
+      <table>
+        <thead><tr><th>Entry Point</th><th>Access Pattern</th></tr></thead>
+        <tbody>
+          <tr><td><code>AppContext</code></td><td>Repos: <code>app.sessions</code>, <code>app.computes</code>, <code>app.events</code>. Stores: <code>app.flows</code>, <code>app.skills</code>, <code>app.agents</code>. Services: <code>app.sessionService</code>.</td></tr>
+          <tr><td><code>SessionService</code></td><td>Simple lifecycle. Delegates complex ops to <code>session-orchestration.ts</code>.</td></tr>
+          <tr><td><code>session-orchestration.ts</code></td><td>Every function takes <code>app: AppContext</code> as first argument. No <code>getApp()</code> calls.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Testing</h2>
+      <p>Tests use <code>bun:test</code>. Always use make targets -- never call <code>bun test</code> directly.</p>
+      <pre><code><span class="comment"># Run all tests (sequential, builds deps first)</span>
+<span class="prompt">$</span> make test
+
+<span class="comment"># Run a single test file</span>
+<span class="prompt">$</span> make test-file F=packages/core/__tests__/session.test.ts
+
+<span class="comment"># Run E2E tests (TUI + Web)</span>
+<span class="prompt">$</span> make test-e2e
+
+<span class="comment"># Watch mode</span>
+<span class="prompt">$</span> make test-watch</code></pre>
+
+      <div class="callout warn">
+        <strong>Never run tests in parallel.</strong> Tests share ports (19100, 19200, 19300), globalThis state, and SQLite databases. Bun runs test files concurrently by default, which causes port collisions and phantom failures. The Makefile enforces <code>--concurrency 1</code>.
+      </div>
+
+      <h3>Test Isolation Pattern</h3>
+      <p>Use <code>AppContext.forTest()</code> for isolated test contexts:</p>
+      <pre><code><span class="keyword">import</span> { AppContext, setApp, clearApp } <span class="keyword">from</span> <span class="string">"../app.js"</span>;
+
+<span class="keyword">let</span> app: AppContext;
+beforeAll(<span class="keyword">async</span> () => {
+  app = AppContext.forTest();
+  <span class="keyword">await</span> app.boot();
+  setApp(app);
+});
+afterAll(<span class="keyword">async</span> () => {
+  <span class="keyword">await</span> app?.shutdown();
+  clearApp();
+});</code></pre>
+      <p><code>AppContext.forTest()</code> creates a temporary directory with an isolated database. It skips the conductor, metrics, and signal handlers. The temp directory is cleaned up on shutdown.</p>
+
+      <h3>withTestContext() Helper</h3>
+      <p>A convenience wrapper that manages the beforeEach/afterAll lifecycle automatically:</p>
+      <pre><code><span class="keyword">import</span> { withTestContext } <span class="keyword">from</span> <span class="string">"./test-helpers.js"</span>;
+<span class="keyword">const</span> { getCtx } = withTestContext();
+
+it(<span class="string">"creates a session"</span>, () => {
+  <span class="keyword">const</span> app = getCtx();
+  <span class="comment">// AppContext is isolated, booted, and ready</span>
+  app.sessions.create({ ... });
+});</code></pre>
+
+      <h3>waitFor() Utility</h3>
+      <p>Polls a condition until it returns true (or times out). Useful for testing async state transitions:</p>
+      <pre><code><span class="keyword">await</span> waitFor(() => getSession(id).status === <span class="string">"running"</span>);</code></pre>
+
+      <h3>E2E Tests</h3>
+      <p>E2E tests require the <code>dist/</code> directory to be built first:</p>
+      <pre><code><span class="comment"># Build first, then run E2E</span>
+<span class="prompt">$</span> make dev  <span class="comment"># or just tsc</span>
+<span class="prompt">$</span> make test-e2e</code></pre>
+      <p>TUI E2E tests use a browser harness (xterm.js + real pty + real tmux). Web E2E tests use Playwright.</p>
+
+      <h2>Building</h2>
+      <pre><code><span class="comment"># Build CLI binary + web frontend</span>
+<span class="prompt">$</span> make build
+
+<span class="comment"># Build native macOS CLI binary (current arch)</span>
+<span class="prompt">$</span> make build-cli
+
+<span class="comment"># Build web frontend (Vite production build)</span>
+<span class="prompt">$</span> make build-web
+
+<span class="comment"># Build Electron app for current platform</span>
+<span class="prompt">$</span> make build-desktop
+
+<span class="comment"># Package for all platforms (macOS + Linux, arm64 + x64)</span>
+<span class="prompt">$</span> make package</code></pre>
+
+      <h2>Vendored Binaries</h2>
+      <p>Some runtime binaries are vendored for distribution:</p>
+      <pre><code><span class="prompt">$</span> make vendor-tmux       <span class="comment"># Build static tmux for all platforms</span>
+<span class="prompt">$</span> make vendor-codegraph   <span class="comment"># Extract codegraph native binaries from npm</span>
+<span class="prompt">$</span> make vendor-goose       <span class="comment"># Download goose binaries from GitHub</span>
+<span class="prompt">$</span> make vendor-codex       <span class="comment"># Download codex binaries from OpenAI GitHub</span>
+<span class="prompt">$</span> make vendor-tensorzero  <span class="comment"># Build TensorZero from source (requires Rust)</span></code></pre>
+
+      <h2>Code Style</h2>
+      <ul>
+        <li>TypeScript with <code>strict: false</code> (implicit <code>any</code> allowed, no strict null checks)</li>
+        <li>ES modules (<code>"type": "module"</code>) -- always use <code>.js</code> import extensions even in TypeScript</li>
+        <li>React + Ink for TUI components, React + Vite + Tailwind for Web</li>
+        <li>YAML for agent/flow/runtime/recipe definitions</li>
+        <li>SQLite for local, PostgreSQL for hosted mode (via <code>IDatabase</code> abstraction, no ORM)</li>
+        <li>Never use em dashes (U+2014) -- use hyphens (-) or double dashes (--) instead</li>
+      </ul>
+
+      <h3>Import Extensions</h3>
+      <p>All relative imports must use <code>.js</code> extensions, even in TypeScript files:</p>
+      <pre><code><span class="comment">// Correct</span>
+<span class="keyword">import</span> { foo } <span class="keyword">from</span> <span class="string">"./bar.js"</span>;
+
+<span class="comment">// Wrong -- breaks at runtime</span>
+<span class="keyword">import</span> { foo } <span class="keyword">from</span> <span class="string">"./bar"</span>;</code></pre>
+
+      <h3>No Global State</h3>
+      <p>Pass all state as arguments. Utility functions should never call <code>getApp()</code> or <code>ARK_DIR()</code>. Every orchestration function takes <code>app: AppContext</code> as its first argument.</p>
+
+      <h2>Linting</h2>
+      <pre><code><span class="comment"># Run ESLint + TypeScript checks</span>
+<span class="prompt">$</span> make lint
+
+<span class="comment"># Auto-fix lint issues</span>
+<span class="prompt">$</span> make lint-fix</code></pre>
+
+      <h2>TypeScript Configuration</h2>
+      <table>
+        <thead><tr><th>Setting</th><th>Value</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>target</code></td><td>ES2022</td><td>Modern JavaScript features</td></tr>
+          <tr><td><code>module</code></td><td>Node16</td><td>ES module resolution</td></tr>
+          <tr><td><code>strict</code></td><td>false</td><td>Allows implicit any, no strict null checks</td></tr>
+          <tr><td><code>jsx</code></td><td>react-jsx</td><td>React 17+ new JSX transform</td></tr>
+          <tr><td><code>declaration</code></td><td>true</td><td>Generates .d.ts files</td></tr>
+          <tr><td><code>sourceMap</code></td><td>true</td><td>Debugging support</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Schema Changes</h2>
+      <p>Ark does not have formal migrations (pre-pilot, no production data worth preserving). The authoritative schema lives in <code>packages/core/repositories/schema.ts</code>.</p>
+      <ul>
+        <li><strong>Adding a new table or column with DEFAULT</strong>: transparent, tables recreate with <code>IF NOT EXISTS</code>.</li>
+        <li><strong>Renaming or changing a column type</strong>: delete the database and let it recreate: <code>rm ~/.ark/ark.db</code></li>
+      </ul>
+
+      <h2>Self-Dogfood</h2>
+      <p>Ark can dispatch agents against its own codebase:</p>
+      <pre><code><span class="comment"># Full SDLC: plan, implement, review, PR</span>
+<span class="prompt">$</span> make self
+
+<span class="comment"># Quick single-agent fix</span>
+<span class="prompt">$</span> make self-quick</code></pre>
+
+      <div class="doc-footer">
+        <a href="api-reference.html">&larr; API Reference</a>
+        <a href="troubleshooting.html">Troubleshooting &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

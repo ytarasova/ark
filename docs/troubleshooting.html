@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Troubleshooting - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <a href="environment.html">Environment</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="router.html">LLM Router</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <a href="runtimes-reference.html">Runtimes</a>
+      <a href="api-reference.html">API Reference</a>
+      <div class="section-title">Development</div>
+      <a href="development.html">Contributing</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Troubleshooting</h1>
+      <p class="subtitle">Common issues, diagnostic tools, and solutions.</p>
+
+      <h2>Diagnostic Tools</h2>
+      <p>Start here when something goes wrong:</p>
+      <pre><code><span class="comment"># Run the health check wizard</span>
+<span class="prompt">$</span> ark doctor
+
+<span class="comment"># Check session status and recent events</span>
+<span class="prompt">$</span> ark session read &lt;session-id&gt;
+
+<span class="comment"># View session events for debugging</span>
+<span class="prompt">$</span> ark session events &lt;session-id&gt;
+
+<span class="comment"># Attach to a running agent's tmux session</span>
+<span class="prompt">$</span> tmux attach -t ark-s-&lt;session-id&gt;
+
+<span class="comment"># List all ark tmux sessions</span>
+<span class="prompt">$</span> tmux list-sessions | grep ark-</code></pre>
+
+      <h2>Installation Issues</h2>
+
+      <h3>Bun not found</h3>
+      <p>Ark requires <a href="https://bun.sh">Bun</a> as its runtime. Install it:</p>
+      <pre><code><span class="prompt">$</span> curl -fsSL https://bun.sh/install | bash</code></pre>
+      <p>If you installed via the self-contained tarball (<code>install.sh</code>), Bun is bundled -- make sure <code>/usr/local/bin/ark</code> is in your PATH.</p>
+
+      <h3>tmux not found</h3>
+      <p>Ark uses tmux to run agent sessions. Install it:</p>
+      <pre><code><span class="comment"># macOS</span>
+<span class="prompt">$</span> brew install tmux
+
+<span class="comment"># Ubuntu/Debian</span>
+<span class="prompt">$</span> sudo apt install tmux</code></pre>
+      <p>If you installed via the self-contained tarball, a static tmux binary is bundled in the Ark package.</p>
+
+      <h3>"ark: command not found" after make install</h3>
+      <p>The symlink may not be on your PATH. Check:</p>
+      <pre><code><span class="prompt">$</span> ls -la /usr/local/bin/ark
+<span class="prompt">$</span> echo $PATH | tr ':' '\n' | grep local</code></pre>
+      <p>If <code>/usr/local/bin</code> is not on your PATH, add it to your shell profile.</p>
+
+      <h2>Session Issues</h2>
+
+      <h3>Session stuck in "running" state</h3>
+      <p>The agent process may have exited without reporting back. Check:</p>
+      <ol>
+        <li>See if the tmux session still exists: <code>tmux list-sessions | grep ark-s-&lt;id&gt;</code></li>
+        <li>If the tmux session is gone, the agent crashed. Stop and restart:</li>
+      </ol>
+      <pre><code><span class="prompt">$</span> ark session stop &lt;session-id&gt;
+<span class="prompt">$</span> ark session dispatch &lt;session-id&gt;</code></pre>
+
+      <h3>Session stuck in "waiting" state</h3>
+      <p>The session is waiting for a gate to be approved. Check what gate is pending:</p>
+      <pre><code><span class="prompt">$</span> ark session read &lt;session-id&gt;</code></pre>
+      <p>Advance manually:</p>
+      <pre><code><span class="prompt">$</span> ark session advance &lt;session-id&gt;</code></pre>
+      <p>Or force-advance (skips verification):</p>
+      <pre><code><span class="prompt">$</span> ark session advance &lt;session-id&gt; --force</code></pre>
+
+      <h3>Agent not receiving messages</h3>
+      <p>Check that the channel relay chain is intact:</p>
+      <ol>
+        <li>ArkD is running: <code>curl http://localhost:19300/health</code></li>
+        <li>Conductor is running: <code>curl http://localhost:19100/health</code> (only if using TUI)</li>
+        <li>Channel port is reachable. The port is derived from the session ID.</li>
+      </ol>
+
+      <h3>Verification scripts failing</h3>
+      <p>If a stage has <code>verify</code> scripts, the agent cannot complete until they all pass. Check which script is failing:</p>
+      <pre><code><span class="prompt">$</span> ark session verify &lt;session-id&gt;</code></pre>
+      <p>Fix the issue in the worktree, then re-run verification or force completion:</p>
+      <pre><code><span class="prompt">$</span> ark session complete &lt;session-id&gt; --force</code></pre>
+
+      <h2>Database Issues</h2>
+
+      <h3>Database locked errors</h3>
+      <p>SQLite has a 5-second busy timeout. If you see "database is locked" errors, check for multiple Ark processes accessing the same database:</p>
+      <pre><code><span class="prompt">$</span> ps aux | grep ark</code></pre>
+      <p>Only one TUI/conductor instance should run at a time. Multiple CLI commands are fine (they use <code>skipConductor: true</code>).</p>
+
+      <h3>Schema mismatch after upgrade</h3>
+      <p>Ark does not have formal migrations (pre-pilot). If a column type changed or was renamed, delete the database and let it recreate:</p>
+      <pre><code><span class="prompt">$</span> rm ~/.ark/ark.db
+<span class="prompt">$</span> ark tui  <span class="comment"># tables recreate from schema.ts on boot</span></code></pre>
+      <div class="callout warn">
+        <strong>Warning:</strong> This deletes all session history, events, and messages. Only do this during development -- not in production.
+      </div>
+
+      <h3>FTS5 search returning nothing</h3>
+      <p>The full-text search index may not be built. Rebuild it:</p>
+      <pre><code><span class="prompt">$</span> ark index</code></pre>
+      <p>Or from the TUI History tab, press <kbd>r</kbd> to refresh and reindex.</p>
+
+      <h2>Compute Issues</h2>
+
+      <h3>Docker provider: permission denied</h3>
+      <p>Your user needs to be in the docker group:</p>
+      <pre><code><span class="prompt">$</span> sudo usermod -aG docker $USER
+<span class="comment"># Log out and back in for the group change to take effect</span></code></pre>
+
+      <h3>EC2 provider: instance not reachable</h3>
+      <p>Check that the security group allows inbound traffic on port 19300 (ArkD). The EC2 provider sets up security groups automatically, but VPC or firewall rules may block traffic.</p>
+
+      <h3>Worktree conflicts</h3>
+      <p>If a worktree fails to create (e.g. because the branch already exists or the worktree path is occupied):</p>
+      <pre><code><span class="comment"># List existing worktrees</span>
+<span class="prompt">$</span> git worktree list
+
+<span class="comment"># Clean up stale worktrees</span>
+<span class="prompt">$</span> git worktree prune
+
+<span class="comment"># Or use Ark's cleanup command</span>
+<span class="prompt">$</span> ark worktree cleanup</code></pre>
+
+      <h2>TUI Issues</h2>
+
+      <h3>TUI looks garbled or has rendering artifacts</h3>
+      <p>Try resizing your terminal or pressing <kbd>Ctrl+L</kbd> to force a re-render. Ink (the TUI framework) can sometimes have rendering issues with certain terminal emulators.</p>
+
+      <h3>Keyboard shortcuts not working</h3>
+      <p>Check if an overlay or form is active. When a form is open, it captures all keyboard input. Press <kbd>Esc</kbd> to close any active overlay. The status bar at the bottom shows the currently available shortcuts.</p>
+
+      <h3>TUI freezes during an operation</h3>
+      <p>All I/O operations in the TUI must be non-blocking. If the TUI appears frozen, it may be waiting for a synchronous operation to complete. Press <kbd>Ctrl+C</kbd> to interrupt, then try again.</p>
+
+      <h2>LLM Router Issues</h2>
+
+      <h3>Router not starting</h3>
+      <p>Check that port 8430 is not already in use:</p>
+      <pre><code><span class="prompt">$</span> lsof -i :8430</code></pre>
+      <p>If another process is using the port, either stop it or configure the router to use a different port:</p>
+      <pre><code><span class="prompt">$</span> ark router start --port 8431</code></pre>
+
+      <h3>All providers in circuit-breaker open state</h3>
+      <p>If all LLM providers have tripped their circuit breakers, the router cannot route any requests. Check your API keys and provider availability. Circuit breakers auto-recover after 30 seconds.</p>
+      <pre><code><span class="prompt">$</span> ark router status</code></pre>
+
+      <h3>TensorZero fails to start</h3>
+      <p>TensorZero tries three startup methods in order: sidecar detect, native binary, Docker. If all three fail:</p>
+      <ol>
+        <li>Install the native binary: <code>make vendor-tensorzero</code> (requires Rust/cargo)</li>
+        <li>Or ensure Docker is running for the Docker fallback</li>
+        <li>Or disable TensorZero in config: set <code>tensorZero.enabled: false</code> in <code>~/.ark/config.yaml</code></li>
+      </ol>
+
+      <h2>Hook Status Issues</h2>
+
+      <h3>Agent status not updating</h3>
+      <p>Ark uses Claude Code hooks for agent status detection. If status is not updating:</p>
+      <ol>
+        <li>Check that <code>.claude/settings.local.json</code> exists in the session's working directory</li>
+        <li>Verify the conductor is running and reachable at <code>http://localhost:19100</code></li>
+        <li>Check the hook endpoint: <code>curl http://localhost:19100/hooks/status</code></li>
+      </ol>
+
+      <h3>Hooks config not cleaned up</h3>
+      <p>When a session stops, Ark should remove <code>.claude/settings.local.json</code>. If it persists:</p>
+      <pre><code><span class="prompt">$</span> rm .claude/settings.local.json</code></pre>
+      <p>This file is session-specific and safe to delete when no session is running in that directory.</p>
+
+      <h2>Knowledge Graph Issues</h2>
+
+      <h3>Codegraph indexer not found</h3>
+      <p>Install ops-codegraph:</p>
+      <pre><code><span class="prompt">$</span> npm install -g @optave/codegraph
+<span class="comment"># Or as a project dependency</span>
+<span class="prompt">$</span> bun add @optave/codegraph</code></pre>
+
+      <h3>Index taking too long</h3>
+      <p>Large repos can take a while to index. The indexer uses tree-sitter (WASM) to parse 33 languages. For very large monorepos, consider indexing incrementally or indexing specific subdirectories.</p>
+
+      <h2>Getting Help</h2>
+      <p>If you're still stuck:</p>
+      <ul>
+        <li>Run <code>ark doctor</code> and include the output in your bug report</li>
+        <li>Check session events: <code>ark session events &lt;id&gt;</code></li>
+        <li>Search existing issues: <a href="https://github.com/ytarasova/ark/issues">GitHub Issues</a></li>
+        <li>File a new issue with reproduction steps</li>
+      </ul>
+
+      <div class="doc-footer">
+        <a href="development.html">&larr; Contributing</a>
+        <a href="./">Home &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>
