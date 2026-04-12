@@ -327,4 +327,18 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     if (!data) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     return { ok: true, data };
   });
+
+  // ── Artifact tracking ──────────────────────────────────────────────────────
+
+  router.handle("session/artifacts/list", async (params) => {
+    const { sessionId, type } = extract<{ sessionId: string; type?: string }>(params, ["sessionId"]);
+    const artifacts = app.artifacts.list(sessionId, type as any);
+    return { artifacts };
+  });
+
+  router.handle("session/artifacts/query", async (params) => {
+    const q = extract<{ session_id?: string; type?: string; value?: string; limit?: number }>(params, []);
+    const artifacts = app.artifacts.query(q as any);
+    return { artifacts };
+  });
 }

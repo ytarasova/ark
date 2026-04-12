@@ -7,3 +7,4 @@ export * from "./flow.js";
 export * from "./common.js";
 export * from "./rpc.js";
 export * from "./tenant.js";
+export * from "./artifact.js";

@@ -149,6 +149,7 @@ export class SessionRepository {
 
   delete(id: string): boolean {
     this.db.prepare("DELETE FROM events WHERE track_id = ? AND tenant_id = ?").run(id, this.tenantId);
+    this.db.prepare("DELETE FROM session_artifacts WHERE session_id = ? AND tenant_id = ?").run(id, this.tenantId);
     const result = this.db.prepare("DELETE FROM sessions WHERE id = ? AND tenant_id = ?").run(id, this.tenantId);
     return result.changes > 0;
   }

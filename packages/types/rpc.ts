@@ -170,6 +170,14 @@ export interface ScheduleDeleteParams { id: string }
 export interface ScheduleDeleteResult { ok: boolean }
 export interface ScheduleIdParams { id: string }
 
+// ── Artifacts ──────────────────────────────────────────────────────────────
+
+export interface ArtifactListParams { sessionId: string; type?: string }
+export interface ArtifactListResult { artifacts: import("./artifact.js").SessionArtifact[] }
+
+export interface ArtifactQueryParams { session_id?: string; type?: string; value?: string; limit?: number }
+export interface ArtifactQueryResult { artifacts: import("./artifact.js").SessionArtifact[] }
+
 // ── Worktree ────────────────────────────────────────────────────────────────
 
 export interface WorktreeFinishParams { sessionId: string; noMerge?: boolean; createPR?: boolean }
