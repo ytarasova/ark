@@ -217,4 +217,21 @@ describe("web server", () => {
     });
     expect(resp.status).toBe(400);
   });
+
+  it("daemon/status returns conductor and arkd health", async () => {
+    server = startWebServer(getApp(), { port: 18547 });
+    const data = await rpcResult(18547, "daemon/status");
+    const result = data.result as Record<string, any>;
+    // Verify response shape
+    expect(result).toHaveProperty("conductor");
+    expect(result).toHaveProperty("arkd");
+    expect(result).toHaveProperty("router");
+    expect(typeof result.conductor.online).toBe("boolean");
+    expect(typeof result.conductor.url).toBe("string");
+    expect(result.conductor.url.length).toBeGreaterThan(0);
+    expect(typeof result.arkd.online).toBe("boolean");
+    expect(typeof result.arkd.url).toBe("string");
+    expect(result.arkd.url.length).toBeGreaterThan(0);
+    expect(typeof result.router.online).toBe("boolean");
+  });
 });

@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight, LayoutDashboard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
 interface SidebarProps {
   activeView: string;
@@ -13,6 +14,32 @@ interface SidebarProps {
   readOnly: boolean;
   collapsed: boolean;
   onToggle: () => void;
+  daemonStatus?: DaemonStatus | null;
+}
+
+/** Derive overall health from daemon probe results. */
+function getDotState(ds: DaemonStatus | null | undefined): { color: string; glow: string; title: string } {
+  if (!ds) return { color: "bg-muted-foreground/30", glow: "", title: "Checking daemons..." };
+  const { conductor, arkd } = ds;
+  if (conductor.online && arkd.online) {
+    return {
+      color: "bg-emerald-400",
+      glow: "shadow-[0_0_8px_rgba(52,211,153,0.5),0_0_2px_rgba(52,211,153,0.8)] animate-[glow-pulse_2.5s_ease-in-out_infinite]",
+      title: "Conductor and arkd online",
+    };
+  }
+  if (conductor.online || arkd.online) {
+    return {
+      color: "bg-amber-400",
+      glow: "shadow-[0_0_8px_rgba(251,191,36,0.5),0_0_2px_rgba(251,191,36,0.8)]",
+      title: `${conductor.online ? "Conductor" : "arkd"} online, ${conductor.online ? "arkd" : "conductor"} offline`,
+    };
+  }
+  return {
+    color: "bg-red-400",
+    glow: "",
+    title: "Conductor and arkd offline",
+  };
 }
 
 const NAV: { id: string; icon: LucideIcon; label: string }[] = [
@@ -28,7 +55,8 @@ const NAV: { id: string; icon: LucideIcon; label: string }[] = [
   { id: "costs", icon: DollarSign, label: "Costs" },
 ];
 
-export function Sidebar({ activeView, onNavigate, readOnly, collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ activeView, onNavigate, readOnly, collapsed, onToggle, daemonStatus }: SidebarProps) {
+  const dot = getDotState(daemonStatus);
   return (
     <div className="bg-sidebar border-r border-sidebar-border flex flex-col h-full overflow-y-auto relative z-2">
       {/* Header - compact, draggable */}
@@ -36,7 +64,7 @@ export function Sidebar({ activeView, onNavigate, readOnly, collapsed, onToggle 
         {!collapsed && (
           <>
             <span className="text-[15px] font-bold text-sidebar-foreground tracking-[-0.03em]">ark</span>
-            <span className="w-[7px] h-[7px] rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5),0_0_2px_rgba(52,211,153,0.8)] animate-[glow-pulse_2.5s_ease-in-out_infinite] shrink-0 no-drag" />
+            <span className={cn("w-[7px] h-[7px] rounded-full shrink-0 no-drag", dot.color, dot.glow)} title={dot.title} />
             <span className="flex-1" />
           </>
         )}

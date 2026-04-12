@@ -17,6 +17,20 @@ import { cleanupWorktrees } from "../../core/services/session-orchestration.js";
 import { exportSession } from "../../core/session/share.js";
 import { addMcpServer, removeMcpServer } from "../../core/tools.js";
 import { generateOpenApiSpec } from "../../core/openapi.js";
+import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_URL } from "../../core/constants.js";
+
+/** Probe a URL's /health endpoint with a short timeout. Returns true if reachable. */
+async function probeHealth(baseUrl: string, timeoutMs = 2000): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const resp = await fetch(`${baseUrl}/health`, { signal: controller.signal });
+    clearTimeout(timer);
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
 
 export function registerWebHandlers(router: Router, app: AppContext): void {
   // ── Status ───────────────────────────────────────────────────────────────
@@ -27,6 +41,23 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
       byStatus[s.status] = (byStatus[s.status] || 0) + 1;
     }
     return { total: sessions.length, byStatus };
+  });
+
+  // ── Daemon auto-detection ────────────────────────────────────────────────
+  router.handle("daemon/status", async () => {
+    const conductorUrl = app.config.conductorUrl ?? DEFAULT_CONDUCTOR_URL;
+    const arkdUrl = process.env.ARK_ARKD_URL || DEFAULT_ARKD_URL;
+
+    const [conductor, arkd] = await Promise.all([
+      probeHealth(conductorUrl),
+      probeHealth(arkdUrl),
+    ]);
+
+    return {
+      conductor: { online: conductor, url: conductorUrl },
+      arkd: { online: arkd, url: arkdUrl },
+      router: { online: app.config.router?.enabled ?? false },
+    };
   });
 
   // ── Search ───────────────────────────────────────────────────────────────

@@ -112,6 +112,11 @@ export const api = {
 
   // System
   getStatus: () => rpc<any>("status/get"),
+  getDaemonStatus: () => rpc<{
+    conductor: { online: boolean; url: string };
+    arkd: { online: boolean; url: string };
+    router: { online: boolean };
+  }>("daemon/status"),
   getGroups: () => rpc<{ groups: any[] }>("group/list").then(r => r.groups.map((g: any) => g.name)),
   getConfig: () => rpc<any>("config/get"),
 
