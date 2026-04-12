@@ -1,10 +1,16 @@
 # Ark Platform Roadmap
 
-> Last updated: 2026-04-11 (third pass -- tenant hardening + leak reap)
+> Last updated: 2026-04-12 (auto-start dispatch + autonomous flow + completion paths)
 > Unit tests: 2724 pass, 0 fail, 0 lint errors, 0 process leaks
 > E2E tests: 89 TUI (`packages/tui-e2e/`) + 78 web (`packages/e2e/web/`) = **167 passing, 0 skipped, 0 failed**
 >
 > **2026-04-10 decision (Foundry 2.0 review meeting):** Ark selected as the company-wide dev-workflow orchestrator -- the layer ABOVE tools like Goose / Claude Code / Codex, not a replacement. Framed as "the foundry" (control plane) with those tools as "the machines." First hand-out to early adopters targeted for the week of 2026-04-13. See **Camp 0: Early Adopter Ship** below.
+>
+> **2026-04-12 session shipped on `main`:**
+> - **Auto-start dispatch for all runtimes** -- replaced the fragile tmux-based `deliverInitialPrompt` (pane polling + `sendReliable`) with native CLI arg injection per executor. Claude: task passed as a positional arg to `claude` CLI for immediate processing. Codex/Gemini: `initialPrompt` added to `LaunchOpts`, handled via three `task_delivery` modes (arg, stdin, file). Goose: `-t` flag for task + new `-s` (stay-alive) flag for interactive/manual-gate stages. The obsolete `deliver-task.ts` module + tests deleted (379 lines removed). Commits `e2eb214`, `c70806c`, `7c053f6`, `ac87721`.
+> - **Channel permissions fix** -- `mcp__ark-channel__*` always included in `permissions.allow` since `ark-channel` is system infrastructure injected at dispatch, not declared in `agent.tools`. Without this, `report` and `send_to_agent` were blocked by Claude Code's permission system for all 12 agents. Commit `0eaf60d`.
+> - **Autonomous flow + SessionEnd completion fallback** -- new `flows/definitions/autonomous.yaml` (single stage, `gate: auto`) for fully autonomous dispatch. When a `SessionEnd` hook fires on a running auto-gate session, the conductor treats it as implicit completion and triggers `advance()` -- handles the case where the channel `report` tool was unavailable but the agent finished its work. Commit `4b7ed83`.
+> - **E2E completion path tests** -- 448-line test file exercising three completion paths: manual (report tool), auto (advance on stage complete), and hook-fallback (SessionEnd triggers advance). Commit `a543e1c`.
 >
 > **2026-04-11 session shipped on `main`:**
 > - **Multi-tenant channel hardening** -- conductor `/api/channel/<sessionId>`, `/api/relay`, and `/hooks/status` all extract tenant via `Authorization: Bearer ark_<tid>_*` or `X-Ark-Tenant-Id` and route through `app.forTenant()`. `ARK_TENANT_ID` is injected into the channel MCP subprocess at dispatch, propagated through arkd's channel relay, and included in the hook curl POST. Closes the cross-tenant channel exposure flagged in the security audit (commits `e80ac4d`, `08d3329`). Unblocks hosted multi-tenant rollout.
@@ -66,7 +72,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Executor barrel + plugin discovery** | `packages/core/executors/index.ts` owns `builtinExecutors: Executor[]` as the single source of truth. Boot loops this array, registering into the module lookup AND the Awilix container under `executor:<name>`. `loadPluginExecutors(arkDir)` discovers user-provided executors at `~/.ark/plugins/executors/*.js` via dynamic import. Failures never block boot. | Yes |
 | **Vendor freshness CI** | `vendor/versions.yaml` codifies pinned upstream versions for goose, codex, tmux, tensorzero, codegraph. Weekly scheduled workflow (`.github/workflows/vendor-freshness.yml`) polls upstream releases and opens a PR bumping the manifest when upstream is newer. Every bump goes through CI + human review, no auto-merge. | N/A |
 | **Module reorganization** | 91 flat files reorganized into 13 domain directories. Barrel exports. All imports updated. | Yes |
-| **SDLC flows** | 7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 9 flow definitions. | Yes |
+| **SDLC flows** | 7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 10 flow definitions (incl. autonomous). | Yes |
 | **Skills** | 7 builtin (spec-extraction, sanity-gate, plan-audit, security-scan, self-review, code-review, test-writing). | Yes |
 | **Recipes** | 8 templates (islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature). | Yes |
 | **CLI** | 17 command modules. `ark dashboard/knowledge/eval/router/runtime/tenant/auth` all working. | Yes |
@@ -76,6 +82,9 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Process leak prevention** | stopAll via provider, awaited dispatches, proper shutdown order. | Yes |
 | **Auth** | API keys (create/validate/revoke/rotate), tenant_id on all entities, per-tenant AppContext, auth middleware. | Yes |
 | **Session launcher** | Interface: TmuxLauncher, ContainerLauncher, ArkdLauncher. Orchestration uses `app.launcher.*` not direct tmux. | Yes |
+| **Auto-start dispatch** | Native CLI arg injection per executor replaces fragile tmux pane polling. Claude: positional arg. Codex/Gemini: `initialPrompt` via LaunchOpts (arg/stdin/file modes). Goose: `-t` + `-s` (stay-alive for manual-gate). Old `deliver-task.ts` module deleted. | Yes |
+| **Autonomous flow** | `flows/definitions/autonomous.yaml` -- single stage, `gate: auto`. `SessionEnd` hook on running auto-gate session triggers implicit completion via `advance()`. Three completion paths (manual report, auto-advance, hook-fallback) all covered by e2e tests. | Yes |
+| **Channel permissions** | `mcp__ark-channel__*` always included in `permissions.allow` -- system infrastructure injected at dispatch, not declared in agent YAML. Ensures `report` and `send_to_agent` tools work for all 12 agents. | Yes |
 | **MCP config stubs** | Templates for Atlassian, GitHub, Linear, Figma. | N/A |
 
 ### PARTIAL -- Built but NOT integration-tested or incomplete
@@ -146,7 +155,11 @@ The orchestration platform for AI-powered software development. Manages the full
 
 **Explicit scoping feedback from the meeting:** Ship a small, reliable surface first. Do NOT dump every feature at once -- foundry-1.0 lesson was that premature breadth drowns the team in shallow bug reports. Decide what's in/out before Monday.
 
-**What has already landed (2026-04-11 session commits on `main`):**
+**What has already landed (2026-04-11 + 2026-04-12 session commits on `main`):**
+- **Auto-start dispatch for all runtimes (2026-04-12)** -- task delivery via native CLI arg injection per executor replaces fragile tmux pane polling. Claude: positional arg. Codex/Gemini: `initialPrompt` via LaunchOpts (arg/stdin/file modes). Goose: `-t` + `-s` (stay-alive for manual-gate). Obsolete `deliver-task.ts` deleted
+- **Channel permissions fix (2026-04-12)** -- `mcp__ark-channel__*` always in `permissions.allow` so `report`/`send_to_agent` work for all 12 agents
+- **Autonomous flow + SessionEnd fallback (2026-04-12)** -- `autonomous.yaml` (single stage, `gate: auto`). `SessionEnd` hook fires on running auto-gate session triggers implicit completion via `advance()`
+- **E2E completion path tests (2026-04-12)** -- 448-line test covering manual, auto, and hook-fallback completion paths
 - Unified Claude settings bundle writer -- `permissions.allow` generated from `agent.tools`, prompt-hint injection so agents know what tools exist without probing
 - Native Goose runtime (`runtimes/goose.yaml` + `packages/core/executors/goose.ts`) with recipe dispatch, channel MCP via `--with-extension`, LLM router routing
 - Vendored binary freshness manifest (`vendor/versions.yaml`) + CI workflow for goose / codex version bumps
@@ -156,7 +169,7 @@ The orchestration platform for AI-powered software development. Manages the full
 - Multi-tenant channel + hook hardening -- `/api/channel`, `/api/relay`, `/hooks/status` all tenant-scoped via `X-Ark-Tenant-Id` extraction and `app.forTenant()` routing. Unblocks hosted multi-tenant rollout (audit-flagged gap closed)
 - Session send paste-buffer race fix + worker agent `{summary}` auto-start -- `make self TASK="..."` and `ark session send` both now work end-to-end without human intervention. Closes the ark-on-ark dogfood loop
 - CI web build before unit tests -- fixes the one consistent CI flake (`web server > starts and serves dashboard HTML`) that was blocking admin-free merges
-- E2E fixture subprocess reaper -- `process.on('exit'|'SIGINT'|'SIGTERM'|'uncaughtException')` cleanup in both `packages/e2e/fixtures/web-server.ts` and `packages/tui-e2e/server.ts`. Kills the "Playwright worker dies mid-test → orphaned `ark web` reparented to launchd forever" leak (found 138 orphans / 3.3 GB in the wild)
+- E2E fixture subprocess reaper -- `process.on('exit'|'SIGINT'|'SIGTERM'|'uncaughtException')` cleanup in both `packages/e2e/fixtures/web-server.ts` and `packages/tui-e2e/server.ts`. Kills the "Playwright worker dies mid-test -> orphaned `ark web` reparented to launchd forever" leak (found 138 orphans / 3.3 GB in the wild)
 
 **Candidate "in scope" for the first hand-out** (builder trio to confirm):
 - Local docker compute with worktree isolation (no AWS creds required on the user's laptop)
