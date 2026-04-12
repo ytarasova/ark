@@ -546,30 +546,41 @@ export async function autoAcceptChannelPrompt(
   tmuxName: string,
   opts?: { maxAttempts?: number; delayMs?: number },
 ): Promise<void> {
-  const max = opts?.maxAttempts ?? 45;
-  const delay = opts?.delayMs ?? 1000;
-  let _accepted = 0;
+  const max = opts?.maxAttempts ?? 60;
+  const delay = opts?.delayMs ?? 500;
+  let accepted = 0;
 
   for (let i = 0; i < max; i++) {
     await Bun.sleep(delay);
     try {
-      const output = await tmux.capturePaneAsync(tmuxName, { lines: 30 });
+      const output = await tmux.capturePaneAsync(tmuxName, { lines: 40 });
 
-      // Found the prompt -- accept it and keep polling
+      // Found the channel development prompt -- accept it
       if (CHANNEL_PROMPT_MARKERS.some(m => output.includes(m))) {
+        // Option 1 is pre-selected (> prefix). Send "1" to select it,
+        // brief pause, then Enter to confirm. Also try just Enter in case
+        // the selection is already active.
         await tmux.sendKeysAsync(tmuxName, "1");
-        await Bun.sleep(300);
+        await Bun.sleep(200);
         await tmux.sendKeysAsync(tmuxName, "Enter");
-        _accepted++;
+        await Bun.sleep(500);
+        // Double-tap Enter in case the first one was swallowed
+        await tmux.sendKeysAsync(tmuxName, "Enter");
+        accepted++;
         continue;
       }
 
-      // Claude is actively working -- safe to stop polling.
-      // These only appear after Claude has fully started and is past any prompts.
+      // Claude is actively working -- safe to stop polling
       if (CLAUDE_WORKING_MARKERS.some(m => output.includes(m))) {
         return;
       }
-    } catch { /* tmux pane may not exist yet during startup -- retry on next iteration */ }
+
+      // If we already accepted at least once and the prompt markers are gone,
+      // Claude is past the prompt even if working markers haven't appeared yet
+      if (accepted > 0 && !CHANNEL_PROMPT_MARKERS.some(m => output.includes(m))) {
+        return;
+      }
+    } catch { /* tmux pane may not exist yet during startup */ }
   }
 }
 
