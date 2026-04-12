@@ -125,23 +125,6 @@ export const claudeCodeExecutor: Executor = {
     claude.deliverTask(session.id, channelPort, opts.task, stage);
     app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
-    // Deliver the initial user message (autonomous dispatch): Claude's system
-    // prompt gives it CONTEXT, but Claude only starts a turn when it receives
-    // a user message. Without this, sessions sit idle at the ">" prompt.
-    // Update the in-memory session with the tmux handle so the helper can
-    // reach the right session before the DB row is re-read upstream.
-    (session as { session_id: string | null }).session_id = tmuxName;
-    const { deliverInitialPrompt, buildAutonomousPrompt } = await import("../services/deliver-task.js");
-    // Prefer the fully-built task (includes header, previous-stage context,
-    // memory/knowledge injection). Fall back to buildAutonomousPrompt if the
-    // task is empty for any reason.
-    const firstMessage = opts.task && opts.task.trim().length > 0
-      ? opts.task
-      : buildAutonomousPrompt(session);
-    // Fire-and-forget -- do not block launch on delivery. The helper logs
-    // failures as session events and is idempotent per session.id.
-    deliverInitialPrompt(app, session, firstMessage).catch(() => { /* logged internally */ });
-
     return { ok: true, handle: tmuxName, claudeSessionId };
   },
 
