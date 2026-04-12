@@ -1327,6 +1327,7 @@ async function _launchAgentTmux(app: AppContext,
   claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, {
     autonomy: opts?.autonomy,
     agent: { tools: agent.tools, mcp_servers: agent.mcp_servers },
+    tenantId: session.tenant_id ?? "default",
   });
 
   // Build launch env from agent config + provider-specific env (e.g. auth tokens for remote)

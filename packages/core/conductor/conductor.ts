@@ -105,7 +105,8 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   const sessionId = url.searchParams.get("session");
   if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
 
-  const s = _app.sessions.get(sessionId);
+  const app = appForRequest(req);
+  const s = app.sessions.get(sessionId);
   if (!s) return Response.json({ error: "session not found" }, { status: 404 });
 
   const payload = await req.json() as Record<string, unknown>;
@@ -119,12 +120,12 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
     const evalResult = evaluateToolCall(toolName, toolInput);
 
     if (evalResult.action === "block") {
-      _app.events.log(sessionId, "guardrail_blocked", {
+      app.events.log(sessionId, "guardrail_blocked", {
         actor: "system",
         data: { tool: toolName, pattern: evalResult.rule?.pattern, input: toolInput },
       });
     } else if (evalResult.action === "warn") {
-      _app.events.log(sessionId, "guardrail_warning", {
+      app.events.log(sessionId, "guardrail_warning", {
         actor: "system",
         data: { tool: toolName, pattern: evalResult.rule?.pattern },
       });
@@ -134,16 +135,16 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   }
 
   // Delegate business logic to session.ts
-  const result = session.applyHookStatus(_app, s, event, payload);
+  const result = session.applyHookStatus(app, s, event, payload);
 
   // Apply events
   for (const evt of result.events ?? []) {
-    _app.events.log(sessionId, evt.type, evt.opts);
+    app.events.log(sessionId, evt.type, evt.opts);
   }
 
   // Apply store updates
   if (result.updates) {
-    _app.sessions.update(sessionId, result.updates);
+    app.sessions.update(sessionId, result.updates);
   }
 
   // Emit to event bus
@@ -154,7 +155,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
 
     // Clean up provider resources on terminal states (stop container, remove worktree, etc.)
     if (result.newStatus === "completed" || result.newStatus === "failed") {
-      session.cleanupOnTerminal(_app, sessionId);
+      session.cleanupOnTerminal(app, sessionId);
       // Close OTLP spans for terminal states
       emitStageSpanEnd(sessionId, { status: result.newStatus });
       emitSessionSpanEnd(sessionId, { status: result.newStatus });
@@ -164,8 +165,8 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
       // Record eval in knowledge graph
       try {
         const { evaluateSession } = await import("../knowledge/evals.js");
-        const freshSession = _app.sessions.get(sessionId);
-        if (freshSession) evaluateSession(_app, freshSession);
+        const freshSession = app.sessions.get(sessionId);
+        if (freshSession) evaluateSession(app, freshSession);
       } catch { /* skip eval on error */ }
     }
   }
@@ -173,13 +174,13 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   // Index transcript
   if (result.shouldIndex && result.indexTranscript) {
     await safeAsync("transcript indexing", async () => {
-      indexSession(_app, result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId);
+      indexSession(app, result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId);
     });
   }
 
   // Track progress in conductor ledger
   if (result.newStatus) {
-    try { addEntry(_app, "default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId); } catch { /* skip ledger on error */ }
+    try { addEntry(app, "default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId); } catch { /* skip ledger on error */ }
   }
 
   return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });

@@ -260,12 +260,13 @@ export function buildToolHints(agent: AgentToolSpec): string {
 
 const ARK_HOOK_MARKER = "# ark-status";
 
-function hookCommand(sessionId: string, conductorUrl: string): string {
-  return `curl -sf -X POST -H 'Content-Type: application/json' -d @- '${conductorUrl}/hooks/status?session=${sessionId}' > /dev/null 2>&1 || true ${ARK_HOOK_MARKER}`;
+function hookCommand(sessionId: string, conductorUrl: string, tenantId?: string): string {
+  const tenantHeader = tenantId ? ` -H 'X-Ark-Tenant-Id: ${tenantId}'` : "";
+  return `curl -sf -X POST -H 'Content-Type: application/json'${tenantHeader} -d @- '${conductorUrl}/hooks/status?session=${sessionId}' > /dev/null 2>&1 || true ${ARK_HOOK_MARKER}`;
 }
 
-function buildHooksConfig(sessionId: string, conductorUrl: string): Record<string, unknown[]> {
-  const cmd = hookCommand(sessionId, conductorUrl);
+function buildHooksConfig(sessionId: string, conductorUrl: string, tenantId?: string): Record<string, unknown[]> {
+  const cmd = hookCommand(sessionId, conductorUrl, tenantId);
   const asyncHook = { type: "command" as const, command: cmd, async: true };
   const syncHook = { type: "command" as const, command: cmd, async: false };
 
@@ -295,7 +296,7 @@ function filterOutArkHooks(hooks: Record<string, unknown[]>): void {
 
 export function writeHooksConfig(
   sessionId: string, conductorUrl: string, workdir: string,
-  opts?: { autonomy?: string; agent?: AgentToolSpec },
+  opts?: { autonomy?: string; agent?: AgentToolSpec; tenantId?: string },
 ): string {
   const claudeDir = join(workdir, ".claude");
   mkdirSync(claudeDir, { recursive: true });
@@ -314,7 +315,7 @@ export function writeHooksConfig(
   }
 
   // Merge new hooks
-  const newHooks = buildHooksConfig(sessionId, conductorUrl);
+  const newHooks = buildHooksConfig(sessionId, conductorUrl, opts?.tenantId);
   const existingHooks = (existing.hooks ?? {}) as Record<string, unknown[]>;
   for (const [event, matchers] of Object.entries(newHooks)) {
     existingHooks[event] = [...(existingHooks[event] ?? []), ...matchers];

@@ -63,6 +63,7 @@ export const claudeCodeExecutor: Executor = {
     claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, {
       autonomy: opts.autonomy,
       agent: { tools: opts.agent.tools, mcp_servers: opts.agent.mcp_servers },
+      tenantId: session.tenant_id ?? "default",
     });
 
     // Build launch env from agent config + provider-specific env + router URL (if enabled)
