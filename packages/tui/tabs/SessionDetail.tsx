@@ -7,7 +7,7 @@ import { getStatusColor } from "../helpers/colors.js";
 import type { InkColor } from "../helpers/colors.js";
 import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
-import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter } from "../helpers/sessionFormatting.js";
+import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter, sanitizeForTerminal } from "../helpers/sessionFormatting.js";
 import { formatCost } from "../../core/observability/costs.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
@@ -330,7 +330,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
         <>
           <Text color={theme.running} bold>{`  ✓ Agent completed successfully`}</Text>
           {s.config?.completion_summary && (
-            <Text color={theme.running} wrap="wrap">{`  ${s.config.completion_summary}`}</Text>
+            <Text color={theme.running} wrap="truncate">{`  ${sanitizeForTerminal(s.config.completion_summary, 200)}`}</Text>
           )}
         </>
       )}
