@@ -6,12 +6,10 @@
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import { existsSync, rmSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { join } from "path";
 import { homedir } from "os";
 
 const execFileAsync = promisify(execFile);
-const __dirname = dirname(fileURLToPath(import.meta.url));
 import type {
   ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
   ComputeSnapshot, PortDecl, PortStatus, Compute, Session,
@@ -20,7 +18,7 @@ import type { AppContext } from "../../../core/app.js";
 import * as tmux from "../../../core/infra/tmux.js";
 import { collectLocalMetrics } from "./metrics.js";
 import { safeAsync } from "../../../core/safe.js";
-import { DEFAULT_CONDUCTOR_URL } from "../../../core/constants.js";
+import { DEFAULT_CONDUCTOR_URL, CHANNEL_SCRIPT_PATH } from "../../../core/constants.js";
 
 /** Check if a port is listening locally. */
 async function checkLocalPort(port: number): Promise<boolean> {
@@ -136,7 +134,7 @@ export class LocalProvider implements ComputeProvider {
   buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
     return {
       command: join(homedir(), ".bun", "bin", "bun"),
-      args: [join(__dirname, "../../../core/conductor/channel.ts")],
+      args: [CHANNEL_SCRIPT_PATH],
       env: {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
