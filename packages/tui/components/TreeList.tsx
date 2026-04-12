@@ -97,8 +97,11 @@ export function TreeList<T>({
     for (const groupName of sortedKeys) {
       const entries = groupMap.get(groupName)!;
       if (groupName) {
+        const count = entries.length;
         rows.push(
-          <Text key={`grp-${groupName}`} backgroundColor={theme.highlight} color={theme.text} bold>{` ${groupName} `}</Text>
+          <Text key={`grp-${groupName}`} backgroundColor={theme.highlight} color={theme.text} bold>
+            {` ${groupName} `}<Text dimColor>{`(${count})`}</Text>{" "}
+          </Text>
         );
       }
       if (entries.length === 0 && groupName) {

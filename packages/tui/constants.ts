@@ -13,6 +13,7 @@ export const ICON: Record<string, string> = {
   blocked: "◐",    // half = needs gate approval
   completed: "✔",  // heavy check = done successfully
   failed: "✖",     // heavy x = error
+  archived: "▫",   // small square = archived/stored
 };
 
 // Static fallback for compatibility — prefers getStatusColor() for theme support
@@ -25,4 +26,5 @@ export const COLOR: Record<string, string> = {
   blocked: "yellow",
   completed: "green",
   failed: "red",
+  archived: "gray",
 };

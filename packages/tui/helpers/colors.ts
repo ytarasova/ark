@@ -26,6 +26,7 @@ export function getStatusColor(status: SessionStatus | string): InkColor {
     blocked: theme.waiting,
     completed: theme.running,
     failed: theme.error,
+    archived: theme.dimText,
   };
   return (map[status] ?? theme.dimText) as InkColor;
 }

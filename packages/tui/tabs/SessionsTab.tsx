@@ -4,6 +4,7 @@ import { getTheme } from "../../core/theme.js";
 import type { Session, SearchResult } from "../../core/index.js";
 import { ICON } from "../constants.js";
 import { getStatusColor } from "../helpers/colors.js";
+import { formatSessionRow, getColumnWidths, fitText, sessionLabel, shortId } from "../helpers/sessionFormatting.js";
 import { ago } from "../helpers.js";
 import { KeyHint, sep } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
@@ -500,44 +501,40 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
             groupSort={groupSortFn}
             renderRow={(s) => {
               const cols = process.stdout.columns ?? 120;
-              const summaryWidth = cols > 140 ? 45 : cols > 100 ? 30 : 20;
-              const icon = ICON[s.status] ?? "?";
-              const raw = s.summary ?? s.ticket ?? s.repo ?? "---";
-              const summary = raw.length > summaryWidth ? raw.slice(0, summaryWidth - 1) + "\u2026" : raw.padEnd(summaryWidth);
-              const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
-              const age = ago(s.created_at).padStart(4);
-              const unread = unreadCounts.get(s.id) ?? 0;
-              const badge = unread > 0 ? ` (${unread})` : "";
-              return `${icon} ${summary} ${stage} ${age}${badge}`;
+              return formatSessionRow(s, cols, unreadCounts.get(s.id) ?? 0);
             }}
             renderColoredRow={(s) => {
               const cols = process.stdout.columns ?? 120;
-              const summaryWidth = cols > 140 ? 45 : cols > 100 ? 30 : 20;
+              const widths = getColumnWidths(cols);
               const icon = ICON[s.status] ?? "?";
               const color = getStatusColor(s.status);
-              const raw = s.summary ?? s.ticket ?? s.repo ?? "---";
-              const summary = raw.length > summaryWidth ? raw.slice(0, summaryWidth - 1) + "\u2026" : raw.padEnd(summaryWidth);
-              const stage = (s.stage ? `stage:${s.stage}` : "---").padEnd(14);
-              const age = ago(s.created_at).padStart(4);
+              const summary = fitText(sessionLabel(s), widths.summary);
               const unread = unreadCounts.get(s.id) ?? 0;
               return (
                 <Text>
-                  {" "} <Text color={color}>{icon}</Text>{` ${summary}`}
-                  {s.branch && <Text color={theme.accent}>{` [${s.branch}]`}</Text>}
-                  {` ${stage} ${age}`}
+                  {"  "}<Text color={color}>{icon}</Text>{` ${summary}`}
+                  {widths.id > 0 && <Text dimColor>{` ${shortId(s.id).padEnd(widths.id - 1)}`}</Text>}
+                  {s.branch && <Text color={theme.accent}>{` ${s.branch}`}</Text>}
+                  {widths.stage > 0 && s.stage && <Text dimColor>{` ${s.stage}`}</Text>}
+                  <Text dimColor>{` ${ago(s.updated_at ?? s.created_at).padStart(4)}`}</Text>
                   {unread > 0 && <Text color={theme.waiting} bold>{` (${unread})`}</Text>}
                 </Text>
               );
             }}
             renderChildren={(s) => {
-              // fork children
               const children = sessions.filter(c => c.parent_id === s.id);
               if (children.length === 0) return null;
               return children.map(child => {
                 const childIcon = ICON[child.status] ?? "?";
                 const childColor = getStatusColor(child.status);
-                const childSummary = (child.summary ?? "---").slice(0, 20);
-                return <Text key={child.id} dimColor>{"   | "}<Text color={childColor}>{childIcon}</Text>{` ${childSummary}`}</Text>;
+                const childLabel = (child.summary ?? "(fork)").slice(0, 24);
+                const childAge = ago(child.updated_at ?? child.created_at).padStart(4);
+                return (
+                  <Text key={child.id} dimColor>
+                    {"    \u2514 "}<Text color={childColor}>{childIcon}</Text>{` ${childLabel}`}
+                    <Text>{`  ${childAge}`}</Text>
+                  </Text>
+                );
               });
             }}
             sel={sel}

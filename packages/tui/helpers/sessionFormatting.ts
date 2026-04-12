@@ -1,8 +1,9 @@
-// ── Session detail pane formatting helpers ───────────────────────────────────
-// Pure functions extracted from SessionsTab detail pane. No side effects, no I/O.
+// ── Session formatting helpers ───────────────────────────────────────────────
+// Pure functions for session display formatting. No side effects, no I/O.
 
-import type { SessionConfig } from "../../types/index.js";
-import { humanTokens } from "../helpers.js";
+import type { Session, SessionConfig } from "../../types/index.js";
+import { humanTokens, ago } from "../helpers.js";
+import { ICON } from "../constants.js";
 
 /** Accepts a full Session or a partial object (for tests that pass bare `{}`). */
 type SessionLike = { config?: Partial<SessionConfig> };
@@ -75,4 +76,54 @@ export function stripAnsiAndFilter(output: string, lastN = 12): string[] {
     )
     .filter(line => line.trim())
     .slice(-lastN);
+}
+
+// ── Session list row formatting ─────────────────────────────────────────────
+
+/** Compute responsive column widths based on terminal width. */
+export function getColumnWidths(cols: number): { summary: number; id: number; stage: number } {
+  if (cols > 140) return { summary: 42, id: 8, stage: 12 };
+  if (cols > 100) return { summary: 28, id: 8, stage: 10 };
+  return { summary: 20, id: 0, stage: 0 };
+}
+
+/** Truncate text with ellipsis or pad to width. If width is 0, returns empty string. */
+export function fitText(text: string, width: number): string {
+  if (width <= 0) return "";
+  if (text.length > width) return text.slice(0, width - 1) + "\u2026";
+  return text.padEnd(width);
+}
+
+/** Format a session's short ID (e.g. "s-abc12" -> "abc12"). */
+export function shortId(id: string): string {
+  return id.replace(/^s-/, "").slice(0, 6);
+}
+
+/** Get the best display text for a session in a list row. */
+export function sessionLabel(s: Pick<Session, "summary" | "ticket" | "repo">): string {
+  return s.summary ?? s.ticket ?? s.repo ?? "(no summary)";
+}
+
+/** Format a session row as a plain string for ListRow highlight matching. */
+export function formatSessionRow(
+  s: Session,
+  cols: number,
+  unreadCount: number,
+): string {
+  const widths = getColumnWidths(cols);
+  const icon = ICON[s.status] ?? "?";
+  const summary = fitText(sessionLabel(s), widths.summary);
+  const id = widths.id > 0 ? ` ${shortId(s.id).padEnd(widths.id - 1)}` : "";
+  const stage = widths.stage > 0 ? ` ${(s.stage ?? "").padEnd(widths.stage)}` : "";
+  const age = ` ${ago(s.updated_at ?? s.created_at).padStart(4)}`;
+  const badge = unreadCount > 0 ? ` (${unreadCount})` : "";
+  return `${icon} ${summary}${id}${stage}${age}${badge}`;
+}
+
+/** Format a child (fork) session row as a plain string. */
+export function formatChildRow(child: Session): string {
+  const icon = ICON[child.status] ?? "?";
+  const label = (child.summary ?? "(fork)").slice(0, 24);
+  const age = ago(child.updated_at ?? child.created_at).padStart(4);
+  return `${icon} ${label}  ${age}`;
 }
