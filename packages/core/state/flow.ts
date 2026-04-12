@@ -29,6 +29,14 @@ export interface StageDefinition {
   compute_template?: string;  // named compute template to use for this stage
   verify?: string[];  // Scripts that must pass before stage completion
   depends_on?: string[];  // DAG: stage names that must complete before this stage runs
+  /**
+   * Runtime isolation mode for this stage.
+   * - "fresh" (default): each stage gets a fresh runtime -- no --resume from prior stage.
+   *   Context is passed structurally via task prompt (PLAN.md, git log, events).
+   * - "continue": preserve the previous stage's claude_session_id so the next
+   *   dispatch resumes the same conversation.
+   */
+  isolation?: "fresh" | "continue";
   // Fork/fan_out-specific
   strategy?: string;
   max_parallel?: number;
