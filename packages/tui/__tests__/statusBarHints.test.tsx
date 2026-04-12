@@ -8,7 +8,12 @@
 import { describe, it, expect } from "bun:test";
 import React from "react";
 import { getOverlayHints } from "../helpers/statusBarHints.js";
-import { getSessionHints } from "../tabs/SessionsTab.js";
+import {
+  getSessionHints,
+  resetSessionFilters,
+  hasActiveSessionFilters,
+  EMPTY_SESSION_FILTERS,
+} from "../tabs/SessionsTab.js";
 import { getComputeHints } from "../tabs/ComputeTab.js";
 import { getToolsHints } from "../tabs/ToolsTab.js";
 import { getFlowsHints } from "../tabs/FlowsTab.js";
@@ -136,6 +141,58 @@ describe("getSessionHints", () => {
     expect(hasLabel(hints, "fork/clone")).toBe(true);
     expect(hasLabel(hints, "move")).toBe(true);
     expect(hasLabel(hints, "delete")).toBe(true);
+  });
+
+  it("no filter active: does NOT show 'clear filter' hint", () => {
+    const hints = getSessionHints(null, EMPTY_SESSION_FILTERS);
+    expect(hasLabel(hints, "clear filter")).toBe(false);
+  });
+
+  it("status filter active: shows Esc:clear filter hint even with no selection", () => {
+    const hints = getSessionHints(null, { statusFilter: "running" });
+    expect(hasLabel(hints, "clear filter")).toBe(true);
+    expect(hasKey(hints, "Esc")).toBe(true);
+  });
+
+  it("status filter active with a selection: clear-filter hint comes before session actions", () => {
+    const session = { status: "running" } as Session;
+    const hints = getSessionHints(session, { statusFilter: "running" });
+    const labels = extractHintLabels(hints).map(h => h.label);
+    expect(labels[0]).toBe("clear filter");
+    expect(hasLabel(hints, "attach")).toBe(true); // session-level hints still present
+  });
+
+  it("default filters arg is empty (back-compat with single-arg callers)", () => {
+    const hints = getSessionHints(null);
+    expect(hasLabel(hints, "clear filter")).toBe(false);
+  });
+});
+
+describe("session filter helpers", () => {
+  it("EMPTY_SESSION_FILTERS has no active filter", () => {
+    expect(hasActiveSessionFilters(EMPTY_SESSION_FILTERS)).toBe(false);
+  });
+
+  it("hasActiveSessionFilters returns true when statusFilter is set", () => {
+    expect(hasActiveSessionFilters({ statusFilter: "running" })).toBe(true);
+    expect(hasActiveSessionFilters({ statusFilter: "failed" })).toBe(true);
+  });
+
+  it("hasActiveSessionFilters returns false when statusFilter is null", () => {
+    expect(hasActiveSessionFilters({ statusFilter: null })).toBe(false);
+  });
+
+  it("resetSessionFilters clears every dimension regardless of input", () => {
+    expect(resetSessionFilters({ statusFilter: "running" })).toEqual(EMPTY_SESSION_FILTERS);
+    expect(resetSessionFilters({ statusFilter: "failed" })).toEqual(EMPTY_SESSION_FILTERS);
+    expect(resetSessionFilters({ statusFilter: null })).toEqual(EMPTY_SESSION_FILTERS);
+  });
+
+  it("resetSessionFilters output is itself inactive (idempotent)", () => {
+    const cleared = resetSessionFilters({ statusFilter: "running" });
+    expect(hasActiveSessionFilters(cleared)).toBe(false);
+    // running it again on already-cleared state is a no-op
+    expect(resetSessionFilters(cleared)).toEqual(cleared);
   });
 });
 
