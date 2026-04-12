@@ -11,6 +11,7 @@ export interface FlowState {
   sessionId: string;
   flowName: string;
   completedStages: string[];
+  skippedStages: string[];
   currentStage: string | null;
   stageResults: Record<string, { status: string; completedAt: string; data?: Record<string, unknown> }>;
   startedAt: string;
@@ -50,6 +51,7 @@ export function markStageCompleted(app: AppContext, sessionId: string, stageName
       sessionId,
       flowName: "",
       completedStages: [],
+      skippedStages: [],
       currentStage: stageName,
       stageResults: {},
       startedAt: new Date().toISOString(),
@@ -69,6 +71,39 @@ export function markStageCompleted(app: AppContext, sessionId: string, stageName
   saveFlowState(app, state);
 }
 
+/** Mark stages as skipped (not on the active conditional path). */
+export function markStagesSkipped(app: AppContext, sessionId: string, stageNames: string[]): void {
+  let state = loadFlowState(app, sessionId);
+  if (!state) {
+    state = {
+      sessionId,
+      flowName: "",
+      completedStages: [],
+      skippedStages: [],
+      currentStage: null,
+      stageResults: {},
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  for (const name of stageNames) {
+    if (!state.skippedStages.includes(name)) {
+      state.skippedStages.push(name);
+    }
+    state.stageResults[name] = {
+      status: "skipped",
+      completedAt: new Date().toISOString(),
+    };
+  }
+  saveFlowState(app, state);
+}
+
+/** Get skipped stages for a session. */
+export function getSkippedStages(app: AppContext, sessionId: string): string[] {
+  const state = loadFlowState(app, sessionId);
+  return state?.skippedStages ?? [];
+}
+
 /** Set the current executing stage. */
 export function setCurrentStage(app: AppContext, sessionId: string, stageName: string, flowName?: string): void {
   let state = loadFlowState(app, sessionId);
@@ -77,6 +112,7 @@ export function setCurrentStage(app: AppContext, sessionId: string, stageName: s
       sessionId,
       flowName: flowName ?? "",
       completedStages: [],
+      skippedStages: [],
       currentStage: stageName,
       stageResults: {},
       startedAt: new Date().toISOString(),

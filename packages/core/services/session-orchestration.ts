@@ -31,9 +31,9 @@ import type { OutboundMessage } from "../conductor/channel-types.js";
 import { safeAsync } from "../safe.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
 import { profileGroupPrefix } from "../state/profiles.js";
-import { parseGraphFlow, getSuccessors } from "../state/graph-flow.js";
+import { parseGraphFlow, getSuccessors, resolveNextStages, computeSkippedStages } from "../state/graph-flow.js";
 import { evaluateTermination, parseTermination, type TerminationContext } from "../termination.js";
-import { markStageCompleted, setCurrentStage } from "../state/flow-state.js";
+import { markStageCompleted, setCurrentStage, markStagesSkipped, getSkippedStages, loadFlowState } from "../state/flow-state.js";
 // memory.ts removed -- knowledge graph context injection handles memory/learning recall
 import { detectHandoff } from "../handoff.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
@@ -577,16 +577,37 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   // Observability: track stage advancement
   recordEvent({ type: "agent_turn", sessionId, data: { stage } });
 
-  // Graph flow routing: if flow definition has edges, use DAG successor resolution
+  // Graph flow routing: if flow definition has edges, use DAG conditional routing
   try {
     const flowDef = app.flows.get(flowName);
-    if (flowDef && (flowDef as FlowDefinition & { edges?: unknown[] }).edges?.length > 0) {
+    if (flowDef && flowDef.edges?.length > 0) {
       const graphFlow = parseGraphFlow(flowDef);
-      const successors = getSuccessors(graphFlow, stage, session.config);
-      if (successors.length > 0) {
-        const graphNextStage = successors[0];
-        // Persist flow state before advancing
+      const flowState = loadFlowState(app, sessionId);
+      const completedStages = flowState?.completedStages ?? [];
+      const skippedStages = flowState?.skippedStages ?? [];
+
+      // Resolve next stages with conditional routing and join barrier awareness
+      const readyStages = resolveNextStages(
+        graphFlow, stage, session.config ?? {},
+        completedStages, skippedStages,
+      );
+
+      if (readyStages.length > 0) {
+        // Mark current stage completed
         try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
+
+        // Compute which stages should be skipped due to conditional branching
+        const allSuccessors = getSuccessors(graphFlow, stage);
+        if (allSuccessors.length > 1) {
+          const newSkipped = computeSkippedStages(graphFlow, stage, readyStages, skippedStages);
+          if (newSkipped.length > skippedStages.length) {
+            try { markStagesSkipped(app, sessionId, newSkipped); } catch { /* skip */ }
+          }
+        }
+
+        // Advance to the first ready stage (additional ready stages will be
+        // picked up on subsequent advance() calls if the flow has parallel branches)
+        const graphNextStage = readyStages[0];
         try { setCurrentStage(app, sessionId, graphNextStage, flowName); } catch { /* skip */ }
 
         // Stage isolation: clear runtime handles so next stage gets a fresh runtime.
@@ -598,14 +619,50 @@ export async function advance(app: AppContext, sessionId: string, force = false)
           graphSessionUpdates.claude_session_id = null;
         }
         app.sessions.update(sessionId, graphSessionUpdates);
-        app.events.log(sessionId, "stage_advanced", { actor: "system", stage: graphNextStage, data: { via: "graph-flow", successors, isolation: graphIsolation } });
+        app.events.log(sessionId, "stage_advanced", {
+          actor: "system", stage: graphNextStage,
+          data: { via: "graph-flow-conditional", readyStages, skippedStages: flowState?.skippedStages ?? [], isolation: graphIsolation },
+        });
         emitStageSpanEnd(sessionId, { status: "completed" });
-        const graphAction = flow.getStageAction(app,flowName, graphNextStage);
-        const graphStageDef = flow.getStage(app,flowName, graphNextStage);
+        const graphAction = flow.getStageAction(app, flowName, graphNextStage);
+        const graphStageDef = flow.getStage(app, flowName, graphNextStage);
         emitStageSpanStart(sessionId, { stage: graphNextStage, agent: graphAction?.agent, gate: graphStageDef?.gate });
         saveCheckpoint(app, sessionId);
         return { ok: true, message: `Advanced to ${graphNextStage} (graph-flow)` };
       }
+
+      // No ready stages -- check if this is because join barriers aren't met
+      // or because we've reached a terminal node
+      const allSuccessors = getSuccessors(graphFlow, stage, session.config ?? {});
+      if (allSuccessors.length > 0) {
+        // Successors exist but aren't ready (join barriers) -- mark completed and wait
+        try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
+        app.sessions.update(sessionId, { status: "waiting" });
+        app.events.log(sessionId, "stage_waiting", {
+          actor: "system", stage,
+          data: { via: "graph-flow-conditional", waiting_for: allSuccessors, reason: "join-barrier" },
+        });
+        return { ok: true, message: `Stage ${stage} completed, waiting for join barrier` };
+      }
+
+      // Terminal node -- flow complete
+      try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
+      app.sessions.update(sessionId, { status: "completed" });
+      app.events.log(sessionId, "session_completed", {
+        stage, actor: "system",
+        data: { final_stage: stage, flow: flowName, via: "graph-flow-conditional" },
+      });
+      app.messages.markRead(sessionId);
+      emitStageSpanEnd(sessionId, { status: "completed" });
+      const s = app.sessions.get(sessionId);
+      const agg = app.usageRecorder.getSessionCost(sessionId);
+      emitSessionSpanEnd(sessionId, {
+        status: "completed",
+        tokens_in: agg.input_tokens, tokens_out: agg.output_tokens, tokens_cache: agg.cache_read_tokens,
+        cost_usd: agg.cost, turns: s?.config?.turns as number | undefined,
+      });
+      flushSpans();
+      return { ok: true, message: "Flow completed (graph-flow)" };
     }
   } catch { /* graph flow not applicable, fall through to linear */ }
 

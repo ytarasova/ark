@@ -1,0 +1,60 @@
+name: conditional
+description: "Conditional routing -- branch based on review outcome, converge at PR"
+
+stages:
+  - name: plan
+    agent: planner
+    gate: manual
+    task: |
+      Analyze {summary} and create PLAN.md.
+
+  - name: implement
+    agent: implementer
+    gate: auto
+    task: |
+      Implement the changes from PLAN.md for: {summary}
+
+  - name: review
+    agent: reviewer
+    gate: auto
+    task: |
+      Review the implementation. Set session.config.review_result to
+      "approved", "needs_changes", or "rejected".
+
+  - name: revise
+    agent: implementer
+    gate: auto
+    task: |
+      Address review feedback and fix the flagged issues.
+
+  - name: reject-close
+    agent: closer
+    gate: auto
+    task: |
+      Close the session -- implementation was rejected.
+
+  - name: pr
+    action: create_pr
+    gate: auto
+
+edges:
+  - from: plan
+    to: implement
+  - from: implement
+    to: review
+  # Conditional branching after review
+  - from: review
+    to: pr
+    condition: "session.review_result === 'approved'"
+    label: approved
+  - from: review
+    to: revise
+    condition: "session.review_result === 'needs_changes'"
+    label: needs changes
+  - from: review
+    to: reject-close
+    condition: "session.review_result === 'rejected'"
+    label: rejected
+  # After revision, go back to review
+  - from: revise
+    to: review

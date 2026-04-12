@@ -37,6 +37,13 @@ export interface RecipeDefinition {
 
 export type GateType = "auto" | "manual" | "condition" | "review";
 
+export interface FlowEdgeDefinition {
+  from: string;
+  to: string;
+  condition?: string;  // JS expression evaluated against session data
+  label?: string;
+}
+
 export interface StageDefinition {
   name: string;
   type?: "agent" | "action" | "fork";
@@ -69,5 +76,6 @@ export interface FlowDefinition {
   name: string;
   description?: string;
   stages: StageDefinition[];
+  edges?: FlowEdgeDefinition[];
   source?: "builtin" | "user";
 }

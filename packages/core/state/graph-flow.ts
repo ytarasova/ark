@@ -122,6 +122,109 @@ export function topologicalSort(flow: GraphFlow): string[] {
   return result;
 }
 
+/**
+ * Resolve the next stages to execute from a given node, considering:
+ * 1. Conditional edge evaluation against session data
+ * 2. Default edges (no condition) as fallback when no conditional edges match
+ * 3. Join barriers -- only return a successor if ALL its active predecessors are completed
+ *
+ * Returns an array of stage names that are ready to execute.
+ * Empty array means: either no successors (terminal node) or join barriers not met.
+ */
+export function resolveNextStages(
+  flow: GraphFlow,
+  currentNode: string,
+  sessionData: Record<string, unknown>,
+  completedStages: string[],
+  skippedStages: string[] = [],
+): string[] {
+  // The current node is completing -- include it in the completed set
+  // so join barrier checks on successors see it as done
+  const completed = new Set([...completedStages, currentNode]);
+  const skipped = new Set(skippedStages);
+
+  const outgoing = flow.edges.filter(e => e.from === currentNode);
+  if (outgoing.length === 0) return [];
+
+  // Separate conditional and unconditional (default) edges
+  const conditionalEdges = outgoing.filter(e => e.condition);
+  const defaultEdges = outgoing.filter(e => !e.condition);
+
+  let successorNames: string[];
+
+  if (conditionalEdges.length > 0) {
+    // Evaluate conditional edges
+    const matched = conditionalEdges
+      .filter(e => evaluateCondition(e.condition!, sessionData))
+      .map(e => e.to);
+
+    // If no conditional edges matched, use default edges as fallback
+    successorNames = matched.length > 0 ? matched : defaultEdges.map(e => e.to);
+  } else {
+    // No conditional edges -- use all default edges
+    successorNames = defaultEdges.map(e => e.to);
+  }
+
+  // Filter out already-completed or skipped stages
+  successorNames = successorNames.filter(s => !completed.has(s) && !skipped.has(s));
+
+  // Check join barriers -- a successor is only ready if ALL its
+  // active predecessors (not skipped) have completed
+  return successorNames.filter(successor => {
+    const preds = getPredecessors(flow, successor);
+    // Only wait for predecessors that are on the active path (not skipped)
+    const activePreds = preds.filter(p => !skipped.has(p));
+    return activePreds.every(p => completed.has(p));
+  });
+}
+
+/**
+ * Determine which stages should be marked as skipped when a conditional
+ * branch is NOT taken. Given the chosen successors from a node, find
+ * all nodes reachable ONLY through the unchosen edges and mark them skipped.
+ */
+export function computeSkippedStages(
+  flow: GraphFlow,
+  currentNode: string,
+  chosenSuccessors: string[],
+  existingSkipped: string[] = [],
+): string[] {
+  const chosen = new Set(chosenSuccessors);
+  const outgoing = flow.edges.filter(e => e.from === currentNode);
+  const unchosenTargets = outgoing.map(e => e.to).filter(t => !chosen.has(t));
+
+  // BFS from unchosen targets to find all exclusively-reachable nodes
+  const reachableFromChosen = new Set<string>();
+  const queue = [...chosenSuccessors];
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    if (reachableFromChosen.has(node)) continue;
+    reachableFromChosen.add(node);
+    for (const e of flow.edges.filter(ed => ed.from === node)) {
+      queue.push(e.to);
+    }
+  }
+
+  // Nodes reachable ONLY from unchosen paths (not also reachable from chosen paths)
+  const skipped = new Set(existingSkipped);
+  const unchosenQueue = [...unchosenTargets];
+  const visited = new Set<string>();
+  while (unchosenQueue.length > 0) {
+    const node = unchosenQueue.shift()!;
+    if (visited.has(node)) continue;
+    visited.add(node);
+    // Only skip if not reachable from the chosen path
+    if (!reachableFromChosen.has(node)) {
+      skipped.add(node);
+      for (const e of flow.edges.filter(ed => ed.from === node)) {
+        unchosenQueue.push(e.to);
+      }
+    }
+  }
+
+  return [...skipped];
+}
+
 /** Validate a graph flow for cycles and missing nodes. */
 export function validateGraphFlow(flow: GraphFlow): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
