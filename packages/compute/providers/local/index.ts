@@ -136,7 +136,7 @@ export class LocalProvider implements ComputeProvider {
   buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
     return {
       command: join(homedir(), ".bun", "bin", "bun"),
-      args: [join(__dirname, "../../../core/channel.ts")],
+      args: [join(__dirname, "../../../core/conductor/channel.ts")],
       env: {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
