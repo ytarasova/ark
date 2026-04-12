@@ -1180,21 +1180,50 @@ export async function setupSessionWorktree(
   onLog?: (msg: string) => void,
 ): Promise<string> {
   const log = onLog ?? (() => {});
-  // Fallback to CWD when no explicit workdir set (e.g. local sessions)
-  const workdir = session.workdir ?? ".";
-  let effectiveWorkdir = workdir;
 
-  // Create git worktree unless provider doesn't support it or session config explicitly disables it
-  const wantWorktree = provider?.supportsWorktree && session.config?.worktree !== false;
-  if (wantWorktree && workdir !== "." && existsSync(join(workdir, ".git"))) {
+  // Resolve the repo source path BEFORE deciding whether to worktree.
+  // Previously we bailed out when workdir was "." or null -- that's exactly
+  // the self-dogfood case (ark running on its own repo with --repo .), and
+  // it's the most dangerous case to skip isolation for: without a worktree
+  // the agent edits the live checkout and parallel dispatches collide.
+  //
+  // Prefer session.repo (stable source-of-truth for the upstream checkout);
+  // fall back to workdir only when repo isn't set. This matters on resume:
+  // a previous dispatch may have already set session.workdir to a worktree
+  // path that cleanupSession then deleted -- using workdir as the source
+  // would chase a dangling reference.
+  const repoRaw = session.repo;
+  const workdirRaw = session.workdir;
+  const hasExplicitRepo = repoRaw && repoRaw !== "." && repoRaw.trim() !== "";
+  const hasExplicitWorkdir = workdirRaw && workdirRaw !== "." && workdirRaw.trim() !== "";
+  const repoSource = hasExplicitRepo
+    ? resolve(repoRaw!)
+    : (hasExplicitWorkdir ? resolve(workdirRaw!) : resolve("."));
+
+  let effectiveWorkdir = repoSource;
+
+  // Create git worktree unless provider doesn't support it or session config explicitly disables it.
+  // We worktree when repoSource is a real git repo -- even if it resolves to the current cwd
+  // (that is precisely when isolation matters most for the self-dogfood loop).
+  const wantWorktree = provider?.supportsWorktree === true && session.config?.worktree !== false;
+  if (wantWorktree && existsSync(join(repoSource, ".git"))) {
     log("Setting up git worktree...");
-    const wt = await setupWorktree(app, workdir, session.id, session.branch ?? undefined);
-    if (wt) effectiveWorkdir = wt;
+    const wt = await setupWorktree(app, repoSource, session.id, session.branch ?? undefined);
+    if (wt) {
+      effectiveWorkdir = wt;
+    } else {
+      // Hard fail: silently falling back to the live checkout is dangerous.
+      // Surface the error so the operator knows isolation was not achieved.
+      throw new Error(
+        `Failed to create git worktree for session ${session.id} from ${repoSource}. ` +
+        `Refusing to dispatch against the live checkout. Check git worktree state (\`git worktree list\` in ${repoSource}) and retry.`,
+      );
+    }
   }
 
   // Trust worktree for Claude
   log("Configuring Claude trust + channel...");
-  claude.trustWorktree(workdir, effectiveWorkdir);
+  claude.trustWorktree(repoSource, effectiveWorkdir);
 
   // Persist an ABSOLUTE workdir on the session row. The previous behaviour
   // left session.workdir as null/"." when the user passed --repo ".", which
@@ -1398,15 +1427,18 @@ function formatTaskHeader(app: AppContext, session: Session, stage: string, agen
   const resolved = resolveFlow(app, session.flow, vars);
   const stageDef = resolved?.stages.find(s => s.name === stage);
 
-  // If stage has a task template, use it as the primary prompt
+  // Every autonomously-dispatched session (including bare) gets an actionable
+  // first-turn prompt. The system prompt gives Claude context, but Claude only
+  // starts working when it receives a user message -- this IS that user message.
+  // "Wait for instructions via steer" framing is wrong for --dispatch mode.
   if (stageDef?.task) {
     parts.push(stageDef.task);
     parts.push(`\nYou are the ${agentName} agent, running the '${stage}' stage.`);
   } else if (isBare) {
-    // Bare flow: interactive session -- no predefined task pipeline
-    parts.push(`Session ${session.id}${session.summary ? ` -- ${session.summary}` : ""}`);
-    parts.push(`\nYou are the ${agentName} agent in an interactive session.`);
-    parts.push(`You will receive instructions from the user via steer messages.`);
+    // Bare flow under autonomous dispatch: treat the summary as an actionable task.
+    parts.push(`Begin working on the following task immediately. Do not ask for confirmation.`);
+    parts.push(`\nTask: ${session.summary ?? "(no summary provided)"}`);
+    parts.push(`\nYou are the ${agentName} agent.`);
   } else {
     parts.push(`Work on ${session.ticket ?? session.id}: ${session.summary ?? "the task"}`);
     parts.push(`\nYou are the ${agentName} agent, running the '${stage}' stage.`);
