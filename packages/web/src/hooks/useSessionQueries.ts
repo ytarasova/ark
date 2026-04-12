@@ -1,8 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./useApi.js";
 
-export function useSessionsQuery() {
-  return useQuery({ queryKey: ["sessions"], queryFn: api.getSessions });
+export function useSessionsQuery(serverStatus?: string) {
+  const filters = serverStatus ? { status: serverStatus } : undefined;
+  return useQuery({
+    queryKey: ["sessions", serverStatus || "default"],
+    queryFn: () => api.getSessions(filters),
+  });
 }
 
 export function useGroupsQuery() {

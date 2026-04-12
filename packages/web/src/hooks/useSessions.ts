@@ -3,16 +3,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSessionsQuery, useGroupsQuery } from "./useSessionQueries.js";
 import { useSse } from "./useSse.js";
 
-export function useSessions() {
+export function useSessions(serverStatus?: string) {
   const queryClient = useQueryClient();
-  const { data: sessions = [], refetch } = useSessionsQuery();
+  const { data: sessions = [], refetch } = useSessionsQuery(serverStatus);
   const { data: groups = [] } = useGroupsQuery();
 
   const sseData = useSse<any[]>("/api/events/stream");
 
   useEffect(() => {
     if (!sseData) return;
-    queryClient.setQueryData<any[]>(["sessions"], (prev) => {
+    // Skip SSE merges for archived view -- archived sessions don't change in real-time
+    if (serverStatus === "archived") return;
+    const queryKey = ["sessions", serverStatus || "default"];
+    queryClient.setQueryData<any[]>(queryKey, (prev) => {
       if (!prev) return prev;
       const map = new Map(prev.map((s) => [s.id, s]));
       for (const u of sseData) {
@@ -25,7 +28,7 @@ export function useSessions() {
       }
       return Array.from(map.values());
     });
-  }, [sseData, queryClient]);
+  }, [sseData, queryClient, serverStatus]);
 
   return { sessions, groups, refresh: refetch };
 }

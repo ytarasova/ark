@@ -59,7 +59,7 @@ export async function fetchApi<T>(path: string, opts?: RequestInit): Promise<T> 
 
 export const api = {
   // Sessions
-  getSessions: () => rpc<{ sessions: any[] }>("session/list", { limit: 200 }).then(r => r.sessions),
+  getSessions: (filters?: Record<string, unknown>) => rpc<{ sessions: any[] }>("session/list", { limit: 200, ...filters }).then(r => r.sessions),
   getSession: (id: string) => rpc<any>("session/read", { sessionId: id, include: ["events"] }),
   getOutput: (id: string) => rpc<{ output: string }>("session/output", { sessionId: id }).then(r => ({ ok: true, output: r.output })),
   getEvents: (id: string) => rpc<{ events: any[] }>("session/events", { sessionId: id }).then(r => r.events),
