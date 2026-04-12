@@ -446,3 +446,93 @@ describe("Conductor channel report delivery", () => {
     expect(updated?.status).toBe("running");
   });
 });
+
+// ── Regression: SessionService.complete() must advance, not leave "ready" ───
+
+describe("Regression: complete() must advance flow (not leave status=ready)", () => {
+  it("SessionService.complete() + advance() on single-stage flow (bare) reaches 'completed'", async () => {
+    // Use startSession (orchestration) to properly wire stage/flow like production
+    const { startSession } = await import("../services/session-orchestration.js");
+    const session = startSession(app, { summary: "svc complete bare", flow: "bare" });
+    app.sessions.update(session.id, { status: "running" });
+
+    // Call complete via SessionService (same path as RPC handler)
+    const result = app.sessionService.complete(session.id);
+    expect(result.ok).toBe(true);
+
+    // Must call advance -- this is what the RPC handler must do
+    const advResult = await app.sessionService.advance(session.id, true);
+    expect(advResult.ok).toBe(true);
+
+    // Session must be "completed", not stuck at "ready"
+    const updated = app.sessions.get(session.id);
+    expect(updated?.status).toBe("completed");
+  });
+
+  it("SessionService.complete() + advance() on multi-stage flow (quick) advances to next stage", async () => {
+    const { startSession } = await import("../services/session-orchestration.js");
+    const session = startSession(app, { summary: "svc complete quick", flow: "quick" });
+    // startSession sets stage to "implement" for quick flow
+    app.sessions.update(session.id, { status: "running" });
+
+    const result = app.sessionService.complete(session.id);
+    expect(result.ok).toBe(true);
+
+    const advResult = await app.sessionService.advance(session.id, true);
+    expect(advResult.ok).toBe(true);
+
+    // Should advance to next stage (verify), not stay at "ready" on "implement"
+    const updated = app.sessions.get(session.id);
+    expect(updated?.stage).toBe("verify");
+    expect(updated?.status).toBe("ready");
+  });
+
+  it("RPC session/complete handler advances bare flow to 'completed'", async () => {
+    const { startSession } = await import("../services/session-orchestration.js");
+    const session = startSession(app, { summary: "rpc complete bare", flow: "bare" });
+    app.sessions.update(session.id, { status: "running" });
+
+    // Use Router + registerSessionHandlers (same pattern as handler tests)
+    const { Router } = await import("../../server/router.js");
+    const { registerSessionHandlers } = await import("../../server/handlers/session.js");
+    const { createRequest } = await import("../../protocol/types.js");
+
+    const router = new Router();
+    registerSessionHandlers(router, app);
+
+    const res = await router.dispatch(
+      createRequest(1, "session/complete", { sessionId: session.id }),
+    );
+
+    // RPC should succeed
+    expect((res as any).error).toBeUndefined();
+
+    // The session must reach "completed" -- not stay at "ready"
+    const updated = app.sessions.get(session.id);
+    expect(updated?.status).toBe("completed");
+  });
+
+  it("RPC session/complete handler advances quick flow to next stage", async () => {
+    const { startSession } = await import("../services/session-orchestration.js");
+    const session = startSession(app, { summary: "rpc complete quick", flow: "quick" });
+    app.sessions.update(session.id, { status: "running" });
+
+    const { Router } = await import("../../server/router.js");
+    const { registerSessionHandlers } = await import("../../server/handlers/session.js");
+    const { createRequest } = await import("../../protocol/types.js");
+
+    const router = new Router();
+    registerSessionHandlers(router, app);
+
+    const res = await router.dispatch(
+      createRequest(1, "session/complete", { sessionId: session.id }),
+    );
+
+    expect((res as any).error).toBeUndefined();
+
+    // Should advance to "verify" stage, not stay at "ready" on "implement"
+    const updated = app.sessions.get(session.id);
+    expect(updated?.stage).toBe("verify");
+    expect(updated?.status).toBe("ready");
+  });
+});
