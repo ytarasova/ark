@@ -10,6 +10,7 @@ export interface RepoConfig {
   env?: Record<string, string>;
   verify?: string[];  // Default verification scripts for all stages
   auto_pr?: boolean;  // Auto-create PR on agent completion (default: true for repos with remotes)
+  auto_rebase?: boolean;  // Auto-rebase onto base branch before PR creation (default: true)
 }
 
 export function loadRepoConfig(dir: string): RepoConfig {
