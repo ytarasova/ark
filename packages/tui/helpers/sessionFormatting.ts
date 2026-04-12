@@ -78,6 +78,23 @@ export function stripAnsiAndFilter(output: string, lastN = 12): string[] {
     .slice(-lastN);
 }
 
+/** Format elapsed duration from ISO timestamp to now (or between two ISO timestamps). */
+export function formatDuration(from: string | null, to?: string | null): string {
+  if (!from) return "";
+  const start = new Date(from).getTime();
+  if (isNaN(start)) return "";
+  const end = to ? new Date(to).getTime() : Date.now();
+  if (isNaN(end)) return "";
+  const s = Math.max(0, Math.floor((end - start) / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h`;
+}
+
 // ── Session list row formatting ─────────────────────────────────────────────
 
 /** Compute responsive column widths based on terminal width. */

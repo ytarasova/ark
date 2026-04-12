@@ -7,7 +7,7 @@ import { getStatusColor } from "../helpers/colors.js";
 import type { InkColor } from "../helpers/colors.js";
 import { hms } from "../helpers.js";
 import { formatEvent } from "../helpers/formatEvent.js";
-import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter, sanitizeForTerminal } from "../helpers/sessionFormatting.js";
+import { formatTokenDisplay, buildFileLinks, buildCommitLinks, stripAnsiAndFilter, sanitizeForTerminal, formatDuration } from "../helpers/sessionFormatting.js";
 import { formatCost } from "../../core/observability/costs.js";
 import { SectionHeader } from "../components/SectionHeader.js";
 import { DetailPanel } from "../components/DetailPanel.js";
@@ -344,6 +344,9 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
         <Text color={theme.waiting} bold wrap="wrap">{`  ⏸ ${s.breakpoint_reason}`}</Text>
       )}
       <KeyValue label="Compute">{s.compute_name || "local"}</KeyValue>
+      {s.session_id && (s.status === "running" || s.status === "waiting") && (
+        <KeyValue label="Channel"><Text color={theme.running}>{`port ${channelPort}`}</Text></KeyValue>
+      )}
       {s.repo && <KeyValue label="Repo">{s.repo}</KeyValue>}
       {s.branch && <KeyValue label="Branch">{s.branch}</KeyValue>}
       {s.workdir && s.workdir !== s.repo && (
@@ -356,6 +359,16 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
       {s.stage && <KeyValue label="Stage">{s.stage}</KeyValue>}
       {s.agent && <KeyValue label="Agent">{s.agent}</KeyValue>}
       {s.group_name && <KeyValue label="Group">{s.group_name}</KeyValue>}
+      {s.config?.skills?.length ? (
+        <KeyValue label="Skills">{s.config.skills.join(", ")}</KeyValue>
+      ) : null}
+      <KeyValue label="Created">{hms(s.created_at)}{" "}<Text dimColor>({formatDuration(s.created_at)} ago)</Text></KeyValue>
+      {(s.status === "running" || s.status === "waiting") && (
+        <KeyValue label="Duration">{formatDuration(s.created_at)}</KeyValue>
+      )}
+      {(s.status === "completed" || s.status === "stopped" || s.status === "failed") && (
+        <KeyValue label="Duration">{formatDuration(s.created_at, s.updated_at)}</KeyValue>
+      )}
 
       {/* Flow pipeline */}
       {s.flow && s.stage && flowStages.length > 1 && (
@@ -421,9 +434,6 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
               />
             </Box>
           )}
-          {pane === "right" && !todoAddMode && (
-            <Text dimColor>{"  A:add  T:toggle  D:delete  [/]:navigate"}</Text>
-          )}
         </>
       ) : (
         <>
@@ -446,54 +456,47 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
               />
             </Box>
           ) : (
-            <Text dimColor>{pane === "right" ? "  No todos. Press A to add." : "  No todos."}</Text>
+            <Text dimColor>{"  No todos."}</Text>
           )}
         </>
       )}
 
-      {/* Files changed - as a collapsible list */}
+      {/* Files changed */}
       {buildFileLinks(s) && (() => {
         const fileLinks = buildFileLinks(s)!;
         return (
           <>
             <Text> </Text>
-            <Text bold dimColor>{`  Files changed (${fileLinks.length})`}</Text>
+            <SectionHeader title={`Files Changed (${fileLinks.length})`} />
             {fileLinks.slice(0, 15).map((f) => (
               <Text key={f.path} dimColor>
                 {f.url
-                  ? `    \x1b]8;;${f.url}\x07${f.path}\x1b]8;;\x07`
-                  : `    ${f.path}`}
+                  ? `  \x1b]8;;${f.url}\x07${f.path}\x1b]8;;\x07`
+                  : `  ${f.path}`}
               </Text>
             ))}
-            {fileLinks.length > 15 && <Text dimColor>{`    ... and ${fileLinks.length - 15} more`}</Text>}
+            {fileLinks.length > 15 && <Text dimColor>{`  ... and ${fileLinks.length - 15} more`}</Text>}
           </>
         );
       })()}
 
-      {/* Commits - with GitHub links */}
+      {/* Commits */}
       {buildCommitLinks(s) && (() => {
         const commitLinks = buildCommitLinks(s)!;
         return (
           <>
             <Text> </Text>
-            <Text bold dimColor>{`  Commits (${commitLinks.length})`}</Text>
+            <SectionHeader title={`Commits (${commitLinks.length})`} />
             {commitLinks.slice(0, 10).map((c) => (
               <Text key={c.shortSha} dimColor>
                 {c.url
-                  ? `    \x1b]8;;${c.url}\x07${c.shortSha}\x1b]8;;\x07`
-                  : `    ${c.shortSha}`}
+                  ? `  \x1b]8;;${c.url}\x07${c.shortSha}\x1b]8;;\x07`
+                  : `  ${c.shortSha}`}
               </Text>
             ))}
           </>
         );
       })()}
-
-      {/* Channel status */}
-      {s.session_id && (s.status === "running" || s.status === "waiting") && (
-        <Text color={theme.running}>
-          {`  ⚡ Channel: port ${channelPort}`}
-        </Text>
-      )}
 
       {/* Conversation history or search results */}
       {searchMode && sortedSearchResults !== null ? (
