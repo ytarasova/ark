@@ -1,5 +1,5 @@
 name: autonomous-sdlc
-description: "Fully autonomous SDLC: plan -> implement -> review -> PR. All gates auto, no human needed."
+description: "Fully autonomous SDLC: plan -> implement -> verify -> review -> PR. All gates auto, no human needed."
 stages:
   - name: plan
     agent: planner
@@ -21,10 +21,25 @@ stages:
       Run the test suite and ensure all tests pass.
       When done, call report(completed) listing files changed and test results.
 
+  - name: verify
+    agent: verifier
+    gate: auto
+    depends_on: [implement]
+    on_failure: "retry(2)"
+    task: |
+      Run verification on all changes from the implement stage.
+      1. Run the project test suite and confirm all tests pass.
+      2. Run linting/formatting checks if configured.
+      3. Review test coverage -- new code should have tests.
+      4. Check for security issues (hardcoded secrets, injection vectors).
+      5. Validate acceptance criteria from PLAN.md are met.
+      Write verify-report.md with results. If any check fails, fix the issue
+      or report(error) with details. When all checks pass, report(completed).
+
   - name: review
     agent: reviewer
     gate: auto
-    depends_on: [implement]
+    depends_on: [verify]
     task: |
       Review all changes on this branch vs main.
       Run `git diff main...HEAD` to see the full diff.
