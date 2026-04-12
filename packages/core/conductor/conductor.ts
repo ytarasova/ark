@@ -171,6 +171,20 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
     }
   }
 
+  // Auto-advance for SessionEnd fallback on auto-gate sessions
+  if (result.shouldAdvance) {
+    const advResult = await session.advance(app, sessionId);
+    const updated = (result.shouldAutoDispatch && advResult.ok) ? app.sessions.get(sessionId) : null;
+    if (updated?.status === "ready" && updated.stage) {
+      const nextAction = flow.getStageAction(app, updated.flow, updated.stage);
+      if (nextAction.type === "agent" || nextAction.type === "fork") {
+        session.dispatch(app, sessionId).catch(err => {
+          logError("conductor", `auto-dispatch failed for ${sessionId}: ${err?.message ?? err}`);
+        });
+      }
+    }
+  }
+
   // Index transcript
   if (result.shouldIndex && result.indexTranscript) {
     await safeAsync("transcript indexing", async () => {

@@ -269,18 +269,20 @@ describe("Conductor /hooks/status endpoint", () => {
     expect(updated?.error).toBe("agent crashed");
   });
 
-  it("SessionEnd can still set completed on auto-gate session", async () => {
-    // Use default flow with implement stage (gate: auto)
+  it("SessionEnd advances auto-gate session to next stage", async () => {
+    // Use default flow with implement stage (gate: auto) -- advance moves to verify
     const session = getApp().sessions.create({ summary: "hook test", flow: "default" });
     getApp().sessions.update(session.id, { status: "running", stage: "implement" });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
     const body = await resp.json() as Record<string, unknown>;
-    expect(body.mapped).toBe("completed");
+    expect(body.mapped).toBe("ready");
 
     const updated = getApp().sessions.get(session.id);
-    expect(updated?.status).toBe("completed");
+    // advance() should have moved to the next stage (verify)
+    expect(updated?.stage).toBe("verify");
+    expect(updated?.status).toBe("ready");
   });
 
   it("Stop hook does not index transcript when claude session ID does not match", async () => {
@@ -359,14 +361,16 @@ describe("Conductor /hooks/status endpoint", () => {
     expect(updated?.status).toBe("failed");
   });
 
-  it("SessionEnd still completes auto-gate sessions", async () => {
+  it("SessionEnd advances auto-gate sessions via advance()", async () => {
     const session = getApp().sessions.create({ summary: "auto test", flow: "default" });
     getApp().sessions.update(session.id, { status: "running", stage: "implement" });
 
     await postHook(session.id, { hook_event_name: "SessionEnd" });
 
     const updated = getApp().sessions.get(session.id);
-    expect(updated?.status).toBe("completed");
+    // advance() moves to verify stage (next after implement in default flow)
+    expect(updated?.stage).toBe("verify");
+    expect(updated?.status).toBe("ready");
   });
 
   it("UserPromptSubmit clears breakpoint_reason when resuming from waiting", async () => {

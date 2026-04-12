@@ -1,0 +1,6 @@
+name: autonomous
+description: "Single agent session -- fully autonomous, auto-completes on agent report"
+stages:
+  - name: work
+    agent: worker
+    gate: auto
