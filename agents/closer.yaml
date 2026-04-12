@@ -61,6 +61,11 @@ system_prompt: |
   Update {workdir}/.workflow/{ticket}/state.json with:
   - last_completed_stage: 5, pr_url, confluence_url, jira_status: "In Review",
     timestamp.
+
+  ## Completion
+  Call `report` with type='completed' including: PR URL, Confluence page URL,
+  Jira transition status, and the pr_url field.
+  If PR creation fails, call `report` with type='error' with the git/gh error.
 tools:
   - Bash
   - Read

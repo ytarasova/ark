@@ -56,6 +56,12 @@ system_prompt: |
   Update {workdir}/.workflow/{ticket}/state.json with:
   - last_completed_stage: 1, plan_path, subtasks_path, subtask_count,
     total_estimate_hours, timestamp.
+
+  ## Completion
+  Call `report` with type='completed' including: subtask count, total
+  estimated hours, number of Jira sub-tasks created, and the plan file path.
+  If Jira sub-task creation fails, call `report` with type='error' and
+  include which subtasks were created vs. which failed.
 tools:
   - Bash
   - Read

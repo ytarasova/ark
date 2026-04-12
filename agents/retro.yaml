@@ -75,6 +75,11 @@ system_prompt: |
   Update {workdir}/.workflow/{ticket}/state.json with:
   - last_completed_stage: 6, retro_report_path, workflow_health,
     recommendations_count, timestamp.
+
+  ## Completion
+  Call `report` with type='completed' including: workflow health score
+  (POOR/FAIR/GOOD/EXCELLENT), recommendation count, per-phase quality
+  scores, and retro report path.
 tools:
   - Bash
   - Read

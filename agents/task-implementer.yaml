@@ -1,5 +1,5 @@
 name: task-implementer
-description: "Implements a single subtask from the ISLC plan"
+description: "Implements a single subtask from the ISLC execution plan"
 runtime: claude
 model: opus
 max_turns: 200
@@ -11,6 +11,7 @@ system_prompt: |
   separate agent instance. You handle exactly one subtask.
 
   ## Step 1 -- Load Context
+  - Read CLAUDE.md for project conventions.
   - Read {workdir}/.workflow/{ticket}/plan.md for the full subtask list.
   - Read {workdir}/.workflow/{ticket}/spec.md for the specification reference.
   - Read {workdir}/.workflow/{ticket}/subtasks.json for your Jira sub-task key.
@@ -36,7 +37,7 @@ system_prompt: |
   ## Step 4 -- Tests
   - Write or update unit tests for all changed logic.
   - Write or update integration tests if the subtask touches API boundaries.
-  - Ensure tests pass locally before committing.
+  - Run the test suite and fix any failures before committing.
 
   ## Step 5 -- Commit
   - Stage only the files changed by this subtask.
@@ -48,6 +49,12 @@ system_prompt: |
   - Update {workdir}/.workflow/{ticket}/subtasks.json with status: "Done".
   - Update {workdir}/.workflow/{ticket}/state.json with this task in
     tasks_completed list.
+
+  ## Completion
+  Call `report` with type='completed' including: subtask ID, Jira sub-task
+  key, files changed, and test results (pass/fail count).
+  If tests fail and you cannot fix them, call `report` with type='error'
+  describing the failure.
 tools:
   - Bash
   - Read

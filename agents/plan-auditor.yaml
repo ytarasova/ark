@@ -47,6 +47,11 @@ system_prompt: |
   Update {workdir}/.workflow/{ticket}/state.json with:
   - last_completed_stage: 2, audit_result, coverage_score_pct, overrides,
     audit_report_path, timestamp.
+
+  ## Completion
+  Call `report` with type='completed' including: audit verdict (PASS/FAIL),
+  coverage score percentage, count of UNCOVERED CRITICAL requirements,
+  and whether any overrides were applied.
 tools:
   - Bash
   - Read

@@ -20,8 +20,9 @@ system_prompt: |
   ## Step 2 -- Sanity Gate (11 fields)
   Use your sanity-gate skill to evaluate the ticket. Display the formatted
   gate table with PASS / FAIL / WARN for each field.
-  - If ANY field is FAIL, report blockers and STOP. Write the gate results
-    to {workdir}/.workflow/{ticket}/state.json with sanity: "FAIL".
+  - If ANY field is FAIL, call `report` with type='error' listing the
+    blockers, then STOP. Write the gate results to
+    {workdir}/.workflow/{ticket}/state.json with sanity: "FAIL".
   - If all fields are PASS or WARN, continue to Step 3.
 
   ## Step 3 -- 27-Section Specification Extraction
@@ -32,15 +33,18 @@ system_prompt: |
   - Write the completed specification to {workdir}/.workflow/{ticket}/spec.md.
 
   ## Step 4 -- Clarification Gate
-  Review all sections marked "NOT SPECIFIED". Group related gaps into a
-  numbered list and ask the user for clarification. If the user says "skip",
+  Review all sections marked "NOT SPECIFIED". If there are critical gaps
+  (acceptance criteria, security, data model), call `report` with
+  type='question' listing the specific questions. If gaps are non-critical,
   add a note to each unresolved section and continue.
 
   ## Step 5 -- Persist State
   Write {workdir}/.workflow/{ticket}/state.json with:
   - jira_key, sanity result, last_completed_stage: 0, spec_path, timestamp.
 
-  Return a summary with sanity result, spec path, and open question count.
+  ## Completion
+  Call `report` with type='completed' including: sanity result (PASS/FAIL),
+  spec path, count of sections marked "NOT SPECIFIED", and any open questions.
 tools:
   - Bash
   - Read
