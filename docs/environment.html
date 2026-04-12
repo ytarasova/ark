@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Environment Reference - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="tui.html">TUI Dashboard</a>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <a href="environment.html">Environment</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="router.html">LLM Router</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <a href="runtimes-reference.html">Runtimes</a>
+      <a href="api-reference.html">API Reference</a>
+      <div class="section-title">Development</div>
+      <a href="development.html">Contributing</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>Environment Reference</h1>
+      <p class="subtitle">Environment variables, data locations, and port assignments.</p>
+
+      <h2>Environment Variables</h2>
+
+      <h3>Core</h3>
+      <table>
+        <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>ARK_CONDUCTOR_PORT</code></td><td><code>19100</code></td><td>Conductor HTTP server port</td></tr>
+          <tr><td><code>ARK_CONDUCTOR_URL</code></td><td><code>http://localhost:19100</code></td><td>Conductor URL (fallback if arkd unavailable)</td></tr>
+          <tr><td><code>ARK_ARKD_URL</code></td><td><code>http://localhost:19300</code></td><td>ArkD URL -- channel reports go here first</td></tr>
+          <tr><td><code>ARK_ARKD_PORT</code></td><td><code>19300</code></td><td>ArkD daemon listen port</td></tr>
+          <tr><td><code>ARK_ARKD_TOKEN</code></td><td>-</td><td>Bearer token for ArkD auth (when set, all requests must include it)</td></tr>
+          <tr><td><code>ARK_CHANNEL_PORT</code></td><td>auto-assigned</td><td>Per-session MCP channel port (derived: <code>19200 + hash(sessionId) % 10000</code>)</td></tr>
+          <tr><td><code>ARK_SESSION_ID</code></td><td>-</td><td>Set in channel context to identify the current session</td></tr>
+          <tr><td><code>ARK_STAGE</code></td><td>-</td><td>Current flow stage name in channel context</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Remote Mode</h3>
+      <table>
+        <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>ARK_SERVER</code></td><td>-</td><td>Remote Ark server URL. When set, CLI/TUI connects via WebSocket instead of booting locally.</td></tr>
+          <tr><td><code>ARK_TOKEN</code></td><td>-</td><td>API key for authenticating with a remote Ark server. Format: <code>ark_&lt;tenantId&gt;_&lt;secret&gt;</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Hosted Mode</h3>
+      <table>
+        <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>DATABASE_URL</code></td><td>-</td><td>PostgreSQL connection URL. When set, uses PostgreSQL instead of SQLite.</td></tr>
+          <tr><td><code>REDIS_URL</code></td><td>-</td><td>Redis URL for the SSE event bus. When set, uses Redis instead of in-memory bus.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Testing</h3>
+      <table>
+        <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>ARK_TEST_DIR</code></td><td>-</td><td>Override temp directory for test isolation. Used by <code>AppContext.forTest()</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Agent Environment</h3>
+      <p>These variables are injected into agent processes at dispatch when the LLM Router is enabled:</p>
+      <table>
+        <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>ANTHROPIC_BASE_URL</code></td><td>Set to the router URL to redirect Claude API calls through the router</td></tr>
+          <tr><td><code>OPENAI_BASE_URL</code></td><td>Set to the router URL to redirect OpenAI API calls through the router</td></tr>
+          <tr><td><code>CLAUDE_AUTOCOMPACT_PCT_OVERRIDE</code></td><td>Set to <code>80</code> by the Claude runtime for auto-compaction threshold</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Data Locations</h2>
+
+      <h3>Ark Data Directory (<code>~/.ark/</code>)</h3>
+      <table>
+        <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>~/.ark/ark.db</code></td><td>SQLite database (WAL mode, 5s busy timeout). Contains all entity tables.</td></tr>
+          <tr><td><code>~/.ark/config.yaml</code></td><td>User configuration: router, knowledge, tensorzero, compute templates, budgets, auth</td></tr>
+          <tr><td><code>~/.ark/tensorzero/</code></td><td>Generated <code>tensorzero.toml</code> and runtime files (when TensorZero enabled)</td></tr>
+          <tr><td><code>~/.ark/tracks/&lt;sessionId&gt;/</code></td><td>Launcher scripts and channel configurations per session</td></tr>
+          <tr><td><code>~/.ark/worktrees/&lt;sessionId&gt;/</code></td><td>Git worktrees for isolated session workspaces</td></tr>
+          <tr><td><code>~/.ark/skills/</code></td><td>Global skill definitions (user tier for SkillStore)</td></tr>
+          <tr><td><code>~/.ark/recipes/</code></td><td>Global recipe definitions (user tier for RecipeStore)</td></tr>
+          <tr><td><code>~/.ark/flows/</code></td><td>Global flow definitions (user tier for FlowStore)</td></tr>
+          <tr><td><code>~/.ark/agents/</code></td><td>Global agent definitions (user tier for AgentStore)</td></tr>
+          <tr><td><code>~/.ark/runtimes/</code></td><td>Global runtime definitions (user tier for RuntimeStore)</td></tr>
+          <tr><td><code>~/.ark/plugins/executors/</code></td><td>Custom executor plugin modules (loaded at boot)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Database Tables</h3>
+      <p>The SQLite database at <code>~/.ark/ark.db</code> contains these tenant-scoped tables:</p>
+      <table>
+        <thead><tr><th>Table</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>sessions</code></td><td>Session lifecycle, status, flow, agent, compute binding</td></tr>
+          <tr><td><code>compute</code></td><td>Compute target instances and their status</td></tr>
+          <tr><td><code>compute_templates</code></td><td>Named compute presets</td></tr>
+          <tr><td><code>compute_pools</code></td><td>Compute pool definitions for shared infrastructure</td></tr>
+          <tr><td><code>events</code></td><td>Session events (status changes, stage transitions, errors)</td></tr>
+          <tr><td><code>messages</code></td><td>Agent-human conversation messages</td></tr>
+          <tr><td><code>todos</code></td><td>Checklist items attached to sessions</td></tr>
+          <tr><td><code>groups</code></td><td>Session grouping for organization</td></tr>
+          <tr><td><code>schedules</code></td><td>Scheduled/recurring session definitions</td></tr>
+          <tr><td><code>usage_records</code></td><td>Token usage and cost tracking per request</td></tr>
+          <tr><td><code>resource_definitions</code></td><td>DB-backed resource store (hosted mode)</td></tr>
+          <tr><td><code>knowledge</code></td><td>Knowledge graph nodes (files, symbols, memories, learnings)</td></tr>
+          <tr><td><code>knowledge_edges</code></td><td>Knowledge graph edges (depends_on, imports, modified_by, etc.)</td></tr>
+          <tr><td><code>transcript_index</code></td><td>FTS5 full-text search index over transcripts</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Per-Repo Data</h3>
+      <table>
+        <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>.ark.yaml</code></td><td>Per-repo configuration (default flow, agent, compute, verify scripts, auto_pr toggle)</td></tr>
+          <tr><td><code>.ark/skills/</code></td><td>Project-level skill definitions (highest priority in three-tier resolution)</td></tr>
+          <tr><td><code>.ark/recipes/</code></td><td>Project-level recipe definitions</td></tr>
+          <tr><td><code>.ark/flows/</code></td><td>Project-level flow definitions</td></tr>
+          <tr><td><code>.ark/agents/</code></td><td>Project-level agent definitions</td></tr>
+          <tr><td><code>.ark/runtimes/</code></td><td>Project-level runtime definitions</td></tr>
+          <tr><td><code>.codegraph/graph.db</code></td><td>Per-repo ops-codegraph index. Ingested into knowledge tables by the indexer.</td></tr>
+          <tr><td><code>.claude/settings.local.json</code></td><td>Per-session hook config (written at dispatch, cleaned on stop)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Agent Transcript Locations</h3>
+      <table>
+        <thead><tr><th>Runtime</th><th>Location</th><th>Format</th></tr></thead>
+        <tbody>
+          <tr><td>Claude Code</td><td><code>~/.claude/projects/&lt;slug&gt;/&lt;session&gt;.jsonl</code></td><td>JSONL (conversation turns)</td></tr>
+          <tr><td>Codex</td><td><code>~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl</code></td><td>JSONL (cwd-matched)</td></tr>
+          <tr><td>Gemini</td><td><code>~/.gemini/tmp/&lt;slug&gt;/chats/session-*.jsonl</code></td><td>JSONL (hash-matched by workdir)</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Port Assignments</h2>
+      <table>
+        <thead><tr><th>Service</th><th>Port</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Conductor</td><td><code>19100</code></td><td>Hardcoded. HTTP server for hook status and channel relay.</td></tr>
+          <tr><td>Channel</td><td><code>19200 + offset</code></td><td>Deterministic per-session: <code>19200 + (parseInt(sessionId, 16) % 10000)</code></td></tr>
+          <tr><td>ArkD</td><td><code>19300</code></td><td>Default. Universal agent daemon on every compute target.</td></tr>
+          <tr><td>LLM Router</td><td><code>8430</code></td><td>Default. OpenAI-compatible proxy.</td></tr>
+          <tr><td>TensorZero</td><td><code>3000</code></td><td>Default. Optional LLM gateway behind the router.</td></tr>
+          <tr><td>Web UI</td><td><code>8420</code></td><td>Default. Ark web dashboard (Vite).</td></tr>
+          <tr><td>Vite HMR</td><td><code>5173</code></td><td>Dev only. Vite dev server with hot module replacement.</td></tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong>Port collisions:</strong> Tests share ports 19100, 19200, and 19300. This is why tests must always run sequentially via <code>make test</code> -- never in parallel.
+      </div>
+
+      <h2>Three-Tier Resource Resolution</h2>
+      <p>Agents, flows, skills, recipes, and runtimes all use three-tier resolution. When Ark looks up a resource by name, it checks these locations in order (highest priority first):</p>
+      <ol>
+        <li><strong>Project</strong>: <code>.ark/&lt;type&gt;/&lt;name&gt;.yaml</code> (or <code>.md</code> for skills) in the current repo</li>
+        <li><strong>Global</strong>: <code>~/.ark/&lt;type&gt;/&lt;name&gt;.yaml</code> (user-level)</li>
+        <li><strong>Builtin</strong>: <code>&lt;type&gt;/&lt;name&gt;.yaml</code> shipped with Ark</li>
+      </ol>
+      <p>Project-level definitions override global ones, which override builtins. This lets you customize any resource per-repo without modifying Ark itself.</p>
+
+      <div class="doc-footer">
+        <a href="compute.html">&larr; Compute Providers</a>
+        <a href="howto-memories.html">Memories &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>
