@@ -13,6 +13,7 @@ import {
   shellQuoteArgs,
   channelMcpConfig,
   writeChannelConfig,
+  removeChannelConfig,
   buildLauncher,
   trustDirectory,
   type ClaudeArgsOpts,
@@ -267,6 +268,75 @@ describe("writeChannelConfig", () => {
     const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
     const channelConfig = content.mcpServers["ark-channel"];
     expect(channelConfig.command).toContain(".bun/bin/bun");
+  });
+});
+
+// ── removeChannelConfig ──────────────────────────────────────────────────────
+
+describe("removeChannelConfig", () => {
+  it("removes ark-channel from .mcp.json", () => {
+    const workdir = getCtx().arkDir;
+    writeChannelConfig("s-abc123", "work", 19300, workdir);
+    expect(existsSync(join(workdir, ".mcp.json"))).toBe(true);
+
+    removeChannelConfig(workdir);
+
+    // File should be removed entirely (no other servers)
+    expect(existsSync(join(workdir, ".mcp.json"))).toBe(false);
+  });
+
+  it("preserves other MCP servers in .mcp.json", () => {
+    const workdir = getCtx().arkDir;
+    const { writeFileSync: wfs } = require("fs");
+    wfs(join(workdir, ".mcp.json"), JSON.stringify({
+      mcpServers: { "other-server": { command: "other" } },
+    }));
+
+    writeChannelConfig("s-abc123", "work", 19300, workdir);
+    removeChannelConfig(workdir);
+
+    const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
+    expect(content.mcpServers["other-server"]).toBeDefined();
+    expect(content.mcpServers["ark-channel"]).toBeUndefined();
+  });
+
+  it("preserves non-mcpServers keys in .mcp.json", () => {
+    const workdir = getCtx().arkDir;
+    const { writeFileSync: wfs } = require("fs");
+    wfs(join(workdir, ".mcp.json"), JSON.stringify({
+      mcpServers: { "ark-channel": { command: "bun" } },
+      customKey: "preserved",
+    }));
+
+    removeChannelConfig(workdir);
+
+    const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
+    expect(content.customKey).toBe("preserved");
+    expect(content.mcpServers).toBeUndefined();
+  });
+
+  it("does nothing if no .mcp.json exists", () => {
+    expect(() => removeChannelConfig(getCtx().arkDir)).not.toThrow();
+  });
+
+  it("does nothing if .mcp.json has no ark-channel", () => {
+    const workdir = getCtx().arkDir;
+    const { writeFileSync: wfs } = require("fs");
+    wfs(join(workdir, ".mcp.json"), JSON.stringify({
+      mcpServers: { "other-server": { command: "other" } },
+    }));
+
+    removeChannelConfig(workdir);
+
+    const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
+    expect(content.mcpServers["other-server"]).toBeDefined();
+  });
+
+  it("is idempotent -- calling twice does not error", () => {
+    const workdir = getCtx().arkDir;
+    writeChannelConfig("s-abc123", "work", 19300, workdir);
+    removeChannelConfig(workdir);
+    expect(() => removeChannelConfig(workdir)).not.toThrow();
   });
 });
 

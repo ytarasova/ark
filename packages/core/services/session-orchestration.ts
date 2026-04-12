@@ -611,10 +611,13 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
   // Checkpoint before state transition
   saveCheckpoint(app, sessionId);
 
-  // Clean up hook config from working directory
+  // Clean up hook config and channel MCP config from working directory
   if (session.workdir) {
     try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
       logError("session", `stop ${sessionId}: removeHooksConfig: ${e?.message ?? e}`);
+    }
+    try { claude.removeChannelConfig(session.workdir); } catch (e: any) {
+      logError("session", `stop ${sessionId}: removeChannelConfig: ${e?.message ?? e}`);
     }
   }
 
@@ -1141,10 +1144,13 @@ export async function deleteSessionAsync(app: AppContext, sessionId: string): Pr
     await app.launcher.kill(session.session_id);
   }
 
-  // 2. Clean up hook config (not provider-dependent)
+  // 2. Clean up hook config and channel MCP config (not provider-dependent)
   if (session.workdir) {
     try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
       logError("session", `delete ${sessionId}: removeHooksConfig: ${e?.message ?? e}`);
+    }
+    try { claude.removeChannelConfig(session.workdir); } catch (e: any) {
+      logError("session", `delete ${sessionId}: removeChannelConfig: ${e?.message ?? e}`);
     }
   }
 

@@ -666,6 +666,23 @@ export class AppContext {
       } catch { /* settings.local.json may be malformed; safe to skip */ }
     });
 
+    await safeAsync("boot: cleanup stale mcp config", async () => {
+      const cwd = process.cwd();
+      const mcpPath = join(cwd, ".mcp.json");
+      if (!existsSync(mcpPath)) return;
+      try {
+        const content = JSON.parse(readFileSync(mcpPath, "utf-8"));
+        const channelEnv = content?.mcpServers?.["ark-channel"]?.env;
+        if (!channelEnv?.ARK_SESSION_ID) return;
+        const sid = channelEnv.ARK_SESSION_ID;
+        const session = this.sessions.get(sid);
+        if (!session || !["running", "waiting"].includes(session.status)) {
+          const { removeChannelConfig } = await import("./claude/claude.js");
+          removeChannelConfig(cwd);
+        }
+      } catch { /* .mcp.json may be malformed; safe to skip */ }
+    });
+
     await safeAsync("boot: detect stale sessions", async () => {
       const { sessionExistsAsync } = await import("./infra/tmux.js");
       const running = this.sessions.list({ status: "running" });
