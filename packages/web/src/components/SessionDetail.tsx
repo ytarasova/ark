@@ -23,12 +23,16 @@ interface SessionDetailProps {
   onClose: () => void;
   onToast: (msg: string, type: string) => void;
   readOnly: boolean;
+  chatOpen?: boolean;
+  onChatOpenChange?: (open: boolean) => void;
 }
 
-function SessionActions({ session, onAction, onSend }: { session: any; onAction: (action: string) => void; onSend: (msg: string) => void }) {
+function SessionActions({ session, onAction, onSend, chatOpen, onChatOpenChange }: { session: any; onAction: (action: string) => void; onSend: (msg: string) => void; chatOpen?: boolean; onChatOpenChange?: (open: boolean) => void }) {
   const s = session.status;
   const [sendMsg, setSendMsg] = useState("");
-  const [showSend, setShowSend] = useState(false);
+  const [showSendInternal, setShowSendInternal] = useState(false);
+  const showSend = chatOpen ?? showSendInternal;
+  const setShowSend = (v: boolean) => { setShowSendInternal(v); onChatOpenChange?.(v); };
   return (
     <div>
       <div className="flex gap-1.5 flex-wrap">
@@ -104,7 +108,7 @@ function SessionActions({ session, onAction, onSend }: { session: any; onAction:
   );
 }
 
-export function SessionDetail({ sessionId, onClose, onToast, readOnly }: SessionDetailProps) {
+export function SessionDetail({ sessionId, onClose, onToast, readOnly, chatOpen, onChatOpenChange }: SessionDetailProps) {
   const { detail, setDetail, todos, setTodos, messages, flowStages, cost, output, outputRef } = useSessionDetailData(sessionId);
   const [diffData, setDiffData] = useState<any>(null);
   const [showDiff, setShowDiff] = useState(false);
@@ -276,7 +280,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly }: Session
         {/* Actions */}
         {!readOnly && (
           <div className="mb-5">
-            <SessionActions session={s} onAction={handleAction} onSend={handleSend} />
+            <SessionActions session={s} onAction={handleAction} onSend={handleSend} chatOpen={chatOpen} onChatOpenChange={onChatOpenChange} />
           </div>
         )}
 
