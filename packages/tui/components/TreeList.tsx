@@ -99,9 +99,11 @@ export function TreeList<T>({
       if (groupName) {
         const count = entries.length;
         rows.push(
-          <Text key={`grp-${groupName}`} backgroundColor={theme.highlight} color={theme.text} bold>
-            {` ${groupName} `}<Text dimColor>{`(${count})`}</Text>{" "}
-          </Text>
+          <Box key={`grp-${groupName}`}>
+            <Text backgroundColor={theme.highlight} color={theme.text} bold>
+              {` ${groupName} `}<Text dimColor>{`(${count})`}</Text>{" "}
+            </Text>
+          </Box>
         );
       }
       if (entries.length === 0 && groupName) {
@@ -111,18 +113,24 @@ export function TreeList<T>({
         const isSel = visualIdx === clampedSel;
         visualIdx++;
         if (isSel) { selRow = rows.length; selectedItem = item; }
-        rows.push(
-          <Box key={`item-${flatIndex}`} flexDirection="column">
-            {isSel ? (
-              <ListRow selected>{`> ${renderRow(item, true)}`}</ListRow>
-            ) : (
-              renderColoredRow
-                ? renderColoredRow(item)
-                : <Text wrap="truncate">{`  ${renderRow(item, false)}`}</Text>
-            )}
-            {renderChildren?.(item)}
-          </Box>
+        const rowContent = isSel ? (
+          <ListRow selected>{`> ${renderRow(item, true)}`}</ListRow>
+        ) : (
+          renderColoredRow
+            ? renderColoredRow(item)
+            : <Text wrap="truncate">{`  ${renderRow(item, false)}`}</Text>
         );
+        const children = renderChildren?.(item);
+        if (children) {
+          rows.push(
+            <Box key={`item-${flatIndex}`} flexDirection="column">
+              {rowContent}
+              {children}
+            </Box>
+          );
+        } else {
+          rows.push(<React.Fragment key={`item-${flatIndex}`}>{rowContent}</React.Fragment>);
+        }
         if (spacing) {
           rows.push(<Text key={`sp-${flatIndex}`}>{" "}</Text>);
         }
