@@ -2409,6 +2409,164 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
   return result;
 }
 
+// ── Orchestrator-Mediated Stage Handoff ────────────────────────────────────
+
+export interface StageHandoffResult {
+  /** Whether the handoff completed successfully */
+  ok: boolean;
+  /** Human-readable outcome message */
+  message: string;
+  /** The stage we advanced from (null if handoff was skipped) */
+  fromStage?: string | null;
+  /** The stage we advanced to (null if flow completed) */
+  toStage?: string | null;
+  /** Whether dispatch was triggered for the next stage */
+  dispatched?: boolean;
+  /** Whether the handoff was blocked by verification */
+  blockedByVerification?: boolean;
+  /** Whether the flow completed (no more stages) */
+  flowCompleted?: boolean;
+}
+
+/**
+ * Orchestrator-mediated stage handoff.
+ *
+ * This is the single entry point for advancing a session from one stage to the
+ * next after an agent completes. It consolidates the verify -> advance -> dispatch
+ * chain that was previously duplicated in the conductor's handleReport() and
+ * handleHookStatus() handlers.
+ *
+ * The handoff sequence:
+ *   1. Pre-advance verification (verify scripts + unresolved todos)
+ *   2. advance() to transition to the next stage (or complete the flow)
+ *   3. Auto-dispatch of the next stage (agent, fork, or action)
+ *   4. Emit stage_handoff event for observability
+ *
+ * Callers: conductor handleReport(), conductor handleHookStatus(), or any
+ * code path where shouldAdvance + shouldAutoDispatch are both true.
+ */
+export async function mediateStageHandoff(
+  app: AppContext,
+  sessionId: string,
+  opts?: { autoDispatch?: boolean; source?: string },
+): Promise<StageHandoffResult> {
+  const autoDispatch = opts?.autoDispatch ?? true;
+  const source = opts?.source ?? "unknown";
+
+  const session = app.sessions.get(sessionId);
+  if (!session) {
+    return { ok: false, message: `Session ${sessionId} not found` };
+  }
+
+  const fromStage = session.stage;
+
+  // Step 1: Pre-advance verification (verify scripts + unresolved todos)
+  if (fromStage && session.flow) {
+    const stageDef = flow.getStage(app, session.flow, fromStage);
+    const hasTodos = app.todos.list(sessionId).some(t => !t.done);
+    if (stageDef?.verify?.length || hasTodos) {
+      const verify = await runVerification(app, sessionId);
+      if (!verify.ok) {
+        logWarn("handoff", `stage handoff blocked by verification for ${sessionId}/${fromStage}: ${verify.message}`);
+        app.sessions.update(sessionId, {
+          status: "blocked",
+          breakpoint_reason: `Verification failed before advancing: ${verify.message.slice(0, 200)}`,
+        });
+        app.messages.send(
+          sessionId, "system",
+          `Advance blocked: verification failed for stage '${fromStage}'. ${verify.message}`,
+          "error",
+        );
+        app.events.log(sessionId, "stage_handoff_blocked", {
+          actor: "system",
+          stage: fromStage,
+          data: { reason: "verification_failed", source, message: verify.message.slice(0, 500) },
+        });
+        return {
+          ok: false,
+          message: `Verification failed: ${verify.message}`,
+          fromStage,
+          blockedByVerification: true,
+        };
+      }
+    }
+  }
+
+  // Step 2: Advance to the next stage (or complete the flow)
+  const advResult = await advance(app, sessionId);
+  if (!advResult.ok) {
+    return { ok: false, message: advResult.message, fromStage };
+  }
+
+  const updated = app.sessions.get(sessionId);
+
+  // Check if the flow completed (no more stages)
+  if (updated?.status === "completed") {
+    app.events.log(sessionId, "stage_handoff", {
+      actor: "system",
+      stage: fromStage ?? undefined,
+      data: { from_stage: fromStage, to_stage: null, flow_completed: true, source },
+    });
+    return {
+      ok: true,
+      message: "Flow completed",
+      fromStage,
+      toStage: null,
+      flowCompleted: true,
+    };
+  }
+
+  const toStage = updated?.stage ?? null;
+
+  // Step 3: Auto-dispatch the next stage if requested
+  let dispatched = false;
+  if (autoDispatch && updated?.status === "ready" && toStage) {
+    const nextAction = flow.getStageAction(app, updated.flow, toStage);
+    if (nextAction.type === "agent" || nextAction.type === "fork") {
+      dispatch(app, sessionId).catch(err => {
+        logError("handoff", `auto-dispatch failed for ${sessionId}/${toStage}: ${err?.message ?? err}`);
+      });
+      dispatched = true;
+    } else if (nextAction.type === "action") {
+      safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
+        const verify = await runVerification(app, sessionId);
+        if (!verify.ok) {
+          logWarn("handoff", `action stage blocked by verification for ${sessionId}/${toStage}: ${verify.message}`);
+          app.sessions.update(sessionId, {
+            status: "blocked",
+            breakpoint_reason: `Verification failed: ${verify.message.slice(0, 200)}`,
+          });
+          return;
+        }
+        await executeAction(app, sessionId, nextAction.action ?? "");
+      });
+      dispatched = true;
+    }
+  }
+
+  // Step 4: Emit handoff event for observability
+  app.events.log(sessionId, "stage_handoff", {
+    actor: "system",
+    stage: toStage ?? undefined,
+    data: {
+      from_stage: fromStage,
+      to_stage: toStage,
+      dispatched,
+      source,
+    },
+  });
+
+  return {
+    ok: true,
+    message: dispatched
+      ? `Handed off from '${fromStage}' to '${toStage}' (dispatched)`
+      : `Advanced from '${fromStage}' to '${toStage}'`,
+    fromStage,
+    toStage,
+    dispatched,
+  };
+}
+
 // ── Fail-Loopback ──────────────────────────────────────────────────────────
 
 export function retryWithContext(app: AppContext, 
