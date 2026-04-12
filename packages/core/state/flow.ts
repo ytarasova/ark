@@ -26,6 +26,7 @@ export interface StageDefinition {
   on_failure?: string;
   optional?: boolean;
   model?: string;  // override model for this stage (e.g., "opus" for planning, "haiku" for docs)
+  compute_template?: string;  // named compute template to use for this stage
   verify?: string[];  // Scripts that must pass before stage completion
   depends_on?: string[];  // DAG: stage names that must complete before this stage runs
   // Fork/fan_out-specific
