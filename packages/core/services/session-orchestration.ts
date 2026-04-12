@@ -2624,7 +2624,8 @@ export async function mediateStageHandoff(
   if (fromStage && session.flow) {
     const stageDef = flow.getStage(app, session.flow, fromStage);
     const hasTodos = app.todos.list(sessionId).some(t => !t.done);
-    if (stageDef?.verify?.length || hasTodos) {
+    const repoVerify = session.workdir ? loadRepoConfig(session.workdir).verify : undefined;
+    if (stageDef?.verify?.length || repoVerify?.length || hasTodos) {
       const verify = await runVerification(app, sessionId);
       if (!verify.ok) {
         logWarn("handoff", `stage handoff blocked by verification for ${sessionId}/${fromStage}: ${verify.message}`);
