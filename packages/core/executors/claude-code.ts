@@ -6,7 +6,7 @@
  */
 
 import { mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as claude from "../claude/claude.js";
@@ -57,7 +57,10 @@ export const claudeCodeExecutor: Executor = {
         (channelConfig as Record<string, unknown>).env = { ARK_TENANT_ID: session.tenant_id ?? "default" };
       }
     }
-    const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir });
+    // Resolve the original repo path so MCP servers from the source repo's
+    // .mcp.json can be merged into the worktree's .mcp.json.
+    const originalRepoDir = session.repo ? resolve(session.repo) : undefined;
+    const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir, originalRepoDir });
 
     // Status hooks + permissions allow-list
     claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, {

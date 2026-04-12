@@ -1390,7 +1390,8 @@ async function _launchAgentTmux(app: AppContext,
   // Channel config + launcher
   const channelPort = app.sessions.channelPort(session.id);
   const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
-  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir });
+  const originalRepoDir = session.repo ? resolve(session.repo) : undefined;
+  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir, originalRepoDir });
 
   // Status hooks + permissions allow-list -- write .claude/settings.local.json
   claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, {
