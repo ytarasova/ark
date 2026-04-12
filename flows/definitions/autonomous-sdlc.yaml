@@ -1,0 +1,39 @@
+name: autonomous-sdlc
+description: "Fully autonomous SDLC: plan -> implement -> review -> PR. All gates auto, no human needed."
+stages:
+  - name: plan
+    agent: planner
+    gate: auto
+    task: |
+      Analyse {summary} and create PLAN.md with implementation strategy.
+      Read the codebase, identify files to change, design the approach.
+      Commit PLAN.md to the branch.
+      When done, call report(completed) with a summary of the plan.
+
+  - name: implement
+    agent: implementer
+    gate: auto
+    depends_on: [plan]
+    on_failure: "retry(2)"
+    task: |
+      Implement {summary}. Follow the plan from PLAN.md.
+      Write production-quality code with tests. Create atomic commits.
+      Run the test suite and ensure all tests pass.
+      When done, call report(completed) listing files changed and test results.
+
+  - name: review
+    agent: reviewer
+    gate: auto
+    depends_on: [implement]
+    task: |
+      Review all changes on this branch vs main.
+      Run `git diff main...HEAD` to see the full diff.
+      Run tests to verify they pass.
+      Check for correctness, code quality, security, and test coverage.
+      If blocking issues found, report(error) with details.
+      If changes look good, report(completed) with approval summary.
+
+  - name: pr
+    action: create_pr
+    gate: auto
+    depends_on: [review]

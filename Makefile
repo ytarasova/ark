@@ -65,9 +65,13 @@ dev-web: ## Start only the Vite dev server (needs `ark web` on :8420 separately)
 tui: ## Launch the terminal UI (from source)
 	./ark tui
 
-self: ## Dispatch an ark agent against THIS repo (make self TASK="fix X")
+self: ## Dispatch full SDLC (plan->implement->review->PR) against THIS repo
 	@test -n "$(TASK)" || (echo 'Usage: make self TASK="<description>"'; exit 1)
 	./ark session start --recipe self-dogfood --summary "$(TASK)" --dispatch
+
+self-quick: ## Dispatch single-agent quick fix against THIS repo
+	@test -n "$(TASK)" || (echo 'Usage: make self-quick TASK="<description>"'; exit 1)
+	./ark session start --recipe self-quick --summary "$(TASK)" --dispatch
 
 web: ## Launch the web dashboard (production build)
 	@$(MAKE) build-web --no-print-directory
