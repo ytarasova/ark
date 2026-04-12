@@ -2174,7 +2174,6 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
       // Agents that "explore" but don't commit are not done -- steer them to finish.
       if (session.workdir && session.branch) {
         try {
-          const { execFileSync } = require("child_process");
           const newCommits = execFileSync("git", ["log", "--oneline", `origin/main..HEAD`], {
             cwd: session.workdir, encoding: "utf-8", timeout: 5000,
           }).trim();
@@ -2195,6 +2194,36 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
             };
             // Don't advance -- session stays running so agent can finish
             break;
+          }
+        } catch { /* git check failed (e.g. no remote) -- continue to next check */ }
+
+        // Check for uncommitted changes -- agent must commit ALL work before completing.
+        // Catches staged-but-uncommitted and modified-but-unstaged tracked files.
+        try {
+          const status = execFileSync("git", ["status", "--porcelain"], {
+            cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+          }).trim();
+          if (status) {
+            // Filter out untracked files (??) -- only reject for tracked file changes
+            const uncommitted = status.split("\n").filter(l => l && !l.startsWith("??"));
+            if (uncommitted.length > 0) {
+              result.logEvents!.push({
+                type: "completion_rejected",
+                opts: {
+                  stage: session.stage ?? undefined,
+                  actor: "system",
+                  data: { reason: "uncommitted changes in worktree", files: uncommitted.slice(0, 10) },
+                },
+              });
+              const fileList = uncommitted.slice(0, 5).join("\n");
+              result.message = {
+                role: "system",
+                content: `Completion rejected: ${uncommitted.length} file(s) have uncommitted changes. Stage and commit all changes before reporting completed.\n${fileList}`,
+                type: "error",
+              };
+              // Don't advance -- session stays running so agent can commit remaining changes
+              break;
+            }
           }
         } catch { /* git check failed -- allow completion to proceed */ }
       }

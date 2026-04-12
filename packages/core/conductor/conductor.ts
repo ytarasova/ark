@@ -653,6 +653,27 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
 
   // Handle advance + auto-dispatch for completed reports
   if (result.shouldAdvance) {
+    // Run stage verification (verify scripts + todos) before advancing from the current stage.
+    // This ensures verify scripts defined on agent stages (e.g. implement) are enforced
+    // before the flow moves to the next stage -- not just before action stages.
+    const preAdvSession = app.sessions.get(sessionId);
+    if (preAdvSession?.stage && preAdvSession?.flow) {
+      const stageDef = flow.getStage(app, preAdvSession.flow, preAdvSession.stage);
+      if (stageDef?.verify?.length || app.todos.list(sessionId).some(t => !t.done)) {
+        const verify = await session.runVerification(app, sessionId);
+        if (!verify.ok) {
+          logWarn("conductor", `stage advance blocked by verification for ${sessionId}/${preAdvSession.stage}: ${verify.message}`);
+          app.sessions.update(sessionId, {
+            status: "blocked",
+            breakpoint_reason: `Verification failed before advancing: ${verify.message.slice(0, 200)}`,
+          });
+          app.messages.send(sessionId, "system", `Advance blocked: verification failed for stage '${preAdvSession.stage}'. ${verify.message}`, "error");
+          sendOSNotification("Ark: Verification failed", `${preAdvSession.summary ?? sessionId} - ${verify.message.slice(0, 100)}`);
+          return;
+        }
+      }
+    }
+
     const advResult = await session.advance(app, sessionId);
     const updated = (result.shouldAutoDispatch && advResult.ok) ? app.sessions.get(sessionId) : null;
     if (updated?.status === "ready" && updated.stage) {
