@@ -44,7 +44,7 @@ export const GLOBAL_HINTS = [
 ];
 
 /** Navigation bar text (always shown on line 2) */
-export const NAV_BAR_TEXT = "j/k:move  f/b:page  g/G:top/end  Tab:pane  |  n:new  /:find  !/@/#/$:filter  |  ?:help  q:quit";
+export const NAV_BAR_TEXT = "j/k:move  f/b:page  g/G:top/end  Tab:pane  |  n:new  /:find  !/@/#/$:filter  %:group  |  ?:help  q:quit";
 
 export function getOverlayHints(overlay: string): React.ReactNode[] {
   switch (overlay) {

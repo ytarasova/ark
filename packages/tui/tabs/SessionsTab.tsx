@@ -36,15 +36,16 @@ type Overlay = "move" | "group" | "talk" | "inbox" | "fork" | "search" | "replay
 
 /**
  * State that contributes to "which sessions are visible" in the left pane.
- * Today this is only the status filter; kept as a struct so future filter
- * dimensions (group, archived, etc.) can join here without rewriting callers.
+ * Today this is the status filter and group-by mode; kept as a struct so
+ * future filter dimensions can join here without rewriting callers.
  */
 export interface SessionListFilters {
   statusFilter: string | null;
+  groupByStatus: boolean;
 }
 
 /** Initial empty filter state (no filters applied -- all sessions visible). */
-export const EMPTY_SESSION_FILTERS: SessionListFilters = { statusFilter: null };
+export const EMPTY_SESSION_FILTERS: SessionListFilters = { statusFilter: null, groupByStatus: false };
 
 /** True if any list filter dimension is currently active. */
 export function hasActiveSessionFilters(f: SessionListFilters): boolean {
@@ -55,6 +56,36 @@ export function hasActiveSessionFilters(f: SessionListFilters): boolean {
 export function resetSessionFilters(_current: SessionListFilters): SessionListFilters {
   return EMPTY_SESSION_FILTERS;
 }
+
+/** Map a session status to a display group label for status grouping. */
+export function statusGroupLabel(status: string): string {
+  switch (status) {
+    case "running": return "Running";
+    case "waiting": return "Waiting";
+    case "blocked": return "Blocked";
+    case "ready": return "Ready";
+    case "pending": return "Pending";
+    case "completed": return "Completed";
+    case "stopped": return "Stopped";
+    case "failed": return "Failed";
+    case "archived": return "Archived";
+    default: return "Other";
+  }
+}
+
+/** Ordering for status group headers (lower = higher in list). */
+const STATUS_GROUP_ORDER: Record<string, number> = {
+  Running: 0,
+  Waiting: 1,
+  Blocked: 2,
+  Ready: 3,
+  Pending: 4,
+  Completed: 5,
+  Stopped: 6,
+  Failed: 7,
+  Archived: 8,
+  Other: 9,
+};
 
 interface SessionsTabProps extends StoreData {
   asyncState: AsyncState;
@@ -75,23 +106,33 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [groupByStatus, setGroupByStatus] = useState(false);
   const status = useStatusMessage();
 
   // Notify parent when filter state changes so the status bar can show the
   // "Esc:clear filter" hint while any filter is active.
   useEffect(() => {
-    onFiltersChange?.({ statusFilter });
-  }, [statusFilter, onFiltersChange]);
+    onFiltersChange?.({ statusFilter, groupByStatus });
+  }, [statusFilter, groupByStatus, onFiltersChange]);
 
-  // Reset every list filter dimension at once. Wired to Esc on the left pane.
+  // Reset filters (not view modes like groupByStatus). Wired to Esc on the left pane.
   const clearAllFilters = useCallback(() => {
-    const next = resetSessionFilters({ statusFilter });
-    setStatusFilter(next.statusFilter);
-  }, [statusFilter]);
+    setStatusFilter(null);
+  }, []);
 
-  // Top-level sessions, sorted by group name to match visual TreeList order
+  // Top-level sessions, sorted to match visual TreeList order.
+  // When grouping by status, sort by status group order; otherwise by group name.
   const topLevel = useMemo(() => {
     const filtered = sessions.filter((s) => !s.parent_id);
+    if (groupByStatus) {
+      return filtered.sort((a, b) => {
+        const oa = STATUS_GROUP_ORDER[statusGroupLabel(a.status)] ?? 9;
+        const ob = STATUS_GROUP_ORDER[statusGroupLabel(b.status)] ?? 9;
+        if (oa !== ob) return oa - ob;
+        // Within same status group, sort by updated_at descending (most recent first)
+        return (b.updated_at ?? "").localeCompare(a.updated_at ?? "");
+      });
+    }
     return filtered.sort((a, b) => {
       const ga = a.group_name ?? "";
       const gb = b.group_name ?? "";
@@ -99,7 +140,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
       if (ga !== "" && gb === "") return 1;
       return ga.localeCompare(gb);
     });
-  }, [sessions]);
+  }, [sessions, groupByStatus]);
 
   const filteredTopLevel = useMemo(() => {
     if (!statusFilter) return topLevel;
@@ -256,6 +297,10 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
     }
     if (matchesHotkey("filterClear", input, key)) {
       setStatusFilter(null);
+      return;
+    }
+    if (matchesHotkey("groupByStatus", input, key)) {
+      setGroupByStatus(v => !v);
       return;
     }
 
@@ -419,13 +464,14 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
     <Box flexDirection="column" flexGrow={1}>
       <SplitPane
         focus={overlay === "talk" || overlay === "inbox" ? "right" : pane}
-        leftTitle={statusFilter ? `Sessions [${statusFilter}]` : "Sessions"}
+        leftTitle={statusFilter ? `Sessions [${statusFilter}]` : groupByStatus ? "Sessions [by status]" : "Sessions"}
         rightTitle="Details"
         left={
           <TreeList
             items={filteredTopLevel}
-            groupBy={s => s.group_name ?? ""}
-            emptyGroups={groups}
+            groupBy={groupByStatus ? (s => statusGroupLabel(s.status)) : (s => s.group_name ?? "")}
+            emptyGroups={groupByStatus ? undefined : groups}
+            groupSort={groupByStatus ? ((a, b) => (STATUS_GROUP_ORDER[a] ?? 9) - (STATUS_GROUP_ORDER[b] ?? 9)) : undefined}
             renderRow={(s) => {
               const cols = process.stdout.columns ?? 120;
               const summaryWidth = cols > 140 ? 45 : cols > 100 ? 30 : 20;
@@ -645,6 +691,9 @@ export function getSessionHints(
     hints.push(<KeyHint key="escClear" k="Esc" label="clear filter" />);
     hints.push(sep(0));
   }
+
+  // Show group-by-status toggle hint
+  hints.push(<KeyHint key="grp" k="%" label={filters.groupByStatus ? "ungroup" : "group"} />);
 
   if (s) {
     // Status-specific actions

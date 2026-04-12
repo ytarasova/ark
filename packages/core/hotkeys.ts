@@ -43,6 +43,7 @@ const DEFAULTS: HotkeyMap = {
   verify: "V",
   archive: "Z",
   export: "E",
+  groupByStatus: "%",
 };
 
 let _hotkeys: HotkeyMap | null = null;

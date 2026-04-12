@@ -10,6 +10,8 @@ interface TreeListProps<T> {
   groupBy?: (item: T) => string;
   /** Extra group names to show even if they have no items (empty buckets). */
   emptyGroups?: string[];
+  /** Custom sort comparator for group keys. If not provided, unnamed first then alphabetical. */
+  groupSort?: (a: string, b: string) => number;
   /** Render a single row as a plain string (for ListRow highlight). */
   renderRow: (item: T, selected: boolean) => string;
   /** Render colored version for unselected rows (optional). If not provided, uses renderRow. */
@@ -45,6 +47,7 @@ export function TreeList<T>({
   items,
   groupBy,
   emptyGroups,
+  groupSort,
   renderRow,
   renderColoredRow,
   renderChildren,
@@ -68,13 +71,13 @@ export function TreeList<T>({
       if (!gm.has(g)) gm.set(g, []);
     }
 
-    // Sort: unnamed group first, then alphabetical
-    const sk = [...gm.keys()].sort((a, b) =>
+    // Sort: use custom comparator if provided, otherwise unnamed first then alphabetical
+    const sk = [...gm.keys()].sort(groupSort ?? ((a, b) =>
       a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)
-    );
+    ));
 
     return { sortedKeys: sk, groupMap: gm };
-  }, [items, groupBy, emptyGroups]);
+  }, [items, groupBy, emptyGroups, groupSort]);
 
   // Hooks MUST be called before any early return (React rules of hooks)
   const prevSelRef = useRef<T | null>(null);
