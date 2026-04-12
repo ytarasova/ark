@@ -2170,6 +2170,35 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
         commits: rr.commits as string[] | undefined,
       };
 
+      // Hard enforcement: reject completion if no new commits exist in the worktree.
+      // Agents that "explore" but don't commit are not done -- steer them to finish.
+      if (session.workdir && session.branch) {
+        try {
+          const { execFileSync } = require("child_process");
+          const newCommits = execFileSync("git", ["log", "--oneline", `origin/main..HEAD`], {
+            cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+          }).trim();
+          if (!newCommits) {
+            // No commits -- reject completion, steer agent to actually commit
+            result.logEvents!.push({
+              type: "completion_rejected",
+              opts: {
+                stage: session.stage ?? undefined,
+                actor: "system",
+                data: { reason: "no new commits in worktree" },
+              },
+            });
+            result.message = {
+              role: "system",
+              content: "Completion rejected: no new commits found. You must commit your changes, push, and create a PR before reporting completed.",
+              type: "error",
+            };
+            // Don't advance -- session stays running so agent can finish
+            break;
+          }
+        } catch { /* git check failed -- allow completion to proceed */ }
+      }
+
       // Check gate type -- manual gates keep session running (user decides when done)
       const stageDef = flow.getStage(app,session.flow, session.stage ?? "");
       const isManualGate = stageDef?.gate === "manual";

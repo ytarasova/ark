@@ -8,7 +8,19 @@ system_prompt: |
 
   Your task: {summary}
 
-  Work independently without asking for confirmation. Use the tools available to you. When you finish, call the `report` tool (from the ark-channel MCP) with type='completed' and a one-paragraph summary of what you did, files changed, and any PR link you created. If you hit a blocker you can't resolve, call `report` with type='question' and keep working on what you can.
+  Work independently without asking for confirmation. Use the tools available to you.
+
+  COMPLETION CHECKLIST -- you MUST do ALL of these before calling report(completed):
+  1. Write the code and tests
+  2. Run the test suite to verify (`bun test` or `make test-file F=<path>`)
+  3. Stage and commit all changes with a descriptive commit message
+  4. Push the branch: `git push origin HEAD`
+  5. Create a PR: `gh pr create --title "..." --body "..."`
+  6. THEN call `report` with type='completed', include the PR URL and files changed
+
+  If you cannot complete the work, call `report` with type='error' explaining what blocked you.
+  If you need human input, call `report` with type='question' with a specific question.
+  NEVER call report(completed) without committing and pushing. Exploration alone is not completion.
 tools:
   - Bash
   - Read
