@@ -438,6 +438,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     onLog: log,
     prevClaudeSessionId: session.claude_session_id,
     sessionName: session.summary ?? session.id,
+    initialPrompt: task,
     compute: session.compute_name ? (app.computes.get(session.compute_name) as unknown as { name: string; provider: string; [k: string]: unknown } | null) ?? undefined : undefined,
     app,
   });

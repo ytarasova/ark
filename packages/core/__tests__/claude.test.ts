@@ -404,6 +404,58 @@ describe("buildLauncher", () => {
   });
 });
 
+// ── buildLauncher initialPrompt ──────────────────────────────────────────────
+
+describe("buildLauncher initialPrompt", () => {
+  const baseOpts: LauncherOpts = {
+    workdir: "/tmp/project",
+    claudeArgs: ["claude", "--model", "opus", "--dangerously-skip-permissions"],
+    mcpConfigPath: "/tmp/.mcp.json",
+  };
+
+  it("appends shell-quoted prompt as last positional arg", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      initialPrompt: "Fix the login bug",
+    });
+    expect(content).toContain("'Fix the login bug'");
+    // Should appear after the extra flags
+    const flagsIndex = content.indexOf("--remote-control");
+    const promptIndex = content.indexOf("'Fix the login bug'");
+    expect(promptIndex).toBeGreaterThan(flagsIndex);
+  });
+
+  it("escapes single quotes in prompt", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      initialPrompt: "don't break it",
+    });
+    // POSIX escaping: 'don'\''t break it'
+    expect(content).toContain("don'\\''t break it");
+  });
+
+  it("does not include prompt arg when initialPrompt is undefined", () => {
+    const { content } = buildLauncher(baseOpts);
+    // After the --remote-control line, script should just have exec bash
+    const lines = content.split("\n");
+    const execLine = lines.findIndex(l => l.trim() === "exec bash");
+    // The line before exec bash should not contain a quoted prompt
+    expect(lines[execLine - 1]).not.toMatch(/^\s+'.*'$/);
+  });
+
+  it("includes prompt in resume fallback branch too", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      prevClaudeSessionId: "old-uuid",
+      initialPrompt: "Continue the task",
+    });
+    // Both the --resume branch and --session-id fallback should have the prompt
+    const matches = content.match(/'Continue the task'/g);
+    expect(matches).not.toBeNull();
+    expect(matches!.length).toBe(2);
+  });
+});
+
 // ── trustDirectory ────────────────────────────────────────────────────────────
 
 describe("trustDirectory", () => {
