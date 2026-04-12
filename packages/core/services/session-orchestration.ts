@@ -438,7 +438,10 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     onLog: log,
     prevClaudeSessionId: session.claude_session_id,
     sessionName: session.summary ?? session.id,
-    initialPrompt: task,
+    // Pass only the summary as the CLI positional arg (initial user message).
+    // The full context-injected task is too large for ARG_MAX; it goes via
+    // system prompt + channel delivery instead.
+    initialPrompt: session.summary ?? task.slice(0, 2000),
     compute: session.compute_name ? (app.computes.get(session.compute_name) as unknown as { name: string; provider: string; [k: string]: unknown } | null) ?? undefined : undefined,
     app,
   });
