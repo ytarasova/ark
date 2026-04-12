@@ -347,7 +347,7 @@ describe("autonomous-sdlc flow", () => {
   it("includes merge stage after pr", () => {
     const stages = getStages(getApp(),"autonomous-sdlc");
     const names = stages.map((s) => s.name);
-    expect(names).toEqual(["plan", "implement", "review", "pr", "merge"]);
+    expect(names).toEqual(["plan", "implement", "verify", "review", "pr", "merge"]);
   });
 
   it("merge stage depends on pr", () => {
