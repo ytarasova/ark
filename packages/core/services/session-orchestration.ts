@@ -618,6 +618,10 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
     }
   }
 
+  // Clean up worktree directory (provider-independent -- ensures cleanup even
+  // when no compute is assigned or provider doesn't handle local worktrees)
+  await removeSessionWorktree(app, session);
+
   // Preserve claude_session_id so restart can --resume the conversation
   app.sessions.update(sessionId, { status: "stopped", error: null, session_id: null });
   app.events.log(sessionId, "session_stopped", {
@@ -1144,7 +1148,11 @@ export async function deleteSessionAsync(app: AppContext, sessionId: string): Pr
     }
   }
 
-  // 3. Soft-delete (keeps DB row for 90s undo window)
+  // 3. Clean up worktree directory (provider-independent fallback --
+  // ensures cleanup even when no compute is assigned or provider doesn't handle local worktrees)
+  await removeSessionWorktree(app, session);
+
+  // 4. Soft-delete (keeps DB row for 90s undo window)
   app.sessions.softDelete(sessionId);
 
   app.events.log(sessionId, "session_deleted", { actor: "user" });
@@ -2458,6 +2466,33 @@ export async function spawnParallelSubagents(app: AppContext, parentId: string, 
 }
 
 // ── Worktree cleanup ──────────────────────────────────────────────────────
+
+/**
+ * Remove the worktree directory for a session, if it exists.
+ * Provider-independent -- called from stop() and deleteSessionAsync() so
+ * worktrees are always cleaned up regardless of compute provider availability.
+ */
+export async function removeSessionWorktree(app: AppContext, session: Session): Promise<void> {
+  const wtPath = join(app.config.worktreesDir, session.id);
+  if (!existsSync(wtPath)) return;
+
+  // Try git worktree remove first (cleans up .git/worktrees metadata)
+  const repo = session.repo ?? session.workdir;
+  if (repo) {
+    try {
+      await execFileAsync("git", ["-C", repo, "worktree", "remove", "--force", wtPath], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      return;
+    } catch { /* fall through to rmSync */ }
+  }
+
+  // Fallback: direct removal (no repo context or git worktree remove failed)
+  await safeAsync(`removeSessionWorktree: rmSync ${session.id}`, async () => {
+    rmSync(wtPath, { recursive: true, force: true });
+  });
+}
 
 /** Find orphaned worktrees -- worktree dirs with no matching session. */
 export function findOrphanedWorktrees(app: AppContext): string[] {
