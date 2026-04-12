@@ -7,6 +7,7 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import { useComputeMetrics } from "../hooks/useComputeMetrics.js";
+import { ArkClientProvider } from "../context/ArkClientProvider.js";
 import { registerProvider, clearProviders } from "../../compute/index.js";
 import type { ComputeProvider } from "../../compute/types.js";
 import { AppContext, setApp, clearApp } from "../../core/index.js";
@@ -29,6 +30,18 @@ function MetricsCapture({
   const metrics = useComputeMetrics(computes, active, pollMs);
   captured = metrics;
   return <Text>{`fetching=${metrics.fetching} snaps=${metrics.snapshots.size}`}</Text>;
+}
+
+/** Wrap component with ArkClientProvider (required for useArkClient in the hook). */
+async function renderWithProvider(el: React.ReactElement) {
+  let ready = false;
+  const result = render(
+    <ArkClientProvider app={app} onReady={() => { ready = true; }}>
+      {el}
+    </ArkClientProvider>
+  );
+  await waitFor(() => ready);
+  return result;
 }
 
 function makeCompute(overrides: Partial<Compute> & { name: string; provider: string }): Compute {
@@ -112,9 +125,9 @@ afterEach(async () => {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("useComputeMetrics", () => {
-  it("starts with empty snapshots and logs", () => {
+  it("starts with empty snapshots and logs", async () => {
     const computes: Compute[] = [];
-    const { unmount } = render(
+    const { unmount } = await renderWithProvider(
       <MetricsCapture computes={computes} active={false} />,
     );
 
@@ -127,7 +140,7 @@ describe("useComputeMetrics", () => {
 
   it("addLog appends timestamped entries (HH:MM:SS  message)", async () => {
     const computes: Compute[] = [];
-    const { unmount } = render(
+    const { unmount } = await renderWithProvider(
       <MetricsCapture computes={computes} active={false} />,
     );
 
@@ -144,7 +157,7 @@ describe("useComputeMetrics", () => {
 
   it("addLog caps at 50 entries (add 60, verify length=50, most recent kept)", async () => {
     const computes: Compute[] = [];
-    const { unmount } = render(
+    const { unmount } = await renderWithProvider(
       <MetricsCapture computes={computes} active={false} />,
     );
 
@@ -175,7 +188,7 @@ describe("useComputeMetrics", () => {
     const computes = [
       makeCompute({ name: "idle-box", provider: "track", status: "running" }),
     ];
-    const { unmount } = render(
+    const { unmount } = await renderWithProvider(
       <MetricsCapture computes={computes} active={false} pollMs={50} />,
     );
 
@@ -187,7 +200,7 @@ describe("useComputeMetrics", () => {
 
   it("addLog works for multiple computes independently", async () => {
     const computes: Compute[] = [];
-    const { unmount } = render(
+    const { unmount } = await renderWithProvider(
       <MetricsCapture computes={computes} active={false} />,
     );
 

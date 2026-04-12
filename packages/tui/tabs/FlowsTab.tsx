@@ -2,7 +2,6 @@ import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
 import { findProjectRoot } from "../../core/index.js";
-import { getApp } from "../../core/app.js";
 import { KeyHint, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
@@ -11,6 +10,7 @@ import { SectionHeader } from "../components/SectionHeader.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useFocus } from "../hooks/useFocus.js";
+import { useArkClient } from "../hooks/useArkClient.js";
 import { FlowForm } from "../forms/FlowForm.js";
 import type { StoreData } from "../hooks/useArkStore.js";
 import type { AsyncState } from "../hooks/useAsync.js";
@@ -23,6 +23,7 @@ interface FlowsTabProps extends StoreData {
 
 export function FlowsTab({ flows, pane, asyncState, refresh }: FlowsTabProps) {
   const focus = useFocus();
+  const ark = useArkClient();
   const [formMode, setFormMode] = useState<"create" | null>(null);
   const hasOverlay = formMode !== null;
   const { sel } = useListNavigation(flows.length, { active: pane === "left" && !hasOverlay });
@@ -54,7 +55,7 @@ export function FlowsTab({ flows, pane, asyncState, refresh }: FlowsTabProps) {
         return;
       }
       asyncState.run("Deleting flow...", async () => {
-        getApp().flows.delete(selected.name);
+        await ark.flowDelete(selected.name);
         status.show(`Deleted '${selected.name}'`);
         refresh();
       });
@@ -101,14 +102,12 @@ function FlowDetail({ flow, pane, statusMessage }: {
   statusMessage: string | null;
 }) {
   const theme = getTheme();
+  const ark = useArkClient();
   const [p, setP] = useState<any>(null);
 
   useEffect(() => {
     if (!flow) { setP(null); return; }
-    try {
-      const loaded = getApp().flows.get(flow.name);
-      setP(loaded);
-    } catch { setP(null); }
+    ark.flowRead(flow.name).then(setP).catch(() => setP(null));
   }, [flow?.name]);
 
   if (!flow) {

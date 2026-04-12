@@ -2,14 +2,13 @@
  * TUI rendering tests - verifies the main App component renders correctly.
  *
  * Uses ink-testing-library to render the TUI in-memory and assert on output.
- * Wraps App in ArkClientProvider (required since TUI migration to ArkClient).
+ * Wraps App in ArkClientProvider with app prop (daemon-client architecture).
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { App } from "../App.js";
-import { AppProvider } from "../context/AppProvider.js";
 import { ArkClientProvider } from "../context/ArkClientProvider.js";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
 
@@ -28,11 +27,9 @@ afterAll(async () => {
 async function renderApp() {
   let ready = false;
   const result = render(
-    <AppProvider app={app}>
-      <ArkClientProvider onReady={() => { ready = true; }}>
-        <App />
-      </ArkClientProvider>
-    </AppProvider>
+    <ArkClientProvider app={app} onReady={() => { ready = true; }}>
+      <App arkDir={app.config.arkDir} />
+    </ArkClientProvider>
   );
   for (let i = 0; i < 100; i++) {
     await new Promise(r => setTimeout(r, 20));

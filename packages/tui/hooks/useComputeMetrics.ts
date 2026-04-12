@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { getProvider } from "../../compute/index.js";
-import { getApp } from "../../core/app.js";
+import { useArkClient } from "./useArkClient.js";
 import type { Compute } from "../../types/index.js";
 import type { ComputeSnapshot } from "../../compute/types.js";
 
 export function useComputeMetrics(computes: Compute[], active: boolean, pollMs = 10000) {
+  const ark = useArkClient();
   const [snapshots, setSnapshots] = useState<Map<string, ComputeSnapshot>>(new Map());
   const [logs, setLogs] = useState<Map<string, string[]>>(new Map());
   const [fetching, setFetching] = useState(false);
@@ -42,17 +43,17 @@ export function useComputeMetrics(computes: Compute[], active: boolean, pollMs =
           const snap = await provider.getMetrics(h);
           if (snap) next.set(h.name, snap);
         } catch {
-          // Metrics failed — check if the instance still exists
+          // Metrics failed -- check if the instance still exists
           if (provider.checkStatus) {
             try {
               const realStatus = await provider.checkStatus(h);
               if (realStatus && realStatus !== h.status) {
-                getApp().computes.update(h.name, { status: realStatus as import("../../types/index.js").ComputeStatus });
+                await ark.computeUpdate(h.name, { status: realStatus });
                 if (realStatus === "destroyed") {
-                  getApp().computes.mergeConfig(h.name, { ip: null });
-                  addLog(h.name, "Instance no longer exists — marked as destroyed");
+                  await ark.computeUpdate(h.name, { config: { ip: null } });
+                  addLog(h.name, "Instance no longer exists -- marked as destroyed");
                 } else {
-                  addLog(h.name, `Status changed: ${h.status} → ${realStatus}`);
+                  addLog(h.name, `Status changed: ${h.status} -> ${realStatus}`);
                 }
               }
             } catch { /* checkStatus itself failed, skip */ }

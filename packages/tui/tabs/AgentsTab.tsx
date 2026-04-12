@@ -2,7 +2,6 @@ import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTheme } from "../../core/theme.js";
 import { findProjectRoot } from "../../core/index.js";
-import { getApp } from "../../core/app.js";
 import type { AgentDefinition } from "../../core/index.js";
 import type { RuntimeDefinition } from "../../types/index.js";
 import { KeyHint, sep, NAV_HINTS, GLOBAL_HINTS } from "../helpers/statusBarHints.js";
@@ -102,7 +101,7 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
       const copyName = `${agent.name}-copy`;
       const scope = projectRoot ? "project" : "global";
       asyncState.run("Copying agent...", async () => {
-        getApp().agents.save(copyName, { ...agent, name: copyName } as AgentDefinition, scope, scope === "project" ? projectRoot : undefined);
+        await ark.agentSave({ ...agent, name: copyName }, { scope });
         status.show(`Copied -> '${copyName}' (${scope})`);
         refresh();
       });
@@ -116,7 +115,7 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
       }
       const scope = agent._source as "project" | "global";
       asyncState.run("Deleting agent...", async () => {
-        getApp().agents.delete(agent.name, scope, scope === "project" ? projectRoot : undefined);
+        await ark.agentDelete(agent.name, scope);
         status.show(`Deleted '${agent.name}'`);
         refresh();
       });
@@ -182,14 +181,16 @@ function AgentDetail({ agent, pane, statusMessage, projectRoot }: {
   projectRoot?: string;
 }) {
   const theme = getTheme();
+  const ark = useArkClient();
   if (!agent) {
     return <Box flexGrow={1}><Text dimColor>{"  No agent selected."}</Text></Box>;
   }
 
-  const a = useMemo(() => {
-    try { return getApp().agents.get(agent.name, projectRoot); } catch { return null; }
+  const [a, setA] = useState<AgentDefinition | null>(null);
+  useEffect(() => {
+    ark.agentRead(agent.name).then(setA).catch(() => setA(null));
   }, [agent.name, projectRoot]);
-  if (!a) return <Text dimColor>{"  Failed to load agent"}</Text>;
+  if (!a) return <Text dimColor>{"  Loading..."}</Text>;
 
   const sections: [string, string[]][] = [
     ["Tools", a.tools],
