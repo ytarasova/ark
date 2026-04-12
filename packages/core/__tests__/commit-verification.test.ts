@@ -1,5 +1,5 @@
 /**
- * Tests for commit verification gate in applyReport().
+ * Tests for commit verification gate in applyReport() and applyHookStatus().
  *
  * Validates that agents must commit all changes before the implement stage
  * (or any agent stage) can advance:
@@ -8,6 +8,8 @@
  * 3. Clean working tree with commits allows completion
  * 4. Sessions without workdir/branch skip the check
  * 5. Verify scripts on a stage block advancement when they fail
+ * 6. Per-stage commit verification uses stage_start_sha
+ * 7. stage_start_sha is recorded during dispatch
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from "bun:test";
@@ -16,7 +18,7 @@ import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { AppContext, setApp, clearApp } from "../app.js";
-import { applyReport } from "../services/session-orchestration.js";
+import { applyReport, applyHookStatus } from "../services/session-orchestration.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
 
 let app: AppContext;
@@ -272,5 +274,225 @@ describe("Commit verification: manual gate interaction", () => {
     expect(result.shouldAdvance).toBeFalsy();
     // Should still have a message (agent completed, waiting for human)
     expect(result.message).toBeTruthy();
+  });
+});
+
+// ── Per-stage commit verification (stage_start_sha) ──────────────────────────
+
+describe("Per-stage commit verification via stage_start_sha", () => {
+  it("rejects completion when HEAD matches stage_start_sha (no new commits this stage)", () => {
+    const gitDir = createTempGitRepo();
+
+    // Record initial HEAD as stage_start_sha (simulating what dispatch does)
+    const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: gitDir, encoding: "utf-8",
+    }).trim();
+
+    const session = app.sessions.create({ summary: "no stage commits", flow: "quick" });
+    app.sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      workdir: gitDir,
+      branch: "test-branch",
+    });
+    app.sessions.mergeConfig(session.id, { stage_start_sha: headSha });
+
+    const result = applyReport(app, session.id, makeReport(session.id, "implement"));
+
+    // Should reject -- HEAD == stage_start_sha means no commits this stage
+    expect(result.shouldAdvance).toBeFalsy();
+    expect(result.message?.type).toBe("error");
+    expect(result.message?.content).toContain("no new commits found for this stage");
+  });
+
+  it("allows completion when HEAD differs from stage_start_sha (commits made this stage)", () => {
+    const gitDir = createTempGitRepo();
+
+    // Record initial HEAD as stage_start_sha
+    const startSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: gitDir, encoding: "utf-8",
+    }).trim();
+
+    // Make a commit (simulating agent work during the stage)
+    writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
+    execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "stage work"], { cwd: gitDir });
+
+    const session = app.sessions.create({ summary: "has stage commits", flow: "quick" });
+    app.sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      workdir: gitDir,
+      branch: "test-branch",
+    });
+    app.sessions.mergeConfig(session.id, { stage_start_sha: startSha });
+
+    const result = applyReport(app, session.id, makeReport(session.id, "implement"));
+
+    // Should allow -- HEAD differs from stage_start_sha
+    expect(result.shouldAdvance).toBe(true);
+    expect(result.shouldAutoDispatch).toBe(true);
+    expect(result.updates.status).toBe("ready");
+  });
+
+  it("rejects even when branch has prior-stage commits but none for current stage", () => {
+    const gitDir = createTempGitRepo();
+
+    // Simulate a prior stage making commits
+    writeFileSync(join(gitDir, "prior-stage.ts"), "export const prior = true;");
+    execFileSync("git", ["add", "prior-stage.ts"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "prior stage commit"], { cwd: gitDir });
+
+    // Record HEAD now as stage_start_sha (this stage starts here)
+    const startSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: gitDir, encoding: "utf-8",
+    }).trim();
+
+    // No new commits after stage started
+
+    const session = app.sessions.create({ summary: "prior commits only", flow: "quick" });
+    app.sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      workdir: gitDir,
+      branch: "test-branch",
+    });
+    app.sessions.mergeConfig(session.id, { stage_start_sha: startSha });
+
+    const result = applyReport(app, session.id, makeReport(session.id, "implement"));
+
+    // Should reject -- no commits since stage_start_sha despite prior-stage commits existing
+    expect(result.shouldAdvance).toBeFalsy();
+    expect(result.message?.type).toBe("error");
+    expect(result.message?.content).toContain("no new commits found for this stage");
+  });
+
+  it("includes stage_start_sha in completion_rejected event data", () => {
+    const gitDir = createTempGitRepo();
+    const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: gitDir, encoding: "utf-8",
+    }).trim();
+
+    const session = app.sessions.create({ summary: "rejection sha test", flow: "quick" });
+    app.sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      workdir: gitDir,
+      branch: "test-branch",
+    });
+    app.sessions.mergeConfig(session.id, { stage_start_sha: headSha });
+
+    const result = applyReport(app, session.id, makeReport(session.id, "implement"));
+
+    const rejectionEvent = result.logEvents!.find(e => e.type === "completion_rejected");
+    expect(rejectionEvent).toBeTruthy();
+    expect(rejectionEvent!.opts.data?.stage_start_sha).toBe(headSha);
+  });
+
+  it("falls back to origin/main..HEAD when stage_start_sha is not set", () => {
+    const gitDir = createTempGitRepo();
+
+    // Make a commit so origin/main..HEAD fallback finds something
+    writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
+    execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "work"], { cwd: gitDir });
+
+    const session = app.sessions.create({ summary: "no sha fallback", flow: "quick" });
+    app.sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      workdir: gitDir,
+      branch: "test-branch",
+    });
+    // Deliberately NOT setting stage_start_sha
+
+    const result = applyReport(app, session.id, makeReport(session.id, "implement"));
+
+    // Fallback to origin/main..HEAD will fail (no remote) but catch allows continuation
+    // So this should pass through to uncommitted check (which passes since tree is clean)
+    expect(result.shouldAdvance).toBe(true);
+  });
+});
+
+// ── Per-stage commit verification in applyHookStatus ─────────────────────────
+
+describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => {
+  it("rejects auto-advance when HEAD matches stage_start_sha on SessionEnd", () => {
+    const gitDir = createTempGitRepo();
+    const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: gitDir, encoding: "utf-8",
+    }).trim();
+
+    const session = app.sessions.create({ summary: "hook no commits", flow: "quick" });
+    app.sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      workdir: gitDir,
+      branch: "test-branch",
+    });
+    app.sessions.mergeConfig(session.id, { stage_start_sha: headSha });
+
+    // Re-fetch session to include merged config
+    const freshSession = app.sessions.get(session.id)!;
+
+    const result = applyHookStatus(app, freshSession, "SessionEnd", {});
+
+    // Should NOT advance -- no commits since stage_start_sha
+    expect(result.shouldAdvance).toBeFalsy();
+    expect(result.updates?.error).toContain("without committing");
+  });
+
+  it("allows auto-advance when HEAD differs from stage_start_sha on SessionEnd", () => {
+    const gitDir = createTempGitRepo();
+    const startSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: gitDir, encoding: "utf-8",
+    }).trim();
+
+    // Make a commit during the stage
+    writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
+    execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "stage work"], { cwd: gitDir });
+
+    const session = app.sessions.create({ summary: "hook has commits", flow: "quick" });
+    app.sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      workdir: gitDir,
+      branch: "test-branch",
+    });
+    app.sessions.mergeConfig(session.id, { stage_start_sha: startSha });
+
+    const freshSession = app.sessions.get(session.id)!;
+
+    const result = applyHookStatus(app, freshSession, "SessionEnd", {});
+
+    // Should advance -- commits exist since stage_start_sha
+    expect(result.shouldAdvance).toBe(true);
+    expect(result.shouldAutoDispatch).toBe(true);
+  });
+
+  it("falls back to origin/main..HEAD when stage_start_sha is not set in hook path", () => {
+    const gitDir = createTempGitRepo();
+
+    // Make a commit so there's content on branch
+    writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
+    execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "work"], { cwd: gitDir });
+
+    const session = app.sessions.create({ summary: "hook no sha", flow: "quick" });
+    app.sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      workdir: gitDir,
+      branch: "test-branch",
+    });
+    // No stage_start_sha set
+
+    const freshSession = app.sessions.get(session.id)!;
+
+    const result = applyHookStatus(app, freshSession, "SessionEnd", {});
+
+    // Fallback to origin/main..HEAD will fail (no remote), catch allows (hasNewCommits = true)
+    expect(result.shouldAdvance).toBe(true);
   });
 });

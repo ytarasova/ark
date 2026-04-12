@@ -449,13 +449,27 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
   const tmuxName = launchResult.handle;
 
+  // Record HEAD sha at stage start for per-stage commit verification
+  let stageStartSha: string | undefined;
+  if (session.workdir) {
+    try {
+      stageStartSha = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+      }).trim();
+    } catch { /* no git -- skip */ }
+  }
+
   app.sessions.update(sessionId, { status: "running", agent: agentName, session_id: tmuxName });
+  if (stageStartSha) {
+    app.sessions.mergeConfig(sessionId, { stage_start_sha: stageStartSha });
+  }
   app.events.log(sessionId, "stage_started", {
     stage, actor: "user",
     data: {
       agent: agentName, session_id: tmuxName, model: agent.model,
       tools: agent.tools, skills: agent.skills, memories: agent.memories,
       task_preview: task.slice(0, 200),
+      stage_start_sha: stageStartSha,
     },
   });
 
@@ -2033,18 +2047,18 @@ export function applyHookStatus(app: AppContext,
     let hasNewCommits = false;
     if (session.workdir) {
       try {
-        const { execFileSync } = require("child_process");
-        const log = execFileSync("git", ["log", "--oneline", "origin/main..HEAD"], {
-          cwd: session.workdir, encoding: "utf-8", timeout: 5000,
-        }).trim();
-        // Check against stage_start_sha if available, else just any commits
-        const startSha = (session.config as any)?.stage_start_sha;
+        const startSha = (session.config as any)?.stage_start_sha as string | undefined;
         if (startSha) {
+          // Per-stage check: compare HEAD against the sha recorded when this stage started
           const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
             cwd: session.workdir, encoding: "utf-8", timeout: 5000,
           }).trim();
           hasNewCommits = headSha !== startSha;
         } else {
+          // Fallback: check for any commits on branch vs origin/main
+          const log = execFileSync("git", ["log", "--oneline", "origin/main..HEAD"], {
+            cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+          }).trim();
           hasNewCommits = !!log;
         }
       } catch { hasNewCommits = true; /* allow on git error */ }
@@ -2058,8 +2072,10 @@ export function applyHookStatus(app: AppContext,
     } else {
       // Agent exited without committing -- don't advance, mark as failed
       newStatus = "failed" as any;
+      if (!result.updates) result.updates = {};
       result.updates.error = "Agent exited without committing any changes";
-      result.logEvents!.push({
+      if (!result.logEvents) result.logEvents = [];
+      result.logEvents.push({
         type: "completion_rejected",
         opts: { stage: session.stage ?? undefined, actor: "system", data: { reason: "no commits on SessionEnd" } },
       });
@@ -2102,8 +2118,8 @@ export function applyHookStatus(app: AppContext,
   }
 
   if (newStatus) {
-    const updates: Partial<Session> = { status: newStatus as Session["status"] };
-    if (newStatus === "failed") {
+    const updates: Partial<Session> = { ...result.updates, status: newStatus as Session["status"] };
+    if (newStatus === "failed" && !updates.error) {
       updates.error = String(payload.error ?? payload.error_details ?? "unknown error");
     }
     // Clear stale breakpoint when resuming from waiting
@@ -2260,26 +2276,39 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
         commits: rr.commits as string[] | undefined,
       };
 
-      // Hard enforcement: reject completion if no new commits exist in the worktree.
-      // Agents that "explore" but don't commit are not done -- steer them to finish.
+      // Hard enforcement: reject completion if no new commits exist for the current stage.
+      // Uses stage_start_sha (recorded at dispatch) for per-stage verification.
+      // Falls back to origin/main..HEAD when stage_start_sha is unavailable.
       if (session.workdir && session.branch) {
         try {
-          const newCommits = execFileSync("git", ["log", "--oneline", `origin/main..HEAD`], {
-            cwd: session.workdir, encoding: "utf-8", timeout: 5000,
-          }).trim();
-          if (!newCommits) {
-            // No commits -- reject completion, steer agent to actually commit
+          const startSha = (session.config as any)?.stage_start_sha as string | undefined;
+          let hasNewCommits = false;
+          if (startSha) {
+            // Per-stage check: compare HEAD against the sha recorded when this stage started
+            const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
+              cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+            }).trim();
+            hasNewCommits = headSha !== startSha;
+          } else {
+            // Fallback: check for any commits on branch vs origin/main
+            const newCommits = execFileSync("git", ["log", "--oneline", `origin/main..HEAD`], {
+              cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+            }).trim();
+            hasNewCommits = !!newCommits;
+          }
+          if (!hasNewCommits) {
+            // No commits during this stage -- reject completion
             result.logEvents!.push({
               type: "completion_rejected",
               opts: {
                 stage: session.stage ?? undefined,
                 actor: "system",
-                data: { reason: "no new commits in worktree" },
+                data: { reason: "no new commits in worktree", stage_start_sha: startSha },
               },
             });
             result.message = {
               role: "system",
-              content: "Completion rejected: no new commits found. You must commit your changes, push, and create a PR before reporting completed.",
+              content: "Completion rejected: no new commits found for this stage. You must commit your changes, push, and create a PR before reporting completed.",
               type: "error",
             };
             // Don't advance -- session stays running so agent can finish
