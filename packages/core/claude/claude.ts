@@ -7,7 +7,7 @@
  */
 
 import { randomUUID } from "crypto";
-import { existsSync, readFileSync, writeFileSync, symlinkSync, mkdirSync, renameSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, symlinkSync, mkdirSync, renameSync } from "fs";
 import { join, resolve } from "path";
 import { homedir } from "os";
 
@@ -361,6 +361,32 @@ export function writeHooksConfig(
   renameSync(tmpPath, settingsPath);
 
   return settingsPath;
+}
+
+/**
+ * Remove the ark-channel entry from the worktree's .mcp.json.
+ * Mirrors removeHooksConfig -- called on session stop/delete to avoid
+ * stale MCP config pointing at a dead channel port.
+ */
+export function removeChannelConfig(workdir: string): void {
+  const mcpConfigPath = join(workdir, ".mcp.json");
+  if (!existsSync(mcpConfigPath)) return;
+
+  let config: Record<string, any>;
+  try { config = JSON.parse(readFileSync(mcpConfigPath, "utf-8")); }
+  catch (e: any) { console.error(`removeChannelConfig: failed to parse ${mcpConfigPath}:`, e?.message ?? e); return; }
+
+  if (config.mcpServers && typeof config.mcpServers === "object") {
+    delete config.mcpServers["ark-channel"];
+    if (Object.keys(config.mcpServers).length === 0) delete config.mcpServers;
+  }
+
+  // If only empty object remains, remove the file entirely
+  if (Object.keys(config).length === 0) {
+    try { unlinkSync(mcpConfigPath); } catch { /* already gone */ }
+  } else {
+    writeFileSync(mcpConfigPath, JSON.stringify(config, null, 2));
+  }
 }
 
 export function removeHooksConfig(workdir: string): void {
