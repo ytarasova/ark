@@ -66,6 +66,12 @@ system_prompt: |
   Update {workdir}/.workflow/{ticket}/state.json with:
   - last_completed_stage: 4, verify_result, critical_failures,
     warnings, verify_report_path, timestamp.
+
+  ## Completion
+  Call `report` with type='completed' including: verification verdict
+  (PASS/FAIL/PASS WITH WARNINGS), count of critical failures, count of
+  warnings, test results summary (total/passed/failed), and the
+  verify-report.md path.
 tools:
   - Bash
   - Read
