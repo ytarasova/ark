@@ -34,16 +34,39 @@ import { matchesHotkey } from "../../core/hotkeys.js";
 
 type Overlay = "move" | "group" | "talk" | "inbox" | "fork" | "search" | "replay" | "mcp" | "skills" | "settings" | "find" | "memory" | "worktreeFinish" | null;
 
+/**
+ * State that contributes to "which sessions are visible" in the left pane.
+ * Today this is only the status filter; kept as a struct so future filter
+ * dimensions (group, archived, etc.) can join here without rewriting callers.
+ */
+export interface SessionListFilters {
+  statusFilter: string | null;
+}
+
+/** Initial empty filter state (no filters applied -- all sessions visible). */
+export const EMPTY_SESSION_FILTERS: SessionListFilters = { statusFilter: null };
+
+/** True if any list filter dimension is currently active. */
+export function hasActiveSessionFilters(f: SessionListFilters): boolean {
+  return f.statusFilter !== null;
+}
+
+/** Reset every list filter dimension to its empty default. Pure helper. */
+export function resetSessionFilters(_current: SessionListFilters): SessionListFilters {
+  return EMPTY_SESSION_FILTERS;
+}
+
 interface SessionsTabProps extends StoreData {
   asyncState: AsyncState;
   pane: "left" | "right";
   onShowForm: () => void;
   onSelectionChange?: (session: Session | null) => void;
+  onFiltersChange?: (filters: SessionListFilters) => void;
   formOverlay?: React.ReactNode;
   refresh: () => void;
 }
 
-export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState, onShowForm, onSelectionChange, formOverlay }: SessionsTabProps) {
+export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState, onShowForm, onSelectionChange, onFiltersChange, formOverlay }: SessionsTabProps) {
   const theme = getTheme();
   const ark = useArkClient();
   const focus = useFocus();
@@ -53,6 +76,18 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const status = useStatusMessage();
+
+  // Notify parent when filter state changes so the status bar can show the
+  // "Esc:clear filter" hint while any filter is active.
+  useEffect(() => {
+    onFiltersChange?.({ statusFilter });
+  }, [statusFilter, onFiltersChange]);
+
+  // Reset every list filter dimension at once. Wired to Esc on the left pane.
+  const clearAllFilters = useCallback(() => {
+    const next = resetSessionFilters({ statusFilter });
+    setStatusFilter(next.statusFilter);
+  }, [statusFilter]);
 
   // Top-level sessions, sorted by group name to match visual TreeList order
   const topLevel = useMemo(() => {
@@ -176,6 +211,17 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
 
   useInput((input, key) => {
     if (pane !== "left" || hasOverlay) return;
+
+    // Esc clears every active filter dimension at once. No-op if nothing is
+    // filtered, so Esc never feels broken regardless of state.
+    if (key.escape) {
+      if (confirmation.pending) { confirmation.cancel(); status.clear(); return; }
+      if (hasActiveSessionFilters({ statusFilter })) {
+        clearAllFilters();
+        status.show("Filters cleared");
+      }
+      return;
+    }
 
     // Global keys — work regardless of selection
     if (matchesHotkey("search", input, key)) { setOverlay("find"); return; }
@@ -423,7 +469,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
               });
             }}
             sel={sel}
-            emptyMessage={statusFilter ? `No ${statusFilter} sessions. Press 0 to clear filter.` : "No sessions. Press n to create."}
+            emptyMessage={statusFilter ? `No ${statusFilter} sessions.` : "No sessions."}
           />
         }
         right={
@@ -585,8 +631,18 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   );
 }
 
-export function getSessionHints(s: Session | null | undefined): React.ReactNode[] {
+export function getSessionHints(
+  s: Session | null | undefined,
+  filters: SessionListFilters = EMPTY_SESSION_FILTERS,
+): React.ReactNode[] {
   const hints: React.ReactNode[] = [];
+
+  // Show "Esc:clear filter" first whenever ANY list filter is active so the
+  // user always has an obvious escape hatch from a stuck filter state.
+  if (hasActiveSessionFilters(filters)) {
+    hints.push(<KeyHint key="escClear" k="Esc" label="clear filter" />);
+    hints.push(sep(0));
+  }
 
   if (s) {
     // Status-specific actions

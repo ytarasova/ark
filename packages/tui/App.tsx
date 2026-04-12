@@ -16,7 +16,7 @@ import {
   getGenericHints,
   flattenHints,
 } from "./helpers/statusBarHints.js";
-import { SessionsTab, getSessionHints } from "./tabs/SessionsTab.js";
+import { SessionsTab, getSessionHints, EMPTY_SESSION_FILTERS, type SessionListFilters } from "./tabs/SessionsTab.js";
 import { ComputeTab, getComputeHints } from "./tabs/ComputeTab.js";
 import { AgentsTab, getAgentsHints } from "./tabs/AgentsTab.js";
 import { FlowsTab, getFlowsHints } from "./tabs/FlowsTab.js";
@@ -72,6 +72,7 @@ function AppInner() {
   const [eventLogExpanded, setEventLogExpanded] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [selectedSession, setSelectedSession] = useState<import("../types/index.js").Session | null>(null);
+  const [sessionFilters, setSessionFilters] = useState<SessionListFilters>(EMPTY_SESSION_FILTERS);
   const [pane, setPane] = useState<Pane>("left");
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 40;
@@ -152,6 +153,7 @@ function AppInner() {
           asyncState={sessionsAsync}
           onShowForm={() => setShowForm("session")}
           onSelectionChange={setSelectedSession}
+          onFiltersChange={setSessionFilters}
 
           formOverlay={showForm === "session" ? (
             <NewSessionForm
@@ -234,7 +236,7 @@ function AppInner() {
         hints={useMemo(() =>
           focus.owner ? getOverlayHints(focus.owner)
           : pane === "right" ? getRightPaneHints(tab)
-          : tab === "sessions" ? getSessionHints(selectedSession)
+          : tab === "sessions" ? getSessionHints(selectedSession, sessionFilters)
           : tab === "agents" ? getAgentsHints()
           : tab === "tools" ? getToolsHints()
           : tab === "flows" ? getFlowsHints()
@@ -244,7 +246,7 @@ function AppInner() {
           : tab === "costs" ? getCostsHints()
           : tab === "schedules" ? getSchedulesHints()
           : getGenericHints(),
-        [tab, pane, focus.owner, selectedSession])}
+        [tab, pane, focus.owner, selectedSession, sessionFilters])}
         overlayBarText={focus.owner ? flattenHints(getOverlayHints(focus.owner)) : null}
         sessions={store.sessions}
         loading={asyncState.loading}
