@@ -13,6 +13,7 @@ import {
   resetSessionFilters,
   hasActiveSessionFilters,
   EMPTY_SESSION_FILTERS,
+  statusGroupLabel,
 } from "../tabs/SessionsTab.js";
 import { getComputeHints } from "../tabs/ComputeTab.js";
 import { getToolsHints } from "../tabs/ToolsTab.js";
@@ -92,10 +93,10 @@ describe("getOverlayHints", () => {
 });
 
 describe("getSessionHints", () => {
-  it("null session returns empty hints (no session-specific actions)", () => {
+  it("null session returns only the group toggle hint", () => {
     const hints = getSessionHints(null);
-    // No session selected = no context-specific actions
-    expect(hints).toHaveLength(0);
+    // No session selected = only the group-by-status toggle hint
+    expect(hasLabel(hints, "group")).toBe(true);
     expect(hasLabel(hints, "attach")).toBe(false);
     expect(hasLabel(hints, "stop")).toBe(false);
   });
@@ -149,14 +150,14 @@ describe("getSessionHints", () => {
   });
 
   it("status filter active: shows Esc:clear filter hint even with no selection", () => {
-    const hints = getSessionHints(null, { statusFilter: "running" });
+    const hints = getSessionHints(null, { statusFilter: "running", groupByStatus: false });
     expect(hasLabel(hints, "clear filter")).toBe(true);
     expect(hasKey(hints, "Esc")).toBe(true);
   });
 
   it("status filter active with a selection: clear-filter hint comes before session actions", () => {
     const session = { status: "running" } as Session;
-    const hints = getSessionHints(session, { statusFilter: "running" });
+    const hints = getSessionHints(session, { statusFilter: "running", groupByStatus: false });
     const labels = extractHintLabels(hints).map(h => h.label);
     expect(labels[0]).toBe("clear filter");
     expect(hasLabel(hints, "attach")).toBe(true); // session-level hints still present
@@ -166,6 +167,18 @@ describe("getSessionHints", () => {
     const hints = getSessionHints(null);
     expect(hasLabel(hints, "clear filter")).toBe(false);
   });
+
+  it("groupByStatus active: shows '%:ungroup' hint", () => {
+    const hints = getSessionHints(null, { statusFilter: null, groupByStatus: true });
+    expect(hasLabel(hints, "ungroup")).toBe(true);
+    expect(hasKey(hints, "%")).toBe(true);
+  });
+
+  it("groupByStatus inactive: shows '%:group' hint", () => {
+    const hints = getSessionHints(null, EMPTY_SESSION_FILTERS);
+    expect(hasLabel(hints, "group")).toBe(true);
+    expect(hasKey(hints, "%")).toBe(true);
+  });
 });
 
 describe("session filter helpers", () => {
@@ -173,26 +186,53 @@ describe("session filter helpers", () => {
     expect(hasActiveSessionFilters(EMPTY_SESSION_FILTERS)).toBe(false);
   });
 
+  it("EMPTY_SESSION_FILTERS includes groupByStatus: false", () => {
+    expect(EMPTY_SESSION_FILTERS.groupByStatus).toBe(false);
+  });
+
   it("hasActiveSessionFilters returns true when statusFilter is set", () => {
-    expect(hasActiveSessionFilters({ statusFilter: "running" })).toBe(true);
-    expect(hasActiveSessionFilters({ statusFilter: "failed" })).toBe(true);
+    expect(hasActiveSessionFilters({ statusFilter: "running", groupByStatus: false })).toBe(true);
+    expect(hasActiveSessionFilters({ statusFilter: "failed", groupByStatus: false })).toBe(true);
   });
 
   it("hasActiveSessionFilters returns false when statusFilter is null", () => {
-    expect(hasActiveSessionFilters({ statusFilter: null })).toBe(false);
+    expect(hasActiveSessionFilters({ statusFilter: null, groupByStatus: false })).toBe(false);
+  });
+
+  it("hasActiveSessionFilters is not affected by groupByStatus alone", () => {
+    expect(hasActiveSessionFilters({ statusFilter: null, groupByStatus: true })).toBe(false);
   });
 
   it("resetSessionFilters clears every dimension regardless of input", () => {
-    expect(resetSessionFilters({ statusFilter: "running" })).toEqual(EMPTY_SESSION_FILTERS);
-    expect(resetSessionFilters({ statusFilter: "failed" })).toEqual(EMPTY_SESSION_FILTERS);
-    expect(resetSessionFilters({ statusFilter: null })).toEqual(EMPTY_SESSION_FILTERS);
+    expect(resetSessionFilters({ statusFilter: "running", groupByStatus: true })).toEqual(EMPTY_SESSION_FILTERS);
+    expect(resetSessionFilters({ statusFilter: "failed", groupByStatus: false })).toEqual(EMPTY_SESSION_FILTERS);
+    expect(resetSessionFilters({ statusFilter: null, groupByStatus: false })).toEqual(EMPTY_SESSION_FILTERS);
   });
 
   it("resetSessionFilters output is itself inactive (idempotent)", () => {
-    const cleared = resetSessionFilters({ statusFilter: "running" });
+    const cleared = resetSessionFilters({ statusFilter: "running", groupByStatus: true });
     expect(hasActiveSessionFilters(cleared)).toBe(false);
     // running it again on already-cleared state is a no-op
     expect(resetSessionFilters(cleared)).toEqual(cleared);
+  });
+});
+
+describe("statusGroupLabel", () => {
+  it("maps known statuses to display labels", () => {
+    expect(statusGroupLabel("running")).toBe("Running");
+    expect(statusGroupLabel("waiting")).toBe("Waiting");
+    expect(statusGroupLabel("blocked")).toBe("Blocked");
+    expect(statusGroupLabel("ready")).toBe("Ready");
+    expect(statusGroupLabel("pending")).toBe("Pending");
+    expect(statusGroupLabel("completed")).toBe("Completed");
+    expect(statusGroupLabel("stopped")).toBe("Stopped");
+    expect(statusGroupLabel("failed")).toBe("Failed");
+    expect(statusGroupLabel("archived")).toBe("Archived");
+  });
+
+  it("maps unknown statuses to 'Other'", () => {
+    expect(statusGroupLabel("unknown")).toBe("Other");
+    expect(statusGroupLabel("")).toBe("Other");
   });
 });
 
