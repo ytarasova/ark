@@ -35,6 +35,8 @@ export interface LaunchOpts {
   sessionName?: string;
   /** AppContext passed from dispatch -- avoids getApp() in executors. */
   app?: import("./app.js").AppContext;
+  /** Initial prompt to send to the agent at launch (auto-start). */
+  initialPrompt?: string;
 }
 
 export interface LaunchResult {
