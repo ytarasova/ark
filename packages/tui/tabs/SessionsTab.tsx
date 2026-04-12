@@ -4,7 +4,7 @@ import { getTheme } from "../../core/theme.js";
 import type { Session, SearchResult } from "../../core/index.js";
 import { ICON } from "../constants.js";
 import { getStatusColor } from "../helpers/colors.js";
-import { formatSessionRow, getColumnWidths, fitText, sessionLabel, shortId } from "../helpers/sessionFormatting.js";
+import { fitText, sessionLabel } from "../helpers/sessionFormatting.js";
 import { ago } from "../helpers.js";
 import { KeyHint, sep } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";

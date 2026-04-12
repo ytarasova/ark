@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { existsSync, readFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import {
   MODEL_MAP,
@@ -239,8 +239,7 @@ describe("writeChannelConfig", () => {
   it("preserves existing .mcp.json content", () => {
     const workdir = getCtx().arkDir;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { writeFileSync: wfs } = require("fs");
-    wfs(join(workdir, ".mcp.json"), JSON.stringify({
+    writeFileSync(join(workdir, ".mcp.json"), JSON.stringify({
       mcpServers: { "other-server": { command: "other" } },
     }));
 
@@ -274,8 +273,7 @@ describe("writeChannelConfig", () => {
     const workdir = getCtx().arkDir;
     const originalRepo = join(workdir, "original-repo");
     mkdirSync(originalRepo, { recursive: true });
-    const { writeFileSync: wfs } = require("fs");
-    wfs(join(originalRepo, ".mcp.json"), JSON.stringify({
+    writeFileSync(join(originalRepo, ".mcp.json"), JSON.stringify({
       mcpServers: {
         "context7": { command: "npx", args: ["-y", "@context7/mcp"] },
         "playwright": { command: "npx", args: ["-y", "@playwright/mcp"] },
@@ -297,8 +295,7 @@ describe("writeChannelConfig", () => {
     const workdir = getCtx().arkDir;
     const originalRepo = join(workdir, "original-repo");
     mkdirSync(originalRepo, { recursive: true });
-    const { writeFileSync: wfs } = require("fs");
-    wfs(join(originalRepo, ".mcp.json"), JSON.stringify({
+    writeFileSync(join(originalRepo, ".mcp.json"), JSON.stringify({
       mcpServers: { "my-server": { command: "old-cmd" } },
     }));
 
@@ -320,8 +317,7 @@ describe("writeChannelConfig", () => {
     const workdir = getCtx().arkDir;
     const originalRepo = join(workdir, "original-repo");
     mkdirSync(originalRepo, { recursive: true });
-    const { writeFileSync: wfs } = require("fs");
-    wfs(join(originalRepo, ".mcp.json"), JSON.stringify({
+    writeFileSync(join(originalRepo, ".mcp.json"), JSON.stringify({
       mcpServers: {
         "ark-channel": { command: "stale-bun", env: { ARK_SESSION_ID: "s-old" } },
         "useful-server": { command: "useful" },
@@ -341,8 +337,7 @@ describe("writeChannelConfig", () => {
 
   it("does not merge when originalRepoDir equals workdir", () => {
     const workdir = getCtx().arkDir;
-    const { writeFileSync: wfs } = require("fs");
-    wfs(join(workdir, ".mcp.json"), JSON.stringify({
+    writeFileSync(join(workdir, ".mcp.json"), JSON.stringify({
       mcpServers: { "existing": { command: "existing" } },
     }));
 
@@ -386,8 +381,7 @@ describe("removeChannelConfig", () => {
 
   it("preserves other MCP servers in .mcp.json", () => {
     const workdir = getCtx().arkDir;
-    const { writeFileSync: wfs } = require("fs");
-    wfs(join(workdir, ".mcp.json"), JSON.stringify({
+    writeFileSync(join(workdir, ".mcp.json"), JSON.stringify({
       mcpServers: { "other-server": { command: "other" } },
     }));
 
@@ -401,8 +395,7 @@ describe("removeChannelConfig", () => {
 
   it("preserves non-mcpServers keys in .mcp.json", () => {
     const workdir = getCtx().arkDir;
-    const { writeFileSync: wfs } = require("fs");
-    wfs(join(workdir, ".mcp.json"), JSON.stringify({
+    writeFileSync(join(workdir, ".mcp.json"), JSON.stringify({
       mcpServers: { "ark-channel": { command: "bun" } },
       customKey: "preserved",
     }));
@@ -420,8 +413,7 @@ describe("removeChannelConfig", () => {
 
   it("does nothing if .mcp.json has no ark-channel", () => {
     const workdir = getCtx().arkDir;
-    const { writeFileSync: wfs } = require("fs");
-    wfs(join(workdir, ".mcp.json"), JSON.stringify({
+    writeFileSync(join(workdir, ".mcp.json"), JSON.stringify({
       mcpServers: { "other-server": { command: "other" } },
     }));
 
