@@ -1,12 +1,28 @@
 # Ark Platform Roadmap
 
-> Last updated: 2026-04-12 (full-day session -- 28 PRs, autonomous SDLC, artifact tracking, orchestrator-mediated handoff, stage isolation, per-stage compute templates)
-> Unit tests: 2724 pass, 0 fail, 0 lint errors, 0 process leaks
+> Last updated: 2026-04-12 (51 PRs total -- DAG conditional routing, on_outcome branching, on_failure retry, daemon lifecycle, TUI daemon-client rewire, auto-rebase, verify stage, 6-page documentation suite, agent prompt optimization)
+> Unit tests: ~2968 test cases across 251 test files, 0 fail, 0 lint errors, 0 process leaks
 > E2E tests: 89 TUI (`packages/tui-e2e/`) + 78 web (`packages/e2e/web/`) = **167 passing, 0 skipped, 0 failed**
 >
 > **2026-04-10 decision (Foundry 2.0 review meeting):** Ark selected as the company-wide dev-workflow orchestrator -- the layer ABOVE tools like Goose / Claude Code / Codex, not a replacement. Framed as "the foundry" (control plane) with those tools as "the machines." First hand-out to early adopters targeted for the week of 2026-04-13. See **Camp 0: Early Adopter Ship** below.
 >
-> **2026-04-12 session shipped on `main`:**
+> **2026-04-12 session (continued) -- PRs #38-#51 shipped on `main`:**
+> - **on_outcome routing** -- `on_outcome` field on `StageDefinition` maps agent-reported outcomes (e.g. "approved", "rejected", "needs_info") to named target stages. `resolveNextStage()` checks the on_outcome map before falling back to linear progression. `CompletionReport` and `ReportResult` extended with `outcome` field. `validateDAG` checks that target stages exist. 16 tests. Commit `e2ab174`.
+> - **DAG conditional routing** -- `FlowEdge` interface with `condition` field (JS expression evaluated against session data). `resolveNextStages()` separates conditional and default edges, evaluates conditions, respects join barriers, and computes skipped stages. Helpers: `getSuccessors()`, `getPredecessors()`, `isJoinNode()`, `topologicalSort()`, `validateGraphFlow()`. New `conditional.yaml` flow definition demonstrates review-outcome branching. 11 tests. Commit `c986c45`.
+> - **on_failure retry loop** -- `on_failure: "retry(N)"` directive on flow stages. `parseOnFailure()` extracts max retries. `retryWithContext()` resets session to "ready" and re-dispatches with error context injected. Wired through both `handleReport()` and `handleHookStatus()` in conductor. Retry events logged with attempt tracking. 17 tests. Commit `d1d9221`.
+> - **Verify stage in autonomous-sdlc** -- new `verify` stage between `implement` and `review` in `autonomous-sdlc.yaml`. Uses `verifier` agent with `gate: auto` and `on_failure: "retry(2)"`. Runs test suite, lint, security checks, coverage analysis, acceptance criteria. `mediateStageHandoff()` now enforces repo config verify scripts (was inconsistent with `complete()`). 29 tests. Commit `a9f958f`.
+> - **TUI daemon-client rewire** -- complete replacement of direct `AppContext`/`getApp()` access in TUI with `ArkClient` RPC calls. `ArkClientProvider` creates in-memory transport pair for local mode. New `session/replay` RPC endpoint with `ReplayStep` type. All TUI components (AgentsTab, FlowsTab, SessionReplay, useComputeMetrics) now use RPC. TUI works in both local and remote modes. 5 tests. Commit `337d178`.
+> - **`ark daemon` command** -- `ark daemon start` (with `--detach` for background mode, PID file at `~/.ark/daemon.pid`), `ark daemon stop` (PID-based, stale cleanup), `ark daemon status` (health probe with version/platform display). Graceful shutdown handlers. Commit `e7640ed`.
+> - **Web daemon auto-detection** -- probes conductor (:19100/health) and arkd (:19300/health) with 2s timeout. New `daemon/status` RPC handler with parallel health probes. `useDaemonStatus` hook polls every 15s. Sidebar status dot (green/amber/red) and Dashboard System Health card reflect live daemon state. 3 tests. Commit `0ecdfc8`.
+> - **Auto-rebase before PR creation** -- `git rebase origin/<base-branch>` runs before `create_pr` action stage. Controlled by `auto_rebase` config in `.ark.yaml` (default: true). On conflict: aborts cleanly and proceeds with PR creation. 44 tests. Commit `7be0249`.
+> - **Agent prompt optimization** -- all 12 agent YAMLs updated with explicit completion protocols, structured JSON output (P0-P3), error recovery guidance, "read before write" patterns. Reviewer gets code-review skill. Worker gets CLAUDE.md context. Commit `3c3cc36`.
+> - **Comprehensive documentation suite** -- 6 new HTML pages: API Reference, Contributing/Development, Environment Variables, LLM Router, Runtimes Reference, Troubleshooting. Navigation updated across all 28 doc pages. Commit `a531ba0`.
+> - **Stage validation E2E tests** -- 770-line test suite covering verify scripts, TODO enforcement, multi-stage flow progression, handoff blocking, error recovery. 38 tests. Commit `ca58826`.
+> - **Completion path fix** -- `session/complete` RPC handler now calls `advance()` after `complete()`, fixing sessions stuck at "ready". 24 tests. Commit `f673708`.
+> - **Friendly repo name display** -- session detail shows basename (e.g. "ark") instead of full path. `formatRepoName()` helper. CLI and TUI forms store basename on create. 43 tests updated. Commit `bccca20`.
+> - **Lint cleanup** -- replaced `require()` with ES6 imports, removed unused imports. Commit `a79c521`.
+>
+> **2026-04-12 session (earlier) shipped on `main`:**
 > - **Auto-start dispatch for all runtimes** -- replaced the fragile tmux-based `deliverInitialPrompt` (pane polling + `sendReliable`) with native CLI arg injection per executor. Claude: task passed as a positional arg to `claude` CLI for immediate processing. Codex/Gemini: `initialPrompt` added to `LaunchOpts`, handled via three `task_delivery` modes (arg, stdin, file). Goose: `-t` flag for task + new `-s` (stay-alive) flag for interactive/manual-gate stages. The obsolete `deliver-task.ts` module + tests deleted (379 lines removed). Commits `e2eb214`, `c70806c`, `7c053f6`, `ac87721`.
 > - **Channel permissions fix** -- `mcp__ark-channel__*` always included in `permissions.allow` since `ark-channel` is system infrastructure injected at dispatch, not declared in `agent.tools`. Without this, `report` and `send_to_agent` were blocked by Claude Code's permission system for all 12 agents. Commit `0eaf60d`.
 > - **Autonomous flow + SessionEnd completion fallback** -- new `flows/definitions/autonomous.yaml` (single stage, `gate: auto`) for fully autonomous dispatch. When a `SessionEnd` hook fires on a running auto-gate session, the conductor treats it as implicit completion and triggers `advance()` -- handles the case where the channel `report` tool was unavailable but the agent finished its work. Commit `4b7ed83`.
@@ -85,7 +101,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Awilix DI container** | All services/repos/stores resolve from AppContext. Zero `getApp()` in production code. | Yes |
 | **IDatabase abstraction** | SQLite adapter (local). Postgres adapter (hosted -- sync-over-async, see caveats). | Yes |
 | **Session orchestration** | Full lifecycle: start, dispatch, stop, resume, advance, complete, fork, clone, spawn, fan-out, handoff. | Yes |
-| **DAG flow engine** | `depends_on`, parallel stages, auto-join on child completion, branch merge with conflict detection. | Yes |
+| **DAG flow engine** | `depends_on`, parallel stages, auto-join on child completion, branch merge with conflict detection. DAG conditional routing (FlowEdge with `condition`), on_outcome branching, on_failure retry, topological sort, cycle detection, join barriers, skipped-stage computation. | Yes |
 | **Knowledge graph** | Unified store (codebase + sessions + memories + learnings + skills). MCP tools. Context injection at dispatch. Markdown export/import. Old systems (memory.ts, learnings.ts, hybrid-search.ts) deleted. | 79 tests |
 | **Agent eval system** | Runtime evals: evaluateSession, getAgentStats, detectDrift, listEvals. Auto-evaluates on session completion. Old keyword-matching evals deleted. | 10 tests |
 | **Universal cost tracking** | PricingRegistry (300+ models via LiteLLM JSON), UsageRecorder (usage_records table), multi-dimensional attribution (session, user, tenant, model, provider, runtime, agent_role). | 28 tests |
@@ -98,13 +114,25 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Schema cleanup** | Dead `migrateAddColumn` calls removed -- schema.ts is now the canonical CREATE TABLE definition. No in-place migration layer until there's production data to preserve. `rm ~/.ark/ark.db` is the documented dev workflow for destructive changes. | Yes |
 | **Goose native runtime** | Full native integration (`packages/core/executors/goose.ts`): text + recipe dispatch (`--recipe` / `--sub-recipe` / `--params`), channel MCP wired as `--with-extension`, router-injected `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL`, `--no-session --quiet --output-format stream-json`, `--model` / `--max-turns` from agent YAML. Binary vendored per platform via `scripts/vendor-goose.sh` + `vendor/versions.yaml` manifest. Unlocks Abhimanyu's ISLC recipe set without porting. | 15 unit tests |
 | **Executor barrel + plugin discovery** | `packages/core/executors/index.ts` owns `builtinExecutors: Executor[]` as the single source of truth. Boot loops this array, registering into the module lookup AND the Awilix container under `executor:<name>`. `loadPluginExecutors(arkDir)` discovers user-provided executors at `~/.ark/plugins/executors/*.js` via dynamic import. Failures never block boot. | Yes |
+| **on_outcome routing** | `on_outcome` field on `StageDefinition` maps agent-reported outcome labels (e.g. "approved", "rejected") to named target stages. `resolveNextStage()` checks on_outcome map before linear fallback. Wired through `applyReport` -> `mediateStageHandoff` -> `advance`. `validateDAG` validates target stages exist. Channel `report` tool accepts `outcome` parameter. | 16 tests |
+| **DAG conditional routing** | `FlowEdge` interface with `condition` field (JS expressions against session data). `resolveNextStages()` evaluates conditions, respects join barriers, computes skipped stages. Helpers: `getSuccessors`, `getPredecessors`, `isJoinNode`, `topologicalSort`, `validateGraphFlow`. New `conditional.yaml` flow definition. | 11 tests |
+| **on_failure retry loop** | `on_failure: "retry(N)"` directive on flow stages. `parseOnFailure()` extracts max retries. `retryWithContext()` resets session and re-dispatches with error context. Wired through `handleReport()` and `handleHookStatus()` in conductor. Retry events logged with attempt tracking. | 17 tests |
+| **Daemon lifecycle management** | `ark daemon start` (`--detach` for background, PID file at `~/.ark/daemon.pid`), `ark daemon stop` (PID-based, stale cleanup), `ark daemon status` (health probe, version/platform display). Graceful shutdown handlers. | Yes |
+| **Web daemon auto-detection** | Probes conductor (:19100) and arkd (:19300) health endpoints. New `daemon/status` RPC handler. `useDaemonStatus` hook polls every 15s. Sidebar status dot (green/amber/red) and Dashboard System Health card show live daemon state. | 3 tests |
+| **TUI daemon-client architecture** | Complete replacement of direct `AppContext`/`getApp()` in TUI with `ArkClient` RPC calls. `ArkClientProvider` creates in-memory transport pair for local mode. New `session/replay` RPC endpoint. TUI works in both local and remote modes identically. | 5 tests |
+| **Auto-rebase before PR creation** | `git rebase origin/<base-branch>` before `create_pr` action stage. Controlled by `auto_rebase` in `.ark.yaml` (default: true). On conflict: aborts cleanly, proceeds with PR creation. | 44 tests |
+| **Agent prompt optimization** | All 12 agent YAMLs updated: explicit completion protocols, structured JSON output (P0-P3), error recovery, "read before write" patterns. Reviewer gets code-review skill. Worker gets CLAUDE.md context. | N/A |
+| **Verify stage in autonomous-sdlc** | New `verify` stage between `implement` and `review`. Uses `verifier` agent with `gate: auto` and `on_failure: "retry(2)"`. Pipeline: plan -> implement -> verify -> review -> pr -> merge. `mediateStageHandoff()` enforces repo config verify scripts. | 29 tests |
+| **Comprehensive documentation suite** | 6 new HTML pages: API Reference, Contributing, Environment Variables, LLM Router, Runtimes Reference, Troubleshooting. Navigation updated across all 28 doc pages. | N/A |
+| **Stage validation E2E tests** | 770-line test suite covering verify scripts, TODO enforcement, multi-stage flow progression, handoff blocking, error recovery. | 38 tests |
+| **Completion path fix** | `session/complete` RPC handler calls `advance()` after `complete()`, fixing sessions stuck at "ready" instead of progressing. | 24 tests |
 | **Vendor freshness CI** | `vendor/versions.yaml` codifies pinned upstream versions for goose, codex, tmux, tensorzero, codegraph. Weekly scheduled workflow (`.github/workflows/vendor-freshness.yml`) polls upstream releases and opens a PR bumping the manifest when upstream is newer. Every bump goes through CI + human review, no auto-merge. | N/A |
 | **Module reorganization** | 91 flat files reorganized into 13 domain directories. Barrel exports. All imports updated. | Yes |
-| **SDLC flows** | 7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 12 flow definitions (incl. autonomous, autonomous-sdlc, brainstorm). | Yes |
+| **SDLC flows** | 7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 13 flow definitions (incl. autonomous, autonomous-sdlc, brainstorm, conditional). | Yes |
 | **Skills** | 7 builtin (spec-extraction, sanity-gate, plan-audit, security-scan, self-review, code-review, test-writing). | Yes |
 | **Recipes** | 10 templates (islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature, self-dogfood, self-quick). | Yes |
-| **CLI** | 17 command modules. `ark dashboard/knowledge/eval/router/runtime/tenant/auth` all working. | Yes |
-| **Web UI** | Dashboard (widget grid + Recharts cost charts), Sessions, Agents+Runtimes, Flows, Compute, History, Memory/Knowledge, Tools, Schedules, Costs, Settings, Login. | Yes |
+| **CLI** | 25 command modules. `ark dashboard/knowledge/eval/router/runtime/tenant/auth/daemon` all working. | Yes |
+| **Web UI** | Dashboard (widget grid + Recharts cost charts + daemon health), Sessions (status filter tabs), Agents+Runtimes, Flows, Compute, History, Memory/Knowledge, Tools, Schedules, Costs, Settings, Login. 28 doc pages. | Yes |
 | **TUI** | 9-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary in empty state. ASCII cost charts. Agents+Runtimes sub-groups. | Yes |
 | **ESLint** | 0 errors, 0 warnings. CI lint step. | Yes |
 | **Process leak prevention** | stopAll via provider, awaited dispatches, proper shutdown order. | Yes |
@@ -113,7 +141,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Auto-start dispatch** | Native CLI arg injection per executor replaces fragile tmux pane polling. Claude: positional arg. Codex/Gemini: `initialPrompt` via LaunchOpts (arg/stdin/file modes). Goose: `-t` + `-s` (stay-alive for manual-gate). Old `deliver-task.ts` module deleted. | Yes |
 | **Autonomous flow** | `flows/definitions/autonomous.yaml` -- single stage, `gate: auto`. `SessionEnd` hook on running auto-gate session triggers implicit completion via `advance()`. Three completion paths (manual report, auto-advance, hook-fallback) all covered by e2e tests. | Yes |
 | **Channel permissions** | `mcp__ark-channel__*` always included in `permissions.allow` -- system infrastructure injected at dispatch, not declared in agent YAML. Ensures `report` and `send_to_agent` tools work for all 12 agents. | Yes |
-| **Autonomous-SDLC flow** | `flows/definitions/autonomous-sdlc.yaml` -- four auto-gated stages (plan -> implement -> review -> pr). Self-dogfood recipe uses this flow. `self-quick` recipe for trivial tasks. | Yes |
+| **Autonomous-SDLC flow** | `flows/definitions/autonomous-sdlc.yaml` -- six auto-gated stages (plan -> implement -> verify -> review -> pr -> merge). Verify stage uses `verifier` agent with `on_failure: "retry(2)"`. Self-dogfood recipe uses this flow. `self-quick` recipe for trivial tasks. | Yes |
 | **Auto-merge action stage** | `auto_merge` action runs `gh pr merge --squash --auto`. Added to autonomous-sdlc and quick flows. Completes plan-to-merge pipeline. | Yes |
 | **Commit verification gates** | Two-layer gate: `applyReport()` checks `git status --porcelain` for uncommitted tracked files; conductor runs `runVerification()` before advancing agent stages. Worker agent system prompt enforces commit-before-completion. | 276 tests |
 | **Worktree auto-cleanup** | `removeSessionWorktree()` cleans up `~/.ark/worktrees/<sessionId>` on stop/delete via `git worktree remove --force` + `rmSync` fallback. Provider-independent. | Yes |
@@ -150,7 +178,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Auth middleware** | Token extraction, tenant scoping in web server. | Never tested with real multi-user sessions. No session management. | Medium |
 | **SDLC flow E2E** | Full pipeline defined with agents, skills, recipes. Flow progression mechanics exercised by `flows.pw.ts` + `flows.spec.ts` -- walks `default` flow through all 9 stages via `session/advance`, asserts each transition. | Never processed a real Jira ticket end-to-end with a real Claude agent. MCP integrations (Atlassian, Bitbucket, Figma) still untested against live services. | Medium |
 | **OTLP observability** | `otlp.ts` sends spans to OTLP/HTTP endpoint. | Never tested against real Jaeger/Tempo/Honeycomb. | Medium |
-| **Knowledge: Axon indexer** | Calls Axon subprocess, parses output, stores in graph. | Never tested with real Axon installed. Mock-tested only. | Medium |
+| **Knowledge: ops-codegraph indexer** | Calls ops-codegraph (33 languages via tree-sitter), parses output, stores in knowledge graph. | Never tested with real codegraph installed in CI. Mock-tested only. | Medium |
 | **Cost: router feed-back** | Router has in-memory cost tracking. UsageRecorder exists. | Router doesn't call `app.usageRecorder.record()` yet. Not wired. | Medium |
 | **Cost: non-Claude runtimes** | UsageRecorder supports any model/provider. | Codex/Gemini/Aider executors don't report usage yet. Only Claude transcript parsing works. | High |
 | **Dashboard** | Web widget grid, TUI summary, CLI command. | Data sources are partially mocked. No real fleet to visualize. | Low |
@@ -229,6 +257,19 @@ The orchestration platform for AI-powered software development. Manages the full
 - **Channel prompt auto-accept hardening (2026-04-12)** -- faster polling, double-tap Enter, early exit
 - **applyReport infrastructure file exclusion (2026-04-12)** -- filters `.claude/settings.local.json` and `.mcp.json` from uncommitted check; fixes "ready instead of completed" regression
 - **TUI session list polish (2026-04-12)** -- 12 fixes: grouping bugs, row width, age column, left pane width, ListRow unification, completion summary sanitization, SessionDetail pane polish
+- **on_outcome routing (2026-04-12)** -- agents report outcome labels, flow branches to mapped stages instead of linear next. 16 tests
+- **DAG conditional routing (2026-04-12)** -- `FlowEdge` with `condition` field, JS expression evaluation, join barriers, skip computation. New `conditional.yaml` flow. 11 tests
+- **on_failure retry loop (2026-04-12)** -- `on_failure: "retry(N)"` directive, `retryWithContext()` re-dispatches with error context. 17 tests
+- **Verify stage in autonomous-sdlc (2026-04-12)** -- new `verify` stage between `implement` and `review` with `verifier` agent. Pipeline now: plan -> implement -> verify -> review -> pr -> merge. 29 tests
+- **TUI daemon-client architecture (2026-04-12)** -- all TUI components rewired from direct `AppContext` to `ArkClient` RPC. Works in both local and remote modes
+- **`ark daemon` command (2026-04-12)** -- `start`/`stop`/`status` subcommands with `--detach`, PID file management, health probing
+- **Web daemon auto-detection (2026-04-12)** -- live health probes for conductor + arkd. Sidebar status dot + Dashboard System Health card
+- **Auto-rebase before PR creation (2026-04-12)** -- `git rebase origin/<base-branch>` before `create_pr` action. Configurable via `.ark.yaml`. 44 tests
+- **Agent prompt optimization (2026-04-12)** -- all 12 agent YAMLs updated: completion protocols, structured JSON output, error recovery, "read before write"
+- **Documentation suite (2026-04-12)** -- 6 new HTML pages: API Reference, Contributing, Environment Variables, LLM Router, Runtimes Reference, Troubleshooting
+- **Stage validation E2E tests (2026-04-12)** -- 770-line test suite: verify scripts, TODO enforcement, multi-stage flow progression. 38 tests
+- **Completion path fix (2026-04-12)** -- `session/complete` RPC calls `advance()` after `complete()`, fixing stuck sessions. 24 tests
+- **Friendly repo name display (2026-04-12)** -- basename instead of full path across CLI, TUI, and web
 - Unified Claude settings bundle writer -- `permissions.allow` generated from `agent.tools`, prompt-hint injection so agents know what tools exist without probing
 - Native Goose runtime (`runtimes/goose.yaml` + `packages/core/executors/goose.ts`) with recipe dispatch, channel MCP via `--with-extension`, LLM router routing
 - Vendored binary freshness manifest (`vendor/versions.yaml`) + CI workflow for goose / codex version bumps
@@ -357,7 +398,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | Build + publish Docker image to registry | 0.5 day | Deployment |
 | End-to-end: real Jira ticket through full SDLC flow | 2-3 days | "Send to dev" workflow |
 | Test remote client mode (TUI/CLI → remote server) | 1 day | Multi-user |
-| Test Axon indexer with real codebase | 0.5 day | Knowledge graph |
+| Test ops-codegraph indexer with real codebase | 0.5 day | Knowledge graph |
 
 ### Camp 2: Workflow Persistence & Recovery
 
@@ -589,6 +630,10 @@ All three are the same binary with different config. No separate builds.
 | ~~Core module reorganization~~ | ~~3-5 days~~ | **DONE** -- 13 domain directories |
 | ~~Delete old eval system~~ | ~~1-2 days~~ | **DONE** |
 | ~~Delete old knowledge systems~~ | ~~1-2 days~~ | **DONE** -- memory.ts, learnings.ts, hybrid-search.ts, knowledge.ts |
+| ~~Daemon lifecycle management~~ | ~~1-2 days~~ | **DONE** -- `ark daemon start/stop/status`, PID files, health probes |
+| ~~TUI daemon-client architecture~~ | ~~2-3 days~~ | **DONE** -- all TUI components via ArkClient RPC, works local + remote |
+| ~~DAG flow engine enhancements~~ | ~~2-3 days~~ | **DONE** -- on_outcome routing, conditional edges, on_failure retry, join barriers |
+| ~~Auto-rebase before PR~~ | ~~0.5 day~~ | **DONE** -- configurable via `.ark.yaml`, graceful conflict handling |
 | Async repo layer for Postgres | 3-5 days | Not started -- blocks hosted scale |
 | CI/CD pipeline (build/test/publish) | 1-2 days | Not started |
 | Higress gateway integration (enterprise) | 2-3 days | Research done, not started |
@@ -610,23 +655,59 @@ Camp 13: Plugin Platform          ████████       Phase 1 DONE (P
                                                  manifest/versioning/hot-reload, sandboxing)
 Camp 2:  Workflow Persistence     ████████       Temporal + crash recovery
 Camp 3:  Agent Intelligence       ████           Partial (evals, costs done; trust scoring, latency p50/p95 remain)
-Camp 4:  Dashboard & Viz          ████           Partial (dashboard, charts, smart polling done; live feed, graph viz remain)
+Camp 4:  Dashboard & Viz          ██             Mostly done (dashboard, charts, smart polling, daemon health).
+                                                 Remains: live feed, graph viz, agent detail depth
 Camp 5:  Security                 ██████         Enterprise blocker (audit trail, posture score, exec approval, secret detection)
-Camp 9:  Architecture             ████           Partial (DI, PluginRegistry, schema cleanup done; async Postgres remains)
+Camp 9:  Architecture             ██             Mostly done (DI, PluginRegistry, schema cleanup, daemon lifecycle,
+                                                 TUI daemon-client, DAG engine). Remains: async Postgres
 Camp 6:  Integrations             ██████         Webhooks, alert rules, GitHub Issues sync, Linear, Slack commands
 Camp 7:  Task Management          ████████       Task board ABOVE sessions, Aegis review, quality gates
 Camp 8:  UX Polish                ██████         Desktop .dmg shipping (currently broken), Homebrew, onboarding wizard, i18n
 ```
 
-**What changed in this update (2026-04-12 full session -- 28 PRs, 85 commits):**
+**What changed in this update (2026-04-12 full session -- 51 PRs, 100+ commits):**
 
-**Autonomous SDLC pipeline (end-to-end):**
-- Plan -> implement -> review -> PR -> auto-merge, fully autonomous with commit verification gates.
-- `autonomous-sdlc.yaml` (4-stage auto-gated), `brainstorm.yaml` (3-stage manual-gated for ideation).
+**DAG flow engine (new -- production-grade branching and routing):**
+- on_outcome routing -- agents report outcome labels (e.g. "approved", "rejected"), flow
+  advances to the mapped stage instead of linear next. Wired through applyReport -> advance.
+- DAG conditional routing -- `FlowEdge` with `condition` field (JS expressions against session
+  data). `resolveNextStages()` evaluates conditions, computes skipped stages, respects join barriers.
+- New `conditional.yaml` flow definition: review-outcome branching with revise/reject/approve paths.
+- on_failure retry loop -- `on_failure: "retry(N)"` directive. `retryWithContext()` re-dispatches
+  with error context. Wired through both `handleReport()` and `handleHookStatus()` in conductor.
+
+**Autonomous SDLC pipeline (hardened):**
+- Plan -> implement -> verify -> review -> PR -> auto-merge (6-stage, fully autonomous).
+- New `verify` stage with `verifier` agent, `gate: auto`, `on_failure: "retry(2)"`.
+- `mediateStageHandoff()` now enforces repo config verify scripts (was inconsistent).
+- `brainstorm.yaml` (3-stage manual-gated for ideation).
 - `auto_merge` action stage added to autonomous-sdlc and quick flows.
 - Three completion paths all tested: manual report, auto-advance, hook-fallback.
+- Auto-rebase before PR creation (`auto_rebase` in `.ark.yaml`, default true).
 
-**Stage orchestration infrastructure (new -- the architectural foundation for production SDLC):**
+**Daemon lifecycle (new):**
+- `ark daemon start/stop/status` CLI commands with `--detach` background mode, PID file management.
+- Web daemon auto-detection -- probes conductor + arkd health endpoints. Sidebar status dot
+  (green/amber/red) and Dashboard System Health card reflect live state.
+- `useDaemonStatus` hook polls every 15s with smart visibility detection.
+
+**TUI daemon-client architecture (new):**
+- Complete replacement of direct `AppContext`/`getApp()` in TUI with `ArkClient` RPC calls.
+- `ArkClientProvider` creates in-memory transport pair for local mode.
+- New `session/replay` RPC endpoint with `ReplayStep` type.
+- TUI now works identically in local and remote modes.
+
+**Agent prompt optimization (all 12 agents):**
+- Explicit completion protocols with `report()` guidance per role.
+- Structured JSON output format (P0-P3 priority) matching ReviewResult interface.
+- Error recovery guidance, "read before write" patterns.
+- Worker gets CLAUDE.md context, reviewer gets code-review skill.
+
+**Documentation (6 new pages):**
+- API Reference, Contributing/Development, Environment Variables, LLM Router,
+  Runtimes Reference, Troubleshooting. Navigation updated across all 28 doc pages.
+
+**Stage orchestration infrastructure:**
 - `mediateStageHandoff()` -- single orchestration entry point for all stage transitions
   (verify -> advance -> dispatch), replacing duplicated logic in conductor.
 - Stage isolation -- each stage gets a fresh runtime by default; `advance()` clears
@@ -638,7 +719,7 @@ Camp 8:  UX Polish                ██████         Desktop .dmg shippi
 - Artifact tracking -- `session_artifacts` table with cross-session query, 4 artifact types
   (file, commit, pr, branch), RPC handlers wired.
 
-**MCP config lifecycle (new):**
+**MCP config lifecycle:**
 - `writeChannelConfig` merges original repo `.mcp.json` into worktrees (agents keep user MCP servers).
 - `removeChannelConfig()` cleans up `ark-channel` entry on stop/delete + stale cleanup at boot.
 - Infrastructure file exclusion from uncommitted check (`.claude/settings.local.json`, `.mcp.json`).
@@ -648,12 +729,14 @@ Camp 8:  UX Polish                ██████         Desktop .dmg shippi
 - Conductor runs `runVerification()` before advancing agent stages.
 - SessionEnd auto-advance checks `git log` for new commits; no commits -> session failed.
 - Infrastructure files excluded from the uncommitted check.
+- Completion path fix -- `session/complete` RPC calls `advance()` after `complete()`.
 
 **Surface parity (TUI + Web):**
 - TUI: session-by-status grouping (`%`), per-stage status timeline in SessionDetail,
   12 display polish fixes (row width, age column, left pane, ListRow unification).
 - Web: full status filter tabs (running/waiting/pending/blocked/completed/failed/archived).
 - TUI/Web chat keyboard shortcuts (Tab/Enter/@mention hints, j/k/t/n/Escape).
+- Friendly repo name display (basename instead of full path) across all surfaces.
 
 **Runtime coverage:**
 - Auto-start dispatch for all 4 runtimes (Claude positional arg, Codex/Gemini initialPrompt, Goose -t/-s).
@@ -667,6 +750,7 @@ Camp 8:  UX Polish                ██████         Desktop .dmg shippi
 - CLI `--status` validation against `SESSION_STATUSES`.
 - Dispatch ARG_MAX fix (pass summary only, not full context blob).
 - Worktree auto-cleanup on stop/delete (provider-independent).
+- Lint cleanup: replaced `require()` with ES6 imports across codebase.
 
 ---
 
@@ -676,7 +760,7 @@ Camp 8:  UX Polish                ██████         Desktop .dmg shippi
 |---------|---------------|-------------|--------------|
 | **Mission Control** | 32-panel dashboard, Kanban, security posture, webhooks | Compute orchestration, DAG flows, knowledge graph | Dashboard depth, task board, security |
 | **SoulForge** | Codebase knowledge graph, PageRank, blast radius | Unified knowledge (code + sessions + memories) | Symbol-level precision (Axon handles this) |
-| **Goose** | Recipe-based SDLC, server mode | We replaced Goose's recipes with native Ark flows | Server mode (our control plane) |
+| **Goose** | Recipe-based SDLC, server mode | DAG conditional routing + on_outcome branching replaces Goose's linear recipes | Server mode (our control plane) |
 | **Higress** | CNCF AI gateway, enterprise-grade | Custom router with Ark-specific features | Enterprise gateway (use Higress for prod) |
 
 ---
@@ -747,9 +831,9 @@ From deep analysis of builderz-labs/mission-control (32 panels):
 
 | Feature | Ark Status | Gap |
 |---------|-----------|-----|
-| PageRank ranking of files | Axon does this (via indexer) | Need: verify Axon integration works with real repo |
+| PageRank ranking of files | ops-codegraph does this (via indexer) | Need: verify codegraph integration works with real repo |
 | Blast radius scoring | knowledge/impact MCP tool exists | Need: real-world testing |
-| Symbol-level extraction (33+ languages) | Axon handles via tree-sitter | Need: Axon as required dependency, tested |
+| Symbol-level extraction (33+ languages) | ops-codegraph handles via tree-sitter WASM | Need: codegraph as required dependency, tested |
 | Git co-change history | indexCoChanges() in indexer.ts | Need: real-world testing |
 | Real-time graph updates as files change | Incremental indexing on session completion | Need: verify incremental path works |
 
@@ -770,6 +854,10 @@ From deep analysis of builderz-labs/mission-control (32 panels):
 2. **TensorZero replaces our hand-rolled LLM provider adapters.** Keep our routing intelligence (classifier, task-aware policies, tenant policies, sticky sessions). TensorZero handles API dispatch (format conversion, retries, streaming, A/B testing, feedback optimization). Runs as Rust sidecar. Apache 2.0.
 3. **Async Postgres repos** required for hosted scale. Camp 9 priority.
 4. **Task board:** Tasks sit ABOVE sessions. Creating a task doesn't dispatch -- dispatching a task creates a session.
+5. **TUI as pure RPC client.** All TUI components communicate via ArkClient RPC, not direct AppContext. Makes local and remote mode identical. In-memory transport pair for local mode avoids network overhead.
+6. **DAG engine: dual routing model.** Static routing via `on_outcome` (agent-reported labels) for deliberate branching. Dynamic routing via `condition` (JS expressions against session data) for data-driven flow control. Both coexist on the same stage/edge.
+7. **on_failure retry with error context injection.** Failed stages re-dispatch with the failure reason injected into the task prompt, not just retried blindly. Max retries configurable per stage via `on_failure: "retry(N)"`.
+8. **Auto-rebase default-on, conflict-tolerant.** PR branches auto-rebase onto base before creation. Conflicts abort the rebase and proceed with PR anyway -- human handles the merge conflict in the PR itself.
 
 ## TensorZero Integration Plan
 
@@ -803,5 +891,9 @@ Agent → Ark Routing Layer (classify, policy, context) → TensorZero (Rust sid
 4. Build ≠ integrated (7 providers, router, auth, Postgres -- none tested against real services).
 5. Knowledge should be unified (7 systems → 1 graph).
 6. Theme consistency matters (0 hardcoded colors).
+7. DAG engine needs both static (depends_on, on_outcome) and dynamic (condition expressions) routing -- real workflows aren't linear.
+8. TUI-as-daemon-client pays for itself: one rewire makes local + remote mode identical, and eliminates an entire class of getApp() coupling bugs.
+9. Agents need explicit completion protocols in their prompts -- without them, agents finish work but forget to report status, leaving sessions stuck.
+10. Auto-rebase before PR reduces merge conflicts but must handle conflicts gracefully (abort + proceed) -- blocking PR creation on rebase failure is worse than the conflict.
 7. Mission Control sets the UX bar (32 panels vs our 11 views).
 8. Cost tracking must be universal (not just Claude -- every provider, every user, every dimension).
