@@ -181,6 +181,19 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
         session.dispatch(app, sessionId).catch(err => {
           logError("conductor", `auto-dispatch failed for ${sessionId}: ${err?.message ?? err}`);
         });
+      } else if (nextAction.type === "action") {
+        safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
+          const verify = await session.runVerification(app, sessionId);
+          if (!verify.ok) {
+            logWarn("conductor", `action stage blocked by verification for ${sessionId}: ${verify.message}`);
+            app.sessions.update(sessionId, {
+              status: "blocked",
+              breakpoint_reason: `Verification failed: ${verify.message.slice(0, 200)}`,
+            });
+            return;
+          }
+          await session.executeAction(app, sessionId, nextAction.action ?? "");
+        });
       }
     }
   }
