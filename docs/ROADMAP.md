@@ -1,6 +1,6 @@
 # Ark Platform Roadmap
 
-> Last updated: 2026-04-12 (auto-start dispatch + autonomous flow + completion paths)
+> Last updated: 2026-04-12 (full-day session -- autonomous SDLC, commit gates, worktree cleanup, brainstorm flow)
 > Unit tests: 2724 pass, 0 fail, 0 lint errors, 0 process leaks
 > E2E tests: 89 TUI (`packages/tui-e2e/`) + 78 web (`packages/e2e/web/`) = **167 passing, 0 skipped, 0 failed**
 >
@@ -11,6 +11,20 @@
 > - **Channel permissions fix** -- `mcp__ark-channel__*` always included in `permissions.allow` since `ark-channel` is system infrastructure injected at dispatch, not declared in `agent.tools`. Without this, `report` and `send_to_agent` were blocked by Claude Code's permission system for all 12 agents. Commit `0eaf60d`.
 > - **Autonomous flow + SessionEnd completion fallback** -- new `flows/definitions/autonomous.yaml` (single stage, `gate: auto`) for fully autonomous dispatch. When a `SessionEnd` hook fires on a running auto-gate session, the conductor treats it as implicit completion and triggers `advance()` -- handles the case where the channel `report` tool was unavailable but the agent finished its work. Commit `4b7ed83`.
 > - **E2E completion path tests** -- 448-line test file exercising three completion paths: manual (report tool), auto (advance on stage complete), and hook-fallback (SessionEnd triggers advance). Commit `a543e1c`.
+> - **Autonomous-SDLC flow** -- new `flows/definitions/autonomous-sdlc.yaml` with four auto-gated stages: plan (planner agent writes PLAN.md), implement (implementer writes code + tests), review (reviewer checks diff), pr (action stage auto-creates GitHub PR). Self-dogfood recipe upgraded to use this flow. New `self-quick` recipe + `make self-quick` for trivial tasks. Commit `13df653`.
+> - **Auto-merge action stage** -- new `auto_merge` action stage type that runs `gh pr merge --squash --auto` after PR creation. Added to autonomous-sdlc and quick flows. Completes the fully autonomous pipeline from plan through merge. Commit `b642bc2`.
+> - **Commit verification gates** -- two layers preventing agents from advancing past implement with uncommitted work: (1) `applyReport()` checks `git status --porcelain` for tracked file changes and blocks completion if found, (2) conductor runs `runVerification()` before advancing agent stages (not just action stages). 276-line test suite. Commits `953dff1`, `93a215c`.
+> - **Worktree auto-cleanup on session stop/delete** -- provider-independent `removeSessionWorktree()` helper that cleans up `~/.ark/worktrees/<sessionId>` via `git worktree remove --force` with `rmSync` fallback. Called from both `stop()` and `deleteSessionAsync()` regardless of provider availability. Commit `16e3a41`.
+> - **Channel path fix cascade** -- MCP channel server path broke after module reorg (`core/channel.ts` -> `core/conductor/channel.ts`). Fixed in three iterations across claude.ts, LocalProvider, and LocalArkdProvider, then centralized all three into a single `CHANNEL_SCRIPT_PATH` constant in `constants.ts`. Commits `fed500b`, `4dce66f`, `1356d15`, `911017f`.
+> - **Brainstorm flow** -- new `flows/definitions/brainstorm.yaml` with three stages (explore -> synthesize -> plan), manual gates for human steering. Explore generates multiple approaches, synthesize ranks and recommends, plan creates actionable PLAN.md. Commit `5b0f75a`.
+> - **Poller fix for Codex/Gemini** -- status poller now treats `not_found` as completed (cli-agent executor returns this when tmux session exits), fixing Codex/Gemini sessions stuck in "running" forever after the agent finished. Commit `c35adb0`.
+> - **Conductor action-stage fix** -- `handleHookStatus` auto-advance block now handles action stages (create_pr, merge, close), not just agent/fork stages. Previously, review -> pr transition via SessionEnd hook silently dropped the action. Commit `b4daca0`.
+> - **Local provider singleton** -- `ComputeRepository.create()` enforces one row per singleton provider+tenant combo, preventing ghost compute entries during parallel dispatch. Commit `8dc2f25`.
+> - **TUI session grouping** -- press `%` to group sessions by status (Running, Waiting, Blocked, etc.) with meaningful sort order. TreeList gains `groupSort` prop. Commit `1988607`.
+> - **TUI/Web chat keyboard shortcuts** -- TUI inbox overlay shows Tab/Enter/@mention hints; web SessionsPage gains j/k navigation, t for chat toggle, n for new session, / for search, Escape to dismiss. Commits `3c78736`, `cd81ed7`.
+> - **CLI status validation** -- `ark session list --status` now uses Commander `.choices()` with exported `SESSION_STATUSES` array for validation. Commit `1a3ded8`.
+> - **Gemini autonomous dispatch test** -- 293-line test suite validating the full Gemini runtime path: resolution, model remapping, cli-agent executor launch, status poller, flow advance, and transcript parser registration. Commit `0e20cda`.
+> - **Dispatch ARG_MAX fix** -- pass only `session.summary` (not the full context-injected task blob) as the CLI positional arg. The detailed context remains available via `--append-system-prompt` and channel delivery. Fixes silent crashes on macOS when context exceeded 256KB. Commit `1292fdb`.
 >
 > **2026-04-11 session shipped on `main`:**
 > - **Multi-tenant channel hardening** -- conductor `/api/channel/<sessionId>`, `/api/relay`, and `/hooks/status` all extract tenant via `Authorization: Bearer ark_<tid>_*` or `X-Ark-Tenant-Id` and route through `app.forTenant()`. `ARK_TENANT_ID` is injected into the channel MCP subprocess at dispatch, propagated through arkd's channel relay, and included in the hook curl POST. Closes the cross-tenant channel exposure flagged in the security audit (commits `e80ac4d`, `08d3329`). Unblocks hosted multi-tenant rollout.
@@ -72,9 +86,9 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Executor barrel + plugin discovery** | `packages/core/executors/index.ts` owns `builtinExecutors: Executor[]` as the single source of truth. Boot loops this array, registering into the module lookup AND the Awilix container under `executor:<name>`. `loadPluginExecutors(arkDir)` discovers user-provided executors at `~/.ark/plugins/executors/*.js` via dynamic import. Failures never block boot. | Yes |
 | **Vendor freshness CI** | `vendor/versions.yaml` codifies pinned upstream versions for goose, codex, tmux, tensorzero, codegraph. Weekly scheduled workflow (`.github/workflows/vendor-freshness.yml`) polls upstream releases and opens a PR bumping the manifest when upstream is newer. Every bump goes through CI + human review, no auto-merge. | N/A |
 | **Module reorganization** | 91 flat files reorganized into 13 domain directories. Barrel exports. All imports updated. | Yes |
-| **SDLC flows** | 7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 10 flow definitions (incl. autonomous). | Yes |
+| **SDLC flows** | 7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 12 flow definitions (incl. autonomous, autonomous-sdlc, brainstorm). | Yes |
 | **Skills** | 7 builtin (spec-extraction, sanity-gate, plan-audit, security-scan, self-review, code-review, test-writing). | Yes |
-| **Recipes** | 8 templates (islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature). | Yes |
+| **Recipes** | 10 templates (islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature, self-dogfood, self-quick). | Yes |
 | **CLI** | 17 command modules. `ark dashboard/knowledge/eval/router/runtime/tenant/auth` all working. | Yes |
 | **Web UI** | Dashboard (widget grid + Recharts cost charts), Sessions, Agents+Runtimes, Flows, Compute, History, Memory/Knowledge, Tools, Schedules, Costs, Settings, Login. | Yes |
 | **TUI** | 9-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary in empty state. ASCII cost charts. Agents+Runtimes sub-groups. | Yes |
@@ -85,6 +99,15 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Auto-start dispatch** | Native CLI arg injection per executor replaces fragile tmux pane polling. Claude: positional arg. Codex/Gemini: `initialPrompt` via LaunchOpts (arg/stdin/file modes). Goose: `-t` + `-s` (stay-alive for manual-gate). Old `deliver-task.ts` module deleted. | Yes |
 | **Autonomous flow** | `flows/definitions/autonomous.yaml` -- single stage, `gate: auto`. `SessionEnd` hook on running auto-gate session triggers implicit completion via `advance()`. Three completion paths (manual report, auto-advance, hook-fallback) all covered by e2e tests. | Yes |
 | **Channel permissions** | `mcp__ark-channel__*` always included in `permissions.allow` -- system infrastructure injected at dispatch, not declared in agent YAML. Ensures `report` and `send_to_agent` tools work for all 12 agents. | Yes |
+| **Autonomous-SDLC flow** | `flows/definitions/autonomous-sdlc.yaml` -- four auto-gated stages (plan -> implement -> review -> pr). Self-dogfood recipe uses this flow. `self-quick` recipe for trivial tasks. | Yes |
+| **Auto-merge action stage** | `auto_merge` action runs `gh pr merge --squash --auto`. Added to autonomous-sdlc and quick flows. Completes plan-to-merge pipeline. | Yes |
+| **Commit verification gates** | Two-layer gate: `applyReport()` checks `git status --porcelain` for uncommitted tracked files; conductor runs `runVerification()` before advancing agent stages. Worker agent system prompt enforces commit-before-completion. | 276 tests |
+| **Worktree auto-cleanup** | `removeSessionWorktree()` cleans up `~/.ark/worktrees/<sessionId>` on stop/delete via `git worktree remove --force` + `rmSync` fallback. Provider-independent. | Yes |
+| **Brainstorm flow** | `flows/definitions/brainstorm.yaml` -- three manual-gated stages (explore -> synthesize -> plan) for interactive ideation. | Yes |
+| **Channel path centralization** | `CHANNEL_SCRIPT_PATH` constant in `constants.ts` replaces 3 hardcoded `path.join(__dirname, ...)` resolutions across providers + claude.ts. | Yes |
+| **Local provider singleton** | `ComputeRepository.create()` enforces one row per singleton provider+tenant combo. Prevents ghost compute entries from parallel dispatch. | Yes |
+| **TUI session grouping** | `%` key toggles grouping sessions by status (Running, Waiting, etc.) with meaningful sort order. TreeList `groupSort` prop. | Yes |
+| **CLI status validation** | `ark session list --status` uses Commander `.choices()` with exported `SESSION_STATUSES` array. | Yes |
 | **MCP config stubs** | Templates for Atlassian, GitHub, Linear, Figma. | N/A |
 
 ### PARTIAL -- Built but NOT integration-tested or incomplete
@@ -159,6 +182,17 @@ The orchestration platform for AI-powered software development. Manages the full
 - **Auto-start dispatch for all runtimes (2026-04-12)** -- task delivery via native CLI arg injection per executor replaces fragile tmux pane polling. Claude: positional arg. Codex/Gemini: `initialPrompt` via LaunchOpts (arg/stdin/file modes). Goose: `-t` + `-s` (stay-alive for manual-gate). Obsolete `deliver-task.ts` deleted
 - **Channel permissions fix (2026-04-12)** -- `mcp__ark-channel__*` always in `permissions.allow` so `report`/`send_to_agent` work for all 12 agents
 - **Autonomous flow + SessionEnd fallback (2026-04-12)** -- `autonomous.yaml` (single stage, `gate: auto`). `SessionEnd` hook fires on running auto-gate session triggers implicit completion via `advance()`
+- **Autonomous-SDLC flow (2026-04-12)** -- four auto-gated stages (plan -> implement -> review -> pr + auto_merge). Self-dogfood recipe upgraded to full SDLC. New `self-quick` recipe for trivial tasks
+- **Commit verification gates (2026-04-12)** -- `applyReport()` checks `git status --porcelain` for uncommitted tracked files; conductor runs verify scripts before advancing agent stages (not just action stages). Worker agent prompt enforces commit-before-completion
+- **Worktree auto-cleanup (2026-04-12)** -- `removeSessionWorktree()` on stop/delete via `git worktree remove --force` + `rmSync` fallback, independent of provider
+- **Brainstorm flow (2026-04-12)** -- three manual-gated stages (explore -> synthesize -> plan) for interactive ideation
+- **Channel path centralization (2026-04-12)** -- `CHANNEL_SCRIPT_PATH` constant replaces 3 hardcoded path resolutions, fixing MCP server path broken after module reorg
+- **Poller + conductor fixes (2026-04-12)** -- poller treats `not_found` as completed (fixes Codex/Gemini sessions stuck forever); conductor handles action stages in hook-based auto-advance
+- **Local provider singleton (2026-04-12)** -- enforces one compute row per singleton provider+tenant combo, prevents ghost entries from parallel dispatch
+- **TUI session grouping (2026-04-12)** -- `%` key groups sessions by status with meaningful sort order
+- **CLI status validation (2026-04-12)** -- `ark session list --status` validates against `SESSION_STATUSES`
+- **Gemini autonomous dispatch test (2026-04-12)** -- 293-line test validating full Gemini runtime path
+- **Dispatch ARG_MAX fix (2026-04-12)** -- pass only `session.summary` as CLI arg (not full context blob); fixes silent crash on macOS when context exceeded 256KB
 - **E2E completion path tests (2026-04-12)** -- 448-line test covering manual, auto, and hook-fallback completion paths
 - Unified Claude settings bundle writer -- `permissions.allow` generated from `agent.tools`, prompt-hint injection so agents know what tools exist without probing
 - Native Goose runtime (`runtimes/goose.yaml` + `packages/core/executors/goose.ts`) with recipe dispatch, channel MCP via `--with-extension`, LLM router routing
@@ -549,15 +583,19 @@ Camp 7:  Task Management          ████████       Task board ABOV
 Camp 8:  UX Polish                ██████         Desktop .dmg shipping (currently broken), Homebrew, onboarding wizard, i18n
 ```
 
-**What changed in this update (2026-04-11):**
+**What changed in this update (2026-04-12):**
 
-- Camp 1 dropped from 12 bars to 2 -- the e2e work is 80% complete. The
-  remaining blocks are real-service integration (K8s, E2B, Docker image
-  publish) which are deployment tasks, not coverage gaps.
-- Camp 9 gained a "Phase 1 DI refactor done" note -- PluginRegistry is
-  wired and executors flow through Awilix.
-- Camp 8 explicitly surfaces the desktop shipping regression (unsigned
-  .dmg not landing on releases) so it's not lost in "UX polish".
+- Autonomous SDLC pipeline is now end-to-end: plan -> implement -> review -> PR -> auto-merge,
+  with commit verification gates preventing agents from advancing with uncommitted work.
+- 11 new flow definitions: `autonomous-sdlc.yaml` (4-stage auto-gated) and `brainstorm.yaml`
+  (3-stage manual-gated for ideation). `auto_merge` action stage added to quick flow too.
+- Worktree lifecycle hardened: auto-cleanup on stop/delete, provider-independent.
+- Channel MCP path resolution centralized in `CHANNEL_SCRIPT_PATH` -- eliminates a class of
+  post-reorg breakage across providers.
+- Codex/Gemini sessions now finish correctly (poller `not_found` fix + conductor action-stage fix).
+- Local compute no longer ghosts (singleton enforcement).
+- TUI gains session-by-status grouping (`%`), web gains keyboard shortcuts for sessions.
+- CLI `--status` validation, Gemini dispatch test suite, ARG_MAX dispatch fix all landed.
 
 ---
 
