@@ -743,6 +743,14 @@ export async function executeAction(app: AppContext, sessionId: string, action: 
       }
       return result;
     }
+    case "auto_merge": {
+      const result = await mergeWorktreePR(app, sessionId);
+      if (result.ok) {
+        app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: s.pr_url ?? undefined } });
+        return await advance(app, sessionId, true);
+      }
+      return result;
+    }
     case "close_ticket":
     case "close": {
       app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action } });
@@ -1735,6 +1743,46 @@ export async function createWorktreePR(app: AppContext, sessionId: string, opts?
     return { ok: true, message: `PR created: ${prUrl}`, pr_url: prUrl };
   } catch (e: any) {
     return { ok: false, message: `PR creation failed: ${e?.message ?? e}` };
+  }
+}
+
+// ── PR merge (auto_merge action) ────────────────────────────────────────
+
+/**
+ * Merge an existing PR via `gh pr merge`. Used by the auto_merge action stage.
+ * Requires the session to have a pr_url (set by a preceding create_pr stage).
+ */
+export async function mergeWorktreePR(app: AppContext, sessionId: string, opts?: {
+  method?: "merge" | "squash" | "rebase";
+  deleteAfter?: boolean;
+}): Promise<{ ok: boolean; message: string }> {
+  const session = app.sessions.get(sessionId);
+  if (!session) return { ok: false, message: `Session ${sessionId} not found` };
+
+  const prUrl = session.pr_url;
+  if (!prUrl) return { ok: false, message: "Session has no PR URL -- run create_pr first" };
+
+  const repo = session.repo;
+  if (!repo) return { ok: false, message: "Session has no repo" };
+
+  const method = opts?.method ?? "squash";
+  const deleteAfter = opts?.deleteAfter ?? true;
+
+  try {
+    const ghArgs = ["pr", "merge", prUrl, `--${method}`, "--auto"];
+    if (deleteAfter) ghArgs.push("--delete-branch");
+    const cwd = session.workdir ?? repo;
+    await execFileAsync("gh", ghArgs, { encoding: "utf-8", timeout: 30_000, cwd });
+
+    app.events.log(sessionId, "pr_merged", {
+      stage: session.stage ?? undefined,
+      actor: "system",
+      data: { pr_url: prUrl, method, delete_branch: deleteAfter },
+    });
+
+    return { ok: true, message: `PR merge initiated: ${prUrl}` };
+  } catch (e: any) {
+    return { ok: false, message: `PR merge failed: ${e?.message ?? e}` };
   }
 }
 
