@@ -14,6 +14,7 @@ import {
   channelMcpConfig,
   writeChannelConfig,
   removeChannelConfig,
+  readUserMcpConfig,
   buildLauncher,
   trustDirectory,
   type ClaudeArgsOpts,
@@ -269,6 +270,79 @@ describe("writeChannelConfig", () => {
     const channelConfig = content.mcpServers["ark-channel"];
     expect(channelConfig.command).toContain(".bun/bin/bun");
   });
+
+  it("merges user MCP servers into worktree config", () => {
+    const workdir = getCtx().arkDir;
+    const userServers = {
+      "my-tool": { command: "node", args: ["tool.js"] },
+      "another-tool": { command: "python", args: ["serve.py"] },
+    };
+    writeChannelConfig("s-merge01", "work", 19300, workdir, { userMcpServers: userServers });
+
+    const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
+    expect(content.mcpServers["my-tool"]).toEqual({ command: "node", args: ["tool.js"] });
+    expect(content.mcpServers["another-tool"]).toEqual({ command: "python", args: ["serve.py"] });
+    expect(content.mcpServers["ark-channel"]).toBeDefined();
+  });
+
+  it("worktree-local servers take precedence over user servers", () => {
+    const workdir = getCtx().arkDir;
+    const { writeFileSync: wfs } = require("fs");
+    // Write existing worktree config with a server that shares a name with user config
+    wfs(join(workdir, ".mcp.json"), JSON.stringify({
+      mcpServers: { "shared-tool": { command: "local-version" } },
+    }));
+
+    const userServers = {
+      "shared-tool": { command: "global-version" },
+      "user-only-tool": { command: "user-tool" },
+    };
+    writeChannelConfig("s-merge02", "work", 19300, workdir, { userMcpServers: userServers });
+
+    const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
+    // Worktree-local version wins over user global
+    expect(content.mcpServers["shared-tool"].command).toBe("local-version");
+    // User-only tool is still merged in
+    expect(content.mcpServers["user-only-tool"].command).toBe("user-tool");
+    expect(content.mcpServers["ark-channel"]).toBeDefined();
+  });
+
+  it("ark-channel always takes precedence over user servers", () => {
+    const workdir = getCtx().arkDir;
+    const userServers = {
+      "ark-channel": { command: "impostor", args: ["fake"] },
+    };
+    writeChannelConfig("s-merge03", "work", 19300, workdir, { userMcpServers: userServers });
+
+    const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
+    // ark-channel should be the real channel config, not the user's impostor
+    expect(content.mcpServers["ark-channel"].command).not.toBe("impostor");
+    expect(content.mcpServers["ark-channel"].env.ARK_SESSION_ID).toBe("s-merge03");
+  });
+
+  it("handles empty user MCP config gracefully", () => {
+    const workdir = getCtx().arkDir;
+    writeChannelConfig("s-merge04", "work", 19300, workdir, { userMcpServers: {} });
+
+    const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
+    expect(content.mcpServers["ark-channel"]).toBeDefined();
+    // Should only have ark-channel
+    expect(Object.keys(content.mcpServers)).toEqual(["ark-channel"]);
+  });
+});
+
+// ── readUserMcpConfig ──────────────────────────────────────────────────────
+
+describe("readUserMcpConfig", () => {
+  it("is exported as a function", () => {
+    expect(typeof readUserMcpConfig).toBe("function");
+  });
+
+  it("returns an object (may be empty if ~/.claude/.mcp.json is missing)", () => {
+    const result = readUserMcpConfig();
+    expect(typeof result).toBe("object");
+    expect(result).not.toBeNull();
+  });
 });
 
 // ── removeChannelConfig ──────────────────────────────────────────────────────
@@ -276,7 +350,7 @@ describe("writeChannelConfig", () => {
 describe("removeChannelConfig", () => {
   it("removes ark-channel from .mcp.json", () => {
     const workdir = getCtx().arkDir;
-    writeChannelConfig("s-abc123", "work", 19300, workdir);
+    writeChannelConfig("s-abc123", "work", 19300, workdir, { userMcpServers: {} });
     expect(existsSync(join(workdir, ".mcp.json"))).toBe(true);
 
     removeChannelConfig(workdir);
@@ -292,7 +366,7 @@ describe("removeChannelConfig", () => {
       mcpServers: { "other-server": { command: "other" } },
     }));
 
-    writeChannelConfig("s-abc123", "work", 19300, workdir);
+    writeChannelConfig("s-abc123", "work", 19300, workdir, { userMcpServers: {} });
     removeChannelConfig(workdir);
 
     const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
@@ -334,7 +408,7 @@ describe("removeChannelConfig", () => {
 
   it("is idempotent -- calling twice does not error", () => {
     const workdir = getCtx().arkDir;
-    writeChannelConfig("s-abc123", "work", 19300, workdir);
+    writeChannelConfig("s-abc123", "work", 19300, workdir, { userMcpServers: {} });
     removeChannelConfig(workdir);
     expect(() => removeChannelConfig(workdir)).not.toThrow();
   });

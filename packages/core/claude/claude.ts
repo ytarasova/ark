@@ -92,6 +92,24 @@ export function shellQuoteArgs(claudeArgs: string[]): string {
   }).join(" ");
 }
 
+// ── User MCP config ────────────────────────────────────────────────────────
+
+/**
+ * Read the user's global MCP config from ~/.claude/.mcp.json.
+ * Returns the parsed mcpServers object, or empty object if not found or invalid.
+ */
+export function readUserMcpConfig(): Record<string, unknown> {
+  const userMcpPath = join(homedir(), ".claude", ".mcp.json");
+  if (!existsSync(userMcpPath)) return {};
+  try {
+    const content = JSON.parse(readFileSync(userMcpPath, "utf-8"));
+    return (content?.mcpServers && typeof content.mcpServers === "object") ? content.mcpServers : {};
+  } catch (e: any) {
+    console.error(`readUserMcpConfig: failed to parse ${userMcpPath}:`, e?.message ?? e);
+    return {};
+  }
+}
+
 // ── Channel MCP config ──────────────────────────────────────────────────────
 
 export function channelMcpConfig(
@@ -122,19 +140,26 @@ export function channelMcpConfig(
 export function writeChannelConfig(
   sessionId: string, stage: string, channelPort: number,
   workdir: string,
-  opts?: { conductorUrl?: string; channelConfig?: Record<string, unknown>; tracksDir?: string },
+  opts?: { conductorUrl?: string; channelConfig?: Record<string, unknown>; tracksDir?: string; userMcpServers?: Record<string, unknown> },
 ): string {
   const config = opts?.channelConfig ?? channelMcpConfig(sessionId, stage, channelPort, { conductorUrl: opts?.conductorUrl });
 
-  // Write to worktree .mcp.json so Claude finds it
+  // Write to worktree .mcp.json so Claude finds it.
+  // Merge user's global MCP config (~/.claude/.mcp.json) so agents in worktrees
+  // have access to the same MCP servers the user has configured globally.
+  // Priority: worktree-local servers > user-global servers > ark-channel (always present).
   const mcpConfigPath = join(workdir, ".mcp.json");
   let existing: Record<string, any> = {};
   if (existsSync(mcpConfigPath)) {
     try { existing = JSON.parse(readFileSync(mcpConfigPath, "utf-8")); }
     catch (e: any) { console.error(`writeChannelConfig: failed to parse ${mcpConfigPath}:`, e?.message ?? e); }
   }
-  if (!existing.mcpServers) existing.mcpServers = {};
-  existing.mcpServers["ark-channel"] = config;
+
+  // Start with user's global MCP servers as the base, then overlay worktree-local ones
+  const userServers = opts?.userMcpServers ?? readUserMcpConfig();
+  const mergedServers = { ...userServers, ...(existing.mcpServers ?? {}) };
+  mergedServers["ark-channel"] = config;
+  existing.mcpServers = mergedServers;
   writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));
 
   // Also write a copy to tracks dir for reference
