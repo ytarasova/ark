@@ -2164,6 +2164,10 @@ export interface HookStatusResult {
   shouldAdvance?: boolean;
   /** Whether to auto-dispatch next stage after advance */
   shouldAutoDispatch?: boolean;
+  /** Whether the failure should trigger an on_failure retry loop */
+  shouldRetry?: boolean;
+  /** Max retries from the on_failure directive (e.g. retry(3) -> 3) */
+  retryMaxRetries?: number;
 }
 
 /**
@@ -2288,6 +2292,16 @@ export function applyHookStatus(app: AppContext,
     }
     result.updates = updates;
     result.newStatus = newStatus;
+
+    // Check on_failure directive for automatic retry on failure
+    if (newStatus === "failed" && session.stage && session.flow) {
+      const failStageDef = flow.getStage(app, session.flow, session.stage);
+      const retryDirective = parseOnFailure(failStageDef?.on_failure);
+      if (retryDirective) {
+        result.shouldRetry = true;
+        result.retryMaxRetries = retryDirective.maxRetries;
+      }
+    }
   }
 
   // Check termination conditions from flow stage config
@@ -2371,6 +2385,10 @@ export interface ReportResult {
   message?: { role: MessageRole; content: string; type: MessageType };
   /** PR URL detected from report */
   prUrl?: string;
+  /** Whether the error should trigger an on_failure retry loop */
+  shouldRetry?: boolean;
+  /** Max retries from the on_failure directive (e.g. retry(3) -> 3) */
+  retryMaxRetries?: number;
 }
 
 /**
@@ -2548,6 +2566,16 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
       const er = report as unknown as Record<string, unknown>;
       result.updates.status = "failed";
       result.updates.error = (er.error ?? er.message) as string | null;
+
+      // Check on_failure directive for automatic retry
+      if (session.stage && session.flow) {
+        const errStageDef = flow.getStage(app, session.flow, session.stage);
+        const retryDirective = parseOnFailure(errStageDef?.on_failure);
+        if (retryDirective) {
+          result.shouldRetry = true;
+          result.retryMaxRetries = retryDirective.maxRetries;
+        }
+      }
       break;
     }
     case "progress": {
@@ -2730,7 +2758,19 @@ export async function mediateStageHandoff(
 
 // ── Fail-Loopback ──────────────────────────────────────────────────────────
 
-export function retryWithContext(app: AppContext, 
+/**
+ * Parse an on_failure directive string.
+ * Supports: "retry(N)" where N is max retry count, or "notify" (no retry).
+ * Returns null if the directive doesn't indicate retry.
+ */
+export function parseOnFailure(directive: string | undefined): { retry: true; maxRetries: number } | null {
+  if (!directive) return null;
+  const match = directive.match(/^retry\((\d+)\)$/);
+  if (!match) return null;
+  return { retry: true, maxRetries: parseInt(match[1], 10) };
+}
+
+export function retryWithContext(app: AppContext,
   sessionId: string,
   opts?: { maxRetries?: number }
 ): { ok: boolean; message: string } {
