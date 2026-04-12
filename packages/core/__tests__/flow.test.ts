@@ -333,6 +333,33 @@ describe("getStageAction", () => {
     expect(action.on_failure).toBeUndefined();
     expect(action.optional).toBeUndefined();
   });
+
+  it("returns auto_merge action for autonomous-sdlc merge stage", () => {
+    const action = getStageAction(getApp(),"autonomous-sdlc", "merge");
+    expect(action.type).toBe("action");
+    expect(action.action).toBe("auto_merge");
+  });
+});
+
+// ── autonomous-sdlc flow ────────────────────────────────────────────────────
+
+describe("autonomous-sdlc flow", () => {
+  it("includes merge stage after pr", () => {
+    const stages = getStages(getApp(),"autonomous-sdlc");
+    const names = stages.map((s) => s.name);
+    expect(names).toEqual(["plan", "implement", "review", "pr", "merge"]);
+  });
+
+  it("merge stage depends on pr", () => {
+    const stage = getStage(getApp(),"autonomous-sdlc", "merge");
+    expect(stage).not.toBeNull();
+    expect(stage!.depends_on).toEqual(["pr"]);
+  });
+
+  it("merge stage has auto gate", () => {
+    const result = evaluateGate(getApp(),"autonomous-sdlc", "merge", {});
+    expect(result.canProceed).toBe(true);
+  });
 });
 
 // ── resolveFlow ─────────────────────────────────────────────────────────────

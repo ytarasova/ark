@@ -7,7 +7,7 @@ import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { withTestContext } from "./test-helpers.js";
-import { interrupt, worktreeDiff, createWorktreePR, runVerification } from "../services/session-orchestration.js";
+import { interrupt, worktreeDiff, createWorktreePR, mergeWorktreePR, executeAction, runVerification } from "../services/session-orchestration.js";
 import { getStageDefinition } from "../state/flow.js";
 import { loadRepoConfig } from "../repo-config.js";
 import { getApp } from "../app.js";
@@ -121,6 +121,53 @@ describe("createWorktreePR(getApp())", () => {
 
   it("is exported as a function", () => {
     expect(typeof createWorktreePR).toBe("function");
+  });
+});
+
+// ── Test 3b: mergeWorktreePR(getApp()) ──────────────────────────────────────────────
+
+describe("mergeWorktreePR(getApp())", () => {
+  it("returns error for non-existent session", async () => {
+    const result = await mergeWorktreePR(getApp(), "s-nonexistent");
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("not found");
+  });
+
+  it("returns error when session has no PR URL", async () => {
+    const session = getApp().sessions.create({ summary: "merge-no-pr" });
+    const result = await mergeWorktreePR(getApp(), session.id);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("no PR URL");
+  });
+
+  it("returns error when session has no repo", async () => {
+    const session = getApp().sessions.create({ summary: "merge-no-repo" });
+    getApp().sessions.update(session.id, { pr_url: "https://github.com/org/repo/pull/1" });
+    const result = await mergeWorktreePR(getApp(), session.id);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("no repo");
+  });
+
+  it("is exported as a function", () => {
+    expect(typeof mergeWorktreePR).toBe("function");
+  });
+});
+
+// ── Test 3c: executeAction auto_merge ─────────────────────────────────────────
+
+describe("executeAction auto_merge", () => {
+  it("returns error when session has no PR URL", async () => {
+    const session = getApp().sessions.create({ summary: "auto-merge-no-pr", flow: "autonomous-sdlc" });
+    getApp().sessions.update(session.id, { stage: "merge" });
+    const result = await executeAction(getApp(), session.id, "auto_merge");
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("no PR URL");
+  });
+
+  it("returns error for non-existent session", async () => {
+    const result = await executeAction(getApp(), "s-nonexistent", "auto_merge");
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("not found");
   });
 });
 

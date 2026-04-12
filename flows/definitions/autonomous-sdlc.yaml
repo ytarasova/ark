@@ -37,3 +37,8 @@ stages:
     action: create_pr
     gate: auto
     depends_on: [review]
+
+  - name: merge
+    action: auto_merge
+    gate: auto
+    depends_on: [pr]
