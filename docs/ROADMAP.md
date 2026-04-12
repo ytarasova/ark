@@ -242,11 +242,6 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
   dedicated `.pw.ts` file asserting on real rendered content, not
   boilerplate DOM presence.
 
-**Legacy harness deprecation.** `packages/e2e/tui.deprecated/` still
-contains the original `TuiDriver` tests -- 6 files -- but none are
-imported by the test runner. Safe to delete as a follow-up sweep. The
-new harness eclipses everything they covered.
-
 **Patterns worth copying for future coverage:**
 
 1. **Seed-before-boot** -- always allocate `ARK_TEST_DIR` via

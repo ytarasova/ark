@@ -86,11 +86,9 @@ test("sessions tab opens", async ({ page }) => {
 The `harness` object exposes `pageUrl`, `arkDir`, `tmuxTmpDir`, the
 underlying `pty`, and `stop()` / `write()` / `resize()` / `readOutput()`.
 
-## What the legacy harness still covers
+## Legacy harness
 
-`packages/e2e/tui.deprecated/` contains the 6 pre-existing TuiDriver
-tests: `dispatch`, `sessions`, `session-crud`, `talk`, `tabs`, `worktree`.
-They're preserved for reference while we port coverage over -- each one
-has an equivalent to write against this harness, and the port is on the
-roadmap as a Camp 1 follow-up. Do not add new tests to the deprecated
-directory.
+The original TuiDriver tests (`dispatch`, `sessions`, `session-crud`,
+`talk`, `tabs`, `worktree`) have all been ported to this harness. The
+legacy `packages/e2e/tui.deprecated/` directory and `tui-driver.ts`
+fixture were deleted after the port was complete.
