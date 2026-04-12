@@ -1,6 +1,6 @@
 # Ark Platform Roadmap
 
-> Last updated: 2026-04-12 (full-day session -- autonomous SDLC, commit gates, worktree cleanup, brainstorm flow)
+> Last updated: 2026-04-12 (full-day session -- 28 PRs, autonomous SDLC, artifact tracking, orchestrator-mediated handoff, stage isolation, per-stage compute templates)
 > Unit tests: 2724 pass, 0 fail, 0 lint errors, 0 process leaks
 > E2E tests: 89 TUI (`packages/tui-e2e/`) + 78 web (`packages/e2e/web/`) = **167 passing, 0 skipped, 0 failed**
 >
@@ -25,6 +25,20 @@
 > - **CLI status validation** -- `ark session list --status` now uses Commander `.choices()` with exported `SESSION_STATUSES` array for validation. Commit `1a3ded8`.
 > - **Gemini autonomous dispatch test** -- 293-line test suite validating the full Gemini runtime path: resolution, model remapping, cli-agent executor launch, status poller, flow advance, and transcript parser registration. Commit `0e20cda`.
 > - **Dispatch ARG_MAX fix** -- pass only `session.summary` (not the full context-injected task blob) as the CLI positional arg. The detailed context remains available via `--append-system-prompt` and channel delivery. Fixes silent crashes on macOS when context exceeded 256KB. Commit `1292fdb`.
+> - **Per-stage commit verification using stage_start_sha** -- records HEAD sha at dispatch time in session config. `applyReport()` and `applyHookStatus()` verify new commits were made during the current stage (not just anywhere on the branch). Falls back to `origin/main..HEAD` when `stage_start_sha` is unavailable. Also fixes pre-existing bug where `result.updates` was undefined on the no-commits path. Commits `a4c437a`, `b32cdd9`.
+> - **Web status filter tabs** -- full status filter tabs added to the web SessionsPage: running, waiting, pending, blocked, completed, failed, archived. Archived sessions require server-side filtering since they're excluded by default. SSE real-time updates skipped for archived view. Surface parity with CLI `--status` flag. Commits `f8931e0`, `8dd991f`.
+> - **MCP config cleanup on stop/delete** -- `removeChannelConfig()` mirrors `removeHooksConfig()` -- removes the `ark-channel` entry from `.mcp.json`, preserves other servers, deletes the file if empty. Called on stop, delete, and at boot for stale config cleanup. Previously, stale MCP config pointed at dead channel ports forever. Commit `23e14da`.
+> - **MCP config merge into worktrees** -- git worktrees don't include untracked files like `.mcp.json`, so agents in worktrees lost access to MCP servers configured in the original repo. `writeChannelConfig` now accepts `originalRepoDir` and merges servers from the source repo's `.mcp.json` before writing the `ark-channel` entry. Existing worktree entries preserved; stale `ark-channel` entries from the original skipped. Commits `0810f76`, `65e0acb`.
+> - **Goose autonomous dispatch test** -- comprehensive test suite for the Goose runtime's autonomous dispatch path: runtime resolution, executor selection, command building, status poller integration, billing config, flow completion. Mirrors `gemini-autonomous-dispatch.test.ts`. Commits `0adfeaf`, `d825862`.
+> - **Artifact tracking in session store** -- new `session_artifacts` table with `ArtifactRepository` for queryable tracking of session outputs (files changed, commits, PRs, branches). Four artifact types: file, commit, pr, branch. Cross-session query, deduplication, tenant scoping. Conductor persists artifacts from agent reports (progress + completion). JSON-RPC handlers: `session/artifacts/list`, `session/artifacts/query`. 15 tests. Commits `671c71b`, `e60b07b`.
+> - **Orchestrator-mediated stage handoff** -- `mediateStageHandoff()` consolidates the duplicated verify -> advance -> dispatch chain from conductor's `handleReport()` and `handleHookStatus()` into a single orchestration function. Single entry point for stage transitions with pre-advance verification, auto-dispatch routing, and `stage_handoff` observability events. Commits `9f0a831`, `89de3ff`.
+> - **Channel prompt auto-accept hardening** -- faster polling (500ms vs 1000ms), double-tap Enter after selecting option 1, exit early once prompt is dismissed. Previous version missed the prompt window due to slow polling. Commit `387939a`.
+> - **applyReport infrastructure file exclusion** -- uncommitted-changes guard was rejecting completions because `.claude/settings.local.json` and `.mcp.json` are always modified at dispatch. These Ark infrastructure files are now filtered from `git status`. Also fixes the "ready instead of completed" regression where single-stage sessions got stuck. Commit `7859603`.
+> - **Per-stage status timeline in TUI** -- replaces the simple flow pipeline breadcrumb with a detailed stage timeline showing per-stage status icons, agent names, durations, and start timestamps. Derives status from session events (`stage_started`/`stage_completed`). Renders completed (green check), running (blue dot), failed (red X), and pending (open circle). Commit `296884c`.
+> - **Per-stage compute templates** -- `compute_template` field on `StageDefinition` allows flow YAML authors to specify different compute templates per stage. At dispatch, `resolveComputeForStage()` looks up the template (DB then config), reuses existing compute or auto-provisions, and overrides `compute_name` for that stage. Commit `d23858e`.
+> - **Stage isolation with fresh runtime per stage** -- each stage gets a fresh runtime by default: `advance()` clears `claude_session_id` and `session_id` so the next dispatch creates a new Claude session instead of resuming. Context passes structurally through the task prompt (PLAN.md, git log, stage events). Stages can opt into `isolation: "continue"` in flow YAML to preserve `claude_session_id` for same-agent refinement (e.g. review -> fixup). Commit `f77ed4e`.
+> - **SessionEnd hook commit enforcement** -- agents exiting Claude Code without calling `report(completed)` were bypassing commit enforcement entirely. SessionEnd auto-advance now checks `git log` for new commits; if `stage_start_sha` is set, compares HEAD against it. No new commits -> session marked failed with "Agent exited without committing any changes." Commit `2b123d9`.
+> - **TUI session list polish cascade** -- 12 fixes across PRs #22-#24: session-by-status grouping display bugs, row width calculation alignment, age column visibility, left pane width (30%), ListRow unification, completion summary sanitization, SessionDetail pane polish, group header formatting. Commits `fce0f1f` through `afb05ca`.
 >
 > **2026-04-11 session shipped on `main`:**
 > - **Multi-tenant channel hardening** -- conductor `/api/channel/<sessionId>`, `/api/relay`, and `/hooks/status` all extract tenant via `Authorization: Bearer ark_<tid>_*` or `X-Ark-Tenant-Id` and route through `app.forTenant()`. `ARK_TENANT_ID` is injected into the channel MCP subprocess at dispatch, propagated through arkd's channel relay, and included in the hook curl POST. Closes the cross-tenant channel exposure flagged in the security audit (commits `e80ac4d`, `08d3329`). Unblocks hosted multi-tenant rollout.
@@ -109,6 +123,15 @@ The orchestration platform for AI-powered software development. Manages the full
 | **TUI session grouping** | `%` key toggles grouping sessions by status (Running, Waiting, etc.) with meaningful sort order. TreeList `groupSort` prop. | Yes |
 | **CLI status validation** | `ark session list --status` uses Commander `.choices()` with exported `SESSION_STATUSES` array. | Yes |
 | **MCP config stubs** | Templates for Atlassian, GitHub, Linear, Figma. | N/A |
+| **Artifact tracking** | `session_artifacts` table with `ArtifactRepository` -- queryable tracking of session outputs (files, commits, PRs, branches). Cross-session query, dedup, tenant-scoped. Conductor persists artifacts from agent reports. RPC: `session/artifacts/list`, `session/artifacts/query`. | 15 tests |
+| **Orchestrator-mediated handoff** | `mediateStageHandoff()` -- single entry point for stage transitions. Consolidates verify -> advance -> dispatch chain from conductor's `handleReport()` and `handleHookStatus()`. Pre-advance verification, auto-dispatch routing, `stage_handoff` observability events. | Yes |
+| **Per-stage commit verification** | Records HEAD sha at dispatch as `stage_start_sha`. `applyReport()` and `applyHookStatus()` verify new commits during the current stage, not just anywhere on the branch. SessionEnd hook also enforces (no commits -> failed). | Yes |
+| **Per-stage compute templates** | `compute_template` field on `StageDefinition` -- flow YAML can specify different compute per stage. `resolveComputeForStage()` looks up template (DB then config), reuses or auto-provisions compute. | Yes |
+| **Stage isolation** | Each stage gets a fresh runtime by default -- `advance()` clears `claude_session_id` and `session_id`. Context passes structurally (PLAN.md, git log, stage events). Stages opt into `isolation: "continue"` to preserve session for same-agent refinement. | Yes |
+| **MCP config merging** | Worktrees get MCP servers from original repo's `.mcp.json` merged in at dispatch. `removeChannelConfig()` cleans up `ark-channel` entry on stop/delete. Stale config cleanup at boot. | Yes |
+| **Web status filter tabs** | Full status filter tabs (running, waiting, pending, blocked, completed, failed, archived) on web SessionsPage. Server-side filtering for archived. Surface parity with CLI `--status`. | Yes |
+| **Per-stage status timeline (TUI)** | Detailed stage timeline in SessionDetail replacing simple breadcrumb -- per-stage status icons, agent names, durations, start timestamps. Derives from `stage_started`/`stage_completed` events. | Yes |
+| **Goose autonomous dispatch test** | Comprehensive test: runtime resolution, executor selection, command building, status poller, billing config, flow completion. Mirrors Gemini test pattern. | Yes |
 
 ### PARTIAL -- Built but NOT integration-tested or incomplete
 
@@ -194,6 +217,18 @@ The orchestration platform for AI-powered software development. Manages the full
 - **Gemini autonomous dispatch test (2026-04-12)** -- 293-line test validating full Gemini runtime path
 - **Dispatch ARG_MAX fix (2026-04-12)** -- pass only `session.summary` as CLI arg (not full context blob); fixes silent crash on macOS when context exceeded 256KB
 - **E2E completion path tests (2026-04-12)** -- 448-line test covering manual, auto, and hook-fallback completion paths
+- **Per-stage commit verification (2026-04-12)** -- records HEAD sha at dispatch as `stage_start_sha`, verifies new commits during the current stage. SessionEnd hook enforcement: no commits -> session failed
+- **Web status filter tabs (2026-04-12)** -- full status filters (running, waiting, pending, blocked, completed, failed, archived) on web SessionsPage, surface parity with CLI
+- **MCP config lifecycle (2026-04-12)** -- `removeChannelConfig()` cleans up `ark-channel` on stop/delete; `writeChannelConfig` merges original repo's `.mcp.json` into worktrees so agents keep user-configured MCP servers
+- **Artifact tracking (2026-04-12)** -- `session_artifacts` table with `ArtifactRepository` for queryable tracking of files, commits, PRs, branches. Cross-session query, dedup, tenant-scoped. RPC handlers wired
+- **Orchestrator-mediated handoff (2026-04-12)** -- `mediateStageHandoff()` consolidates verify -> advance -> dispatch from conductor into single orchestration function with observability events
+- **Per-stage compute templates (2026-04-12)** -- `compute_template` field on `StageDefinition`, `resolveComputeForStage()` auto-provisions per stage
+- **Stage isolation (2026-04-12)** -- each stage gets fresh runtime by default (clears `claude_session_id`). Context passes structurally. Opt-in `isolation: "continue"` for same-agent refinement
+- **Per-stage status timeline in TUI (2026-04-12)** -- detailed timeline with status icons, agent names, durations replacing simple breadcrumb
+- **Goose autonomous dispatch test (2026-04-12)** -- comprehensive test mirroring Gemini pattern
+- **Channel prompt auto-accept hardening (2026-04-12)** -- faster polling, double-tap Enter, early exit
+- **applyReport infrastructure file exclusion (2026-04-12)** -- filters `.claude/settings.local.json` and `.mcp.json` from uncommitted check; fixes "ready instead of completed" regression
+- **TUI session list polish (2026-04-12)** -- 12 fixes: grouping bugs, row width, age column, left pane width, ListRow unification, completion summary sanitization, SessionDetail pane polish
 - Unified Claude settings bundle writer -- `permissions.allow` generated from `agent.tools`, prompt-hint injection so agents know what tools exist without probing
 - Native Goose runtime (`runtimes/goose.yaml` + `packages/core/executors/goose.ts`) with recipe dispatch, channel MCP via `--with-extension`, LLM router routing
 - Vendored binary freshness manifest (`vendor/versions.yaml`) + CI workflow for goose / codex version bumps
@@ -583,19 +618,55 @@ Camp 7:  Task Management          ████████       Task board ABOV
 Camp 8:  UX Polish                ██████         Desktop .dmg shipping (currently broken), Homebrew, onboarding wizard, i18n
 ```
 
-**What changed in this update (2026-04-12):**
+**What changed in this update (2026-04-12 full session -- 28 PRs, 85 commits):**
 
-- Autonomous SDLC pipeline is now end-to-end: plan -> implement -> review -> PR -> auto-merge,
-  with commit verification gates preventing agents from advancing with uncommitted work.
-- 11 new flow definitions: `autonomous-sdlc.yaml` (4-stage auto-gated) and `brainstorm.yaml`
-  (3-stage manual-gated for ideation). `auto_merge` action stage added to quick flow too.
-- Worktree lifecycle hardened: auto-cleanup on stop/delete, provider-independent.
-- Channel MCP path resolution centralized in `CHANNEL_SCRIPT_PATH` -- eliminates a class of
-  post-reorg breakage across providers.
-- Codex/Gemini sessions now finish correctly (poller `not_found` fix + conductor action-stage fix).
-- Local compute no longer ghosts (singleton enforcement).
-- TUI gains session-by-status grouping (`%`), web gains keyboard shortcuts for sessions.
-- CLI `--status` validation, Gemini dispatch test suite, ARG_MAX dispatch fix all landed.
+**Autonomous SDLC pipeline (end-to-end):**
+- Plan -> implement -> review -> PR -> auto-merge, fully autonomous with commit verification gates.
+- `autonomous-sdlc.yaml` (4-stage auto-gated), `brainstorm.yaml` (3-stage manual-gated for ideation).
+- `auto_merge` action stage added to autonomous-sdlc and quick flows.
+- Three completion paths all tested: manual report, auto-advance, hook-fallback.
+
+**Stage orchestration infrastructure (new -- the architectural foundation for production SDLC):**
+- `mediateStageHandoff()` -- single orchestration entry point for all stage transitions
+  (verify -> advance -> dispatch), replacing duplicated logic in conductor.
+- Stage isolation -- each stage gets a fresh runtime by default; `advance()` clears
+  `claude_session_id`. Opt-in `isolation: "continue"` for same-agent refinement.
+- Per-stage compute templates -- `compute_template` field on `StageDefinition`, with
+  `resolveComputeForStage()` for auto-provisioning per stage.
+- Per-stage commit verification -- records HEAD sha at dispatch as `stage_start_sha`,
+  verifies new commits at stage boundary. SessionEnd hook also enforces (no commits -> failed).
+- Artifact tracking -- `session_artifacts` table with cross-session query, 4 artifact types
+  (file, commit, pr, branch), RPC handlers wired.
+
+**MCP config lifecycle (new):**
+- `writeChannelConfig` merges original repo `.mcp.json` into worktrees (agents keep user MCP servers).
+- `removeChannelConfig()` cleans up `ark-channel` entry on stop/delete + stale cleanup at boot.
+- Infrastructure file exclusion from uncommitted check (`.claude/settings.local.json`, `.mcp.json`).
+
+**Commit enforcement hardening:**
+- `applyReport()` checks `git status --porcelain` for uncommitted tracked files.
+- Conductor runs `runVerification()` before advancing agent stages.
+- SessionEnd auto-advance checks `git log` for new commits; no commits -> session failed.
+- Infrastructure files excluded from the uncommitted check.
+
+**Surface parity (TUI + Web):**
+- TUI: session-by-status grouping (`%`), per-stage status timeline in SessionDetail,
+  12 display polish fixes (row width, age column, left pane, ListRow unification).
+- Web: full status filter tabs (running/waiting/pending/blocked/completed/failed/archived).
+- TUI/Web chat keyboard shortcuts (Tab/Enter/@mention hints, j/k/t/n/Escape).
+
+**Runtime coverage:**
+- Auto-start dispatch for all 4 runtimes (Claude positional arg, Codex/Gemini initialPrompt, Goose -t/-s).
+- Gemini + Goose autonomous dispatch test suites.
+- Poller `not_found` fix for Codex/Gemini; conductor action-stage fix.
+- Channel prompt auto-accept hardening (faster polling, double-tap Enter).
+
+**Infrastructure:**
+- Channel MCP path centralized in `CHANNEL_SCRIPT_PATH` constant.
+- Local provider singleton enforcement.
+- CLI `--status` validation against `SESSION_STATUSES`.
+- Dispatch ARG_MAX fix (pass summary only, not full context blob).
+- Worktree auto-cleanup on stop/delete (provider-independent).
 
 ---
 
