@@ -559,7 +559,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   return { ok: true, message: tmuxName };
 }
 
-export async function advance(app: AppContext, sessionId: string, force = false): Promise<{ ok: boolean; message: string }> {
+export async function advance(app: AppContext, sessionId: string, force = false, outcome?: string): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -609,10 +609,10 @@ export async function advance(app: AppContext, sessionId: string, force = false)
     }
   } catch { /* graph flow not applicable, fall through to linear */ }
 
-  const nextStage = flow.getNextStage(app,flowName, stage);
+  const nextStage = flow.resolveNextStage(app, flowName, stage, outcome);
   if (!nextStage) {
     // Flow complete -- persist final stage completion
-    try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
+    try { markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined); } catch { /* skip */ }
     app.sessions.update(sessionId, { status: "completed" });
     app.events.log(sessionId, "session_completed", {
       stage, actor: "system",
@@ -646,7 +646,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
   }
 
   // Persist flow state: mark completed + set next
-  try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
+  try { markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined); } catch { /* skip */ }
   try { setCurrentStage(app, sessionId, nextStage, flowName); } catch { /* skip */ }
 
   const nextAction = flow.getStageAction(app,flowName, nextStage);
@@ -669,6 +669,7 @@ export async function advance(app: AppContext, sessionId: string, force = false)
       stage_type: nextAction.type, stage_agent: nextAction.agent,
       forced: force,
       isolation,
+      ...(outcome ? { outcome, via: "on_outcome" } : {}),
     },
   });
 
@@ -2363,6 +2364,8 @@ export interface ReportResult {
   shouldAdvance?: boolean;
   /** Whether to auto-dispatch next stage after advance */
   shouldAutoDispatch?: boolean;
+  /** Stage outcome label for on_outcome routing (from CompletionReport.outcome) */
+  outcome?: string;
   /** Events to emit on the event bus */
   busEvents?: Array<{ type: string; sessionId: string; data: Record<string, unknown> }>;
   /** Events to log to the store */
@@ -2435,6 +2438,11 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
         filesChanged: rr.filesChanged as string[] | undefined,
         commits: rr.commits as string[] | undefined,
       };
+
+      // Capture outcome for on_outcome routing
+      if (rr.outcome) {
+        result.outcome = rr.outcome as string;
+      }
 
       // Hard enforcement: reject completion if no new commits exist for the current stage.
       // Uses stage_start_sha (recorded at dispatch) for per-stage verification.
@@ -2608,7 +2616,7 @@ export interface StageHandoffResult {
 export async function mediateStageHandoff(
   app: AppContext,
   sessionId: string,
-  opts?: { autoDispatch?: boolean; source?: string },
+  opts?: { autoDispatch?: boolean; source?: string; outcome?: string },
 ): Promise<StageHandoffResult> {
   const autoDispatch = opts?.autoDispatch ?? true;
   const source = opts?.source ?? "unknown";
@@ -2654,7 +2662,7 @@ export async function mediateStageHandoff(
   }
 
   // Step 2: Advance to the next stage (or complete the flow)
-  const advResult = await advance(app, sessionId);
+  const advResult = await advance(app, sessionId, false, opts?.outcome);
   if (!advResult.ok) {
     return { ok: false, message: advResult.message, fromStage };
   }

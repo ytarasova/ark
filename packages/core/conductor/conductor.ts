@@ -636,6 +636,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     const handoff = await session.mediateStageHandoff(app, sessionId, {
       autoDispatch: result.shouldAutoDispatch,
       source: "channel_report",
+      outcome: result.outcome,
     });
     if (handoff.blockedByVerification) {
       const s = app.sessions.get(sessionId);

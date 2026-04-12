@@ -56,6 +56,12 @@ export interface CompletionReport {
   turns?: number;
   /** GitHub PR URL - set when agent creates a PR */
   pr_url?: string;
+  /**
+   * Stage outcome label for flow routing.
+   * When the stage has `on_outcome` defined, this value selects the next stage.
+   * Example: "approved", "rejected", "needs_info"
+   */
+  outcome?: string;
 }
 
 /** Agent → Conductor: question for human */

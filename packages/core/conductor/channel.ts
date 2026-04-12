@@ -90,6 +90,10 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: "string",
             description: "GitHub PR URL - include when you create a pull request",
           },
+          outcome: {
+            type: "string",
+            description: "Stage outcome label for flow routing (e.g., 'approved', 'rejected'). Used with on_outcome in flow definitions.",
+          },
         },
         required: ["type", "message"],
       },
@@ -127,11 +131,13 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     const report: OutboundMessage = (() => {
       const base = { sessionId: SESSION_ID, stage: process.env.ARK_STAGE ?? "" };
       const prUrl = args.pr_url as string | undefined;
+      const outcomeVal = args.outcome as string | undefined;
       switch (reportType) {
         case "completed":
           return { ...base, type: "completed" as const, summary: message,
             filesChanged: (args.filesChanged as string[]) ?? [], commits: (args.commits as string[]) ?? [],
-            ...(prUrl ? { pr_url: prUrl } : {}) };
+            ...(prUrl ? { pr_url: prUrl } : {}),
+            ...(outcomeVal ? { outcome: outcomeVal } : {}) };
         case "question":
           return { ...base, type: "question" as const, question: message };
         case "error":

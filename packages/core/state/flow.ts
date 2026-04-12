@@ -24,6 +24,20 @@ export interface StageDefinition {
   gate: "auto" | "manual" | "condition" | "review";
   autonomy?: "full" | "execute" | "edit" | "read-only";
   on_failure?: string;
+  /**
+   * Outcome-based routing. Maps outcome labels reported by the agent
+   * to target stage names. When an agent completes with an `outcome`
+   * field, the flow advances to the mapped stage instead of the linear next.
+   *
+   * Example:
+   *   on_outcome:
+   *     approved: deploy
+   *     rejected: revise
+   *     needs_info: clarify
+   *
+   * If the outcome doesn't match any key, falls back to linear next stage.
+   */
+  on_outcome?: Record<string, string>;
   optional?: boolean;
   model?: string;  // override model for this stage (e.g., "opus" for planning, "haiku" for docs)
   compute_template?: string;  // named compute template to use for this stage
@@ -78,6 +92,29 @@ export function getNextStage(app: AppContext, flowName: string, currentStage: st
   const stages = getStages(app, flowName);
   const idx = stages.findIndex((s) => s.name === currentStage);
   return idx >= 0 && idx + 1 < stages.length ? stages[idx + 1].name : null;
+}
+
+/**
+ * Resolve the next stage using outcome-based routing if available.
+ *
+ * When the current stage has `on_outcome` and an outcome string is provided,
+ * the mapped target stage is returned. Falls back to linear `getNextStage()`
+ * when no on_outcome is defined, no outcome is provided, or the outcome
+ * doesn't match any key.
+ */
+export function resolveNextStage(
+  app: AppContext, flowName: string, currentStage: string, outcome?: string,
+): string | null {
+  const stage = getStage(app, flowName, currentStage);
+  if (stage?.on_outcome && outcome) {
+    const target = stage.on_outcome[outcome];
+    if (target) {
+      // Validate that target stage exists in the flow
+      const targetStage = getStage(app, flowName, target);
+      if (targetStage) return target;
+    }
+  }
+  return getNextStage(app, flowName, currentStage);
 }
 
 // ── Gate evaluation ─────────────────────────────────────────────────────────
@@ -142,10 +179,19 @@ export function getStageAction(app: AppContext, flowName: string, stageName: str
 export function validateDAG(stages: StageDefinition[]): void {
   const names = new Set(stages.map(s => s.name));
   for (const stage of stages) {
-    if (!stage.depends_on) continue;
-    for (const dep of stage.depends_on) {
-      if (!names.has(dep)) {
-        throw new Error(`Stage '${stage.name}' depends on unknown stage '${dep}'`);
+    if (stage.depends_on) {
+      for (const dep of stage.depends_on) {
+        if (!names.has(dep)) {
+          throw new Error(`Stage '${stage.name}' depends on unknown stage '${dep}'`);
+        }
+      }
+    }
+    // Validate on_outcome targets reference real stages
+    if (stage.on_outcome) {
+      for (const [outcome, target] of Object.entries(stage.on_outcome)) {
+        if (!names.has(target)) {
+          throw new Error(`Stage '${stage.name}' on_outcome '${outcome}' references unknown stage '${target}'`);
+        }
       }
     }
   }
