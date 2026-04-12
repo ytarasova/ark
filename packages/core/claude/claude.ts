@@ -328,8 +328,14 @@ export function writeHooksConfig(
   // Build permissions.allow from agent.tools + declared mcp_servers (if agent provided).
   // autonomy=full / --dangerously-skip-permissions is the explicit override: when set,
   // Claude Code bypasses this list. The allow list is authoritative when bypass is off.
-  if (opts?.agent && (opts.agent.tools?.length ?? 0) > 0) {
-    const allow = buildPermissionsAllow(opts.agent);
+  //
+  // ark-channel is ALWAYS included -- it's system infrastructure injected by dispatch,
+  // not declared in agent YAML. Without it, report/send_to_agent tools are blocked.
+  {
+    const allow = opts?.agent ? buildPermissionsAllow(opts.agent) : [];
+    if (!allow.includes("mcp__ark-channel__*")) {
+      allow.push("mcp__ark-channel__*");
+    }
     const perms = (existing.permissions ?? {}) as Record<string, unknown>;
     perms.allow = allow;
     existing.permissions = perms;
