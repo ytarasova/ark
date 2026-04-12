@@ -252,6 +252,15 @@ export class ArkClient {
     return agent;
   }
 
+  async agentSave(agent: Partial<AgentDefinition> & { name: string }, opts?: { scope?: "global" | "project"; update?: boolean }): Promise<{ ok: boolean; name: string; scope: string }> {
+    const method = opts?.update ? "agent/update" : "agent/create";
+    return this.rpc(method, { ...agent, scope: opts?.scope });
+  }
+
+  async agentDelete(name: string, scope?: "global" | "project"): Promise<{ ok: boolean }> {
+    return this.rpc("agent/delete", { name, scope });
+  }
+
   async flowList(): Promise<FlowDefinition[]> {
     const { flows } = await this.rpc<FlowListResult>("flow/list");
     return flows;
@@ -262,6 +271,14 @@ export class ArkClient {
     return flow;
   }
 
+  async flowCreate(opts: { name: string; description?: string; stages: FlowDefinition["stages"]; scope?: "global" | "project" }): Promise<{ ok: boolean; name: string }> {
+    return this.rpc("flow/create", opts as unknown as Record<string, unknown>);
+  }
+
+  async flowDelete(name: string, scope?: "global" | "project"): Promise<{ ok: boolean }> {
+    return this.rpc("flow/delete", { name, scope });
+  }
+
   async skillList(): Promise<SkillDefinition[]> {
     const { skills } = await this.rpc<SkillListResult>("skill/list");
     return skills;
@@ -270,6 +287,14 @@ export class ArkClient {
   async skillRead(name: string): Promise<SkillDefinition> {
     const { skill } = await this.rpc<SkillReadResult>("skill/read", { name });
     return skill;
+  }
+
+  async skillSave(skill: Partial<SkillDefinition> & { name: string }, opts?: { scope?: "global" | "project" }): Promise<{ ok: boolean; name: string; scope: string }> {
+    return this.rpc("skill/save", { ...skill, scope: opts?.scope });
+  }
+
+  async skillDelete(name: string, scope?: "global" | "project"): Promise<{ ok: boolean }> {
+    return this.rpc("skill/delete", { name, scope });
   }
 
   async runtimeList(): Promise<RuntimeDefinition[]> {
@@ -295,6 +320,10 @@ export class ArkClient {
   async recipeUse(name: string, variables?: Record<string, string>): Promise<Session> {
     const { session } = await this.rpc<RecipeUseResult>("recipe/use", { name, variables });
     return session;
+  }
+
+  async recipeDelete(name: string, scope?: "global" | "project"): Promise<{ ok: boolean }> {
+    return this.rpc("recipe/delete", { name, scope });
   }
 
   async computeList(): Promise<Compute[]> {

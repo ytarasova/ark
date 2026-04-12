@@ -1,5 +1,8 @@
 import type { Command } from "commander";
 import chalk from "chalk";
+import { readFileSync, existsSync } from "fs";
+import { resolve } from "path";
+import YAML from "yaml";
 import { getArkClient } from "./_shared.js";
 
 export function registerFlowCommands(program: Command) {
@@ -28,4 +31,60 @@ export function registerFlowCommands(program: Command) {
       console.log(chalk.red("Not found"));
     }
   });
+
+  pipe.command("create")
+    .description("Create a flow from a YAML file")
+    .argument("<name>", "Flow name")
+    .option("--from <file>", "YAML file containing the stages array")
+    .option("--description <text>", "Flow description")
+    .option("--scope <scope>", "global or project", "global")
+    .action(async (name: string, opts: { from?: string; description?: string; scope?: string }) => {
+      const ark = await getArkClient();
+      let stages: unknown[] = [];
+      let description = opts.description ?? "";
+      if (opts.from) {
+        const file = resolve(opts.from);
+        if (!existsSync(file)) {
+          console.log(chalk.red(`File not found: ${file}`));
+          process.exit(1);
+        }
+        const parsed = YAML.parse(readFileSync(file, "utf-8")) as { stages?: unknown[]; description?: string };
+        stages = parsed?.stages ?? [];
+        if (!description && parsed?.description) description = parsed.description;
+      }
+      if (!Array.isArray(stages) || stages.length === 0) {
+        console.log(chalk.red("No stages provided. Pass --from <file.yaml> with a 'stages:' array."));
+        process.exit(1);
+      }
+      try {
+        const result = await ark.flowCreate({
+          name,
+          description,
+          stages: stages as never,
+          scope: (opts.scope as "global" | "project") ?? "global",
+        });
+        console.log(chalk.green(`Created flow '${result.name}'`));
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.log(chalk.red(`Failed: ${msg}`));
+        process.exit(1);
+      }
+    });
+
+  pipe.command("delete")
+    .description("Delete a flow (global or project only -- builtins are protected)")
+    .argument("<name>", "Flow name")
+    .option("--scope <scope>", "global or project", "global")
+    .action(async (name: string, opts: { scope?: string }) => {
+      const ark = await getArkClient();
+      try {
+        const result = await ark.flowDelete(name, (opts.scope as "global" | "project") ?? "global");
+        if (result.ok) console.log(chalk.green(`Deleted flow '${name}'`));
+        else console.log(chalk.red(`Flow '${name}' not found`));
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.log(chalk.red(`Failed: ${msg}`));
+        process.exit(1);
+      }
+    });
 }

@@ -5,8 +5,11 @@ import { findProjectRoot } from "../../core/agent/agent.js";
 import { instantiateRecipe } from "../../core/agent/recipe.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type {
+  AgentDefinition,
   AgentReadParams,
+  FlowDefinition,
   FlowReadParams,
+  SkillDefinition,
   SkillReadParams,
   RecipeReadParams,
   RecipeUseParams,
@@ -17,6 +20,11 @@ import type {
   GroupDeleteParams,
   ComputeProviderName,
 } from "../../types/index.js";
+
+// FlowDefinition from `types/flow.ts` is the protocol shape; we only use it
+// for the request body type below. The runtime FlowDefinition expected by
+// app.flows.save() lives in core/state/flow.ts -- we cast across the boundary
+// in flow/create where the two definitions meet.
 
 /** Kill tmux sessions for zombie ark sessions (no DB record or terminal status). */
 async function cleanZombieSessions(app: AppContext): Promise<number> {
@@ -44,6 +52,73 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (!agent) throw new Error(`Agent '${name}' not found`);
     return { agent };
   });
+
+  /**
+   * Create or update an agent definition. Used by Web (`Create Agent` /
+   * `Edit Agent` forms) and remote CLI clients. The handler intentionally
+   * accepts a partial body and fills in safe defaults so callers don't have
+   * to spell out every required field.
+   */
+  router.handle("agent/create", async (p) => {
+    const params = extract<Partial<AgentDefinition> & { name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const { scope, ...rest } = params;
+    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const existing = app.agents.get(params.name, projectRoot);
+    if (existing && existing._source !== "builtin") {
+      throw new Error(`Agent '${params.name}' already exists. Use agent/update to modify it.`);
+    }
+    const agent: AgentDefinition = {
+      name: params.name,
+      description: rest.description ?? "",
+      model: rest.model ?? "sonnet",
+      max_turns: rest.max_turns ?? 200,
+      system_prompt: rest.system_prompt ?? "",
+      tools: rest.tools ?? ["Bash", "Read", "Write", "Edit", "Glob", "Grep"],
+      mcp_servers: rest.mcp_servers ?? [],
+      skills: rest.skills ?? [],
+      memories: rest.memories ?? [],
+      context: rest.context ?? [],
+      permission_mode: rest.permission_mode ?? "bypassPermissions",
+      env: rest.env ?? {},
+      ...(rest.runtime ? { runtime: rest.runtime } : {}),
+      ...(rest.command ? { command: rest.command } : {}),
+      ...(rest.task_delivery ? { task_delivery: rest.task_delivery } : {}),
+    };
+    const resolvedScope: "global" | "project" = scope === "project" && projectRoot ? "project" : "global";
+    app.agents.save(agent.name, agent, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    return { ok: true, name: agent.name, scope: resolvedScope };
+  });
+
+  router.handle("agent/update", async (p) => {
+    const params = extract<Partial<AgentDefinition> & { name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const { scope, ...rest } = params;
+    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const existing = app.agents.get(params.name, projectRoot);
+    if (!existing) throw new Error(`Agent '${params.name}' not found`);
+    if (existing._source === "builtin") {
+      throw new Error(`Agent '${params.name}' is builtin -- copy it to global/project before editing.`);
+    }
+    const merged: AgentDefinition = { ...existing, ...rest, name: params.name };
+    const resolvedScope: "global" | "project" =
+      scope ?? (existing._source === "project" ? "project" : "global");
+    app.agents.save(merged.name, merged, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    return { ok: true, name: merged.name, scope: resolvedScope };
+  });
+
+  router.handle("agent/delete", async (p) => {
+    const { name, scope } = extract<{ name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const existing = app.agents.get(name, projectRoot);
+    if (!existing) throw new Error(`Agent '${name}' not found`);
+    if (existing._source === "builtin") {
+      throw new Error(`Cannot delete builtin agent '${name}'.`);
+    }
+    const resolvedScope: "global" | "project" =
+      scope ?? (existing._source === "project" ? "project" : "global");
+    const ok = app.agents.delete(name, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    return { ok };
+  });
+
   router.handle("flow/list", async () => ({ flows: app.flows.list() }));
   router.handle("flow/read", async (p) => {
     const { name } = extract<FlowReadParams>(p, ["name"]);
@@ -51,10 +126,90 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (!flow) throw new Error(`Flow '${name}' not found`);
     return { flow };
   });
+
+  /**
+   * Create a flow from a stages array. The Web `New Flow` form has been
+   * sending this RPC for a while -- it just wasn't registered, so every
+   * `Create Flow` click silently 404'd at the JSON-RPC layer.
+   *
+   * Note: `app.flows.get()` returns the raw YAML object so it doesn't carry
+   * a source tag. We use `app.flows.list()` (which does tag source) to know
+   * whether an existing flow with this name is builtin or user/project.
+   */
+  router.handle("flow/create", async (p) => {
+    const params = extract<{
+      name: string;
+      description?: string;
+      stages: FlowDefinition["stages"];
+      scope?: "global" | "project";
+    }>(p, ["name", "stages"]);
+    if (!Array.isArray(params.stages) || params.stages.length === 0) {
+      throw new Error("flow/create requires at least one stage");
+    }
+    const summary = app.flows.list().find(f => f.name === params.name);
+    if (summary && summary.source !== "builtin") {
+      throw new Error(`Flow '${params.name}' already exists.`);
+    }
+    // The runtime FlowDefinition (core/state/flow.ts) is the right shape for
+    // app.flows.save(); we cast through unknown because the protocol type
+    // (types/flow.ts) is structurally compatible but not the same identity.
+    const flow = {
+      name: params.name,
+      description: params.description,
+      stages: params.stages,
+    } as unknown as Parameters<typeof app.flows.save>[1];
+    app.flows.save(params.name, flow, params.scope ?? "global");
+    return { ok: true, name: params.name };
+  });
+
+  router.handle("flow/delete", async (p) => {
+    const { name, scope } = extract<{ name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const summary = app.flows.list().find(f => f.name === name);
+    if (!summary) throw new Error(`Flow '${name}' not found`);
+    if (summary.source === "builtin") {
+      throw new Error(`Cannot delete builtin flow '${name}'.`);
+    }
+    const ok = app.flows.delete(name, scope ?? "global");
+    return { ok };
+  });
+
   router.handle("skill/list", async () => ({ skills: app.skills.list() }));
   router.handle("skill/read", async (p) => {
     const { name } = extract<SkillReadParams>(p, ["name"]);
     return { skill: app.skills.get(name) };
+  });
+
+  /**
+   * Create or update a skill. Web `New Skill` form already calls this --
+   * registering the handler unblocks the broken form.
+   */
+  router.handle("skill/save", async (p) => {
+    const params = extract<Partial<SkillDefinition> & { name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const { scope, ...rest } = params;
+    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const skill: SkillDefinition = {
+      name: params.name,
+      description: rest.description ?? "",
+      prompt: rest.prompt ?? "",
+      tags: rest.tags ?? [],
+    };
+    const resolvedScope: "global" | "project" = scope === "project" && projectRoot ? "project" : "global";
+    app.skills.save(skill.name, skill, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    return { ok: true, name: skill.name, scope: resolvedScope };
+  });
+
+  router.handle("skill/delete", async (p) => {
+    const { name, scope } = extract<{ name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const existing = app.skills.get(name, projectRoot);
+    if (!existing) throw new Error(`Skill '${name}' not found`);
+    if (existing._source === "builtin") {
+      throw new Error(`Cannot delete builtin skill '${name}'.`);
+    }
+    const resolvedScope: "global" | "project" =
+      scope ?? (existing._source === "project" ? "project" : "global");
+    const ok = app.skills.delete(name, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    return { ok };
   });
   router.handle("runtime/list", async () => ({ runtimes: app.runtimes.list() }));
   router.handle("runtime/read", async (p) => {
@@ -78,6 +233,20 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const instance = instantiateRecipe(recipe, (variables ?? {}) as Record<string, string>);
     const session = app.sessionService.start(instance);
     return { session };
+  });
+
+  router.handle("recipe/delete", async (p) => {
+    const { name, scope } = extract<{ name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const existing = app.recipes.get(name, projectRoot);
+    if (!existing) throw new Error(`Recipe '${name}' not found`);
+    if (existing._source === "builtin") {
+      throw new Error(`Cannot delete builtin recipe '${name}'.`);
+    }
+    const resolvedScope: "global" | "project" =
+      scope ?? (existing._source === "project" ? "project" : "global");
+    const ok = app.recipes.delete(name, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    return { ok };
   });
   router.handle("compute/list", async () => ({ targets: app.computes.list() }));
   router.handle("compute/create", async (p) => {
