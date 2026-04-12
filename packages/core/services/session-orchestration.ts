@@ -2331,7 +2331,13 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
           }).trim();
           if (status) {
             // Filter out untracked files (??) -- only reject for tracked file changes
-            const uncommitted = status.split("\n").filter(l => l && !l.startsWith("??"));
+            const uncommitted = status.split("\n").filter(l => {
+              if (!l || l.startsWith("??")) return false;
+              // Ignore Ark infrastructure files modified at dispatch
+              const file = l.slice(3).trim();
+              if (file === ".mcp.json" || file.startsWith(".claude/")) return false;
+              return true;
+            });
             if (uncommitted.length > 0) {
               result.logEvents!.push({
                 type: "completion_rejected",
