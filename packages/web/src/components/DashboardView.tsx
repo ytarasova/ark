@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card.js";
 import { StatusDot } from "./StatusDot.js";
 import { Activity, DollarSign, Cpu, Heart, Plus, Search, Upload } from "lucide-react";
 import { Button } from "./ui/button.js";
+import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
 // Theme colors for charts and status
 const STATUS_COLORS: Record<string, string> = {
@@ -57,9 +58,10 @@ interface DashboardData {
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
   readOnly: boolean;
+  daemonStatus?: DaemonStatus | null;
 }
 
-export function DashboardView({ onNavigate, readOnly }: DashboardViewProps) {
+export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardViewProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,13 +141,32 @@ export function DashboardView({ onNavigate, readOnly }: DashboardViewProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] text-muted-foreground">Conductor</span>
-            <span className={cn("text-[12px] font-medium flex items-center gap-1.5", system.conductor ? "text-emerald-400" : "text-red-400")}>
-              <span className={cn("w-1.5 h-1.5 rounded-full", system.conductor ? "bg-emerald-400" : "bg-red-400")} />
-              {system.conductor ? "online" : "offline"}
-            </span>
-          </div>
+          {/* Conductor status -- use live probe when available, fall back to dashboard data */}
+          {(() => {
+            const online = daemonStatus ? daemonStatus.conductor.online : system.conductor;
+            return (
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] text-muted-foreground">Conductor</span>
+                <span className={cn("text-[12px] font-medium flex items-center gap-1.5", online ? "text-emerald-400" : "text-red-400")}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", online ? "bg-emerald-400" : "bg-red-400")} />
+                  {online ? "online" : "offline"}
+                </span>
+              </div>
+            );
+          })()}
+          {/* ArkD status -- only shown when daemon probing is available */}
+          {(() => {
+            const online = daemonStatus?.arkd.online ?? false;
+            return (
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] text-muted-foreground">ArkD</span>
+                <span className={cn("text-[12px] font-medium flex items-center gap-1.5", online ? "text-emerald-400" : "text-muted-foreground/50")}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", online ? "bg-emerald-400" : "bg-muted-foreground/30")} />
+                  {online ? "online" : "offline"}
+                </span>
+              </div>
+            );
+          })()}
           <div className="flex items-center justify-between">
             <span className="text-[12px] text-muted-foreground">Router</span>
             <span className={cn("text-[12px] font-medium flex items-center gap-1.5", system.router ? "text-emerald-400" : "text-muted-foreground/50")}>

@@ -15,6 +15,7 @@ import { CostsPage } from "./pages/CostsPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
+import { useDaemonStatus } from "./hooks/useDaemonStatus.js";
 
 const READ_ONLY = document.getElementById("root")?.dataset.readonly === "true";
 const AUTH_REQUIRED = document.getElementById("root")?.dataset.auth === "true";
@@ -34,6 +35,7 @@ function App() {
     return !!localStorage.getItem("ark-token");
   });
   const readOnly = READ_ONLY;
+  const daemonStatus = useDaemonStatus();
 
   function showToast(msg: string, type: string) {
     setToast({ msg, type });
@@ -47,37 +49,37 @@ function App() {
   return (
     <>
       {view === "dashboard" && (
-        <DashboardPage view={view} onNavigate={setView} readOnly={readOnly} />
+        <DashboardPage view={view} onNavigate={setView} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "sessions" && (
-        <SessionsPage view={view} onNavigate={setView} readOnly={readOnly} onToast={showToast} />
+        <SessionsPage view={view} onNavigate={setView} readOnly={readOnly} onToast={showToast} daemonStatus={daemonStatus} />
       )}
       {view === "agents" && (
-        <AgentsPage view={view} onNavigate={setView} readOnly={readOnly} />
+        <AgentsPage view={view} onNavigate={setView} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "tools" && (
-        <ToolsPage view={view} onNavigate={setView} readOnly={readOnly} />
+        <ToolsPage view={view} onNavigate={setView} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "flows" && (
-        <FlowsPage view={view} onNavigate={setView} readOnly={readOnly} />
+        <FlowsPage view={view} onNavigate={setView} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "history" && (
-        <HistoryPage view={view} onNavigate={setView} readOnly={readOnly} />
+        <HistoryPage view={view} onNavigate={setView} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "compute" && (
-        <ComputePage view={view} onNavigate={setView} readOnly={readOnly} />
+        <ComputePage view={view} onNavigate={setView} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "schedules" && (
-        <SchedulesPage view={view} onNavigate={setView} readOnly={readOnly} />
+        <SchedulesPage view={view} onNavigate={setView} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "memory" && (
-        <MemoryPage view={view} onNavigate={setView} readOnly={readOnly} />
+        <MemoryPage view={view} onNavigate={setView} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "costs" && (
-        <CostsPage view={view} onNavigate={setView} readOnly={readOnly} />
+        <CostsPage view={view} onNavigate={setView} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "settings" && (
-        <SettingsPage view={view} onNavigate={setView} readOnly={readOnly} />
+        <SettingsPage view={view} onNavigate={setView} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {toast && (
         <Toast

@@ -3,18 +3,20 @@ import { Layout } from "../components/Layout.js";
 import { HistoryView } from "../components/HistoryView.js";
 import { cn } from "../lib/utils.js";
 import { Database, FileText } from "lucide-react";
+import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
 interface HistoryPageProps {
   view: string;
   onNavigate: (view: string) => void;
   readOnly: boolean;
+  daemonStatus?: DaemonStatus | null;
 }
 
-export function HistoryPage({ view, onNavigate, readOnly }: HistoryPageProps) {
+export function HistoryPage({ view, onNavigate, readOnly, daemonStatus }: HistoryPageProps) {
   const [historyMode, setHistoryMode] = useState<"sessions" | "transcripts">("sessions");
 
   return (
-    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="History" padded={false}
+    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="History" padded={false} daemonStatus={daemonStatus}
       headerLeft={
         <div className="flex gap-1 ml-2">
           {(["sessions", "transcripts"] as const).map(m => (

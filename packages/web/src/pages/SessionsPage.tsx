@@ -11,14 +11,17 @@ import { Search } from "lucide-react";
 
 const FILTERS = ["all", "running", "waiting", "pending", "stopped", "blocked", "completed", "failed", "archived"];
 
+import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
+
 interface SessionsPageProps {
   view: string;
   onNavigate: (view: string) => void;
   readOnly: boolean;
   onToast: (msg: string, type: string) => void;
+  daemonStatus?: DaemonStatus | null;
 }
 
-export function SessionsPage({ view, onNavigate, readOnly, onToast }: SessionsPageProps) {
+export function SessionsPage({ view, onNavigate, readOnly, onToast, daemonStatus }: SessionsPageProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -138,7 +141,7 @@ export function SessionsPage({ view, onNavigate, readOnly, onToast }: SessionsPa
 
   return (
     <Layout
-      view={view} onNavigate={onNavigate} readOnly={readOnly} title="Sessions"
+      view={view} onNavigate={onNavigate} readOnly={readOnly} title="Sessions" daemonStatus={daemonStatus}
       padded={false}
       headerLeft={
         <div className="flex gap-1.5 items-center">
