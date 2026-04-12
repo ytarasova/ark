@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Layout } from "../components/Layout.js";
 import { SessionList } from "../components/SessionList.js";
 import { SessionDetail } from "../components/SessionDetail.js";
@@ -25,10 +25,91 @@ export function SessionsPage({ view, onNavigate, readOnly, onToast }: SessionsPa
   const [search, setSearch] = useState("");
   const [groupFilter, _setGroupFilter] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const runningCount = sessions.filter(s => s.status === "running").length;
   const waitingCount = sessions.filter(s => s.status === "waiting").length;
   const failedCount = sessions.filter(s => s.status === "failed").length;
+
+  // Compute filtered sessions for keyboard navigation (mirrors SessionList logic)
+  const filteredSessions = useMemo(() => {
+    let list = sessions || [];
+    if (filter !== "all") list = list.filter((s) => s.status === filter);
+    if (groupFilter) list = list.filter((s) => s.group_name === groupFilter);
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((s) =>
+        (s.summary || "").toLowerCase().includes(q) ||
+        (s.id || "").toLowerCase().includes(q) ||
+        (s.repo || "").toLowerCase().includes(q) ||
+        (s.agent || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [sessions, filter, search, groupFilter]);
+
+  // Close chat when session changes
+  useEffect(() => { setChatOpen(false); }, [selectedId]);
+
+  // Keyboard shortcuts
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+    switch (e.key) {
+      case "j": { // Next session
+        e.preventDefault();
+        if (filteredSessions.length === 0) break;
+        const idx = selectedId ? filteredSessions.findIndex(s => s.id === selectedId) : -1;
+        const next = Math.min(idx + 1, filteredSessions.length - 1);
+        setSelectedId(filteredSessions[next].id);
+        setShowNew(false);
+        break;
+      }
+      case "k": { // Previous session
+        e.preventDefault();
+        if (filteredSessions.length === 0) break;
+        const idx = selectedId ? filteredSessions.findIndex(s => s.id === selectedId) : filteredSessions.length;
+        const prev = Math.max(idx - 1, 0);
+        setSelectedId(filteredSessions[prev].id);
+        setShowNew(false);
+        break;
+      }
+      case "t": { // Toggle chat
+        if (!selectedId) break;
+        const sel = filteredSessions.find(s => s.id === selectedId);
+        if (sel && (sel.status === "running" || sel.status === "waiting")) {
+          e.preventDefault();
+          setChatOpen(o => !o);
+        }
+        break;
+      }
+      case "n": { // New session
+        if (readOnly) break;
+        e.preventDefault();
+        setShowNew(true);
+        setSelectedId(null);
+        break;
+      }
+      case "/": { // Focus search
+        e.preventDefault();
+        searchRef.current?.focus();
+        break;
+      }
+      case "Escape": {
+        if (chatOpen) { setChatOpen(false); break; }
+        if (showNew) { setShowNew(false); break; }
+        if (selectedId) { setSelectedId(null); break; }
+        break;
+      }
+    }
+  }, [filteredSessions, selectedId, readOnly, chatOpen, showNew]);
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   async function handleNewSession(form: any) {
     const shouldDispatch = form.dispatch;
@@ -79,8 +160,9 @@ export function SessionsPage({ view, onNavigate, readOnly, onToast }: SessionsPa
           <div className="relative">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
+              ref={searchRef}
               className="w-40 h-7 pl-7 pr-2 text-[11px] bg-secondary"
-              placeholder="Search..."
+              placeholder="Search (/)..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -111,10 +193,20 @@ export function SessionsPage({ view, onNavigate, readOnly, onToast }: SessionsPa
               onClose={() => setSelectedId(null)}
               onToast={onToast}
               readOnly={readOnly}
+              chatOpen={chatOpen}
+              onChatOpenChange={setChatOpen}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-              Select a session or create a new one
+              <div className="text-center">
+                <div>Select a session or create a new one</div>
+                <div className="mt-2 text-xs text-muted-foreground/60">
+                  <kbd className="px-1.5 py-0.5 rounded bg-secondary text-[10px] font-mono">j</kbd>/<kbd className="px-1.5 py-0.5 rounded bg-secondary text-[10px] font-mono">k</kbd> navigate
+                  {" "}<kbd className="px-1.5 py-0.5 rounded bg-secondary text-[10px] font-mono">t</kbd> chat
+                  {" "}<kbd className="px-1.5 py-0.5 rounded bg-secondary text-[10px] font-mono">n</kbd> new
+                  {" "}<kbd className="px-1.5 py-0.5 rounded bg-secondary text-[10px] font-mono">/</kbd> search
+                </div>
+              </div>
             </div>
           )}
         </div>

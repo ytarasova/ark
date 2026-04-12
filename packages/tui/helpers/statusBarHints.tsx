@@ -70,6 +70,7 @@ export function getOverlayHints(overlay: string): React.ReactNode[] {
       ];
     case "talk":
       return [
+        <KeyHint key="tab" k="Tab" label="scroll/type" />,
         <KeyHint key="enter" k="Enter" label="send" />,
         <KeyHint key="esc" k="Esc" label="close" />,
       ];
@@ -86,6 +87,9 @@ export function getOverlayHints(overlay: string): React.ReactNode[] {
       ];
     case "inbox":
       return [
+        <KeyHint key="tab" k="Tab" label="scroll/type" />,
+        <KeyHint key="enter" k="Enter" label="send" />,
+        <KeyHint key="at" k="@" label="mention" />,
         <KeyHint key="esc" k="Esc" label="close" />,
       ];
     case "settings":
