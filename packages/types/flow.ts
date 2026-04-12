@@ -53,6 +53,20 @@ export interface StageDefinition {
   gate: GateType;
   autonomy?: "full" | "execute" | "edit" | "read-only";
   on_failure?: string;
+  /**
+   * Outcome-based routing. Maps outcome labels reported by the agent
+   * to target stage names. When an agent completes with an `outcome`
+   * field, the flow advances to the mapped stage instead of the linear next.
+   *
+   * Example:
+   *   on_outcome:
+   *     approved: deploy
+   *     rejected: revise
+   *     needs_info: clarify
+   *
+   * If the outcome doesn't match any key, falls back to linear next stage.
+   */
+  on_outcome?: Record<string, string>;
   optional?: boolean;
   model?: string;
   /** Scripts that must pass before stage completion. */
