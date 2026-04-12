@@ -66,11 +66,11 @@ describe("writeHooksConfig", () => {
   it("preserves existing non-hook settings", () => {
     const claudeDir = join(getCtx().arkDir, ".claude");
     mkdirSync(claudeDir, { recursive: true });
-    writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({ permissions: { allow: ["Bash"] } }));
+    writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({ customKey: "preserved" }));
 
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
-    expect(settings.permissions.allow).toContain("Bash");
+    expect(settings.customKey).toBe("preserved");
     expect(settings.hooks).toBeDefined();
   });
 
@@ -121,12 +121,12 @@ describe("removeHooksConfig", () => {
     // Add extra settings
     const settingsPath = join(getCtx().arkDir, ".claude", "settings.local.json");
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
-    settings.permissions = { allow: ["Bash"] };
+    settings.customKey = "preserved";
     writeFileSync(settingsPath, JSON.stringify(settings));
 
     removeHooksConfig(getCtx().arkDir);
     const cleaned = JSON.parse(readFileSync(settingsPath, "utf-8"));
-    expect(cleaned.permissions.allow).toContain("Bash");
+    expect(cleaned.customKey).toBe("preserved");
     expect(cleaned.hooks).toBeUndefined();
   });
 
@@ -231,16 +231,33 @@ describe("writeHooksConfig with agent", () => {
       agent: { tools: ["Bash", "Read", "Write"], mcp_servers: [] },
     });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions.allow).toEqual(["Bash", "Read", "Write"]);
+    expect(settings.permissions.allow).toContain("Bash");
+    expect(settings.permissions.allow).toContain("Read");
+    expect(settings.permissions.allow).toContain("Write");
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
     expect(settings._ark?.managedAllow).toBe(true);
   });
 
-  it("does not write permissions.allow when agent has no tools", () => {
+  it("always includes mcp__ark-channel__* even when agent has no tools", () => {
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
       agent: { tools: [], mcp_servers: [] },
     });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions?.allow).toBeUndefined();
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
+  });
+
+  it("always includes mcp__ark-channel__* even when no agent is provided", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
+  });
+
+  it("always includes mcp__ark-channel__* when agent.tools and mcp_servers are undefined", () => {
+    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+      agent: {},
+    });
+    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
   });
 
   it("includes implicit mcp wildcards from declared servers", () => {
@@ -250,6 +267,7 @@ describe("writeHooksConfig with agent", () => {
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions.allow).toContain("mcp__atlassian__*");
     expect(settings.permissions.allow).toContain("mcp__figma__*");
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
   });
 
   it("coexists with autonomy-driven permissions.deny", () => {
@@ -258,7 +276,11 @@ describe("writeHooksConfig with agent", () => {
       agent: { tools: ["Bash", "Read", "Write", "Edit"], mcp_servers: [] },
     });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions.allow).toEqual(["Bash", "Read", "Write", "Edit"]);
+    expect(settings.permissions.allow).toContain("Bash");
+    expect(settings.permissions.allow).toContain("Read");
+    expect(settings.permissions.allow).toContain("Write");
+    expect(settings.permissions.allow).toContain("Edit");
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
     expect(settings.permissions.deny).toEqual(["Bash"]);
   });
 
@@ -274,7 +296,7 @@ describe("writeHooksConfig with agent", () => {
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { agent });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     const allow = settings.permissions.allow;
-    expect(allow).toEqual(["Bash", "Read", "mcp__atlassian__*"]);
+    expect(allow).toEqual(["Bash", "Read", "mcp__atlassian__*", "mcp__ark-channel__*"]);
   });
 });
 
@@ -343,7 +365,7 @@ describe("removeHooksConfig with agent permissions", () => {
     expect(settings._ark).toBeUndefined();
   });
 
-  it("preserves user-added permissions.allow when ark never managed one", () => {
+  it("cleans ark-managed allow list on remove even when pre-existing user entries existed", () => {
     const claudeDir = join(getCtx().arkDir, ".claude");
     mkdirSync(claudeDir, { recursive: true });
     writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
@@ -352,6 +374,7 @@ describe("removeHooksConfig with agent permissions", () => {
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
     removeHooksConfig(getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
-    expect(settings.permissions.allow).toEqual(["UserTool"]);
+    // ark always manages allow now (for ark-channel), so remove cleans it
+    expect(settings.permissions?.allow).toBeUndefined();
   });
 });
