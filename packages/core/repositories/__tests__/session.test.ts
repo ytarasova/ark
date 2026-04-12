@@ -116,6 +116,24 @@ describe("SessionRepository", () => {
     expect(result[0].flow).toBe("quick");
   });
 
+  it("list excludes archived sessions by default", () => {
+    const s1 = repo.create({ summary: "active" });
+    const s2 = repo.create({ summary: "old" });
+    repo.update(s2.id, { status: "archived" as SessionStatus });
+    const all = repo.list();
+    expect(all.some(s => s.id === s1.id)).toBe(true);
+    expect(all.some(s => s.id === s2.id)).toBe(false);
+  });
+
+  it("list returns archived sessions when status filter is archived", () => {
+    const s1 = repo.create({ summary: "active" });
+    const s2 = repo.create({ summary: "old" });
+    repo.update(s2.id, { status: "archived" as SessionStatus });
+    const archived = repo.list({ status: "archived" });
+    expect(archived.some(s => s.id === s2.id)).toBe(true);
+    expect(archived.some(s => s.id === s1.id)).toBe(false);
+  });
+
   it("list excludes deleting sessions", () => {
     const s = repo.create({});
     repo.softDelete(s.id);

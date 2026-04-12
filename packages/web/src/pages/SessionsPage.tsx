@@ -9,7 +9,7 @@ import { Button } from "../components/ui/button.js";
 import { Input } from "../components/ui/input.js";
 import { Search } from "lucide-react";
 
-const FILTERS = ["all", "running", "waiting", "stopped", "failed", "completed"];
+const FILTERS = ["all", "running", "waiting", "pending", "stopped", "blocked", "completed", "failed", "archived"];
 
 interface SessionsPageProps {
   view: string;
@@ -19,10 +19,12 @@ interface SessionsPageProps {
 }
 
 export function SessionsPage({ view, onNavigate, readOnly, onToast }: SessionsPageProps) {
-  const { sessions, groups: _groups, refresh } = useSessions();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  // Pass "archived" to the server so it returns archived sessions (excluded by default)
+  const serverStatus = filter === "archived" ? "archived" : undefined;
+  const { sessions, groups: _groups, refresh } = useSessions(serverStatus);
   const [groupFilter, _setGroupFilter] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -33,9 +35,10 @@ export function SessionsPage({ view, onNavigate, readOnly, onToast }: SessionsPa
   const failedCount = sessions.filter(s => s.status === "failed").length;
 
   // Compute filtered sessions for keyboard navigation (mirrors SessionList logic)
+  // When filter is "archived", server already returns only archived sessions
   const filteredSessions = useMemo(() => {
     let list = sessions || [];
-    if (filter !== "all") list = list.filter((s) => s.status === filter);
+    if (filter !== "all" && filter !== "archived") list = list.filter((s) => s.status === filter);
     if (groupFilter) list = list.filter((s) => s.group_name === groupFilter);
     if (search) {
       const q = search.toLowerCase();

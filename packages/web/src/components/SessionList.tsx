@@ -18,7 +18,8 @@ export function SessionList({
 }: SessionListProps) {
   const filtered = useMemo(() => {
     let list = sessions || [];
-    if (filter !== "all") list = list.filter((s) => s.status === filter);
+    // "archived" is filtered server-side; skip redundant client-side status filter
+    if (filter !== "all" && filter !== "archived") list = list.filter((s) => s.status === filter);
     if (groupFilter) list = list.filter((s) => s.group_name === groupFilter);
     if (search) {
       const q = search.toLowerCase();

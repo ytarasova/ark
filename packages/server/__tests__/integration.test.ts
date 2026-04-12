@@ -173,6 +173,30 @@ describe("end-to-end: server + client", () => {
     client.close();
   });
 
+  it("session list excludes archived by default but includes them when filtered", async () => {
+    const { client } = createInMemoryPair();
+    await client.initialize();
+
+    const s1 = await client.sessionStart({ summary: "archived-test-active", repo: ".", flow: "bare" });
+    const s2 = await client.sessionStart({ summary: "archived-test-old", repo: ".", flow: "bare" });
+    await client.sessionUpdate(s2.id, { status: "archived" });
+
+    // Default list should exclude archived
+    const all = await client.sessionList();
+    expect(all.some((s: any) => s.id === s1.id)).toBe(true);
+    expect(all.some((s: any) => s.id === s2.id)).toBe(false);
+
+    // Filtering by archived should return only the archived session
+    const archived = await client.sessionList({ status: "archived" });
+    expect(archived.some((s: any) => s.id === s2.id)).toBe(true);
+    expect(archived.some((s: any) => s.id === s1.id)).toBe(false);
+
+    // Clean up
+    await client.sessionDelete(s1.id);
+    await client.sessionDelete(s2.id);
+    client.close();
+  });
+
   it("session list filters by repo", async () => {
     const { client } = createInMemoryPair();
     await client.initialize();
