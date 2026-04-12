@@ -23,13 +23,14 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
 
       const status = await executor.status(handle);
 
-      if (status.state === "completed" || status.state === "failed") {
+      if (status.state === "completed" || status.state === "failed" || status.state === "not_found") {
         stopStatusPoller(sessionId);
 
         const session = app.sessions.get(sessionId);
         if (!session || session.status !== "running") return;
 
-        const newStatus = status.state === "completed" ? "completed" : "failed";
+        // "not_found" means the tmux session exited (process finished) -- treat as completed
+        const newStatus = status.state === "failed" ? "failed" : "completed";
         const error = status.state === "failed" ? (status as { error?: string }).error : null;
 
         app.sessions.update(sessionId, {
