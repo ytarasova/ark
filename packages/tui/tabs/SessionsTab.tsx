@@ -500,22 +500,21 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
             emptyGroups={groupByStatus ? undefined : groups}
             groupSort={groupSortFn}
             renderRow={(s) => {
-              const cols = process.stdout.columns ?? 120;
+              const cols = Math.floor((process.stdout.columns ?? 120) / 2) - 2;
               return formatSessionRow(s, cols, unreadCounts.get(s.id) ?? 0);
             }}
             renderColoredRow={(s) => {
-              const cols = process.stdout.columns ?? 120;
-              const widths = getColumnWidths(cols);
+              // Left pane is roughly half the terminal width
+              const cols = Math.floor((process.stdout.columns ?? 120) / 2) - 2;
               const icon = ICON[s.status] ?? "?";
               const color = getStatusColor(s.status);
-              const summary = fitText(sessionLabel(s), widths.summary);
+              // Reserve: 2 indent + 2 icon + 5 age + 4 unread badge = ~13 fixed chars
+              const summaryWidth = Math.max(cols - 13, 12);
+              const summary = fitText(sessionLabel(s), summaryWidth);
               const unread = unreadCounts.get(s.id) ?? 0;
               return (
-                <Text>
+                <Text wrap="truncate">
                   {"  "}<Text color={color}>{icon}</Text>{` ${summary}`}
-                  {widths.id > 0 && <Text dimColor>{` ${shortId(s.id).padEnd(widths.id - 1)}`}</Text>}
-                  {s.branch && <Text color={theme.accent}>{` ${s.branch}`}</Text>}
-                  {widths.stage > 0 && s.stage && <Text dimColor>{` ${s.stage}`}</Text>}
                   <Text dimColor>{` ${ago(s.updated_at ?? s.created_at).padStart(4)}`}</Text>
                   {unread > 0 && <Text color={theme.waiting} bold>{` (${unread})`}</Text>}
                 </Text>
