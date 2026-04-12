@@ -33,6 +33,8 @@ export interface LaunchOpts {
   onLog?: (msg: string) => void;
   prevClaudeSessionId?: string | null;
   sessionName?: string;
+  /** Initial prompt to pass as positional arg for immediate processing. */
+  initialPrompt?: string;
   /** AppContext passed from dispatch -- avoids getApp() in executors. */
   app?: import("./app.js").AppContext;
 }

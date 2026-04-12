@@ -401,6 +401,8 @@ export interface LauncherOpts {
   sessionName?: string;
   /** Environment variables to export before launching Claude */
   env?: Record<string, string>;
+  /** Initial prompt passed as positional arg -- triggers immediate processing */
+  initialPrompt?: string;
 }
 
 /** Generate launcher bash script content. */
@@ -423,21 +425,25 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   // Can't source .bashrc -- it exits early for non-interactive shells
   const pathSetup = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.nvm/versions/node/*/bin:$PATH"\n`;
 
+  // When initialPrompt is provided, append it as the last positional arg
+  // to trigger immediate processing (claude "prompt" --session-id X).
+  const promptArg = opts.initialPrompt ? ` \\\n  ${shellQuote(opts.initialPrompt)}` : "";
+
   let content: string;
   if (opts.prevClaudeSessionId) {
     content = `#!/bin/bash
 ${pathSetup}cd ${shellQuote(opts.workdir)}
 ${envBlock}${claudeCmd} --resume ${shellQuote(opts.prevClaudeSessionId)} \\
-  ${extraFlags} || \\
+  ${extraFlags}${promptArg} || \\
 ${claudeCmd} --session-id ${shellQuote(claudeSessionId)} \\
-  ${extraFlags}
+  ${extraFlags}${promptArg}
 exec bash
 `;
   } else {
     content = `#!/bin/bash
 ${pathSetup}cd ${shellQuote(opts.workdir)}
 ${envBlock}${claudeCmd} --session-id ${shellQuote(claudeSessionId)} \\
-  ${extraFlags}
+  ${extraFlags}${promptArg}
 exec bash
 `;
   }
