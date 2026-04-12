@@ -6,14 +6,10 @@ withTestContext();
 
 describe("compute CRUD", () => {
 
-  it("creates a local compute as running by default", () => {
-    const compute = getApp().computes.create({ name: "my-laptop" });
-    expect(compute.name).toBe("my-laptop");
-    expect(compute.provider).toBe("local");
-    expect(compute.status).toBe("running");
-    expect(compute.config).toEqual({});
-    expect(typeof compute.created_at).toBe("string");
-    expect(typeof compute.updated_at).toBe("string");
+  it("rejects creating a second local compute (singleton)", () => {
+    // "local" is auto-seeded -- creating another with provider=local must throw
+    expect(() => getApp().computes.create({ name: "my-laptop" })).toThrow(/singleton/);
+    expect(() => getApp().computes.create({ name: "my-laptop", provider: "local" })).toThrow(/singleton/);
   });
 
   it("creates a non-local compute as stopped by default", () => {
@@ -42,18 +38,18 @@ describe("compute CRUD", () => {
   });
 
   it("lists all computes", () => {
-    getApp().computes.create({ name: "h1" });
-    getApp().computes.create({ name: "h2" });
-    getApp().computes.create({ name: "h3" });
+    getApp().computes.create({ name: "h1", provider: "docker" });
+    getApp().computes.create({ name: "h2", provider: "docker" });
+    getApp().computes.create({ name: "h3", provider: "docker" });
     const computes = getApp().computes.list();
-    // +1 for the auto-created "local" compute from ensureLocalCompute()
+    // +1 for the auto-created "local" compute from seedLocalCompute()
     expect(computes.length).toBe(4);
   });
 
   it("filters by provider", () => {
-    getApp().computes.create({ name: "local-1", provider: "local" });
     getApp().computes.create({ name: "docker-1", provider: "docker" });
     getApp().computes.create({ name: "docker-2", provider: "docker" });
+    getApp().computes.create({ name: "ec2-1", provider: "ec2" });
     const computes = getApp().computes.list({ provider: "docker" });
     expect(computes.length).toBe(2);
     expect(computes.every((h) => h.provider === "docker")).toBe(true);
@@ -70,20 +66,18 @@ describe("compute CRUD", () => {
   });
 
   it("updates compute fields including config as JSON", () => {
-    getApp().computes.create({ name: "up", provider: "local" });
+    getApp().computes.create({ name: "up", provider: "docker" });
     const updated = getApp().computes.update("up", {
       status: "running",
-      provider: "docker",
       config: { port: 3000 },
     });
     expect(updated).not.toBeNull();
     expect(updated!.status).toBe("running");
-    expect(updated!.provider).toBe("docker");
     expect(updated!.config).toEqual({ port: 3000 });
   });
 
   it("deletes a compute", () => {
-    getApp().computes.create({ name: "del-me" });
+    getApp().computes.create({ name: "del-me", provider: "docker" });
     expect(getApp().computes.delete("del-me")).toBe(true);
     expect(getApp().computes.get("del-me")).toBeNull();
   });
@@ -93,8 +87,8 @@ describe("compute CRUD", () => {
   });
 
   it("throws on duplicate compute name", () => {
-    getApp().computes.create({ name: "dup" });
-    expect(() => getApp().computes.create({ name: "dup" })).toThrow();
+    getApp().computes.create({ name: "dup", provider: "docker" });
+    expect(() => getApp().computes.create({ name: "dup", provider: "docker" })).toThrow();
   });
 
   it("returns null when updating a non-existent compute", () => {

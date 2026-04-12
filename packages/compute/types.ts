@@ -80,6 +80,7 @@ export interface ComputeProvider {
   syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void>;
 
   // ── Capability flags ────────────────────────────────────────────────────
+  readonly singleton?: boolean;
   readonly canReboot: boolean;
   readonly canDelete: boolean;
   readonly supportsWorktree: boolean;
