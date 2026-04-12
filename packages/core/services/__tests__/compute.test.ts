@@ -29,9 +29,9 @@ describe("ComputeService", () => {
     expect(c.status).toBe("stopped");
   });
 
-  it("create with local provider defaults to running", () => {
-    const c = svc.create({ name: "local2", provider: "local" });
-    expect(c.status).toBe("running");
+  it("create rejects second local provider (singleton)", () => {
+    // "local" already seeded -- creating another must throw
+    expect(() => svc.create({ name: "local2", provider: "local" })).toThrow(/singleton/);
   });
 
   // ── get ────────────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ describe("ComputeService", () => {
   // ── mergeConfig ────────────────────────────────────────────────────────────
 
   it("mergeConfig delegates to repository", () => {
-    svc.create({ name: "merge", config: { ip: "1.2.3.4" } });
+    svc.create({ name: "merge", provider: "docker", config: { ip: "1.2.3.4" } });
     const updated = svc.mergeConfig("merge", { region: "us-east-1" });
     expect(updated!.config).toEqual({ ip: "1.2.3.4", region: "us-east-1" });
   });

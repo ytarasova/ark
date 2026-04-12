@@ -44,6 +44,9 @@ const COMPUTE_COLUMNS = new Set([
   "provider", "status", "config", "updated_at",
 ]);
 
+// Providers that allow only one compute instance per tenant.
+const SINGLETON_PROVIDERS = new Set(["local"]);
+
 // ── Repository ──────────────────────────────────────────────────────────────
 
 export class ComputeRepository {
@@ -57,6 +60,16 @@ export class ComputeRepository {
   create(opts: CreateComputeOpts): Compute {
     const ts = now();
     const provider = opts.provider ?? "local";
+
+    // Singleton providers allow only one compute instance per tenant.
+    if (SINGLETON_PROVIDERS.has(provider)) {
+      const existing = this.db.prepare(
+        "SELECT name FROM compute WHERE provider = ? AND tenant_id = ?"
+      ).get(provider, this.tenantId) as { name: string } | undefined;
+      if (existing) {
+        throw new Error(`Provider '${provider}' is a singleton -- compute '${existing.name}' already exists`);
+      }
+    }
 
     const initialStatus: ComputeStatus = provider === "local" ? "running" : "stopped";
 

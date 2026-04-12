@@ -28,15 +28,14 @@ describe("ComputeRepository", () => {
     expect(c.created_at).toBeTruthy();
   });
 
-  it("create with local provider defaults to running", () => {
-    const c = repo.create({ name: "local2", provider: "local" });
-    expect(c.status).toBe("running");
+  it("create rejects second local provider (singleton)", () => {
+    // "local" already seeded -- creating another must throw
+    expect(() => repo.create({ name: "local2", provider: "local" })).toThrow(/singleton/);
   });
 
-  it("create with no provider defaults to local/running", () => {
-    const c = repo.create({ name: "auto" });
-    expect(c.provider).toBe("local");
-    expect(c.status).toBe("running");
+  it("create with no provider defaults to local and rejects (singleton)", () => {
+    // Default provider is "local", which is already seeded
+    expect(() => repo.create({ name: "auto" })).toThrow(/singleton/);
   });
 
   it("create stores config", () => {
@@ -58,7 +57,7 @@ describe("ComputeRepository", () => {
   });
 
   it("get parses config from JSON", () => {
-    repo.create({ name: "with-cfg", config: { ip: "10.0.0.1" } });
+    repo.create({ name: "with-cfg", provider: "docker", config: { ip: "10.0.0.1" } });
     const c = repo.get("with-cfg");
     expect(c!.config).toEqual({ ip: "10.0.0.1" });
   });
@@ -81,16 +80,17 @@ describe("ComputeRepository", () => {
   });
 
   it("list filters by status", () => {
-    repo.create({ name: "run1", provider: "local" }); // running
+    // "local" already seeded as running; add a stopped docker
     repo.create({ name: "stop1", provider: "docker" }); // stopped
     const running = repo.list({ status: "running" });
+    expect(running.length).toBeGreaterThanOrEqual(1);
     expect(running.every(c => c.status === "running")).toBe(true);
   });
 
   it("list respects limit", () => {
-    repo.create({ name: "a" });
-    repo.create({ name: "b" });
-    repo.create({ name: "c" });
+    repo.create({ name: "a", provider: "docker" });
+    repo.create({ name: "b", provider: "docker" });
+    repo.create({ name: "c", provider: "docker" });
     const result = repo.list({ limit: 2 });
     expect(result.length).toBe(2);
   });
@@ -104,13 +104,13 @@ describe("ComputeRepository", () => {
   });
 
   it("update skips unknown columns", () => {
-    repo.create({ name: "upd2" });
+    repo.create({ name: "upd2", provider: "docker" });
     const updated = repo.update("upd2", { unknownField: "x" } as Record<string, unknown>);
     expect(updated).not.toBeNull();
   });
 
   it("update skips name and created_at", () => {
-    repo.create({ name: "upd3" });
+    repo.create({ name: "upd3", provider: "docker" });
     const original = repo.get("upd3")!;
     repo.update("upd3", { name: "hacked", created_at: "1999" } as Record<string, unknown>);
     const after = repo.get("upd3")!;
@@ -119,7 +119,7 @@ describe("ComputeRepository", () => {
   });
 
   it("update handles config as JSON", () => {
-    repo.create({ name: "cfg-upd" });
+    repo.create({ name: "cfg-upd", provider: "docker" });
     const updated = repo.update("cfg-upd", { config: { region: "eu-west-1" } as ComputeConfig });
     expect(updated!.config).toEqual({ region: "eu-west-1" });
   });
@@ -148,7 +148,7 @@ describe("ComputeRepository", () => {
   // ── mergeConfig ─────────────────────────────────────────────────────────
 
   it("mergeConfig merges without replacing existing keys", () => {
-    repo.create({ name: "merge", config: { ip: "1.2.3.4", region: "us-east-1" } });
+    repo.create({ name: "merge", provider: "docker", config: { ip: "1.2.3.4", region: "us-east-1" } });
     const updated = repo.mergeConfig("merge", { region: "eu-west-1", key_path: "/tmp/k" });
     expect(updated!.config).toEqual({ ip: "1.2.3.4", region: "eu-west-1", key_path: "/tmp/k" });
   });
@@ -159,7 +159,7 @@ describe("ComputeRepository", () => {
   });
 
   it("mergeConfig updates updated_at", () => {
-    repo.create({ name: "ts-test" });
+    repo.create({ name: "ts-test", provider: "docker" });
     const before = repo.get("ts-test")!;
     repo.mergeConfig("ts-test", { x: 1 });
     const after = repo.get("ts-test")!;
