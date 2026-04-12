@@ -122,7 +122,7 @@ export function channelMcpConfig(
 export function writeChannelConfig(
   sessionId: string, stage: string, channelPort: number,
   workdir: string,
-  opts?: { conductorUrl?: string; channelConfig?: Record<string, unknown>; tracksDir?: string },
+  opts?: { conductorUrl?: string; channelConfig?: Record<string, unknown>; tracksDir?: string; originalRepoDir?: string },
 ): string {
   const config = opts?.channelConfig ?? channelMcpConfig(sessionId, stage, channelPort, { conductorUrl: opts?.conductorUrl });
 
@@ -133,6 +133,30 @@ export function writeChannelConfig(
     try { existing = JSON.parse(readFileSync(mcpConfigPath, "utf-8")); }
     catch (e: any) { console.error(`writeChannelConfig: failed to parse ${mcpConfigPath}:`, e?.message ?? e); }
   }
+
+  // Merge MCP servers from the original repo's .mcp.json into the worktree.
+  // Git worktrees don't include untracked files like .mcp.json, so agents in
+  // worktrees would lose access to MCP servers configured in the original repo.
+  if (opts?.originalRepoDir && resolve(opts.originalRepoDir) !== resolve(workdir)) {
+    const origMcpPath = join(opts.originalRepoDir, ".mcp.json");
+    if (existsSync(origMcpPath)) {
+      try {
+        const origConfig = JSON.parse(readFileSync(origMcpPath, "utf-8"));
+        if (origConfig.mcpServers && typeof origConfig.mcpServers === "object") {
+          if (!existing.mcpServers) existing.mcpServers = {};
+          for (const [name, serverConfig] of Object.entries(origConfig.mcpServers)) {
+            // Skip ark-channel (we write our own) and don't override existing entries
+            if (name !== "ark-channel" && !existing.mcpServers[name]) {
+              existing.mcpServers[name] = serverConfig;
+            }
+          }
+        }
+      } catch (e: any) {
+        console.error(`writeChannelConfig: failed to merge original repo MCP config from ${origMcpPath}:`, e?.message ?? e);
+      }
+    }
+  }
+
   if (!existing.mcpServers) existing.mcpServers = {};
   existing.mcpServers["ark-channel"] = config;
   writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));

@@ -269,6 +269,105 @@ describe("writeChannelConfig", () => {
     const channelConfig = content.mcpServers["ark-channel"];
     expect(channelConfig.command).toContain(".bun/bin/bun");
   });
+
+  it("merges MCP servers from original repo into worktree", () => {
+    const workdir = getCtx().arkDir;
+    const originalRepo = join(workdir, "original-repo");
+    mkdirSync(originalRepo, { recursive: true });
+    const { writeFileSync: wfs } = require("fs");
+    wfs(join(originalRepo, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        "context7": { command: "npx", args: ["-y", "@context7/mcp"] },
+        "playwright": { command: "npx", args: ["-y", "@playwright/mcp"] },
+      },
+    }));
+
+    const worktreeDir = join(workdir, "worktree");
+    mkdirSync(worktreeDir, { recursive: true });
+
+    writeChannelConfig("s-abc123", "work", 19300, worktreeDir, { originalRepoDir: originalRepo });
+
+    const content = JSON.parse(readFileSync(join(worktreeDir, ".mcp.json"), "utf-8"));
+    expect(content.mcpServers["ark-channel"]).toBeDefined();
+    expect(content.mcpServers["context7"]).toEqual({ command: "npx", args: ["-y", "@context7/mcp"] });
+    expect(content.mcpServers["playwright"]).toEqual({ command: "npx", args: ["-y", "@playwright/mcp"] });
+  });
+
+  it("does not override existing worktree MCP servers with original repo servers", () => {
+    const workdir = getCtx().arkDir;
+    const originalRepo = join(workdir, "original-repo");
+    mkdirSync(originalRepo, { recursive: true });
+    const { writeFileSync: wfs } = require("fs");
+    wfs(join(originalRepo, ".mcp.json"), JSON.stringify({
+      mcpServers: { "my-server": { command: "old-cmd" } },
+    }));
+
+    const worktreeDir = join(workdir, "worktree");
+    mkdirSync(worktreeDir, { recursive: true });
+    wfs(join(worktreeDir, ".mcp.json"), JSON.stringify({
+      mcpServers: { "my-server": { command: "new-cmd" } },
+    }));
+
+    writeChannelConfig("s-abc123", "work", 19300, worktreeDir, { originalRepoDir: originalRepo });
+
+    const content = JSON.parse(readFileSync(join(worktreeDir, ".mcp.json"), "utf-8"));
+    // Worktree's existing server should NOT be overridden
+    expect(content.mcpServers["my-server"]).toEqual({ command: "new-cmd" });
+    expect(content.mcpServers["ark-channel"]).toBeDefined();
+  });
+
+  it("skips ark-channel from original repo MCP config", () => {
+    const workdir = getCtx().arkDir;
+    const originalRepo = join(workdir, "original-repo");
+    mkdirSync(originalRepo, { recursive: true });
+    const { writeFileSync: wfs } = require("fs");
+    wfs(join(originalRepo, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        "ark-channel": { command: "stale-bun", env: { ARK_SESSION_ID: "s-old" } },
+        "useful-server": { command: "useful" },
+      },
+    }));
+
+    const worktreeDir = join(workdir, "worktree");
+    mkdirSync(worktreeDir, { recursive: true });
+
+    writeChannelConfig("s-new", "work", 19300, worktreeDir, { originalRepoDir: originalRepo });
+
+    const content = JSON.parse(readFileSync(join(worktreeDir, ".mcp.json"), "utf-8"));
+    // ark-channel should be the NEW one, not the stale one from original
+    expect(content.mcpServers["ark-channel"].env.ARK_SESSION_ID).toBe("s-new");
+    expect(content.mcpServers["useful-server"]).toEqual({ command: "useful" });
+  });
+
+  it("does not merge when originalRepoDir equals workdir", () => {
+    const workdir = getCtx().arkDir;
+    const { writeFileSync: wfs } = require("fs");
+    wfs(join(workdir, ".mcp.json"), JSON.stringify({
+      mcpServers: { "existing": { command: "existing" } },
+    }));
+
+    // When originalRepoDir === workdir, no merging happens (no worktree was created)
+    writeChannelConfig("s-abc123", "work", 19300, workdir, { originalRepoDir: workdir });
+
+    const content = JSON.parse(readFileSync(join(workdir, ".mcp.json"), "utf-8"));
+    expect(content.mcpServers["existing"]).toBeDefined();
+    expect(content.mcpServers["ark-channel"]).toBeDefined();
+  });
+
+  it("handles missing .mcp.json in original repo gracefully", () => {
+    const workdir = getCtx().arkDir;
+    const originalRepo = join(workdir, "no-mcp-repo");
+    mkdirSync(originalRepo, { recursive: true });
+
+    const worktreeDir = join(workdir, "worktree");
+    mkdirSync(worktreeDir, { recursive: true });
+
+    // Should not throw -- original repo has no .mcp.json
+    writeChannelConfig("s-abc123", "work", 19300, worktreeDir, { originalRepoDir: originalRepo });
+
+    const content = JSON.parse(readFileSync(join(worktreeDir, ".mcp.json"), "utf-8"));
+    expect(content.mcpServers["ark-channel"]).toBeDefined();
+  });
 });
 
 // ── removeChannelConfig ──────────────────────────────────────────────────────
