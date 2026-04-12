@@ -20,7 +20,7 @@ export const cliAgentExecutor: Executor = {
 
   async launch(opts: LaunchOpts): Promise<LaunchResult> {
     const app = opts.app!;
-    const { sessionId, workdir, agent, task, stage: _stage, onLog: log = () => {} } = opts;
+    const { sessionId, workdir, agent, task, stage: _stage, onLog: log = () => {}, initialPrompt } = opts;
 
     const command = agent.command;
     if (!command || command.length === 0) {
@@ -65,31 +65,50 @@ export const cliAgentExecutor: Executor = {
     writeFileSync(envFile, envLines);
     const envPrefix = envLines ? `source ${JSON.stringify(envFile)} && ` : "";
 
+    // Determine the effective prompt: initialPrompt overrides task for delivery
+    const effectiveTask = initialPrompt ?? task;
+
     // Build the command line
     let cmdLine: string;
     const cmdStr = command.join(" ");
+    let sendPromptAfterLaunch = false;
 
     switch (taskDelivery) {
-      case "file":
-        // Pass task as a file path argument
+      case "file": {
+        // Write the effective prompt to the task file for file-based delivery
+        if (initialPrompt) writeFileSync(taskFile, initialPrompt);
         cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && ${cmdStr} ${JSON.stringify(taskFile)}`;
         break;
+      }
       case "arg": {
         // Pass task as the last CLI argument (truncated to 4000 chars for shell safety)
-        const shortTask = task.slice(0, 4000);
+        const shortTask = effectiveTask.slice(0, 4000);
         cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && ${cmdStr} ${JSON.stringify(shortTask)}`;
         break;
       }
       case "stdin":
       default:
-        // Pipe task via stdin using file
-        cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && cat ${JSON.stringify(taskFile)} | ${cmdStr}`;
+        if (initialPrompt) {
+          // Launch the CLI without piping, then send the prompt via tmux send-keys
+          cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && ${cmdStr}`;
+          sendPromptAfterLaunch = true;
+        } else {
+          // Pipe task via stdin using file
+          cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && cat ${JSON.stringify(taskFile)} | ${cmdStr}`;
+        }
         break;
     }
 
     // Launch in tmux
     log(`Launching ${command[0]} in tmux...`);
     await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.arkDir });
+
+    // For stdin delivery with initialPrompt, send via tmux after the process starts
+    if (sendPromptAfterLaunch && initialPrompt) {
+      // Brief delay to let the process initialize before sending input
+      await Bun.sleep(200);
+      await tmux.sendTextAsync(tmuxName, initialPrompt);
+    }
 
     return { ok: true, handle: tmuxName };
   },
