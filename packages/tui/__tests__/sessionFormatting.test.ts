@@ -15,6 +15,7 @@ import {
   sessionLabel,
   formatSessionRow,
   formatChildRow,
+  buildStageTimeline,
 } from "../helpers/sessionFormatting.js";
 import type { Session } from "../../types/index.js";
 
@@ -395,5 +396,97 @@ describe("formatChildRow", () => {
     const child = makeSession({ summary: null });
     const row = formatChildRow(child);
     expect(row).toContain("(fork)");
+  });
+});
+
+// ── Stage timeline ──────────────────────────────────────────────────────────
+
+describe("buildStageTimeline", () => {
+  const stages = [
+    { name: "plan", agent: "planner" },
+    { name: "implement", agent: "implementer" },
+    { name: "review", agent: "reviewer" },
+  ];
+
+  it("returns empty array when no stages", () => {
+    const result = buildStageTimeline({ stages: [], events: [], currentStage: null, sessionStatus: "pending" });
+    expect(result).toEqual([]);
+  });
+
+  it("marks all stages as pending when no events exist", () => {
+    const result = buildStageTimeline({ stages, events: [], currentStage: null, sessionStatus: "pending" });
+    expect(result).toHaveLength(3);
+    expect(result[0].status).toBe("pending");
+    expect(result[1].status).toBe("pending");
+    expect(result[2].status).toBe("pending");
+    expect(result[0].agent).toBe("planner");
+    expect(result[0].duration).toBeNull();
+  });
+
+  it("marks current stage as running", () => {
+    const result = buildStageTimeline({ stages, events: [], currentStage: "implement", sessionStatus: "running" });
+    expect(result[0].status).toBe("pending");
+    expect(result[1].status).toBe("running");
+    expect(result[2].status).toBe("pending");
+  });
+
+  it("marks completed stages from events", () => {
+    const events = [
+      { type: "stage_started", stage: null, data: { stage: "plan", agent: "planner" }, created_at: "2026-01-01T10:00:00Z" },
+      { type: "stage_completed", stage: null, data: { stage: "plan" }, created_at: "2026-01-01T10:05:00Z" },
+      { type: "stage_started", stage: null, data: { stage: "implement", agent: "implementer" }, created_at: "2026-01-01T10:06:00Z" },
+    ];
+    const result = buildStageTimeline({ stages, events, currentStage: "implement", sessionStatus: "running" });
+    expect(result[0].status).toBe("completed");
+    expect(result[0].startedAt).toBe("2026-01-01T10:00:00Z");
+    expect(result[0].completedAt).toBe("2026-01-01T10:05:00Z");
+    expect(result[0].duration).toBe("5m 0s");
+    expect(result[1].status).toBe("running");
+    expect(result[1].startedAt).toBe("2026-01-01T10:06:00Z");
+    expect(result[1].completedAt).toBeNull();
+    expect(result[2].status).toBe("pending");
+  });
+
+  it("marks current stage as failed when session is failed", () => {
+    const events = [
+      { type: "stage_started", stage: null, data: { stage: "implement" }, created_at: "2026-01-01T10:00:00Z" },
+    ];
+    const result = buildStageTimeline({ stages, events, currentStage: "implement", sessionStatus: "failed" });
+    expect(result[1].status).toBe("failed");
+    expect(result[0].status).toBe("pending");
+    expect(result[2].status).toBe("pending");
+  });
+
+  it("uses event.stage field as fallback when data.stage is missing", () => {
+    const events = [
+      { type: "stage_started", stage: "plan", data: {}, created_at: "2026-01-01T10:00:00Z" },
+      { type: "stage_completed", stage: "plan", data: null, created_at: "2026-01-01T10:03:00Z" },
+    ];
+    const result = buildStageTimeline({ stages, events, currentStage: "implement", sessionStatus: "running" });
+    expect(result[0].status).toBe("completed");
+    expect(result[0].duration).toBe("3m 0s");
+  });
+
+  it("handles all stages completed", () => {
+    const events = [
+      { type: "stage_started", stage: null, data: { stage: "plan" }, created_at: "2026-01-01T10:00:00Z" },
+      { type: "stage_completed", stage: null, data: { stage: "plan" }, created_at: "2026-01-01T10:02:00Z" },
+      { type: "stage_started", stage: null, data: { stage: "implement" }, created_at: "2026-01-01T10:03:00Z" },
+      { type: "stage_completed", stage: null, data: { stage: "implement" }, created_at: "2026-01-01T10:10:00Z" },
+      { type: "stage_started", stage: null, data: { stage: "review" }, created_at: "2026-01-01T10:11:00Z" },
+      { type: "stage_completed", stage: null, data: { stage: "review" }, created_at: "2026-01-01T10:15:00Z" },
+    ];
+    const result = buildStageTimeline({ stages, events, currentStage: null, sessionStatus: "completed" });
+    expect(result.every(e => e.status === "completed")).toBe(true);
+    expect(result[0].duration).toBe("2m 0s");
+    expect(result[1].duration).toBe("7m 0s");
+    expect(result[2].duration).toBe("4m 0s");
+  });
+
+  it("handles stages without agent defined", () => {
+    const noAgentStages = [{ name: "test" }];
+    const result = buildStageTimeline({ stages: noAgentStages, events: [], currentStage: "test", sessionStatus: "running" });
+    expect(result[0].agent).toBeNull();
+    expect(result[0].status).toBe("running");
   });
 });

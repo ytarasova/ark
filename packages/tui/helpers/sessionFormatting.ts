@@ -95,6 +95,77 @@ export function formatDuration(from: string | null, to?: string | null): string 
   return `${d}d ${h % 24}h`;
 }
 
+// ── Stage timeline helpers ──────────────────────────────────────────────────
+
+export interface StageTimelineEntry {
+  name: string;
+  status: "completed" | "running" | "pending" | "failed";
+  agent: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  duration: string | null;
+}
+
+export interface StageTimelineInput {
+  stages: { name: string; agent?: string }[];
+  events: { type: string; stage?: string | null; data?: Record<string, unknown> | null; created_at: string }[];
+  currentStage: string | null;
+  sessionStatus: string;
+}
+
+/** Build per-stage timeline entries from flow stages and session events. Pure function. */
+export function buildStageTimeline(input: StageTimelineInput): StageTimelineEntry[] {
+  const { stages, events, currentStage, sessionStatus } = input;
+  if (stages.length === 0) return [];
+
+  // Index events by stage name
+  const startEvents = new Map<string, string>(); // stage -> created_at
+  const completeEvents = new Map<string, string>(); // stage -> created_at
+  const failedStages = new Set<string>();
+
+  for (const ev of events) {
+    const stageName = (ev.data?.stage as string) ?? ev.stage ?? null;
+    if (!stageName) continue;
+
+    if (ev.type === "stage_started") {
+      startEvents.set(stageName, ev.created_at);
+    } else if (ev.type === "stage_completed") {
+      completeEvents.set(stageName, ev.created_at);
+    } else if (ev.type === "agent_error" || ev.type === "agent_exited") {
+      // Only mark as failed if it matches the current stage and session is failed
+      if (stageName === currentStage && sessionStatus === "failed") {
+        failedStages.add(stageName);
+      }
+    }
+  }
+
+  return stages.map((stage) => {
+    const started = startEvents.get(stage.name) ?? null;
+    const completed = completeEvents.get(stage.name) ?? null;
+    const agent = stage.agent ?? null;
+
+    let status: StageTimelineEntry["status"];
+    if (completed) {
+      status = "completed";
+    } else if (failedStages.has(stage.name)) {
+      status = "failed";
+    } else if (stage.name === currentStage) {
+      status = sessionStatus === "failed" ? "failed" : "running";
+    } else {
+      status = "pending";
+    }
+
+    let duration: string | null = null;
+    if (started && completed) {
+      duration = formatDuration(started, completed);
+    } else if (started && status === "running") {
+      duration = formatDuration(started);
+    }
+
+    return { name: stage.name, status, agent, startedAt: started, completedAt: completed, duration };
+  });
+}
+
 // ── Session list row formatting ─────────────────────────────────────────────
 
 /** Compute responsive column widths based on terminal width. */
