@@ -2026,10 +2026,44 @@ export function applyHookStatus(app: AppContext,
   let newStatus = statusMap[hookEvent];
 
   // Auto-gate SessionEnd fallback: trigger advance so the flow can progress
-  // (handles case where agent finished but channel report was unavailable)
+  // (handles case where agent finished but channel report was unavailable).
+  // Verify new commits exist first -- agents that "explored" without committing
+  // should NOT auto-advance (same enforcement as applyReport).
   if (hookEvent === "SessionEnd" && isAutoGate && session.status === "running") {
-    result.shouldAdvance = true;
-    result.shouldAutoDispatch = true;
+    let hasNewCommits = false;
+    if (session.workdir) {
+      try {
+        const { execFileSync } = require("child_process");
+        const log = execFileSync("git", ["log", "--oneline", "origin/main..HEAD"], {
+          cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+        }).trim();
+        // Check against stage_start_sha if available, else just any commits
+        const startSha = (session.config as any)?.stage_start_sha;
+        if (startSha) {
+          const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
+            cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+          }).trim();
+          hasNewCommits = headSha !== startSha;
+        } else {
+          hasNewCommits = !!log;
+        }
+      } catch { hasNewCommits = true; /* allow on git error */ }
+    } else {
+      hasNewCommits = true; /* no workdir = skip check */
+    }
+
+    if (hasNewCommits) {
+      result.shouldAdvance = true;
+      result.shouldAutoDispatch = true;
+    } else {
+      // Agent exited without committing -- don't advance, mark as failed
+      newStatus = "failed" as any;
+      result.updates.error = "Agent exited without committing any changes";
+      result.logEvents!.push({
+        type: "completion_rejected",
+        opts: { stage: session.stage ?? undefined, actor: "system", data: { reason: "no commits on SessionEnd" } },
+      });
+    }
   }
 
   // Don't override terminal status -- late hooks can fire after session is done or manually stopped
