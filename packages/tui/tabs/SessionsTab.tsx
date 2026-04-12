@@ -505,18 +505,21 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
             }}
             renderColoredRow={(s) => {
               // Left pane is roughly half the terminal width
-              const cols = Math.floor((process.stdout.columns ?? 120) / 2) - 2;
+              const cols = Math.floor((process.stdout.columns ?? 120) / 2) - 4;
               const icon = ICON[s.status] ?? "?";
               const color = getStatusColor(s.status);
-              // Reserve: 2 indent + 2 icon + 5 age + 4 unread badge = ~13 fixed chars
-              const summaryWidth = Math.max(cols - 13, 12);
-              const summary = fitText(sessionLabel(s), summaryWidth);
+              const age = ago(s.updated_at ?? s.created_at);
               const unread = unreadCounts.get(s.id) ?? 0;
+              const badge = unread > 0 ? ` (${unread})` : "";
+              // Fixed-width age (6) + badge + indent (4) + icon (2) = ~12 reserved
+              const reserved = 12 + age.length + badge.length;
+              const summaryWidth = Math.max(cols - reserved, 10);
+              const summary = fitText(sessionLabel(s), summaryWidth);
               return (
-                <Text wrap="truncate">
+                <Text>
                   {"  "}<Text color={color}>{icon}</Text>{` ${summary}`}
-                  <Text dimColor>{` ${ago(s.updated_at ?? s.created_at).padStart(4)}`}</Text>
-                  {unread > 0 && <Text color={theme.waiting} bold>{` (${unread})`}</Text>}
+                  <Text dimColor>{` ${age}`}</Text>
+                  {unread > 0 && <Text color={theme.waiting} bold>{badge}</Text>}
                 </Text>
               );
             }}
