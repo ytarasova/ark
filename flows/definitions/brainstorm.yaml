@@ -1,0 +1,43 @@
+name: brainstorm
+description: "Brainstorm flow: explore ideas -> synthesize -> plan. Interactive ideation with human steering."
+stages:
+  - name: explore
+    agent: worker
+    gate: manual
+    task: |
+      Brainstorm approaches for: {summary}
+      Working in {workdir} on repo {repo}.
+
+      Your job is to explore the problem space and generate ideas:
+      1. Read the codebase to understand relevant architecture and constraints
+      2. Generate multiple distinct approaches (at least 3)
+      3. For each approach, outline: summary, trade-offs, effort estimate, risks
+      4. Identify open questions that need human input
+      5. Write findings to BRAINSTORM.md
+
+      Think divergently -- quantity of ideas matters more than polish at this stage.
+      Ask questions via report(question) if you need clarification.
+
+  - name: synthesize
+    agent: worker
+    gate: manual
+    depends_on: [explore]
+    task: |
+      Synthesize the brainstorm output for: {summary}
+
+      Read BRAINSTORM.md and consolidate:
+      1. Rank approaches by feasibility, effort, and alignment with goals
+      2. Identify the recommended approach with justification
+      3. List key decisions that need to be made
+      4. Note any risks or unknowns that remain
+      5. Update BRAINSTORM.md with a "Recommendation" section
+
+  - name: plan
+    agent: planner
+    gate: manual
+    depends_on: [synthesize]
+    optional: true
+    task: |
+      Create an implementation plan based on the brainstorm recommendation.
+      Read BRAINSTORM.md for context and the chosen approach.
+      Write PLAN.md with actionable steps, files to change, and testing strategy.
