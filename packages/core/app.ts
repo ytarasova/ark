@@ -605,7 +605,7 @@ export class AppContext {
       // Start arkd (local agent proxy) alongside the conductor.
       // Agents post reports to arkd, which forwards to the conductor.
       await safeAsync("boot: start arkd", async () => {
-        const { startArkd } = await import("../../arkd/server.js");
+        const { startArkd } = await import("../arkd/server.js");
         const conductorUrl = `http://localhost:${this.config.conductorPort}`;
         this.arkd = startArkd(this.config.arkdPort ?? 19300, { conductorUrl, quiet: true });
       });
