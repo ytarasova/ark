@@ -580,7 +580,8 @@ export async function advance(app: AppContext, sessionId: string, force = false,
   // Graph flow routing: if flow definition has edges, use DAG conditional routing
   try {
     const flowDef = app.flows.get(flowName);
-    if (flowDef && flowDef.edges?.length > 0) {
+    const hasDependsOn = flowDef?.stages?.some(s => s.depends_on?.length > 0);
+    if (flowDef && (flowDef.edges?.length > 0 || hasDependsOn)) {
       const graphFlow = parseGraphFlow(flowDef);
       const flowState = loadFlowState(app, sessionId);
       const completedStages = flowState?.completedStages ?? [];
