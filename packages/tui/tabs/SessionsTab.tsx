@@ -138,11 +138,21 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   const [selected, setSelected] = useState<Session | null>(null);
 
   /** Move selection to the next (or previous) item after a removal. */
+  const nextSelectionRef = useRef<string | null>(null);
   const selectNextAfterRemoval = (removedId: string) => {
     const idx = filteredTopLevel.findIndex(s => s.id === removedId);
     const next = filteredTopLevel[idx + 1] ?? filteredTopLevel[idx - 1] ?? null;
+    nextSelectionRef.current = next?.id ?? null;
     setSelected(next);
   };
+  // After store refresh, re-resolve selection by ID to avoid stale object reference
+  useEffect(() => {
+    if (nextSelectionRef.current && selected?.id !== nextSelectionRef.current) {
+      const fresh = filteredTopLevel.find(s => s.id === nextSelectionRef.current);
+      if (fresh) setSelected(fresh);
+      nextSelectionRef.current = null;
+    }
+  }, [filteredTopLevel]);
 
   // Push/pop focus when overlay opens/closes
   const prevOverlayRef = useRef<Overlay>(null);
