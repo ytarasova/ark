@@ -72,7 +72,7 @@ if (!isRemoteMode()) {
 const program = new Command()
   .name("ark")
   .description("Ark - autonomous agent ecosystem")
-  .version("0.1.0")
+  .version(core.getCurrentVersion())
   .option("-p, --profile <name>", "Use a specific profile")
   .option("--server <url>", "Connect to a remote Ark control plane (e.g. https://ark.company.com)")
   .option("--token <key>", "API key for authentication with the remote server");

@@ -10,7 +10,7 @@ const REPO = process.env.ARK_GITHUB_REPO ?? "yana/ark";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 
 interface UpdateState {
   lastCheck: string;
@@ -22,11 +22,24 @@ function statePath(arkDir: string): string {
   return join(arkDir, "update-check.json");
 }
 
-/** Get the current version from package.json. Falls back to 0.0.0 when run from a compiled bundle without the file. */
+/** Get the current version from the root package.json. Walks up from __dirname
+ * looking for a package.json whose "name" is "ark", so it works both when run
+ * from source (bun) and from a compiled dist/ bundle. Falls back to 0.0.0 if
+ * the file can't be located or parsed. */
 export function getCurrentVersion(): string {
   try {
-    const pkg = JSON.parse(readFileSync(join(__dirname, "../../package.json"), "utf-8"));
-    return pkg.version ?? "0.0.0";
+    let dir = __dirname;
+    for (let i = 0; i < 10; i++) {
+      const candidate = join(dir, "package.json");
+      if (existsSync(candidate)) {
+        const pkg = JSON.parse(readFileSync(candidate, "utf-8"));
+        if (pkg.name === "ark") return pkg.version ?? "0.0.0";
+      }
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return "0.0.0";
   } catch {
     return "0.0.0";
   }
