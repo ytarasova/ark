@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { useInput, useStdout } from "ink";
-import { ScrollView, type ScrollViewRef } from "ink-scroll-view";
+import { ScrollList, type ScrollListRef } from "ink-scroll-list";
 
 interface ScrollBoxProps {
   children: React.ReactNode;
@@ -13,46 +13,25 @@ interface ScrollBoxProps {
 }
 
 /**
- * Scrollable container backed by ink-scroll-view.
- * The parent Box must constrain the height (e.g. via flexGrow={1}
- * + overflow="hidden" on SplitPane's content area).
+ * Scrollable list backed by ink-scroll-list.
+ * Auto-scrolls to keep the selected item visible.
+ * Parent Box must constrain the height.
  */
 export function ScrollBox({ children, active = true, followIndex, resetKey }: ScrollBoxProps) {
-  const scrollRef = useRef<ScrollViewRef>(null);
+  const listRef = useRef<ScrollListRef>(null);
   const { stdout } = useStdout();
 
   // Re-measure on terminal resize
   useEffect(() => {
-    const onResize = () => scrollRef.current?.remeasure();
+    const onResize = () => listRef.current?.remeasure();
     stdout?.on("resize", onResize);
     return () => { stdout?.off("resize", onResize); };
   }, [stdout]);
 
-  // Reset scroll to top when resetKey changes
-  useEffect(() => {
-    scrollRef.current?.scrollToTop();
-  }, [resetKey]);
-
-  // Follow mode: scroll to keep followIndex item visible
-  useEffect(() => {
-    if (followIndex === undefined || !scrollRef.current) return;
-    const sv = scrollRef.current;
-    const pos = sv.getItemPosition(followIndex);
-    if (!pos) return;
-    const viewportH = sv.getViewportHeight();
-    const currentOffset = sv.getScrollOffset();
-    // Only scroll if the item is outside the visible viewport
-    if (pos.top < currentOffset) {
-      sv.scrollTo(pos.top);
-    } else if (pos.top + pos.height > currentOffset + viewportH) {
-      sv.scrollTo(pos.top + pos.height - viewportH);
-    }
-  }, [followIndex]);
-
-  // Keyboard scrolling
+  // Keyboard scrolling (only when not in follow mode)
   useInput((input, key) => {
     if (!active || followIndex !== undefined) return;
-    const sv = scrollRef.current;
+    const sv = listRef.current;
     if (!sv) return;
     const pageSize = sv.getViewportHeight() || 10;
     if (input === "j" || key.downArrow) sv.scrollBy(1);
@@ -64,8 +43,8 @@ export function ScrollBox({ children, active = true, followIndex, resetKey }: Sc
   });
 
   return (
-    <ScrollView ref={scrollRef}>
+    <ScrollList ref={listRef} selectedIndex={followIndex ?? 0}>
       {children}
-    </ScrollView>
+    </ScrollList>
   );
 }
