@@ -675,8 +675,8 @@ export class AppContext {
         if (!sid) return;
         const session = this.sessions.get(sid);
         if (!session || !["running", "waiting"].includes(session.status)) {
-          const { removeHooksConfig } = await import("./claude/claude.js");
-          removeHooksConfig(cwd);
+          const { removeSettings } = await import("./claude/claude.js");
+          removeSettings(cwd);
         }
       } catch { /* settings.local.json may be malformed; safe to skip */ }
     });

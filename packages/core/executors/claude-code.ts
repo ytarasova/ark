@@ -62,8 +62,8 @@ export const claudeCodeExecutor: Executor = {
     const originalRepoDir = session.repo ? resolve(session.repo) : undefined;
     const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir, originalRepoDir });
 
-    // Status hooks + permissions allow-list
-    claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, {
+    // Unified Claude settings bundle -- hooks, permissions, metadata
+    claude.writeSettings(session.id, conductorUrl, effectiveWorkdir, {
       autonomy: opts.autonomy,
       agent: { tools: opts.agent.tools, mcp_servers: opts.agent.mcp_servers },
       tenantId: session.tenant_id ?? "default",

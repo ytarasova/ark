@@ -314,9 +314,24 @@ function filterOutArkHooks(hooks: Record<string, unknown[]>): void {
   }
 }
 
-export function writeHooksConfig(
+/** Options for writing the unified Claude settings bundle (.claude/settings.local.json). */
+export interface ClaudeSettingsOpts {
+  autonomy?: string;
+  agent?: AgentToolSpec;
+  tenantId?: string;
+}
+
+/**
+ * Write the unified Claude settings bundle to .claude/settings.local.json.
+ *
+ * Manages three concerns in a single atomic write:
+ *   1. Status hooks -- curl-based event reporting to the conductor
+ *   2. Permissions -- allow list (from agent tools) and deny list (from autonomy level)
+ *   3. _ark metadata -- tracks which settings are ark-managed for clean teardown
+ */
+export function writeSettings(
   sessionId: string, conductorUrl: string, workdir: string,
-  opts?: { autonomy?: string; agent?: AgentToolSpec; tenantId?: string },
+  opts?: ClaudeSettingsOpts,
 ): string {
   const claudeDir = join(workdir, ".claude");
   mkdirSync(claudeDir, { recursive: true });
@@ -325,7 +340,7 @@ export function writeHooksConfig(
   let existing: Record<string, unknown> = {};
   if (existsSync(settingsPath)) {
     try { existing = JSON.parse(readFileSync(settingsPath, "utf-8")); }
-    catch (e: any) { console.error(`writeHooksConfig: failed to parse ${settingsPath}:`, e?.message ?? e); }
+    catch (e: any) { console.error(`writeSettings: failed to parse ${settingsPath}:`, e?.message ?? e); }
   }
 
   // Remove previous ark hooks (idempotent)
@@ -389,7 +404,7 @@ export function writeHooksConfig(
 
 /**
  * Remove the ark-channel entry from the worktree's .mcp.json.
- * Mirrors removeHooksConfig -- called on session stop/delete to avoid
+ * Mirrors removeSettings -- called on session stop/delete to avoid
  * stale MCP config pointing at a dead channel port.
  */
 export function removeChannelConfig(workdir: string): void {
@@ -413,13 +428,14 @@ export function removeChannelConfig(workdir: string): void {
   }
 }
 
-export function removeHooksConfig(workdir: string): void {
+/** Remove ark-managed settings from .claude/settings.local.json (hooks, permissions, metadata). */
+export function removeSettings(workdir: string): void {
   const settingsPath = join(workdir, ".claude", "settings.local.json");
   if (!existsSync(settingsPath)) return;
 
   let settings: Record<string, unknown>;
   try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")); }
-  catch (e: any) { console.error(`removeHooksConfig: failed to parse ${settingsPath}:`, e?.message ?? e); return; }
+  catch (e: any) { console.error(`removeSettings: failed to parse ${settingsPath}:`, e?.message ?? e); return; }
 
   const arkMeta = (settings._ark ?? {}) as Record<string, unknown>;
 
@@ -440,6 +456,12 @@ export function removeHooksConfig(workdir: string): void {
 
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 }
+
+// Backward-compatible aliases (deprecated -- use writeSettings / removeSettings)
+/** @deprecated Use writeSettings instead */
+export const writeHooksConfig = writeSettings;
+/** @deprecated Use removeSettings instead */
+export const removeHooksConfig = removeSettings;
 
 // ── Launcher script ─────────────────────────────────────────────────────────
 

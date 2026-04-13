@@ -1,7 +1,7 @@
 /**
  * Tests for tiered autonomy — full/execute/edit/read-only per flow stage.
  *
- * Covers: buildArgs permission gating, writeHooksConfig permission deny rules,
+ * Covers: buildArgs permission gating, writeSettings permission deny rules,
  * flow YAML loading with autonomy field, and resolveFlow preservation.
  */
 
@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import { buildArgs, writeHooksConfig } from "../claude/claude.js";
+import { buildArgs, writeSettings } from "../claude/claude.js";
 import { resolveFlow } from "../state/flow.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
@@ -74,51 +74,52 @@ describe("buildArgs autonomy", () => {
   });
 });
 
-// ── writeHooksConfig autonomy ────────────────────────────────────────────────
+// ── writeSettings autonomy ────────────────────────────────────────────────
 
-describe("writeHooksConfig autonomy", () => {
+describe("writeSettings autonomy", () => {
   it("autonomy 'edit' adds permissions.deny: ['Bash']", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "edit" });
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "edit" });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions).toBeDefined();
     expect(settings.permissions.deny).toEqual(["Bash"]);
   });
 
   it("autonomy 'read-only' adds permissions.deny: ['Bash', 'Write', 'Edit']", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "read-only" });
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "read-only" });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions).toBeDefined();
     expect(settings.permissions.deny).toEqual(["Bash", "Write", "Edit"]);
   });
 
   it("autonomy 'full' does NOT add permissions.deny", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "full" });
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "full" });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions).toBeUndefined();
+    expect(settings.permissions?.deny).toBeUndefined();
   });
 
   it("no autonomy does NOT add permissions.deny", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions).toBeUndefined();
+    expect(settings.permissions?.deny).toBeUndefined();
   });
 
   it("autonomy 'execute' does NOT add permissions.deny", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "execute" });
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "execute" });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions).toBeUndefined();
+    expect(settings.permissions?.deny).toBeUndefined();
   });
 
-  it("autonomy 'edit' preserves existing settings alongside deny rules", () => {
+  it("autonomy 'edit' preserves existing hooks alongside deny rules", () => {
     const claudeDir = join(getCtx().arkDir, ".claude");
     mkdirSync(claudeDir, { recursive: true });
     writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
-      permissions: { allow: ["Read"] },
+      customKey: "preserved",
     }));
 
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "edit" });
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "edit" });
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
-    expect(settings.permissions.allow).toEqual(["Read"]);
+    expect(settings.customKey).toBe("preserved");
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
     expect(settings.permissions.deny).toEqual(["Bash"]);
     expect(settings.hooks).toBeDefined();
   });

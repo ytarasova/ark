@@ -770,8 +770,8 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
 
   // Clean up hook config and channel MCP config from working directory
   if (session.workdir) {
-    try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
-      logError("session", `stop ${sessionId}: removeHooksConfig: ${e?.message ?? e}`);
+    try { claude.removeSettings(session.workdir); } catch (e: any) {
+      logError("session", `stop ${sessionId}: removeSettings: ${e?.message ?? e}`);
     }
     try { claude.removeChannelConfig(session.workdir); } catch (e: any) {
       logError("session", `stop ${sessionId}: removeChannelConfig: ${e?.message ?? e}`);
@@ -1303,8 +1303,8 @@ export async function deleteSessionAsync(app: AppContext, sessionId: string): Pr
 
   // 2. Clean up hook config and channel MCP config (not provider-dependent)
   if (session.workdir) {
-    try { claude.removeHooksConfig(session.workdir); } catch (e: any) {
-      logError("session", `delete ${sessionId}: removeHooksConfig: ${e?.message ?? e}`);
+    try { claude.removeSettings(session.workdir); } catch (e: any) {
+      logError("session", `delete ${sessionId}: removeSettings: ${e?.message ?? e}`);
     }
     try { claude.removeChannelConfig(session.workdir); } catch (e: any) {
       logError("session", `delete ${sessionId}: removeChannelConfig: ${e?.message ?? e}`);
@@ -1536,8 +1536,8 @@ async function _launchAgentTmux(app: AppContext,
   const originalRepoDir = session.repo ? resolve(session.repo) : undefined;
   const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir, originalRepoDir });
 
-  // Status hooks + permissions allow-list -- write .claude/settings.local.json
-  claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, {
+  // Unified Claude settings bundle -- hooks, permissions, metadata
+  claude.writeSettings(session.id, conductorUrl, effectiveWorkdir, {
     autonomy: opts?.autonomy,
     agent: { tools: agent.tools, mcp_servers: agent.mcp_servers },
     tenantId: session.tenant_id ?? "default",
