@@ -1,144 +1,147 @@
-# Plan: Unified Claude Settings Bundle -- Rename writeHooksConfig to writeSettings
+# Plan: Rework loop error context injection (retryWithContext)
 
 ## Summary
 
-`writeHooksConfig` in `packages/core/claude/claude.ts` manages the full Claude `settings.local.json` bundle (hooks, permissions allow/deny, `_ark` metadata) but its name implies it only handles hooks. Rename to `writeSettings`/`removeSettings`, extract a typed `ClaudeSettingsOpts` interface, update all call sites and tests, and add backward-compatible aliases so nothing breaks. A prior attempt exists on branch `ark-s-35c483` (commit `35bcacf`) but was never merged and contained unrelated changes -- this plan delivers the rename cleanly against current main (`6d864f4`).
+The `retryWithContext` function in `session-hooks.ts` logs a `retry_with_context` event and resets the session to "ready" for re-dispatch, but **the actual error context is never injected into the agent's prompt**. When `dispatch()` re-launches the agent, `buildTaskWithHandoff()` / `appendPreviousStageContext()` have no logic to detect retry events or include the failure reason. The agent retries blind -- defeating the purpose of "retry with context." This plan adds error context injection into the task prompt on retry dispatch.
 
 ## Files to modify/create
 
 | File | Change |
 |------|--------|
-| `packages/core/claude/claude.ts` | Rename functions, extract `ClaudeSettingsOpts` interface, add JSDoc, add backward-compat aliases |
-| `packages/core/executors/claude-code.ts` | Update call `claude.writeHooksConfig` -> `claude.writeSettings` (line 66) |
-| `packages/core/services/session-orchestration.ts` | Update 3 call sites: `writeHooksConfig` (line 1540), `removeHooksConfig` (lines 773, 1306), and their log messages |
-| `packages/core/app.ts` | Update dynamic import of `removeHooksConfig` -> `removeSettings` (line 678-679) |
-| `packages/core/__tests__/claude-hooks.test.ts` | Update imports and all test references to new names |
-| `packages/core/__tests__/e2e-autonomy.test.ts` | Update imports and all test references to new names |
-| `CLAUDE.md` | Update documentation references (lines 479, 483) |
+| `packages/core/services/session-hooks.ts` (~line 683) | Store error context in `session.config._retry_context` before clearing the `error` field in `retryWithContext()` |
+| `packages/core/services/session-orchestration.ts` (~line 1689) | Inject `_retry_context` into agent prompt in `appendPreviousStageContext()` |
+| `packages/core/services/session-orchestration.ts` (~line 536) | Clear `_retry_context` from config after successful dispatch |
+| `packages/core/__tests__/fail-loopback.test.ts` | Add test: `retryWithContext` stores `_retry_context` in session config |
+| `packages/core/__tests__/on-failure-retry.test.ts` | Add test: conductor retry stores error context in session config |
 
 ## Implementation steps
 
-### Step 1: Rename core functions in `packages/core/claude/claude.ts`
+### Step 1: Preserve error context in session config before clearing
 
-1. **Add `ClaudeSettingsOpts` interface** before the function (insert before line 330):
-   ```ts
-   /** Options for writing the unified Claude settings bundle (.claude/settings.local.json). */
-   export interface ClaudeSettingsOpts {
-     autonomy?: string;
-     agent?: AgentToolSpec;
-     tenantId?: string;
-   }
-   ```
+In `packages/core/services/session-hooks.ts`, function `retryWithContext()` (line 683-711):
 
-2. **Rename `writeHooksConfig` to `writeSettings`** (line 330):
-   - Add JSDoc:
-     ```ts
-     /**
-      * Write the unified Claude settings bundle to .claude/settings.local.json.
-      *
-      * Manages three concerns in a single atomic write:
-      *   1. Status hooks -- curl-based event reporting to the conductor
-      *   2. Permissions -- allow list (from agent tools) and deny list (from autonomy level)
-      *   3. _ark metadata -- tracks which settings are ark-managed for clean teardown
-      */
-     ```
-   - Change function signature opts type from inline `{ autonomy?: string; agent?: AgentToolSpec; tenantId?: string }` to `ClaudeSettingsOpts`
-   - Update error message string: `writeHooksConfig:` -> `writeSettings:`
-
-3. **Rename `removeHooksConfig` to `removeSettings`** (line 429):
-   - Add JSDoc: `/** Remove ark-managed settings from .claude/settings.local.json (hooks, permissions, metadata). */`
-   - Update error message string: `removeHooksConfig:` -> `removeSettings:`
-
-4. **Update `removeChannelConfig` JSDoc** (line 405): change `removeHooksConfig` reference to `removeSettings`
-
-5. **Add backward-compatible aliases** after `removeSettings`:
-   ```ts
-   /** @deprecated Use writeSettings instead */
-   export const writeHooksConfig = writeSettings;
-   /** @deprecated Use removeSettings instead */
-   export const removeHooksConfig = removeSettings;
-   ```
-
-### Step 2: Update `packages/core/executors/claude-code.ts` (line 66)
-
-Change:
+Currently it does:
 ```ts
-claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir, {
-```
-To:
-```ts
-claude.writeSettings(session.id, conductorUrl, effectiveWorkdir, {
+app.sessions.update(sessionId, { status: "ready", error: null });
 ```
 
-### Step 3: Update `packages/core/services/session-orchestration.ts` (3 sites)
+This clears the error before `dispatch()` runs, so `dispatch()` can't read it. Fix: store the error in `session.config._retry_context` via `mergeConfig` before the status reset.
 
-1. **Line 1540** (dispatch path): `claude.writeHooksConfig(...)` -> `claude.writeSettings(...)`
-2. **Line 773** (stop path): `claude.removeHooksConfig(...)` -> `claude.removeSettings(...)` and update log message from `removeHooksConfig` to `removeSettings`
-3. **Line 1306** (delete path): `claude.removeHooksConfig(...)` -> `claude.removeSettings(...)` and update log message from `removeHooksConfig` to `removeSettings`
+**Change** (after the `app.events.log` call on line 698, before the status reset on line 708):
 
-### Step 4: Update `packages/core/app.ts` (lines 678-679)
-
-Change:
 ```ts
-const { removeHooksConfig } = await import("./claude/claude.js");
-removeHooksConfig(cwd);
-```
-To:
-```ts
-const { removeSettings } = await import("./claude/claude.js");
-removeSettings(cwd);
+// Preserve error context for injection into next dispatch prompt
+app.sessions.mergeConfig(sessionId, {
+  _retry_context: {
+    attempt: priorRetries + 1,
+    maxRetries,
+    error: typeof s.error === "string" ? s.error.slice(0, 2000) : s.error,
+    stage: s.stage,
+  },
+});
 ```
 
-### Step 5: Update `packages/core/__tests__/claude-hooks.test.ts`
+The 2000-char truncation prevents oversized prompts from full stack traces.
 
-1. Update import (line 7): `writeHooksConfig, removeHooksConfig` -> `writeSettings, removeSettings`
-2. Rename all `writeHooksConfig(...)` calls to `writeSettings(...)`
-3. Rename all `removeHooksConfig(...)` calls to `removeSettings(...)`
-4. Update describe block names:
-   - `"writeHooksConfig"` -> `"writeSettings"`
-   - `"removeHooksConfig"` -> `"removeSettings"`
-   - `"writeHooksConfig with agent"` -> `"writeSettings with agent"`
-   - `"removeHooksConfig with agent permissions"` -> `"removeSettings with agent permissions"`
+### Step 2: Inject error context into task prompt on retry dispatch
 
-### Step 6: Update `packages/core/__tests__/e2e-autonomy.test.ts`
+In `packages/core/services/session-orchestration.ts`, function `appendPreviousStageContext()` (line 1689-1733):
 
-1. Update import (line 14): `writeHooksConfig, removeHooksConfig` -> `writeSettings, removeSettings`
-2. Rename all `writeHooksConfig(...)` calls to `writeSettings(...)`
-3. Rename all `removeHooksConfig(...)` calls to `removeSettings(...)`
-4. Update describe block names and comments referencing the old names
+Add a section **before** the "Previous stages" block (right after `const parts: string[] = [];` on line 1690) that reads `_retry_context` and injects the failure context:
 
-### Step 7: Update `CLAUDE.md` (lines 479, 483)
+```ts
+// Inject error context from previous retry attempt (fail-loopback)
+const retryCtx = (session.config as any)?._retry_context as
+  { attempt: number; maxRetries: number; error: string; stage: string } | undefined;
+if (retryCtx) {
+  parts.push(`\n## IMPORTANT: Previous attempt failed (retry ${retryCtx.attempt}/${retryCtx.maxRetries})`);
+  parts.push(`The previous attempt at this stage ('${retryCtx.stage ?? "unknown"}') failed with the following error:`);
+  parts.push(`\`\`\`\n${retryCtx.error ?? "unknown error"}\n\`\`\``);
+  parts.push(`Fix the issue that caused this failure. Do not repeat the same approach that failed.`);
+}
+```
 
-1. Line 479: Change `claude.writeHooksConfig()` to `claude.writeSettings()`
-2. Line 483: Change `writeHooksConfig, removeHooksConfig` to `writeSettings, removeSettings`
+This goes first so it's the most prominent context the agent sees.
 
-### Step 8: Verify
+### Step 3: Clear retry context after successful dispatch
+
+In `packages/core/services/session-orchestration.ts`, function `dispatch()`, after `app.sessions.update(sessionId, { status: "running", agent: agentName, session_id: tmuxName })` on line 536:
+
+```ts
+// Clear retry context after successful re-dispatch (consumed by task prompt above)
+if ((session.config as any)?._retry_context) {
+  app.sessions.mergeConfig(sessionId, { _retry_context: null });
+}
+```
+
+This ensures the retry context is consumed once and doesn't leak into subsequent non-retry dispatches.
+
+### Step 4: Add tests
+
+**In `packages/core/__tests__/fail-loopback.test.ts`**, add after the "error context logged as event" test:
+
+```ts
+it("stores retry context in session config", () => {
+  const s = getApp().sessions.create({ summary: "test", flow: "bare" });
+  getApp().sessions.update(s.id, { status: "failed", error: "Build failed: missing import", stage: "work" });
+
+  session.retryWithContext(getApp(), s.id);
+
+  const updated = getApp().sessions.get(s.id)!;
+  const ctx = (updated.config as any)?._retry_context;
+  expect(ctx).toBeDefined();
+  expect(ctx.error).toBe("Build failed: missing import");
+  expect(ctx.attempt).toBe(1);
+  expect(ctx.stage).toBe("work");
+});
+```
+
+**In `packages/core/__tests__/on-failure-retry.test.ts`**, add inside the conductor integration describe:
+
+```ts
+it("retry stores error context in session config for next dispatch", async () => {
+  const app = getApp();
+  const s = app.sessions.create({ summary: "context injection test", flow: "quick" });
+  app.sessions.update(s.id, { status: "running", stage: "implement" });
+
+  await postReport(s.id, {
+    type: "error",
+    error: "TypeError: Cannot read properties of undefined",
+    stage: "implement",
+  });
+
+  const updated = app.sessions.get(s.id)!;
+  const ctx = (updated.config as any)?._retry_context;
+  expect(ctx).toBeDefined();
+  expect(ctx.error).toBe("TypeError: Cannot read properties of undefined");
+  expect(ctx.attempt).toBe(1);
+  expect(ctx.maxRetries).toBe(3);
+});
+```
+
+### Step 5: Run tests
 
 ```bash
-# Targeted test files first
-make test-file F=packages/core/__tests__/claude-hooks.test.ts
-make test-file F=packages/core/__tests__/e2e-autonomy.test.ts
-
-# Grep audit: no remaining non-alias references
-grep -r "writeHooksConfig\|removeHooksConfig" packages/core/ --include="*.ts" | grep -v "deprecated\|@deprecated\|export const writeHooksConfig\|export const removeHooksConfig"
-
-# Full suite
+make test-file F=packages/core/__tests__/fail-loopback.test.ts
+make test-file F=packages/core/__tests__/on-failure-retry.test.ts
 make test
 ```
 
 ## Testing strategy
 
-1. **No new tests needed** -- this is a pure rename. All existing tests verify the same behavior.
-2. **Run targeted test files first**: `claude-hooks.test.ts` (18 tests) and `e2e-autonomy.test.ts` (10 tests) directly exercise the renamed functions.
-3. **Grep audit** to confirm no call sites still use the old names (excluding the alias definitions).
-4. **Full test suite** (`make test`) to catch any transitive breakage from test files that weren't identified above.
+1. **Existing tests**: All 17 existing tests in `fail-loopback.test.ts` and `on-failure-retry.test.ts` must still pass (no behavior changes to existing logic).
+2. **New unit tests**: Two new tests verify `_retry_context` is stored in session config and available for prompt injection.
+3. **Integration coverage**: The `appendPreviousStageContext` injection is exercised indirectly through the dispatch path. A full E2E test would require mocking the executor -- not worth the complexity for this change. Manual verification is sufficient.
+4. **Manual E2E**: Dispatch a session on the `quick` flow, send an error report to the conductor, verify the re-dispatched agent's tmux pane shows "Previous attempt failed" in its initial prompt.
 
 ## Risk assessment
 
-- **Low risk**: Pure rename with zero behavior change. Backward-compatible aliases ensure any code still using `writeHooksConfig`/`removeHooksConfig` (including dynamic imports in `app.ts`) continues to work.
-- **No migration concerns**: No runtime data or configuration references these function names.
-- **Prior attempt reference**: The `ark-s-35c483` branch also fixed "4 stale test expectations that assumed permissions.allow was not always written." Those fixes are NOT needed here -- the current main already has the correct test expectations after commit `87ed580`.
+- **Low risk**: All changes are additive. Storing `_retry_context` in the JSON config blob requires no schema changes.
+- **No breaking changes**: The `retryWithContext` function signature and return type are unchanged. Existing callers (conductor.ts lines 161 and 690) are unaffected.
+- **Edge case -- long errors**: Truncated to 2000 chars in Step 1 to avoid prompt bloat.
+- **Edge case -- dispatch failure after retry**: If `dispatch()` fails after `retryWithContext` sets "ready", `_retry_context` persists in config. This is harmless -- it will be consumed on the next successful dispatch or cleared manually.
+- **Edge case -- multiple rapid retries**: Each `retryWithContext` call overwrites `_retry_context` with the latest error, so only the most recent failure is injected. This is correct behavior.
 
 ## Open questions
 
-None -- the scope is narrow and well-defined from the prior attempt and the ROADMAP entry.
+None -- the approach is straightforward and all information needed is in the codebase.
