@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import { getTheme } from "../../core/theme.js";
 import { existsSync } from "fs";
-import { resolve as resolvePath, basename } from "path";
+import { resolve as resolvePath } from "path";
 import { useArkClient } from "../hooks/useArkClient.js";
 import { loadRepoConfig } from "../../core/repo-config.js";
 import { getIsolationModes } from "../../compute/index.js";
@@ -117,7 +117,7 @@ export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessio
     if (!existsSync(rp)) return;
     if (!existsSync(resolvePath(rp, ".git"))) return;
     const workdir = rp;
-    repo = basename(rp);
+    repo = rp;
     addRecentRepo(repoPath);
 
     // Sanitize name: alphanumeric, dash, underscore only

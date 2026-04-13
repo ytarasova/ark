@@ -66,7 +66,7 @@ export interface ArkdOpts {
 
 export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void; setConductorUrl(url: string): void } {
   // Mutable runtime config
-  let conductorUrl: string | null = opts?.conductorUrl ?? null;
+  let conductorUrl: string | null = opts?.conductorUrl ?? process.env.ARK_CONDUCTOR_URL ?? "http://localhost:19100";
   const bindHost = opts?.hostname ?? "0.0.0.0";
 
   // Control plane registration
@@ -767,18 +767,19 @@ async function channelReport(
   conductorUrl: string | null,
   tenantId?: string | null,
 ): Promise<ChannelReportRes> {
-  if (!conductorUrl) return { ok: true, forwarded: false };
+  if (!conductorUrl) return { ok: false, forwarded: false, error: "no conductor URL configured" };
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (tenantId) headers["X-Ark-Tenant-Id"] = tenantId;
-    await fetch(`${conductorUrl}/api/channel/${sessionId}`, {
+    const resp = await fetch(`${conductorUrl}/api/channel/${sessionId}`, {
       method: "POST",
       headers,
       body: JSON.stringify(report),
     });
+    if (!resp.ok) return { ok: false, forwarded: false, error: `conductor returned ${resp.status}` };
     return { ok: true, forwarded: true };
-  } catch {
-    return { ok: true, forwarded: false };
+  } catch (e: any) {
+    return { ok: false, forwarded: false, error: e?.message ?? "fetch failed" };
   }
 }
 
@@ -787,18 +788,19 @@ async function channelRelay(
   conductorUrl: string | null,
   tenantId?: string | null,
 ): Promise<ChannelRelayRes> {
-  if (!conductorUrl) return { ok: true, forwarded: false };
+  if (!conductorUrl) return { ok: false, forwarded: false };
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (tenantId) headers["X-Ark-Tenant-Id"] = tenantId;
-    await fetch(`${conductorUrl}/api/relay`, {
+    const resp = await fetch(`${conductorUrl}/api/relay`, {
       method: "POST",
       headers,
       body: JSON.stringify(req),
     });
+    if (!resp.ok) return { ok: false, forwarded: false };
     return { ok: true, forwarded: true };
   } catch {
-    return { ok: true, forwarded: false };
+    return { ok: false, forwarded: false };
   }
 }
 

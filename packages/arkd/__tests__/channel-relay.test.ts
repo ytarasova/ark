@@ -134,7 +134,7 @@ describe("/channel/:sessionId (report forwarding)", () => {
   it("returns forwarded:false when conductor unreachable", async () => {
     await client.setConfig({ conductorUrl: "http://localhost:1" });
     const result = await client.channelReport("s-test-000", { type: "error", error: "boom" });
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
     expect(result.forwarded).toBe(false);
 
     // Restore

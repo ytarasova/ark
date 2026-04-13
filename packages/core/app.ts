@@ -86,6 +86,7 @@ export class AppContext {
   private _tenantPolicyManager: TenantPolicyManager | null = null;
 
   conductor: { stop(): void } | null = null;
+  arkd: { stop(): void } | null = null;
   metricsPoller: { stop(): void } | null = null;
   /** Rollback config stored here so conductor can access it without globalThis. */
   rollbackConfig: import("./config.js").RollbackSettings | null = null;
@@ -600,6 +601,14 @@ export class AppContext {
         const { startConductor } = await import("./conductor/conductor.js");
         this.conductor = startConductor(this, this.config.conductorPort, { quiet: true });
       });
+
+      // Start arkd (local agent proxy) alongside the conductor.
+      // Agents post reports to arkd, which forwards to the conductor.
+      await safeAsync("boot: start arkd", async () => {
+        const { startArkd } = await import("../arkd/server.js");
+        const conductorUrl = `http://localhost:${this.config.conductorPort}`;
+        this.arkd = startArkd(this.config.arkdPort ?? 19300, { conductorUrl, quiet: true });
+      });
     }
   }
 
@@ -743,6 +752,7 @@ export class AppContext {
     if (this.metricsPoller) { this.metricsPoller.stop(); this.metricsPoller = null; }
     if (this._router) { this._router.stop(); this._router = null; }
     if (this._tensorZero) { await this._tensorZero.stop().catch(() => {}); this._tensorZero = null; }
+    if (this.arkd) { this.arkd.stop(); this.arkd = null; }
     if (this.conductor) { this.conductor.stop(); this.conductor = null; }
     if (this._eventBus) { this._eventBus.clear(); this._eventBus = null; }
 

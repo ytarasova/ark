@@ -19,12 +19,11 @@ import {
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { OutboundMessage } from "./channel-types.js";
-import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL } from "../constants.js";
+import { DEFAULT_ARKD_URL } from "../constants.js";
 
 const SESSION_ID = process.env.ARK_SESSION_ID ?? "unknown";
 const ARKD_URL = DEFAULT_ARKD_URL;
 // Fallback: if no arkd available, try conductor directly
-const CONDUCTOR_URL = DEFAULT_CONDUCTOR_URL;
 const HTTP_PORT = parseInt(process.env.ARK_CHANNEL_PORT ?? "0");
 const TENANT_ID = process.env.ARK_TENANT_ID;
 
@@ -149,23 +148,15 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       }
     })();
 
-    // Report through arkd (preferred) with conductor fallback
+    // Report through arkd -- the single path for agent-to-conductor communication.
+    // Arkd forwards to the conductor. No fallback: if arkd is down, the report is lost.
     try {
       await fetch(`${ARKD_URL}/channel/${SESSION_ID}`, {
         method: "POST",
         headers: outboundHeaders(),
         body: JSON.stringify(report),
       });
-    } catch {
-      // Fallback: direct to conductor if arkd not available
-      try {
-        await fetch(`${CONDUCTOR_URL}/api/channel/${SESSION_ID}`, {
-          method: "POST",
-          headers: outboundHeaders(),
-          body: JSON.stringify(report),
-        });
-      } catch { /* report delivery is best-effort */ }
-    }
+    } catch { /* arkd not reachable */ }
 
     return { content: [{ type: "text", text: `Reported: ${reportType}` }] };
   }
@@ -176,22 +167,14 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       target: args.target_session as string,
       message: args.message as string,
     };
-    // Relay through arkd (preferred) with conductor fallback
+    // Relay through arkd -- the single path for agent-to-agent communication.
     try {
       await fetch(`${ARKD_URL}/channel/relay`, {
         method: "POST",
         headers: outboundHeaders(),
         body: JSON.stringify(relayPayload),
       });
-    } catch {
-      try {
-        await fetch(`${CONDUCTOR_URL}/api/relay`, {
-          method: "POST",
-          headers: outboundHeaders(),
-          body: JSON.stringify(relayPayload),
-        });
-      } catch { /* relay fallback is best-effort */ }
-    }
+    } catch { /* arkd not reachable */ }
     return { content: [{ type: "text", text: `Sent to ${args.target_session}` }] };
   }
 

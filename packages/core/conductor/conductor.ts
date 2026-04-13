@@ -652,15 +652,19 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
 
   // Handle advance + auto-dispatch for completed reports via orchestrator-mediated handoff
   if (result.shouldAdvance) {
-    const handoff = await session.mediateStageHandoff(app, sessionId, {
-      autoDispatch: result.shouldAutoDispatch,
-      source: "channel_report",
-      outcome: result.outcome,
-    });
-    if (handoff.blockedByVerification) {
-      const s = app.sessions.get(sessionId);
-      sendOSNotification("Ark: Verification failed", `${s?.summary ?? sessionId} - ${handoff.message.slice(0, 100)}`);
-      return;
+    try {
+      const handoff = await session.mediateStageHandoff(app, sessionId, {
+        autoDispatch: result.shouldAutoDispatch,
+        source: "channel_report",
+        outcome: result.outcome,
+      });
+      if (handoff.blockedByVerification) {
+        const s = app.sessions.get(sessionId);
+        sendOSNotification("Ark: Verification failed", `${s?.summary ?? sessionId} - ${handoff.message.slice(0, 100)}`);
+        return;
+      }
+    } catch (handoffErr: any) {
+      logError("conductor", `mediateStageHandoff failed for ${sessionId}: ${handoffErr?.message ?? handoffErr}`);
     }
   }
 

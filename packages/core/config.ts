@@ -66,6 +66,7 @@ export interface ArkConfig {
   logDir: string;
   conductorPort: number;
   conductorUrl: string;
+  arkdPort: number;
   env: "production" | "test";
   otlp: OtlpSettings;
   rollback: RollbackSettings;
@@ -116,6 +117,7 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
     logDir: join(arkDir, "logs"),
     conductorPort,
     conductorUrl: process.env.ARK_CONDUCTOR_URL ?? (conductorPort !== 19100 ? `http://localhost:${conductorPort}` : DEFAULT_CONDUCTOR_URL),
+    arkdPort: overrides?.arkdPort ?? parseInt(process.env.ARK_ARKD_PORT ?? "19300", 10),
     env: process.env.ARK_TEST_DIR !== undefined ? "test" : "production",
     otlp: {
       enabled: (yaml.otlp as Record<string, unknown>)?.enabled === true,

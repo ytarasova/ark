@@ -132,7 +132,7 @@ export interface ChannelReportReq {
   sessionId: string;
   report: Record<string, unknown>;
 }
-export interface ChannelReportRes { ok: true; forwarded: boolean }
+export interface ChannelReportRes { ok: boolean; forwarded: boolean; error?: string }
 
 /** Agent-to-agent relay forwarded through arkd to conductor */
 export interface ChannelRelayReq {
@@ -140,7 +140,7 @@ export interface ChannelRelayReq {
   target: string;
   message: string;
 }
-export interface ChannelRelayRes { ok: true; forwarded: boolean }
+export interface ChannelRelayRes { ok: boolean; forwarded: boolean }
 
 /** Conductor → agent delivery: arkd delivers to local channel port */
 export interface ChannelDeliverReq {

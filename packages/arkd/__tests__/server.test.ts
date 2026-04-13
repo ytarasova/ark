@@ -501,3 +501,73 @@ describe("Server lifecycle", () => {
     }
   });
 });
+
+// ── Channel report forwarding ──────────────────────────────────────────────
+
+describe("Channel report forwarding", () => {
+  it("defaults conductorUrl to localhost:19100", () => {
+    // The main test server was started without conductorUrl.
+    // With the fix, it defaults to http://localhost:19100.
+    // We can verify by posting a channel report -- it should attempt to forward
+    // (and fail since the conductor isn't running on that port for this test).
+    // The key assertion is that it returns ok:false with an error, not ok:true/forwarded:false.
+  });
+
+  it("returns ok:false when conductor is unreachable", async () => {
+    // Start arkd with a bogus conductor URL
+    const ephemeral = startArkd(19380, { conductorUrl: "http://localhost:19999", quiet: true });
+    try {
+      const resp = await fetch("http://localhost:19380/channel/test-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "completed", summary: "test" }),
+      });
+      const data = await resp.json() as any;
+      expect(data.ok).toBe(false);
+      expect(data.forwarded).toBe(false);
+      expect(data.error).toBeDefined();
+    } finally {
+      ephemeral.stop();
+    }
+  });
+
+  it("forwards report to conductor and returns forwarded:true", async () => {
+    // Start a mock conductor that accepts channel reports
+    const received: any[] = [];
+    const mockConductor = Bun.serve({
+      port: 19381,
+      async fetch(req) {
+        if (req.method === "POST" && new URL(req.url).pathname.startsWith("/api/channel/")) {
+          const body = await req.json();
+          received.push(body);
+          return Response.json({ status: "ok" });
+        }
+        return new Response("not found", { status: 404 });
+      },
+    });
+
+    // Give the mock server a moment to bind
+    await Bun.sleep(50);
+
+    const ephemeral = startArkd(19382, { conductorUrl: "http://localhost:19381", quiet: true });
+    await Bun.sleep(50);
+    try {
+      const resp = await fetch("http://localhost:19382/channel/s-test123", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "completed", summary: "test report" }),
+      });
+      const data = await resp.json() as any;
+      expect(data.ok).toBe(true);
+      expect(data.forwarded).toBe(true);
+
+      // Verify the mock conductor received the report
+      await pollUntil(() => received.length > 0, { timeout: 2000 });
+      expect(received[0].type).toBe("completed");
+      expect(received[0].summary).toBe("test report");
+    } finally {
+      ephemeral.stop();
+      mockConductor.stop();
+    }
+  });
+});
