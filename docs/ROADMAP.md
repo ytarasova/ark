@@ -210,6 +210,8 @@ The orchestration platform for AI-powered software development. Manages the full
 | **CI/CD pipeline for Ark** | GitHub Actions runs tests but doesn't build/publish artifacts. | Deployment gap |
 | **Async Postgres repos** | Repos use sync IDatabase methods. Postgres adapter uses `Bun.sleepSync` hack. | Architecture gap |
 | **Higress gateway integration** | Custom router works for dev. Enterprise needs CNCF-grade gateway. | LLM Router research |
+| **Zoekt code search** | Sourcegraph's fast trigram-based code search engine (github.com/sourcegraph/zoekt). Could complement or replace FTS5 transcript search for large-scale code search across repos. Evaluate as a backend for `ark search` and knowledge graph queries. | Abhimanyu 2026-04-13 |
+| **Worktree untracked file setup** | Git worktrees don't include untracked files (.env, .envrc, config/local.yaml). Agents in worktrees lose access to env vars and local config. Add `.ark.yaml` `worktree.copy` list and optional `worktree.setup` script hook. | Abhimanyu 2026-04-13 |
 | **Knowledge graph visualization** | No visual rendering of the graph in web UI. MC uses reagraph. | Mission Control gap analysis |
 | **Live feed sidebar** | No real-time event stream without leaving current view. MC has collapsible sidebar. | Mission Control gap analysis |
 | **Boot sequence** | No staged loading screen with progress. MC shows 9-step boot. | Mission Control gap analysis |
