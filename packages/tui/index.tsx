@@ -39,6 +39,14 @@ process.on("unhandledRejection", (err: any) => {
   log("ERROR", `Unhandled rejection: ${err?.message ?? err}`);
 });
 
+process.on("SIGTERM", () => { log("SIGNAL", "SIGTERM received"); });
+process.on("SIGHUP", () => { log("SIGNAL", "SIGHUP received"); });
+process.on("SIGINT", () => { log("SIGNAL", "SIGINT received"); });
+process.on("beforeExit", (code) => { log("EXIT", `beforeExit code=${code}`); });
+process.on("exit", (code) => {
+  try { require("fs").appendFileSync(LOG_FILE, `${new Date().toISOString()} [EXIT] process.exit code=${code} stack=${new Error().stack}\n`); } catch {}
+});
+
 process.on("uncaughtException", (err: any) => {
   log("CRASH", `${err?.message ?? err}\n${err?.stack ?? ""}`);
   process.stderr.write(`\nTUI crash: ${err?.message ?? err}\nLog: ${LOG_FILE}\n`);
