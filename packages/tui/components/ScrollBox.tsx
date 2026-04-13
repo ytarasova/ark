@@ -1,6 +1,9 @@
-import React, { useEffect, useRef } from "react";
-import { useInput, useStdout } from "ink";
-import { ScrollList, type ScrollListRef } from "ink-scroll-list";
+import React, { useMemo, Children, createContext, useContext } from "react";
+import { Box } from "ink";
+import { useVirtualScroll, type ScrollAlignment } from "../hooks/useVirtualScroll.js";
+
+/** Parent components set this to tell ScrollBox the exact available height. */
+export const AvailableHeightContext = createContext<number>(30);
 
 interface ScrollBoxProps {
   children: React.ReactNode;
@@ -8,43 +11,39 @@ interface ScrollBoxProps {
   active?: boolean;
   /** Index of the child to keep visible (auto-scroll). */
   followIndex?: number;
+  /** How to position the followed item. */
+  alignment?: ScrollAlignment;
   /** When this key changes, scroll resets to top. */
   resetKey?: string | number | null;
 }
 
 /**
- * Scrollable list backed by ink-scroll-list.
- * Auto-scrolls to keep the selected item visible.
- * Parent Box must constrain the height.
+ * Virtual-scrolling container. Renders only a window of children
+ * sized by AvailableHeightContext from the parent layout.
  */
-export function ScrollBox({ children, active = true, followIndex, resetKey }: ScrollBoxProps) {
-  const listRef = useRef<ScrollListRef>(null);
-  const { stdout } = useStdout();
+export function ScrollBox({ children, active = true, followIndex, alignment = "center", resetKey }: ScrollBoxProps) {
+  const availableHeight = useContext(AvailableHeightContext);
 
-  // Re-measure on terminal resize
-  useEffect(() => {
-    const onResize = () => listRef.current?.remeasure();
-    stdout?.on("resize", onResize);
-    return () => { stdout?.off("resize", onResize); };
-  }, [stdout]);
+  const items = useMemo(() => {
+    const flat: React.ReactNode[] = [];
+    Children.forEach(children, (child) => {
+      if (child === null || child === undefined) return;
+      flat.push(child);
+    });
+    return flat;
+  }, [children]);
 
-  // Keyboard scrolling (only when not in follow mode)
-  useInput((input, key) => {
-    if (!active || followIndex !== undefined) return;
-    const sv = listRef.current;
-    if (!sv) return;
-    const pageSize = sv.getViewportHeight() || 10;
-    if (input === "j" || key.downArrow) sv.scrollBy(1);
-    else if (input === "k" || key.upArrow) sv.scrollBy(-1);
-    else if (input === "f" || key.pageDown) sv.scrollBy(pageSize);
-    else if (input === "b" || key.pageUp) sv.scrollBy(-pageSize);
-    else if (input === "g") sv.scrollToTop();
-    else if (input === "G") sv.scrollToBottom();
+  const { start, end } = useVirtualScroll({
+    total: items.length,
+    selectedIndex: followIndex,
+    alignment,
+    active,
+    windowSize: availableHeight,
   });
 
   return (
-    <ScrollList ref={listRef} selectedIndex={followIndex ?? 0} scrollAlignment="auto">
-      {children}
-    </ScrollList>
+    <Box flexDirection="column" height={availableHeight}>
+      {items.slice(start, end)}
+    </Box>
   );
 }
