@@ -362,7 +362,7 @@ export function SessionDetail({ session: s, sessions, pane, searchMode, searchQu
       {s.config?.skills?.length ? (
         <KeyValue label="Skills">{s.config.skills.join(", ")}</KeyValue>
       ) : null}
-      <KeyValue label="Created">{hms(s.created_at)}{" "}<Text dimColor>({formatDuration(s.created_at)} ago)</Text></KeyValue>
+      <KeyValue label="Created">{hms(s.created_at)}</KeyValue>
       {(s.status === "running" || s.status === "waiting") && (
         <KeyValue label="Duration">{formatDuration(s.created_at)}</KeyValue>
       )}
