@@ -33,10 +33,19 @@ export function ScrollBox({ children, active = true, followIndex, resetKey }: Sc
     scrollRef.current?.scrollToTop();
   }, [resetKey]);
 
-  // Follow mode: scroll to keep followIndex visible
+  // Follow mode: scroll to keep followIndex item visible
   useEffect(() => {
-    if (followIndex !== undefined && scrollRef.current) {
-      scrollRef.current.scrollTo(followIndex);
+    if (followIndex === undefined || !scrollRef.current) return;
+    const sv = scrollRef.current;
+    const pos = sv.getItemPosition(followIndex);
+    if (!pos) return;
+    const viewportH = sv.getViewportHeight();
+    const currentOffset = sv.getScrollOffset();
+    // Only scroll if the item is outside the visible viewport
+    if (pos.top < currentOffset) {
+      sv.scrollTo(pos.top);
+    } else if (pos.top + pos.height > currentOffset + viewportH) {
+      sv.scrollTo(pos.top + pos.height - viewportH);
     }
   }, [followIndex]);
 
