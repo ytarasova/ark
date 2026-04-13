@@ -82,11 +82,16 @@ export function ScrollBox({ children, reserveRows = 6, active = true, followInde
 
   const canScroll = total > maxHeight;
   const visible = items.slice(offset, offset + displayHeight);
+  // Pad with empty lines to maintain stable panel height
+  const padCount = Math.max(0, displayHeight - visible.length);
 
   return (
     <Box flexDirection="column" flexGrow={1} overflow="hidden">
       {visible.map((item, i) => (
         <React.Fragment key={offset + i}>{item}</React.Fragment>
+      ))}
+      {Array.from({ length: padCount }, (_, i) => (
+        <Text key={`pad-${i}`}>{" "}</Text>
       ))}
       {canScroll && (
         <Text dimColor>
