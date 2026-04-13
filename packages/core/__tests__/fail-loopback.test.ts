@@ -44,6 +44,32 @@ describe("fail-loopback", () => {
     expect(result.message).toContain("Max retries");
   });
 
+  it("stores retry context in session config", () => {
+    const s = getApp().sessions.create({ summary: "test", flow: "bare" });
+    getApp().sessions.update(s.id, { status: "failed", error: "Build failed: missing import", stage: "work" });
+
+    session.retryWithContext(getApp(), s.id);
+
+    const updated = getApp().sessions.get(s.id)!;
+    const ctx = (updated.config as any)?._retry_context;
+    expect(ctx).toBeDefined();
+    expect(ctx.error).toBe("Build failed: missing import");
+    expect(ctx.attempt).toBe(1);
+    expect(ctx.stage).toBe("work");
+  });
+
+  it("truncates long error messages in retry context", () => {
+    const s = getApp().sessions.create({ summary: "test", flow: "bare" });
+    const longError = "x".repeat(3000);
+    getApp().sessions.update(s.id, { status: "failed", error: longError, stage: "work" });
+
+    session.retryWithContext(getApp(), s.id);
+
+    const updated = getApp().sessions.get(s.id)!;
+    const ctx = (updated.config as any)?._retry_context;
+    expect(ctx.error.length).toBe(2000);
+  });
+
   it("rejects non-failed sessions", () => {
     const s = getApp().sessions.create({ summary: "test", flow: "bare" });
     getApp().sessions.update(s.id, { status: "running" });

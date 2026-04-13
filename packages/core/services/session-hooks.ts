@@ -704,6 +704,16 @@ export function retryWithContext(app: AppContext,
     },
   });
 
+  // Preserve error context for injection into next dispatch prompt
+  app.sessions.mergeConfig(sessionId, {
+    _retry_context: {
+      attempt: priorRetries + 1,
+      maxRetries,
+      error: typeof s.error === "string" ? s.error.slice(0, 2000) : s.error,
+      stage: s.stage,
+    },
+  });
+
   // Reset to ready for re-dispatch
   app.sessions.update(sessionId, { status: "ready", error: null });
 

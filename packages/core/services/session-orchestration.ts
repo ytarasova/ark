@@ -537,6 +537,10 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   if (stageStartSha) {
     app.sessions.mergeConfig(sessionId, { stage_start_sha: stageStartSha });
   }
+  // Clear retry context after successful re-dispatch (consumed by task prompt above)
+  if ((session.config as any)?._retry_context) {
+    app.sessions.mergeConfig(sessionId, { _retry_context: null });
+  }
   app.events.log(sessionId, "stage_started", {
     stage, actor: "user",
     data: {
@@ -1688,6 +1692,16 @@ function formatTaskHeader(app: AppContext, session: Session, stage: string, agen
 /** Append previous stage context: completed stages, PLAN.md, and recent git log. */
 async function appendPreviousStageContext(app: AppContext, session: Session): Promise<string[]> {
   const parts: string[] = [];
+
+  // Inject error context from previous retry attempt (fail-loopback)
+  const retryCtx = (session.config as any)?._retry_context as
+    { attempt: number; maxRetries: number; error: string; stage: string } | undefined;
+  if (retryCtx) {
+    parts.push(`\n## IMPORTANT: Previous attempt failed (retry ${retryCtx.attempt}/${retryCtx.maxRetries})`);
+    parts.push(`The previous attempt at this stage ('${retryCtx.stage ?? "unknown"}') failed with the following error:`);
+    parts.push(`\`\`\`\n${retryCtx.error ?? "unknown error"}\n\`\`\``);
+    parts.push(`Fix the issue that caused this failure. Do not repeat the same approach that failed.`);
+  }
 
   // Previous stage context
   const events = app.events.list(session.id);

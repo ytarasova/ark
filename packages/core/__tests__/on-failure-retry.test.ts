@@ -251,6 +251,25 @@ describe("conductor on_failure retry loop", () => {
     expect(updated.error).toBe("Still failing");
   });
 
+  it("retry stores error context in session config for next dispatch", async () => {
+    const app = getApp();
+    const s = app.sessions.create({ summary: "context injection test", flow: "quick" });
+    app.sessions.update(s.id, { status: "running", stage: "implement" });
+
+    await postReport(s.id, {
+      type: "error",
+      error: "TypeError: Cannot read properties of undefined",
+      stage: "implement",
+    });
+
+    const updated = app.sessions.get(s.id)!;
+    const ctx = (updated.config as any)?._retry_context;
+    expect(ctx).toBeDefined();
+    expect(ctx.error).toBe("TypeError: Cannot read properties of undefined");
+    expect(ctx.attempt).toBe(1);
+    expect(ctx.maxRetries).toBe(3);
+  });
+
   it("error report on non-retry stage stays failed", async () => {
     const app = getApp();
     const session = app.sessions.create({ summary: "no-retry test", flow: "quick" });
