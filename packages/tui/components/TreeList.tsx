@@ -96,30 +96,20 @@ export function TreeList<T>({
   if (!isEmpty) {
     for (const groupName of sortedKeys) {
       const entries = groupMap.get(groupName)!;
-      // Render group header for named groups
-      if (groupName) {
-        const count = entries.length;
+      if (entries.length === 0 && groupName) {
+        // Empty group: header + "(empty)" as one block
         rows.push(
-          <Text key={`grp-${groupName}`} color={theme.accent} bold wrap="truncate">
-            {`${groupName} (${count})`}
-          </Text>
+          <Box key={`grp-${groupName}`} flexDirection="column">
+            <Text color={theme.accent} bold wrap="truncate">{`${groupName} (0)`}</Text>
+            <Text dimColor>{"    (empty)"}</Text>
+          </Box>
         );
       }
-      if (entries.length === 0 && groupName) {
-        rows.push(<Text key={`empty-${groupName}`} dimColor>{"    (empty)"}</Text>);
-      }
-      // Track where the group header is so we can scroll to it when the
-      // first item in the group is selected (keeps headers visible).
-      const groupHeaderRow = groupName ? rows.length - 1 : -1;
       for (let ei = 0; ei < entries.length; ei++) {
         const { item, flatIndex } = entries[ei];
         const isSel = visualIdx === clampedSel;
         visualIdx++;
-        if (isSel) {
-          // Scroll to the group header when the first item in a group is selected
-          selRow = (ei === 0 && groupHeaderRow >= 0) ? groupHeaderRow : rows.length;
-          selectedItem = item;
-        }
+        if (isSel) { selRow = rows.length; selectedItem = item; }
         const rowContent = isSel ? (
           <ListRow selected>{`> ${renderRow(item, true)}`}</ListRow>
         ) : (
@@ -127,17 +117,18 @@ export function TreeList<T>({
             ? renderColoredRow(item)
             : <Text wrap="truncate">{`  ${renderRow(item, false)}`}</Text>
         );
+        // Attach group header to the first item so they scroll together
+        const header = (ei === 0 && groupName) ? (
+          <Text color={theme.accent} bold wrap="truncate">{`${groupName} (${entries.length})`}</Text>
+        ) : null;
         const children = renderChildren?.(item);
-        if (children) {
-          rows.push(
-            <Box key={`item-${flatIndex}`} flexDirection="column">
-              {rowContent}
-              {children}
-            </Box>
-          );
-        } else {
-          rows.push(React.cloneElement(rowContent as React.ReactElement, { key: `item-${flatIndex}` }));
-        }
+        rows.push(
+          <Box key={`item-${flatIndex}`} flexDirection="column">
+            {header}
+            {rowContent}
+            {children}
+          </Box>
+        );
         if (spacing) {
           rows.push(<Text key={`sp-${flatIndex}`}>{" "}</Text>);
         }
