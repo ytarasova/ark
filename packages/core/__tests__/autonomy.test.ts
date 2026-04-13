@@ -94,19 +94,25 @@ describe("writeHooksConfig autonomy", () => {
   it("autonomy 'full' does NOT add permissions.deny", () => {
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "full" });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions).toBeUndefined();
+    expect(settings.permissions).toBeDefined();
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
+    expect(settings.permissions.deny).toBeUndefined();
   });
 
   it("no autonomy does NOT add permissions.deny", () => {
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions).toBeUndefined();
+    expect(settings.permissions).toBeDefined();
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
+    expect(settings.permissions.deny).toBeUndefined();
   });
 
   it("autonomy 'execute' does NOT add permissions.deny", () => {
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "execute" });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions).toBeUndefined();
+    expect(settings.permissions).toBeDefined();
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
+    expect(settings.permissions.deny).toBeUndefined();
   });
 
   it("autonomy 'edit' preserves existing settings alongside deny rules", () => {
@@ -118,7 +124,7 @@ describe("writeHooksConfig autonomy", () => {
 
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "edit" });
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
-    expect(settings.permissions.allow).toEqual(["Read"]);
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
     expect(settings.permissions.deny).toEqual(["Bash"]);
     expect(settings.hooks).toBeDefined();
   });

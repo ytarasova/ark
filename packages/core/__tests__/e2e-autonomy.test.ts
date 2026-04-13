@@ -165,7 +165,9 @@ describe("E2E: writeHooksConfig writes permission deny rules", () => {
     const settings = JSON.parse(
       readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
-    expect(settings.permissions).toBeUndefined();
+    expect(settings.permissions).toBeDefined();
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
+    expect(settings.permissions.deny).toBeUndefined();
   });
 
   it("execute does NOT add permissions.deny", () => {
@@ -174,7 +176,9 @@ describe("E2E: writeHooksConfig writes permission deny rules", () => {
     const settings = JSON.parse(
       readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
-    expect(settings.permissions).toBeUndefined();
+    expect(settings.permissions).toBeDefined();
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
+    expect(settings.permissions.deny).toBeUndefined();
   });
 
   it("no autonomy does NOT add permissions.deny", () => {
@@ -183,7 +187,9 @@ describe("E2E: writeHooksConfig writes permission deny rules", () => {
     const settings = JSON.parse(
       readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
-    expect(settings.permissions).toBeUndefined();
+    expect(settings.permissions).toBeDefined();
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
+    expect(settings.permissions.deny).toBeUndefined();
   });
 
   it("edit preserves existing allow rules alongside new deny rules", () => {
@@ -197,7 +203,7 @@ describe("E2E: writeHooksConfig writes permission deny rules", () => {
     writeHooksConfig("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "edit" });
 
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
-    expect(settings.permissions.allow).toEqual(["Read", "Glob"]);
+    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
     expect(settings.permissions.deny).toEqual(["Bash"]);
     expect(settings.hooks).toBeDefined();
   });
@@ -314,6 +320,8 @@ describe("E2E: full autonomy pipeline", () => {
     const settings1 = JSON.parse(
       readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
     );
-    expect(settings1.permissions).toBeUndefined();
+    expect(settings1.permissions).toBeDefined();
+    expect(settings1.permissions.allow).toContain("mcp__ark-channel__*");
+    expect(settings1.permissions.deny).toBeUndefined();
   });
 });

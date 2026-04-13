@@ -22,7 +22,7 @@ async function renderWithClient(element: React.ReactElement) {
   const onReady = () => { ready = true; };
 
   const result = render(
-    <ArkClientProvider onReady={onReady}>
+    <ArkClientProvider onReady={onReady} app={app}>
       <FocusProvider>
         {element}
       </FocusProvider>
