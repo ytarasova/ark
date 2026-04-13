@@ -322,7 +322,7 @@ function HistoryDetailContent({ item, searchResult, pane, conversation, detailId
       </Box>
       {/* Scrollable conversation section */}
       <Box flexDirection="column" flexGrow={1} borderStyle="single" borderColor={theme.dimText} borderTop={true} borderBottom={false} borderLeft={false} borderRight={false}>
-        <ScrollBox active={pane === "right"} reserveRows={18} resetKey={detailId}>
+        <ScrollBox active={pane === "right"} resetKey={detailId}>
           <ConversationScrollContent turns={conversation} />
         </ScrollBox>
       </Box>

@@ -14,10 +14,9 @@ interface DetailPanelProps {
  * across all tabs.
  */
 export function DetailPanel({ children, active = false, resetKey }: DetailPanelProps) {
-  // reserveRows accounts for: tab bar (1) + split pane borders (2) +
   // panel title+gap (2) + event log (2) + status bar (1) + padding (1) = 9
   return (
-    <ScrollBox active={active} reserveRows={9} resetKey={resetKey}>
+    <ScrollBox active={active} resetKey={resetKey}>
       {children}
     </ScrollBox>
   );

@@ -86,7 +86,7 @@ export function SessionReplay({ session, onClose }: SessionReplayProps) {
   const flowLabel = session.flow ?? "default";
 
   return (
-    <ScrollBox active={!searchMode} reserveRows={9}>
+    <ScrollBox active={!searchMode}>
       {/* Header */}
       <Text bold>
         {` Session ${session.id} | flow: ${flowLabel} | ${session.status} | ${steps.length} events`}

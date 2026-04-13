@@ -676,13 +676,13 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
             />
         }
       />
-      {(status.message || confirmation.status.message) && (
-        <Box>
+      <Box height={1}>
+        {(status.message || confirmation.status.message) ? (
           <Text color={confirmation.pending === "delete" ? "red" : theme.accent}>
             {` ${confirmation.status.message ?? status.message}`}
           </Text>
-        </Box>
-      )}
+        ) : <Text>{" "}</Text>}
+      </Box>
     </Box>
   );
 }

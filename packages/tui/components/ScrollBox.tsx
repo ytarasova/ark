@@ -1,107 +1,62 @@
-import React, { useState, useMemo, useEffect, useCallback, Children, createContext, useContext } from "react";
-import { Box, Text, useInput, useStdout } from "ink";
-
-/**
- * Context for parent components to tell ScrollBox its available height.
- * When set, ScrollBox uses this instead of guessing from terminal rows.
- */
-export const ScrollHeightContext = createContext<number | null>(null);
+import React, { useEffect, useRef } from "react";
+import { useInput, useStdout } from "ink";
+import { ScrollView, type ScrollViewRef } from "ink-scroll-view";
 
 interface ScrollBoxProps {
   children: React.ReactNode;
-  /**
-   * Fallback: rows to subtract from terminal height when no
-   * ScrollHeightContext is provided. Prefer using context.
-   */
-  reserveRows?: number;
   /** When true, this ScrollBox captures j/k/f/b scroll keys. */
   active?: boolean;
-  /** Index of the item to keep visible (auto-scroll). */
+  /** Index of the child to keep visible (auto-scroll). */
   followIndex?: number;
   /** When this key changes, scroll resets to top. */
   resetKey?: string | number | null;
 }
 
 /**
- * Scrollable container that clips children to available height.
- *
- * Height is determined by (in priority order):
- * 1. ScrollHeightContext (parent tells us the exact height)
- * 2. terminalRows - reserveRows (fallback estimate)
- *
- * Two scroll modes:
- * 1. Self-managed (active): captures j/k/f/b keys for scrolling.
- * 2. Follow mode (followIndex set): auto-scrolls to keep the followed index visible.
+ * Scrollable container backed by ink-scroll-view.
+ * The parent Box must constrain the height (e.g. via flexGrow={1}
+ * + overflow="hidden" on SplitPane's content area).
  */
-export function ScrollBox({ children, reserveRows = 10, active = true, followIndex, resetKey }: ScrollBoxProps) {
+export function ScrollBox({ children, active = true, followIndex, resetKey }: ScrollBoxProps) {
+  const scrollRef = useRef<ScrollViewRef>(null);
   const { stdout } = useStdout();
-  const contextHeight = useContext(ScrollHeightContext);
-  const maxHeight = contextHeight ?? ((stdout?.rows ?? 40) - reserveRows);
-  const [offset, setOffset] = useState(0);
+
+  // Re-measure on terminal resize
+  useEffect(() => {
+    const onResize = () => scrollRef.current?.remeasure();
+    stdout?.on("resize", onResize);
+    return () => { stdout?.off("resize", onResize); };
+  }, [stdout]);
 
   // Reset scroll to top when resetKey changes
   useEffect(() => {
-    setOffset(0);
+    scrollRef.current?.scrollToTop();
   }, [resetKey]);
 
-  const items = useMemo(() => {
-    const flat: React.ReactNode[] = [];
-    Children.forEach(children, (child) => {
-      if (child === null || child === undefined) return;
-      flat.push(child);
-    });
-    return flat;
-  }, [children]);
-
-  const total = items.length;
-  const displayHeight = maxHeight - (total > maxHeight ? 1 : 0); // reserve 1 row for scroll indicator
-  const maxOffset = Math.max(0, total - displayHeight);
-
-  // Follow mode: auto-scroll to keep followIndex visible
+  // Follow mode: scroll to keep followIndex visible
   useEffect(() => {
-    if (followIndex === undefined) return;
-    const maxFollow = Math.max(0, total - 1);
-    const clamped = Math.max(0, Math.min(followIndex, maxFollow));
-    setOffset(prev => {
-      if (clamped < prev) return clamped;
-      if (clamped >= prev + displayHeight) return Math.max(0, clamped - displayHeight + 1);
-      return prev;
-    });
-  }, [followIndex, displayHeight, total]);
+    if (followIndex !== undefined && scrollRef.current) {
+      scrollRef.current.scrollTo(followIndex);
+    }
+  }, [followIndex]);
 
-  // Self-managed scroll (only when not in follow mode)
+  // Keyboard scrolling
   useInput((input, key) => {
     if (!active || followIndex !== undefined) return;
-    if (input === "j" || key.downArrow) {
-      setOffset(o => Math.min(o + 1, maxOffset));
-    } else if (input === "k" || key.upArrow) {
-      setOffset(o => Math.max(o - 1, 0));
-    } else if (input === "f" || key.pageDown) {
-      setOffset(o => Math.min(o + displayHeight, maxOffset));
-    } else if (input === "b" || key.pageUp) {
-      setOffset(o => Math.max(o - displayHeight, 0));
-    } else if (input === "g") {
-      setOffset(0);
-    } else if (input === "G") {
-      setOffset(maxOffset);
-    }
+    const sv = scrollRef.current;
+    if (!sv) return;
+    const pageSize = sv.getViewportHeight() || 10;
+    if (input === "j" || key.downArrow) sv.scrollBy(1);
+    else if (input === "k" || key.upArrow) sv.scrollBy(-1);
+    else if (input === "f" || key.pageDown) sv.scrollBy(pageSize);
+    else if (input === "b" || key.pageUp) sv.scrollBy(-pageSize);
+    else if (input === "g") sv.scrollToTop();
+    else if (input === "G") sv.scrollToBottom();
   });
 
-  const canScroll = total > maxHeight;
-  const visible = items.slice(offset, offset + displayHeight);
-
   return (
-    <Box flexDirection="column" height={maxHeight} overflow="hidden">
-      {visible.map((item, i) => (
-        <React.Fragment key={offset + i}>{item}</React.Fragment>
-      ))}
-      {canScroll && (
-        <Text dimColor>
-          {offset > 0 ? " ▲" : "  "}
-          {` ${offset + 1}-${Math.min(offset + displayHeight, total)}/${total} `}
-          {offset < maxOffset ? "▼" : " "}
-        </Text>
-      )}
-    </Box>
+    <ScrollView ref={scrollRef}>
+      {children}
+    </ScrollView>
   );
 }

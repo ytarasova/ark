@@ -1,5 +1,5 @@
 /**
- * Tests for ScrollBox component — rendering, follow mode, scroll indicators.
+ * Tests for ScrollBox component -- rendering, follow mode, scroll indicators.
  */
 
 import { describe, it, expect } from "bun:test";
@@ -26,13 +26,10 @@ describe("ScrollBox", () => {
   });
 
   it("does not respond to j/k in followIndex mode", async () => {
-    // In follow mode, the ScrollBox delegates scrolling to the parent.
-    // j/k should NOT change the internal offset.
-    // We create enough items to overflow, then verify j key does nothing.
     const items = Array.from({ length: 50 }, (_, i) => <Text key={i}>Item {i}</Text>);
 
     const { lastFrame, stdin, unmount } = render(
-      <ScrollBox followIndex={0} reserveRows={6}>
+      <ScrollBox followIndex={0}>
         {items}
       </ScrollBox>
     );
@@ -41,7 +38,6 @@ describe("ScrollBox", () => {
     stdin.write("j");
     stdin.write("j");
     stdin.write("j");
-    // The frame should be unchanged because j/k are ignored in follow mode
     await waitFor(() => lastFrame()! === before);
     const after = lastFrame()!;
     expect(after).toBe(before);
@@ -51,34 +47,32 @@ describe("ScrollBox", () => {
   it("followIndex beyond item count does not cause negative offset", () => {
     const items = Array.from({ length: 5 }, (_, i) => <Text key={i}>Item {i}</Text>);
 
-    // followIndex=100 is way beyond the 5 items — should clamp, not go negative
     const { lastFrame, unmount } = render(
-      <ScrollBox followIndex={100} reserveRows={6}>
+      <ScrollBox followIndex={100}>
         {items}
       </ScrollBox>
     );
 
     const frame = lastFrame()!;
-    // All 5 items should be visible (they fit in the terminal)
     expect(frame).toContain("Item 0");
     expect(frame).toContain("Item 4");
-    // No crash, no negative offset artifacts
     unmount();
   });
 
-  it("shows scroll indicator when content overflows", () => {
-    // Create more items than can fit in the terminal (default 40 - 6 reserve = 34 rows)
-    const items = Array.from({ length: 50 }, (_, i) => <Text key={i}>Item {i}</Text>);
+  it("renders all items when they fit in available space", () => {
+    const items = Array.from({ length: 5 }, (_, i) => <Text key={i}>Row {i}</Text>);
 
     const { lastFrame, unmount } = render(
-      <ScrollBox reserveRows={6}>
+      <ScrollBox>
         {items}
       </ScrollBox>
     );
 
     const frame = lastFrame()!;
-    // Should show the down arrow indicator (content below)
-    expect(frame).toContain("\u25BC"); // ▼
+    expect(frame).toContain("Row 0");
+    expect(frame).toContain("Row 4");
+    // No scroll indicator for small lists
+    expect(frame).not.toContain("\u25BC");
     unmount();
   });
 });

@@ -74,7 +74,7 @@ export function TalkToSession({ session, asyncState, onDone }: TalkToSessionProp
         <ScrollBox
           active={scrollMode}
           followIndex={inputFocused ? messageElements.length - 1 : undefined}
-          reserveRows={12}
+         
         >
           {messageElements}
         </ScrollBox>

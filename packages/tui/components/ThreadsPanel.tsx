@@ -164,7 +164,7 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
         <ScrollBox
           active={scrollMode}
           followIndex={inputFocused ? allMessages.length - 1 : undefined}
-          reserveRows={12}
+         
         >
           {allMessages.map((m) => {
             const isUser = m.role === "user";
