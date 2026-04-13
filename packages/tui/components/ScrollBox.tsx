@@ -1,29 +1,26 @@
-import React, { useState, useEffect, Children, useMemo } from "react";
+import React, { useState, useMemo, useEffect, Children } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 
 interface ScrollBoxProps {
   children: React.ReactNode;
-  /** Reserve this many rows for chrome outside the scroll area (tabs, status bar, etc.) */
+  /** Lines to subtract from terminal height (tab bar, status bar, borders, etc.). */
   reserveRows?: number;
-  /** Whether this scroll box should respond to its own j/k scroll keys */
+  /** When true, this ScrollBox captures j/k/f/b scroll keys. */
   active?: boolean;
-  /**
-   * Follow an external selection index (for list panes).
-   * When set, the scroll box auto-scrolls to keep this index visible
-   * and does NOT handle j/k internally (the parent owns navigation).
-   */
+  /** Index of the item to keep visible (auto-scroll). */
   followIndex?: number;
-  /** When this value changes, scroll resets to the top. */
-  resetKey?: string;
+  /** When this key changes, scroll resets to top. */
+  resetKey?: string | number | null;
 }
 
 /**
  * Scrollable container that clips children to terminal height.
  *
  * Two modes:
- * 1. Self-managed (default): responds to j/k for scrolling. Used by right/detail panes.
+ * 1. Self-managed (active): captures j/k/f/b keys for scrolling.
  * 2. Follow mode (followIndex set): auto-scrolls to keep the followed index visible.
- *    Used by left/list panes where useListNavigation owns j/k.
+ *
+ * Items = direct children (not unwrapped from Fragments).
  */
 export function ScrollBox({ children, reserveRows = 6, active = true, followIndex, resetKey }: ScrollBoxProps) {
   const { stdout } = useStdout();
@@ -68,10 +65,8 @@ export function ScrollBox({ children, reserveRows = 6, active = true, followInde
     } else if (input === "k" || key.upArrow) {
       setOffset(o => Math.max(o - 1, 0));
     } else if (input === "f" || key.pageDown) {
-      // Page down
       setOffset(o => Math.min(o + displayHeight, maxOffset));
     } else if (input === "b" || key.pageUp) {
-      // Page up
       setOffset(o => Math.max(o - displayHeight, 0));
     } else if (input === "g") {
       setOffset(0);
@@ -82,21 +77,16 @@ export function ScrollBox({ children, reserveRows = 6, active = true, followInde
 
   const canScroll = total > maxHeight;
   const visible = items.slice(offset, offset + displayHeight);
-  // Pad with empty lines to maintain stable panel height
-  const padCount = Math.max(0, displayHeight - visible.length);
 
   return (
-    <Box flexDirection="column" flexGrow={1} overflow="hidden">
+    <Box flexDirection="column" height={maxHeight} overflow="hidden">
       {visible.map((item, i) => (
         <React.Fragment key={offset + i}>{item}</React.Fragment>
-      ))}
-      {Array.from({ length: padCount }, (_, i) => (
-        <Text key={`pad-${i}`}>{" "}</Text>
       ))}
       {canScroll && (
         <Text dimColor>
           {offset > 0 ? " ▲" : "  "}
-          {` ${offset + 1}–${Math.min(offset + displayHeight, total)}/${total} `}
+          {` ${offset + 1}-${Math.min(offset + displayHeight, total)}/${total} `}
           {offset < maxOffset ? "▼" : " "}
         </Text>
       )}
