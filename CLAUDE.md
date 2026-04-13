@@ -22,6 +22,43 @@ ark claude list       # list Claude Code sessions on disk (--project to filter)
 ark arkd              # start the arkd daemon (--port 19300, --conductor-url http://localhost:19100)
 ```
 
+## Ark on Ark (Dogfooding)
+
+Use Ark to build Ark. Dispatch autonomous agent sessions for feature work instead of coding manually.
+
+```bash
+# Dispatch a feature via the autonomous SDLC flow (plan -> implement -> verify -> review -> PR -> merge)
+./ark session start --flow autonomous-sdlc --repo /Users/paytmlabs/Projects/ark \
+  --summary "Describe the feature or fix here" --dispatch
+
+# Quick flow (implement -> verify -> PR -> merge, no planning/review)
+./ark session start --flow quick --repo /Users/paytmlabs/Projects/ark \
+  --summary "Quick task description" --dispatch
+
+# Check session status
+./ark session list
+./ark session show <id>
+./ark session events <id>
+
+# Attach to the agent's tmux session to watch it work
+tmux attach -t ark-s-<id>
+```
+
+**Prerequisites for dispatch:**
+- TUI must be running (`make tui`) -- it starts both the conductor (port 19100) and arkd (port 19300)
+- Or run conductor + arkd manually: the conductor handles orchestration, arkd is the local agent proxy
+
+**How the report pipeline works:**
+- Agent completes work and calls `report(completed)` via the channel MCP
+- Channel posts to arkd (port 19300)
+- Arkd forwards to conductor (port 19100)
+- Conductor runs `applyReport` -> `mediateStageHandoff` -> `advance` -> auto-dispatches next stage
+
+**Common issues:**
+- Session stuck at "ready" after agent completes: check that arkd is running (`curl localhost:19300/health`) and conductor is running (`curl localhost:19100/health`). Stale conductor processes can survive TUI restarts -- kill them with `lsof -ti:19100 | xargs kill`.
+- `--repo` must use a full path (e.g. `/Users/paytmlabs/Projects/ark`), not a relative path or basename. The display layer (`formatRepoName`) handles showing the friendly name.
+- Agent worktrees are created under `~/.ark/worktrees/<session-id>/`. Each session gets an isolated git worktree.
+
 ## Project Structure
 
 ```
