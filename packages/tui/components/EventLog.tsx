@@ -13,20 +13,19 @@ export function EventLog({ expanded }: EventLogProps) {
   const latest = events[0];
 
   if (!expanded) {
+    // Single line -- no border, no box height overhead
     return (
-      <Box borderStyle="single" borderColor={theme.dimText} paddingX={1}>
-        <Text dimColor>
-          {"Events "}
-          {latest
-            ? <Text>
-                <Text color={latest.color}>{latest.message}</Text>
-                <Text dimColor>{` ${latest.time.slice(0, 5)} `}</Text>
-                <Text dimColor bold>{"(e:expand)"}</Text>
-              </Text>
-            : <Text dimColor bold>{"(e:expand)"}</Text>
-          }
-        </Text>
-      </Box>
+      <Text dimColor>
+        {"Events "}
+        {latest
+          ? <Text>
+              <Text color={latest.color}>{latest.message}</Text>
+              <Text dimColor>{` ${latest.time.slice(0, 5)} `}</Text>
+              <Text dimColor bold>{"(e:expand)"}</Text>
+            </Text>
+          : <Text dimColor bold>{"(e:expand)"}</Text>
+        }
+      </Text>
     );
   }
 
