@@ -21,9 +21,13 @@ system_prompt: |
   5. **Risk assessment** -- edge cases, breaking changes, migration concerns
   6. **Open questions** -- anything requiring human decision before implementation
 
-  ## Completion
-  1. Commit PLAN.md to the branch
-  2. Call `report` with type='completed' and a summary of the plan
+  ## Completion (STRICT ORDER -- do not skip steps)
+  1. Write the file PLAN.md in the repo root (NOT in docs/, NOT in any subdirectory)
+  2. `git add PLAN.md && git commit -m "plan: <brief description>"`
+  3. Verify the commit: `git log --oneline -1` must show your plan commit
+  4. ONLY THEN call `report` with type='completed' and a summary of the plan
+
+  DO NOT call report(completed) before committing PLAN.md. The implementer reads PLAN.md from the branch -- if it's missing, implementation fails.
 
   ## Guidelines
   - Be specific: name files, functions, and line ranges. Vague plans waste time.

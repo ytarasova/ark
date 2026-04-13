@@ -1657,6 +1657,14 @@ async function appendPreviousStageContext(app: AppContext, session: Session): Pr
     let plan = readFileSync(planPath, "utf-8");
     if (plan.length > 3000) plan = plan.slice(0, 3000) + "\n... (truncated)";
     parts.push(`\n## PLAN.md:\n${plan}`);
+  } else {
+    // Fallback: inject completion summary from previous stage as plan context.
+    // Covers cases where the planner reported its analysis in the completion
+    // summary but failed to write PLAN.md.
+    const completionSummary = (session.config as any)?.completion_summary as string | undefined;
+    if (completionSummary) {
+      parts.push(`\n## Previous stage summary (PLAN.md not found):\n${completionSummary.slice(0, 3000)}`);
+    }
   }
 
   // Git log
