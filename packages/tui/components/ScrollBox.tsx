@@ -37,20 +37,10 @@ export function ScrollBox({ children, reserveRows = 6, active = true, followInde
 
   const items = useMemo(() => {
     const flat: React.ReactNode[] = [];
-    const flatten = (node: React.ReactNode) => {
-      Children.forEach(node, (child) => {
-        if (child === null || child === undefined) return;
-        if (React.isValidElement(child)) {
-          const el = child as React.ReactElement;
-          if (el.type === React.Fragment) {
-            flatten(el.props.children);
-            return;
-          }
-        }
-        flat.push(child);
-      });
-    };
-    flatten(children);
+    Children.forEach(children, (child) => {
+      if (child === null || child === undefined) return;
+      flat.push(child);
+    });
     return flat;
   }, [children]);
 
