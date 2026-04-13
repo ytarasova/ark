@@ -1,6 +1,6 @@
 import { type Command, Option } from "commander";
 import chalk from "chalk";
-import { resolve, basename } from "path";
+import { resolve } from "path";
 import { existsSync } from "fs";
 import { execSync } from "child_process";
 import * as core from "../../core/index.js";
@@ -54,7 +54,7 @@ export function registerSessionCommands(program: Command) {
         const rp = resolve(repo);
         if (existsSync(rp)) {
           workdir = rp;
-          repo = basename(rp);
+          repo = rp;
         }
       }
 

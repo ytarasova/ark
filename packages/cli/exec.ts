@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { resolve, basename } from "path";
+import { resolve } from "path";
 import { existsSync } from "fs";
 import { getApp } from "../core/app.js";
 import { startSession, dispatch, waitForCompletion } from "../core/services/session-orchestration.js";
@@ -26,7 +26,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
   const rp = resolve(repo);
   if (existsSync(rp)) {
     workdir = rp;
-    if (repo === "." || repo === "./") repo = basename(rp);
+    if (repo === "." || repo === "./") repo = rp;
   }
 
   // Sanitize summary
@@ -83,7 +83,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
     } else if (final.status === "completed") {
       console.log(chalk.green(`Completed`));
       const usage = final.config?.usage;
-      if (usage) console.log(chalk.dim(`  Tokens: ${(usage.total_tokens / 1000).toFixed(1)}K`));
+      if (usage) console.log(chalk.dim(`  Tokens: ${((usage as any).total_tokens / 1000).toFixed(1)}K`));
     } else if (final.status === "failed") {
       console.error(chalk.red(`Failed: ${final.error ?? "unknown"}`));
     } else {
