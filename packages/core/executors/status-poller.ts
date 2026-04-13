@@ -16,12 +16,25 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
   // Don't double-poll
   if (activePollers.has(sessionId)) return;
 
+  let tick = 0;
   const interval = setInterval(async () => {
+    tick++;
     try {
       const executor = app.pluginRegistry.executor(executorName) ?? getExecutor(executorName);
       if (!executor) { stopStatusPoller(sessionId); return; }
 
       const status = await executor.status(handle);
+
+      // Every 5th tick (~15s), snapshot the process tree for observability
+      if (tick % 5 === 0 && status.state === "running") {
+        try {
+          const { snapshotSessionTree } = await import("./process-tree.js");
+          const tree = await snapshotSessionTree(handle);
+          if (tree) {
+            app.sessions.mergeConfig(sessionId, { process_tree: tree });
+          }
+        } catch { /* best-effort */ }
+      }
 
       if (status.state === "completed" || status.state === "failed" || status.state === "not_found") {
         stopStatusPoller(sessionId);

@@ -177,8 +177,9 @@ export const gooseExecutor: Executor = {
 
     log("Launching goose in tmux...");
     await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.arkDir });
+    const rootPid = await tmux.getPanePidAsync(tmuxName);
 
-    return { ok: true, handle: tmuxName };
+    return { ok: true, handle: tmuxName, pid: rootPid ?? undefined };
   },
 
   async kill(handle: string): Promise<void> {

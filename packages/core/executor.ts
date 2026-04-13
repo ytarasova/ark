@@ -46,6 +46,19 @@ export interface LaunchResult {
   handle: string;
   message?: string;
   claudeSessionId?: string | null;
+  pid?: number;
+}
+
+export interface ProcessInfo {
+  rootPid: number;
+  children: Array<{
+    pid: number;
+    ppid: number;
+    command: string;
+    cpu?: number;
+    mem?: number;
+  }>;
+  capturedAt: string;
 }
 
 export type ExecutorStatus =

@@ -514,6 +514,15 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
   const tmuxName = launchResult.handle;
 
+  // Persist launch PID for process-tree tracking
+  if (launchResult.pid) {
+    app.sessions.mergeConfig(sessionId, {
+      launch_pid: launchResult.pid,
+      launch_executor: runtime,
+      launched_at: new Date().toISOString(),
+    });
+  }
+
   // Record HEAD sha at stage start for per-stage commit verification
   let stageStartSha: string | undefined;
   if (session.workdir) {
@@ -747,6 +756,15 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
   // Skip if already stopped (unless force -- used by stopAll for cleanup)
   if (!opts?.force && ["stopped", "completed", "failed"].includes(session.status) && !session.session_id) {
     return { ok: true, message: "Already stopped" };
+  }
+
+  // Attempt graceful tree-kill before blunt tmux/provider kill
+  const launchPid = session.config?.launch_pid as number | undefined;
+  if (launchPid) {
+    try {
+      const { killProcessTree } = await import("../executors/process-tree.js");
+      await killProcessTree(launchPid);
+    } catch { /* fall through to tmux kill */ }
   }
 
   // Kill agent + clean up provider resources FIRST (before any DB writes)

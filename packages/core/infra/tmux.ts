@@ -117,6 +117,17 @@ export function killSessionAsync(name: string): Promise<boolean> {
   });
 }
 
+/** Get the PID of the first pane in a tmux session (async) */
+export async function getPanePidAsync(name: string): Promise<number | null> {
+  try {
+    const { stdout } = await execFileAsync(tmuxBin(),
+      ["list-panes", "-t", name, "-F", "#{pane_pid}"],
+      { encoding: "utf-8" });
+    const pid = parseInt(stdout.trim().split("\n")[0], 10);
+    return isNaN(pid) ? null : pid;
+  } catch { return null; }
+}
+
 /** Create a new tmux session running a command (async) */
 export async function createSessionAsync(name: string, command: string, opts?: {
   width?: number;
