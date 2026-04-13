@@ -124,10 +124,11 @@ export const claudeCodeExecutor: Executor = {
     // Local launch
     log("Starting local tmux session...");
     await tmux.createSessionAsync(tmuxName, `bash ${launcher}`, { arkDir: app.config.arkDir });
+    const rootPid = await tmux.getPanePidAsync(tmuxName);
     claude.autoAcceptChannelPrompt(tmuxName);
     app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
-    return { ok: true, handle: tmuxName, claudeSessionId };
+    return { ok: true, handle: tmuxName, pid: rootPid ?? undefined, claudeSessionId };
   },
 
   async kill(handle: string): Promise<void> {

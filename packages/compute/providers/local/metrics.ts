@@ -7,6 +7,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { tmuxBin } from "../../../core/infra/tmux.js";
+import { getProcessTree } from "../../../core/executors/process-tree.js";
 import type {
   ComputeSnapshot,
   ComputeMetrics,
@@ -147,28 +148,16 @@ async function getTmuxSessions(): Promise<ComputeSession[]> {
     let projectPath = "";
 
     if (panePid) {
-      const firstPid = panePid.split("\n")[0].trim();
-      if (firstPid) {
-        const childrenOut = await run("pgrep", ["-P", firstPid]);
-        const childPids = childrenOut
-          .split("\n")
-          .filter((p) => p.trim())
-          .map((p) => p.trim());
-
-        for (const cpid of childPids) {
-          const info = await run("ps", ["-p", cpid, "-o", "pcpu,pmem,args"]);
-          if (info.toLowerCase().includes("claude")) {
-            const statsMatch = info.match(
-              /\s*([\d.]+)\s+([\d.]+)\s+(.+)/m,
-            );
-            if (statsMatch) {
-              cpu = parseFloat(statsMatch[1]) || 0;
-              mem = parseFloat(statsMatch[2]) || 0;
-              const args = statsMatch[3];
-              mode = args.includes("dangerously") ? "development" : "normal";
-            }
-            break;
-          }
+      const firstPid = parseInt(panePid.split("\n")[0].trim(), 10);
+      if (!isNaN(firstPid)) {
+        const tree = await getProcessTree(firstPid);
+        const agentProc = tree.children.find((c) =>
+          c.command.toLowerCase().includes("claude"),
+        );
+        if (agentProc) {
+          cpu = agentProc.cpu ?? 0;
+          mem = agentProc.mem ?? 0;
+          mode = agentProc.command.includes("dangerously") ? "development" : "normal";
         }
 
         const paneDir = await run(tmuxBin(), [

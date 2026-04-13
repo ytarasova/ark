@@ -85,7 +85,7 @@ export const subprocessExecutor: Executor = {
     });
 
     processes.set(handle, tracked);
-    return { ok: true, handle };
+    return { ok: true, handle, pid: proc.pid };
   },
 
   async kill(handle: string): Promise<void> {

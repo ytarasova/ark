@@ -102,6 +102,7 @@ export const cliAgentExecutor: Executor = {
     // Launch in tmux
     log(`Launching ${command[0]} in tmux...`);
     await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.arkDir });
+    const rootPid = await tmux.getPanePidAsync(tmuxName);
 
     // For stdin delivery with initialPrompt, send via tmux after the process starts
     if (sendPromptAfterLaunch && initialPrompt) {
@@ -110,7 +111,7 @@ export const cliAgentExecutor: Executor = {
       await tmux.sendTextAsync(tmuxName, initialPrompt);
     }
 
-    return { ok: true, handle: tmuxName };
+    return { ok: true, handle: tmuxName, pid: rootPid ?? undefined };
   },
 
   async kill(handle: string): Promise<void> {

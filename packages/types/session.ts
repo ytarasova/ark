@@ -28,6 +28,19 @@ export interface SessionConfig {
   _pending_handoff?: { agent: string; instructions?: string };
   // Skills attached to session
   skills?: string[];
+  // Process tree tracking (set at dispatch, updated by status poller)
+  /** PID of the root process in the agent's tmux pane (set at dispatch). */
+  launch_pid?: number;
+  /** Name of the executor that launched the agent (e.g. "claude-code", "goose"). */
+  launch_executor?: string;
+  /** ISO timestamp when the agent process was launched. */
+  launched_at?: string;
+  /** Latest process tree snapshot (updated every ~15s by status poller). */
+  process_tree?: {
+    rootPid: number;
+    children: Array<{ pid: number; ppid: number; command: string; cpu?: number; mem?: number }>;
+    capturedAt: string;
+  };
   // Extensible for provider-specific state
   [key: string]: unknown;
 }
