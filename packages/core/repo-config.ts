@@ -11,6 +11,10 @@ export interface RepoConfig {
   verify?: string[];  // Default verification scripts for all stages
   auto_pr?: boolean;  // Auto-create PR on agent completion (default: true for repos with remotes)
   auto_rebase?: boolean;  // Auto-rebase onto base branch before PR creation (default: true)
+  worktree?: {
+    copy?: string[];   // Glob patterns for untracked files to copy (e.g. [".env", ".envrc", "config/*.yaml"])
+    setup?: string;    // Shell command to run after worktree creation (e.g. "cp .env.example .env && bun install")
+  };
 }
 
 export function loadRepoConfig(dir: string): RepoConfig {

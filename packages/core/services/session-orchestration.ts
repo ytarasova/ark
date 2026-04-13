@@ -7,7 +7,7 @@
 
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from "fs";
-import { join, resolve } from "path";
+import { dirname, join, resolve } from "path";
 import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
 
@@ -1405,6 +1405,22 @@ export async function setupSessionWorktree(
     }
   }
 
+  // Copy untracked files + run setup from .ark.yaml worktree config
+  if (effectiveWorkdir !== repoSource) {
+    const repoConfig = loadRepoConfig(repoSource);
+    if (repoConfig.worktree?.copy?.length) {
+      log("Copying untracked files to worktree...");
+      const copied = await copyWorktreeFiles(repoSource, effectiveWorkdir, repoConfig.worktree.copy);
+      if (copied.length > 0) {
+        log(`Copied ${copied.length} file(s): ${copied.slice(0, 5).join(", ")}${copied.length > 5 ? "..." : ""}`);
+      }
+    }
+    if (repoConfig.worktree?.setup) {
+      log("Running worktree setup script...");
+      await runWorktreeSetup(effectiveWorkdir, repoConfig.worktree.setup, log);
+    }
+  }
+
   // Trust worktree for Claude
   log("Configuring Claude trust + channel...");
   claude.trustWorktree(repoSource, effectiveWorkdir);
@@ -1769,6 +1785,57 @@ async function setupWorktree(app: AppContext, repoPath: string, sessionId: strin
     logError("session", `setupWorktree: worktree prune failed: ${e?.message ?? e}`);
   }
   return null;
+}
+
+/**
+ * Copy untracked files matching glob patterns from source repo into worktree.
+ * Only copies files that exist in the source but NOT in the worktree (avoids
+ * overwriting tracked files that git already placed).
+ */
+export async function copyWorktreeFiles(
+  sourceRepo: string,
+  worktreeDir: string,
+  patterns: string[],
+): Promise<string[]> {
+  const copied: string[] = [];
+  for (const pattern of patterns) {
+    if (pattern.includes("..")) continue;
+
+    const glob = new Bun.Glob(pattern);
+    for await (const relPath of glob.scan({ cwd: sourceRepo, dot: true })) {
+      const target = join(worktreeDir, relPath);
+      if (existsSync(target)) continue;
+
+      const source = join(sourceRepo, relPath);
+      mkdirSync(dirname(target), { recursive: true });
+      const content = readFileSync(source);
+      writeFileSync(target, content);
+      copied.push(relPath);
+    }
+  }
+  return copied;
+}
+
+/**
+ * Run a setup script in the worktree directory after file copy.
+ * Times out after 60 seconds. Errors are logged but do not fail dispatch.
+ */
+export async function runWorktreeSetup(
+  worktreeDir: string,
+  command: string,
+  onLog?: (msg: string) => void,
+): Promise<void> {
+  try {
+    const { stdout, stderr } = await execFileAsync("sh", ["-c", command], {
+      cwd: worktreeDir,
+      timeout: 60_000,
+      encoding: "utf-8",
+    });
+    if (stdout?.trim()) onLog?.(`setup stdout: ${stdout.trim().slice(0, 500)}`);
+    if (stderr?.trim()) onLog?.(`setup stderr: ${stderr.trim().slice(0, 500)}`);
+  } catch (e: any) {
+    onLog?.(`Worktree setup script failed (non-fatal): ${e?.message ?? e}`);
+  }
 }
 
 // ── Worktree diff ───────────────────────────────────────────────────────
