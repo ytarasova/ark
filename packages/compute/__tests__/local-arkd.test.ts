@@ -49,15 +49,23 @@ function makeSession(sessionId?: string): Session {
   } as Session;
 }
 
+let ownServer = false;
+
 beforeAll(() => {
   tempDir = join(tmpdir(), `local-arkd-test-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
-  server = startArkd(ARKD_PORT, { quiet: true });
+  try {
+    server = startArkd(ARKD_PORT, { quiet: true });
+    ownServer = true;
+  } catch {
+    // Port already in use (e.g., real arkd running) -- reuse existing daemon
+    console.log(`Port ${ARKD_PORT} in use, reusing existing arkd`);
+  }
   client = new ArkdClient(`http://localhost:${ARKD_PORT}`);
 });
 
 afterAll(() => {
-  server.stop();
+  if (ownServer) server?.stop();
   try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup */ }
 });
 

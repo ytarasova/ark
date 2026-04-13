@@ -246,13 +246,13 @@ describe("writeHooksConfig with agent", () => {
     expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
   });
 
-  it("always includes mcp__ark-channel__* even when no agent is provided", () => {
+  it("does not write permissions.allow when no agent is provided", () => {
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions.allow).toContain("mcp__ark-channel__*");
+    expect(settings.permissions).toBeUndefined();
   });
 
-  it("always includes mcp__ark-channel__* when agent.tools and mcp_servers are undefined", () => {
+  it("includes mcp__ark-channel__* when agent.tools and mcp_servers are undefined", () => {
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
       agent: {},
     });
@@ -365,7 +365,7 @@ describe("removeHooksConfig with agent permissions", () => {
     expect(settings._ark).toBeUndefined();
   });
 
-  it("cleans ark-managed allow list on remove even when pre-existing user entries existed", () => {
+  it("preserves pre-existing allow list when no agent was provided", () => {
     const claudeDir = join(getCtx().arkDir, ".claude");
     mkdirSync(claudeDir, { recursive: true });
     writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
@@ -374,7 +374,7 @@ describe("removeHooksConfig with agent permissions", () => {
     writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
     removeHooksConfig(getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
-    // ark always manages allow now (for ark-channel), so remove cleans it
-    expect(settings.permissions?.allow).toBeUndefined();
+    // No agent = no managedAllow, so user's pre-existing allow list is preserved
+    expect(settings.permissions?.allow).toEqual(["UserTool"]);
   });
 });

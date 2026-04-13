@@ -349,8 +349,8 @@ describe("Conductor /hooks/status endpoint", () => {
   });
 
   it("StopFailure still fails auto-gate sessions", async () => {
-    const session = getApp().sessions.create({ summary: "auto test", flow: "default" });
-    getApp().sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = getApp().sessions.create({ summary: "auto test", flow: "quick" });
+    getApp().sessions.update(session.id, { status: "running", stage: "verify" });
 
     await postHook(session.id, {
       hook_event_name: "StopFailure",

@@ -301,7 +301,7 @@ describe("writeChannelConfig", () => {
 
     const worktreeDir = join(workdir, "worktree");
     mkdirSync(worktreeDir, { recursive: true });
-    wfs(join(worktreeDir, ".mcp.json"), JSON.stringify({
+    writeFileSync(join(worktreeDir, ".mcp.json"), JSON.stringify({
       mcpServers: { "my-server": { command: "new-cmd" } },
     }));
 

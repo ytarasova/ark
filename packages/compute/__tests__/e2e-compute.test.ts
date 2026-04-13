@@ -215,9 +215,8 @@ describe("E2E Compute: Local provider getMetrics", () => {
   afterEach(() => cleanupComputes());
 
   it("returns a valid metrics snapshot", async () => {
-    const name = `test-metrics-local-${Date.now()}`;
-    const compute = getApp().computes.create({ name, provider: "local" });
-    computeNames.push(name);
+    const compute = getApp().computes.get("local")!;
+    expect(compute).not.toBeNull();
 
     const provider = getProvider("local")!;
     expect(provider).not.toBeNull();
@@ -259,9 +258,8 @@ describe("E2E Compute: Local provider probePorts", () => {
   afterEach(() => cleanupComputes());
 
   it("detects a listening port and a closed port", async () => {
-    const name = `test-probe-local-${Date.now()}`;
-    const compute = getApp().computes.create({ name, provider: "local" });
-    computeNames.push(name);
+    const compute = getApp().computes.get("local")!;
+    expect(compute).not.toBeNull();
 
     const provider = getProvider("local")!;
 
@@ -311,7 +309,7 @@ describe("E2E Compute: mergeComputeConfig", () => {
     const name = `test-merge-cfg-${Date.now()}`;
     getApp().computes.create({
       name,
-      provider: "local",
+      provider: "docker",
       config: { existing: "value", count: 42 },
     });
     computeNames.push(name);

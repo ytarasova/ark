@@ -111,7 +111,7 @@ describe("useComputeActions (pattern tests)", () => {
   });
 
   it("delete removes compute from store via protocol", async () => {
-    const compute = app.computes.create({ name: "del-target", provider: "local" });
+    const compute = app.computes.create({ name: "del-target", provider: "docker" });
     expect(app.computes.get("del-target")).not.toBeNull();
     // The hook would call ark.computeStopInstance + ark.computeDelete
     // Verify the underlying store operation works

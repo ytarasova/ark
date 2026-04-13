@@ -94,7 +94,7 @@ describe("CLI: compute lifecycle", () => {
     // createCompute for local should exist in a test context
     const name = `test-running-${Date.now()}`;
     testComputes.push(name);
-    app.computes.create({ name, provider: "local" });
+    app.computes.create({ name, provider: "docker" });
     app.computes.update(name, { status: "running" });
     // Attempting to delete a running compute should be rejected by the CLI
     // In core, deleteCompute doesn't check status, so we test the constraint here

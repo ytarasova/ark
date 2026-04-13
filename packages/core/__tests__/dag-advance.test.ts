@@ -82,7 +82,7 @@ describe("DAG-based advance", () => {
 
   test("linear flow (quick) completes when last stage done", async () => {
     const s = app.sessions.create({ summary: "Test linear completion", flow: "quick" });
-    app.sessions.update(s.id, { stage: "pr", status: "ready" });
+    app.sessions.update(s.id, { stage: "merge", status: "ready" });
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
