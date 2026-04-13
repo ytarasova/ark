@@ -10,7 +10,7 @@
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-web tui web desktop \
+.PHONY: help install dev dev-daemon dev-arkd dev-web tui web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-watch lint \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
@@ -23,7 +23,7 @@ ARK_BIN := /usr/local/bin/ark
 help: ## Show available commands
 	@echo ""
 	@echo "  \033[1mDevelopment\033[0m"
-	@grep -E '^(install|dev|dev-web|tui|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|tui|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
 	@grep -E '^(test|test-file|test-e2e|test-watch):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -58,6 +58,20 @@ dev: ## Hot-reload: ark web (:8420) + Vite dev server (:5173) with HMR
 	  $(BUN) --watch packages/cli/index.ts web --port 8420 --api-only 2>&1 | sed 's/^/[api] /' & \
 	  sleep 1 && cd packages/web && npx vite --port 5173 2>&1 | sed 's/^/[web] /' & \
 	  wait
+
+dev-daemon: ## Hot-reload: server daemon (conductor :19100 + arkd :19300 + WS :19400)
+	@echo "\033[1mArk server daemon (hot-reload)\033[0m"
+	@echo "  WebSocket:  ws://localhost:19400"
+	@echo "  Conductor:  http://localhost:19100"
+	@echo "  ArkD:       http://localhost:19300"
+	@echo ""
+	$(BUN) --watch packages/cli/index.ts server daemon start
+
+dev-arkd: ## Hot-reload: arkd agent daemon (:19300)
+	@echo "\033[1mArkD agent daemon (hot-reload)\033[0m"
+	@echo "  ArkD:  http://localhost:19300"
+	@echo ""
+	$(BUN) --watch packages/cli/index.ts arkd
 
 dev-web: ## Start only the Vite dev server (needs `ark web` on :8420 separately)
 	cd packages/web && npx vite --port 5173
