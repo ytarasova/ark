@@ -107,7 +107,7 @@ describe("dispatch compute: config file writing", () => {
     const session = getApp().sessions.create({ summary: "hooks-config-test" });
     const conductorUrl = "http://localhost:19100";
 
-    const settingsPath = claude.writeHooksConfig(session.id, conductorUrl, workdir);
+    const settingsPath = claude.writeSettings(session.id, conductorUrl, workdir);
     expect(existsSync(settingsPath)).toBe(true);
 
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
@@ -150,7 +150,7 @@ describe("dispatch compute: config file writing", () => {
     mkdirSync(workdir, { recursive: true });
 
     const session = getApp().sessions.create({ summary: "async-hooks-test" });
-    claude.writeHooksConfig(session.id, "http://localhost:19100", workdir);
+    claude.writeSettings(session.id, "http://localhost:19100", workdir);
 
     const settingsPath = join(workdir, ".claude", "settings.local.json");
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
@@ -168,15 +168,15 @@ describe("dispatch compute: config file writing", () => {
     }
   });
 
-  it("writeHooksConfig is idempotent (can be called twice)", () => {
+  it("writeSettings is idempotent (can be called twice)", () => {
     const workdir = join(app.config.arkDir, "workdir-idempotent");
     mkdirSync(workdir, { recursive: true });
 
     const session = getApp().sessions.create({ summary: "idempotent-test" });
     const url = "http://localhost:19100";
 
-    claude.writeHooksConfig(session.id, url, workdir);
-    claude.writeHooksConfig(session.id, url, workdir);
+    claude.writeSettings(session.id, url, workdir);
+    claude.writeSettings(session.id, url, workdir);
 
     const settingsPath = join(workdir, ".claude", "settings.local.json");
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));

@@ -486,11 +486,11 @@ const data = useMemo(() => core.loadData(id), [id]);
 
 ## Hook-Based Agent Status
 
-Ark uses Claude Code hooks for agent status detection. At dispatch time, `claude.writeHooksConfig()` writes `.claude/settings.local.json` to the session working directory with HTTP hooks that POST status events to the conductor.
+Ark uses Claude Code hooks for agent status detection. At dispatch time, `claude.writeSettings()` writes `.claude/settings.local.json` to the session working directory with HTTP hooks that POST status events to the conductor.
 
 **Hooks are ONLY for status detection** (busy/idle/error/done). They are NOT part of the channel/conductor communication system. Channels handle agent↔human messaging via MCP.
 
-Key files: `claude.ts` (writeHooksConfig, removeHooksConfig), `conductor.ts` (/hooks/status endpoint), `session-orchestration.ts` (applyHookStatus wiring).
+Key files: `claude.ts` (writeSettings, removeSettings), `conductor.ts` (/hooks/status endpoint), `session-orchestration.ts` (applyHookStatus wiring).
 
 ## Code Style
 

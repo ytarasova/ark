@@ -11,7 +11,7 @@ import { join } from "path";
 
 import { AppContext, setApp, clearApp, getApp } from "../app.js";
 import { startSession, deleteSessionAsync } from "../services/session-orchestration.js";
-import { writeHooksConfig } from "../claude/claude.js";
+import { writeSettings } from "../claude/claude.js";
 
 let app: AppContext;
 
@@ -140,7 +140,7 @@ describe("deleteSessionAsync", () => {
     });
 
     // Write hooks config into the workdir
-    writeHooksConfig(session.id, "http://localhost:19100", workdir);
+    writeSettings(session.id, "http://localhost:19100", workdir);
 
     // Verify hooks file exists and has ark hooks
     const settingsPath = join(workdir, ".claude", "settings.local.json");
