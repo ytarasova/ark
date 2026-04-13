@@ -15,7 +15,7 @@
 
 import type { Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
@@ -96,6 +96,36 @@ export function seedSession(
   // Match the `s-<hex>` pattern liberally.
   const match = out.match(/s-[0-9a-f]+/);
   return match?.[0] ?? "";
+}
+
+/**
+ * Seed a session row directly into SQLite via the sqlite3 CLI.
+ * Much faster than `seedSession` (no conductor/arkd boot per call).
+ */
+export function seedSessionRaw(
+  arkDir: string,
+  opts: { summary: string; status?: string; flow?: string },
+): string {
+  const id = `s-${Math.random().toString(16).slice(2, 8)}`;
+  const status = opts.status ?? "ready";
+  const flow = opts.flow ?? "bare";
+  const now = new Date().toISOString();
+  const dbPath = join(arkDir, "ark.db");
+  const sql = `
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY, ticket TEXT, summary TEXT, repo TEXT, branch TEXT,
+      compute_name TEXT, session_id TEXT, claude_session_id TEXT, stage TEXT,
+      status TEXT NOT NULL DEFAULT 'pending', flow TEXT NOT NULL DEFAULT 'default',
+      agent TEXT, workdir TEXT, pr_url TEXT, pr_id TEXT, error TEXT,
+      parent_id TEXT, fork_group TEXT, group_name TEXT, breakpoint_reason TEXT,
+      attached_by TEXT, config TEXT DEFAULT '{}', user_id TEXT,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    INSERT INTO sessions (id, summary, status, flow, stage, created_at, updated_at, tenant_id)
+    VALUES ('${id}', '${opts.summary.replace(/'/g, "''")}', '${status}', '${flow}', 'work', '${now}', '${now}', 'default');
+  `;
+  execFileSync("sqlite3", [dbPath, sql], { encoding: "utf-8", timeout: 5000 });
+  return id;
 }
 
 /** Read the full xterm buffer as a single string. */

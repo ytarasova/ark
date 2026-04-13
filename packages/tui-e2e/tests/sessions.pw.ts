@@ -10,7 +10,7 @@
 import { test, expect } from "@playwright/test";
 import { rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { startHarness, waitForText, readTerminal, seedSession, pressKey, mkTempArkDir, runArkCli } from "../harness.js";
+import { startHarness, waitForText, readTerminal, seedSession, seedSessionRaw, pressKey, mkTempArkDir, runArkCli } from "../harness.js";
 
 test.describe("Ark TUI sessions list", () => {
   test("seeded sessions appear in the list pane", async ({ page }) => {
@@ -85,6 +85,52 @@ test.describe("Ark TUI sessions list", () => {
         expect(readyPos).toBeGreaterThan(-1);
         expect(firstSessionPos).toBeGreaterThan(-1);
         expect(readyPos).toBeLessThan(firstSessionPos);
+      } finally {
+        await harness.stop();
+      }
+    } finally {
+      rmSync(arkDir, { recursive: true, force: true });
+    }
+  });
+
+  test("group-by-status header visible with many sessions (scroll required)", async ({ page }) => {
+    const arkDir = mkTempArkDir();
+    try {
+      // Seed completed sessions first, then ready sessions (newest = top of default sort)
+      for (let i = 0; i < 50; i++) {
+        seedSessionRaw(arkDir, { summary: `scroll-done-${String(i).padStart(2, "0")}`, status: "completed" });
+      }
+      seedSessionRaw(arkDir, { summary: "scroll-ready-A", status: "ready" });
+      seedSessionRaw(arkDir, { summary: "scroll-ready-B", status: "ready" });
+      seedSessionRaw(arkDir, { summary: "scroll-ready-C", status: "ready" });
+
+      const harness = await startHarness({ arkDir, rows: 25 });
+      try {
+        await page.goto(harness.pageUrl);
+        await waitForText(page, "Sessions", { timeoutMs: 15_000 });
+        await waitForText(page, "scroll-ready-A", { timeoutMs: 10_000 });
+
+        // Toggle group-by-status
+        await pressKey(page, "%");
+        await waitForText(page, "by status", { timeoutMs: 5_000 });
+
+        const text = await readTerminal(page);
+
+        // Debug: check what's visible
+        console.log("HAS Ready (3):", text.includes("Ready (3)"));
+        console.log("HAS Ready:", text.includes("Ready"));
+        console.log("HAS scroll-ready:", text.includes("scroll-ready"));
+        // Print first 20 lines of left panel
+        const leftArea = text.split("\n").slice(0, 25).join("\n");
+        console.log("TOP OF TERMINAL:\n" + leftArea);
+
+        // "Ready" header MUST be visible on screen (not scrolled off)
+        const readyPos = text.indexOf("Ready (3)");
+        expect(readyPos).toBeGreaterThan(-1);
+
+        // The first ready session must appear after the header
+        const firstReadyPos = text.indexOf("scroll-ready-");
+        expect(firstReadyPos).toBeGreaterThan(readyPos);
       } finally {
         await harness.stop();
       }
