@@ -96,14 +96,13 @@ export function TreeList<T>({
   if (!isEmpty) {
     for (const groupName of sortedKeys) {
       const entries = groupMap.get(groupName)!;
+      // Always render group header for named groups
       if (groupName) {
         const count = entries.length;
         rows.push(
-          <Box key={`grp-${groupName}`}>
-            <Text color={theme.accent} bold>
-              {`-- ${groupName} `}<Text dimColor>{`(${count})`}</Text>{` --`}
-            </Text>
-          </Box>
+          <Text key={`grp-${groupName}`} color={theme.accent} bold wrap="truncate">
+            {`-- ${groupName} (${count}) --`}
+          </Text>
         );
       }
       if (entries.length === 0 && groupName) {
