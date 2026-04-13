@@ -96,7 +96,7 @@ export function TreeList<T>({
   if (!isEmpty) {
     for (const groupName of sortedKeys) {
       const entries = groupMap.get(groupName)!;
-      // Always render group header for named groups
+      // Render group header for named groups
       if (groupName) {
         const count = entries.length;
         rows.push(
@@ -108,10 +108,18 @@ export function TreeList<T>({
       if (entries.length === 0 && groupName) {
         rows.push(<Text key={`empty-${groupName}`} dimColor>{"    (empty)"}</Text>);
       }
-      for (const { item, flatIndex } of entries) {
+      // Track where the group header is so we can scroll to it when the
+      // first item in the group is selected (keeps headers visible).
+      const groupHeaderRow = groupName ? rows.length - 1 : -1;
+      for (let ei = 0; ei < entries.length; ei++) {
+        const { item, flatIndex } = entries[ei];
         const isSel = visualIdx === clampedSel;
         visualIdx++;
-        if (isSel) { selRow = rows.length; selectedItem = item; }
+        if (isSel) {
+          // Scroll to the group header when the first item in a group is selected
+          selRow = (ei === 0 && groupHeaderRow >= 0) ? groupHeaderRow : rows.length;
+          selectedItem = item;
+        }
         const rowContent = isSel ? (
           <ListRow selected>{`> ${renderRow(item, true)}`}</ListRow>
         ) : (
