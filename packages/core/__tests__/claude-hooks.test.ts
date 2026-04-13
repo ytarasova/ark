@@ -1,22 +1,22 @@
 /**
- * Tests for claude.ts hook config — writeHooksConfig / removeHooksConfig.
+ * Tests for claude.ts settings bundle — writeSettings / removeSettings.
  */
 import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { writeHooksConfig, removeHooksConfig, buildPermissionsAllow, buildToolHints } from "../claude/claude.js";
+import { writeSettings, removeSettings, buildPermissionsAllow, buildToolHints } from "../claude/claude.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 
-describe("writeHooksConfig", () => {
+describe("writeSettings", () => {
   it("creates .claude/settings.local.json in workdir", () => {
-    writeHooksConfig("s-test123", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test123", "http://localhost:19100", getCtx().arkDir);
     expect(existsSync(join(getCtx().arkDir, ".claude", "settings.local.json"))).toBe(true);
   });
 
   it("contains hooks for all 9 events", () => {
-    writeHooksConfig("s-test123", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test123", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     const events = Object.keys(settings.hooks);
     expect(events).toContain("PreToolUse");
@@ -32,14 +32,14 @@ describe("writeHooksConfig", () => {
   });
 
   it("PreCompact/PostCompact hooks have no matcher (match all triggers)", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.hooks.PreCompact[0].matcher).toBeUndefined();
     expect(settings.hooks.PostCompact[0].matcher).toBeUndefined();
   });
 
   it("hooks use command type with curl to correct conductor URL", () => {
-    writeHooksConfig("s-abc", "http://host.docker.internal:19100", getCtx().arkDir);
+    writeSettings("s-abc", "http://host.docker.internal:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     const cmd = settings.hooks.Stop[0].hooks[0].command;
     expect(cmd).toContain("curl");
@@ -48,7 +48,7 @@ describe("writeHooksConfig", () => {
   });
 
   it("PreToolUse hook is sync, all others are async", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     // PreToolUse must be synchronous for guardrail enforcement
     expect(settings.hooks.PreToolUse[0].hooks[0].async).toBe(false);
@@ -68,27 +68,27 @@ describe("writeHooksConfig", () => {
     mkdirSync(claudeDir, { recursive: true });
     writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({ customKey: "preserved" }));
 
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
     expect(settings.customKey).toBe("preserved");
     expect(settings.hooks).toBeDefined();
   });
 
   it("is idempotent — calling twice doesn't duplicate hooks", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.hooks.Stop.length).toBe(1);
   });
 
   it("includes session ID in hook command", () => {
-    writeHooksConfig("s-myid", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-myid", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.hooks.Stop[0].hooks[0].command).toContain("s-myid");
   });
 
   it("hook command is a single line (no newlines)", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     const cmd = settings.hooks.Stop[0].hooks[0].command;
     expect(cmd).not.toContain("\n");
@@ -96,42 +96,42 @@ describe("writeHooksConfig", () => {
   });
 
   it("hook command suppresses curl output", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     const cmd = settings.hooks.Stop[0].hooks[0].command;
     expect(cmd).toContain("> /dev/null 2>&1");
   });
 
   it("SessionStart has startup|resume matcher", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.hooks.SessionStart[0].matcher).toBe("startup|resume");
   });
 
   it("Notification has permission_prompt|idle_prompt matcher", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.hooks.Notification[0].matcher).toBe("permission_prompt|idle_prompt");
   });
 });
 
-describe("removeHooksConfig", () => {
+describe("removeSettings", () => {
   it("removes ark hooks but preserves other settings", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     // Add extra settings
     const settingsPath = join(getCtx().arkDir, ".claude", "settings.local.json");
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
     settings.customKey = "preserved";
     writeFileSync(settingsPath, JSON.stringify(settings));
 
-    removeHooksConfig(getCtx().arkDir);
+    removeSettings(getCtx().arkDir);
     const cleaned = JSON.parse(readFileSync(settingsPath, "utf-8"));
     expect(cleaned.customKey).toBe("preserved");
     expect(cleaned.hooks).toBeUndefined();
   });
 
   it("does nothing if no settings file exists", () => {
-    expect(() => removeHooksConfig(getCtx().arkDir)).not.toThrow();
+    expect(() => removeSettings(getCtx().arkDir)).not.toThrow();
   });
 
   it("preserves non-ark hooks", () => {
@@ -144,10 +144,10 @@ describe("removeHooksConfig", () => {
     }));
 
     // Add ark hooks on top
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
 
     // Remove ark hooks
-    removeHooksConfig(getCtx().arkDir);
+    removeSettings(getCtx().arkDir);
 
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
     expect(settings.hooks.Stop).toBeDefined();
@@ -223,11 +223,11 @@ describe("buildPermissionsAllow", () => {
   });
 });
 
-// ── writeHooksConfig: agent → permissions.allow integration ────────────────
+// ── writeSettings: agent → permissions.allow integration ────────────────
 
-describe("writeHooksConfig with agent", () => {
+describe("writeSettings with agent", () => {
   it("writes permissions.allow from agent.tools when agent is provided", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, {
       agent: { tools: ["Bash", "Read", "Write"], mcp_servers: [] },
     });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
@@ -239,7 +239,7 @@ describe("writeHooksConfig with agent", () => {
   });
 
   it("always includes mcp__ark-channel__* even when agent has no tools", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, {
       agent: { tools: [], mcp_servers: [] },
     });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
@@ -247,13 +247,13 @@ describe("writeHooksConfig with agent", () => {
   });
 
   it("does not write permissions.allow when no agent is provided", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions).toBeUndefined();
   });
 
   it("includes mcp__ark-channel__* when agent.tools and mcp_servers are undefined", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, {
       agent: {},
     });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
@@ -261,7 +261,7 @@ describe("writeHooksConfig with agent", () => {
   });
 
   it("includes implicit mcp wildcards from declared servers", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, {
       agent: { tools: ["Bash"], mcp_servers: ["atlassian", "figma"] },
     });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
@@ -271,7 +271,7 @@ describe("writeHooksConfig with agent", () => {
   });
 
   it("coexists with autonomy-driven permissions.deny", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, {
       autonomy: "edit",
       agent: { tools: ["Bash", "Read", "Write", "Edit"], mcp_servers: [] },
     });
@@ -285,22 +285,22 @@ describe("writeHooksConfig with agent", () => {
   });
 
   it("throws when agent tools reference an undeclared MCP server", () => {
-    expect(() => writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+    expect(() => writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, {
       agent: { tools: ["mcp__github__createIssue"], mcp_servers: [] },
     })).toThrow(/references MCP server 'github'/);
   });
 
   it("idempotent: rewriting with the same agent produces the same allow list", () => {
     const agent = { tools: ["Bash", "Read"], mcp_servers: ["atlassian"] };
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { agent });
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, { agent });
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, { agent });
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, { agent });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     const allow = settings.permissions.allow;
     expect(allow).toEqual(["Bash", "Read", "mcp__atlassian__*", "mcp__ark-channel__*"]);
   });
 });
 
-// ── removeHooksConfig: ark-managed permissions cleanup ────────────────────
+// ── removeSettings: ark-managed permissions cleanup ────────────────────
 
 // ── buildToolHints unit tests ───────────────────────────────────────────────
 
@@ -354,12 +354,12 @@ describe("buildToolHints", () => {
   });
 });
 
-describe("removeHooksConfig with agent permissions", () => {
+describe("removeSettings with agent permissions", () => {
   it("removes ark-managed allow list but preserves user allow entries added after", () => {
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir, {
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, {
       agent: { tools: ["Bash", "Read"], mcp_servers: [] },
     });
-    removeHooksConfig(getCtx().arkDir);
+    removeSettings(getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions?.allow).toBeUndefined();
     expect(settings._ark).toBeUndefined();
@@ -371,8 +371,8 @@ describe("removeHooksConfig with agent permissions", () => {
     writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
       permissions: { allow: ["UserTool"] },
     }));
-    writeHooksConfig("s-test", "http://localhost:19100", getCtx().arkDir);
-    removeHooksConfig(getCtx().arkDir);
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
+    removeSettings(getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
     // No agent = no managedAllow, so user's pre-existing allow list is preserved
     expect(settings.permissions?.allow).toEqual(["UserTool"]);
