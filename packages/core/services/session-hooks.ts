@@ -619,7 +619,7 @@ export async function mediateStageHandoff(
       });
       dispatched = true;
     } else if (nextAction.type === "action") {
-      safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
+      await safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
         const verify = await runVerification(app, sessionId);
         if (!verify.ok) {
           logWarn("handoff", `action stage blocked by verification for ${sessionId}/${toStage}: ${verify.message}`);
