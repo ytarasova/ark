@@ -52,7 +52,7 @@ tools:
   - Edit
   - Glob
   - Grep
-mcp_servers: [atlassian, figma]
+mcp_servers: []
 skills: [sanity-gate, spec-extraction]
 memories: []
 context:

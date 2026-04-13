@@ -79,7 +79,7 @@ tools:
   - Edit
   - Glob
   - Grep
-mcp_servers: [atlassian, figma]
+mcp_servers: []
 skills: [security-scan, self-review]
 memories:
   - code-style

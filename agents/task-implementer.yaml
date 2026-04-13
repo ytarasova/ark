@@ -63,7 +63,7 @@ tools:
   - Glob
   - Grep
   - WebSearch
-mcp_servers: [atlassian, figma]
+mcp_servers: []
 skills: []
 memories:
   - code-style
