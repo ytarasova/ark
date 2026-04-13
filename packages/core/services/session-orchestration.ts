@@ -544,13 +544,13 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   // Checkpoint after successful dispatch
   saveCheckpoint(app, sessionId);
 
-  // Start status poller for non-Claude runtimes (Claude uses hook-based status)
-  if (runtime !== "claude-code") {
-    try {
-      const { startStatusPoller } = await import("../executors/status-poller.js");
-      startStatusPoller(app, sessionId, tmuxName, runtime);
-    } catch { /* ignore */ }
-  }
+  // Start status poller for ALL runtimes as a crash detection fallback.
+  // Claude uses hook-based status but hooks don't fire when the agent crashes
+  // (e.g. MCP config error, OOM, segfault). The poller detects tmux session exit.
+  try {
+    const { startStatusPoller } = await import("../executors/status-poller.js");
+    startStatusPoller(app, sessionId, tmuxName, runtime);
+  } catch { /* ignore */ }
 
   // Observability + telemetry
   recordEvent({ type: "session_start", sessionId, data: { agent: session.agent ?? agentName, flow: session.flow } });
