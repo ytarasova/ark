@@ -101,7 +101,7 @@ export function TreeList<T>({
         rows.push(
           <Box key={`grp-${groupName}`}>
             <Text color={theme.accent} bold>
-              {`── ${groupName} `}<Text dimColor>{`(${count})`}</Text>{` ──`}
+              {`-- ${groupName} `}<Text dimColor>{`(${count})`}</Text>{` --`}
             </Text>
           </Box>
         );
