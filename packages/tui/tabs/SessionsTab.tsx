@@ -137,6 +137,13 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   const hasOverlay = formOverlay || overlay;
   const [selected, setSelected] = useState<Session | null>(null);
 
+  /** Move selection to the next (or previous) item after a removal. */
+  const selectNextAfterRemoval = (removedId: string) => {
+    const idx = filteredTopLevel.findIndex(s => s.id === removedId);
+    const next = filteredTopLevel[idx + 1] ?? filteredTopLevel[idx - 1] ?? null;
+    setSelected(next);
+  };
+
   // Push/pop focus when overlay opens/closes
   const prevOverlayRef = useRef<Overlay>(null);
   useEffect(() => {
@@ -354,6 +361,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
       if (selected) setOverlay("fork");
     } else if (matchesHotkey("delete", input, key)) {
       if (confirmation.confirm("delete", `Delete '${selected.summary ?? selected.id}'? Press x again to confirm`)) {
+        selectNextAfterRemoval(selected.id);
         actions.delete(selected.id);
         status.show("Deleted. Ctrl+Z to undo (90s)");
       }
@@ -401,6 +409,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
       }
     } else if (matchesHotkey("archive", input, key)) {
       if (selected && ["completed", "stopped", "failed"].includes(selected.status)) {
+        selectNextAfterRemoval(selected.id);
         actions.archive(selected.id);
       } else if (selected?.status === "archived") {
         actions.restore(selected.id);
