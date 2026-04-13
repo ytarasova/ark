@@ -13,9 +13,11 @@ interface StatusBarProps {
   sessions: Session[];
   loading: boolean;
   error: string | null;
+  /** WebSocket connection status for daemon/remote mode */
+  connectionStatus?: "connected" | "reconnecting" | "disconnected";
 }
 
-export function StatusBar({ hints, overlayBarText, sessions, loading, error }: StatusBarProps) {
+export function StatusBar({ hints, overlayBarText, sessions, loading, error, connectionStatus }: StatusBarProps) {
   const theme = getTheme();
   const { stdout } = useStdout();
   const columns = stdout?.columns ?? 120;
@@ -51,6 +53,8 @@ export function StatusBar({ hints, overlayBarText, sessions, loading, error }: S
             {counts.waiting > 0 && <Text color={theme.waiting}>{`  ◑ ${counts.waiting}`}</Text>}
             {counts.completed > 0 && <Text color={theme.running}>{`  ✔ ${counts.completed}`}</Text>}
             {counts.failed > 0 && <Text color={theme.error}>{`  ✕ ${counts.failed}`}</Text>}
+            {connectionStatus === "reconnecting" && <Text color="yellow">{`  ⟳ Reconnecting...`}</Text>}
+            {connectionStatus === "disconnected" && <Text color="red">{`  ✕ Disconnected`}</Text>}
           </Box>
           <Box flexGrow={1} justifyContent="flex-end">
             {hints}

@@ -6,6 +6,7 @@
  */
 
 import type { Transport } from "./transport.js";
+import type { ConnectionStatus } from "./transport.js";
 import {
   createRequest, createNotification,
   isResponse, isError, isNotification,
@@ -59,10 +60,35 @@ export class ArkClient {
   private idCounter = 0;
   private pending = new Map<RequestId, { resolve: (v: any) => void; reject: (e: Error) => void }>();
   private listeners = new Map<string, Set<(data: any) => void>>();
+  private _connectionStatus: ConnectionStatus = "connected";
+  private _statusHandlers = new Set<(status: ConnectionStatus) => void>();
+  private _lastSubscribe?: string[];
 
   constructor(transport: Transport) {
     this.transport = transport;
     this.transport.onMessage((msg) => this.handleMessage(msg));
+  }
+
+  /** Current connection status. */
+  get connectionStatus(): ConnectionStatus {
+    return this._connectionStatus;
+  }
+
+  /** Subscribe to connection status changes. Returns an unsubscribe function. */
+  onConnectionStatus(handler: (status: ConnectionStatus) => void): () => void {
+    this._statusHandlers.add(handler);
+    return () => { this._statusHandlers.delete(handler); };
+  }
+
+  /** Called by the transport layer (or externally) to update connection status. */
+  setConnectionStatus(status: ConnectionStatus): void {
+    if (status === this._connectionStatus) return;
+    this._connectionStatus = status;
+    for (const h of this._statusHandlers) h(status);
+    // On reconnect, re-initialize subscriptions
+    if (status === "connected" && this._lastSubscribe) {
+      this.initialize({ subscribe: this._lastSubscribe }).catch(() => {});
+    }
   }
 
   // ── Internal ────────────────────────────────────────────────────────────────
@@ -114,9 +140,11 @@ export class ArkClient {
   // ── Lifecycle ───────────────────────────────────────────────────────────────
 
   async initialize(opts?: { subscribe?: string[] }): Promise<{ server: { name: string; version: string } }> {
+    const subscribe = opts?.subscribe ?? ["**"];
+    this._lastSubscribe = subscribe;
     const result = await this.rpc<{ server: { name: string; version: string } }>("initialize", {
       client: { name: "ark-client", version: ARK_VERSION },
-      subscribe: opts?.subscribe ?? ["**"],
+      subscribe,
     });
     this.transport.send(createNotification("initialized"));
     return result;

@@ -106,6 +106,10 @@ export class ArkServer {
       hostname: "127.0.0.1",
       fetch(req, server) {
         if (server.upgrade(req)) return;
+        const url = new URL(req.url, `http://localhost`);
+        if (url.pathname === "/health") {
+          return Response.json({ status: "ok", pid: process.pid, uptime: process.uptime() });
+        }
         return new Response("Ark Server -- connect via WebSocket", { status: 200 });
       },
       websocket: {

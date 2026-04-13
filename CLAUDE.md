@@ -20,6 +20,9 @@ ark search <query>    # search sessions, events, messages (--transcripts for JSO
 ark index             # rebuild transcript FTS5 search index
 ark claude list       # list Claude Code sessions on disk (--project to filter)
 ark arkd              # start the arkd daemon (--port 19300, --conductor-url http://localhost:19100)
+ark server daemon start  # start server daemon (AppContext + conductor + WS on :19400; --detach for background)
+ark server daemon stop   # stop server daemon
+ark server daemon status # check server daemon status
 ```
 
 ## Ark on Ark (Dogfooding)
@@ -154,6 +157,8 @@ import { foo } from "./bar";     // breaks at runtime
 
 **ArkD port 19300 is the default** for the universal agent daemon. Local providers use `http://localhost:19300`, remote providers use `http://<ip>:19300`. Channel relay goes through arkd - channel.ts reports to arkd, arkd forwards to conductor.
 
+**Server daemon port 19400 is the default** for the Ark server daemon (`ark server daemon start`). The daemon owns AppContext, conductor (:19100), arkd (:19300), and exposes a JSON-RPC WebSocket endpoint on :19400. The TUI connects as a thin WebSocket client -- no in-process boot. Port map: 19100 (conductor), 19300 (arkd), 19400 (server daemon WS). The TUI auto-starts the daemon if not running. PID file: `~/.ark/server.pid`. Fallback: `ARK_TUI_EMBEDDED=1` runs the old in-process mode.
+
 **No ESLint config file.** The `lint` script exists but no `.eslintrc` or `eslint.config.*` - runs with ESLint defaults.
 
 **Bun-only testing.** Tests use `bun:test`. Always run via `make test` -- never call `bun test` directly.
@@ -202,11 +207,14 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 | `ARK_CONDUCTOR_URL` | `http://localhost:19100` | Conductor URL (fallback if arkd unavailable) |
 | `ARK_ARKD_URL` | `http://localhost:19300` | ArkD URL - channel reports go here first |
 | `ARK_ARKD_PORT` | `19300` | ArkD daemon port |
+| `ARK_SERVER_PORT` | `19400` | Server daemon WebSocket port |
+| `ARK_SERVER_URL` | `http://localhost:19400` | Server daemon URL |
 | `ARK_CHANNEL_PORT` | auto-assigned | Per-session MCP channel port |
 | `ARK_SESSION_ID` | - | Set in channel context |
 | `ARK_STAGE` | - | Current flow stage in channel |
 | `ARK_SERVER` | - | Remote Ark server URL (enables remote client mode) |
 | `ARK_TOKEN` | - | API key for remote server authentication |
+| `ARK_TUI_EMBEDDED` | - | Set to `1` to run TUI in legacy embedded mode (in-process AppContext) |
 | `DATABASE_URL` | - | PostgreSQL connection URL (hosted mode; defaults to SQLite) |
 | `REDIS_URL` | - | Redis URL for SSE bus (hosted mode; defaults to in-memory) |
 | `ARK_TEST_DIR` | - | Temp dir for test isolation |
@@ -218,6 +226,8 @@ Test conductor ports use offsets (19199, 19200, 19300) to avoid collisions.
 | `~/.ark/ark.db` | SQLite database (WAL mode, 5s busy timeout). Tenant-scoped tables: sessions, compute, compute_templates, compute_pools, events, messages, todos, groups, schedules, usage_records, resource_definitions, knowledge, knowledge_edges. FTS5: transcript_index |
 | `~/.ark/config.yaml` | User config: router, knowledge, tensorzero, compute_templates, default_compute, budgets, auth |
 | `~/.ark/tensorzero/` | Generated `tensorzero.toml` + runtime files (when TensorZero enabled) |
+| `~/.ark/server.pid` | Server daemon PID file (JSON: pid, port, startedAt) |
+| `~/.ark/daemon.pid` | ArkD agent daemon PID file (JSON: pid, port, hostname, startedAt) |
 | `~/.ark/tracks/<sessionId>/` | Launcher scripts, channel configs |
 | `~/.ark/worktrees/<sessionId>/` | Git worktrees for isolated sessions |
 | `~/.ark/skills/` | Global skill definitions (user tier for SkillStore) |
