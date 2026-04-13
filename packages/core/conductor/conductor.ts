@@ -28,7 +28,7 @@ import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../../compute/index.js";
 import { indexSession } from "../search/search.js";
 import { listSchedules, cronMatches, updateScheduleLastRun } from "../schedule.js";
-import { pollPRReviews, pollAutoMerge } from "../integrations/pr-poller.js";
+import { pollPRReviews } from "../integrations/pr-poller.js";
 import { pollIssues } from "../integrations/issue-poller.js";
 import { ArkdClient } from "../../arkd/client.js";
 import { safeAsync } from "../safe.js";
@@ -428,11 +428,6 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
     safeAsync("PR review polling", () => pollPRReviews(app)),
   POLL_INTERVAL_MS);
 
-  // Auto-merge CI wait poller - check every 60 seconds
-  const autoMergeTimer = setInterval(() =>
-    safeAsync("auto-merge polling", () => pollAutoMerge(app)),
-  POLL_INTERVAL_MS);
-
   // Issue poller - only start if a label is configured
   let issueTimer: ReturnType<typeof setInterval> | null = null;
   if (opts?.issueLabel) {
@@ -448,7 +443,6 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
     stop() {
       clearInterval(scheduleTimer);
       clearInterval(prTimer);
-      clearInterval(autoMergeTimer);
       if (issueTimer) clearInterval(issueTimer);
       server.stop();
     },
