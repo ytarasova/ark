@@ -788,18 +788,19 @@ async function channelRelay(
   conductorUrl: string | null,
   tenantId?: string | null,
 ): Promise<ChannelRelayRes> {
-  if (!conductorUrl) return { ok: true, forwarded: false };
+  if (!conductorUrl) return { ok: false, forwarded: false };
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (tenantId) headers["X-Ark-Tenant-Id"] = tenantId;
-    await fetch(`${conductorUrl}/api/relay`, {
+    const resp = await fetch(`${conductorUrl}/api/relay`, {
       method: "POST",
       headers,
       body: JSON.stringify(req),
     });
+    if (!resp.ok) return { ok: false, forwarded: false };
     return { ok: true, forwarded: true };
   } catch {
-    return { ok: true, forwarded: false };
+    return { ok: false, forwarded: false };
   }
 }
 

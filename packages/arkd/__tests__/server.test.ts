@@ -515,9 +515,9 @@ describe("Channel report forwarding", () => {
 
   it("returns ok:false when conductor is unreachable", async () => {
     // Start arkd with a bogus conductor URL
-    const ephemeral = startArkd(19360, { conductorUrl: "http://localhost:19999", quiet: true });
+    const ephemeral = startArkd(19380, { conductorUrl: "http://localhost:19999", quiet: true });
     try {
-      const resp = await fetch("http://localhost:19360/channel/test-session", {
+      const resp = await fetch("http://localhost:19380/channel/test-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "completed", summary: "test" }),
@@ -535,7 +535,7 @@ describe("Channel report forwarding", () => {
     // Start a mock conductor that accepts channel reports
     const received: any[] = [];
     const mockConductor = Bun.serve({
-      port: 19361,
+      port: 19381,
       async fetch(req) {
         if (req.method === "POST" && new URL(req.url).pathname.startsWith("/api/channel/")) {
           const body = await req.json();
@@ -549,10 +549,10 @@ describe("Channel report forwarding", () => {
     // Give the mock server a moment to bind
     await Bun.sleep(50);
 
-    const ephemeral = startArkd(19362, { conductorUrl: "http://localhost:19361", quiet: true });
+    const ephemeral = startArkd(19382, { conductorUrl: "http://localhost:19381", quiet: true });
     await Bun.sleep(50);
     try {
-      const resp = await fetch("http://localhost:19362/channel/s-test123", {
+      const resp = await fetch("http://localhost:19382/channel/s-test123", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "completed", summary: "test report" }),

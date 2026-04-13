@@ -140,7 +140,7 @@ export interface ChannelRelayReq {
   target: string;
   message: string;
 }
-export interface ChannelRelayRes { ok: true; forwarded: boolean }
+export interface ChannelRelayRes { ok: boolean; forwarded: boolean }
 
 /** Conductor → agent delivery: arkd delivers to local channel port */
 export interface ChannelDeliverReq {
