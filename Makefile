@@ -10,7 +10,7 @@
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-web tui web desktop \
+.PHONY: help install dev dev-web tui daemon web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-watch lint \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
@@ -65,6 +65,9 @@ dev-web: ## Start only the Vite dev server (needs `ark web` on :8420 separately)
 tui: ## Launch the terminal UI (from source)
 	./ark tui
 
+daemon: ## Start the Ark background daemon
+	./ark daemon start
+
 self: ## Dispatch full SDLC (plan->implement->review->PR) against THIS repo
 	@test -n "$(TASK)" || (echo 'Usage: make self TASK="<description>"'; exit 1)
 	./ark session start --recipe self-dogfood --summary "$(TASK)" --dispatch
@@ -83,7 +86,7 @@ desktop: build-web ## Launch the Electron desktop app
 # ── Testing ──────────────────────────────────────────────────────────────────
 
 test: build-web ## Run all unit tests (sequential -- never parallel)
-	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/tui packages/arkd packages/web --concurrency 1
+	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/tui packages/arkd packages/daemon packages/web --concurrency 1
 
 test-file: ## Run a single test: make test-file F=packages/core/__tests__/foo.test.ts
 	$(BUN) test $(F) --concurrency 1

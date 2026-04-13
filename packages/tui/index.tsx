@@ -5,27 +5,45 @@ import { appendFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { AppContext, setApp } from "../core/app.js";
 import { loadConfig } from "../core/config.js";
+import { isDaemonRunning } from "../daemon/lockfile.js";
+import { checkDaemonHealth } from "../daemon/health.js";
 import { App } from "./App.js";
 import { ArkClientProvider } from "./context/ArkClientProvider.js";
 
-// ── Resolve remote mode ────────────────────────────────────────────────────
+// -- Resolve remote mode -------------------------------------------------
 const remoteServerUrl = process.env.ARK_TUI_SERVER || process.env.ARK_SERVER;
 const remoteToken = process.env.ARK_TUI_TOKEN || process.env.ARK_TOKEN;
 const isRemote = !!remoteServerUrl;
 
-// ── Boot application ────────────────────────────────────────────────────────
-// In local mode, boot AppContext (conductor + DB + services) as the daemon
-// backend. The TUI itself is a pure client -- all data flows through ArkClient
-// RPC calls, never direct getApp()/AppContext access from components.
-let app: AppContext | null = null;
+// -- Resolve daemon mode -------------------------------------------------
+// Priority: ARK_TUI_SERVER (remote) > ARK_DAEMON_URL (explicit) > lockfile auto-discovery > in-process
+let daemonUrl: string | undefined = process.env.ARK_DAEMON_URL;
 const config = loadConfig();
-if (!isRemote) {
+
+if (!isRemote && !daemonUrl) {
+  const arkDir = config.arkDir ?? join(process.env.HOME ?? "/tmp", ".ark");
+  const { running, info } = isDaemonRunning(arkDir);
+  if (running && info) {
+    const healthy = await checkDaemonHealth(info.ws_url);
+    if (healthy) {
+      daemonUrl = info.ws_url;
+    }
+  }
+}
+
+const useDaemon = !isRemote && !!daemonUrl;
+
+// -- Boot application ----------------------------------------------------
+// If a daemon is running, connect via WebSocket (thin client).
+// Otherwise, boot AppContext in-process (backward compatible).
+let app: AppContext | null = null;
+if (!isRemote && !useDaemon) {
   app = new AppContext(config);
   setApp(app);
   await app.boot();
 }
 
-// ── Logging ─────────────────────────────────────────────────────────────────
+// -- Logging -------------------------------------------------------------
 const logDir = config.logDir ?? join(process.env.HOME ?? "/tmp", ".ark", "logs");
 try { mkdirSync(logDir, { recursive: true }); } catch { /* log dir may already exist */ }
 const LOG_FILE = join(logDir, "tui.log");
@@ -48,11 +66,13 @@ process.on("uncaughtException", (err: any) => {
 
 if (isRemote) {
   log("INFO", `TUI starting in remote mode (server: ${remoteServerUrl})`);
+} else if (useDaemon) {
+  log("INFO", `TUI starting in daemon mode (ws: ${daemonUrl})`);
 } else {
   log("INFO", `TUI starting (conductor port ${config.conductorPort})`);
 }
 
-// ── Terminal check ──────────────────────────────────────────────────────────
+// -- Terminal check -------------------------------------------------------
 if (!process.stdin.isTTY) {
   log("ERROR", "stdin is not a TTY");
   process.stderr.write("Error: ark tui requires a terminal (TTY)\n");
@@ -62,13 +82,19 @@ if (!process.stdin.isTTY) {
 
 try { process.stdin.setRawMode(true); process.stdin.setRawMode(false); } catch { /* stdin may not be a TTY */ }
 
-// ── Resolve arkDir for UI state persistence ─────────────────────────────────
+// -- Resolve arkDir for UI state persistence ------------------------------
 const arkDir = config.arkDir ?? join(process.env.HOME ?? "/tmp", ".ark");
 
-// ── Render ──────────────────────────────────────────────────────────────────
+// -- Resolve serverUrl for ArkClientProvider ------------------------------
+// In daemon mode, we pass the WS URL directly as serverUrl so the provider
+// connects via WebSocket (same code path as remote mode).
+const effectiveServerUrl = isRemote ? remoteServerUrl : useDaemon ? daemonUrl : undefined;
+const effectiveToken = isRemote ? remoteToken : undefined;
+
+// -- Render ---------------------------------------------------------------
 try {
   const { waitUntilExit } = render(
-    <ArkClientProvider serverUrl={remoteServerUrl} token={remoteToken} app={app ?? undefined}>
+    <ArkClientProvider serverUrl={effectiveServerUrl} token={effectiveToken} app={app ?? undefined}>
       <App arkDir={arkDir} />
     </ArkClientProvider>,
     { patchConsole: false, exitOnCtrlC: true },

@@ -1,9 +1,10 @@
-import React, { useMemo } from "react";
+import React, { useContext, useMemo } from "react";
 import { Box, Text, useStdout } from "ink";
 import { getTheme } from "../../core/theme.js";
 import { getActiveProfile } from "../../core/index.js";
 import type { Session } from "../../core/index.js";
 import { NAV_BAR_TEXT } from "../helpers/statusBarHints.js";
+import { ConnectionStatusContext } from "../context/ArkClientProvider.js";
 
 interface StatusBarProps {
   /** Context-specific hints from the active tab (line 1, right-aligned) */
@@ -20,6 +21,7 @@ export function StatusBar({ hints, overlayBarText, sessions, loading, error }: S
   const { stdout } = useStdout();
   const columns = stdout?.columns ?? 120;
   const profile = useMemo(() => { try { return getActiveProfile(); } catch { return "default"; } }, []);
+  const connectionStatus = useContext(ConnectionStatusContext);
 
   const counts = useMemo(() => {
     const c = { running: 0, waiting: 0, stopped: 0, completed: 0, failed: 0 };
@@ -45,6 +47,8 @@ export function StatusBar({ hints, overlayBarText, sessions, loading, error }: S
       {!overlayBarText && (
         <Box>
           <Box>
+            {connectionStatus === "reconnecting" && <Text color={theme.waiting}>{" reconnecting..."}</Text>}
+            {connectionStatus === "disconnected" && <Text color={theme.error}>{" daemon disconnected"}</Text>}
             {profile !== "default" && <Text color={theme.accent}>{` [${profile}]`}</Text>}
             <Text bold>{` ${sessions.length} sessions`}</Text>
             {!loading && counts.running > 0 && <Text color={theme.running}>{`  ● ${counts.running}`}</Text>}

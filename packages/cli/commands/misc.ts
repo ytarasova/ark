@@ -174,6 +174,104 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       await import("../../core/conductor/channel.js");
     });
 
+  // ── Daemon ──────────────────────────────────────────────────────────────────
+
+  const daemon = program.command("daemon").description("Manage the Ark background daemon");
+
+  daemon.command("start")
+    .description("Start the daemon (AppContext + WS server + conductor + arkd)")
+    .option("-p, --port <port>", "WebSocket port", "19400")
+    .option("--web-port <port>", "Also start web dashboard on this port")
+    .option("--background", "Detach and run in the background")
+    .option("-q, --quiet", "Suppress startup banner")
+    .action(async (opts) => {
+      if (opts.background) {
+        // Spawn a detached child running `ark daemon start` without --background
+        const args = ["daemon", "start", "--port", opts.port];
+        if (opts.webPort) args.push("--web-port", opts.webPort);
+        if (opts.quiet) args.push("--quiet");
+
+        const child = Bun.spawn([process.argv[0], process.argv[1], ...args], {
+          stdio: ["ignore", "ignore", "ignore"],
+          env: { ...process.env },
+        });
+        child.unref();
+        console.log(chalk.green(`Daemon starting in background (pid ${child.pid})`));
+        process.exit(0);
+      }
+
+      const { startDaemon } = await import("../../daemon/index.js");
+      const handle = await startDaemon({
+        wsPort: parseInt(opts.port, 10),
+        webPort: opts.webPort ? parseInt(opts.webPort, 10) : undefined,
+        quiet: opts.quiet,
+      });
+
+      // Graceful shutdown on signals
+      const onSignal = async () => {
+        if (!opts.quiet) console.log(chalk.dim("\nShutting down daemon..."));
+        await handle.shutdown();
+        process.exit(0);
+      };
+      process.on("SIGINT", onSignal);
+      process.on("SIGTERM", onSignal);
+
+      // Keep the process alive
+      await new Promise(() => {});
+    });
+
+  daemon.command("stop")
+    .description("Stop a running daemon")
+    .action(async () => {
+      const { isDaemonRunning, removeLockfile } = await import("../../daemon/lockfile.js");
+      const { loadConfig } = await import("../../core/config.js");
+      const config = loadConfig();
+      const { running, info } = isDaemonRunning(config.arkDir);
+
+      if (!running || !info) {
+        console.log(chalk.yellow("No daemon is running."));
+        return;
+      }
+
+      try {
+        process.kill(info.pid, "SIGTERM");
+        console.log(chalk.green(`Sent SIGTERM to daemon (pid ${info.pid})`));
+      } catch (err: any) {
+        if (err.code === "ESRCH") {
+          console.log(chalk.yellow(`Daemon process ${info.pid} not found -- cleaning up stale lockfile.`));
+          removeLockfile(config.arkDir);
+        } else {
+          console.log(chalk.red(`Failed to stop daemon: ${err.message}`));
+        }
+      }
+    });
+
+  daemon.command("status")
+    .description("Show daemon status")
+    .action(async () => {
+      const { isDaemonRunning } = await import("../../daemon/lockfile.js");
+      const { checkDaemonHealth } = await import("../../daemon/health.js");
+      const { loadConfig } = await import("../../core/config.js");
+      const config = loadConfig();
+      const { running, info } = isDaemonRunning(config.arkDir);
+
+      if (!running || !info) {
+        console.log(chalk.yellow("Daemon is not running."));
+        return;
+      }
+
+      const healthy = await checkDaemonHealth(info.ws_url);
+
+      console.log(chalk.bold("Ark Daemon Status"));
+      console.log(`  PID:        ${info.pid}`);
+      console.log(`  WebSocket:  ${info.ws_url}`);
+      console.log(`  Conductor:  http://localhost:${info.conductor_port}`);
+      console.log(`  Arkd:       http://localhost:${info.arkd_port}`);
+      if (info.web_port) console.log(`  Web:        http://localhost:${info.web_port}`);
+      console.log(`  Started:    ${info.started_at}`);
+      console.log(`  Health:     ${healthy ? chalk.green("healthy") : chalk.red("unhealthy")}`);
+    });
+
   // ── Auth is registered via commands/auth.ts (API keys + Claude setup) ──────
   // ── Costs is registered via commands/costs.ts ─────────────────────────────
 

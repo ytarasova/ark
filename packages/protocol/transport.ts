@@ -40,10 +40,11 @@ export interface Transport {
  */
 export function createWebSocketTransport(
   url: string,
-  opts?: { token?: string },
+  opts?: { token?: string; onDisconnect?: () => void },
 ): { transport: Transport; ready: Promise<void> } {
   const handlers: ((msg: JsonRpcMessage) => void)[] = [];
   let ws: WebSocket;
+  let intentionalClose = false;
 
   // Append token as query param if provided
   const connectUrl = opts?.token
@@ -66,7 +67,11 @@ export function createWebSocketTransport(
       reject(new Error(`WebSocket connection failed: ${connectUrl}`));
     };
 
-    ws.onclose = () => {};
+    ws.onclose = () => {
+      if (!intentionalClose && opts?.onDisconnect) {
+        opts.onDisconnect();
+      }
+    };
   });
 
   const transport: Transport = {
@@ -77,6 +82,7 @@ export function createWebSocketTransport(
       handlers.push(handler);
     },
     close() {
+      intentionalClose = true;
       ws.close();
     },
   };
