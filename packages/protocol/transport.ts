@@ -34,49 +34,116 @@ export interface Transport {
   close(): void;
 }
 
+export type ConnectionStatus = "connected" | "reconnecting" | "disconnected";
+
+export interface WebSocketTransportOptions {
+  token?: string;
+  reconnect?: boolean;
+  maxReconnectDelay?: number;
+  onStatus?: (status: ConnectionStatus) => void;
+}
+
 /**
  * Create a WebSocket client transport that connects to a remote Ark server.
- * Supports optional Bearer token for authentication.
+ * Supports optional Bearer token for authentication and automatic reconnection.
  */
 export function createWebSocketTransport(
   url: string,
-  opts?: { token?: string },
+  opts?: WebSocketTransportOptions,
 ): { transport: Transport; ready: Promise<void> } {
   const handlers: ((msg: JsonRpcMessage) => void)[] = [];
+  const reconnect = opts?.reconnect ?? false;
+  const maxDelay = opts?.maxReconnectDelay ?? 30000;
+  const onStatus = opts?.onStatus;
+
   let ws: WebSocket;
+  let closed = false;
+  let buffer: JsonRpcMessage[] = [];
+  const MAX_BUFFER = 100;
 
   // Append token as query param if provided
   const connectUrl = opts?.token
     ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(opts.token)}`
     : url;
 
-  const ready = new Promise<void>((resolve, reject) => {
-    ws = new WebSocket(connectUrl);
-
-    ws.onopen = () => resolve();
-
-    ws.onmessage = (event) => {
+  function wireWs(socket: WebSocket) {
+    socket.onmessage = (event) => {
       try {
         const msg = JSON.parse(typeof event.data === "string" ? event.data : new TextDecoder().decode(event.data));
         for (const h of handlers) h(msg);
       } catch { /* ignore malformed messages */ }
     };
 
+    socket.onclose = () => {
+      if (closed || !reconnect) return;
+      onStatus?.("reconnecting");
+      startReconnect();
+    };
+
+    socket.onerror = () => {
+      // onerror is always followed by onclose for WebSocket, so reconnect fires there
+    };
+  }
+
+  function startReconnect() {
+    let delay = 1000;
+    const attempt = () => {
+      if (closed) return;
+      try {
+        const next = new WebSocket(connectUrl);
+        next.onopen = () => {
+          ws = next;
+          wireWs(ws);
+          onStatus?.("connected");
+          // Flush buffered messages
+          const pending = buffer;
+          buffer = [];
+          for (const msg of pending) {
+            try { ws.send(JSON.stringify(msg)); } catch { /* drop if send fails */ }
+          }
+        };
+        next.onerror = () => {
+          // Retry with backoff
+          delay = Math.min(delay * 2, maxDelay);
+          setTimeout(attempt, delay);
+        };
+      } catch {
+        delay = Math.min(delay * 2, maxDelay);
+        setTimeout(attempt, delay);
+      }
+    };
+    setTimeout(attempt, delay);
+  }
+
+  const ready = new Promise<void>((resolve, reject) => {
+    ws = new WebSocket(connectUrl);
+
+    ws.onopen = () => {
+      wireWs(ws);
+      onStatus?.("connected");
+      resolve();
+    };
+
     ws.onerror = (_err) => {
       reject(new Error(`WebSocket connection failed: ${connectUrl}`));
     };
-
-    ws.onclose = () => {};
   });
 
   const transport: Transport = {
     send(msg) {
-      ws.send(JSON.stringify(msg));
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(msg));
+      } else if (reconnect && !closed) {
+        // Buffer during reconnect
+        buffer.push(msg);
+        if (buffer.length > MAX_BUFFER) buffer.shift();
+      }
     },
     onMessage(handler) {
       handlers.push(handler);
     },
     close() {
+      closed = true;
       ws.close();
     },
   };

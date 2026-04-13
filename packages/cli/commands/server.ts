@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import chalk from "chalk";
+import { registerServerDaemonCommands } from "./server-daemon.js";
 
 /**
  * `ark server start` -- start the JSON-RPC server in either local
@@ -9,6 +10,8 @@ import chalk from "chalk";
  */
 export function registerServerCommands(program: Command) {
   const serverCmd = program.command("server").description("JSON-RPC server");
+
+  registerServerDaemonCommands(serverCmd);
 
   serverCmd
     .command("start")

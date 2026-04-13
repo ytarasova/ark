@@ -1,10 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { ArkClientContext } from "../hooks/useArkClient.js";
 import { ArkClient } from "../../protocol/client.js";
-import { ArkServer } from "../../server/index.js";
-import { registerAllHandlers } from "../../server/register.js";
 import { createWebSocketTransport } from "../../protocol/transport.js";
-import type { AppContext } from "../../core/app.js";
+import type { ConnectionStatus } from "../../protocol/transport.js";
 import type { Transport } from "../../protocol/transport.js";
 import type { JsonRpcMessage } from "../../protocol/types.js";
 
@@ -30,56 +28,84 @@ function createInMemoryPair(): { clientTransport: Transport; serverTransport: Tr
 interface Props {
   children: React.ReactNode;
   onReady?: () => void;
-  /** Remote control plane URL. When set, connects via WebSocket instead of in-process. */
+  /** Remote or local daemon URL. When set, connects via WebSocket. */
   serverUrl?: string;
   /** Auth token for remote server. */
   token?: string;
-  /** AppContext for local in-process mode. Passed explicitly -- no getApp() calls. */
-  app?: AppContext;
+  /** AppContext for embedded in-process mode (ARK_TUI_EMBEDDED=1 fallback). */
+  app?: any;
+  /** Called when connection status changes (for daemon/remote mode). */
+  onConnectionStatus?: (status: ConnectionStatus) => void;
 }
 
-export function ArkClientProvider({ children, onReady, serverUrl, token, app }: Props) {
+export function ArkClientProvider({ children, onReady, serverUrl, token, app, onConnectionStatus }: Props) {
   const [client, setClient] = useState<ArkClient | null>(null);
-  const serverRef = useRef<ArkServer | null>(null);
+  const arkRef = useRef<ArkClient | null>(null);
 
   useEffect(() => {
-    let ark: ArkClient;
+    let cancelled = false;
 
     if (serverUrl) {
-      // Remote mode: connect to control plane via WebSocket
+      // Daemon or remote mode: connect via WebSocket with reconnection
       const wsUrl = serverUrl.replace(/^http/, "ws").replace(/\/$/, "") + "/ws";
-      const { transport, ready } = createWebSocketTransport(wsUrl, { token });
+      const { transport, ready } = createWebSocketTransport(wsUrl, {
+        token,
+        reconnect: true,
+        onStatus: (status) => {
+          if (!cancelled) {
+            arkRef.current?.setConnectionStatus(status);
+            onConnectionStatus?.(status);
+          }
+        },
+      });
 
-      ark = new ArkClient(transport);
+      const ark = new ArkClient(transport);
+      arkRef.current = ark;
       ready
         .then(() => ark.initialize({ subscribe: ["**"] }))
         .then(() => {
-          setClient(ark);
-          onReady?.();
+          if (!cancelled) {
+            setClient(ark);
+            onReady?.();
+          }
         })
         .catch((err) => {
-          console.error(`Failed to connect to remote server: ${err.message}`);
+          if (!cancelled) console.error(`Failed to connect to server: ${err.message}`);
         });
     } else if (app) {
-      // Local mode: in-process server backed by the provided AppContext
-      const server = new ArkServer();
-      registerAllHandlers(server.router, app);
-      serverRef.current = server;
+      // Embedded mode: in-process server (dynamic import to avoid static dependency)
+      (async () => {
+        if (cancelled) return;
+        const { ArkServer } = await import("../../server/index.js");
+        const { registerAllHandlers } = await import("../../server/register.js");
 
-      const { clientTransport, serverTransport } = createInMemoryPair();
-      server.addConnection(serverTransport);
+        if (cancelled) return;
+        const server = new ArkServer();
+        registerAllHandlers(server.router, app);
 
-      ark = new ArkClient(clientTransport);
-      ark.initialize({ subscribe: ["**"] }).then(() => {
-        setClient(ark);
-        onReady?.();
+        const { clientTransport, serverTransport } = createInMemoryPair();
+        server.addConnection(serverTransport);
+
+        const ark = new ArkClient(clientTransport);
+        arkRef.current = ark;
+        await ark.initialize({ subscribe: ["**"] });
+        if (!cancelled) {
+          setClient(ark);
+          onReady?.();
+        }
+      })().catch((err) => {
+        if (!cancelled) console.error(`ArkClientProvider init error: ${err.message}`);
       });
     } else {
       console.error("ArkClientProvider: either serverUrl or app must be provided");
       return;
     }
 
-    return () => { ark.close(); };
+    return () => {
+      cancelled = true;
+      try { arkRef.current?.close(); } catch { /* cleanup is best-effort */ }
+      arkRef.current = null;
+    };
   }, [serverUrl, app]);
 
   if (!client) return null;

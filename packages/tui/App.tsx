@@ -31,6 +31,7 @@ import { NewSessionForm, type SessionPrefill } from "./forms/NewSessionForm.js";
 import { NewComputeForm } from "./forms/NewComputeForm.js";
 import { HelpOverlay } from "./components/HelpOverlay.js";
 import { TABS } from "./components/TabBar.js";
+import type { ConnectionStatus } from "../protocol/transport.js";
 
 interface AppProps {
   /** Path to the Ark data directory, used for UI state persistence. */
@@ -57,6 +58,12 @@ function AppInner({ arkDir: arkDirProp }: { arkDir?: string }) {
   const computeAsync = useAsync(store.refresh);
 
   const arkDir = arkDirProp ?? join(process.env.HOME ?? "/tmp", ".ark");
+
+  // Connection status tracking for daemon/remote mode
+  const [connStatus, setConnStatus] = useState<ConnectionStatus>("connected");
+  useEffect(() => {
+    return ark.onConnectionStatus(setConnStatus);
+  }, [ark]);
 
   // Restore persisted tab on mount
   const savedState = useMemo(() => loadUiState(arkDir), [arkDir]);
@@ -255,6 +262,7 @@ function AppInner({ arkDir: arkDirProp }: { arkDir?: string }) {
         sessions={store.sessions}
         loading={asyncState.loading}
         error={asyncState.error}
+        connectionStatus={connStatus}
       />
     </Box>
   );
