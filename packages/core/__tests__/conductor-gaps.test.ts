@@ -154,6 +154,9 @@ describe("mergeWorktreePR(getApp())", () => {
 });
 
 // ── Test 3c: executeAction auto_merge ─────────────────────────────────────────
+// Note: The success path (mergeWorktreePR succeeds -> session goes to "waiting"
+// instead of immediately completing) is tested in pr-merge-poller.test.ts.
+// These tests verify the error paths which remain unchanged.
 
 describe("executeAction auto_merge", () => {
   it("returns error when session has no PR URL", async () => {
@@ -168,6 +171,32 @@ describe("executeAction auto_merge", () => {
     const result = await executeAction(getApp(), "s-nonexistent", "auto_merge");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
+  });
+
+  it("returns error when session has no repo", async () => {
+    const session = getApp().sessions.create({ summary: "auto-merge-no-repo", flow: "autonomous-sdlc" });
+    getApp().sessions.update(session.id, {
+      stage: "merge",
+      pr_url: "https://github.com/org/repo/pull/1",
+    });
+    const result = await executeAction(getApp(), session.id, "auto_merge");
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("no repo");
+  });
+
+  it("does not advance session on merge failure (stays in current state)", async () => {
+    const session = getApp().sessions.create({ summary: "auto-merge-fail-no-advance", flow: "autonomous-sdlc" });
+    getApp().sessions.update(session.id, {
+      stage: "merge",
+      status: "running",
+      pr_url: "https://github.com/org/repo/pull/1",
+    });
+    const result = await executeAction(getApp(), session.id, "auto_merge");
+    expect(result.ok).toBe(false);
+    // Session should NOT have been advanced or set to waiting
+    const updated = getApp().sessions.get(session.id)!;
+    expect(updated.status).toBe("running");
+    expect(updated.stage).toBe("merge");
   });
 });
 

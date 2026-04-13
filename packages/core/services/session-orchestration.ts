@@ -930,7 +930,22 @@ export async function executeAction(app: AppContext, sessionId: string, action: 
       const result = await mergeWorktreePR(app, sessionId);
       if (result.ok) {
         app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: s.pr_url ?? undefined } });
-        return await advance(app, sessionId, true);
+        // Don't advance yet -- gh pr merge --auto only queues the merge.
+        // Transition to waiting; pr-merge-poller will advance once PR is actually merged.
+        app.sessions.update(sessionId, {
+          status: "waiting",
+          breakpoint_reason: "Waiting for CI checks to pass and PR to merge",
+          config: {
+            ...(s.config ?? {}),
+            merge_queued_at: new Date().toISOString(),
+          },
+        });
+        app.events.log(sessionId, "merge_waiting", {
+          stage: s.stage ?? undefined,
+          actor: "system",
+          data: { pr_url: s.pr_url ?? undefined, reason: "gh pr merge --auto queued, waiting for CI" },
+        });
+        return { ok: true, message: "Auto-merge queued -- waiting for CI to pass" };
       }
       return result;
     }
