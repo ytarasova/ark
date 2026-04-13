@@ -1,151 +1,176 @@
-# Plan: auto_merge must wait for CI before completing the session
+# Plan: Fix Action Stages Not Auto-Executing `create_pr` and `auto_merge`
 
 ## Summary
 
-The `auto_merge` action in `executeAction()` calls `gh pr merge --auto` then immediately calls `advance()`, which marks the session completed since "merge" is the last flow stage. But `--auto` only *queues* the PR for merge once CI passes -- it doesn't mean the PR is actually merged. If CI fails, the PR never merges, yet the session is already marked completed. The fix: after `gh pr merge --auto` succeeds, transition the session to a `waiting` state and poll `gh pr view` until the PR is actually merged (or fails).
+Consecutive action stages (e.g., `create_pr` followed by `auto_merge` in the `quick` and `autonomous-sdlc` flows) fail to chain-execute because `executeAction()` internally calls `advance()` which moves the stage pointer forward, but nobody dispatches/executes the newly-advanced-to action stage. The fix removes `advance()` from `executeAction()` (separation of concerns) and adds recursive chaining in `mediateStageHandoff()` so consecutive action stages execute in sequence.
 
-## Files to modify/create
+## Root Cause
 
-1. **`packages/core/services/session-orchestration.ts`** (~lines 910-917) -- Change the `auto_merge` case in `executeAction()` to set session status to `waiting` instead of immediately calling `advance()`.
-2. **`packages/core/integrations/pr-merge-poller.ts`** (new) -- New poller that monitors sessions in `waiting` status at the `merge` stage, polls `gh pr view --json state` to detect MERGED/CLOSED, then calls `advance()` on success or fails the session on CI failure.
-3. **`packages/core/conductor/conductor.ts`** (~line 437) -- Register the merge poller alongside the existing PR review poller in the conductor's interval loop.
-4. **`packages/core/__tests__/pr-merge-poller.test.ts`** (new) -- Unit tests for the merge polling logic.
-5. **`packages/core/__tests__/conductor-gaps.test.ts`** (~line 156) -- Update existing `executeAction auto_merge` tests to verify the new waiting behavior.
+In `mediateStageHandoff()` (`session-hooks.ts:606-630`), when the next stage is an action:
 
-## Implementation steps
+1. `safeAsync` runs `executeAction("create_pr")` in the background
+2. `executeAction()` creates the PR, then calls `advance()` internally -- moving stage from `pr` to `merge`, status `ready`
+3. `safeAsync` callback returns. **Nobody checks if `merge` is also an action and executes it.**
+4. Session sits at stage `merge` with status `ready` forever.
 
-### Step 1: Create `pr-merge-poller.ts`
+The `advance()` function (`session-orchestration.ts:562`) only moves the stage pointer and sets status -- it does NOT dispatch agents or execute actions. That responsibility belongs to `mediateStageHandoff()`, which has already returned.
 
-Create `packages/core/integrations/pr-merge-poller.ts` following the same pattern as `pr-poller.ts`:
+## Files to Modify/Create
 
-```ts
-// Key exports:
-export function setGhExec(fn: GhExecFn): void  // for testing
-export async function fetchPRState(prUrl: string, ghExec?): Promise<{ state: string; mergedAt?: string } | null>
-export async function pollPRMerges(app: AppContext, opts?: { ghExec? }): Promise<void>
-export async function checkSessionMerge(app: AppContext, session: Session, opts?): Promise<void>
-```
+| File | Change |
+|------|--------|
+| `packages/core/services/session-orchestration.ts` (lines 888-928) | Remove `advance()` calls from `executeAction()` -- it should only execute the action |
+| `packages/core/services/session-hooks.ts` (lines 615-629) | After `executeAction()` succeeds in the `safeAsync` callback, recursively call `mediateStageHandoff()` to advance and dispatch/execute the next stage |
+| `packages/core/__tests__/action-stage-chaining.test.ts` | **New file**: test that consecutive action stages chain-execute correctly |
 
-**Logic for `pollPRMerges()`:**
-- Scan sessions where: `status === "waiting"` AND `pr_url` is set AND the session config has `merge_queued_at` (set by the `auto_merge` action).
-- For each, call `fetchPRState()` via `gh pr view <url> --json state,mergedAt`.
-- Cooldown: skip if `last_merge_check` in config was < 30s ago (check more frequently than reviews since this blocks flow completion).
-- Delegate to `checkSessionMerge()` for each matched session.
+## Implementation Steps
 
-**Logic for `checkSessionMerge()`:**
-- If `state === "MERGED"`: log `pr_merged_confirmed` event, call `advance(app, sessionId, true)` to complete the flow. The advance call will reach the "no next stage" branch and mark the session completed.
-- If `state === "CLOSED"` (not merged): log `pr_merge_failed` event, set session status to `failed` with error "PR was closed without merging -- CI checks may have failed".
-- If `state === "OPEN"`: PR is still waiting for CI. Update `last_merge_check` timestamp and continue polling.
-- gh CLI error: graceful no-op, keep polling on next tick.
+### Step 1: Modify `executeAction()` to remove internal `advance()` calls
 
-### Step 2: Modify `executeAction` for `auto_merge`
+**File:** `packages/core/services/session-orchestration.ts`, function `executeAction()` (lines 888-928)
 
-In `packages/core/services/session-orchestration.ts`, change the `auto_merge` case (~line 910):
+For each action case that calls `advance()`, remove the `advance()` call and return the action result directly:
 
-**Before:**
-```ts
+```typescript
+case "create_pr": {
+  const result = await createWorktreePR(app, sessionId, { title: s.summary ?? undefined });
+  if (result.ok) {
+    app.events.log(sessionId, "action_executed", {
+      stage: s.stage ?? undefined, actor: "system",
+      data: { action, pr_url: result.pr_url },
+    });
+  }
+  return result;  // was: return await advance(app, sessionId, true);
+}
+
 case "auto_merge": {
   const result = await mergeWorktreePR(app, sessionId);
   if (result.ok) {
-    app.events.log(sessionId, "action_executed", { ... });
-    return await advance(app, sessionId, true);
+    app.events.log(sessionId, "action_executed", {
+      stage: s.stage ?? undefined, actor: "system",
+      data: { action, pr_url: s.pr_url ?? undefined },
+    });
   }
-  return result;
+  return result;  // was: return await advance(app, sessionId, true);
+}
+
+case "close_ticket":
+case "close": {
+  app.events.log(sessionId, "action_executed", {
+    stage: s.stage ?? undefined, actor: "system", data: { action },
+  });
+  return { ok: true, message: `Action '${action}' executed` };
+  // was: return await advance(app, sessionId, true);
+}
+
+default: {
+  app.events.log(sessionId, "action_skipped", {
+    stage: s.stage ?? undefined, actor: "system",
+    data: { action, reason: "unknown action type" },
+  });
+  return { ok: true, message: `Action '${action}' skipped (unknown)` };
+  // was: return await advance(app, sessionId, true);
 }
 ```
 
-**After:**
-```ts
-case "auto_merge": {
-  const result = await mergeWorktreePR(app, sessionId);
-  if (result.ok) {
-    app.events.log(sessionId, "action_executed", { ... });
-    // Don't advance yet -- gh pr merge --auto only queues the merge.
-    // Transition to waiting; pr-merge-poller will advance once PR is actually merged.
-    app.sessions.update(sessionId, {
-      status: "waiting",
-      breakpoint_reason: "Waiting for CI checks to pass and PR to merge",
-      config: {
-        ...(s.config ?? {}),
-        merge_queued_at: new Date().toISOString(),
-      },
+The `merge_pr`/`merge` case already does NOT call `advance()` (it calls `finishWorktree` and returns), so it needs no change.
+
+### Step 2: Add action chaining in `mediateStageHandoff()`
+
+**File:** `packages/core/services/session-hooks.ts`, inside the action branch of Step 3 (lines 615-629)
+
+After `executeAction()` returns successfully, call `mediateStageHandoff()` recursively to advance past the completed action stage and dispatch/execute whatever comes next:
+
+```typescript
+} else if (nextAction.type === "action") {
+  safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
+    const verify = await runVerification(app, sessionId);
+    if (!verify.ok) {
+      logWarn("handoff", `action stage blocked by verification for ${sessionId}/${toStage}: ${verify.message}`);
+      app.sessions.update(sessionId, {
+        status: "blocked",
+        breakpoint_reason: `Verification failed: ${verify.message.slice(0, 200)}`,
+      });
+      return;
+    }
+    const result = await executeAction(app, sessionId, nextAction.action ?? "");
+    if (!result.ok) {
+      logWarn("handoff", `action '${nextAction.action}' failed for ${sessionId}: ${result.message}`);
+      app.sessions.update(sessionId, {
+        status: "failed",
+        error: `Action '${nextAction.action}' failed: ${result.message.slice(0, 200)}`,
+      });
+      return;
+    }
+    // Action succeeded -- chain into mediateStageHandoff to advance
+    // past this action stage and dispatch/execute the next stage.
+    await mediateStageHandoff(app, sessionId, {
+      autoDispatch: true,
+      source: "action_chain",
     });
-    app.events.log(sessionId, "merge_waiting", {
-      stage: s.stage ?? undefined,
-      actor: "system",
-      data: { pr_url: s.pr_url, reason: "gh pr merge --auto queued, waiting for CI" },
-    });
-    return { ok: true, message: "Auto-merge queued -- waiting for CI to pass" };
-  }
-  return result;
+  });
+  dispatched = true;
 }
 ```
 
-### Step 3: Register merge poller in conductor
+The recursive chain terminates naturally when:
+- `advance()` inside the recursive `mediateStageHandoff` completes the flow (no more stages)
+- The next stage is an agent/fork (gets dispatched, no further recursion)
+- An action fails (returns early from `safeAsync` callback)
+- Verification fails (returns early)
 
-In `packages/core/conductor/conductor.ts`, after the PR review poller registration (~line 438):
+### Step 3: Write tests for action stage chaining
 
-```ts
-import { pollPRMerges } from "../integrations/pr-merge-poller.js";
+**File:** `packages/core/__tests__/action-stage-chaining.test.ts` (new)
 
-// PR merge poller - check every 30 seconds (blocks flow completion, needs faster checks)
-const mergeTimer = setInterval(() =>
-  safeAsync("PR merge polling", () => pollPRMerges(app)),
-30_000);
+Test cases using `AppContext.forTest()` and inline flow definitions:
+
+1. **Single action stage chains to completion**: Flow with `[agent, action:close]`. Set session at agent stage with status `ready`, call `mediateStageHandoff()`. Verify `action_executed` event logged and flow completes (`session.status === "completed"`).
+
+2. **Consecutive action stages chain-execute**: Flow with `[agent, action:close, action:close]`. Verify both `action_executed` events logged and session reaches `completed`.
+
+3. **Action failure stops chain and sets failed status**: Flow with `[agent, action:create_pr, action:auto_merge]`. Session has no workdir/repo so `create_pr` fails. Verify session gets `failed` status and no `auto_merge` event.
+
+4. **Action stage followed by agent stage**: Flow with `[agent1, action:close, agent2]`. Verify action executes, then session advances to `agent2` stage with status `ready` and `dispatched=true`.
+
+5. **`executeAction` no longer calls advance internally**: Call `executeAction()` directly for `close` action. Verify session stage is unchanged after the call.
+
+Note: Use `close` action for success cases since it requires no external dependencies (no git, no `gh`). Use `create_pr` for failure cases since it fails without a workdir.
+
+### Step 4: Run tests and verify
+
+```bash
+make test-file F=packages/core/__tests__/action-stage-chaining.test.ts
+make test-file F=packages/core/__tests__/conductor-gaps.test.ts
+make test-file F=packages/core/__tests__/stage-handoff.test.ts
+make test-file F=packages/core/__tests__/stage-validation-e2e.test.ts
+make test-file F=packages/core/__tests__/quality-gate-autonomous.test.ts
+make test
 ```
 
-Add `mergeTimer` to the cleanup list alongside `prTimer`.
+## Testing Strategy
 
-### Step 4: Write tests
+1. **Unit test `executeAction()`**: Verify it no longer calls `advance()` -- after execution, session stage should remain unchanged.
+2. **Integration test `mediateStageHandoff()` with action stages**: Verify the full chain: agent completes -> action stage executes -> next stage dispatched/executed.
+3. **Consecutive action chain**: Create inline flow with multiple `close` actions. Verify all execute and flow completes.
+4. **Error handling**: Verify action failures set `failed` status and stop the chain.
+5. **Regression tests**: Run existing stage-handoff, quality-gate, and conductor-gaps tests to ensure no regressions.
 
-Create `packages/core/__tests__/pr-merge-poller.test.ts`:
+## Risk Assessment
 
-1. **`fetchPRState` tests**: parses MERGED/OPEN/CLOSED states from gh output, returns null on error.
-2. **`pollPRMerges` tests**: skips sessions without pr_url, skips non-waiting sessions, skips sessions without `merge_queued_at`, respects cooldown.
-3. **`checkSessionMerge` tests**: 
-   - MERGED state -> calls advance, session reaches completed.
-   - CLOSED state -> session set to failed with descriptive error.
-   - OPEN state -> session stays waiting, config updated with timestamp.
-   - gh CLI error -> graceful no-op (keeps polling).
+### Low Risk
+- **`executeAction()` API change**: Only called from one place -- `mediateStageHandoff()` in `session-hooks.ts:626`. Return type stays `{ ok, message }`.
+- **`merge_pr`/`merge` case**: Already does not call `advance()`, so unaffected.
 
-### Step 5: Update existing tests
+### Medium Risk
+- **Recursive `mediateStageHandoff()` stack depth**: Flows rarely have more than 2-3 consecutive action stages. No mitigation needed.
+- **Action failures now set `failed` status**: Previously, if `create_pr` failed, `executeAction` returned the error to the `safeAsync` callback which silently ate it (only logged). Now the session gets `failed` status with an error message. This is actually better behavior -- operators can see the failure.
 
-In `conductor-gaps.test.ts`, update the `executeAction auto_merge` tests:
-- Verify that after `executeAction(app, sessionId, "auto_merge")`, the session status is `waiting` (not `completed`).
-- Verify that `breakpoint_reason` is set.
-- Verify that `merge_queued_at` is stored in config.
-- Note: these tests already mock the gh command (it fails), so the waiting behavior is only tested when `mergeWorktreePR` succeeds. The new `pr-merge-poller.test.ts` covers the polling side.
+### Edge Cases
+- **Action stage with verify scripts**: The `safeAsync` callback runs `runVerification()` before `executeAction()`. The recursive `mediateStageHandoff()` also runs pre-advance verification on the completed action stage. This double-verification is harmless since action stages typically have no verify scripts.
+- **Hook-status path**: `handleHookStatus` in `conductor.ts` also calls `mediateStageHandoff()`. The fix applies equally to both paths.
+- **Graph-flow (DAG) routing**: The `quick` and `autonomous-sdlc` flows use `depends_on` but not `edges`, so they use linear resolution. The fix works for both graph-flow and linear paths since the chaining happens in `mediateStageHandoff()` which is called after `advance()` regardless of routing mode.
 
-## Testing strategy
+## Open Questions
 
-1. **Unit tests** (`pr-merge-poller.test.ts`): Mock `gh` CLI via `setGhExec()` pattern (same as `pr-poller.ts`). Test each state transition (MERGED -> complete, CLOSED -> fail, OPEN -> keep waiting).
-2. **Integration tests** (`conductor-gaps.test.ts`): Verify `executeAction("auto_merge")` produces the correct intermediate `waiting` state.
-3. **Manual E2E**: Dispatch an `autonomous-sdlc` or `quick` flow session, let it reach the merge stage, verify it enters `waiting` status in the TUI, then confirm it completes after the PR actually merges on GitHub.
-4. **Edge cases to test**:
-   - Session has no pr_url when auto_merge fires (existing error path, unchanged).
-   - `gh pr merge --auto` itself fails (e.g., auto-merge not enabled on repo). Existing error path handles this.
-   - Repo has no CI at all -- `gh pr merge --auto` may merge immediately. Poller should detect MERGED on first check (~30s delay).
-   - Session manually stopped while waiting for merge -- poller skips non-waiting sessions.
-   - Conductor restart while session is waiting -- poller picks it up since it scans all sessions.
-
-## Risk assessment
-
-1. **Repos without branch protection**: `gh pr merge --auto` requires branch protection with required status checks. If not configured, `gh` may reject `--auto` or merge immediately. The existing `mergeWorktreePR()` error path handles the rejection case. If it merges immediately, the poller will pick up MERGED on first tick (30s delay, acceptable).
-
-2. **Polling overhead**: One `gh pr view` call per waiting-to-merge session every 30s. Minimal -- rarely more than a few sessions in this state. GitHub rate limit is 5000/hr for authenticated users; this adds ~120/hr per session.
-
-3. **No breaking changes**: The only behavioral change is that `auto_merge` no longer immediately completes the session. Sessions that previously jumped to `completed` will now spend time in `waiting` first. This is the correct behavior.
-
-4. **Backward compatibility**: Flows that don't use `auto_merge` are unaffected. The merge poller only targets sessions with `merge_queued_at` in their config.
-
-5. **Edge case -- conductor restart**: If the conductor restarts while a session is waiting for merge, the poller will pick it up on the next tick since it scans all sessions in the right state. No state is lost.
-
-6. **30s completion delay for instant merges**: If the PR merges instantly (no CI), there's a worst-case 30s delay before the session transitions to completed. This is acceptable -- the TUI shows "waiting for CI" which is informative.
-
-## Open questions
-
-1. **Fallback for repos without branch protection**: Should we detect the "auto-merge not supported" error from `gh` and fall back to a direct merge (drop `--auto`)? Or keep the current behavior where the error propagates and the session fails? Recommend: keep failing -- direct merge without CI is unsafe. If needed, users can set `auto_merge: false` in `.ark.yaml` to skip the merge stage entirely.
-
-2. **Timeout behavior**: Should there be a hard timeout that fails the session after extended CI wait? Recommend: start without a timeout. The `waiting` state is visible in the TUI, and users can manually stop/retry. Add timeout config later if needed.
-
-3. **Notification on long wait**: Should we emit a TUI notification / event when CI has been pending for > 10 minutes? Nice to have, not blocking for this change.
+None -- the fix is mechanical and well-scoped. The only behavioral change is that consecutive action stages now auto-execute instead of stalling.
