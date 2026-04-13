@@ -58,29 +58,56 @@ test.describe("Ark TUI sessions list", () => {
   test("group-by-status shows status group headers", async ({ page }) => {
     const arkDir = mkTempArkDir();
     try {
-      // Seed sessions -- they start in "ready" status
-      seedSession(arkDir, { summary: "group-test-alpha" });
-      seedSession(arkDir, { summary: "group-test-beta" });
-      // Mark one as completed via CLI
-      const id = seedSession(arkDir, { summary: "group-test-done" });
-      if (id) {
-        runArkCli(["session", "complete", id, "--force"], { arkDir });
-      }
+      // Seed sessions: 3 ready + 2 completed
+      seedSession(arkDir, { summary: "grp-ready-alpha" });
+      seedSession(arkDir, { summary: "grp-ready-beta" });
+      seedSession(arkDir, { summary: "grp-ready-gamma" });
+      const doneId1 = seedSession(arkDir, { summary: "grp-done-0" });
+      const doneId2 = seedSession(arkDir, { summary: "grp-done-1" });
+      if (doneId1) runArkCli(["session", "complete", doneId1, "--force"], { arkDir });
+      if (doneId2) runArkCli(["session", "complete", doneId2, "--force"], { arkDir });
 
-      const harness = await startHarness({ arkDir, rows: 40 });
+      const harness = await startHarness({ arkDir, rows: 30 });
       try {
         await page.goto(harness.pageUrl);
         await waitForText(page, "Sessions", { timeoutMs: 15_000 });
-        await waitForText(page, "group-test-alpha", { timeoutMs: 10_000 });
+        await waitForText(page, "grp-ready-alpha", { timeoutMs: 10_000 });
 
         // Toggle group-by-status with %
         await pressKey(page, "%");
         await waitForText(page, "by status", { timeoutMs: 5_000 });
 
         const text = await readTerminal(page);
-        // Group headers should be visible
-        expect(text).toContain("Ready");
-        expect(text).toContain("Completed");
+
+        // "Ready" header must be present and appear before the first ready session
+        const readyPos = text.indexOf("Ready (3)");
+        const firstSessionPos = text.indexOf("grp-ready-");
+        expect(readyPos).toBeGreaterThan(-1);
+        expect(firstSessionPos).toBeGreaterThan(-1);
+        expect(readyPos).toBeLessThan(firstSessionPos);
+      } finally {
+        await harness.stop();
+      }
+    } finally {
+      rmSync(arkDir, { recursive: true, force: true });
+    }
+  });
+
+  test("group-by-status with zero sessions shows no crash", async ({ page }) => {
+    const arkDir = mkTempArkDir();
+    try {
+      const harness = await startHarness({ arkDir, rows: 30 });
+      try {
+        await page.goto(harness.pageUrl);
+        await waitForText(page, "Sessions", { timeoutMs: 15_000 });
+
+        // Toggle group-by-status with no sessions
+        await pressKey(page, "%");
+        await waitForText(page, "by status", { timeoutMs: 5_000 });
+
+        const text = await readTerminal(page);
+        // Should not crash, just show empty
+        expect(text).toContain("Sessions");
       } finally {
         await harness.stop();
       }

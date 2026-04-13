@@ -250,6 +250,7 @@ export async function startHarness(opts: HarnessOpts = {}): Promise<Harness> {
   const env: Record<string, string> = {
     ...process.env,
     ARK_TEST_DIR: arkDir,
+    ARK_TUI_EMBEDDED: "1",  // Boot in-process with test DB, don't connect to daemon
     TMUX_TMPDIR: tmuxTmpDir,
     TERM: "xterm-256color",
     COLORTERM: "truecolor",
