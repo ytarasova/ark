@@ -474,7 +474,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
     <Box flexDirection="column" flexGrow={1}>
       <SplitPane
         focus={overlay === "talk" || overlay === "inbox" ? "right" : pane}
-        outerChrome={7}
+        outerChrome={5}
         leftTitle={statusFilter && groupByStatus ? `Sessions [${statusFilter}, by status]` : statusFilter ? `Sessions [${statusFilter}]` : groupByStatus ? "Sessions [by status]" : "Sessions"}
         rightTitle="Details"
         left={

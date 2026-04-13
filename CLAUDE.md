@@ -418,15 +418,15 @@ At dispatch to remote compute, Ark syncs `.claude/commands/`, `.claude/skills/`,
 | `W` | Worktree finish (Merge/PR) | `Z` | Archive/restore |
 | `c` | Clone session | `m` | Move to group |
 | `i` | Inbox/threads | `g` | Group manager |
-| `Tab` | Focus detail pane | `e` | Expand events |
+| `Tab` | Focus detail pane | | |
 
-**Tools tab (7):** `Enter`:view/use `x`:delete (6 categories: MCP Servers, Commands, Claude Skills, Ark Skills, Recipes, Context)
+**Tools tab (8):** `Enter`:view/use `x`:delete (6 categories: MCP Servers, Commands, Claude Skills, Ark Skills, Recipes, Context)
 
-**History tab (5):** `Enter`:import `r`:refresh+reindex `s`:search
+**History tab (6):** `Enter`:import `r`:refresh+reindex `s`:search
 
-**Compute tab (4):** `Enter`:provision `s`:start/stop `c`:clean `n`:new `x`:delete
+**Compute tab (5):** `Enter`:provision `s`:start/stop `c`:clean `n`:new `x`:delete
 
-**Global:** `1-9`:switch tabs `Tab`:toggle pane `e`:events `q`:quit
+**Global:** `1-9`:switch tabs `Tab`:toggle pane `q`:quit
 
 ## TUI Design System
 

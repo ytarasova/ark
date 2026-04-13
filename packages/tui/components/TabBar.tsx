@@ -3,20 +3,21 @@ import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { getTheme } from "../../core/theme.js";
 
-export type Tab = "sessions" | "agents" | "flows" | "compute" | "history" | "memory" | "tools" | "schedules" | "costs";
+export type Tab = "sessions" | "agents" | "events" | "flows" | "compute" | "history" | "memory" | "tools" | "schedules" | "costs";
 
-export const TABS: Tab[] = ["sessions", "agents", "flows", "compute", "history", "memory", "tools", "schedules", "costs"];
+export const TABS: Tab[] = ["sessions", "agents", "events", "flows", "compute", "history", "memory", "tools", "schedules", "costs"];
 
 const TAB_KEYS: Record<Tab, string> = {
   sessions: "1",
   agents: "2",
-  flows: "3",
-  compute: "4",
-  history: "5",
-  memory: "6",
-  tools: "7",
-  schedules: "8",
-  costs: "9",
+  events: "3",
+  flows: "4",
+  compute: "5",
+  history: "6",
+  memory: "7",
+  tools: "8",
+  schedules: "9",
+  costs: "",
 };
 
 interface TabBarProps {
@@ -32,7 +33,7 @@ export function TabBar({ active, loading, loadingLabel }: TabBarProps) {
       {TABS.map((tab) => {
         const isActive = tab === active;
         const key = TAB_KEYS[tab];
-        const label = `${key}:${tab.charAt(0).toUpperCase() + tab.slice(1)}`;
+        const label = key ? `${key}:${tab.charAt(0).toUpperCase() + tab.slice(1)}` : tab.charAt(0).toUpperCase() + tab.slice(1);
         return (
           <Box key={tab} marginRight={1}>
             {isActive ? (

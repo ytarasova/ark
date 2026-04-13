@@ -35,7 +35,7 @@ const GROUPS: ShortcutGroup[] = [
       ["Tab", "Toggle panes"],
       ["/", "Search sessions"],
       ["?", "This help"],
-      ["1-8", "Switch tabs"],
+      ["1-9", "Switch tabs"],
       ["q", "Quit"],
     ],
   },
@@ -49,7 +49,7 @@ const GROUPS: ShortcutGroup[] = [
       ["M", "MCP Manager"],
       ["K", "Skills Manager"],
       ["P", "Settings"],
-      ["e", "Expand events"],
+      ["3", "Events tab"],
     ],
   },
   {
