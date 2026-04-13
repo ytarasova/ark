@@ -1,21 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
-import { useStdout, useInput } from "ink";
+import { useInput } from "ink";
 
 export type ScrollAlignment = "auto" | "center" | "top";
 
 interface VirtualScrollOpts {
   /** Total number of items in the list. */
   total: number;
+  /** Number of visible rows. Must be provided explicitly by the parent layout. */
+  windowSize: number;
   /** Index of the item to keep visible. */
   selectedIndex?: number;
   /** How to position the selected item in the viewport. */
   alignment?: ScrollAlignment;
   /** Whether this scroll instance handles keyboard input. */
   active?: boolean;
-  /** Explicit window size (number of visible rows). When provided, overrides terminal calculation. */
-  windowSize?: number;
-  /** Margin rows to subtract from terminal height for chrome (only used when windowSize is not set). */
-  marginRows?: number;
 }
 
 interface VirtualScrollResult {
@@ -23,8 +21,6 @@ interface VirtualScrollResult {
   start: number;
   /** One past the last visible item index. */
   end: number;
-  /** Number of visible items (window size). */
-  windowSize: number;
   /** Scroll to top. */
   scrollToTop: () => void;
   /** Scroll to bottom. */
@@ -32,15 +28,11 @@ interface VirtualScrollResult {
 }
 
 /**
- * Virtual scroll hook. Computes a visible window [start, end) of items
- * based on terminal height and selected index. Handles keyboard navigation
- * (j/k/f/b/g/G) when active.
+ * Virtual scroll hook. Computes a visible window [start, end) of items.
+ * windowSize must be provided by the caller -- no terminal row guessing.
  */
 export function useVirtualScroll(opts: VirtualScrollOpts): VirtualScrollResult {
-  const { total, selectedIndex, alignment = "center", active = false, marginRows = 8, windowSize: explicitWindow } = opts;
-  const { stdout } = useStdout();
-  const termRows = stdout?.rows ?? 40;
-  const windowSize = explicitWindow ?? Math.max(5, termRows - marginRows);
+  const { total, windowSize, selectedIndex, alignment = "center", active = false } = opts;
   const maxOffset = Math.max(0, total - windowSize);
 
   const [offset, setOffset] = useState(0);
@@ -50,19 +42,15 @@ export function useVirtualScroll(opts: VirtualScrollOpts): VirtualScrollResult {
     if (selectedIndex === undefined) return;
     setOffset(prev => {
       switch (alignment) {
-        case "center": {
+        case "center":
           return Math.max(0, Math.min(selectedIndex - Math.floor(windowSize / 2), maxOffset));
-        }
-        case "top": {
+        case "top":
           return Math.max(0, Math.min(selectedIndex, maxOffset));
-        }
         case "auto":
-        default: {
-          // Minimal scroll: only move if selected item is outside viewport
+        default:
           if (selectedIndex < prev) return selectedIndex;
           if (selectedIndex >= prev + windowSize) return Math.min(selectedIndex - windowSize + 1, maxOffset);
           return prev;
-        }
       }
     });
   }, [selectedIndex, windowSize, maxOffset, alignment]);
@@ -84,7 +72,6 @@ export function useVirtualScroll(opts: VirtualScrollOpts): VirtualScrollResult {
   return {
     start: offset,
     end: Math.min(offset + windowSize, total),
-    windowSize,
     scrollToTop,
     scrollToBottom,
   };
