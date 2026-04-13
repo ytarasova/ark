@@ -11,7 +11,6 @@ import { TreeList } from "../components/TreeList.js";
 import { ScrollBox } from "../components/ScrollBox.js";
 import { KeyValue } from "../components/KeyValue.js";
 import { TextInputEnhanced } from "../components/TextInputEnhanced.js";
-import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useFocus } from "../hooks/useFocus.js";
 import { useArkClient } from "../hooks/useArkClient.js";
@@ -91,12 +90,8 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh: _
     [arkSessions, claudeSessions],
   );
 
-  const { sel } = useListNavigation(
-    mode === "recent" ? historyItems.length : searchResults.length,
-    { active: pane === "left" && !searchInputActive },
-  );
-  const selectedItem = mode === "recent" ? historyItems[sel] ?? null : null;
-  const selectedSearchResult = mode === "search" ? searchResults[sel] ?? null : null;
+  const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
+  const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
 
   // Derive a display ID for the detail panel (works for both modes)
   const detailSessionId = selectedItem?.id ?? selectedSearchResult?.sessionId ?? null;
@@ -219,6 +214,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh: _
             ) : mode === "recent" ? (
               <TreeList
                 items={historyItems}
+                getKey={(item) => item.id}
                 renderRow={(item) => {
                   const project = item.claudeSession?.project?.split("/").pop() ?? "";
                   const label = item.summary ? item.summary.slice(0, 30) : project || item.id.slice(0, 8);
@@ -241,7 +237,9 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh: _
                     </Text>
                   );
                 }}
-                sel={sel}
+                selectedKey={selectedItem?.id ?? null}
+                onSelect={(item) => setSelectedItem(item)}
+                active={pane === "left" && !searchInputActive}
                 emptyMessage="  No sessions found."
               />
             ) : asyncState.loading ? (
@@ -249,6 +247,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh: _
             ) : (
               <TreeList
                 items={searchResults}
+                getKey={(r) => `${r.sessionId}:${r.source}:${r.match?.slice(0, 20) ?? ""}`}
                 renderRow={(r) => {
                   return `${r.source.slice(0, 4).padEnd(4)} ${r.match?.slice(0, 50) || ""}`;
                 }}
@@ -258,7 +257,9 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh: _
                     {` ${r.match?.slice(0, 50) || ""}`}
                   </Text>
                 )}
-                sel={sel}
+                selectedKey={selectedSearchResult ? `${selectedSearchResult.sessionId}:${selectedSearchResult.source}:${selectedSearchResult.match?.slice(0, 20) ?? ""}` : null}
+                onSelect={(item) => setSelectedSearchResult(item)}
+                active={pane === "left" && !searchInputActive}
                 emptyMessage="  No results found."
               />
             )}

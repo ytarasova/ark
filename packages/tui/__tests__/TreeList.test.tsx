@@ -10,10 +10,12 @@ const items = [
   { id: "c", name: "Gamma", group: "g2" },
 ];
 
+const noop = () => {};
+
 describe("TreeList", () => {
   it("renders flat list when no groupBy", () => {
     const { lastFrame, unmount } = render(
-      <TreeList items={items} renderRow={(item) => `  ${item.name}`} sel={0} />
+      <TreeList items={items} getKey={(i) => i.id} renderRow={(item) => `  ${item.name}`} selectedKey="a" onSelect={noop} />
     );
     expect(lastFrame()!).toContain("Alpha");
     expect(lastFrame()!).toContain("Beta");
@@ -23,7 +25,7 @@ describe("TreeList", () => {
 
   it("renders group headers when groupBy is provided", () => {
     const { lastFrame, unmount } = render(
-      <TreeList items={items} groupBy={(i) => i.group} renderRow={(i) => `  ${i.name}`} sel={0} />
+      <TreeList items={items} getKey={(i) => i.id} groupBy={(i) => i.group} renderRow={(i) => `  ${i.name}`} selectedKey="a" onSelect={noop} />
     );
     expect(lastFrame()!).toContain("g1");
     expect(lastFrame()!).toContain("g2");
@@ -32,7 +34,7 @@ describe("TreeList", () => {
 
   it("shows empty message when no items", () => {
     const { lastFrame, unmount } = render(
-      <TreeList items={[]} renderRow={() => ""} sel={0} emptyMessage="Nothing here." />
+      <TreeList items={[]} getKey={() => ""} renderRow={() => ""} selectedKey={null} onSelect={noop} emptyMessage="Nothing here." />
     );
     expect(lastFrame()!).toContain("Nothing here.");
     unmount();
@@ -42,9 +44,11 @@ describe("TreeList", () => {
     const { lastFrame, unmount } = render(
       <TreeList
         items={[items[0]]}
+        getKey={(i) => i.id}
         renderRow={(i) => `  ${i.name}`}
         renderChildren={(i) => <Text dimColor>{"    child of " + i.name}</Text>}
-        sel={0}
+        selectedKey="a"
+        onSelect={noop}
       />
     );
     expect(lastFrame()!).toContain("child of Alpha");
@@ -55,9 +59,11 @@ describe("TreeList", () => {
     const { lastFrame, unmount } = render(
       <TreeList
         items={items}
+        getKey={(i) => i.id}
         renderRow={(i) => `  ${i.name}`}
         renderColoredRow={(i) => <Text color="green">{`  ${i.name}`}</Text>}
-        sel={0}
+        selectedKey="a"
+        onSelect={noop}
       />
     );
     expect(lastFrame()!).toContain("Beta");
@@ -65,40 +71,43 @@ describe("TreeList", () => {
     unmount();
   });
 
-  it("sel follows visual group order, not original array order", () => {
+  it("selects correct item by key regardless of group order", () => {
     // Items in reverse group order (z before a)
     const unsorted = [
       { id: "z", name: "Zulu", group: "z-group" },
       { id: "a", name: "Alpha", group: "a-group" },
     ];
-    // sel=0 should select the first VISUAL item (a-group → Alpha)
+    // selectedKey="a" should select Alpha even though Zulu comes first in array
     const { lastFrame, unmount } = render(
       <TreeList
         items={unsorted}
+        getKey={(i) => i.id}
         groupBy={(i) => i.group}
         renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
-        sel={0}
+        selectedKey="a"
+        onSelect={noop}
       />
     );
     const frame = lastFrame()!;
-    // Alpha (a-group) should be selected, not Zulu (z-group)
     expect(frame).toContain("> Alpha");
     expect(frame).not.toContain("> Zulu");
     unmount();
   });
 
-  it("sel=1 selects second visual item across groups", () => {
+  it("selects second item by key across groups", () => {
     const unsorted = [
       { id: "z", name: "Zulu", group: "z-group" },
       { id: "a", name: "Alpha", group: "a-group" },
     ];
-    // sel=1 should select Zulu (second in visual order)
+    // selectedKey="z" selects Zulu
     const { lastFrame, unmount } = render(
       <TreeList
         items={unsorted}
+        getKey={(i) => i.id}
         groupBy={(i) => i.group}
         renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
-        sel={1}
+        selectedKey="z"
+        onSelect={noop}
       />
     );
     const frame = lastFrame()!;
@@ -118,10 +127,12 @@ describe("TreeList", () => {
     const { lastFrame, unmount } = render(
       <TreeList
         items={statusItems}
+        getKey={(i) => i.id}
         groupBy={(i) => i.group}
         groupSort={(a, b) => (order[a] ?? 9) - (order[b] ?? 9)}
         renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
-        sel={0}
+        selectedKey="r1"
+        onSelect={noop}
       />
     );
     const frame = lastFrame()!;
@@ -131,7 +142,7 @@ describe("TreeList", () => {
     const stopIdx = frame.indexOf("Stopped");
     expect(runIdx).toBeLessThan(waitIdx);
     expect(waitIdx).toBeLessThan(stopIdx);
-    // sel=0 should select first item in first group (Running -> Run1)
+    // selectedKey="r1" selects Run1
     expect(frame).toContain("> Run1");
     unmount();
   });
@@ -145,9 +156,11 @@ describe("TreeList", () => {
     const { lastFrame, unmount } = render(
       <TreeList
         items={statusItems}
+        getKey={(i) => i.id}
         groupBy={(i) => i.group}
         renderRow={(i) => `  ${i.name}`}
-        sel={0}
+        selectedKey="r1"
+        onSelect={noop}
       />
     );
     const frame = lastFrame()!;
@@ -161,13 +174,15 @@ describe("TreeList", () => {
       { id: "r1", name: "Run1", group: "Running" },
       { id: "f1", name: "Fail1", group: "Failed" },
     ];
-    // sel=0 selects first item (Failed -> Fail1, alphabetical order)
+    // selectedKey="f1" selects Fail1 (first item in Failed group, alphabetically first)
     const { lastFrame, unmount } = render(
       <TreeList
         items={statusItems}
+        getKey={(i) => i.id}
         groupBy={(i) => i.group}
         renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
-        sel={0}
+        selectedKey="f1"
+        onSelect={noop}
       />
     );
     const frame = lastFrame()!;
@@ -187,10 +202,12 @@ describe("TreeList", () => {
     const { lastFrame, unmount } = render(
       <TreeList
         items={statusItems}
+        getKey={(i) => i.id}
         groupBy={(i) => i.group}
         groupSort={(a, b) => (order[a] ?? 9) - (order[b] ?? 9)}
         renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
-        sel={0}
+        selectedKey="r1"
+        onSelect={noop}
       />
     );
     const frame = lastFrame()!;
@@ -214,17 +231,52 @@ describe("TreeList", () => {
     const { lastFrame, unmount } = render(
       <TreeList
         items={items}
+        getKey={(i) => i.id}
         groupBy={(i) => i.group}
         emptyGroups={["b-group"]}
         renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
-        sel={0}
+        selectedKey="a"
+        onSelect={noop}
       />
     );
     const frame = lastFrame()!;
-    // sel=0 should be Alpha (a-group, first alphabetically)
+    // selectedKey="a" selects Alpha
     expect(frame).toContain("> Alpha");
     expect(frame).toContain("(empty)"); // b-group shows as empty
     expect(frame).not.toContain("> Charlie");
+    unmount();
+  });
+
+  it("calls onSelect with first item when selectedKey is null", () => {
+    let selected: any = undefined;
+    const { unmount } = render(
+      <TreeList
+        items={items}
+        getKey={(i) => i.id}
+        renderRow={(i) => i.name}
+        selectedKey={null}
+        onSelect={(item) => { selected = item; }}
+      />
+    );
+    // Allow useEffect to fire
+    expect(selected).not.toBeNull();
+    expect(selected?.id).toBe("a");
+    unmount();
+  });
+
+  it("calls onSelect(null) when items are empty", () => {
+    let called = false;
+    const { unmount } = render(
+      <TreeList
+        items={[]}
+        getKey={() => ""}
+        renderRow={() => ""}
+        selectedKey="nonexistent"
+        onSelect={(item) => { if (item === null) called = true; }}
+        emptyMessage="empty"
+      />
+    );
+    expect(called).toBe(true);
     unmount();
   });
 });
