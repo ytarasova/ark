@@ -136,7 +136,7 @@ export function TreeList<T>({
             </Box>
           );
         } else {
-          rows.push(<Box key={`item-${flatIndex}`}>{rowContent}</Box>);
+          rows.push(React.cloneElement(rowContent as React.ReactElement, { key: `item-${flatIndex}` }));
         }
         if (spacing) {
           rows.push(<Text key={`sp-${flatIndex}`}>{" "}</Text>);
