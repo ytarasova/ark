@@ -1,5 +1,5 @@
 export { SessionService } from "./session.js";
-export type { HookStatusResult, ReportResult } from "./session-orchestration.js";
+export type { HookStatusResult, ReportResult } from "./session-hooks.js";
 export type { SessionOpResult } from "../../types/index.js";
 export { ComputeService } from "./compute.js";
 export { HistoryService } from "./history.js";
