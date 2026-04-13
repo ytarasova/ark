@@ -16,7 +16,7 @@ interface SplitPaneProps {
   outerChrome?: number;
 }
 
-export function SplitPane({ left, right, leftTitle, rightTitle, leftWidth = "30%", focus = "left", outerChrome = 6 }: SplitPaneProps) {
+export function SplitPane({ left, right, leftTitle, rightTitle, leftWidth = "30%", focus = "left", outerChrome = 7 }: SplitPaneProps) {
   const theme = getTheme();
   const rightWidth = `${100 - parseInt(leftWidth)}%`;
   const { stdout } = useStdout();
