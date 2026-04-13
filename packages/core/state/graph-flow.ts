@@ -44,10 +44,29 @@ export function parseGraphFlow(yaml: any): GraphFlow {
     label: e.label,
   }));
 
-  // Auto-generate edges from linear stages if no explicit edges
+  // Auto-generate edges when no explicit edges provided
   if (edges.length === 0 && nodes.length > 1) {
-    for (let i = 0; i < nodes.length - 1; i++) {
-      edges.push({ from: nodes[i].name, to: nodes[i + 1].name });
+    const rawStages = yaml.nodes ?? yaml.stages ?? [];
+    const hasDependsOn = rawStages.some((s: any) => s.depends_on?.length > 0);
+
+    if (hasDependsOn) {
+      // Synthesize edges from depends_on declarations
+      for (let i = 0; i < rawStages.length; i++) {
+        const s = rawStages[i];
+        if (s.depends_on?.length > 0) {
+          for (const dep of s.depends_on) {
+            edges.push({ from: dep, to: s.name });
+          }
+        } else if (i > 0) {
+          // No depends_on: implicit linear dependency on previous stage
+          edges.push({ from: rawStages[i - 1].name, to: s.name });
+        }
+      }
+    } else {
+      // Pure linear: no depends_on anywhere
+      for (let i = 0; i < nodes.length - 1; i++) {
+        edges.push({ from: nodes[i].name, to: nodes[i + 1].name });
+      }
     }
   }
 

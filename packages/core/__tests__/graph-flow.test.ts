@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { parseGraphFlow, getSuccessors, getPredecessors, isJoinNode, isFanOutNode, topologicalSort, validateGraphFlow } from "../state/graph-flow.js";
+import { parseGraphFlow, getSuccessors, getPredecessors, isJoinNode, isFanOutNode, topologicalSort, validateGraphFlow, resolveNextStages } from "../state/graph-flow.js";
 
 describe("graph flow", () => {
   const flow = parseGraphFlow({
@@ -89,5 +89,119 @@ describe("graph flow", () => {
     });
     expect(getSuccessors(conditional, "check", { status: "approved" })).toEqual(["pass"]);
     expect(getSuccessors(conditional, "check", { status: "rejected" })).toEqual(["fail"]);
+  });
+});
+
+describe("depends_on edge synthesis", () => {
+  it("creates correct edges from depends_on", () => {
+    const flow = parseGraphFlow({
+      name: "deps-flow",
+      stages: [
+        { name: "plan", agent: "planner" },
+        { name: "implement", agent: "implementer", depends_on: ["plan"] },
+        { name: "review", agent: "reviewer", depends_on: ["implement"] },
+      ],
+    });
+    expect(flow.edges).toHaveLength(2);
+    expect(flow.edges).toContainEqual({ from: "plan", to: "implement" });
+    expect(flow.edges).toContainEqual({ from: "implement", to: "review" });
+  });
+
+  it("creates fan-out edges from depends_on", () => {
+    const flow = parseGraphFlow({
+      name: "fanout",
+      stages: [
+        { name: "plan", agent: "planner" },
+        { name: "impl", agent: "implementer", depends_on: ["plan"] },
+        { name: "test", agent: "tester", depends_on: ["plan"] },
+      ],
+    });
+    expect(flow.edges).toHaveLength(2);
+    expect(flow.edges).toContainEqual({ from: "plan", to: "impl" });
+    expect(flow.edges).toContainEqual({ from: "plan", to: "test" });
+    expect(isFanOutNode(flow, "plan")).toBe(true);
+  });
+
+  it("creates join edges from depends_on", () => {
+    const flow = parseGraphFlow({
+      name: "join",
+      stages: [
+        { name: "a", agent: "x" },
+        { name: "b", agent: "x", depends_on: ["a"] },
+        { name: "c", agent: "x", depends_on: ["a"] },
+        { name: "d", agent: "x", depends_on: ["b", "c"] },
+      ],
+    });
+    expect(flow.edges).toContainEqual({ from: "b", to: "d" });
+    expect(flow.edges).toContainEqual({ from: "c", to: "d" });
+    expect(isJoinNode(flow, "d")).toBe(true);
+  });
+
+  it("handles mixed depends_on and implicit linear", () => {
+    const flow = parseGraphFlow({
+      name: "mixed",
+      stages: [
+        { name: "a", agent: "x" },
+        { name: "b", agent: "x", depends_on: ["a"] },
+        { name: "c", agent: "x" }, // no depends_on -- implicit linear from b
+      ],
+    });
+    expect(flow.edges).toHaveLength(2);
+    expect(flow.edges).toContainEqual({ from: "a", to: "b" });
+    expect(flow.edges).toContainEqual({ from: "b", to: "c" });
+  });
+
+  it("detects entrypoints correctly with depends_on", () => {
+    const flow = parseGraphFlow({
+      name: "entry",
+      stages: [
+        { name: "start", agent: "x" },
+        { name: "middle", agent: "x", depends_on: ["start"] },
+        { name: "end", agent: "x", depends_on: ["middle"] },
+      ],
+    });
+    expect(flow.entrypoints).toEqual(["start"]);
+  });
+
+  it("resolveNextStages works with synthesized edges", () => {
+    const flow = parseGraphFlow({
+      name: "dag-parallel",
+      stages: [
+        { name: "plan", agent: "planner" },
+        { name: "implement", agent: "implementer", depends_on: ["plan"] },
+        { name: "test", agent: "tester", depends_on: ["plan"] },
+        { name: "integrate", agent: "implementer", depends_on: ["implement", "test"] },
+      ],
+    });
+
+    // After plan completes, both implement and test are ready (parallel)
+    const afterPlan = resolveNextStages(flow, "plan", {}, []);
+    expect(afterPlan).toContain("implement");
+    expect(afterPlan).toContain("test");
+    expect(afterPlan).toHaveLength(2);
+
+    // After implement completes (but test not done), integrate is NOT ready (join barrier)
+    const afterImpl = resolveNextStages(flow, "implement", {}, ["plan"]);
+    expect(afterImpl).toEqual([]);
+
+    // After both implement and test complete, integrate IS ready
+    const afterBoth = resolveNextStages(flow, "test", {}, ["plan", "implement"]);
+    expect(afterBoth).toEqual(["integrate"]);
+  });
+
+  it("explicit edges take priority over depends_on", () => {
+    const flow = parseGraphFlow({
+      name: "explicit",
+      stages: [
+        { name: "a", agent: "x", depends_on: ["nonexistent"] },
+        { name: "b", agent: "x" },
+      ],
+      edges: [
+        { from: "a", to: "b" },
+      ],
+    });
+    // Explicit edges are used, depends_on is ignored
+    expect(flow.edges).toHaveLength(1);
+    expect(flow.edges[0]).toEqual({ from: "a", to: "b" });
   });
 });

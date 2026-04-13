@@ -4,9 +4,11 @@ import { join } from "path";
 import { AppContext, setApp, clearApp } from "../app.js";
 import { advance } from "../services/session-orchestration.js";
 import { getApp } from "../app.js";
+import { markStageCompleted, loadFlowState } from "../state/flow-state.js";
 
 let app: AppContext;
 let dagFlowPath: string;
+let parallelFlowPath: string;
 
 beforeAll(async () => {
   app = AppContext.forTest();
@@ -33,10 +35,34 @@ stages:
     gate: auto
     depends_on: [implement]
 `);
+
+  // Write a parallel DAG flow for fan-out / join testing
+  parallelFlowPath = join(flowsDir, "test-dag-parallel.yaml");
+  writeFileSync(parallelFlowPath, `
+name: test-dag-parallel
+description: Test parallel DAG with fan-out and join
+stages:
+  - name: plan
+    agent: planner
+    gate: auto
+  - name: implement
+    agent: implementer
+    gate: auto
+    depends_on: [plan]
+  - name: test
+    agent: tester
+    gate: auto
+    depends_on: [plan]
+  - name: integrate
+    agent: implementer
+    gate: auto
+    depends_on: [implement, test]
+`);
 });
 
 afterAll(async () => {
   if (dagFlowPath && existsSync(dagFlowPath)) rmSync(dagFlowPath);
+  if (parallelFlowPath && existsSync(parallelFlowPath)) rmSync(parallelFlowPath);
   await app?.shutdown();
   clearApp();
 });
@@ -86,6 +112,77 @@ describe("DAG-based advance", () => {
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
+    const updated = app.sessions.get(s.id);
+    expect(updated!.status).toBe("completed");
+  });
+});
+
+describe("Parallel DAG advance via depends_on", () => {
+  test("advance from plan moves to first ready parallel stage", async () => {
+    const s = app.sessions.create({ summary: "Test parallel DAG", flow: "test-dag-parallel" });
+    app.sessions.update(s.id, { stage: "plan", status: "ready" });
+
+    const result = await advance(app, s.id, true);
+    expect(result.ok).toBe(true);
+
+    const updated = app.sessions.get(s.id);
+    // Should advance to one of the parallel stages (implement or test)
+    expect(["implement", "test"]).toContain(updated!.stage);
+    expect(updated!.status).toBe("ready");
+
+    // Flow state should show plan as completed
+    const flowState = loadFlowState(app, s.id);
+    expect(flowState).not.toBeNull();
+    expect(flowState!.completedStages).toContain("plan");
+  });
+
+  test("join barrier blocks integrate until both parallel stages complete", async () => {
+    const s = app.sessions.create({ summary: "Test join barrier", flow: "test-dag-parallel" });
+    app.sessions.update(s.id, { stage: "implement", status: "ready" });
+
+    // Mark plan as completed in flow state (it ran before implement)
+    markStageCompleted(app, s.id, "plan");
+
+    const result = await advance(app, s.id, true);
+    expect(result.ok).toBe(true);
+
+    const updated = app.sessions.get(s.id);
+    // integrate requires both implement AND test to complete
+    // test is not yet done, so integrate is blocked
+    // session should be waiting (join barrier) or advance to test
+    // The behavior depends on whether test is seen as a successor --
+    // implement has no edge to test, so they're siblings, not sequential
+    expect(updated!.status).toBe("waiting");
+  });
+
+  test("integrate becomes ready after both parallel stages complete", async () => {
+    const s = app.sessions.create({ summary: "Test join complete", flow: "test-dag-parallel" });
+    app.sessions.update(s.id, { stage: "test", status: "ready" });
+
+    // Mark plan and implement as completed in flow state
+    markStageCompleted(app, s.id, "plan");
+    markStageCompleted(app, s.id, "implement");
+
+    const result = await advance(app, s.id, true);
+    expect(result.ok).toBe(true);
+
+    const updated = app.sessions.get(s.id);
+    expect(updated!.stage).toBe("integrate");
+    expect(updated!.status).toBe("ready");
+  });
+
+  test("parallel DAG flow completes when last stage done", async () => {
+    const s = app.sessions.create({ summary: "Test parallel completion", flow: "test-dag-parallel" });
+    app.sessions.update(s.id, { stage: "integrate", status: "ready" });
+
+    // Mark all preceding stages as completed
+    markStageCompleted(app, s.id, "plan");
+    markStageCompleted(app, s.id, "implement");
+    markStageCompleted(app, s.id, "test");
+
+    const result = await advance(app, s.id, true);
+    expect(result.ok).toBe(true);
+
     const updated = app.sessions.get(s.id);
     expect(updated!.status).toBe("completed");
   });

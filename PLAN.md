@@ -1,154 +1,136 @@
-# Plan: Extract Hook/Report Status Logic from session-orchestration.ts
+# Plan: Unify flow routing -- `depends_on` should create implicit edges
 
 ## Summary
 
-Extract the hook status processing (`applyHookStatus`, `HookStatusResult`), report processing (`applyReport`, `ReportResult`), and stage handoff orchestration (`mediateStageHandoff`, `StageHandoffResult`) into a new dedicated module `packages/core/services/session-hooks.ts`. These three groups form a cohesive "inbound event processing" subsystem that is logically distinct from the session lifecycle operations (start, stop, dispatch, advance) in `session-orchestration.ts`. This reduces the 3070-line god class by ~630 lines and isolates the conductor-facing business logic into a single, focused module.
+The flow system has two separate routing implementations that don't talk to each other: (1) the graph-flow path that uses explicit `edges:` arrays with conditional routing, join barriers, and skipped-stage tracking, and (2) the linear fallback path that ignores `depends_on` entirely and just calls `resolveNextStage()` (pure linear progression). When a flow defines `depends_on` on its stages but has no explicit `edges:` array, `parseGraphFlow()` generates linear edges (A->B->C) instead of honoring the declared DAG dependencies. This means flows like `dag-parallel.yaml` (parallel implement+test after plan, join at integrate) never actually run in parallel -- they degrade to linear execution.
+
+The fix: make `parseGraphFlow()` synthesize edges from `depends_on` declarations when no explicit `edges:` are provided, and route all `depends_on` flows through the graph-flow path in `advance()`.
 
 ## Files to modify/create
 
 | File | Change |
 |------|--------|
-| `packages/core/services/session-hooks.ts` | **CREATE** -- new module containing `applyHookStatus`, `applyReport`, `mediateStageHandoff`, `parseOnFailure`, `retryWithContext`, `detectStatus`, and their interfaces (`HookStatusResult`, `ReportResult`, `StageHandoffResult`) |
-| `packages/core/services/session-orchestration.ts` | **MODIFY** -- remove the extracted functions/interfaces (~lines 2208-2874), add re-exports from `session-hooks.js` for backward compatibility |
-| `packages/core/services/index.ts` | **MODIFY** -- update re-exports to source types from `session-hooks.js` |
-| `packages/core/conductor/conductor.ts` | **MODIFY** -- update import to use `session-hooks.js` for `applyHookStatus`, `applyReport`, `mediateStageHandoff`, `retryWithContext` (currently imports all via `session-orchestration.js` as `session.*`) |
-| `packages/core/index.ts` | **MODIFY** -- update type re-exports if needed (currently re-exports `HookStatusResult`, `ReportResult` from `session-orchestration.js`) |
+| `packages/core/state/graph-flow.ts` (lines 47-52) | Generate edges from `depends_on` instead of linear fallback when stages have `depends_on` |
+| `packages/core/services/session-orchestration.ts` (line 583) | Route through graph-flow path when stages have `depends_on`, not only when `edges` exist |
+| `packages/core/__tests__/graph-flow.test.ts` | Add tests for `depends_on`-to-edge synthesis |
+| `packages/core/__tests__/dag-advance.test.ts` | Add integration test for parallel DAG advance via `depends_on` |
 
 ## Implementation steps
 
-### Step 1: Create `packages/core/services/session-hooks.ts`
+### Step 1: Synthesize edges from `depends_on` in `parseGraphFlow()`
 
-Extract these functions and interfaces into the new file:
-
-**Interfaces (lines 2219-2237, 2439-2460, 2675-2690):**
-- `HookStatusResult`
-- `ReportResult`
-- `StageHandoffResult`
-
-**Functions (lines 2209-2434, 2467-2671, 2709-2830, 2839-2874):**
-- `detectStatus` (line 2209) -- tmux status detection fallback
-- `applyHookStatus` (line 2248) -- hook event business logic
-- `applyReport` (line 2467) -- channel report business logic
-- `mediateStageHandoff` (line 2709) -- orchestrated stage-to-stage handoff
-- `parseOnFailure` (line 2839) -- on_failure directive parser
-- `retryWithContext` (line 2846) -- retry-with-error-context logic
-
-**Internal helpers that must move with the functions:**
-- `recordSessionUsage` (line 91) -- called by `applyHookStatus` for transcript usage. This is also called from `complete()` via `parseNonClaudeTranscript()`, so it should remain in `session-orchestration.ts` and be imported by `session-hooks.ts`, OR be extracted to a shared utility. **Decision: keep `recordSessionUsage` in `session-orchestration.ts` and import it into `session-hooks.ts`** since it's a general utility used by both modules.
-
-**Imports the new module will need:**
-- `AppContext` from `../app.js`
-- `Session`, `MessageRole`, `MessageType` from `../../types/index.js`
-- `OutboundMessage` from `../conductor/channel-types.js`
-- `* as flow` from `../state/flow.js`
-- `execFileSync` from `child_process`
-- `detectHandoff` from `../handoff.js`
-- `logError`, `logWarn` from `../observability/structured-log.js`
-- `evaluateTermination`, `parseTermination`, `TerminationContext` from `../termination.js`
-- `loadRepoConfig` from `../repo-config.js`
-- `safeAsync` from `../safe.js`
-- Cross-references back to `session-orchestration.js`: `advance`, `runVerification`, `dispatch`, `getOutput`, `executeAction`, `recordSessionUsage`
-
-### Step 2: Update imports in `session-orchestration.ts`
-
-Remove the extracted code blocks (lines 2208-2874). Add re-exports for backward compatibility:
+In `packages/core/state/graph-flow.ts`, lines 47-52, the auto-edge generation currently does:
 
 ```ts
-// Re-exports from session-hooks.ts for backward compatibility
-export {
-  applyHookStatus,
-  applyReport,
-  mediateStageHandoff,
-  parseOnFailure,
-  retryWithContext,
-  detectStatus,
-} from "./session-hooks.js";
-export type {
-  HookStatusResult,
-  ReportResult,
-  StageHandoffResult,
-} from "./session-hooks.js";
+if (edges.length === 0 && nodes.length > 1) {
+  for (let i = 0; i < nodes.length - 1; i++) {
+    edges.push({ from: nodes[i].name, to: nodes[i + 1].name });
+  }
+}
 ```
 
-This ensures all 35+ test files and the conductor that import from `session-orchestration.js` continue to work without modification.
+Replace with logic that checks if any stage has `depends_on`. The input `yaml` object is the raw flow definition, so stages are available as `yaml.nodes ?? yaml.stages`. The function must:
 
-### Step 3: Update `conductor.ts` imports (optional optimization)
+1. Check if any node in the raw YAML has a `depends_on` field.
+2. If YES: generate one edge per dependency (`{ from: dep, to: stage.name }` for each dep in `depends_on`). Stages with no `depends_on` and `i > 0` get an implicit edge from the previous stage (preserving the existing linear fallback for mixed flows).
+3. If NO `depends_on` found: keep the existing linear edge generation.
+4. Explicit `edges:` from YAML still take highest priority (unchanged -- they're already parsed on line 40).
 
-The conductor currently does `import * as session from "../services/session-orchestration.js"` and calls `session.applyHookStatus(...)`, `session.applyReport(...)`, etc. Since re-exports preserve this, **no changes are strictly required**. However, for clarity, the conductor could import hook-related functions directly from `session-hooks.js`:
+Concrete replacement for lines 47-52:
 
 ```ts
-import { applyHookStatus, applyReport, mediateStageHandoff, retryWithContext } from "../services/session-hooks.js";
-import * as session from "../services/session-orchestration.js"; // for dispatch, stop, cleanupOnTerminal, etc.
+// Auto-generate edges when no explicit edges provided
+if (edges.length === 0 && nodes.length > 1) {
+  const rawStages = yaml.nodes ?? yaml.stages ?? [];
+  const hasDependsOn = rawStages.some((s: any) => s.depends_on?.length > 0);
+
+  if (hasDependsOn) {
+    // Synthesize edges from depends_on declarations
+    for (let i = 0; i < rawStages.length; i++) {
+      const s = rawStages[i];
+      if (s.depends_on?.length > 0) {
+        for (const dep of s.depends_on) {
+          edges.push({ from: dep, to: s.name });
+        }
+      } else if (i > 0) {
+        // No depends_on: implicit linear dependency on previous stage
+        edges.push({ from: rawStages[i - 1].name, to: s.name });
+      }
+    }
+  } else {
+    // Pure linear: no depends_on anywhere
+    for (let i = 0; i < nodes.length - 1; i++) {
+      edges.push({ from: nodes[i].name, to: nodes[i + 1].name });
+    }
+  }
+}
 ```
 
-**Decision: skip this for now.** Re-exports make it unnecessary, and touching conductor imports adds risk for no functional gain. Can be done in a follow-up cleanup pass.
+### Step 2: Route `depends_on` flows through the graph-flow path in `advance()`
 
-### Step 4: Update `packages/core/services/index.ts`
-
-Change the type re-exports to source from `session-hooks.js`:
+In `packages/core/services/session-orchestration.ts`, line 583, the condition is:
 
 ```ts
-export type { HookStatusResult, ReportResult, StageHandoffResult } from "./session-hooks.js";
+if (flowDef && flowDef.edges?.length > 0) {
 ```
 
-### Step 5: Update `packages/core/index.ts`
+This only triggers for flows with explicit `edges:`. Change to also trigger when any stage has `depends_on`:
 
-Change the type re-exports to source from `session-hooks.js` (or leave as-is since `session-orchestration.js` re-exports them).
-
-**Decision: leave as-is** -- the re-exports in `session-orchestration.js` make this transparent.
-
-### Step 6: Handle circular dependency between `session-hooks.ts` and `session-orchestration.ts`
-
-`session-hooks.ts` needs to call functions from `session-orchestration.ts`:
-- `applyHookStatus` calls `getOutput()` (line 2421)
-- `mediateStageHandoff` calls `advance()`, `runVerification()`, `dispatch()`, `executeAction()` (lines 2758, 2730, 2788, 2803)
-
-`session-orchestration.ts` currently calls `applyHookStatus` / `applyReport` only through re-exports (no internal calls).
-
-**Solution: use dynamic `import()` in `session-hooks.ts`** for the cross-module calls, matching the existing pattern used throughout the codebase (e.g., `await import("../session/guardrails.js")`). This avoids circular dependency issues at module load time.
-
-Alternatively, since `session-hooks.ts` imports from `session-orchestration.ts` but not vice versa (only re-exports), this is a one-way dependency and static imports should work fine. The re-exports in `session-orchestration.ts` are just `export { ... } from "./session-hooks.js"` which don't create a true circular dependency in ES modules.
-
-**Decision: use static imports.** `session-orchestration.ts` only re-exports (no import-and-use), so there's no circular dependency.
-
-### Step 7: Run tests
-
-```bash
-make test-file F=packages/core/__tests__/completion-paths.test.ts
-make test-file F=packages/core/__tests__/autonomous-flow.test.ts
-make test-file F=packages/core/__tests__/on-failure-retry.test.ts
-make test-file F=packages/core/__tests__/commit-verification.test.ts
-make test-file F=packages/core/__tests__/stage-handoff.test.ts
-make test-file F=packages/core/__tests__/on-outcome.test.ts
-make test-file F=packages/core/__tests__/bug-fixes.test.ts
-make test
+```ts
+const hasDependsOn = flowDef?.stages?.some(s => s.depends_on?.length > 0);
+if (flowDef && (flowDef.edges?.length > 0 || hasDependsOn)) {
 ```
+
+This ensures flows like `dag-parallel.yaml`, `autonomous-sdlc.yaml`, `quick.yaml`, `default.yaml`, `islc.yaml`, and `islc-quick.yaml` all route through the graph-flow path which handles join barriers, parallel readiness detection, and skipped stages.
+
+### Step 3: No changes needed to `FlowNode` interface
+
+`parseGraphFlow()` strips stage data to `name`, `agent`, `model`, `gate`, `on_failure` (lines 32-38). The `depends_on` field is not propagated to `FlowNode` because edges carry the dependency information. The raw YAML is available in the function scope for Step 1.
+
+### Step 4: Add unit tests for `depends_on` edge synthesis
+
+In `packages/core/__tests__/graph-flow.test.ts`, add these tests:
+
+1. **`depends_on` creates correct edges** -- Parse a flow with stages using `depends_on` but no explicit edges. Verify edges match the dependency graph.
+2. **Parallel fan-out from `depends_on`** -- Stages B and C both `depends_on: [A]`. Verify edges: A->B, A->C. Verify `isFanOutNode(flow, "A")` returns true.
+3. **Join barrier from `depends_on`** -- Stage D `depends_on: [B, C]`. Verify edges B->D, C->D. Verify `isJoinNode(flow, "D")` returns true.
+4. **Mixed `depends_on` and implicit linear** -- Stage A (no deps), B (`depends_on: [A]`), C (no deps, should get implicit B->C edge).
+5. **`resolveNextStages` with synthesized edges** -- After plan completes, both implement and test are ready (parallel). After both complete, integrate is ready (join).
+6. **Entrypoints detected correctly** -- First stage with no `depends_on` is auto-detected as entrypoint.
+
+### Step 5: Add integration test for DAG advance with parallel stages
+
+In `packages/core/__tests__/dag-advance.test.ts`, add a test using a dag-parallel flow pattern (plan -> parallel [implement, test] -> integrate):
+
+1. Write a test flow YAML with parallel branches via `depends_on`.
+2. Create a session, set stage to `plan`.
+3. Advance from `plan` -- verify session moves to first ready parallel stage.
+4. Verify flow state shows `plan` as completed.
+5. Mark first parallel stage completed in flow state, advance -- verify `integrate` is NOT yet ready (join barrier), or second parallel stage is dispatched.
+6. Complete remaining parallel stage, advance -- verify `integrate` becomes next stage.
 
 ## Testing strategy
 
-- **No new tests needed.** This is a pure extraction refactor -- all existing behavior is preserved. The 7 test files that directly import `applyHookStatus`/`applyReport`/`mediateStageHandoff` from `session-orchestration.js` will continue to work via re-exports.
-- **Run the full test suite** (`make test`) to verify no import resolution or runtime breakage.
-- **Key test files to verify first** (they directly exercise the extracted functions):
-  - `completion-paths.test.ts` -- `applyHookStatus` + `applyReport` status transitions
-  - `autonomous-flow.test.ts` -- `applyHookStatus` SessionEnd auto-gate fallback
-  - `on-failure-retry.test.ts` -- `applyHookStatus` + `retryWithContext` retry logic
-  - `commit-verification.test.ts` -- `applyReport` + `applyHookStatus` commit checks
-  - `stage-handoff.test.ts` -- `mediateStageHandoff` integration with `applyHookStatus`
-  - `on-outcome.test.ts` -- `applyReport` outcome routing
-  - `bug-fixes.test.ts` -- `applyReport` edge cases
+- **Unit tests** (`graph-flow.test.ts`): Verify `parseGraphFlow()` correctly synthesizes edges from `depends_on`. Cover patterns: linear, fan-out, join, mixed.
+- **Unit tests** (`dag-flow.test.ts`): Existing `getReadyStages()` tests must continue to pass (function is not modified).
+- **Integration tests** (`dag-advance.test.ts`): Verify `advance()` correctly uses graph-flow routing for `depends_on` flows, including join barrier waiting behavior.
+- **Existing test suite**: Run `make test` to verify no regressions. All existing flows that use `depends_on` with linear chains (like `quick.yaml`) should still advance correctly since the graph-flow path handles linear DAGs.
+- **Manual verification**: Dispatch a session with `dag-parallel` flow and observe stage transitions.
 
 ## Risk assessment
 
-| Risk | Mitigation |
-|------|------------|
-| **Circular dependency** between `session-hooks.ts` and `session-orchestration.ts` | One-way dependency only: hooks imports from orchestration, orchestration only re-exports from hooks. ES module re-exports don't create circular deps. |
-| **Import breakage** in test files or other consumers | Re-exports in `session-orchestration.ts` maintain 100% backward compatibility. No test files need modification. |
-| **`recordSessionUsage` shared between both modules** | Keep it in `session-orchestration.ts` (where `parseNonClaudeTranscript` also uses it), import into `session-hooks.ts`. It's an internal (non-exported) helper, so export it from orchestration. |
-| **`.js` extension in imports** | All new imports must use `.js` extensions per project convention. |
-| **`conductor.ts` namespace import** | Conductor uses `import * as session`, so all re-exported names appear on the `session` namespace unchanged. |
+1. **All `depends_on` flows now route through graph-flow path** -- This changes the code path for `autonomous-sdlc`, `quick`, `default`, `islc`, `islc-quick`, and `dag-parallel` flows. The graph-flow path is more capable (handles joins, conditionals, skipped stages), so this should be strictly better. Risk: if any flow relied on the linear path's simpler behavior, it could behave differently. Mitigation: the graph-flow path produces correct linear progression for linear chains.
+
+2. **Flow state persistence becomes required** -- The graph-flow path uses `loadFlowState()` / `markStageCompleted()` for tracking. The linear path didn't depend on this. `loadFlowState()` returns null gracefully and `markStageCompleted()` creates the file on first call, so this is safe for flows that never had state files.
+
+3. **`on_outcome` routing gap** -- The linear path handles `on_outcome` via `resolveNextStage()`. The graph-flow path does NOT handle `on_outcome`. However, no current flow YAML uses `on_outcome` (only the `StageDefinition` type supports it), so this is a theoretical risk only. A follow-up can map `on_outcome` to conditional edges if needed.
+
+4. **Existing `dag-advance.test.ts` tests** -- The test creates a linear DAG flow (plan->implement->review with `depends_on`). After the change, this flow routes through graph-flow instead of linear. Assertions about `stage === "implement"` still hold since graph-flow resolves linear chains correctly. The "last stage completes flow" test uses event-based stage tracking that may need updating to use flow state instead.
+
+5. **No breaking changes to flow YAML format** -- The `depends_on` field and `edges` array semantics are unchanged. This is purely an internal routing fix.
 
 ## Open questions
 
-1. **Should `recordSessionUsage` move to a shared utility module?** It's used by both `session-orchestration.ts` (via `parseNonClaudeTranscript` in `complete()`) and `session-hooks.ts` (via `applyHookStatus`). Currently a private function -- extracting it to e.g. `services/usage.ts` would be cleaner but adds scope. Recommendation: export it from `session-orchestration.ts` for now, extract to a utility in a future pass.
+1. **Should `advance()` dispatch multiple parallel stages simultaneously?** Currently even in the graph-flow path, only `readyStages[0]` is dispatched (line 610). For true parallel execution of `dag-parallel` (implement + test at the same time), multi-dispatch would be needed. This is out of scope -- this plan only unifies routing so the DAG is correctly resolved. A follow-up can dispatch all ready stages.
 
-2. **Should we update conductor.ts imports now or later?** The conductor could import directly from `session-hooks.js` for hook/report functions. This is cleaner but not necessary due to re-exports. Recommendation: defer to a follow-up PR to keep this change minimal and safe.
+2. **Should `on_outcome` be converted to conditional edges in `parseGraphFlow()`?** No current flow uses `on_outcome` without explicit `edges:`, so this isn't urgent. For completeness, `parseGraphFlow()` could translate `on_outcome` maps into conditional edge entries. Recommend deferring.
