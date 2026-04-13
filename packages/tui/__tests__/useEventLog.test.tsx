@@ -91,6 +91,8 @@ describe("useEventLog", () => {
     for (const entry of capturedEvents) {
       expect(typeof entry.time).toBe("string");
       expect(typeof entry.source).toBe("string");
+      expect(typeof entry.sessionId).toBe("string");
+      expect(entry.sessionId).toBeTruthy();
       expect(typeof entry.type).toBe("string");
       expect(typeof entry.message).toBe("string");
       expect(typeof entry.color).toBe("string");

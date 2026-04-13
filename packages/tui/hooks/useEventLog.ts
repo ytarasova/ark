@@ -12,6 +12,7 @@ import { eventLogColor, type InkColor } from "../helpers/colors.js";
 export interface EventLogEntry {
   time: string;
   source: string;
+  sessionId: string;
   type: string;
   message: string;
   color: InkColor;
@@ -34,6 +35,7 @@ async function fetchEvents(ark: ArkClient, expanded: boolean): Promise<EventLogE
           allEvents.push({
             time: hms(ev.created_at),
             source,
+            sessionId: s.id,
             type: ev.type,
             message: formatEvent(ev.type, ev.data ?? undefined),
             color: eventLogColor(ev.type),

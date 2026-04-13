@@ -14,7 +14,7 @@ interface DetailPanelProps {
  * across all tabs.
  */
 export function DetailPanel({ children, active = false, resetKey }: DetailPanelProps) {
-  // panel title+gap (2) + event log (2) + status bar (1) + padding (1) = 9
+  // panel title+gap (2) + status bar (3) = 5
   return (
     <ScrollBox active={active} resetKey={resetKey}>
       {children}

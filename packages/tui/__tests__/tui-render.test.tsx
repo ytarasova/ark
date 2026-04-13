@@ -49,18 +49,20 @@ describe("TUI App rendering", () => {
     unmount();
   });
 
-  it("renders tab bar with all 9 tabs", async () => {
+  it("renders tab bar with all 10 tabs", async () => {
     const { lastFrame, unmount } = await renderApp();
     const frame = lastFrame()!;
-
-    expect(frame).toContain("Sessions");
-    expect(frame).toContain("Agents");
-    expect(frame).toContain("Flows");
-    expect(frame).toContain("Compute");
-    expect(frame).toContain("History");
-    expect(frame).toContain("Memory");
-    expect(frame).toContain("Tools");
-    expect(frame).toContain("Schedules");
+    // Ink may wrap/truncate tab labels mid-word in narrow test terminals,
+    // so check for the key prefix which always appears on one line.
+    expect(frame).toContain("1:Sess");
+    expect(frame).toContain("2:Agen");
+    expect(frame).toContain("3:Even");
+    expect(frame).toContain("4:Flow");
+    expect(frame).toContain("5:Compu");
+    expect(frame).toContain("6:Histo");
+    expect(frame).toContain("7:Memo");
+    expect(frame).toContain("8:Tools");
+    expect(frame).toContain("9:Sched");
     expect(frame).toContain("Costs");
     unmount();
   });
@@ -77,17 +79,17 @@ describe("TUI App rendering", () => {
   it("tab switching works via key press", async () => {
     const { lastFrame, stdin, unmount } = await renderApp();
 
-    // Press "4" to switch to Compute tab
-    stdin.write("4");
+    // Press "5" to switch to Compute tab
+    stdin.write("5");
 
-    // Wait for React to re-render
+    // Wait for React to re-render; Ink may truncate "Compute" in narrow terminals
     for (let i = 0; i < 50; i++) {
       await new Promise(r => setTimeout(r, 20));
-      if (lastFrame()?.includes("Compute")) break;
+      if (lastFrame()?.includes("5:Compu")) break;
     }
 
     const frame = lastFrame()!;
-    expect(frame).toContain("Compute");
+    expect(frame).toContain("5:Compu");
     unmount();
   });
 

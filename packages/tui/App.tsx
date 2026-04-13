@@ -10,7 +10,7 @@ import { TabBar } from "./components/TabBar.js";
 import type { Tab } from "./components/TabBar.js";
 import type { Pane } from "./components/SplitPane.js";
 import { StatusBar } from "./components/StatusBar.js";
-import { EventLog } from "./components/EventLog.js";
+import { EventsTab, getEventsHints } from "./tabs/EventsTab.js";
 import {
   getOverlayHints,
   getRightPaneHints,
@@ -80,7 +80,6 @@ function AppInner({ arkDir: arkDirProp }: { arkDir?: string }) {
 
   const [showForm, setShowForm] = useState<string | null>(null);
   const [sessionPrefill, setSessionPrefill] = useState<SessionPrefill | undefined>();
-  const [eventLogExpanded, setEventLogExpanded] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [selectedSession, setSelectedSession] = useState<import("../types/index.js").Session | null>(null);
   const [sessionFilters, setSessionFilters] = useState<SessionListFilters>(EMPTY_SESSION_FILTERS);
@@ -144,9 +143,7 @@ function AppInner({ arkDir: arkDirProp }: { arkDir?: string }) {
       return;
     }
 
-    if (input === "e") {
-      setEventLogExpanded((v) => !v);
-    } else if (input >= "1" && input <= "9") {
+    if (input >= "1" && input <= "9") {
       const tab = TABS[parseInt(input) - 1];
       if (tab) switchTab(tab);
     }
@@ -182,6 +179,8 @@ function AppInner({ arkDir: arkDirProp }: { arkDir?: string }) {
           asyncState={agentsAsync}
           refresh={store.refresh}
         />
+      ) : tab === "events" ? (
+        <EventsTab pane={pane} />
       ) : tab === "tools" ? (
         <ToolsTab
           pane={pane}
@@ -239,16 +238,13 @@ function AppInner({ arkDir: arkDirProp }: { arkDir?: string }) {
         <HelpOverlay onClose={() => setShowHelp(false)} />
       )}
 
-      <EventLog
-        expanded={eventLogExpanded}
-      />
-
       <StatusBar
         hints={useMemo(() =>
           focus.owner ? getOverlayHints(focus.owner)
           : pane === "right" ? getRightPaneHints(tab)
           : tab === "sessions" ? getSessionHints(selectedSession, sessionFilters)
           : tab === "agents" ? getAgentsHints()
+          : tab === "events" ? getEventsHints()
           : tab === "tools" ? getToolsHints()
           : tab === "flows" ? getFlowsHints()
           : tab === "compute" ? getComputeHints()

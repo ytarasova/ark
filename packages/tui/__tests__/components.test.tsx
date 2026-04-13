@@ -26,14 +26,15 @@ describe("TabBar", () => {
     const frame = lastFrame()!;
     expect(frame).toContain("1:Sessions");
     expect(frame).toContain("2:Agents");
-    expect(frame).toContain("3:Flows");
-    expect(frame).toContain("4:Compute");
-    expect(frame).toContain("5:History");
-    expect(frame).toContain("6:Memory");
+    expect(frame).toContain("3:Events");
+    expect(frame).toContain("4:Flows");
+    expect(frame).toContain("5:Compute");
+    expect(frame).toContain("6:History");
+    expect(frame).toContain("7:Memory");
   });
 
   it("highlights the active tab by including it in output", () => {
-    const tabs = ["sessions", "agents", "flows", "compute", "history", "memory", "tools", "schedules", "costs"] as const;
+    const tabs = ["sessions", "agents", "events", "flows", "compute", "history", "memory", "tools", "schedules", "costs"] as const;
     for (const tab of tabs) {
       const { lastFrame } = render(<TabBar active={tab} />);
       const frame = lastFrame()!;
@@ -43,12 +44,12 @@ describe("TabBar", () => {
   });
 
   it("renders correctly with each tab active", () => {
-    const tabs = ["sessions", "agents", "flows", "compute", "history", "memory", "tools", "schedules", "costs"] as const;
+    const tabs = ["sessions", "agents", "events", "flows", "compute", "history", "memory", "tools", "schedules", "costs"] as const;
     for (const tab of tabs) {
       const { lastFrame } = render(<TabBar active={tab} />);
       const frame = lastFrame()!;
       expect(frame).toContain("1:Sessions");
-      expect(frame).toContain("4:Compute");
+      expect(frame).toContain("5:Compute");
     }
   });
 });
