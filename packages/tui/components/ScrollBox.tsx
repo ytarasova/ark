@@ -43,7 +43,7 @@ export function ScrollBox({ children, active = true, followIndex, resetKey }: Sc
   });
 
   return (
-    <ScrollList ref={listRef} selectedIndex={followIndex ?? 0} scrollAlignment="center">
+    <ScrollList ref={listRef} selectedIndex={followIndex ?? 0} scrollAlignment="auto">
       {children}
     </ScrollList>
   );
