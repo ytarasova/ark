@@ -10,7 +10,6 @@ import { KeyHint, sep } from "../helpers/statusBarHints.js";
 import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { ThreadsPanel } from "../components/ThreadsPanel.js";
-import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useSessionActions } from "../hooks/useSessionActions.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useConfirmation } from "../hooks/useConfirmation.js";
@@ -121,27 +120,8 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
     setStatusFilter(null);
   }, []);
 
-  // Top-level sessions, sorted to match visual TreeList order.
-  // When grouping by status, sort by status group order; otherwise by group name.
-  const topLevel = useMemo(() => {
-    const filtered = sessions.filter((s) => !s.parent_id);
-    if (groupByStatus) {
-      return filtered.sort((a, b) => {
-        const oa = STATUS_GROUP_ORDER[statusGroupLabel(a.status)] ?? 9;
-        const ob = STATUS_GROUP_ORDER[statusGroupLabel(b.status)] ?? 9;
-        if (oa !== ob) return oa - ob;
-        // Within same status group, sort by updated_at descending (most recent first)
-        return (b.updated_at ?? "").localeCompare(a.updated_at ?? "");
-      });
-    }
-    return filtered.sort((a, b) => {
-      const ga = a.group_name ?? "";
-      const gb = b.group_name ?? "";
-      if (ga === "" && gb !== "") return -1;
-      if (ga !== "" && gb === "") return 1;
-      return ga.localeCompare(gb);
-    });
-  }, [sessions, groupByStatus]);
+  // Top-level sessions (no pre-sort needed -- TreeList handles ordering via groupBy/groupSort)
+  const topLevel = useMemo(() => sessions.filter((s) => !s.parent_id), [sessions]);
 
   const filteredTopLevel = useMemo(() => {
     if (!statusFilter) return topLevel;
@@ -155,19 +135,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
   }, [topLevel, statusFilter]);
 
   const hasOverlay = formOverlay || overlay;
-  const { sel, setSel } = useListNavigation(filteredTopLevel.length, { active: pane === "left" && !hasOverlay });
-
-  // Sticky selection: when groupByStatus toggles, keep the same session
-  // selected by finding its new index in the reordered list.
-  const stickySelRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (stickySelRef.current) {
-      const id = stickySelRef.current;
-      stickySelRef.current = null;
-      const newIdx = filteredTopLevel.findIndex(s => s.id === id);
-      if (newIdx >= 0) setSel(newIdx);
-    }
-  }, [filteredTopLevel]);
+  const [selected, setSelected] = useState<Session | null>(null);
 
   // Push/pop focus when overlay opens/closes
   const prevOverlayRef = useRef<Overlay>(null);
@@ -179,8 +147,6 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
     }
     prevOverlayRef.current = overlay;
   }, [overlay]);
-
-  const selected = filteredTopLevel[sel] ?? null;
 
   // Clear search state when selected session changes
   useEffect(() => { setSearchResults(null); setSearchQuery(""); }, [selected?.id]);
@@ -324,9 +290,6 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
       return;
     }
     if (matchesHotkey("groupByStatus", input, key)) {
-      // Store current session ID so the useEffect below can restore
-      // selection after the reorder.
-      stickySelRef.current = selected?.id ?? null;
       setGroupByStatus(v => !v);
       return;
     }
@@ -465,7 +428,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
     } else if (input === "X") {
       if (selectedGroup && groupSessions.length > 0) {
         actions.deleteGroup(groupSessions);
-        setSel(0);
+        setSelected(null);
       }
     }
   });
@@ -496,6 +459,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
         left={
           <TreeList
             items={filteredTopLevel}
+            getKey={(s) => s.id}
             groupBy={groupByFn}
             emptyGroups={groupByStatus ? undefined : groups}
             groupSort={groupSortFn}
@@ -547,7 +511,9 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
                 );
               });
             }}
-            sel={sel}
+            selectedKey={selected?.id ?? null}
+            onSelect={(item) => setSelected(item)}
+            active={pane === "left" && !hasOverlay}
             emptyMessage={statusFilter ? `No ${statusFilter} sessions.` : "No sessions."}
           />
         }
@@ -639,8 +605,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
             <SessionSearch
               sessions={topLevel}
               onSelect={(s) => {
-                const idx = filteredTopLevel.findIndex(t => t.id === s.id);
-                if (idx >= 0) setSel(idx);
+                setSelected(s);
               }}
               onClose={() => setOverlay(null)}
             />

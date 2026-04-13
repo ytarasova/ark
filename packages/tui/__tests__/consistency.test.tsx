@@ -9,17 +9,21 @@ const items = [
   { id: "c", name: "Gamma" },
 ];
 
+const noop = () => {};
+
 describe("TreeList consistency", () => {
   it("renders > marker for selected item and spaces for unselected", () => {
     const { lastFrame, unmount } = render(
       <TreeList
         items={items}
+        getKey={(item) => item.id}
         renderRow={(item) => item.name}
-        sel={1}
+        selectedKey="b"
+        onSelect={noop}
       />
     );
     const frame = lastFrame()!;
-    // Selected item (Beta at index 1) should have > prefix
+    // Selected item (Beta) should have > prefix
     expect(frame).toContain("> Beta");
     // Unselected items should not have > prefix
     expect(frame).not.toContain("> Alpha");
@@ -34,8 +38,10 @@ describe("TreeList consistency", () => {
     const { lastFrame, unmount } = render(
       <TreeList
         items={items}
+        getKey={(item) => item.id}
         renderRow={(item) => item.name}
-        sel={0}
+        selectedKey="a"
+        onSelect={noop}
       />
     );
     const frame = lastFrame()!;

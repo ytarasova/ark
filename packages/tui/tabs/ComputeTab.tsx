@@ -16,7 +16,6 @@ import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { KeyValue } from "../components/KeyValue.js";
 import { DataTable } from "../components/DataTable.js";
-import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useComputeActions } from "../hooks/useComputeActions.js";
 import { useFocus } from "../hooks/useFocus.js";
 import type { StoreData } from "../hooks/useArkStore.js";
@@ -41,12 +40,8 @@ export function ComputeTab({ computes, sessions, refresh: _refresh, pane, snapsh
   const [showTemplates, setShowTemplates] = useState(false);
   const [templates, setTemplates] = useState<Array<{ name: string; description?: string; provider: string; config: Record<string, unknown> }>>([]);
 
-  // Sort by provider to match TreeList's visual group order
-  const sorted = useMemo(() =>
-    [...computes].sort((a, b) => a.provider.localeCompare(b.provider)),
-  [computes]);
+  const [selected, setSelected] = useState<Compute | null>(null);
 
-  const { sel } = useListNavigation(sorted.length, { active: pane === "left" && !formOverlay && !confirmation.pending && !showTemplates });
   const status = useStatusMessage();
   const actions = useComputeActions(asyncState, addComputeLog);
 
@@ -55,8 +50,6 @@ export function ComputeTab({ computes, sessions, refresh: _refresh, pane, snapsh
     if (confirmation.pending) focus.push("confirm");
     else focus.pop("confirm");
   }, [confirmation.pending]);
-
-  const selected = sorted[sel] ?? null;
 
   const hasOverlay = !!formOverlay || showTemplates;
 
@@ -131,7 +124,8 @@ export function ComputeTab({ computes, sessions, refresh: _refresh, pane, snapsh
         rightTitle="Details"
         left={
           <TreeList
-            items={sorted}
+            items={computes}
+            getKey={(h) => h.name}
             groupBy={h => h.provider}
             renderRow={(h) => {
               const icon = h.status === "destroyed" ? "\u2715" /* ✕ cross */ : h.status === "running" ? "\u25CF" /* ● circle */ : "\u25CB";
@@ -142,7 +136,9 @@ export function ComputeTab({ computes, sessions, refresh: _refresh, pane, snapsh
               const icon = h.status === "destroyed" ? "\u2715" /* ✕ cross */ : h.status === "running" ? "\u25CF" /* ● circle */ : "\u25CB";
               return <Text>{" "} <Text color={iconColor}>{icon}</Text>{` ${h.name.padEnd(16)} ${h.provider}`}</Text>;
             }}
-            sel={sel}
+            selectedKey={selected?.name ?? null}
+            onSelect={(item) => setSelected(item)}
+            active={pane === "left" && !formOverlay && !confirmation.pending && !showTemplates}
             emptyMessage="  No compute configured."
           />
         }

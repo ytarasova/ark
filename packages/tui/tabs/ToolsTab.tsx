@@ -11,7 +11,6 @@ import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { SectionHeader } from "../components/SectionHeader.js";
-import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useFocus } from "../hooks/useFocus.js";
 import { useArkClient } from "../hooks/useArkClient.js";
@@ -63,24 +62,15 @@ export function ToolsTab({ pane, asyncState, refresh, onUseRecipe }: ToolsTabPro
 
   const [items, setItems] = useState<ToolEntry[]>([]);
   useEffect(() => {
-    ark.toolsList(projectRoot).then((raw: ToolEntry[]) => {
-      const sorted = raw.sort((a: ToolEntry, b: ToolEntry) => {
-        const ga = groupLabel(a);
-        const gb = groupLabel(b);
-        if (ga === gb) return a.name.localeCompare(b.name);
-        return ga.localeCompare(gb);
-      });
-      setItems(sorted);
-    });
+    ark.toolsList(projectRoot).then((raw: ToolEntry[]) => setItems(raw));
   }, [projectRoot, version]);
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const hasOverlay = confirmDelete;
-  const { sel } = useListNavigation(items.length, { active: pane === "left" && !hasOverlay });
-  const selected = items[sel] ?? null;
+  const [selected, setSelected] = useState<ToolEntry | null>(null);
 
   // Clear confirm on selection change
-  useEffect(() => { setConfirmDelete(false); }, [sel]);
+  useEffect(() => { setConfirmDelete(false); }, [selected?.name]);
 
   // Push focus when confirmation overlay is active
   useEffect(() => {
@@ -197,12 +187,15 @@ export function ToolsTab({ pane, asyncState, refresh, onUseRecipe }: ToolsTabPro
       left={
         <TreeList
           items={items}
+          getKey={(item) => `${item.kind}:${item.name}`}
           groupBy={groupLabel}
           emptyGroups={projectRoot ? [...GLOBAL_GROUPS, ...PROJECT_GROUPS] : GLOBAL_GROUPS}
           renderRow={(item) => {
             return `${item.name.padEnd(20)} ${item.description}`;
           }}
-          sel={sel}
+          selectedKey={selected ? `${selected.kind}:${selected.name}` : null}
+          onSelect={(item) => setSelected(item)}
+          active={pane === "left" && !hasOverlay}
           emptyMessage="  No tools found."
         />
       }

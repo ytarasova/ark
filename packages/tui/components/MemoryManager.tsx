@@ -9,7 +9,6 @@ import { TreeList } from "./TreeList.js";
 import { DetailPanel } from "./DetailPanel.js";
 import { SectionHeader } from "./SectionHeader.js";
 import { KeyValue } from "./KeyValue.js";
-import { useListNavigation } from "../hooks/useListNavigation.js";
 import type { AsyncState } from "../hooks/useAsync.js";
 
 type Mode = "list" | "add" | "search" | "stats";
@@ -67,8 +66,7 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
   useEffect(() => { loadMemories(); loadStats(); }, [viewType]);
 
   const displayList = searchResults ?? memories;
-  const { sel } = useListNavigation(displayList.length, { active: pane === "left" && mode === "list" });
-  const selected = displayList[sel] ?? null;
+  const [selected, setSelected] = useState<any>(null);
 
   // Clear status after timeout
   useEffect(() => {
@@ -212,6 +210,7 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
           ) : (
             <TreeList
               items={displayList}
+              getKey={(m) => m.id ?? String(displayList.indexOf(m))}
               renderRow={(m) => getItemLabel(m)}
               renderColoredRow={(m) => (
                 <Box flexDirection="column">
@@ -225,7 +224,9 @@ export function MemoryManager({ asyncState: _asyncState, pane = "left", onClose 
                   </Text>
                 </Box>
               )}
-              sel={sel}
+              selectedKey={selected?.id ?? null}
+              onSelect={(item) => setSelected(item)}
+              active={pane === "left" && mode === "list"}
               emptyMessage={`  No ${viewLabel.toLowerCase()}. Press n to add.`}
             />
           )}

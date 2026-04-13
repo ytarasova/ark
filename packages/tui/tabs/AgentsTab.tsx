@@ -9,7 +9,6 @@ import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { SectionHeader } from "../components/SectionHeader.js";
-import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useFocus } from "../hooks/useFocus.js";
 import { useArkClient } from "../hooks/useArkClient.js";
@@ -47,18 +46,14 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
     ark.runtimeList().then(setRuntimes).catch(() => setRuntimes([]));
   }, [ark]);
 
-  // Build combined list: roles first, then runtimes
+  // Build combined list: roles and runtimes (no pre-sort needed -- TreeList handles grouping)
   const items: ListItem[] = useMemo(() => {
     const roles: ListItem[] = agents.map((a) => ({ kind: "role" as const, data: a }));
     const rts: ListItem[] = runtimes.map((r) => ({ kind: "runtime" as const, data: r }));
-    // Sort each group by name
-    roles.sort((a, b) => a.data.name.localeCompare(b.data.name));
-    rts.sort((a, b) => a.data.name.localeCompare(b.data.name));
     return [...roles, ...rts];
   }, [agents, runtimes]);
 
-  const { sel } = useListNavigation(items.length, { active: pane === "left" && !hasOverlay });
-  const selected = items[sel] ?? null;
+  const [selected, setSelected] = useState<ListItem | null>(null);
 
   useEffect(() => {
     if (formMode) focus.push("form");
@@ -134,6 +129,7 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
       left={
         <TreeList
           items={items}
+          getKey={(i) => `${i.kind}:${i.data.name}`}
           groupBy={groupLabel}
           emptyGroups={["Roles", "Runtimes"]}
           renderRow={(item) => {
@@ -148,7 +144,9 @@ export function AgentsTab({ agents, pane, asyncState, refresh }: AgentsTabProps)
               return `${r.name.padEnd(18)} ${type} ${model} ${r.description ?? ""}`;
             }
           }}
-          sel={sel}
+          selectedKey={selected ? `${selected.kind}:${selected.data.name}` : null}
+          onSelect={(item) => setSelected(item)}
+          active={pane === "left" && !hasOverlay}
           emptyMessage="  No agents or runtimes found."
         />
       }

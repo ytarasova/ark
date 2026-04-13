@@ -7,7 +7,6 @@ import { SplitPane } from "../components/SplitPane.js";
 import { TreeList } from "../components/TreeList.js";
 import { DetailPanel } from "../components/DetailPanel.js";
 import { SectionHeader } from "../components/SectionHeader.js";
-import { useListNavigation } from "../hooks/useListNavigation.js";
 import { useStatusMessage } from "../hooks/useStatusMessage.js";
 import { useFocus } from "../hooks/useFocus.js";
 import { useArkClient } from "../hooks/useArkClient.js";
@@ -26,11 +25,9 @@ export function FlowsTab({ flows, pane, asyncState, refresh }: FlowsTabProps) {
   const ark = useArkClient();
   const [formMode, setFormMode] = useState<"create" | null>(null);
   const hasOverlay = formMode !== null;
-  const { sel } = useListNavigation(flows.length, { active: pane === "left" && !hasOverlay });
+  const [selected, setSelected] = useState<any>(null);
   const status = useStatusMessage();
   const projectRoot = useMemo(() => findProjectRoot(process.cwd()) ?? undefined, []);
-
-  const selected = flows[sel] ?? null;
 
   useEffect(() => {
     if (formMode) focus.push("form");
@@ -71,11 +68,14 @@ export function FlowsTab({ flows, pane, asyncState, refresh }: FlowsTabProps) {
       left={
         <TreeList
           items={flows}
+          getKey={(p) => p.name}
           renderRow={(p) => {
             const source = p.source === "user" ? "*" : " ";
             return `${source} ${p.name.padEnd(16)} ${p.stages.length} stages`;
           }}
-          sel={sel}
+          selectedKey={selected?.name ?? null}
+          onSelect={(item) => setSelected(item)}
+          active={pane === "left" && !hasOverlay}
           emptyMessage="  No flows found."
         />
       }
