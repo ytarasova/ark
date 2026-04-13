@@ -291,6 +291,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
     }
     if (matchesHotkey("groupByStatus", input, key)) {
       setGroupByStatus(v => !v);
+      setSelected(null); // Reset to top of new group order
       return;
     }
 
