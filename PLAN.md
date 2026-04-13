@@ -1,136 +1,194 @@
-# Plan: Unify flow routing -- `depends_on` should create implicit edges
+# PLAN: Worktree Untracked File Setup
 
 ## Summary
 
-The flow system has two separate routing implementations that don't talk to each other: (1) the graph-flow path that uses explicit `edges:` arrays with conditional routing, join barriers, and skipped-stage tracking, and (2) the linear fallback path that ignores `depends_on` entirely and just calls `resolveNextStage()` (pure linear progression). When a flow defines `depends_on` on its stages but has no explicit `edges:` array, `parseGraphFlow()` generates linear edges (A->B->C) instead of honoring the declared DAG dependencies. This means flows like `dag-parallel.yaml` (parallel implement+test after plan, join at integrate) never actually run in parallel -- they degrade to linear execution.
-
-The fix: make `parseGraphFlow()` synthesize edges from `depends_on` declarations when no explicit `edges:` are provided, and route all `depends_on` flows through the graph-flow path in `advance()`.
+Git worktrees only contain tracked files, so agents dispatched into worktrees lose access to untracked files like `.env`, `.envrc`, `config/local.yaml`, and other local config. This feature adds a `worktree.copy` glob list and an optional `worktree.setup` script hook to `.ark.yaml` (RepoConfig), allowing repos to declare which untracked files should be copied into worktrees and what setup commands to run after worktree creation.
 
 ## Files to modify/create
 
 | File | Change |
 |------|--------|
-| `packages/core/state/graph-flow.ts` (lines 47-52) | Generate edges from `depends_on` instead of linear fallback when stages have `depends_on` |
-| `packages/core/services/session-orchestration.ts` (line 583) | Route through graph-flow path when stages have `depends_on`, not only when `edges` exist |
-| `packages/core/__tests__/graph-flow.test.ts` | Add tests for `depends_on`-to-edge synthesis |
-| `packages/core/__tests__/dag-advance.test.ts` | Add integration test for parallel DAG advance via `depends_on` |
+| `packages/core/repo-config.ts` | Add `worktree?: { copy?: string[]; setup?: string }` to `RepoConfig` interface |
+| `packages/core/services/session-orchestration.ts` | Add `copyWorktreeFiles()` and `runWorktreeSetup()` helpers; call them from `setupSessionWorktree()` after worktree creation (around line 1394) |
+| `packages/core/__tests__/worktree-setup.test.ts` | **CREATE** -- new test file for copy-glob and setup-script behavior |
+| `packages/core/__tests__/repo-config.test.ts` | Add tests for parsing `worktree.copy` and `worktree.setup` from YAML |
 
 ## Implementation steps
 
-### Step 1: Synthesize edges from `depends_on` in `parseGraphFlow()`
+### Step 1: Extend `RepoConfig` with worktree settings
 
-In `packages/core/state/graph-flow.ts`, lines 47-52, the auto-edge generation currently does:
+In `packages/core/repo-config.ts` (line 5-14), add to the `RepoConfig` interface:
 
 ```ts
-if (edges.length === 0 && nodes.length > 1) {
-  for (let i = 0; i < nodes.length - 1; i++) {
-    edges.push({ from: nodes[i].name, to: nodes[i + 1].name });
+export interface RepoConfig {
+  flow?: string;
+  compute?: string;
+  group?: string;
+  agent?: string;
+  env?: Record<string, string>;
+  verify?: string[];
+  auto_pr?: boolean;
+  auto_rebase?: boolean;
+  worktree?: {
+    copy?: string[];   // Glob patterns for untracked files to copy (e.g. [".env", ".envrc", "config/*.yaml"])
+    setup?: string;    // Shell command to run after worktree creation (e.g. "cp .env.example .env && bun install")
+  };
+}
+```
+
+No parsing changes needed -- `YAML.parse` already handles nested objects transparently.
+
+### Step 2: Add `copyWorktreeFiles()` helper
+
+In `packages/core/services/session-orchestration.ts`, add a new exported function near the existing `setupWorktree()` function (after line ~1770):
+
+```ts
+/**
+ * Copy untracked files matching glob patterns from source repo into worktree.
+ * Only copies files that exist in the source but NOT in the worktree (avoids
+ * overwriting tracked files that git already placed).
+ */
+export async function copyWorktreeFiles(
+  sourceRepo: string,
+  worktreeDir: string,
+  patterns: string[],
+): Promise<string[]> {
+  const copied: string[] = [];
+  for (const pattern of patterns) {
+    // Security: reject patterns with path traversal
+    if (pattern.includes("..")) continue;
+
+    const glob = new Bun.Glob(pattern);
+    for await (const relPath of glob.scan({ cwd: sourceRepo, dot: true })) {
+      // Skip if file already exists in worktree (tracked files placed by git)
+      const target = join(worktreeDir, relPath);
+      if (existsSync(target)) continue;
+
+      const source = join(sourceRepo, relPath);
+      mkdirSync(dirname(target), { recursive: true });
+      const content = readFileSync(source);
+      writeFileSync(target, content);
+      copied.push(relPath);
+    }
+  }
+  return copied;
+}
+```
+
+Add `dirname` to the existing `import { join, resolve } from "path"` (it already imports `join` and `resolve`; add `dirname`).
+
+Uses `Bun.Glob` which is natively available (Bun-only project per CLAUDE.md). The `dot: true` option ensures dotfiles like `.env` are matched.
+
+### Step 3: Add `runWorktreeSetup()` helper
+
+In `packages/core/services/session-orchestration.ts`, add near the copy helper:
+
+```ts
+/**
+ * Run a setup script in the worktree directory after file copy.
+ * Times out after 60 seconds. Errors are logged but do not fail dispatch.
+ */
+export async function runWorktreeSetup(
+  worktreeDir: string,
+  command: string,
+  onLog?: (msg: string) => void,
+): Promise<void> {
+  try {
+    const { stdout, stderr } = await execFileAsync("sh", ["-c", command], {
+      cwd: worktreeDir,
+      timeout: 60_000,
+      encoding: "utf-8",
+    });
+    if (stdout?.trim()) onLog?.(`setup stdout: ${stdout.trim().slice(0, 500)}`);
+    if (stderr?.trim()) onLog?.(`setup stderr: ${stderr.trim().slice(0, 500)}`);
+  } catch (e: any) {
+    onLog?.(`Worktree setup script failed (non-fatal): ${e?.message ?? e}`);
   }
 }
 ```
 
-Replace with logic that checks if any stage has `depends_on`. The input `yaml` object is the raw flow definition, so stages are available as `yaml.nodes ?? yaml.stages`. The function must:
+### Step 4: Wire into `setupSessionWorktree()`
 
-1. Check if any node in the raw YAML has a `depends_on` field.
-2. If YES: generate one edge per dependency (`{ from: dep, to: stage.name }` for each dep in `depends_on`). Stages with no `depends_on` and `i > 0` get an implicit edge from the previous stage (preserving the existing linear fallback for mixed flows).
-3. If NO `depends_on` found: keep the existing linear edge generation.
-4. Explicit `edges:` from YAML still take highest priority (unchanged -- they're already parsed on line 40).
-
-Concrete replacement for lines 47-52:
+In `setupSessionWorktree()` (lines 1357-1425 of `session-orchestration.ts`), insert the copy+setup calls after the worktree is created and before the trust configuration. Specifically, after line 1404 (the closing brace of the `if (wantWorktree ...)` block) and before line 1407 (`// Trust worktree for Claude`):
 
 ```ts
-// Auto-generate edges when no explicit edges provided
-if (edges.length === 0 && nodes.length > 1) {
-  const rawStages = yaml.nodes ?? yaml.stages ?? [];
-  const hasDependsOn = rawStages.some((s: any) => s.depends_on?.length > 0);
-
-  if (hasDependsOn) {
-    // Synthesize edges from depends_on declarations
-    for (let i = 0; i < rawStages.length; i++) {
-      const s = rawStages[i];
-      if (s.depends_on?.length > 0) {
-        for (const dep of s.depends_on) {
-          edges.push({ from: dep, to: s.name });
-        }
-      } else if (i > 0) {
-        // No depends_on: implicit linear dependency on previous stage
-        edges.push({ from: rawStages[i - 1].name, to: s.name });
+  // Copy untracked files + run setup from .ark.yaml worktree config
+  if (effectiveWorkdir !== repoSource) {
+    const repoConfig = loadRepoConfig(repoSource);
+    if (repoConfig.worktree?.copy?.length) {
+      log("Copying untracked files to worktree...");
+      const copied = await copyWorktreeFiles(repoSource, effectiveWorkdir, repoConfig.worktree.copy);
+      if (copied.length > 0) {
+        log(`Copied ${copied.length} file(s): ${copied.slice(0, 5).join(", ")}${copied.length > 5 ? "..." : ""}`);
       }
     }
-  } else {
-    // Pure linear: no depends_on anywhere
-    for (let i = 0; i < nodes.length - 1; i++) {
-      edges.push({ from: nodes[i].name, to: nodes[i + 1].name });
+    if (repoConfig.worktree?.setup) {
+      log("Running worktree setup script...");
+      await runWorktreeSetup(effectiveWorkdir, repoConfig.worktree.setup, log);
     }
   }
-}
 ```
 
-### Step 2: Route `depends_on` flows through the graph-flow path in `advance()`
+The `repoConfig` is loaded from `repoSource` (the original repo checkout), not the worktree. The `.ark.yaml` is tracked so it exists in both, but `repoSource` is the canonical reference.
 
-In `packages/core/services/session-orchestration.ts`, line 583, the condition is:
+### Step 5: Add unit tests for helpers
 
-```ts
-if (flowDef && flowDef.edges?.length > 0) {
-```
+Create `packages/core/__tests__/worktree-setup.test.ts`:
 
-This only triggers for flows with explicit `edges:`. Change to also trigger when any stage has `depends_on`:
+1. **copies matching untracked files** -- create temp "repo" dir with `.env` and `config/local.yaml`, empty "worktree" dir. Call `copyWorktreeFiles`. Assert files copied with correct content and directory structure.
 
-```ts
-const hasDependsOn = flowDef?.stages?.some(s => s.depends_on?.length > 0);
-if (flowDef && (flowDef.edges?.length > 0 || hasDependsOn)) {
-```
+2. **skips files that already exist in worktree** -- pre-populate worktree with `.env` containing different content. Assert original is NOT overwritten.
 
-This ensures flows like `dag-parallel.yaml`, `autonomous-sdlc.yaml`, `quick.yaml`, `default.yaml`, `islc.yaml`, and `islc-quick.yaml` all route through the graph-flow path which handles join barriers, parallel readiness detection, and skipped stages.
+3. **handles nested glob patterns** -- test patterns like `config/**/*.yaml`, `secrets/*.key`.
 
-### Step 3: No changes needed to `FlowNode` interface
+4. **rejects `..` traversal** -- pattern `../../etc/passwd` should be silently skipped.
 
-`parseGraphFlow()` strips stage data to `name`, `agent`, `model`, `gate`, `on_failure` (lines 32-38). The `depends_on` field is not propagated to `FlowNode` because edges carry the dependency information. The raw YAML is available in the function scope for Step 1.
+5. **handles no matches gracefully** -- pattern `*.nonexistent` returns empty array.
 
-### Step 4: Add unit tests for `depends_on` edge synthesis
+6. **runWorktreeSetup executes command in worktree dir** -- run `echo hello > marker.txt`, assert file exists.
 
-In `packages/core/__tests__/graph-flow.test.ts`, add these tests:
+7. **runWorktreeSetup is non-fatal on failure** -- run a command that exits non-zero, assert no exception thrown.
 
-1. **`depends_on` creates correct edges** -- Parse a flow with stages using `depends_on` but no explicit edges. Verify edges match the dependency graph.
-2. **Parallel fan-out from `depends_on`** -- Stages B and C both `depends_on: [A]`. Verify edges: A->B, A->C. Verify `isFanOutNode(flow, "A")` returns true.
-3. **Join barrier from `depends_on`** -- Stage D `depends_on: [B, C]`. Verify edges B->D, C->D. Verify `isJoinNode(flow, "D")` returns true.
-4. **Mixed `depends_on` and implicit linear** -- Stage A (no deps), B (`depends_on: [A]`), C (no deps, should get implicit B->C edge).
-5. **`resolveNextStages` with synthesized edges** -- After plan completes, both implement and test are ready (parallel). After both complete, integrate is ready (join).
-6. **Entrypoints detected correctly** -- First stage with no `depends_on` is auto-detected as entrypoint.
+### Step 6: Add config parsing tests
 
-### Step 5: Add integration test for DAG advance with parallel stages
+In `packages/core/__tests__/repo-config.test.ts`, add:
 
-In `packages/core/__tests__/dag-advance.test.ts`, add a test using a dag-parallel flow pattern (plan -> parallel [implement, test] -> integrate):
+8. **parses worktree.copy list** -- YAML `worktree:\n  copy:\n    - ".env"\n    - "config/*.yaml"` produces correct structure.
 
-1. Write a test flow YAML with parallel branches via `depends_on`.
-2. Create a session, set stage to `plan`.
-3. Advance from `plan` -- verify session moves to first ready parallel stage.
-4. Verify flow state shows `plan` as completed.
-5. Mark first parallel stage completed in flow state, advance -- verify `integrate` is NOT yet ready (join barrier), or second parallel stage is dispatched.
-6. Complete remaining parallel stage, advance -- verify `integrate` becomes next stage.
+9. **parses worktree.setup string** -- YAML `worktree:\n  setup: "bun install"` produces correct structure.
+
+10. **handles partial worktree config** -- only `copy` without `setup`, and vice versa.
 
 ## Testing strategy
 
-- **Unit tests** (`graph-flow.test.ts`): Verify `parseGraphFlow()` correctly synthesizes edges from `depends_on`. Cover patterns: linear, fan-out, join, mixed.
-- **Unit tests** (`dag-flow.test.ts`): Existing `getReadyStages()` tests must continue to pass (function is not modified).
-- **Integration tests** (`dag-advance.test.ts`): Verify `advance()` correctly uses graph-flow routing for `depends_on` flows, including join barrier waiting behavior.
-- **Existing test suite**: Run `make test` to verify no regressions. All existing flows that use `depends_on` with linear chains (like `quick.yaml`) should still advance correctly since the graph-flow path handles linear DAGs.
-- **Manual verification**: Dispatch a session with `dag-parallel` flow and observe stage transitions.
+- **Unit tests**: `copyWorktreeFiles` and `runWorktreeSetup` are standalone functions testable with temp directories. No AppContext or git repo needed.
+- **Config parsing**: Extend existing `repo-config.test.ts` with worktree field cases.
+- **Integration**: The wiring into `setupSessionWorktree` is verified indirectly through the existing dispatch flow. The unit tests for the helpers provide sufficient coverage for the new logic.
+- **Manual verification**: Dispatch a session against a repo with `.ark.yaml` containing `worktree:\n  copy: [".env"]` and confirm the `.env` appears in the worktree.
+
+Run:
+```bash
+make test-file F=packages/core/__tests__/worktree-setup.test.ts
+make test-file F=packages/core/__tests__/repo-config.test.ts
+make test
+```
 
 ## Risk assessment
 
-1. **All `depends_on` flows now route through graph-flow path** -- This changes the code path for `autonomous-sdlc`, `quick`, `default`, `islc`, `islc-quick`, and `dag-parallel` flows. The graph-flow path is more capable (handles joins, conditionals, skipped stages), so this should be strictly better. Risk: if any flow relied on the linear path's simpler behavior, it could behave differently. Mitigation: the graph-flow path produces correct linear progression for linear chains.
-
-2. **Flow state persistence becomes required** -- The graph-flow path uses `loadFlowState()` / `markStageCompleted()` for tracking. The linear path didn't depend on this. `loadFlowState()` returns null gracefully and `markStageCompleted()` creates the file on first call, so this is safe for flows that never had state files.
-
-3. **`on_outcome` routing gap** -- The linear path handles `on_outcome` via `resolveNextStage()`. The graph-flow path does NOT handle `on_outcome`. However, no current flow YAML uses `on_outcome` (only the `StageDefinition` type supports it), so this is a theoretical risk only. A follow-up can map `on_outcome` to conditional edges if needed.
-
-4. **Existing `dag-advance.test.ts` tests** -- The test creates a linear DAG flow (plan->implement->review with `depends_on`). After the change, this flow routes through graph-flow instead of linear. Assertions about `stage === "implement"` still hold since graph-flow resolves linear chains correctly. The "last stage completes flow" test uses event-based stage tracking that may need updating to use flow state instead.
-
-5. **No breaking changes to flow YAML format** -- The `depends_on` field and `edges` array semantics are unchanged. This is purely an internal routing fix.
+| Risk | Mitigation |
+|------|------------|
+| **Glob patterns copy sensitive files unintentionally** | Patterns are explicit opt-in via `.ark.yaml`. No default copying. Users declare exactly what to copy. |
+| **Path traversal via `..` in patterns** | Reject patterns containing `..` segments. Only copy files within the source repo root. |
+| **Large files or many matches slow dispatch** | `Bun.Glob` scan is fast. Patterns should be specific. Copied count is logged for observability. |
+| **Setup script hangs** | 60-second timeout on `execFileAsync`. Non-fatal -- error logged and dispatch continues. |
+| **Setup script has side effects beyond worktree** | Runs with `cwd` set to worktree. User responsibility to scope commands appropriately. |
+| **Breaking changes** | None. New optional field on `RepoConfig`. Existing configs without `worktree` key are unaffected. Existing `setupSessionWorktree` behavior unchanged when no `worktree` config is present. |
+| **Symlinks in source repo** | `readFileSync`/`writeFileSync` follows symlinks and copies content. This is the correct behavior -- the worktree gets real files. |
 
 ## Open questions
 
-1. **Should `advance()` dispatch multiple parallel stages simultaneously?** Currently even in the graph-flow path, only `readyStages[0]` is dispatched (line 610). For true parallel execution of `dag-parallel` (implement + test at the same time), multi-dispatch would be needed. This is out of scope -- this plan only unifies routing so the DAG is correctly resolved. A follow-up can dispatch all ready stages.
+1. **Should `worktree.copy` support negation patterns?** (e.g., `!.env.production` to exclude from a broader `*.env` pattern). Recommendation: defer -- users can write specific patterns. Negation adds complexity for minimal gain.
 
-2. **Should `on_outcome` be converted to conditional edges in `parseGraphFlow()`?** No current flow uses `on_outcome` without explicit `edges:`, so this isn't urgent. For completeness, `parseGraphFlow()` could translate `on_outcome` maps into conditional edge entries. Recommend deferring.
+2. **Should copied files be auto-added to `.gitignore` in the worktree?** Recommendation: no -- the source repo already has these files untracked (via its own `.gitignore`), and the worktree inherits the same `.gitignore` rules.
+
+3. **Should there be a global `~/.ark/config.yaml` equivalent for `worktree.copy`?** Some env files are user-global, not repo-specific. Recommendation: defer -- repo-level `.ark.yaml` covers the primary use case (project-specific config files).

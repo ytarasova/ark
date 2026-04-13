@@ -91,4 +91,49 @@ describe("loadRepoConfig", () => {
     const config = loadRepoConfig(tempDir);
     expect(config).toEqual({});
   });
+
+  it("parses worktree.copy list", () => {
+    writeFileSync(join(tempDir, ".ark.yaml"), [
+      "worktree:",
+      "  copy:",
+      '    - ".env"',
+      '    - "config/*.yaml"',
+    ].join("\n"));
+
+    const config = loadRepoConfig(tempDir);
+    expect(config.worktree?.copy).toEqual([".env", "config/*.yaml"]);
+  });
+
+  it("parses worktree.setup string", () => {
+    writeFileSync(join(tempDir, ".ark.yaml"), [
+      "worktree:",
+      '  setup: "bun install"',
+    ].join("\n"));
+
+    const config = loadRepoConfig(tempDir);
+    expect(config.worktree?.setup).toBe("bun install");
+  });
+
+  it("handles partial worktree config -- copy only", () => {
+    writeFileSync(join(tempDir, ".ark.yaml"), [
+      "worktree:",
+      "  copy:",
+      '    - ".envrc"',
+    ].join("\n"));
+
+    const config = loadRepoConfig(tempDir);
+    expect(config.worktree?.copy).toEqual([".envrc"]);
+    expect(config.worktree?.setup).toBeUndefined();
+  });
+
+  it("handles partial worktree config -- setup only", () => {
+    writeFileSync(join(tempDir, ".ark.yaml"), [
+      "worktree:",
+      '  setup: "make deps"',
+    ].join("\n"));
+
+    const config = loadRepoConfig(tempDir);
+    expect(config.worktree?.setup).toBe("make deps");
+    expect(config.worktree?.copy).toBeUndefined();
+  });
 });
