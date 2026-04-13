@@ -136,6 +136,47 @@ describe("TreeList", () => {
     unmount();
   });
 
+  it("group headers contain group name and item count", () => {
+    const statusItems = [
+      { id: "r1", name: "Run1", group: "Running" },
+      { id: "r2", name: "Run2", group: "Running" },
+      { id: "f1", name: "Fail1", group: "Failed" },
+    ];
+    const { lastFrame, unmount } = render(
+      <TreeList
+        items={statusItems}
+        groupBy={(i) => i.group}
+        renderRow={(i) => `  ${i.name}`}
+        sel={0}
+      />
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("Failed (1)");
+    expect(frame).toContain("Running (2)");
+    unmount();
+  });
+
+  it("group header is visible when first item in group is selected", () => {
+    const statusItems = [
+      { id: "r1", name: "Run1", group: "Running" },
+      { id: "f1", name: "Fail1", group: "Failed" },
+    ];
+    // sel=0 selects first item (Failed -> Fail1, alphabetical order)
+    const { lastFrame, unmount } = render(
+      <TreeList
+        items={statusItems}
+        groupBy={(i) => i.group}
+        renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
+        sel={0}
+      />
+    );
+    const frame = lastFrame()!;
+    // Both the group header and the selected item should be visible
+    expect(frame).toContain("Failed (1)");
+    expect(frame).toContain("> Fail1");
+    unmount();
+  });
+
   it("empty groups between items don't break selection", () => {
     const items = [
       { id: "c", name: "Charlie", group: "c-group" },

@@ -9,7 +9,8 @@
 
 import { test, expect } from "@playwright/test";
 import { rmSync } from "node:fs";
-import { startHarness, waitForText, readTerminal, seedSession, mkTempArkDir } from "../harness.js";
+import { execFileSync } from "node:child_process";
+import { startHarness, waitForText, readTerminal, seedSession, pressKey, mkTempArkDir, runArkCli } from "../harness.js";
 
 test.describe("Ark TUI sessions list", () => {
   test("seeded sessions appear in the list pane", async ({ page }) => {
@@ -46,6 +47,40 @@ test.describe("Ark TUI sessions list", () => {
 
         const text = await readTerminal(page);
         expect(text).toMatch(/\d+ sessions?/);
+      } finally {
+        await harness.stop();
+      }
+    } finally {
+      rmSync(arkDir, { recursive: true, force: true });
+    }
+  });
+
+  test("group-by-status shows status group headers", async ({ page }) => {
+    const arkDir = mkTempArkDir();
+    try {
+      // Seed sessions -- they start in "ready" status
+      seedSession(arkDir, { summary: "group-test-alpha" });
+      seedSession(arkDir, { summary: "group-test-beta" });
+      // Mark one as completed via CLI
+      const id = seedSession(arkDir, { summary: "group-test-done" });
+      if (id) {
+        runArkCli(["session", "complete", id, "--force"], { arkDir });
+      }
+
+      const harness = await startHarness({ arkDir, rows: 40 });
+      try {
+        await page.goto(harness.pageUrl);
+        await waitForText(page, "Sessions", { timeoutMs: 15_000 });
+        await waitForText(page, "group-test-alpha", { timeoutMs: 10_000 });
+
+        // Toggle group-by-status with %
+        await pressKey(page, "%");
+        await waitForText(page, "by status", { timeoutMs: 5_000 });
+
+        const text = await readTerminal(page);
+        // Group headers should be visible
+        expect(text).toContain("Ready");
+        expect(text).toContain("Completed");
       } finally {
         await harness.stop();
       }
