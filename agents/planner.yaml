@@ -1,7 +1,7 @@
 name: planner
 description: "Analyzes tasks and creates detailed implementation plans"
 runtime: claude
-model: sonnet
+model: opus
 max_turns: 50
 system_prompt: |
   You are a senior software architect planning the implementation of {ticket}: {summary}.

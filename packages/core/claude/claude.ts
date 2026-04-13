@@ -285,6 +285,19 @@ function hookCommand(sessionId: string, conductorUrl: string, tenantId?: string)
   return `curl -sf -X POST -H 'Content-Type: application/json'${tenantHeader} -d @- '${conductorUrl}/hooks/status?session=${sessionId}' > /dev/null 2>&1 || true ${ARK_HOOK_MARKER}`;
 }
 
+/**
+ * PostCompact hook: re-inject the original task prompt after context compaction.
+ * Reads the task from ~/.ark/tracks/<sessionId>/task.txt and echoes it as
+ * a user-visible message so the agent retains its mission after compaction.
+ */
+function postCompactTaskHook(sessionId: string): Record<string, unknown> {
+  const arkDir = process.env.ARK_TEST_DIR || `${process.env.HOME}/.ark`;
+  const taskFile = `${arkDir}/tracks/${sessionId}/task.txt`;
+  // Read task file and output a reminder. head -c to avoid ARG_MAX issues.
+  const cmd = `if [ -f '${taskFile}' ]; then echo "TASK REMINDER (re-injected after context compaction):"; head -c 4000 '${taskFile}'; fi ${ARK_HOOK_MARKER}`;
+  return { type: "command", command: cmd, async: false };
+}
+
 function buildHooksConfig(sessionId: string, conductorUrl: string, tenantId?: string): Record<string, unknown[]> {
   const cmd = hookCommand(sessionId, conductorUrl, tenantId);
   const asyncHook = { type: "command" as const, command: cmd, async: true };
@@ -299,7 +312,7 @@ function buildHooksConfig(sessionId: string, conductorUrl: string, tenantId?: st
     SessionEnd: [{ hooks: [asyncHook] }],
     Notification: [{ matcher: "permission_prompt|idle_prompt", hooks: [asyncHook] }],
     PreCompact: [{ hooks: [asyncHook] }],
-    PostCompact: [{ hooks: [asyncHook] }],
+    PostCompact: [{ hooks: [asyncHook, postCompactTaskHook(sessionId)] }],
   };
 }
 
