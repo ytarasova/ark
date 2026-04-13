@@ -6,8 +6,8 @@
  */
 
 import { randomUUID } from "crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from "fs";
-import { join, resolve } from "path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync, copyFileSync } from "fs";
+import { join, resolve, dirname, normalize, isAbsolute } from "path";
 import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
 
@@ -1404,6 +1404,13 @@ export async function setupSessionWorktree(
     }
   }
 
+  // Copy untracked files + run setup from .ark.yaml worktree config
+  const repoConfig = loadRepoConfig(repoSource);
+  if (repoConfig.worktree && (repoConfig.worktree.copy?.length || repoConfig.worktree.setup)) {
+    log("Copying untracked files to worktree...");
+    await applyWorktreeSetup(app, session.id, repoSource, effectiveWorkdir, repoConfig.worktree);
+  }
+
   // Trust worktree for Claude
   log("Configuring Claude trust + channel...");
   claude.trustWorktree(repoSource, effectiveWorkdir);
@@ -1768,6 +1775,98 @@ async function setupWorktree(app: AppContext, repoPath: string, sessionId: strin
     logError("session", `setupWorktree: worktree prune failed: ${e?.message ?? e}`);
   }
   return null;
+}
+
+// ── Worktree untracked file setup ───────────────────────────────────────
+
+/**
+ * Copy untracked files from original repo into worktree and run optional setup script.
+ * Errors are surfaced as events + messages, never thrown -- the agent can still work
+ * without these files, and aborting dispatch would be worse than a missing .env.
+ */
+async function applyWorktreeSetup(
+  app: AppContext,
+  sessionId: string,
+  repoSource: string,
+  worktreePath: string,
+  config: { copy?: string[]; setup?: string },
+): Promise<void> {
+  // Copy listed files
+  if (config.copy?.length) {
+    for (const entry of config.copy) {
+      // Validate: must be relative, no traversal
+      if (isAbsolute(entry) || normalize(entry).startsWith("..")) {
+        app.events.log(sessionId, "worktree_setup_error", {
+          actor: "system",
+          data: { file: entry, error: "path traversal rejected" },
+        });
+        app.messages.send(
+          sessionId, "system",
+          `Failed to copy untracked file '${entry}' to worktree: path traversal rejected`,
+          "error",
+        );
+        continue;
+      }
+
+      const source = join(repoSource, entry);
+      const dest = join(worktreePath, entry);
+
+      // Extra safety: resolved dest must be inside worktree
+      if (!resolve(dest).startsWith(resolve(worktreePath))) {
+        app.events.log(sessionId, "worktree_setup_error", {
+          actor: "system",
+          data: { file: entry, error: "path traversal rejected" },
+        });
+        app.messages.send(
+          sessionId, "system",
+          `Failed to copy untracked file '${entry}' to worktree: path traversal rejected`,
+          "error",
+        );
+        continue;
+      }
+
+      try {
+        if (!existsSync(source)) {
+          throw new Error(`source file not found: ${source}`);
+        }
+        mkdirSync(dirname(dest), { recursive: true });
+        copyFileSync(source, dest);
+      } catch (err: any) {
+        app.events.log(sessionId, "worktree_setup_error", {
+          actor: "system",
+          data: { file: entry, error: err?.message ?? String(err) },
+        });
+        app.messages.send(
+          sessionId, "system",
+          `Failed to copy untracked file '${entry}' to worktree: ${err?.message ?? err}`,
+          "error",
+        );
+      }
+    }
+  }
+
+  // Run optional setup script
+  if (config.setup) {
+    try {
+      await execFileAsync("sh", ["-c", config.setup], {
+        cwd: worktreePath,
+        encoding: "utf-8",
+        timeout: 30_000,
+      });
+    } catch (err: any) {
+      const stderr = err?.stderr ?? "";
+      const exitCode = err?.code ?? err?.status;
+      app.events.log(sessionId, "worktree_setup_error", {
+        actor: "system",
+        data: { script: config.setup, error: stderr || err?.message, exitCode },
+      });
+      app.messages.send(
+        sessionId, "system",
+        `Worktree setup script failed: ${config.setup}\n${stderr || err?.message}`,
+        "error",
+      );
+    }
+  }
 }
 
 // ── Worktree diff ───────────────────────────────────────────────────────

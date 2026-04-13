@@ -11,6 +11,10 @@ export interface RepoConfig {
   verify?: string[];  // Default verification scripts for all stages
   auto_pr?: boolean;  // Auto-create PR on agent completion (default: true for repos with remotes)
   auto_rebase?: boolean;  // Auto-rebase onto base branch before PR creation (default: true)
+  worktree?: {
+    copy?: string[];   // Relative paths of untracked files to copy from original repo
+    setup?: string;    // Shell command to run in worktree after copy (e.g. "direnv allow")
+  };
 }
 
 export function loadRepoConfig(dir: string): RepoConfig {
