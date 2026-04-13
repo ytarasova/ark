@@ -111,6 +111,15 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   const payload = await req.json() as Record<string, unknown>;
   const event = String(payload.hook_event_name ?? "");
 
+  // Guard: ignore stale hook events from a previous stage's agent session.
+  // After stage handoff, the old agent process sends SessionEnd/Stop, but
+  // the Ark session is already running a new agent. Match the agent session
+  // ID in the payload against the session's current session_id to filter stale events.
+  const hookAgentId = payload.session_id as string | undefined;
+  if (hookAgentId && s.claude_session_id && hookAgentId !== s.claude_session_id) {
+    return Response.json({ status: "ok", mapped: "ignored_stale" });
+  }
+
   // Guardrail evaluation for PreToolUse events
   if (event === "PreToolUse") {
     const toolName = String(payload.tool_name ?? "");
