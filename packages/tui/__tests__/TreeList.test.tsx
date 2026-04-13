@@ -177,6 +177,34 @@ describe("TreeList", () => {
     unmount();
   });
 
+  it("first group header appears on the first line of output", () => {
+    const statusItems = [
+      { id: "r1", name: "Run1", group: "Running" },
+      { id: "r2", name: "Run2", group: "Running" },
+      { id: "f1", name: "Fail1", group: "Failed" },
+    ];
+    const order: Record<string, number> = { Running: 0, Failed: 1 };
+    const { lastFrame, unmount } = render(
+      <TreeList
+        items={statusItems}
+        groupBy={(i) => i.group}
+        groupSort={(a, b) => (order[a] ?? 9) - (order[b] ?? 9)}
+        renderRow={(i, selected) => `${selected ? ">" : " "} ${i.name}`}
+        sel={0}
+      />
+    );
+    const frame = lastFrame()!;
+    const lines = frame.split("\n").filter(l => l.trim());
+    // First non-empty line MUST be the first group header
+    expect(lines[0]).toContain("Running (2)");
+    // Second line is the selected item
+    expect(lines[1]).toContain("> Run1");
+    // Failed group header appears later
+    const failedIdx = lines.findIndex(l => l.includes("Failed"));
+    expect(failedIdx).toBeGreaterThan(2);
+    unmount();
+  });
+
   it("empty groups between items don't break selection", () => {
     const items = [
       { id: "c", name: "Charlie", group: "c-group" },

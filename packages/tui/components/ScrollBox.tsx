@@ -84,7 +84,7 @@ export function ScrollBox({ children, reserveRows = 6, active = true, followInde
   const visible = items.slice(offset, offset + displayHeight);
 
   return (
-    <Box flexDirection="column" height={maxHeight} overflow="hidden">
+    <Box flexDirection="column" flexGrow={1} overflow="hidden">
       {visible.map((item, i) => (
         <React.Fragment key={offset + i}>{item}</React.Fragment>
       ))}
