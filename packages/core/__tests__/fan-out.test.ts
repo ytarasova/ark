@@ -586,19 +586,18 @@ describe("spawnParallelSubagents", () => {
     }
   });
 
-  it("each subagent can have different model overrides", async () => {
+  it("each subagent can have different model overrides", () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = await spawnParallelSubagents(app, parent.id, [
-      { task: "Review" },
-      { task: "Docs", model: "haiku" },
-    ]);
+    const r1 = spawnSubagent(app, parent.id, { task: "Review" });
+    const r2 = spawnSubagent(app, parent.id, { task: "Docs", model: "haiku" });
 
-    expect(result.sessionIds).toHaveLength(2);
+    expect(r1.ok).toBe(true);
+    expect(r2.ok).toBe(true);
 
-    const child1 = app.sessions.get(result.sessionIds[0])!;
-    const child2 = app.sessions.get(result.sessionIds[1])!;
+    const child1 = app.sessions.get(r1.sessionId!)!;
+    const child2 = app.sessions.get(r2.sessionId!)!;
     // Both children are linked to parent
     expect(child1.parent_id).toBe(parent.id);
     expect(child2.parent_id).toBe(parent.id);

@@ -82,8 +82,8 @@ describe("autoAcceptChannelPrompt", () => {
 
     await autoAcceptChannelPrompt("ark-test", { maxAttempts: 5, delayMs: 1 });
 
-    // Should have sent "1" then "Enter"
-    expect(sentKeys).toEqual([["1"], ["Enter"]]);
+    // Should have sent "1" then "Enter" (double-tap)
+    expect(sentKeys).toEqual([["1"], ["Enter"], ["Enter"]]);
   });
 
   it("stops polling when Claude is working (no prompt)", async () => {
@@ -105,8 +105,8 @@ describe("autoAcceptChannelPrompt", () => {
 
     await autoAcceptChannelPrompt("ark-test", { maxAttempts: 10, delayMs: 1 });
 
-    // Should have sent "1" + Enter when prompt was found on 3rd poll
-    expect(sentKeys).toEqual([["1"], ["Enter"]]);
+    // Should have sent "1" + Enter (double-tap) when prompt was found on 3rd poll
+    expect(sentKeys).toEqual([["1"], ["Enter"], ["Enter"]]);
   });
 
   it("handles double prompt from resume fallback", async () => {
@@ -146,7 +146,7 @@ describe("autoAcceptChannelPrompt", () => {
 
     await autoAcceptChannelPrompt("ark-test", { maxAttempts: 5, delayMs: 1 });
 
-    expect(sentKeys).toEqual([["1"], ["Enter"]]);
+    expect(sentKeys).toEqual([["1"], ["Enter"], ["Enter"]]);
   });
 
   it("detects Claude working via 'esc to interrupt' marker", async () => {

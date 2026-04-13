@@ -43,14 +43,20 @@ describe("daemon/status RPC handler", () => {
   });
 
   it("reports arkd offline when nothing is listening on the arkd port", async () => {
-    // Default arkd port 19300 should not have anything listening in test env
-    // (unless a real arkd is running, which is unlikely in CI)
-    server = startWebServer(getApp(), { port: 18561 });
-    const data = await rpcResult(18561, "daemon/status");
-    const result = data.result as Record<string, any>;
+    // Point arkd URL to a port that is definitely not in use
+    const origUrl = process.env.ARK_ARKD_URL;
+    process.env.ARK_ARKD_URL = "http://localhost:19399";
+    try {
+      server = startWebServer(getApp(), { port: 18561 });
+      const data = await rpcResult(18561, "daemon/status");
+      const result = data.result as Record<string, any>;
 
-    // ArkD should be offline (no daemon in test context)
-    expect(result.arkd.online).toBe(false);
+      // ArkD should be offline (no daemon on port 19399)
+      expect(result.arkd.online).toBe(false);
+    } finally {
+      if (origUrl !== undefined) process.env.ARK_ARKD_URL = origUrl;
+      else delete process.env.ARK_ARKD_URL;
+    }
   });
 
   it("includes proper URLs from config/env", async () => {

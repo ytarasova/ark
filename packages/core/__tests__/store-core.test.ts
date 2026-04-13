@@ -83,7 +83,7 @@ describe("claimSession", () => {
 
 describe("mergeComputeConfig", () => {
   it("merges keys into existing config", () => {
-    getApp().computes.create({ name: "test-merge", config: { a: 1, b: 2 } });
+    getApp().computes.create({ name: "test-merge", provider: "docker", config: { a: 1, b: 2 } });
 
     const result = getApp().computes.mergeConfig("test-merge", { b: 3, c: 4 });
     expect(result).not.toBeNull();
@@ -100,7 +100,7 @@ describe("mergeComputeConfig", () => {
   });
 
   it("works with empty initial config", () => {
-    getApp().computes.create({ name: "empty-cfg" });
+    getApp().computes.create({ name: "empty-cfg", provider: "docker" });
 
     const result = getApp().computes.mergeConfig("empty-cfg", { foo: "bar" });
     expect(result).not.toBeNull();

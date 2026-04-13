@@ -97,7 +97,7 @@ describe("compute CRUD", () => {
   });
 
   it("silently ignores updates to name and created_at", () => {
-    getApp().computes.create({ name: "immut", provider: "local" });
+    getApp().computes.create({ name: "immut", provider: "docker" });
     const updated = getApp().computes.update("immut", {
       name: "renamed" as unknown,
       created_at: "2000-01-01T00:00:00.000Z",
@@ -110,7 +110,7 @@ describe("compute CRUD", () => {
   });
 
   it("updates updated_at even with empty fields object", () => {
-    const compute = getApp().computes.create({ name: "dev", provider: "local" });
+    const compute = getApp().computes.create({ name: "dev", provider: "docker" });
     const originalUpdatedAt = compute.updated_at;
 
     // Small delay to ensure timestamp differs
@@ -119,8 +119,8 @@ describe("compute CRUD", () => {
 
     const updated = getApp().computes.update("dev", {});
     expect(updated).not.toBeNull();
-    expect(updated!.provider).toBe("local");
-    expect(updated!.status).toBe("running"); // local computes start as running
+    expect(updated!.provider).toBe("docker");
+    expect(updated!.status).toBe("stopped"); // non-local computes start as stopped
     expect(updated!.config).toEqual({});
     expect(updated!.updated_at >= originalUpdatedAt).toBe(true);
   });
@@ -137,7 +137,7 @@ describe("compute CRUD", () => {
   });
 
   it("keeps created_at constant while updated_at changes on update", () => {
-    const compute = getApp().computes.create({ name: "ts-check" });
+    const compute = getApp().computes.create({ name: "ts-check", provider: "docker" });
     const originalCreatedAt = compute.created_at;
     const originalUpdatedAt = compute.updated_at;
 
@@ -153,6 +153,7 @@ describe("compute CRUD", () => {
   it("replaces config entirely instead of merging", () => {
     getApp().computes.create({
       name: "cfg",
+      provider: "docker",
       config: { a: 1, b: 2, c: 3 },
     });
     const updated = getApp().computes.update("cfg", { config: { x: 99 } });
@@ -171,7 +172,7 @@ describe("compute CRUD", () => {
         tags: [i, i + 1, i + 2],
       };
     }
-    const compute = getApp().computes.create({ name: "big-cfg", config: bigConfig });
+    const compute = getApp().computes.create({ name: "big-cfg", provider: "docker", config: bigConfig });
     expect(compute.config).toEqual(bigConfig);
     expect(Object.keys(compute.config).length).toBe(100);
 

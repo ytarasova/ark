@@ -168,8 +168,8 @@ describe("Auto completion path (quick flow)", () => {
 
   it("advance() on last auto-gate stage completes the session", async () => {
     const session = app.sessions.create({ summary: "auto last stage", flow: "quick" });
-    // pr is the last stage in quick flow
-    app.sessions.update(session.id, { status: "ready", stage: "pr" });
+    // merge is the last stage in quick flow
+    app.sessions.update(session.id, { status: "ready", stage: "merge" });
 
     const advResult = await advance(app, session.id);
     expect(advResult.ok).toBe(true);
@@ -236,9 +236,18 @@ describe("Auto completion path (quick flow)", () => {
       summary: "PR created", filesChanged: [], commits: [],
     });
     app.sessions.update(session.id, r3.updates);
+    await advance(app, session.id);
+
+    // Now at merge stage -- simulate merge completion
+    app.sessions.update(session.id, { status: "running" });
+    const r4 = applyReport(app, session.id, {
+      type: "completed", sessionId: session.id, stage: "merge",
+      summary: "Merged", filesChanged: [], commits: [],
+    });
+    app.sessions.update(session.id, r4.updates);
     const finalAdv = await advance(app, session.id);
 
-    // Session should now be completed (pr is last stage)
+    // Session should now be completed (merge is last stage)
     expect(finalAdv.ok).toBe(true);
     expect(finalAdv.message).toContain("completed");
     const final = app.sessions.get(session.id);
@@ -249,15 +258,16 @@ describe("Auto completion path (quick flow)", () => {
 // ── Hook fallback path (SessionEnd on auto-gate) ────────────────────────────
 
 describe("Hook fallback path (SessionEnd)", () => {
-  it("SessionEnd on auto-gate session sets status to completed", () => {
+  it("SessionEnd on auto-gate session sets status to ready with shouldAdvance", () => {
     const session = app.sessions.create({ summary: "hook fallback", flow: "quick" });
     app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const freshSession = app.sessions.get(session.id)!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
-    expect(result.newStatus).toBe("completed");
-    expect(result.updates?.status).toBe("completed");
+    expect(result.newStatus).toBe("ready");
+    expect(result.updates?.status).toBe("ready");
+    expect(result.shouldAdvance).toBe(true);
   });
 
   it("SessionEnd on manual-gate session keeps status running", () => {
@@ -306,8 +316,8 @@ describe("Hook fallback path (SessionEnd)", () => {
     const freshSession = app.sessions.get(session.id)!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
-    // SessionEnd maps to "completed" which matches current status -- no real change
-    expect(result.newStatus).toBe("completed");
+    // Auto-gate SessionEnd maps to "ready", but guard blocks overriding "completed"
+    expect(result.newStatus).toBeUndefined();
   });
 
   it("SessionEnd does not override stopped status", () => {
@@ -402,7 +412,7 @@ describe("Conductor channel report delivery", () => {
     expect(updated?.status).toBe("ready");
   });
 
-  it("POST /hooks/status with SessionEnd on auto-gate completes session via HTTP", async () => {
+  it("POST /hooks/status with SessionEnd on auto-gate advances session via HTTP", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
     const session = app.sessions.create({ summary: "hook http test", flow: "quick" });
@@ -419,10 +429,14 @@ describe("Conductor channel report delivery", () => {
 
     expect(resp.status).toBe(200);
     const body = await resp.json() as Record<string, unknown>;
-    expect(body.mapped).toBe("completed");
+    expect(body.mapped).toBe("ready");
 
+    // Give a moment for the async advance to complete
+    await new Promise(r => setTimeout(r, 100));
     const updated = app.sessions.get(session.id);
-    expect(updated?.status).toBe("completed");
+    // Auto-gate SessionEnd triggers advance to next stage
+    expect(updated?.stage).toBe("verify");
+    expect(updated?.status).toBe("ready");
   });
 
   it("POST /hooks/status with SessionEnd on manual-gate keeps session running via HTTP", async () => {

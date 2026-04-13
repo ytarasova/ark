@@ -162,7 +162,7 @@ describe("rowToCompute via DB", () => {
   it("parses config JSON on getCompute", () => {
     const compute = getApp().computes.create({
       name: "test-compute-1",
-      provider: "local",
+      provider: "docker",
       config: { instanceType: "t3.large", region: "us-east-1" },
     });
 
@@ -173,13 +173,13 @@ describe("rowToCompute via DB", () => {
   });
 
   it("returns empty object for empty config", () => {
-    const compute = getApp().computes.create({ name: "test-compute-2" });
+    const compute = getApp().computes.create({ name: "test-compute-2", provider: "docker" });
     const fetched = getApp().computes.get("test-compute-2");
     expect(fetched!.config).toEqual({});
   });
 
   it("updateCompute preserves config as parsed object", () => {
-    getApp().computes.create({ name: "test-compute-3", config: { a: 1 } });
+    getApp().computes.create({ name: "test-compute-3", provider: "docker", config: { a: 1 } });
     getApp().computes.update("test-compute-3", { config: { a: 1, b: 2 } });
 
     const fetched = getApp().computes.get("test-compute-3");

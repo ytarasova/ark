@@ -295,7 +295,7 @@ function postCompactTaskHook(sessionId: string): Record<string, unknown> {
   const taskFile = `${arkDir}/tracks/${sessionId}/task.txt`;
   // Read task file and output a reminder. head -c to avoid ARG_MAX issues.
   const cmd = `if [ -f '${taskFile}' ]; then echo "TASK REMINDER (re-injected after context compaction):"; head -c 4000 '${taskFile}'; fi ${ARK_HOOK_MARKER}`;
-  return { type: "command", command: cmd, async: false };
+  return { type: "command", command: cmd, async: true };
 }
 
 function buildHooksConfig(sessionId: string, conductorUrl: string, tenantId?: string): Record<string, unknown[]> {
@@ -364,8 +364,8 @@ export function writeHooksConfig(
   //
   // ark-channel is ALWAYS included -- it's system infrastructure injected by dispatch,
   // not declared in agent YAML. Without it, report/send_to_agent tools are blocked.
-  {
-    const allow = opts?.agent ? buildPermissionsAllow(opts.agent) : [];
+  if (opts?.agent) {
+    const allow = buildPermissionsAllow(opts.agent);
     if (!allow.includes("mcp__ark-channel__*")) {
       allow.push("mcp__ark-channel__*");
     }
