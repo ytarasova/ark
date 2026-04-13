@@ -623,7 +623,21 @@ export async function mediateStageHandoff(
           });
           return;
         }
-        await executeAction(app, sessionId, nextAction.action ?? "");
+        const result = await executeAction(app, sessionId, nextAction.action ?? "");
+        if (!result.ok) {
+          logWarn("handoff", `action '${nextAction.action}' failed for ${sessionId}: ${result.message}`);
+          app.sessions.update(sessionId, {
+            status: "failed",
+            error: `Action '${nextAction.action}' failed: ${result.message.slice(0, 200)}`,
+          });
+          return;
+        }
+        // Action succeeded -- chain into mediateStageHandoff to advance
+        // past this action stage and dispatch/execute the next stage.
+        await mediateStageHandoff(app, sessionId, {
+          autoDispatch: true,
+          source: "action_chain",
+        });
       });
       dispatched = true;
     }
