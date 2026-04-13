@@ -108,11 +108,15 @@ export function TreeList<T>({
       if (entries.length === 0 && groupName) {
         rows.push(<Text key={`empty-${groupName}`} dimColor>{"    (empty)"}</Text>);
       }
+      const groupHeaderRow = groupName ? rows.length - 1 : -1;
       for (let ei = 0; ei < entries.length; ei++) {
         const { item, flatIndex } = entries[ei];
         const isSel = visualIdx === clampedSel;
         visualIdx++;
-        if (isSel) { selRow = rows.length; selectedItem = item; }
+        if (isSel) {
+          selRow = (ei === 0 && groupHeaderRow >= 0) ? groupHeaderRow : rows.length;
+          selectedItem = item;
+        }
         const rowContent = isSel ? (
           <ListRow selected>{`> ${renderRow(item, true)}`}</ListRow>
         ) : (
