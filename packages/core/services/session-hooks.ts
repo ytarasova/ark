@@ -48,6 +48,8 @@ export interface HookStatusResult {
   shouldRetry?: boolean;
   /** Max retries from the on_failure directive (e.g. retry(3) -> 3) */
   retryMaxRetries?: number;
+  /** Mark all messages as read (terminal states) */
+  markRead?: boolean;
 }
 
 /** Detect session status from tmux content (fallback when hooks don't fire). */
@@ -174,6 +176,10 @@ export function applyHookStatus(app: AppContext,
     const updates: Partial<Session> = { ...result.updates, status: newStatus as Session["status"] };
     if (newStatus === "failed" && !updates.error) {
       updates.error = String(payload.error ?? payload.error_details ?? "unknown error");
+    }
+    // Mark messages as read on terminal states so badges clear
+    if (newStatus === "completed" || newStatus === "failed" || newStatus === "stopped") {
+      result.markRead = true;
     }
     // Clear stale breakpoint when resuming from waiting
     if (newStatus === "running" && session.status === "waiting") {

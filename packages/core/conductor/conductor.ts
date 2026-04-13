@@ -156,6 +156,11 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
     app.sessions.update(sessionId, result.updates);
   }
 
+  // Mark messages read on terminal states
+  if (result.markRead) {
+    app.messages.markRead(sessionId);
+  }
+
   // On-failure retry loop: if the stage has on_failure: "retry(N)", attempt retry + re-dispatch
   if (result.shouldRetry && result.newStatus === "failed") {
     const retryResult = session.retryWithContext(app, sessionId, {
