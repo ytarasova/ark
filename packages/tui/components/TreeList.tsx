@@ -228,7 +228,7 @@ export function TreeList<T>({
   }
 
   return (
-    <ScrollBox followIndex={followIndex} active={false} reserveRows={9}>
+    <ScrollBox followIndex={followIndex} active={false}>
       {rows}
     </ScrollBox>
   );

@@ -116,14 +116,6 @@ test.describe("Ark TUI sessions list", () => {
 
         const text = await readTerminal(page);
 
-        // Debug: check what's visible
-        console.log("HAS Ready (3):", text.includes("Ready (3)"));
-        console.log("HAS Ready:", text.includes("Ready"));
-        console.log("HAS scroll-ready:", text.includes("scroll-ready"));
-        // Print first 20 lines of left panel
-        const leftArea = text.split("\n").slice(0, 25).join("\n");
-        console.log("TOP OF TERMINAL:\n" + leftArea);
-
         // "Ready" header MUST be visible on screen (not scrolled off)
         const readyPos = text.indexOf("Ready (3)");
         expect(readyPos).toBeGreaterThan(-1);

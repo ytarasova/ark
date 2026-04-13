@@ -1,45 +1,43 @@
-import React, { useState, useMemo, useEffect, useRef, Children } from "react";
-import { Box, Text, useInput, measureElement } from "ink";
+import React, { useState, useMemo, useEffect, useCallback, Children, createContext, useContext } from "react";
+import { Box, Text, useInput, useStdout } from "ink";
+
+/**
+ * Context for parent components to tell ScrollBox its available height.
+ * When set, ScrollBox uses this instead of guessing from terminal rows.
+ */
+export const ScrollHeightContext = createContext<number | null>(null);
 
 interface ScrollBoxProps {
   children: React.ReactNode;
+  /**
+   * Fallback: rows to subtract from terminal height when no
+   * ScrollHeightContext is provided. Prefer using context.
+   */
+  reserveRows?: number;
   /** When true, this ScrollBox captures j/k/f/b scroll keys. */
   active?: boolean;
   /** Index of the item to keep visible (auto-scroll). */
   followIndex?: number;
   /** When this key changes, scroll resets to top. */
   resetKey?: string | number | null;
-  /** Fallback height when measurement is unavailable. */
-  reserveRows?: number;
 }
 
 /**
- * Scrollable container that measures its own available height
- * via Ink's measureElement, then slices children to fit.
+ * Scrollable container that clips children to available height.
  *
- * Two modes:
+ * Height is determined by (in priority order):
+ * 1. ScrollHeightContext (parent tells us the exact height)
+ * 2. terminalRows - reserveRows (fallback estimate)
+ *
+ * Two scroll modes:
  * 1. Self-managed (active): captures j/k/f/b keys for scrolling.
  * 2. Follow mode (followIndex set): auto-scrolls to keep the followed index visible.
  */
-export function ScrollBox({ children, active = true, followIndex, resetKey, reserveRows = 6 }: ScrollBoxProps) {
-  const containerRef = useRef(null);
-  const [measuredHeight, setMeasuredHeight] = useState(0);
+export function ScrollBox({ children, reserveRows = 10, active = true, followIndex, resetKey }: ScrollBoxProps) {
+  const { stdout } = useStdout();
+  const contextHeight = useContext(ScrollHeightContext);
+  const maxHeight = contextHeight ?? ((stdout?.rows ?? 40) - reserveRows);
   const [offset, setOffset] = useState(0);
-
-  // Measure the container's actual available height after render
-  useEffect(() => {
-    if (containerRef.current) {
-      const { height } = measureElement(containerRef.current);
-      if (height > 0 && height !== measuredHeight) {
-        setMeasuredHeight(height);
-      }
-    }
-  });
-
-  // Fallback: estimate from terminal rows when measurement isn't available yet
-  const maxHeight = measuredHeight > 0
-    ? measuredHeight
-    : ((process.stdout?.rows ?? 40) - reserveRows);
 
   // Reset scroll to top when resetKey changes
   useEffect(() => {
@@ -93,7 +91,7 @@ export function ScrollBox({ children, active = true, followIndex, resetKey, rese
   const visible = items.slice(offset, offset + displayHeight);
 
   return (
-    <Box ref={containerRef} flexDirection="column" flexGrow={1} overflow="hidden">
+    <Box flexDirection="column" height={maxHeight} overflow="hidden">
       {visible.map((item, i) => (
         <React.Fragment key={offset + i}>{item}</React.Fragment>
       ))}
