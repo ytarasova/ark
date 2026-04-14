@@ -11,9 +11,10 @@ import { selectClassName } from "./ui/styles.js";
 
 interface MemoryViewProps {
   addRequested?: number;
+  onToast?: (msg: string, type: string) => void;
 }
 
-export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
+export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
   const queryClient = useQueryClient();
   const { data: memories = [] } = useMemoriesQuery();
   const [search, setSearch] = useState("");
@@ -82,20 +83,20 @@ export function MemoryView({ addRequested = 0 }: MemoryViewProps) {
   const handleExport = async () => {
     try {
       await api.knowledgeExport();
-      alert("Knowledge exported to ./knowledge-export");
+      onToast?.("Knowledge exported to ./knowledge-export", "success");
     } catch (e: any) {
-      alert(`Export failed: ${e.message}`);
+      onToast?.(`Export failed: ${e.message}`, "error");
     }
   };
 
   const handleImport = async () => {
     try {
       const result = await api.knowledgeImport();
-      alert(`Imported ${result?.imported ?? 0} nodes`);
+      onToast?.(`Imported ${result?.imported ?? 0} nodes`, "success");
       queryClient.invalidateQueries({ queryKey: ["memories"] });
       queryClient.invalidateQueries({ queryKey: ["knowledge-stats"] });
     } catch (e: any) {
-      alert(`Import failed: ${e.message}`);
+      onToast?.(`Import failed: ${e.message}`, "error");
     }
   };
 

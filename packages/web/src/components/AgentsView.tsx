@@ -160,14 +160,21 @@ function SubTabBar({ active, onChange }: { active: SubTab; onChange: (tab: SubTa
 interface AgentsViewProps {
   showCreate?: boolean;
   onCloseCreate?: () => void;
+  initialSelectedName?: string | null;
+  onSelectedChange?: (name: string | null) => void;
 }
 
-export function AgentsView({ showCreate = false, onCloseCreate }: AgentsViewProps) {
+export function AgentsView({ showCreate = false, onCloseCreate, initialSelectedName, onSelectedChange }: AgentsViewProps) {
   const queryClient = useQueryClient();
   const { data: agents = [] } = useAgentsQuery();
   const { data: runtimes = [] } = useRuntimesQuery();
   const [subTab, setSubTab] = useState<SubTab>("roles");
-  const [selected, setSelected] = useState<any>(null);
+  const [selectedInternal, setSelectedInternal] = useState<any>(null);
+  const selected = selectedInternal ?? (initialSelectedName ? agents.find((a: any) => a.name === initialSelectedName) : null);
+  const setSelected = (item: any) => {
+    setSelectedInternal(item);
+    onSelectedChange?.(item?.name ?? null);
+  };
   const [editing, setEditing] = useState<any>(null);
 
   const [actionMsg, setActionMsg] = useState<{ text: string; type: string } | null>(null);

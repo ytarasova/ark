@@ -6,6 +6,7 @@ export function useSessionsQuery(serverStatus?: string) {
   return useQuery({
     queryKey: ["sessions", serverStatus || "default"],
     queryFn: () => api.getSessions(filters),
+    refetchInterval: 5000,
   });
 }
 

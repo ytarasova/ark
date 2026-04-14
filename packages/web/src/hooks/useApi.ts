@@ -149,8 +149,13 @@ export const api = {
     const flow = r.flow;
     return {
       name: flow.name,
+      description: flow.description,
+      edges: flow.edges,
       stages: (flow.stages ?? []).map((st: any) => ({
         name: st.name, gate: st.gate, agent: st.agent, type: st.type,
+        optional: st.optional, on_failure: st.on_failure,
+        verify: st.verify, depends_on: st.depends_on, task: st.task,
+        action: st.action,
       })),
     };
   }),
