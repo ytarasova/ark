@@ -134,12 +134,12 @@ export function SettingsView() {
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-muted-foreground">Documentation</span>
               <a
-                href="https://github.com/anthropics/ark"
+                href="https://ytarasova.github.io/ark/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[13px] text-primary hover:underline"
               >
-                GitHub
+                Docs
               </a>
             </div>
           </div>
