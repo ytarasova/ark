@@ -78,10 +78,15 @@ dev-tui: ## Hot-reload: TUI connecting to dev daemon (starts daemon if not runni
 		(echo "Daemon not running. Start it with: make dev-daemon" && exit 1)
 	ARK_SERVER_PORT=19400 ./ark tui
 
-dev-web: ## Vite dev server + API proxy (starts daemon if not running)
-	@curl -sf http://localhost:19400/health >/dev/null 2>&1 || \
-		(echo "Daemon not running. Start it with: make dev-daemon" && exit 1)
-	cd packages/web && npx vite --port 5173
+dev-web: ## Hot-reload: API server (:8420) + Vite frontend (:5173)
+	@echo "\033[1mArk Web (hot-reload)\033[0m"
+	@echo "  API:  http://localhost:8420"
+	@echo "  Web:  http://localhost:5173"
+	@echo ""
+	@trap 'kill 0' EXIT; \
+	  $(BUN) --watch packages/cli/index.ts web --port 8420 --api-only 2>&1 | sed 's/^/[api] /' & \
+	  sleep 1 && cd packages/web && npx vite --port 5173 2>&1 | sed 's/^/[web] /' & \
+	  wait
 
 tui-standalone: ## Launch TUI standalone (embedded mode, no daemon needed)
 	./ark tui
