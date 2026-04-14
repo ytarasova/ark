@@ -130,6 +130,7 @@ docs/         User documentation + GitHub Pages site
 - **[TUI Reference](docs/tui-reference.md)** -- all keyboard shortcuts by tab
 - **[Configuration](docs/configuration.md)** -- config files, hotkeys, themes, budgets
 - **[CLAUDE.md](CLAUDE.md)** -- developer documentation (architecture, testing, gotchas)
+- **[Contributing](CONTRIBUTING.md)** -- development setup, testing, and PR guidelines
 
 ## Development
 
