@@ -758,14 +758,17 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
     return { ok: true, message: "Already stopped" };
   }
 
-  // Attempt graceful tree-kill before blunt tmux/provider kill
-  const launchPid = session.config?.launch_pid as number | undefined;
-  if (launchPid) {
-    try {
-      const { killProcessTree } = await import("../executors/process-tree.js");
-      await killProcessTree(launchPid);
-    } catch { /* fall through to tmux kill */ }
-  }
+  // Kill tracked process trees before blunt tmux/provider kill
+  try {
+    const { killProcessTree } = await import("../executors/process-tree.js");
+    const launchPid = session.config?.launch_pid as number | undefined;
+    if (launchPid) await killProcessTree(launchPid);
+    // Also kill PIDs from the process_tree snapshot (recorded by status poller)
+    const tree = (session.config?.process_tree ?? []) as Array<{ pid: number }>;
+    for (const entry of tree) {
+      if (entry.pid) await killProcessTree(entry.pid);
+    }
+  } catch { /* fall through to tmux kill */ }
 
   // Kill agent + clean up provider resources FIRST (before any DB writes)
   // This ensures processes are stopped even if subsequent DB ops fail
