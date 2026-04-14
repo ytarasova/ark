@@ -1,8 +1,20 @@
 # Ark Platform Roadmap
 
-> Last updated: 2026-04-14 (71 PRs total -- v0.14.0 released. Ark-on-Ark dogfooding, daemon-client, TreeList rewrite, action stage fixes, web UI overhaul, knowledge graph, Events tab, docs)
+> Last updated: 2026-04-14 (full background agent gap analysis) (71 PRs total -- v0.14.0 released)
+> Planning framework: **11 sub-projects (SP1-SP11)** covering all 11 layers of the background agent stack
+> Reference: [background-agents.com/landscape](https://background-agents.com/landscape) | [Ona Software Factory](https://ona.com/stories/building-a-software-factory-in-public) | [Open Agents](https://github.com/vercel-labs/open-agents)
 > Releases: v0.13.0 (2026-04-13), v0.14.0 (2026-04-14)
 > Prompt caching: 99.9% hit rate, $3,430 saved (86% reduction) across 47 agent sessions
+>
+> **2026-04-14 "ark init" meeting (Yana, Zineng, Abhimanyu, Atul) -- key decisions:**
+> - **TUI retired** -- consensus to drop TUI from the product surface. Focus on **Web UI + CLI + Electron desktop app**. TUI code stays in repo but receives no further investment.
+> - **Web UI is the primary interface** -- everything doable from web without touching CLI. Missing: conversation interface, repo dropdown, session creation wizard.
+> - **Electron desktop app** -- wrap web UI, build DMGs for macOS + Linux (Intel + ARM). No Windows. Near-term deliverable.
+> - **ACP (Agent Communication Protocol) POC** -- explore as parallel agent interface. Claude Code/Codex don't officially support it; Gemini does. Not a replacement for channels.
+> - **MiniMax as cheap model** -- ~1/10th Claude cost for mechanical tasks. Strategy: plan with Opus/Sonnet, implement with MiniMax. Needs OpenAI-compatible custom provider in LLM Router.
+> - **Benchmarking framework** -- Abhimanyu building task-based model benchmarks (100 real tasks on actual repos). Results could feed LLM Router routing decisions.
+> - **Stay on GitHub** -- free CI with macOS runners, public repo benefits. No Bitbucket migration.
+> - **Team**: Yana (core, break until Thu), Zineng (orienting, web UI improvements), Abhimanyu (benchmarking, ACP, Goose), Atul (adoption tracking).
 >
 > **2026-04-12-14 session -- PRs #53-#83 shipped on `main` (20 PRs, 18 agent-built):**
 > - **Arkd report pipeline** -- fixed silent report drops (arkd defaulted conductorUrl to null), TUI boots arkd alongside conductor, channel routes exclusively through arkd
@@ -99,7 +111,7 @@
 
 ## What Ark Is
 
-The orchestration platform for AI-powered software development. Manages the full lifecycle -- from ticket to merged PR -- across any agent, any model, any compute target. Runs locally as a CLI/TUI or hosted as a multi-tenant service with a control plane.
+The orchestration platform for AI-powered software development. Manages the full lifecycle -- from ticket to merged PR -- across any agent, any model, any compute target. Runs locally as a CLI/web dashboard/Electron desktop app, or hosted as a multi-tenant service with a control plane. (TUI retired as of 2026-04-14 -- no further investment.)
 
 **Positioning (post-Apr-10 decision):** Ark is an opinionated control plane that orchestrates agents; it does not replace the agent runtimes themselves. Goose, Claude Code, Codex, Gemini are the "machines on the factory floor." Ark provides central knowledge, memory, cost tracking, LLM routing, compute provisioning, flow engine, and multi-tenant governance so a company can change models, policies, or skills in ONE place and have it propagate everywhere. The test we want to pass: an agent autonomously finds and fixes a real bug, and the only reason a human hears about it is the commit notification.
 
@@ -202,7 +214,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | Area | Why it matters | Source |
 |------|---------------|--------|
 | **Remote Claude subscription auth provisioning** | Soft preference (not hard ban) for subscription auth at fleet scale to avoid per-token bills. Local `claude-max` works; provisioning N remote VMs with device-code login is the open question. API-key mode stays supported -- this is a "make the non-key path work too," not "delete keys." | 2026-04-10 meeting |
-| **MiniMax / DeepSeek / self-hosted provider support** | Internal teams are hosting OSS models (DeepSeek) and have free MiniMax credits. Router must accept custom OpenAI-compatible endpoints with zero-cost tracking. Jay: "share the key you can use with some on our API" / "let's start hosting them." | 2026-04-10 meeting |
+| **MiniMax / GLM / DeepSeek / self-hosted provider support** | Internal teams have MiniMax credits (~1/10th Claude cost, ~90% perf for mechanical tasks) and are evaluating GLM (may compete with Opus). Router must accept custom OpenAI-compatible endpoints with zero-cost tracking. Strategy confirmed Apr 14: plan with Opus/Sonnet, implement with cheap models. MiniMax-M2.5 available via SambaNova API (`https://api.sambanova.ai/v1`), config in `~/.config/goose/custom_providers/custom_sambanova.json`. Slack: C0AQLGKQ601 for details. | 2026-04-10 + 2026-04-14 meetings |
 | **Dev-environment provisioning (compose + dynamic DNS)** | Per-session isolated dev environments via docker-compose + Traefik-style dynamic DNS so two engineers on the same repo don't collide. Abhimanyu built a prototype against Goose; Ark should absorb the pattern as a compute provider or a session-level addon. | 2026-04-10 meeting |
 | **Built-in secrets vault** | Per-user MCP secrets (Bitbucket app password, Jira, Figma, etc.) injected at dispatch, not checked into YAML. **Hard constraint:** must ship in the single Ark package and work IDENTICALLY in local and control-plane modes. No external vault service required. Design implication: encrypted-at-rest storage inside the Ark DB (SQLite locally, Postgres in hosted) with a pluggable backend so enterprise deployments can optionally point at HashiCorp Vault / VaultMan / AWS Secrets Manager -- but the default path has to be batteries-included. | 2026-04-10 meeting + follow-up |
 | **Pre-engineering product flow (ideate → PRD)** | Before engineering starts, agents should mine Elasticsearch, customer-care logs, repos to identify gaps, build hypotheses, draft PRDs. Reference products: Premium (Mehul), Sage. PM needs a session that can read repos + dashboards + Jira + Figma at once. | 2026-04-10 meeting |
@@ -222,16 +234,44 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Docker image published** | No image in any registry. Can't `docker pull ark`. | Deployment gap |
 | **CI/CD pipeline for Ark** | GitHub Actions runs tests but doesn't build/publish artifacts. | Deployment gap |
 | **Async Postgres repos** | Repos use sync IDatabase methods. Postgres adapter uses `Bun.sleepSync` hack. | Architecture gap |
+| **Decoupled agent-compute architecture** | Three-phase progression: (1) now: agent CLI + repo on same box (1:1:1), (2) near: agent CLI on cheap box, repo on heavy box with arkd proxy between them, (3) target: serverless agent loop (durable workflow) + pooled repo compute via arkd tools. Phase 2 needs arkd-to-arkd tool proxying. Phase 3 needs conductor-hosted channels (currently MCP in tmux) and durable workflow engine. Enables: independent fleet scaling, compute hibernate/snapshot, multi-repo via N compute attachments, compute pooling. Session 1:N Agent 1:M Compute. | 2026-04-14 analysis |
+| **Compute lifecycle (hibernate/snapshot/restore)** | Compute targets should support hibernate (stop billing), snapshot (save state), restore (resume from snapshot). E2B already supports snapshots. EC2 has AMIs. Docker has checkpoint/CRIU. Firecracker has native snapshotting. Expose universally via ComputeProvider interface. | 2026-04-14 analysis |
 | **Higress gateway integration** | Custom router works for dev. Enterprise needs CNCF-grade gateway. | LLM Router research |
 | **Zoekt code search** | Sourcegraph's fast trigram-based code search engine (github.com/sourcegraph/zoekt). Could complement or replace FTS5 transcript search for large-scale code search across repos. Evaluate as a backend for `ark search` and knowledge graph queries. | Abhimanyu 2026-04-13 |
 | **Worktree untracked file setup** | Git worktrees don't include untracked files (.env, .envrc, config/local.yaml). Agents in worktrees lose access to env vars and local config. Add `.ark.yaml` `worktree.copy` list and optional `worktree.setup` script hook. | Abhimanyu 2026-04-13 |
+| **ACP (Agent Communication Protocol) integration** | Standard agent interface for cross-tool communication. Goose uses it via Claude SDP adapter. Claude Code/Codex don't officially support it; Gemini does natively. Explore as parallel interface alongside channels. Would make the platform more agent-runtime-agnostic. | 2026-04-14 meeting |
+| **Task-based benchmarking framework** | Model comparison on real-world tasks (not just prompting). 100 tasks across categories: JWT updates, code graph, PR review, MCP tool calling. Results feed LLM Router routing weights (model X good at tool calling, model Y good at review). Abhimanyu building. | 2026-04-14 meeting |
+| **Web UI conversation interface** | Send messages to running agents from web UI. Currently only TUI has this via `t` shortcut. Channels work for Claude Code; need tmux send-keys fallback for other runtimes. Borrow structured question pattern from Open Agents (`ask_user_question` tool with options UI) instead of plain free-text. | 2026-04-14 meeting (Zineng) |
+| **Web UI repo dropdown** | Pick repos from session history / Claude projects dir instead of typing full paths. | 2026-04-14 meeting (Zineng) |
+| **Web UI tool call renderers** | Per-tool-type rendering (bash: cmd+output, read: file+line numbers, edit: diff, glob: file tree, grep: results). Borrow from Open Agents `/apps/web/components/tool-call/renderers/` (14 renderers, framework-agnostic React). | Open Agents competitive analysis |
+| **Agent-driven todo panel** | Agent creates/manages its own task list visible in a pinned UI panel. Users see real-time progress. Borrow from Open Agents `/packages/agent/tools/todo.ts` + `pinned-todo-panel.tsx`. | Open Agents competitive analysis |
+| **Web UI git panel** | Sidebar git panel: file tree, diff viewer (unified/split), PR creation form, merge method selection, CI check runs. Backend exists in Ark; missing the UI layer. Borrow from Open Agents `git-panel.tsx`. | Open Agents competitive analysis |
+| **Session sharing** | Read-only shareable links for sessions. Borrow from Open Agents `/apps/web/app/shared/[shareId]/` with env variable redaction. | Open Agents competitive analysis |
+| **Stream recovery** | Auto-reconnect SSE on tab visibility changes with retry policies. Critical for long-running agents. Borrow from Open Agents `use-stream-recovery.ts`. | Open Agents competitive analysis |
+| **Model-family prompt overlays** | Per-model behavioral tuning in agent system prompts (GPT: anti-verbosity, Gemini: conciseness, Claude: todo management). Borrow pattern from Open Agents `system-prompt.ts`. | Open Agents competitive analysis |
+| **Sandbox hibernate/snapshot/restore** | Cloud sandboxes hibernate after inactivity, resume from snapshots. Cost optimization for EC2/Firecracker. E2B already supports snapshots; expose the capability. | Open Agents competitive analysis |
+| **Anthropic cache control optimization** | Auto-add `cacheControl: { type: "ephemeral" }` to last tool + last message for Anthropic models. Direct cost savings. Borrow from Open Agents `cache-control.ts`. | Open Agents competitive analysis |
 | **Knowledge graph visualization** | No visual rendering of the graph in web UI. MC uses reagraph. | Mission Control gap analysis |
 | **Live feed sidebar** | No real-time event stream without leaving current view. MC has collapsible sidebar. | Mission Control gap analysis |
 | **Boot sequence** | No staged loading screen with progress. MC shows 9-step boot. | Mission Control gap analysis |
 
 ---
 
-## Roadmap Camps
+## Roadmap Camps (Legacy Detail)
+
+> **Note:** These camps contain detailed task breakdowns, ship-blockers, and what's already landed. The **Background Agent Landscape Gap Analysis** (below the camps) and the **Priority Sequence** (SP1-SP11) are the current planning framework. Camps map to SPs as follows:
+> - Camp 0 (Early Adopter Ship) + Camp 8 (UX Polish) -> **SP1** (TUI removal + Tauri + Web UI)
+> - Camp 5 (Security) -> **SP2** (Security & Secrets)
+> - Camp 6 (Integrations) -> **SP3** (Interface Integrations)
+> - Camp 14 (Decoupled Compute) + Camp 12 (Federated) -> **SP4** (Sandbox & Compute Lifecycle)
+> - Camp 2 (Workflow Persistence) -> **SP5** (Orchestration Hardening)
+> - Camp 10 (Dev-Env + Protocols) -> **SP6** (Protocols & Standards)
+> - Camp 7 (Task Management) + Review -> **SP7** (Review Pipeline)
+> - Camp 3 (Agent Intelligence) + Expansion -> **SP8** (Agent Expansion)
+> - Camp 1 (Integration Testing) + Router -> **SP9** (Models & Router)
+> - Camp 4 (Dashboard) + Evals -> **SP10** (Benchmarks, Evals & Verification Artifacts)
+> - ROI (new) -> **SP11** (ROI & Measurement)
+> - Camp 9 (Architecture), Camp 11 (Multi-Repo), Camp 13 (Plugin Platform) -- absorbed into SP4/SP5/SP6
 
 ### Camp 0: Early Adopter Ship (IMMEDIATE -- week of 2026-04-13)
 
@@ -296,28 +336,36 @@ The orchestration platform for AI-powered software development. Manages the full
 - CI web build before unit tests -- fixes the one consistent CI flake (`web server > starts and serves dashboard HTML`) that was blocking admin-free merges
 - E2E fixture subprocess reaper -- `process.on('exit'|'SIGINT'|'SIGTERM'|'uncaughtException')` cleanup in both `packages/e2e/fixtures/web-server.ts` and `packages/tui-e2e/server.ts`. Kills the "Playwright worker dies mid-test -> orphaned `ark web` reparented to launchd forever" leak (found 138 orphans / 3.3 GB in the wild)
 
-**Candidate "in scope" for the first hand-out** (builder trio to confirm):
+**Candidate "in scope" for the first hand-out** (updated Apr 14 meeting):
+- **Web UI + CLI** as the two user-facing surfaces (TUI retired)
+- **Electron desktop app** wrapping web UI (if DMG packaging is completed in time)
 - Local docker compute with worktree isolation (no AWS creds required on the user's laptop)
-- Optionally **federated compute via Ark token** (see Camp 12) for users who need heavier than local docker -- lets them hit remote EC2/k8s/firecracker without any cloud credentials
+- Optionally **federated compute via Ark token** (see Camp 12) for users who need heavier than local docker
 - `claude-max` + `codex` + `goose` runtimes, subscription auth preferred over API keys
+- **MiniMax via LLM Router** for cheap mechanical tasks (Abhimanyu providing API key)
 - Knowledge graph auto-index on dispatch (already DONE)
 - One polished flow: `code-review` or `fix-bug`, driven from web UI
-- Web dashboard (local mode), limited to Sessions / Flows / Knowledge tabs
+- Web dashboard (local mode): Sessions / Flows / Knowledge tabs + conversation interface + repo dropdown
 - Cost tracking visible even when it's $0 (subscription mode)
 
 **Candidate "out of scope" for the first hand-out:**
+- TUI (retired -- no further investment)
 - Control plane / multi-tenant (builder team uses local mode first)
 - K8s / E2B / Firecracker providers (untested -- see Camp 1)
 - Pre-engineering product flow (ideate/PRD) -- defer to Camp 10
 - Dev-environment provisioning with dynamic DNS -- defer to Camp 10
+- ACP integration (POC only, not production path)
 
 **Ship-blockers to resolve this week:**
 | Blocker | Owner | Notes |
 |---------|-------|-------|
-| Unified Claude settings bundle (tools, OTEL, cost, router, hooks) | Yana | **Camp 0 slice DONE (2026-04-11):** `.claude/settings.local.json` writer extended with `buildPermissionsAllow(agent)` -- maps `agent.tools` into `permissions.allow`, auto-expands declared `mcp_servers` to `mcp__<server>__*` wildcards, rejects explicit `mcp__X__*` entries that reference undeclared servers, and cleans up on session stop via the `_ark.managedAllow` marker. **Confirmed design:** `--dangerously-skip-permissions` (autonomy=full) remains the explicit override -- it bypasses the allow list on purpose. The list is authoritative when bypass is off. **Still to land on the same writer:** OpenTelemetry exporter config, cost-tracking / router URL env vars, Codex / Gemini executor parity (different permission models), load-time agent validation. |
-| ISLC recipe decomposition audit | Yana + Abhimanyu | Ark ships consolidated `islc.yaml` / `islc-quick.yaml`; Abhimanyu's Goose set has 9 separate sub-recipes with specific MCP tool contracts. Decide port-vs-consolidate before hand-out. Porting the decomposed form requires sub-recipe runtime invocation -- see Camp 10. |
-| Decide in/out feature list | Yana + Abhimanyu + Zining | Monday sync |
-| Bug-sweep the chosen surface (limited-features smoke pass) | Yana | Keep tests green |
+| Web UI conversation interface | Zineng | Send messages to agents from web UI. Currently only TUI has this (`t` shortcut). Zineng flagged as blocker. |
+| Web UI repo dropdown | Zineng | List known repos from session history / Claude projects. Users shouldn't have to type full paths. |
+| Electron DMG packaging | Yana (deferred to Thu+) | DMG build was started but dropped. macOS Intel + ARM, Linux Intel + ARM. No Windows. |
+| MiniMax custom provider in LLM Router | Abhimanyu | Accept arbitrary OpenAI-compatible base URL + key. cost_mode=free. |
+| Unified Claude settings bundle (tools, OTEL, cost, router, hooks) | Yana | **Camp 0 slice DONE (2026-04-11):** `.claude/settings.local.json` writer with `buildPermissionsAllow(agent)`. **Still to land:** OTEL exporter config, cost-tracking / router URL env vars, Codex / Gemini executor parity. |
+| ISLC recipe decomposition audit | Yana + Abhimanyu | Still pending. Decide port-vs-consolidate before hand-out. |
+| Bug-sweep the chosen surface (web UI + CLI smoke pass) | Zineng + Abhimanyu | Keep tests green. Orient while fixing bugs. |
 | Onboarding note for the recruit (how to install, what works, what doesn't) | Yana | 1-page README, no marketing |
 | Feedback channel (Slack or doc) | Abhimanyu | Daily gather, weekly triage |
 | Twice-weekly adoption review with leadership | Atul to schedule | Track who's using what |
@@ -500,16 +548,21 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 
 ### Camp 8: User Experience Polish
 
-**Goal:** Professional, polished product.
+**Goal:** Professional, polished product. Web UI + CLI + Electron desktop are the three product surfaces (TUI retired Apr 14).
 
-| Task | Effort |
-|------|--------|
-| Full user management UI (create/edit/delete users, roles) | 1-2 days |
-| Google/GitHub SSO | 1-2 days |
-| Access request workflow | 1 day |
-| i18n foundation | 1-2 days |
-| Natural language schedule parsing | 1 day |
-| Calendar view for schedules | 1-2 days |
+| Task | Effort | Status |
+|------|--------|--------|
+| **Desktop app packaging (Electron or Tauri v2)** | 1-2 days | Electron started but incomplete. Tauri v2 (https://v2.tauri.app/) flagged as alternative -- ~10x smaller binaries, Rust backend, system webview. macOS Intel + ARM, Linux Intel + ARM. No Windows. No signing. Spike both before committing. |
+| **Web UI conversation interface** | 1-2 days | Not started. Send messages to agents from web UI. Currently only works via CLI/TUI. |
+| **Web UI repo dropdown** | 0.5-1 day | Not started. List repos from session history + Claude projects dir. |
+| **Web UI session creation wizard** | 1 day | Not started. Guided flow selection, agent selection, compute selection. |
+| **Web UI facelift** | 2-3 days | Not started. Borrow from v0 Electron mockups (Nov 2025 aspirational design). |
+| Full user management UI (create/edit/delete users, roles) | 1-2 days | Not started |
+| Google/GitHub SSO | 1-2 days | Not started |
+| Access request workflow | 1 day | Not started |
+| i18n foundation | 1-2 days | Not started |
+| Natural language schedule parsing | 1 day | Not started |
+| Calendar view for schedules | 1-2 days | Not started |
 
 ### Camp 10: Dev-Environment Orchestration & Pre-Engineering Flows
 
@@ -636,6 +689,48 @@ All three are the same binary with different config. No separate builds.
 
 **Phase 4 ships #1 + #4 as the default and makes #2 / #3 available as per-tenant opt-ins.** Hosted mode can require #2 for any non-builtin plugin. Phase 4 is deferred until external plugin authors are a real use case; until then, built-in + trusted-user plugins are fine without sandboxing.
 
+### Camp 14: Decoupled Compute Architecture
+
+**Goal:** Separate agent fleet from compute fleet. Agents are cheap/stateless processes (or serverless workflows) that connect to expensive/persistent repo compute via arkd tool proxying over the network. Enables: independent scaling, compute pooling, hibernation, multi-repo, and ultimately serverless agents.
+
+**Three-phase progression:**
+
+**Phase 1: arkd-to-arkd tool proxy (near-term, ~3-5 days)**
+
+The stepping stone. Agent runs on cheap compute (t3.small), repo lives on heavy compute (c6i.4xlarge). Agent-side arkd proxies tool calls (bash, read, write, edit, glob, grep) to repo-side arkd over HTTP.
+
+| Task | Effort | Notes |
+|------|--------|-------|
+| `ComputeAttachment` type: serializable JSON state blob (resourceId, arkdUrl, pool, status, snapshotUrl) | 0.5 day | Like Open Agents' `SandboxState`. Stored in session DB as JSONB. |
+| Session schema: `compute` (string) -> `computes` (ComputeAttachment[]) | 0.5 day | Backward-compat: single element array for existing sessions. |
+| arkd tool proxy endpoints: `/proxy/exec`, `/proxy/file/*` | 2 days | Agent-side arkd receives tool calls, forwards to repo-side arkd URL from attachment. Auth via session token. |
+| Executor changes: pass repo arkd URL to agent environment | 1 day | Agent's tools target remote arkd instead of local filesystem. |
+| E2E test: agent on box A, repo on box B, full SDLC flow | 1 day | Validate tool latency, failure modes, reconnection. |
+
+**Phase 2: Compute lifecycle -- hibernate/snapshot/restore (~3-4 days)**
+
+Make expensive compute hibernatable. Stop billing when idle, resume from snapshot.
+
+| Task | Effort | Notes |
+|------|--------|-------|
+| `ComputeProvider` interface: add `hibernate()`, `snapshot()`, `restore(snapshotId)` | 0.5 day | Optional methods, providers that don't support them return `not_supported`. |
+| E2B snapshot/restore (already supported by SDK) | 1 day | Expose existing capability through the interface. |
+| EC2 AMI snapshot/restore | 1-2 days | Create AMI on hibernate, launch from AMI on restore. |
+| Docker checkpoint/restore (CRIU) | 1 day | Experimental but works for stateless containers. |
+| Inactivity-based auto-hibernate | 0.5 day | Like Open Agents' 30-min inactivity timeout. Conductor polls compute activity. |
+| Lifecycle state machine on ComputeAttachment | 0.5 day | States: provisioning -> active -> hibernating -> hibernated -> restoring -> archived. |
+
+**Phase 3: Serverless agent loop (~5-7 days, depends on Camp 2)**
+
+The endgame. Agent is a durable workflow step, not a persistent tmux process. No agent compute at all -- just the LLM API loop running as a workflow function.
+
+| Task | Effort | Notes |
+|------|--------|-------|
+| Durable workflow engine (local + hosted backends) | 3-5 days | Camp 2 prerequisite. Event-sourced local, Temporal hosted. |
+| Conductor-hosted channels | 1-2 days | Move channel MCP from agent tmux to conductor. Agent polls/streams from conductor instead of running MCP server. |
+| Serverless executor type | 2 days | New executor that runs the agent loop as a workflow step, calling tools on remote arkd. No tmux, no persistent process. |
+| Stream recovery for web UI | 1 day | Reconnect to running workflow on page reload / tab switch. Borrow from Open Agents `use-stream-recovery.ts`. |
+
 ### Camp 9: Architecture Hardening
 
 **Goal:** Codebase is production-grade and maintainable.
@@ -655,32 +750,236 @@ All three are the same binary with different config. No separate builds.
 
 ---
 
+## Background Agent Landscape Gap Analysis
+
+> Reference: [background-agents.com/landscape](https://background-agents.com/landscape) (11 layers, 95+ vendors)
+> Reference: [ona.com -- Building a Software Factory](https://ona.com/stories/building-a-software-factory-in-public)
+> Vision: "No human-written code. Humans steer direction. Agents do everything else."
+
+Ark's endgame is a **complete background agent platform** covering all 11 layers of the stack. Below maps each layer, current coverage, identified gaps, and recommended tools.
+
+### Layer 1: Interface
+**Current:** Web UI (basic), CLI, Desktop (Electron prototype, broken). TUI (retired).
+**Landscape:** Slack, Linear, Jira, GitHub, GitLab Duo, Backstage, Ona, Codex App, Conductor, Kiro, VS Code Server, JetBrains Remote Dev.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| TUI removal (complete deletion) | Delete packages/tui/ (15.8K lines), packages/tui-e2e/, 7 ink deps | 0.5 day | **SP1** |
+| Desktop app distribution (.dmg, .app, AppImage, .deb) | Replace Electron with **Tauri v2** (10x smaller, Rust backend, web UI wraps cleanly) | 2-3 days | **SP1** |
+| Web UI production-grade overhaul | Borrow from **Open Agents** (tool renderers, git panel, todo panel, structured questions, model selector, stream recovery). 6K lines -> 30K+ | 5-7 days | **SP1** |
+| GitHub App integration (webhooks, not just `gh` CLI) | Build GitHub App: inbound webhooks (PR events, issue events trigger sessions), outbound (create issues, comment on PRs, deployment status) | 2-3 days | **SP3** |
+| Bitbucket integration | Bitbucket Cloud REST API + webhooks. PR creation, review triggers, pipeline status | 2-3 days | **SP3** |
+| Jira integration | Jira Cloud REST API. Inbound: ticket events trigger sessions. Outbound: agents create/update tickets, transition status | 2-3 days | **SP3** |
+| Slack bot | Session notifications, slash commands (/ark dispatch, /ark status), thread-based agent chat | 1-2 days | **SP3** |
+| Session sharing (read-only links) | Generate shareable URLs for completed sessions. Viewer sees: transcript, diffs, verification output, terminal recording, cost breakdown. Env variable redaction for security. Borrow from Open Agents `/apps/web/app/shared/[shareId]/`. Works for both web UI and control plane (tenant-scoped sharing policies) | 1-2 days | **SP1** |
+
+### Layer 2: Agents
+**Current:** 5 runtimes (Claude Code, Codex, Gemini, Goose, claude-max). 12 agent roles. All software-dev focused.
+**Landscape:** Claude Code, Codex CLI, Cursor, Devin, Factory Droids, OpenHands, Copilot, Gemini CLI, Ona, Augment Code, Deep Agents, Goose, OpenCode, Kiro, Cline, Kilo Code, Windsurf, Amp, Warp.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| PM agents (PRD generation, stakeholder comms) | New agent roles: `pm-analyst` (reads ES/Jira/Figma, drafts PRDs), `pm-writer` (Confluence/docs output) | 2-3 days | **SP8** |
+| QA agents (test plan, E2E generation, regression hunting) | New agent roles: `qa-planner` (test strategy from spec), `qa-generator` (E2E tests), `qa-regression` (bisect failures) | 2-3 days | **SP8** |
+| DevOps agents (IaC, runbooks, incident response) | New agent roles: `devops-infra` (Terraform/Helm), `devops-incident` (alert triage, runbook execution) | 2-3 days | **SP8** |
+| Design agents (Figma MCP, UI generation) | New agent role: `designer` (Figma MCP for reading designs, generates UI code). Borrow Open Agents' Design subagent pattern | 1-2 days | **SP8** |
+| Custom agent runtime ("arka" -- Ark's own serverless agent) | Lightweight agent runtime that doesn't need Claude Code/Codex/Goose CLI. Runs as a durable workflow, calls tools on remote arkd. The serverless endgame (Camp 14 Phase 3) | 5-7 days | **SP8** |
+| Coverage of emerging runtimes (Kiro, Amp, Warp, Cline, Windsurf) | Add runtime definitions. Most are CLI-agent type -- just YAML + task_delivery config | 1 day each | **SP8** |
+
+### Layer 3: Sandbox / Compute
+**Current:** 11 providers (local, docker, devcontainer, firecracker, EC2 variants, E2B, K8s). No lifecycle management.
+**Landscape:** Ona, Daytona, Modal, Fly.io, OpenComputer, Runloop, Docker, Cloudflare Agents SDK, Codespaces, Coder, Blaxel, OpenSandbox, Vercel Sandbox, Devin, Namespace, Northflank.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| Compute lifecycle (hibernate/snapshot/restore) | Add `hibernate()`, `snapshot()`, `restore()` to ComputeProvider interface. E2B has native snapshots, EC2 via AMIs, Docker via checkpoint/CRIU, Firecracker native | 3-4 days | **SP4** |
+| Decoupled compute (arkd-to-arkd proxy) | Agent on cheap box, repo on heavy box. Agent-side arkd proxies tool calls to repo-side arkd over HTTP | 3-5 days | **SP4** |
+| Compute pooling | Pool of pre-provisioned compute targets. Sessions check out from pool, return on completion. Reduces cold-start from minutes to seconds | 2-3 days | **SP4** |
+| Cloud dev environment integration (**Daytona**) | Daytona as a compute provider -- standardized dev environments with devcontainer.json, pre-built images. Open source, self-hostable | 2-3 days | **SP4** |
+| Serverless compute (**Modal** / **Fly.io**) | For lightweight agent compute (the "agent fleet" in decoupled architecture). Agents run as serverless functions on Modal/Fly, tools call into persistent repo compute | 2-3 days | **SP4** |
+
+### Layer 4: Orchestration
+**Current:** DAG flow engine (15 flows), conductor, on_outcome/on_failure routing. Temporal code exists but never tested.
+**Landscape:** Ona, Temporal, GitHub Actions, GitLab Duo Flows, n8n, Open SWE, Claude Agent SDK, Codex Web, Coder, Kiro, Symphony, Open-Inspect, Cursor Cloud, Devin, Warp Oz.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| Test Temporal integration for control plane | `packages/core/router/tensorzero.ts` pattern exists. Deploy Temporal, validate WorkflowEngine interface against real durable workflows | 2-3 days | **SP5** |
+| Local durable workflow engine | Event-sourced from events table. Sessions survive crash, resume from last completed step. No external dependency. Required for serverless agents | 3-5 days | **SP5** |
+| Event-driven triggers (GitHub webhooks -> sessions) | PR opened -> dispatch reviewer agent. Issue created -> dispatch implementer. Schedule (cron) -> dispatch maintenance agent | 2-3 days | **SP3** |
+| n8n / external workflow integration | Ark as an n8n node. External tools can trigger Ark sessions via API. Bidirectional | 1-2 days | **SP6** |
+
+### Layer 5: Security
+**Current:** Guardrails (pattern-based tool blocking), tenant policies, API keys. No secrets vault, no credential brokering, no static analysis.
+**Landscape:** Veto, Vault, OPA, Vercel Credential Brokering, Keycard, nono.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| Batteries-included secrets vault | **Built into Ark DB** (encrypted-at-rest, AES-256-GCM). Per-user + per-tenant scoping. Injected at dispatch via env-file (not CLI args). Pluggable backend: default = Ark DB, optional adapters for HashiCorp Vault / AWS Secrets Manager / VaultMan | 3-4 days | **SP2** |
+| OPA-style policy engine | **Open Policy Agent** (OPA) or **Cedar** (AWS). Declarative policies: "tenant X cannot use ec2-firecracker", "agent Y cannot run rm -rf", "sessions over $5 require approval". Evaluate at dispatch + tool-call boundaries | 2-3 days | **SP2** |
+| Static analysis integration | **Semgrep** (OSS, multi-language, custom rules) as a verify-stage tool. Run automatically before PR creation. Block merge on P0 findings | 1-2 days | **SP2** |
+| Dependency scanning | **Dependabot** (GitHub-native) for open-source repos + **Trivy** (OSS container scanner) for compute images. Run on schedule or PR event | 1-2 days | **SP2** |
+| Credential brokering | Short-lived tokens issued per-session. Agent gets a scoped token that expires when session ends. No long-lived secrets in agent environment | 2-3 days | **SP2** |
+| Agent Auth protocol support | Implement the emerging **Agent Auth** standard from the landscape. Agents authenticate to services via standardized token exchange | 1-2 days | **SP6** |
+
+### Layer 6: Review
+**Current:** Reviewer agent (code-review skill), auto-PR. No webhook-triggered review, no external tool integration.
+**Landscape:** Ona, GitLab Duo Review, Greptile, CodeRabbit, Claude Review, Copilot Reviews, Cursor Bugbot, Devin, Vercel Agent G, Gemini Code Assist.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| Webhook-triggered PR review | GitHub/Bitbucket PR webhook -> dispatch reviewer agent -> post review comments on PR. Autonomous review without human trigger | 2-3 days | **SP7** |
+| External review tool integration | **CodeRabbit** (AI review as a service) or **Greptile** (codebase-aware review) as fallback/supplementary reviewers alongside Ark's built-in reviewer agent | 1-2 days | **SP7** |
+| Review-on-merge-request for Bitbucket | Bitbucket webhook -> reviewer agent -> inline comments via Bitbucket API | 1-2 days | **SP7** |
+| Structured review output in PR comments | Post P0-P3 findings as GitHub/Bitbucket review comments with severity labels, not just a text blob | 1 day | **SP7** |
+
+### Layer 7: Agent Tooling
+**Current:** Git worktrees, MCP, arkd tools (bash, read, write, edit, glob, grep, exec), MCP socket pooling.
+**Landscape:** VNC, Computer Use, Browserbase, agent-browser, Chromium, Git Worktrees, Browser Use, Nix, Tessl.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| Browser Use (web automation for agents) | **Browserbase** or **Browser Use** (OSS). Agents can browse web, interact with UIs, test web apps, scrape data. Critical for QA + PM agents | 2-3 days | **SP8** |
+| Computer Use (desktop automation) | **Anthropic Computer Use** for agents that need to interact with desktop apps (Figma, Slack, email). MCP tool wrapper | 1-2 days | **SP8** |
+| Nix for reproducible environments | **Nix** as a compute provisioning option -- reproducible dev environments without Docker overhead. Lighter than containers | 2-3 days | **SP4** |
+| Dev server management | Launch/stop/preview dev servers in compute targets. Port forwarding from compute to web UI for live preview (like Open Agents) | 2-3 days | **SP4** |
+
+### Layer 8: Models
+**Current:** LLM Router (3 policies, 300+ model pricing, TensorZero gateway). Never tested against real APIs. Not wired to agents.
+**Landscape:** Claude 4.6, GPT-5, Gemini 3, Llama 4, DeepSeek V3, Cursor Composer, MiniMax M2, Kimi K2.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| Test LLM Router against real APIs | Smoke test: Anthropic, OpenAI, Google. Verify streaming, tool calling, error handling | 1-2 days | **SP9** |
+| Wire router into agent dispatch | Executors inject `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` (code exists but untested). Verify end-to-end: agent -> router -> provider | 1 day | **SP9** |
+| MiniMax / GLM / DeepSeek custom providers | OpenAI-compatible custom endpoint support. MiniMax via SambaNova API (`https://api.sambanova.ai/v1`). cost_mode=free for self-hosted | 1-2 days | **SP9** |
+| Per-stage model routing | Plan with Opus ($75/Mtok output), implement with MiniMax ($1/Mtok output). Configure per-stage in flow YAML: `model_tier: quality|balanced|cost` | 1-2 days | **SP9** |
+| Model-family prompt overlays | Per-model behavioral tuning (GPT: anti-verbosity, Gemini: conciseness, Claude: todo management). Borrow from Open Agents `system-prompt.ts` | 1 day | **SP9** |
+| Anthropic cache control optimization | Auto-add `cacheControl: { type: "ephemeral" }` for cost savings on long conversations. Borrow from Open Agents `cache-control.ts` | 0.5 day | **SP9** |
+
+### Layer 9: Benchmarks & Evals
+**Current:** Eval system exists (evaluateSession, getAgentStats, detectDrift) but never tested against real sessions. No SWE-bench. No benchmark dashboard.
+**Landscape:** SWE-bench, SWE-bench 2, Terminal Bench, Rebar.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| Wire eval system to real sessions | Run evaluateSession on completed sessions. Track success rate, token efficiency, tool call patterns over time | 1-2 days | **SP10** |
+| SWE-bench integration | Run SWE-bench tasks as Ark sessions. Compare agent performance across runtimes and models. Automated via CI | 2-3 days | **SP10** |
+| Task-based benchmark framework (Abhimanyu) | 100 real-world tasks on actual repos (JWT update, PR review, MCP tool calling). Multi-model comparison. Results feed LLM Router routing weights | 3-5 days | **SP10** |
+| Benchmark dashboard | Web UI page showing eval results, model comparison charts, success rates by task type, cost-per-task | 2-3 days | **SP10** |
+| Eval-driven routing | Benchmark results automatically update LLM Router routing weights. "Model X is 95% on tool calling, 60% on review" -> route accordingly | 1-2 days | **SP10** |
+
+### Layer 10: Protocols & Standards
+**Current:** MCP only. ACP as exploratory POC.
+**Landscape:** MCP, A2A, ACP, AGENTS.md, Devcontainer, OCI, OpenTelemetry, Agent Trace, Agent Skills, Agent Auth.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| **A2A** (Agent-to-Agent protocol, Google) | Agents discover and communicate with other agents. Ark already has fan-out/fork -- A2A standardizes the wire format | 2-3 days | **SP6** |
+| **ACP** (Agent Communication Protocol) | Standard agent interface. Goose uses it via Claude SDP adapter. Ark channel system maps to ACP semantics | 2-3 days | **SP6** |
+| **AGENTS.md** | Standard file that describes what agents can do in a repo. Ark should both read (discover repo agent config) and write (declare Ark's capabilities) | 0.5 day | **SP6** |
+| **OpenTelemetry / Agent Trace** | Wire OTLP spans (code exists in `otlp.ts` but never tested). Per-session traces with tool call spans, LLM call spans, stage transitions | 1-2 days | **SP6** |
+| **Agent Skills** protocol | Standard skill discovery and invocation. Ark's skill system maps but isn't protocol-compliant | 1 day | **SP6** |
+| **Agent Auth** protocol | Standardized token exchange for agent-to-service authentication | 1-2 days | **SP6** |
+| **Devcontainer** spec compliance | Ensure Ark's devcontainer compute provider fully implements the spec (features, lifecycle hooks, port forwarding) | 1 day | **SP4** |
+| **OCI** (Open Container Initiative) | Ensure Docker/K8s providers are OCI-compliant for image management | 0.5 day | **SP4** |
+
+### Layer 10b: Verification Artifacts & Session Recording
+**Current:** Events table logs stage transitions. Transcript parsers extract Claude/Codex/Gemini/Goose conversations. Artifacts table tracks files/commits/PRs. No video, no terminal recording, no structured test output capture.
+**Vision:** Every session produces a complete, reviewable audit trail -- what the agent did, what it saw, what it changed, and proof it worked.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| Terminal session recording | **asciinema** (record tmux sessions as `.cast` files). Start recording at dispatch, stop on completion. Store in `~/.ark/recordings/<sessionId>.cast`. Playback in web UI via asciinema-player.js | 1-2 days | **SP10** |
+| GIF/video generation from recordings | Convert `.cast` -> GIF/MP4 via **agg** (asciinema GIF generator) or **svg-term-cli**. Attach to PR descriptions and session artifacts | 1 day | **SP10** |
+| Structured verification output | Capture test results (JUnit XML / TAP), lint results (SARIF), security scan results (SARIF) as typed artifacts. Parse exit codes + structured output, not just pass/fail | 1-2 days | **SP10** |
+| Web preview screenshots | For agents building UIs: capture dev server screenshots via **Playwright** at verify stage. Store as session artifacts. Show in web UI session detail | 1-2 days | **SP10** |
+| Full transcript persistence | Store complete agent transcript (all messages, tool calls, tool results) as JSONL artifact per session. Already partially done via transcript parsers -- ensure 100% coverage across all 5 runtimes | 1 day | **SP10** |
+| Diff snapshots per stage | Capture `git diff --stat` + full diff at each stage boundary. Store as artifacts. Enable "session replay" -- see what changed at each stage | 1 day | **SP10** |
+| Cost breakdown per stage | Per-stage token usage and cost already in usage_records. Surface in web UI session detail as a cost timeline chart | 0.5 day | **SP11** |
+| Session replay in web UI | "Play back" a completed session: show each stage's transcript, diffs, verification output, terminal recording, and cost. Like a build log but richer | 2-3 days | **SP11** |
+| PR attachment of artifacts | Auto-attach to GitHub/Bitbucket PRs: terminal recording GIF, test results summary, diff stats, cost breakdown. Makes PRs self-documenting | 1-2 days | **SP7** |
+| Artifact retention policy | Configurable TTL for recordings/transcripts. Local: keep N days. Control plane: tenant-scoped retention policy | 0.5 day | **SP2** |
+
+### Layer 11: ROI & Measurement
+**Current:** Universal cost tracking (300+ models, api/subscription/free). No developer experience metrics, no contribution charts, no executive reporting.
+**Landscape:** DX, Cursor Analytics, Jellyfish, Git AI, Entire CLI.
+
+| Gap | Tool / Approach | Effort | Priority |
+|-----|----------------|--------|----------|
+| Developer experience metrics | Cycle time (issue -> merged PR), PR throughput, agent success rate, human intervention rate. Track per-user, per-team, per-tenant | 2-3 days | **SP11** |
+| Contribution charts | GitHub-style heatmap showing daily agent activity (PRs merged, lines changed, sessions completed). Borrow from Open Agents `contribution-chart.tsx` | 1 day | **SP11** |
+| Cost-per-feature tracking | Attribute total cost (LLM tokens + compute hours) to a feature/ticket. "Feature X cost $12.50 in agent time" | 1-2 days | **SP11** |
+| Executive dashboard | Tenant-level reporting: total agent hours saved, cost vs manual development, quality metrics (test coverage delta, bug rate delta) | 2-3 days | **SP11** |
+| ROI calculator | "Your agents completed N tasks this week. Estimated human time saved: X hours. Cost: $Y. ROI: Z%" | 1 day | **SP11** |
+
+---
+
 ## Priority Sequence
 
 ```
-Camp 0:  Early Adopter Ship       ████████████   IMMEDIATE -- week of Apr 13, limited-features hand-out
-Camp 1:  Integration Testing      ██             Mostly DONE: 167 e2e tests, TUI harness + web harness green,
-                                                 flow/cost/dispatch contracts covered. Remains: real LLM router
-                                                 smoke, K8s/E2B/arkd real-service runs, Docker image publish
-Camp 10: Dev-Env + Pre-Eng        ██████████     Unblocks Claude-at-fleet, non-engineer adoption (Traefik, VaultMan,
-                                                 sub-recipe runtime, MiniMax router adapter, ideate flow)
-Camp 11: Multi-Repo Support       ██████████     Design decisions locked; lands after pilot closes first bug
-Camp 12: Federated Compute        ██████████     Unblocks pilot: local client + remote compute via token, no AWS creds
-Camp 13: Plugin Platform          ████████       Phase 1 DONE (PluginRegistry + DI); Phases 2-4 (unify stores,
-                                                 manifest/versioning/hot-reload, sandboxing)
-Camp 2:  Workflow Persistence     ████████       Temporal + crash recovery
-Camp 3:  Agent Intelligence       ████           Partial (evals, costs done; trust scoring, latency p50/p95 remain)
-Camp 4:  Dashboard & Viz          ██             Mostly done (dashboard, charts, smart polling, daemon health).
-                                                 Remains: live feed, graph viz, agent detail depth
-Camp 5:  Security                 ██████         Enterprise blocker (audit trail, posture score, exec approval, secret detection)
-Camp 9:  Architecture             ██             Mostly done (DI, PluginRegistry, schema cleanup, daemon lifecycle,
-                                                 TUI daemon-client, DAG engine). Remains: async Postgres
-Camp 6:  Integrations             ██████         Webhooks, alert rules, GitHub Issues sync, Linear, Slack commands
-Camp 7:  Task Management          ████████       Task board ABOVE sessions, Aegis review, quality gates
-Camp 8:  UX Polish                ██████         Desktop .dmg shipping (currently broken), Homebrew, onboarding wizard, i18n
+═══════════════════════════════════════════════════════════════════════════
+TIER 1 -- SHIP (now)
+═══════════════════════════════════════════════════════════════════════════
+SP1:  TUI Removal + Tauri Desktop  ████         Delete TUI (15.8K lines), replace Electron with Tauri v2,
+      + Web UI Overhaul                          ship .dmg/.app + AppImage/.deb. Web UI production overhaul
+                                                 (Open Agents patterns). This is the user-facing foundation.
+
+═══════════════════════════════════════════════════════════════════════════
+TIER 2 -- FOUNDATIONS (next, enables everything)
+═══════════════════════════════════════════════════════════════════════════
+SP2:  Security & Secrets           ████████     Credential vault (built-in), OPA/Cedar policies, Semgrep,
+                                                 Dependabot/Trivy, credential brokering. Non-negotiable for
+                                                 enterprise and multi-tenant. Package with Ark binary.
+SP3:  Interface Integrations       ████████     GitHub App (webhooks), Bitbucket, Jira, Slack bot. Inbound
+                                                 events trigger sessions. Outbound agents interact with services.
+SP9:  Models & Router              ████████     Test LLM Router against real APIs. Wire into agents. MiniMax/
+                                                 GLM/DeepSeek providers. Per-stage model routing. Cache control.
+
+═══════════════════════════════════════════════════════════════════════════
+TIER 3 -- ARCHITECTURE (the big bets)
+═══════════════════════════════════════════════════════════════════════════
+SP4:  Sandbox & Compute Lifecycle  ██████████   Hibernate/snapshot/restore. Arkd-to-arkd proxy (decoupled
+                                                 compute). Compute pooling. Daytona + Modal/Fly.io providers.
+                                                 Dev server management + live preview.
+SP5:  Orchestration Hardening      ████████     Test Temporal. Build local durable workflow engine. Event-
+                                                 driven triggers (webhooks -> sessions). Crash recovery.
+SP6:  Protocols & Standards        ██████       A2A, ACP, AGENTS.md, OpenTelemetry/Agent Trace, Agent Skills,
+                                                 Agent Auth, Devcontainer compliance. Table-stakes for interop.
+
+═══════════════════════════════════════════════════════════════════════════
+TIER 4 -- CAPABILITIES (scale the factory)
+═══════════════════════════════════════════════════════════════════════════
+SP7:  Review Pipeline              ████         Webhook-triggered PR review (GitHub/BB), external tool
+                                                 integration (CodeRabbit, Greptile), structured PR comments.
+SP8:  Agent Expansion              ██████████   PM, QA, DevOps, Design agent roles. Browser Use, Computer Use.
+                                                 Custom "arka" serverless agent runtime. Emerging runtimes
+                                                 (Kiro, Amp, Warp, Cline, Windsurf).
+SP10: Benchmarks, Evals &          ██████████   Wire evals to real sessions. SWE-bench. Task-based benchmarks.
+      Verification Artifacts                     Eval-driven routing. Benchmark dashboard. PLUS: terminal
+                                                 recording (asciinema), GIF generation, structured test/lint/
+                                                 security output (JUnit/SARIF), web preview screenshots,
+                                                 full transcript persistence, diff snapshots per stage,
+                                                 session replay in web UI.
+SP11: ROI & Measurement            ██████       DX metrics, contribution charts, cost-per-feature, executive
+                                                 dashboard, ROI calculator. The "why should we keep paying" answer.
 ```
 
-**What changed in this update (2026-04-12 full session -- 51 PRs, 100+ commits):**
+**What changed in this update (2026-04-14 post-meeting + 2026-04-12 full session):**
+
+**Apr 14 "ark init" meeting decisions:**
+- TUI retired -- product surfaces narrowed to Web UI + CLI + Electron desktop. TUI was most expensive
+  to maintain, hardest to test, least intuitive for new users.
+- Web UI elevated to primary interface. Ship-blockers added: conversation interface, repo dropdown.
+- Electron desktop app packaging (DMG for macOS/Linux, Intel/ARM) promoted to Camp 0 ship-blocker.
+- ACP (Agent Communication Protocol) added as exploratory POC. Not a replacement for channels.
+- MiniMax/GLM added as cheap model targets (~1/10th Claude cost). Strategy: plan with Opus, implement
+  with cheap models. Needs OpenAI-compatible custom provider in LLM Router.
+- Task-based benchmarking framework (Abhimanyu) -- results to feed LLM Router routing weights.
+- Camp 8 (UX Polish) elevated in priority sequence -- now ship-critical since web is primary.
+- Tauri flagged as potential Electron alternative (smaller binary, Rust backend).
+
+**2026-04-12 full session (51 PRs, 100+ commits):**
 
 **DAG flow engine (new -- production-grade branching and routing):**
 - on_outcome routing -- agents report outcome labels (e.g. "approved", "rejected"), flow
@@ -774,6 +1073,7 @@ Camp 8:  UX Polish                ██████         Desktop .dmg shippi
 | Product | Their strength | Our strength | Gap to close |
 |---------|---------------|-------------|--------------|
 | **Mission Control** | 32-panel dashboard, Kanban, security posture, webhooks | Compute orchestration, DAG flows, knowledge graph | Dashboard depth, task board, security |
+| **Vercel Open Agents** | Polished web chat UI (model selector, slash commands, thinking blocks, file autocomplete, PR dialogs), sandbox hibernation/snapshots, live preview/port forwarding, durable workflows, in-session subagent delegation, session sharing | Multi-agent orchestration (12 roles vs 1), DAG flows (15 vs 0), 11 compute providers vs 1, 5 runtimes vs 1, LLM Router, knowledge graph, multi-tenant control plane, cost tracking (300+ models), CLI + Desktop, verification gates, guardrails | **Web UI polish** (biggest gap), sandbox snapshot/hibernate, live preview, durable workflows |
 | **SoulForge** | Codebase knowledge graph, PageRank, blast radius | Unified knowledge (code + sessions + memories) | Symbol-level precision (Axon handles this) |
 | **Goose** | Recipe-based SDLC, server mode | DAG conditional routing + on_outcome branching replaces Goose's linear recipes | Server mode (our control plane) |
 | **Higress** | CNCF AI gateway, enterprise-grade | Custom router with Ark-specific features | Enterprise gateway (use Higress for prod) |
@@ -794,6 +1094,10 @@ Camp 8:  UX Polish                ██████         Desktop .dmg shippi
 - **"Send to dev"**: PRD ready → remote devbox → tested PR at 95% readiness. Requires: Camp 1 (integration testing) + Camp 2 (workflow persistence) + Camp 10 (dev-env provisioning).
 - **Risk team (PAI-32794)**: Per-user MCP credentials, chat history on server → auth + control plane + knowledge graph + Camp 10 credential vault.
 - **Rollout discipline**: Start with individuals, not teams. Limited feature set, not everything at once. Daily feedback from recruits, weekly triage by builders. Success = an agent autonomously closing a real bug end-to-end (the Srinivasan-tweet test).
+- **2026-04-14 "ark init" meeting**: First team sync with Yana, Zineng, Abhimanyu, Atul. Architecture walkthrough confirmed two modes (user/local vs control plane), conductor as central gateway, arkd as per-compute agent manager. TUI retired by consensus. Web UI + CLI + Electron desktop as product surfaces. Zineng orienting on codebase (first tasks: web UI improvements). Abhimanyu building model benchmarks and exploring ACP. Team regroups Apr 15 for roadmap after orientation period. Yana on break until Thu Apr 17 (worked over weekend, out of Claude tokens).
+- **Tauri consideration (2026-04-14)**: Zineng flagged Tauri v2 as potential Electron alternative. Smaller binary size, Rust backend, better security model. Worth evaluating before investing heavily in Electron packaging -- both wrap a web UI, but Tauri produces ~10x smaller binaries.
+- **MiniMax economics (2026-04-14)**: Input $0.30/Mtok, output $1.00/Mtok vs Claude Opus input $15/Mtok, output $75/Mtok. ~25-75x cheaper. ~90% performance for mechanical tasks per Abhimanyu's benchmarks. GLM also competitive on some benchmarks. Strategy: use cheap models for mechanical work (implement, verify) and expensive models for judgment work (plan, review).
+- **Native skill gap (2026-04-14)**: Abhimanyu asked about integrating native skills (like superpowers) into dispatched sessions. Yana: "I added native skill support at some point. Maybe dropped at some point." Needs investigation -- may have regressed during refactors.
 
 ---
 
@@ -873,6 +1177,14 @@ From deep analysis of builderz-labs/mission-control (32 panels):
 6. **DAG engine: dual routing model.** Static routing via `on_outcome` (agent-reported labels) for deliberate branching. Dynamic routing via `condition` (JS expressions against session data) for data-driven flow control. Both coexist on the same stage/edge.
 7. **on_failure retry with error context injection.** Failed stages re-dispatch with the failure reason injected into the task prompt, not just retried blindly. Max retries configurable per stage via `on_failure: "retry(N)"`.
 8. **Auto-rebase default-on, conflict-tolerant.** PR branches auto-rebase onto base before creation. Conflicts abort the rebase and proceed with PR anyway -- human handles the merge conflict in the PR itself.
+9. **TUI retired (2026-04-14).** Product surfaces: Web UI + CLI + Electron desktop app. TUI code stays in repo, no further investment. Reason: most expensive to maintain, hardest to test, least intuitive for new users.
+10. **Web UI is the primary interface (2026-04-14).** Everything doable from web without CLI. Conversation interface, repo dropdown, session wizard are ship-blockers.
+11. **Channels remain the Claude Code agent communication path (2026-04-14).** ACP is exploratory (POC), not a replacement. Claude Code and Codex don't officially support ACP.
+12. **Plan with Opus, implement with cheap models (2026-04-14).** LLM Router should support per-stage model routing. MiniMax (~1/10th Claude cost) for mechanical tasks.
+13. **Benchmarking feeds routing (2026-04-14).** Task-based model benchmarks (not just prompting) should inform LLM Router routing weights per task category.
+14. **Decoupled compute architecture (2026-04-14).** Separate agent fleet from compute fleet. Current: Session 1:1 Agent 1:1 Compute. Target: Session 1:N Agent 1:M Compute. Agents are cheap/stateless (LLM loop only), compute is expensive/persistent (repo, tools, dev servers). Agents connect to compute via tools over network (arkd). Scale independently, hibernate compute without losing agent state. Solves multi-repo naturally (one agent, N compute attachments).
+15. **Compute lifecycle: hibernate/snapshot/restore (2026-04-14).** Compute targets should support hibernate (stop billing), snapshot (save state), restore (resume). E2B has snapshots, EC2 has AMIs, Docker has checkpoint, Firecracker has snapshotting. Expose universally via compute provider interface.
+16. **Web UI overhaul from Open Agents patterns (2026-04-14).** Borrow 10+ components: tool call renderers, git panel, todo panel, structured questions, model selector, contribution charts, stream recovery. Current Ark web is ~6K lines; Open Agents is ~43K. Clone at /tmp/open-agents for reference.
 
 ## TensorZero Integration Plan
 
@@ -912,3 +1224,9 @@ Agent → Ark Routing Layer (classify, policy, context) → TensorZero (Rust sid
 10. Auto-rebase before PR reduces merge conflicts but must handle conflicts gracefully (abort + proceed) -- blocking PR creation on rebase failure is worse than the conflict.
 7. Mission Control sets the UX bar (32 panels vs our 11 views).
 8. Cost tracking must be universal (not just Claude -- every provider, every user, every dimension).
+11. TUI is a maintenance trap. Rich content in text is hard to represent, testing is "literally hell," and agents are bad at fixing TUI bugs. Web UIs are easier to build, test, and iterate on. Retire early, not late.
+12. Plan with expensive models, implement with cheap ones. Most coding work is mechanical once the plan is set -- use 1/10th-cost models for the bulk of token spend.
+13. ACP adoption is fragmented -- don't bet on it yet. Only Gemini has native support. Keep channels as the Claude Code path and explore ACP as a parallel option.
+14. Benchmarking on real tasks beats synthetic benchmarks. Model comparison should use actual repo tasks (JWT update, PR review, MCP tool calling), not isolated prompts.
+15. Decouple agents from compute. Agent VMs are cheap (LLM loop). Compute VMs are expensive (repo, tools, dev servers). When coupled 1:1, you overpay for idle compute and can't share repos across agents. The "agent outside sandbox" pattern from Open Agents enables independent fleet scaling, compute hibernation, and natural multi-repo support.
+16. Compute state should be a serializable JSON blob. If you can serialize compute state (resource ID, pool, status, snapshot URL), you can hibernate it, restore it, move it, and share it -- same pattern as Open Agents' SandboxState. Arkd is already the network boundary.

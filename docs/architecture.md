@@ -27,7 +27,192 @@
 
 ## 1. Overview
 
-Ark is an autonomous agent ecosystem that orchestrates AI coding agents through DAG-based SDLC flows. It ships as a single codebase that runs in two deployment modes -- **local single-user** (SQLite, file-backed stores, no auth) and **hosted control plane** (Postgres, DB-backed stores, API keys, multi-tenant, multi-user) -- with identical code paths toggled by config (`databaseUrl`, `redisUrl`, `auth.enabled`). Core features include 11 compute providers, 3 runtimes (Claude Code, Codex CLI, Gemini CLI), polymorphic transcript parsers, an OpenAI-compatible LLM router, a unified knowledge graph powered by ops-codegraph, MCP socket pooling, bidirectional agent channels, and a universal HTTP daemon (arkd) that runs on every compute target.
+Ark is an autonomous agent ecosystem that orchestrates AI coding agents through DAG-based SDLC flows. It ships as a single codebase that runs in two deployment modes -- **local single-user** (SQLite, file-backed stores, no auth) and **hosted control plane** (Postgres, DB-backed stores, API keys, multi-tenant, multi-user) -- with identical code paths toggled by config (`databaseUrl`, `redisUrl`, `auth.enabled`). Core features include 11 compute providers, 5 runtimes (Claude Code, Codex CLI, Gemini CLI, Goose, Aider), polymorphic transcript parsers, an OpenAI-compatible LLM router, a unified knowledge graph powered by ops-codegraph, MCP socket pooling, bidirectional agent channels, and a universal HTTP daemon (arkd) that runs on every compute target.
+
+### 1.1 System Architecture Diagram
+
+```mermaid
+graph TB
+    %% ── Domain Concepts (top layer) ──
+    subgraph domain["Domain Concepts -- managed by AppContext"]
+        direction LR
+        Flows["Flows<br/>(15 definitions)"]:::domain
+        Sessions:::domain
+        CostTracking["Cost Tracking<br/>(PricingRegistry +<br/>UsageRecorder)"]:::domain
+        SharedMCPs["Shared MCPs /<br/>Compute Templates"]:::domain
+        Recipes["Recipes<br/>(10 templates)"]:::domain
+        LLMRouter["LLM Router<br/>(:8430, 3 policies)"]:::domain
+        SkillsTools["Skills (7) /<br/>Tools"]:::domain
+        KnowledgeGraph["Knowledge Graph<br/>(ops-codegraph,<br/>33 languages)"]:::domain
+    end
+
+    %% ── Ark Server (the actual API gateway) ──
+    ArkServer["Ark Server (:19400)<br/>WebSocket + JSON-RPC 2.0<br/>owns AppContext"]:::server
+
+    %% ── User-facing surfaces ──
+    subgraph surfaces["User Surfaces"]
+        direction LR
+        WebUI["Web UI<br/>(Vite + SSE)"]:::surface
+        CLI["CLI<br/>(ark command)"]:::surface
+        Desktop["Desktop<br/>(Electron / Tauri)"]:::surface
+        TUI_retired["TUI (retired)<br/>React + Ink"]:::retired
+    end
+    surfaces -- "WebSocket / stdio<br/>JSON-RPC 2.0" --> ArkServer
+
+    %% ── Internal services owned by AppContext ──
+    subgraph appContext["AppContext (packages/core/app.ts)"]
+        direction TB
+        SessionService:::internal
+        ComputeService:::internal
+        KnowledgeStore:::internal
+        Repos["Repositories<br/>(SQL CRUD)"]:::internal
+        Stores["Resource Stores<br/>(Flow, Skill, Agent,<br/>Recipe, Runtime)"]:::internal
+        TranscriptParsers["Transcript Parsers<br/>(Claude, Codex,<br/>Gemini, Goose)"]:::internal
+    end
+    ArkServer --> appContext
+    domain --> appContext
+
+    %% ── Conductor (agent-facing control plane HTTP) ──
+    Conductor["Conductor (:19100)<br/>HTTP -- agent reports,<br/>hook status, stage handoff,<br/>guardrails"]:::conductor
+    appContext --> Conductor
+
+    %% ── Deployment modes ──
+    subgraph localMode["User / Local Mode"]
+        direction TB
+        ArkExec["ark server daemon start<br/>(boots Server + Conductor + ArkD)"]:::local
+        SQLite["SQLite (~/.ark/ark.db)<br/>WAL mode"]:::local
+        YAMLFiles["YAML files (~/.ark/)<br/>three-tier resolution"]:::local
+    end
+
+    subgraph controlPlane["Control Plane / Hosted Mode"]
+        direction TB
+        MultiTenant["Multi-Tenant + Multi-User<br/>hierarchical config propagation"]:::hosted
+        PostgresRDS["Postgres / RDS<br/>(DATABASE_URL)"]:::hosted
+        RedisSSE["Redis SSE Bus<br/>(REDIS_URL)"]:::hosted
+        HelmChart["Helm Chart<br/>(.infra/helm/)"]:::hosted
+        WorkerReg["Worker Registry +<br/>Session Scheduler"]:::hosted
+    end
+
+    localMode --> appContext
+    controlPlane --> appContext
+
+    %% ── Hierarchical components ──
+    subgraph hierarchy["Component Hierarchy (three-tier resolution)"]
+        direction LR
+        BuiltIn["Built-in<br/>(shipped with Ark)"]:::hierarchy
+        TenantComp["Tenant<br/>(per-team)"]:::hierarchy
+        UserComp["User<br/>(personal)"]:::hierarchy
+        BuiltIn --> TenantComp --> UserComp
+    end
+    hierarchy -. "skills, agents,<br/>flows, recipes,<br/>runtimes, MCPs" .-> Stores
+
+    %% ── Compute target ──
+    subgraph compute["Compute Target (Local / EC2 / K8s / E2B)"]
+        direction TB
+        ArkD["arkd (:19300)<br/>per-compute agent manager<br/>file ops, exec, metrics"]:::arkd
+        subgraph agentRuntime["Agent Runtimes (in tmux sessions)"]
+            direction LR
+            ClaudeCode["Claude Code"]:::agent
+            Goose["Goose"]:::agent
+            Codex["Codex"]:::agent
+            Gemini["Gemini"]:::agent
+        end
+        Channels["Channels (MCP)<br/>per-session, ephemeral ports"]:::arkd
+        MCPPooling["MCP Pooling<br/>(shared across sessions)"]:::arkd
+        ArkD --> agentRuntime
+        ArkD --> Channels
+        ArkD --> MCPPooling
+    end
+    Conductor <-- "channel relay,<br/>hook status,<br/>dispatch" --> ArkD
+
+    %% ── Executors (how agents launch) ──
+    subgraph executors["Executors (how agents launch)"]
+        direction TB
+        EX_Claude["claude-code<br/>(stdio + hooks)"]:::provider
+        EX_CLI["cli-agent<br/>(codex, gemini)"]:::provider
+        EX_Goose["goose<br/>(recipe dispatch)"]:::provider
+        EX_Sub["subprocess<br/>(arbitrary cmd)"]:::provider
+        EX_Plugin["plugin executors<br/>(~/.ark/plugins/)"]:::provider
+    end
+
+    %% ── Compute Providers (where agents run) ──
+    subgraph computeProviders["Compute Providers (11 total)"]
+        direction TB
+        subgraph cpLocal["Local (4)"]
+            CP_Worktree["local<br/>(worktrees)"]:::provider
+            CP_Docker["docker"]:::provider
+            CP_DevC["devcontainer"]:::provider
+            CP_FC_Local["firecracker"]:::provider
+        end
+        subgraph cpEC2["EC2 Remote (4)"]
+            CP_EC2["ec2<br/>(fresh clone)"]:::provider
+            CP_EC2Docker["ec2-docker"]:::provider
+            CP_EC2DevC["ec2-devcontainer"]:::provider
+            CP_EC2FC["ec2-firecracker"]:::provider
+        end
+        subgraph cpManaged["Managed (3)"]
+            CP_K8s["k8s<br/>(pod)"]:::provider
+            CP_K8sKata["k8s-kata<br/>(Kata/Firecracker)"]:::provider
+            CP_E2B["e2b<br/>(sandbox)"]:::provider
+        end
+    end
+
+    executors -. "launch agent<br/>on target" .-> ArkD
+    computeProviders -. "provision +<br/>manage target" .-> compute
+
+    %% ── Message flow annotation ──
+    LLMRouter -. "ANTHROPIC_BASE_URL /<br/>OPENAI_BASE_URL injection" .-> agentRuntime
+
+    %% ── Styles ──
+    classDef domain fill:#fef3c7,stroke:#d97706,color:#92400e
+    classDef server fill:#ddd6fe,stroke:#7c3aed,color:#4c1d95,stroke-width:3px
+    classDef conductor fill:#dbeafe,stroke:#2563eb,color:#1e40af,stroke-width:2px
+    classDef surface fill:#e0e7ff,stroke:#4f46e5,color:#312e81
+    classDef retired fill:#f1f5f9,stroke:#94a3b8,color:#94a3b8,stroke-dasharray:4
+    classDef local fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
+    classDef hosted fill:#fce7f3,stroke:#db2777,color:#9d174d
+    classDef hierarchy fill:#ecfdf5,stroke:#059669,color:#065f46
+    classDef arkd fill:#fff7ed,stroke:#ea580c,color:#9a3412
+    classDef agent fill:#f0fdf4,stroke:#16a34a,color:#166534
+    classDef provider fill:#f8fafc,stroke:#64748b,color:#334155
+    classDef internal fill:#f0f9ff,stroke:#0284c7,color:#0c4a6e
+```
+
+**Key relationships:**
+- **Ark Server (:19400)** is the API gateway -- all surfaces (Web, CLI, Desktop) connect via WebSocket JSON-RPC 2.0. It owns `AppContext`.
+- **Conductor (:19100)** is agent-facing -- receives hook status, channel reports, and orchestrates stage handoffs. Agents never talk to Ark Server directly.
+- **ArkD (:19300)** runs on every compute target as a stateless proxy -- manages agent lifecycle (tmux), relays channels to conductor, serves file ops and metrics.
+- **Executors** define HOW agents launch (4 built-in: claude-code, cli-agent, goose, subprocess). **Compute Providers** define WHERE they run (11 total across local/EC2/K8s/E2B).
+- **Components** (skills, agents, flows, recipes, runtimes) follow three-tier resolution: built-in -> tenant -> user.
+- **LLM Router (:8430)** injects base URLs into agent environments so all LLM traffic routes transparently.
+- **TUI is retired** (Apr 14, 2026) -- product surfaces are Web UI + CLI + Desktop app.
+
+### 1.2 Message Flow
+
+```
+User (Web/CLI/Desktop)
+  │ WebSocket JSON-RPC
+  ▼
+Ark Server (:19400)
+  │ AppContext
+  ▼
+Conductor (:19100) ──────── delivers task/steer ──────▶ Channel (ephemeral port)
+  ▲                                                          │
+  │ POST /api/channel/:id                                    ▼
+  │ POST /hooks/status                                  Agent (Claude/Goose/etc.)
+  │                                                          │
+  └──────── arkd (:19300) ◀──── report/progress ─────────────┘
+```
+
+### 1.3 Port Map
+
+| Port | Component | Direction | Protocol |
+|------|-----------|-----------|----------|
+| 19100 | Conductor | Agents -> Control plane | HTTP REST |
+| 19300 | ArkD | Agents -> Proxy -> Conductor | HTTP RPC |
+| 19400 | Ark Server | Surfaces -> API | WebSocket JSON-RPC 2.0 |
+| 8430 | LLM Router | Agents -> LLM providers | OpenAI-compatible HTTP |
+| 19500+ | Channels | Conductor -> Agent (per-session) | HTTP POST |
 
 ---
 
