@@ -73,10 +73,14 @@ dev-arkd: ## Hot-reload: arkd agent daemon (:19300)
 	@echo ""
 	$(BUN) --watch packages/cli/index.ts arkd
 
-dev-tui: ## Hot-reload: TUI connecting to dev daemon (run dev-daemon first)
+dev-tui: ## Hot-reload: TUI connecting to dev daemon (starts daemon if not running)
+	@curl -sf http://localhost:19400/health >/dev/null 2>&1 || \
+		(echo "Daemon not running. Start it with: make dev-daemon" && exit 1)
 	ARK_SERVER_PORT=19400 ./ark tui
 
-dev-web: ## Start only the Vite dev server (needs `ark web` on :8420 separately)
+dev-web: ## Vite dev server + API proxy (starts daemon if not running)
+	@curl -sf http://localhost:19400/health >/dev/null 2>&1 || \
+		(echo "Daemon not running. Start it with: make dev-daemon" && exit 1)
 	cd packages/web && npx vite --port 5173
 
 tui: ## Launch the terminal UI (from source)
