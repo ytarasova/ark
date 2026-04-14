@@ -910,10 +910,14 @@ export async function executeAction(app: AppContext, sessionId: string, action: 
 
   switch (action) {
     case "create_pr": {
+      // Skip if a PR already exists (implementer may have created one)
+      if (s.pr_url) {
+        app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: s.pr_url, skipped: "pr_already_exists" } });
+        return await advance(app, sessionId, true);
+      }
       const result = await createWorktreePR(app, sessionId, { title: s.summary ?? undefined });
       if (result.ok) {
         app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: result.pr_url } });
-        // Auto-advance past this action stage
         return await advance(app, sessionId, true);
       }
       return result;
