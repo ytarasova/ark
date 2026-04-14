@@ -1,0 +1,17 @@
+name: docs
+description: "Lightweight flow for documentation: plan -> implement -> PR. No verify/review -- docs don't need test suites or code review."
+stages:
+  - name: plan
+    agent: planner
+    gate: auto
+
+  - name: implement
+    agent: worker
+    gate: auto
+    depends_on: [plan]
+    on_failure: "retry(1)"
+
+  - name: pr
+    action: create_pr
+    gate: auto
+    depends_on: [implement]
