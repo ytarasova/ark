@@ -6,8 +6,8 @@ import type { MessageSendParams, SessionIdParams } from "../../types/index.js";
 export function registerMessagingHandlers(router: Router, app: AppContext): void {
   router.handle("message/send", async (p) => {
     const { sessionId, content } = extract<MessageSendParams>(p, ["sessionId", "content"]);
-    await app.sessionService.send(sessionId, content);
-    return { ok: true };
+    const result = await app.sessionService.send(sessionId, content);
+    return result;
   });
 
   router.handle("gate/approve", async (p) => {

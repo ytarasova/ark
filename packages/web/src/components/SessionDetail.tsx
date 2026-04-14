@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { StatusBadge } from "./StatusDot.js";
+import { ChatPanel } from "./ChatPanel.js";
 import { api } from "../hooks/useApi.js";
 import { useSessionDetailData } from "../hooks/useSessionDetailData.js";
 import { relTime, fmtCost, formatRepoName } from "../util.js";
@@ -27,82 +28,50 @@ interface SessionDetailProps {
   onChatOpenChange?: (open: boolean) => void;
 }
 
-function SessionActions({ session, onAction, onSend, chatOpen, onChatOpenChange }: { session: any; onAction: (action: string) => void; onSend: (msg: string) => void; chatOpen?: boolean; onChatOpenChange?: (open: boolean) => void }) {
+function SessionActions({ session, onAction, chatOpen, onChatOpenChange }: { session: any; onAction: (action: string) => void; chatOpen?: boolean; onChatOpenChange?: (open: boolean) => void }) {
   const s = session.status;
-  const [sendMsg, setSendMsg] = useState("");
-  const [showSendInternal, setShowSendInternal] = useState(false);
-  const showSend = chatOpen ?? showSendInternal;
-  const setShowSend = (v: boolean) => { setShowSendInternal(v); onChatOpenChange?.(v); };
   return (
-    <div>
-      <div className="flex gap-1.5 flex-wrap">
-        {(s === "ready" || s === "pending" || s === "blocked") && (
-          <Button size="xs" onClick={() => onAction("dispatch")}>Dispatch</Button>
-        )}
-        {(s === "running" || s === "waiting") && (
-          <Button variant="warning" size="xs" onClick={() => onAction("stop")}>Stop</Button>
-        )}
-        {(s === "running" || s === "waiting") && (
-          <Button variant="outline" size="xs" onClick={() => onAction("pause")}>Pause</Button>
-        )}
-        {(s === "running" || s === "waiting") && (
-          <Button variant="outline" size="xs" onClick={() => onAction("interrupt")}>Interrupt</Button>
-        )}
-        {(s === "ready" || s === "blocked") && (
-          <Button size="xs" onClick={() => onAction("advance")}>Advance</Button>
-        )}
-        {(s === "running" || s === "waiting") && (
-          <Button variant="success" size="xs" onClick={() => onAction("complete")}>Complete</Button>
-        )}
-        {(s === "stopped" || s === "failed" || s === "completed") && (
-          <Button variant="success" size="xs" onClick={() => onAction("restart")}>Restart</Button>
-        )}
-        {s !== "deleting" && (
-          <Button variant="outline" size="xs" onClick={() => onAction("fork")}>Fork</Button>
-        )}
-        {(s === "running" || s === "waiting") && (
-          <Button variant="outline" size="xs" onClick={() => setShowSend(!showSend)}>Send</Button>
-        )}
-        {(s === "completed" || s === "stopped" || s === "failed") && (
-          <Button variant="outline" size="xs" onClick={() => onAction("archive")}>Archive</Button>
-        )}
-        {s === "archived" && (
-          <Button variant="outline" size="xs" onClick={() => onAction("restore")}>Restore</Button>
-        )}
-        {s !== "deleting" && (
-          <Button variant="destructive" size="xs" onClick={() => onAction("delete")}>Delete</Button>
-        )}
-        {s === "deleting" && (
-          <Button variant="outline" size="xs" onClick={() => onAction("undelete")}>Undelete</Button>
-        )}
-      </div>
-      {showSend && (
-        <div className="flex gap-1 mt-1.5">
-          <Input
-            className="flex-1 h-7 text-xs"
-            placeholder="Message to agent..."
-            value={sendMsg}
-            onChange={(e) => setSendMsg(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && sendMsg.trim()) {
-                onSend(sendMsg.trim());
-                setSendMsg("");
-                setShowSend(false);
-              }
-            }}
-          />
-          <Button
-            size="xs"
-            disabled={!sendMsg.trim()}
-            onClick={() => {
-              if (sendMsg.trim()) {
-                onSend(sendMsg.trim());
-                setSendMsg("");
-                setShowSend(false);
-              }
-            }}
-          >Send</Button>
-        </div>
+    <div className="flex gap-1.5 flex-wrap">
+      {(s === "ready" || s === "pending" || s === "blocked") && (
+        <Button size="xs" onClick={() => onAction("dispatch")}>Dispatch</Button>
+      )}
+      {(s === "running" || s === "waiting") && (
+        <Button variant="warning" size="xs" onClick={() => onAction("stop")}>Stop</Button>
+      )}
+      {(s === "running" || s === "waiting") && (
+        <Button variant="outline" size="xs" onClick={() => onAction("pause")}>Pause</Button>
+      )}
+      {(s === "running" || s === "waiting") && (
+        <Button variant="outline" size="xs" onClick={() => onAction("interrupt")}>Interrupt</Button>
+      )}
+      {(s === "ready" || s === "blocked") && (
+        <Button size="xs" onClick={() => onAction("advance")}>Advance</Button>
+      )}
+      {(s === "running" || s === "waiting") && (
+        <Button variant="success" size="xs" onClick={() => onAction("complete")}>Complete</Button>
+      )}
+      {(s === "stopped" || s === "failed" || s === "completed") && (
+        <Button variant="success" size="xs" onClick={() => onAction("restart")}>Restart</Button>
+      )}
+      {s !== "deleting" && (
+        <Button variant="outline" size="xs" onClick={() => onAction("fork")}>Fork</Button>
+      )}
+      {(s === "running" || s === "waiting") && (
+        <Button variant={chatOpen ? "default" : "outline"} size="xs" onClick={() => onChatOpenChange?.(!chatOpen)}>
+          {chatOpen ? "Close Chat" : "Chat"}
+        </Button>
+      )}
+      {(s === "completed" || s === "stopped" || s === "failed") && (
+        <Button variant="outline" size="xs" onClick={() => onAction("archive")}>Archive</Button>
+      )}
+      {s === "archived" && (
+        <Button variant="outline" size="xs" onClick={() => onAction("restore")}>Restore</Button>
+      )}
+      {s !== "deleting" && (
+        <Button variant="destructive" size="xs" onClick={() => onAction("delete")}>Delete</Button>
+      )}
+      {s === "deleting" && (
+        <Button variant="outline" size="xs" onClick={() => onAction("undelete")}>Undelete</Button>
       )}
     </div>
   );
@@ -230,19 +199,6 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly, chatOpen,
     }
   }
 
-  async function handleSend(message: string) {
-    try {
-      const res = await api.send(sessionId, message);
-      if (res.ok !== false) {
-        onToast("Message sent", "success");
-      } else {
-        onToast(res.message || "Send failed", "error");
-      }
-    } catch (err: any) {
-      onToast(err.message || "Send failed", "error");
-    }
-  }
-
   if (!detail || !detail.session) {
     return (
       <div className="flex flex-col h-full bg-background">
@@ -275,15 +231,23 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly, chatOpen,
         </Button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-5">
-        {/* Actions */}
-        {!readOnly && (
-          <div className="mb-5">
-            <SessionActions session={s} onAction={handleAction} onSend={handleSend} chatOpen={chatOpen} onChatOpenChange={onChatOpenChange} />
-          </div>
-        )}
+      {/* Actions (always visible) */}
+      {!readOnly && (
+        <div className="px-5 pt-3 pb-2 shrink-0">
+          <SessionActions session={s} onAction={handleAction} chatOpen={chatOpen} onChatOpenChange={onChatOpenChange} />
+        </div>
+      )}
 
+      {/* Chat panel (replaces detail content when open) */}
+      {chatOpen ? (
+        <ChatPanel
+          sessionId={sessionId}
+          session={s}
+          onClose={() => onChatOpenChange?.(false)}
+          onToast={onToast}
+        />
+      ) : (
+      <div className="flex-1 overflow-y-auto p-5">
         {/* Metadata */}
         <div className="mb-5">
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Details</h3>
@@ -606,6 +570,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly, chatOpen,
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
