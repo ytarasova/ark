@@ -54,6 +54,18 @@ describe("KnowledgeStore", () => {
     it("returns null for non-existent node", () => {
       expect(store.getNode("nonexistent")).toBeNull();
     });
+
+    it("upserts when addNode is called with an existing id", () => {
+      store.addNode({ id: "file:upsert-test", type: "file", label: "original.ts", content: "v1" });
+      const v1 = store.getNode("file:upsert-test");
+      expect(v1!.label).toBe("original.ts");
+
+      // Second addNode with the same id should replace, not throw
+      store.addNode({ id: "file:upsert-test", type: "file", label: "updated.ts", content: "v2" });
+      const v2 = store.getNode("file:upsert-test");
+      expect(v2!.label).toBe("updated.ts");
+      expect(v2!.content).toBe("v2");
+    });
   });
 
   describe("updateNode", () => {

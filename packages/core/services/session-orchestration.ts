@@ -63,7 +63,7 @@ function ingestRemoteIndex(app: AppContext, data: any, log: (msg: string) => voi
       addedFiles.add(node.file);
     }
     app.knowledge.addNode({
-      id: `symbol:${node.file}::${node.name}`,
+      id: `symbol:${node.file}::${node.name}:${node.line}`,
       type: "symbol",
       label: node.name,
       metadata: { kind: node.kind, file: node.file, line_start: node.line, line_end: node.end_line, exported: node.exported === 1 },
@@ -74,8 +74,8 @@ function ingestRemoteIndex(app: AppContext, data: any, log: (msg: string) => voi
     const tgtNode = (data.nodes ?? []).find((n: any) => n.id === edge.target_id);
     if (srcNode && tgtNode) {
       app.knowledge.addEdge(
-        `symbol:${srcNode.file}::${srcNode.name}`,
-        `symbol:${tgtNode.file}::${tgtNode.name}`,
+        `symbol:${srcNode.file}::${srcNode.name}:${srcNode.line}`,
+        `symbol:${tgtNode.file}::${tgtNode.name}:${tgtNode.line}`,
         edge.kind === "imports" ? "imports" : "depends_on",
       );
     }

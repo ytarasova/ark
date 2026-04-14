@@ -120,13 +120,13 @@ export async function indexCodebase(
     ).all() as CodegraphNode[];
 
     // Build ID lookup for edge mapping
-    const nodeIdMap = new Map<number, { kind: string; name: string; file: string }>();
+    const nodeIdMap = new Map<number, { kind: string; name: string; file: string; line: number }>();
 
     // Track files we've already added (codegraph stores file as a column, not a separate node kind)
     const addedFiles = new Set<string>();
 
     for (const node of nodeRows) {
-      nodeIdMap.set(node.id, { kind: node.kind, name: node.name, file: node.file });
+      nodeIdMap.set(node.id, { kind: node.kind, name: node.name, file: node.file, line: node.line });
 
       // Ensure the file node exists
       if (node.file && !addedFiles.has(node.file)) {
@@ -142,7 +142,7 @@ export async function indexCodebase(
       }
 
       // Add symbol node
-      const symbolId = `symbol:${node.file}::${node.name}`;
+      const symbolId = `symbol:${node.file}::${node.name}:${node.line}`;
       store.addNode({
         id: symbolId,
         type: "symbol",
@@ -171,8 +171,8 @@ export async function indexCodebase(
       const tgt = nodeIdMap.get(edge.target_id);
       if (!src || !tgt) continue;
 
-      const sourceId = `symbol:${src.file}::${src.name}`;
-      const targetId = `symbol:${tgt.file}::${tgt.name}`;
+      const sourceId = `symbol:${src.file}::${src.name}:${src.line}`;
+      const targetId = `symbol:${tgt.file}::${tgt.name}:${tgt.line}`;
 
       const relation = mapEdgeRelation(edge.kind);
       store.addEdge(sourceId, targetId, relation);

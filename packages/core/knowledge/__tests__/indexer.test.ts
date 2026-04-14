@@ -80,18 +80,53 @@ describe("indexCodebase", () => {
     expect(dbFile).not.toBeNull();
 
     // Verify symbol nodes
-    const bootNode = store.getNode("symbol:src/app.ts::boot");
+    const bootNode = store.getNode("symbol:src/app.ts::boot:10");
     expect(bootNode).not.toBeNull();
     expect(bootNode!.type).toBe("symbol");
     expect(bootNode!.label).toBe("boot");
     expect(bootNode!.metadata.kind).toBe("function");
     expect(bootNode!.metadata.exported).toBe(true);
 
-    const dbNode = store.getNode("symbol:src/db.ts::Database");
+    const dbNode = store.getNode("symbol:src/db.ts::Database:5");
     expect(dbNode).not.toBeNull();
     expect(dbNode!.metadata.kind).toBe("class");
 
     // Clean up
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("handles duplicate (file, name) pairs with different line numbers", async () => {
+    // Regression: codegraph produces many symbols with the same (file, name) pair
+    // e.g. 50 'app' parameters across different functions. Each should get a unique ID.
+    const tmpDir = join(app.config.arkDir, "test-repo-dup");
+    const cgDir = join(tmpDir, ".codegraph");
+    mkdirSync(cgDir, { recursive: true });
+
+    const dbPath = join(cgDir, "graph.db");
+    const db = new Database(dbPath);
+    db.run("CREATE TABLE nodes (id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, file TEXT NOT NULL, line INTEGER, end_line INTEGER, parent_id INTEGER, exported INTEGER DEFAULT 0, qualified_name TEXT, scope TEXT, visibility TEXT, role TEXT)");
+    db.run("CREATE TABLE edges (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, kind TEXT NOT NULL, confidence REAL DEFAULT 1.0, dynamic INTEGER DEFAULT 0)");
+
+    // Two symbols with the same name in the same file, different lines
+    db.run("INSERT INTO nodes (id, name, kind, file, line, end_line, exported) VALUES (1, 'app', 'parameter', 'src/orchestration.ts', 10, 10, 0)");
+    db.run("INSERT INTO nodes (id, name, kind, file, line, end_line, exported) VALUES (2, 'app', 'parameter', 'src/orchestration.ts', 25, 25, 0)");
+    db.run("INSERT INTO nodes (id, name, kind, file, line, end_line, exported) VALUES (3, 'boot', 'function', 'src/orchestration.ts', 1, 50, 1)");
+    db.close();
+
+    const fakeExec: ExecFn = () => "";
+
+    const result = await indexCodebase(tmpDir, store, { exec: fakeExec });
+
+    expect(result.symbols).toBe(3);
+
+    // Both 'app' parameters should exist as separate nodes
+    const app1 = store.getNode("symbol:src/orchestration.ts::app:10");
+    const app2 = store.getNode("symbol:src/orchestration.ts::app:25");
+    expect(app1).not.toBeNull();
+    expect(app2).not.toBeNull();
+    expect(app1!.metadata.line_start).toBe(10);
+    expect(app2!.metadata.line_start).toBe(25);
+
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
