@@ -1,8 +1,21 @@
 # Ark Platform Roadmap
 
-> Last updated: 2026-04-12 (51 PRs total -- DAG conditional routing, on_outcome branching, on_failure retry, daemon lifecycle, TUI daemon-client rewire, auto-rebase, verify stage, 6-page documentation suite, agent prompt optimization)
-> Unit tests: ~2968 test cases across 251 test files, 0 fail, 0 lint errors, 0 process leaks
-> E2E tests: 89 TUI (`packages/tui-e2e/`) + 78 web (`packages/e2e/web/`) = **167 passing, 0 skipped, 0 failed**
+> Last updated: 2026-04-14 (71 PRs total -- v0.14.0 released. Ark-on-Ark dogfooding, daemon-client, TreeList rewrite, action stage fixes, web UI overhaul, knowledge graph, Events tab, docs)
+> Releases: v0.13.0 (2026-04-13), v0.14.0 (2026-04-14)
+> Prompt caching: 99.9% hit rate, $3,430 saved (86% reduction) across 47 agent sessions
+>
+> **2026-04-12-14 session -- PRs #53-#83 shipped on `main` (20 PRs, 18 agent-built):**
+> - **Arkd report pipeline** -- fixed silent report drops (arkd defaulted conductorUrl to null), TUI boots arkd alongside conductor, channel routes exclusively through arkd
+> - **Action stage execution** -- `await safeAsync` (was fire-and-forget), `create_pr` checks branch for existing PR via `gh pr view`, auto_merge chain respects waiting status
+> - **TreeList rewrite** -- proper tree component (groups as parent nodes, ink-scroll-list, useVirtualScroll hook, AvailableHeightContext)
+> - **Daemon-client architecture** -- TUI as thin WS client, `make dev-daemon` (hot-reload via bun --watch), `make dev-tui`, `make dev-web`
+> - **Events tab** -- moved from bottom panel to dedicated tab (key 3), freed 3 rows for session list
+> - **Web UI overhaul** -- contextual session controls (split button + dropdown), auto-refresh polling, toast notifications, deep links, flow descriptions, recipe variable rendering
+> - **Knowledge graph fix** -- codegraph -> knowledge store ingestion pipeline repaired, 105 symbol + 13 file nodes indexed
+> - **Bug-sweep** -- 32 pre-existing test failures fixed across 8 root causes
+> - **God class refactor** -- session-hooks.ts extracted from session-orchestration.ts (697 lines)
+> - **Process tree tracking** -- PIDs recorded per session, killed on stop
+> - **Docs** -- CONTRIBUTING.md, CHANGELOG.md overhaul, ONBOARDING.md, agents/flows reference expanded
 >
 > **2026-04-10 decision (Foundry 2.0 review meeting):** Ark selected as the company-wide dev-workflow orchestrator -- the layer ABOVE tools like Goose / Claude Code / Codex, not a replacement. Framed as "the foundry" (control plane) with those tools as "the machines." First hand-out to early adopters targeted for the week of 2026-04-13. See **Camp 0: Early Adopter Ship** below.
 >
