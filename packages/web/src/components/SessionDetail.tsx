@@ -10,6 +10,7 @@ import { Input } from "./ui/input.js";
 import { Separator } from "./ui/separator.js";
 import { Badge } from "./ui/badge.js";
 import { X } from "lucide-react";
+import { TerminalPanel } from "./Terminal.js";
 
 /** Format a token count for display (e.g. 1500 -> "1.5k"). */
 function humanTokens(n: number): string {
@@ -28,7 +29,7 @@ interface SessionDetailProps {
   onChatOpenChange?: (open: boolean) => void;
 }
 
-function SessionActions({ session, onAction, chatOpen, onChatOpenChange }: { session: any; onAction: (action: string) => void; chatOpen?: boolean; onChatOpenChange?: (open: boolean) => void }) {
+function SessionActions({ session, onAction, onAttach, terminalOpen, chatOpen, onChatOpenChange }: { session: any; onAction: (action: string) => void; onAttach?: () => void; terminalOpen?: boolean; chatOpen?: boolean; onChatOpenChange?: (open: boolean) => void }) {
   const s = session.status;
   return (
     <div className="flex gap-1.5 flex-wrap">
@@ -55,6 +56,11 @@ function SessionActions({ session, onAction, chatOpen, onChatOpenChange }: { ses
       )}
       {s !== "deleting" && (
         <Button variant="outline" size="xs" onClick={() => onAction("fork")}>Fork</Button>
+      )}
+      {(s === "running" || s === "waiting") && onAttach && (
+        <Button variant={terminalOpen ? "default" : "outline"} size="xs" onClick={onAttach}>
+          {terminalOpen ? "Detach" : "Attach"}
+        </Button>
       )}
       {(s === "running" || s === "waiting") && (
         <Button variant={chatOpen ? "default" : "outline"} size="xs" onClick={() => onChatOpenChange?.(!chatOpen)}>
@@ -87,6 +93,7 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly, chatOpen,
   const [prUrl, setPrUrl] = useState<string | null>(null);
   const [newTodo, setNewTodo] = useState("");
   const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   async function handleAction(action: string) {
     try {
@@ -234,7 +241,21 @@ export function SessionDetail({ sessionId, onClose, onToast, readOnly, chatOpen,
       {/* Actions (always visible) */}
       {!readOnly && (
         <div className="px-5 pt-3 pb-2 shrink-0">
-          <SessionActions session={s} onAction={handleAction} chatOpen={chatOpen} onChatOpenChange={onChatOpenChange} />
+          <SessionActions
+            session={s}
+            onAction={handleAction}
+            onAttach={() => setTerminalOpen(!terminalOpen)}
+            terminalOpen={terminalOpen}
+            chatOpen={chatOpen}
+            onChatOpenChange={onChatOpenChange}
+          />
+        </div>
+      )}
+
+      {/* Embedded Terminal */}
+      {terminalOpen && (s.status === "running" || s.status === "waiting") && (
+        <div className="px-5 pb-2">
+          <TerminalPanel sessionId={sessionId} onClose={() => setTerminalOpen(false)} />
         </div>
       )}
 

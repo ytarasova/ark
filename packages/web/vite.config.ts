@@ -17,6 +17,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      "/api/terminal": {
+        target: "ws://localhost:8420",
+        ws: true,
+      },
       "/api": "http://localhost:8420",
     },
   },
