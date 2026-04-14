@@ -9,15 +9,16 @@ interface MemoryPageProps {
   onNavigate: (view: string) => void;
   readOnly: boolean;
   daemonStatus?: DaemonStatus | null;
+  onToast?: (msg: string, type: string) => void;
 }
 
-export function MemoryPage({ view, onNavigate, readOnly, daemonStatus }: MemoryPageProps) {
+export function MemoryPage({ view, onNavigate, readOnly, daemonStatus, onToast }: MemoryPageProps) {
   const [addCounter, setAddCounter] = useState(0);
 
   return (
     <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="Memory" padded={false} daemonStatus={daemonStatus}
       headerRight={!readOnly ? <Button size="sm" onClick={() => setAddCounter(c => c + 1)}>+ Add Memory</Button> : undefined}>
-      <MemoryView addRequested={addCounter} />
+      <MemoryView addRequested={addCounter} onToast={onToast} />
     </Layout>
   );
 }

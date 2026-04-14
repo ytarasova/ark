@@ -562,21 +562,50 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
 function TranscriptMessages({ sessionId }: { sessionId: string }) {
   const [turns, setTurns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [indexing, setIndexing] = useState(false);
 
-  useEffect(() => {
-    if (!sessionId) return;
+  const loadMessages = useCallback(async () => {
     setLoading(true);
-    api.getConversation(sessionId, 50)
-      .then((data) => setTurns(Array.isArray(data) ? data : []))
-      .catch(() => setTurns([]))
-      .finally(() => setLoading(false));
+    try {
+      const data = await api.getConversation(sessionId, 50);
+      setTurns(Array.isArray(data) ? data : []);
+    } catch {
+      setTurns([]);
+    } finally {
+      setLoading(false);
+    }
   }, [sessionId]);
+
+  useEffect(() => { if (sessionId) loadMessages(); }, [sessionId, loadMessages]);
+
+  const handleIndex = async () => {
+    setIndexing(true);
+    try {
+      await api.refreshHistory();
+      await loadMessages();
+    } catch {
+      // ignore
+    } finally {
+      setIndexing(false);
+    }
+  };
 
   if (loading) {
     return <div className="text-[11px] text-muted-foreground py-4">Loading messages...</div>;
   }
   if (turns.length === 0) {
-    return <div className="text-[11px] text-muted-foreground py-4">No indexed messages yet. Click Refresh to index transcripts.</div>;
+    return (
+      <div className="text-[11px] text-muted-foreground py-4">
+        No indexed messages yet.{" "}
+        <button
+          className={cn("text-primary hover:underline", indexing && "opacity-50 pointer-events-none")}
+          onClick={handleIndex}
+          disabled={indexing}
+        >
+          {indexing ? "Indexing..." : "Index transcripts"}
+        </button>
+      </div>
+    );
   }
 
   return (

@@ -81,14 +81,14 @@ export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: T
                       <span className="text-card-foreground font-mono">{selected.repo || "-"}</span>
                     </div>
                   </div>
-                  {selected.variables && Object.keys(selected.variables).length > 0 && (
+                  {selected.variables && Array.isArray(selected.variables) && selected.variables.length > 0 && (
                     <div className="mb-4">
                       <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Variables</h3>
                       <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
-                        {Object.entries(selected.variables).map(([k, v]) => (
-                          <div key={k} className="contents">
-                            <span className="text-muted-foreground">{k}</span>
-                            <span className="text-card-foreground font-mono">{String(v)}</span>
+                        {selected.variables.map((v: any) => (
+                          <div key={v.name} className="contents">
+                            <span className="text-muted-foreground">{v.name}{v.required ? " *" : ""}</span>
+                            <span className="text-card-foreground font-mono text-xs">{v.description || "-"}</span>
                           </div>
                         ))}
                       </div>

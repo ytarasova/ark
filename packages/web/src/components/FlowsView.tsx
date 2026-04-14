@@ -7,7 +7,8 @@ import { cn } from "../lib/utils.js";
 import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
-import { GitBranch } from "lucide-react";
+import { Separator } from "./ui/separator.js";
+import { GitBranch, ChevronRight } from "lucide-react";
 import { selectClassName } from "./ui/styles.js";
 
 const GATE_VARIANT: Record<string, "success" | "warning" | "info" | "default"> = {
@@ -120,13 +121,19 @@ function FlowForm({ onClose, onSubmit, agents }: {
 interface FlowsViewProps {
   showCreate?: boolean;
   onCloseCreate?: () => void;
+  initialSelectedName?: string | null;
+  onSelectedChange?: (name: string | null) => void;
 }
 
-export function FlowsView({ showCreate = false, onCloseCreate }: FlowsViewProps) {
+export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedName, onSelectedChange }: FlowsViewProps) {
   const queryClient = useQueryClient();
   const { data: flows = [] } = useFlowsQuery();
   const { data: agents = [] } = useAgentsQuery();
-  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [selectedName, setSelectedNameInternal] = useState<string | null>(initialSelectedName ?? null);
+  const setSelectedName = (name: string | null) => {
+    setSelectedNameInternal(name);
+    onSelectedChange?.(name);
+  };
   const { data: selectedDetail } = useFlowDetail(selectedName);
   const selected = selectedDetail || (selectedName ? flows.find((f: any) => f.name === selectedName) : null);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: string } | null>(null);
@@ -200,47 +207,138 @@ export function FlowsView({ showCreate = false, onCloseCreate }: FlowsViewProps)
               {selected.description && (
                 <p className="text-sm text-muted-foreground mb-5">{selected.description}</p>
               )}
+
+              {/* Visual pipeline diagram */}
+              {selected.stages && selected.stages.length > 0 && (
+                <div className="mb-5">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Pipeline</h3>
+                  <Separator className="mb-3" />
+                  <div className="flex items-center gap-0 flex-wrap">
+                    {selected.stages.map((s: any, i: number) => {
+                      const stageName = typeof s === "string" ? s : s.name;
+                      const gate = typeof s === "string" ? "auto" : (s.gate || "auto");
+                      const isAction = !!(typeof s !== "string" && s.action);
+                      const optional = typeof s !== "string" && s.optional;
+                      return (
+                        <span key={stageName || i} className="inline-flex items-center">
+                          {i > 0 && <ChevronRight size={12} className="text-muted-foreground mx-0.5 shrink-0" />}
+                          <span className={cn(
+                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono border",
+                            gate === "manual" ? "border-amber-500/30 bg-amber-500/5 text-amber-300" :
+                            isAction ? "border-blue-500/30 bg-blue-500/5 text-blue-300" :
+                            "border-border bg-secondary text-foreground",
+                            optional && "opacity-60"
+                          )}>
+                            {stageName}
+                            {optional && <span className="text-[9px] text-muted-foreground">?</span>}
+                          </span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {/* Gate legend */}
+                  <div className="flex gap-4 mt-2 text-[10px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-sm border border-border bg-secondary" /> auto (no human needed)
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-sm border border-amber-500/30 bg-amber-500/5" /> manual (requires approval)
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-sm border border-blue-500/30 bg-blue-500/5" /> action (system step)
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Conditional edges diagram */}
+              {selected.edges && selected.edges.length > 0 && (
+                <div className="mb-5">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Routing</h3>
+                  <Separator className="mb-2" />
+                  <div className="flex flex-col gap-1">
+                    {selected.edges.map((e: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 text-[11px] font-mono">
+                        <span className="text-foreground">{e.from}</span>
+                        <ChevronRight size={10} className="text-muted-foreground" />
+                        <span className="text-foreground">{e.to}</span>
+                        {e.label && <Badge variant="info" className="text-[9px] py-0 px-1">{e.label}</Badge>}
+                        {e.condition && <span className="text-muted-foreground text-[10px] truncate max-w-[300px]">({e.condition})</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Stage details */}
               {selected.stages && selected.stages.length > 0 && (
                 <div className="mb-4">
                   <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Stages</h3>
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">#</th>
-                        <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">Name</th>
-                        <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">Agent</th>
-                        <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">Gate</th>
-                        <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">Type</th>
-                        <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border">Optional</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selected.stages.map((s: any, i: number) => {
-                        // Handle both object stages (from detail endpoint) and string stages (from list endpoint)
-                        const stageName = typeof s === "string" ? s : s.name;
-                        const agent = typeof s === "string" ? "-" : (s.agent || "-");
-                        const gate = typeof s === "string" ? "auto" : (s.gate || "auto");
-                        const stageType = typeof s === "string" ? "-" : (s.type || "-");
-                        const optional = typeof s === "string" ? false : !!s.optional;
-                        return (
-                          <tr key={i} className="hover:bg-accent transition-colors">
-                            <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-muted-foreground font-mono text-[11px]">{i + 1}</td>
-                            <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-foreground font-semibold">{stageName || "-"}</td>
-                            <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">{agent}</td>
-                            <td className="p-2.5 px-3 text-[13px] border-b border-border/50">
-                              <Badge variant={GATE_VARIANT[gate] || "success"} className="text-[10px]">
-                                {gate}
-                              </Badge>
-                            </td>
-                            <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">{stageType}</td>
-                            <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">
-                              {optional && <Badge variant="info" className="text-[10px]">optional</Badge>}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <Separator className="mb-2" />
+                  <div className="flex flex-col gap-3">
+                    {selected.stages.map((s: any, i: number) => {
+                      const stageName = typeof s === "string" ? s : s.name;
+                      const agent = typeof s === "string" ? null : s.agent;
+                      const gate = typeof s === "string" ? "auto" : (s.gate || "auto");
+                      const optional = typeof s !== "string" && s.optional;
+                      const onFailure = typeof s !== "string" ? s.on_failure : null;
+                      const verify = typeof s !== "string" ? s.verify : null;
+                      const dependsOn = typeof s !== "string" ? s.depends_on : null;
+                      const action = typeof s !== "string" ? s.action : null;
+                      const stageType = typeof s !== "string" ? s.type : null;
+
+                      return (
+                        <div key={i} className="border border-border/50 rounded-lg p-3 bg-black/20">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-[10px] font-mono text-muted-foreground w-5">{i + 1}</span>
+                            <span className="text-[13px] font-semibold text-foreground">{stageName}</span>
+                            <Badge variant={GATE_VARIANT[gate] || "success"} className="text-[10px]">{gate}</Badge>
+                            {optional && <Badge variant="info" className="text-[10px]">optional</Badge>}
+                            {stageType && stageType !== "-" && <Badge variant="secondary" className="text-[10px]">{stageType}</Badge>}
+                          </div>
+                          <div className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-1 text-[11px] ml-5">
+                            {agent && (
+                              <>
+                                <span className="text-muted-foreground">Agent</span>
+                                <span className="text-card-foreground font-mono">{agent}</span>
+                              </>
+                            )}
+                            {action && (
+                              <>
+                                <span className="text-muted-foreground">Action</span>
+                                <span className="text-card-foreground font-mono">{action}</span>
+                              </>
+                            )}
+                            <span className="text-muted-foreground">Gate</span>
+                            <span className="text-card-foreground">
+                              {gate === "auto" && "Automatic -- no human intervention needed"}
+                              {gate === "manual" && "Manual -- requires human approval to proceed"}
+                              {gate === "condition" && "Conditional -- proceeds based on expression evaluation"}
+                              {gate === "review" && "Review -- waits for external review (e.g. PR approval)"}
+                            </span>
+                            {dependsOn && dependsOn.length > 0 && (
+                              <>
+                                <span className="text-muted-foreground">Depends on</span>
+                                <span className="text-card-foreground font-mono">{dependsOn.join(", ")}</span>
+                              </>
+                            )}
+                            {onFailure && (
+                              <>
+                                <span className="text-muted-foreground">On failure</span>
+                                <span className="text-amber-400 font-mono">{onFailure}</span>
+                              </>
+                            )}
+                            {verify && verify.length > 0 && (
+                              <>
+                                <span className="text-muted-foreground">Verify</span>
+                                <span className="text-card-foreground font-mono">{verify.join(", ")}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
               {/* Show delete button for non-builtin flows */}

@@ -19,10 +19,16 @@ interface SessionsPageProps {
   readOnly: boolean;
   onToast: (msg: string, type: string) => void;
   daemonStatus?: DaemonStatus | null;
+  initialSelectedId?: string | null;
+  onSelectedChange?: (id: string | null) => void;
 }
 
-export function SessionsPage({ view, onNavigate, readOnly, onToast, daemonStatus }: SessionsPageProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+export function SessionsPage({ view, onNavigate, readOnly, onToast, daemonStatus, initialSelectedId, onSelectedChange }: SessionsPageProps) {
+  const [selectedId, setSelectedIdInternal] = useState<string | null>(initialSelectedId ?? null);
+  const setSelectedId = useCallback((id: string | null) => {
+    setSelectedIdInternal(id);
+    onSelectedChange?.(id);
+  }, [onSelectedChange]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   // Pass "archived" to the server so it returns archived sessions (excluded by default)

@@ -73,6 +73,28 @@ export function useSessionDetailData(sessionId: string): SessionDetailData {
       .catch(() => setFlowStages([]));
   }, [detail?.session?.flow]);
 
+  // Poll session detail while in an active state
+  useEffect(() => {
+    if (!sessionId || !detail?.session) return;
+    const status = detail.session.status;
+    const ACTIVE = ["running", "waiting", "blocked", "pending", "ready"];
+    if (!ACTIVE.includes(status)) return;
+
+    let active = true;
+    const poll = () => {
+      if (!active) return;
+      api.getSession(sessionId).then(d => { if (active) setDetail(d); });
+      api.getTodos(sessionId).then(d => { if (active) setTodos(Array.isArray(d) ? d : []); }).catch(() => {});
+      api.getMessages(sessionId)
+        .then(d => { if (active) setMessages(Array.isArray(d?.messages) ? d.messages : Array.isArray(d) ? d : []); })
+        .catch(() => {});
+      api.getSessionCost(sessionId).then(d => { if (active) setCost(d); }).catch(() => setCost(null));
+    };
+
+    const iv = setInterval(poll, 5000);
+    return () => { active = false; clearInterval(iv); };
+  }, [sessionId, detail?.session?.status]);
+
   // Poll output for running sessions
   useEffect(() => {
     if (!detail || !detail.session) return;

@@ -36,7 +36,7 @@ function SessionActions({ session, onAction, onSend, chatOpen, onChatOpenChange 
   return (
     <div>
       <div className="flex gap-1.5 flex-wrap">
-        {(s === "ready" || s === "pending") && (
+        {(s === "ready" || s === "pending" || s === "blocked") && (
           <Button size="xs" onClick={() => onAction("dispatch")}>Dispatch</Button>
         )}
         {(s === "running" || s === "waiting") && (
@@ -48,13 +48,13 @@ function SessionActions({ session, onAction, onSend, chatOpen, onChatOpenChange 
         {(s === "running" || s === "waiting") && (
           <Button variant="outline" size="xs" onClick={() => onAction("interrupt")}>Interrupt</Button>
         )}
-        {(s === "running" || s === "waiting" || s === "blocked") && (
+        {(s === "ready" || s === "blocked") && (
           <Button size="xs" onClick={() => onAction("advance")}>Advance</Button>
         )}
-        {(s === "running" || s === "waiting" || s === "blocked") && (
+        {(s === "running" || s === "waiting") && (
           <Button variant="success" size="xs" onClick={() => onAction("complete")}>Complete</Button>
         )}
-        {(s === "stopped" || s === "failed") && (
+        {(s === "stopped" || s === "failed" || s === "completed") && (
           <Button variant="success" size="xs" onClick={() => onAction("restart")}>Restart</Button>
         )}
         {s !== "deleting" && (
