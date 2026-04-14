@@ -690,7 +690,8 @@ describe("conductor HTTP integration with stage validation", () => {
 
     const updated = app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
-    expect(updated?.status).toBe("ready");
+    // Status is "running" because auto-dispatch is now properly awaited
+    expect(updated?.status).toBe("running");
   });
 });
 

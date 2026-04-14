@@ -325,7 +325,7 @@ describe("core lifecycle: full round-trip", () => {
     expect(app.sessions.get(session.id)!.status).toBe("running");
 
     // 5. Complete (advances flow)
-    complete(app, session.id);
+    await complete(app, session.id);
     expect(app.sessions.get(session.id)!.status).toBe("completed");
 
     // 6. Delete

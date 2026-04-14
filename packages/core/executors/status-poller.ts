@@ -71,7 +71,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
         try {
           const { sendOSNotification } = await import("../notify.js");
           const title = newStatus === "completed" ? "Agent completed" : "Agent failed";
-          sendOSNotification(`Ark: ${title}`, session.summary ?? sessionId);
+          await sendOSNotification(`Ark: ${title}`, session.summary ?? sessionId);
         } catch { /* best-effort */ }
       }
     } catch { /* ignore polling errors */ }

@@ -54,7 +54,8 @@ describe("mediateStageHandoff", () => {
 
       const updated = app.sessions.get(session.id);
       expect(updated?.stage).toBe("verify");
-      expect(updated?.status).toBe("ready");
+      // Status is "running" because autoDispatch defaults to true and dispatch is now awaited
+      expect(updated?.status).toBe("running");
     });
 
     it("returns dispatched=true when autoDispatch is enabled", async () => {
@@ -365,7 +366,8 @@ describe("mediateStageHandoff via conductor HTTP", () => {
 
     const updated = app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
-    expect(updated?.status).toBe("ready");
+    // Status is "running" because auto-dispatch is now properly awaited
+    expect(updated?.status).toBe("running");
 
     // Verify stage_handoff event was logged
     const events = app.events.list(session.id);
