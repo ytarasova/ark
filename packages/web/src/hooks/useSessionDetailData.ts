@@ -85,9 +85,6 @@ export function useSessionDetailData(sessionId: string): SessionDetailData {
       if (!active) return;
       api.getSession(sessionId).then(d => { if (active) setDetail(d); });
       api.getTodos(sessionId).then(d => { if (active) setTodos(Array.isArray(d) ? d : []); }).catch(() => {});
-      api.getMessages(sessionId)
-        .then(d => { if (active) setMessages(Array.isArray(d?.messages) ? d.messages : Array.isArray(d) ? d : []); })
-        .catch(() => {});
       api.getSessionCost(sessionId).then(d => { if (active) setCost(d); }).catch(() => setCost(null));
     };
 

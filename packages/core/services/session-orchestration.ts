@@ -2322,6 +2322,9 @@ export async function send(app: AppContext, sessionId: string, message: string):
     }
   } catch { /* skip prompt guard on error */ }
 
+  // Persist user message to conversation history before sending to agent
+  app.messages.send(sessionId, "user", message, "text");
+
   const { sendReliable } = await import("../send-reliable.js");
   const result = await sendReliable(session.session_id, message, { waitForReady: false, maxRetries: 3 });
   return { ok: result.ok, message: result.message };

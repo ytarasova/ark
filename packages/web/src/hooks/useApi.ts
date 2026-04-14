@@ -74,6 +74,7 @@ export const api = {
   undelete: (id: string) => rpc<any>("session/undelete", { sessionId: id }),
   fork: (id: string, name?: string) => rpc<any>("session/clone", { sessionId: id, name }).then(r => ({ ok: true, sessionId: r.session?.id })),
   send: (id: string, message: string) => rpc<any>("message/send", { sessionId: id, content: message }),
+  markRead: (id: string) => rpc<any>("message/markRead", { sessionId: id }),
   pause: (id: string, reason?: string) => rpc<any>("session/pause", { sessionId: id, reason }),
   interrupt: (id: string) => rpc<any>("session/interrupt", { sessionId: id }),
   archive: (id: string) => rpc<any>("session/archive", { sessionId: id }),
