@@ -638,12 +638,15 @@ export async function mediateStageHandoff(
           });
           return;
         }
-        // Action succeeded -- chain into mediateStageHandoff to advance
-        // past this action stage and dispatch/execute the next stage.
-        await mediateStageHandoff(app, sessionId, {
-          autoDispatch: true,
-          source: "action_chain",
-        });
+        // Action succeeded -- chain into next stage unless the action
+        // set a non-ready status (e.g. auto_merge sets "waiting").
+        const postAction = app.sessions.get(sessionId);
+        if (postAction?.status === "ready") {
+          await mediateStageHandoff(app, sessionId, {
+            autoDispatch: true,
+            source: "action_chain",
+          });
+        }
       });
       dispatched = true;
     }
