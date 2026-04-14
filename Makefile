@@ -10,7 +10,7 @@
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-daemon dev-arkd dev-web tui web desktop \
+.PHONY: help install dev dev-daemon dev-arkd dev-tui dev-web tui web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-watch lint \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
@@ -72,6 +72,9 @@ dev-arkd: ## Hot-reload: arkd agent daemon (:19300)
 	@echo "  ArkD:  http://localhost:19300"
 	@echo ""
 	$(BUN) --watch packages/cli/index.ts arkd
+
+dev-tui: ## Hot-reload: TUI connecting to dev daemon (run dev-daemon first)
+	ARK_SERVER_PORT=19400 ./ark tui
 
 dev-web: ## Start only the Vite dev server (needs `ark web` on :8420 separately)
 	cd packages/web && npx vite --port 5173
