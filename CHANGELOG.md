@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased
+## v0.14.0 (2026-04-13)
 
 ### TUI
-- **Events tab**: moved Events panel from session detail to its own dedicated tab (key `4`)
+- **Events tab**: moved Events panel from session detail to its own dedicated tab (key `3`)
 - **Virtual scrolling**: replaced custom ScrollBox with ink-scroll-view, extracted useVirtualScroll hook with AvailableHeightContext for proper height management
 - **TreeList rewrite**: proper tree component with key-based selection, stable group headers
 - **Selection stability**: selection stays stable after delete/archive, resets on group-by toggle

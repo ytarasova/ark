@@ -819,13 +819,13 @@ ark tui
 make tui                # same, via Makefile
 ```
 
-React plus Ink terminal dashboard with 9 tabs: Sessions, Flows, Compute, History, Tools, Knowledge, Costs, Dashboard, Settings. Smart polling, SSE updates, overlay-driven forms, full keyboard navigation. Keybindings live in the status bar, not inside panels.
+React plus Ink terminal dashboard with 10 tabs: Sessions, Agents, Events, Flows, Compute, History, Memory, Tools, Schedules, Costs. Smart polling, SSE updates, overlay-driven forms, full keyboard navigation. Keybindings live in the status bar, not inside panels.
 
 Common shortcuts:
 
 | Key | Action |
 |-----|--------|
-| `1-9` | Switch tabs |
+| `1-9`, `0` | Switch tabs |
 | `j/k` | Navigate rows |
 | `n` | New session |
 | `Enter` | Dispatch/restart |

@@ -168,6 +168,140 @@ Stages with the same dependencies run in parallel. The `depends_on` field create
 ark session start --repo . --summary "Refactor auth system" --flow dag-parallel --dispatch
 ```
 
+### islc
+
+Intent-to-Software Lifecycle -- full pipeline from Jira ticket to merged PR with fan-out parallel execution. Includes ticket intake, planning, optional plan audit, parallel subtask execution, verification, PR/close, and retrospective.
+
+```
+ticket-intake (auto) -> plan (manual) -> audit (auto, optional) -> execute[fan_out] (auto) -> verify (manual) -> close (auto) -> retro (auto, optional)
+```
+
+| Stage | Agent/Action | Gate | Depends On | Notes |
+|-------|-------------|------|------------|-------|
+| ticket-intake | ticket-intake | auto | -- | Processes Jira ticket, runs sanity gate, extracts spec. |
+| plan | spec-planner | manual | ticket-intake | Decomposes spec into subtasks, creates Jira sub-tasks. |
+| audit | plan-auditor | auto | plan | Optional. Audits plan coverage against spec. |
+| execute | task-implementer (fan_out) | auto | audit | Up to 4 parallel children, each implements one subtask. |
+| verify | verifier | manual | execute | Runs `npm test` + `npm run lint`. Writes verify-report.md. |
+| close | closer | auto | verify | Creates PR, transitions Jira, publishes Confluence. |
+| retro | retro | auto | close | Optional. Analyses workflow run, writes retro-report.md. |
+
+**Best for**: Enterprise ticket-driven development with Jira integration and full traceability.
+
+```bash
+ark session start --repo . --ticket PROJ-123 --flow islc --dispatch
+```
+
+### islc-quick
+
+Fast ISLC variant -- skips audit and retro stages for quicker ticket-to-PR turnaround.
+
+```
+ticket-intake (auto) -> plan (manual) -> execute[fan_out] (auto) -> verify (auto) -> close (auto)
+```
+
+| Stage | Agent/Action | Gate | Depends On | Notes |
+|-------|-------------|------|------------|-------|
+| ticket-intake | ticket-intake | auto | -- | Processes Jira ticket, runs sanity gate, extracts spec. |
+| plan | islc-planner | manual | ticket-intake | Decomposes spec into subtasks. |
+| execute | islc-implementer (fan_out) | auto | plan | Up to 4 parallel children. |
+| verify | islc-verifier | auto | execute | Runs `npm test` + `npm run lint`. |
+| close | islc-closer | auto | verify | Creates PR, transitions Jira. |
+
+**Best for**: Smaller Jira tickets where audit and retro are unnecessary overhead.
+
+```bash
+ark session start --repo . --ticket PROJ-456 --flow islc-quick --dispatch
+```
+
+### autonomous
+
+Single-agent fully autonomous session. The agent works independently and auto-completes on report.
+
+```
+work (auto)
+```
+
+| Stage | Agent/Action | Gate | Notes |
+|-------|-------------|------|-------|
+| work | worker | auto | Open-ended. Auto-advances when agent reports completed. |
+
+**Best for**: Autonomous tasks that don't need human gates. Similar to `bare` but auto-completes instead of waiting for manual approval.
+
+```bash
+ark session start --repo . --summary "Fix the flaky test" --flow autonomous --dispatch
+```
+
+### autonomous-sdlc
+
+Fully autonomous SDLC pipeline: plan, implement, verify, review, PR, merge. All gates auto -- no human intervention needed.
+
+```
+plan (auto) -> implement (auto) -> verify (auto) -> review (auto) -> pr (auto) -> merge (auto)
+```
+
+| Stage | Agent/Action | Gate | Depends On | Notes |
+|-------|-------------|------|------------|-------|
+| plan | planner | auto | -- | Creates PLAN.md with implementation strategy. |
+| implement | implementer | auto | plan | Implements the plan. Retries up to 2 times on failure. |
+| verify | verifier | auto | implement | Runs test suite, linting, security checks. Retries up to 2 times. |
+| review | reviewer | auto | verify | Reviews diff for correctness and quality. |
+| pr | `create_pr` action | auto | review | Pushes branch and creates a GitHub PR. |
+| merge | `auto_merge` action | auto | pr | Auto-merges the PR. |
+
+**Best for**: Dispatching work that should run end-to-end without human intervention.
+
+```bash
+ark session start --repo . --summary "Add input validation" --flow autonomous-sdlc --dispatch
+```
+
+### brainstorm
+
+Interactive ideation flow: explore the problem space, synthesize ideas, then optionally plan the implementation. Manual gates at each stage for human steering.
+
+```
+explore (manual) -> synthesize (manual) -> plan (manual, optional)
+```
+
+| Stage | Agent/Action | Gate | Depends On | Notes |
+|-------|-------------|------|------------|-------|
+| explore | worker | manual | -- | Generates multiple approaches, writes BRAINSTORM.md. |
+| synthesize | worker | manual | explore | Ranks approaches, writes recommendation. |
+| plan | planner | manual | synthesize | Optional. Creates PLAN.md from the chosen approach. |
+
+**Best for**: Early-stage design exploration before committing to an implementation approach.
+
+```bash
+ark session start --repo . --summary "How should we redesign the auth system?" --flow brainstorm --dispatch
+```
+
+### conditional
+
+Conditional routing flow with branching after review. The reviewer's outcome determines whether the PR proceeds, revisions are needed, or the session is rejected and closed.
+
+```
+plan (manual) -> implement (auto) -> review (auto) --[approved]--> pr (auto)
+                                                   --[needs_changes]--> revise (auto) -> review
+                                                   --[rejected]--> reject-close (auto)
+```
+
+| Stage | Agent/Action | Gate | Notes |
+|-------|-------------|------|-------|
+| plan | planner | manual | Creates PLAN.md. |
+| implement | implementer | auto | Implements the plan. |
+| review | reviewer | auto | Reviews changes. Produces outcome: approved, needs_changes, or rejected. |
+| revise | implementer | auto | Addresses review feedback. Loops back to review. |
+| reject-close | closer | auto | Closes the session on rejection. |
+| pr | `create_pr` action | auto | Creates PR on approval. |
+
+Uses `edges` with `condition` expressions for routing. This is an example of Ark's conditional DAG execution.
+
+**Best for**: Workflows requiring review-based branching with automated revision loops.
+
+```bash
+ark session start --repo . --summary "Add caching layer" --flow conditional --dispatch
+```
+
 ---
 
 ## Flow YAML Fields
@@ -256,4 +390,4 @@ ark flow show default      # Show flow definition with stages
 ark flow show quick        # Show the quick flow
 ```
 
-In the TUI, press `3` to switch to the Flows tab. Navigate with `j/k` and toggle to the detail pane with `Tab`.
+In the TUI, press `4` to switch to the Flows tab. Navigate with `j/k` and toggle to the detail pane with `Tab`.

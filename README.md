@@ -53,7 +53,7 @@ ark search "authentication"
 | Feature | Description | Docs |
 |---------|-------------|------|
 | **Sessions** | Full lifecycle management -- create, dispatch, stop, resume, fork, clone, export/import | [Guide](docs/guide.md#sessions) |
-| **Multi-Runtime Support** | 4 runtimes (Claude, Claude Max subscription, Codex, Gemini) with runtime/role separation -- any agent role on any LLM backend | [CLAUDE.md](CLAUDE.md#runtimes) |
+| **Multi-Runtime Support** | 5 runtimes (Claude, Claude Max subscription, Codex, Gemini, Goose) with runtime/role separation -- any agent role on any LLM backend | [CLAUDE.md](CLAUDE.md#runtimes) |
 | **SDLC Flows** | DAG-based multi-stage pipelines with fan-out, auto-join, verification gates, and 12 specialized agents | [Guide](docs/guide.md#flows--agents) |
 | **Knowledge Graph** | Unified knowledge across codebase, sessions, memories, and learnings via ops-codegraph (33 languages via tree-sitter, native Rust engine) | [Guide](docs/guide.md#knowledge-graph) |
 | **LLM Router** | OpenAI-compatible proxy with 3 routing policies, circuit breakers, and cost tracking. Injects `ANTHROPIC_BASE_URL`/`OPENAI_BASE_URL` into executors at dispatch | [Guide](docs/guide.md#llm-router) |
@@ -63,7 +63,7 @@ ark search "authentication"
 | **Auto-Index on Dispatch** | Local mode honors `knowledge.auto_index` config. Remote compute (arkd) ALWAYS indexes via `/codegraph/index` endpoint | [Guide](docs/guide.md#knowledge-graph) |
 | **Runtime Billing Modes** | `api` (per-token pricing), `subscription` (e.g. Claude Max $200/mo, tokens recorded for rate limits), `free`. Polymorphic transcript parsers per runtime | [CLAUDE.md](CLAUDE.md#runtimes) |
 | **Dashboard** | Fleet status overview with cost charts (Recharts), budget tracking, and recent activity | [CLI](docs/cli-reference.md#ark-dashboard) |
-| **TUI Dashboard** | 9-tab terminal UI with keyboard-driven navigation, search, status filters | [TUI Reference](docs/tui-reference.md) |
+| **TUI Dashboard** | 10-tab terminal UI with keyboard-driven navigation, search, status filters | [TUI Reference](docs/tui-reference.md) |
 | **Web Dashboard** | Browser-based session management with SSE live updates, token auth, read-only mode | [Guide](docs/guide.md#web-dashboard) |
 | **Desktop App** | Electron wrapper around the web dashboard -- native menus, system tray, local-first | -- |
 | **Compute Providers** | Local, Docker, DevContainer, Firecracker, EC2 + arkd (base/docker/devcontainer/firecracker), E2B (managed sandbox), K8s, K8s+Kata | [Guide](docs/guide.md#compute) |
@@ -99,7 +99,7 @@ packages/
               e2b, k8s, k8s-kata
   arkd/       Universal agent daemon -- HTTP server on every compute target
   router/     LLM Router -- OpenAI-compatible proxy with routing policies
-  tui/        React + Ink terminal dashboard (9 tabs)
+  tui/        React + Ink terminal dashboard (10 tabs)
   web/        Vite-based web dashboard (SSE live updates, Dashboard page)
   desktop/    Electron shell wrapping the web dashboard
   server/     JSON-RPC handlers (delegate to services via AppContext)
@@ -110,9 +110,10 @@ packages/
 agents/       12 agent definitions (ticket-intake, spec-planner, plan-auditor,
               implementer, task-implementer, verifier, reviewer, documenter,
               closer, retro, planner, worker)
-runtimes/     4 runtime definitions (claude, claude-max, codex, gemini)
-flows/        9 flow definitions (default, quick, bare, parallel, fan-out,
-              pr-review, dag-parallel, islc, islc-quick)
+runtimes/     5 runtime definitions (claude, claude-max, codex, gemini, goose)
+flows/        13 flow definitions (default, quick, bare, autonomous, autonomous-sdlc,
+              parallel, fan-out, pr-review, dag-parallel, islc, islc-quick,
+              brainstorm, conditional)
 skills/       7 builtin skills (code-review, plan-audit, sanity-gate,
               security-scan, self-review, spec-extraction, test-writing)
 recipes/      8 recipe templates (quick-fix, feature-build, code-review,

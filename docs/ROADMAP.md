@@ -133,7 +133,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Recipes** | 10 templates (islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature, self-dogfood, self-quick). | Yes |
 | **CLI** | 25 command modules. `ark dashboard/knowledge/eval/router/runtime/tenant/auth/daemon` all working. | Yes |
 | **Web UI** | Dashboard (widget grid + Recharts cost charts + daemon health), Sessions (status filter tabs), Agents+Runtimes, Flows, Compute, History, Memory/Knowledge, Tools, Schedules, Costs, Settings, Login. 28 doc pages. | Yes |
-| **TUI** | 9-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary in empty state. ASCII cost charts. Agents+Runtimes sub-groups. | Yes |
+| **TUI** | 10-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary in empty state. ASCII cost charts. Agents+Runtimes sub-groups. | Yes |
 | **ESLint** | 0 errors, 0 warnings. CI lint step. | Yes |
 | **Process leak prevention** | stopAll via provider, awaited dispatches, proper shutdown order. | Yes |
 | **Auth** | API keys (create/validate/revoke/rotate), tenant_id on all entities, per-tenant AppContext, auth middleware. | Yes |
@@ -741,7 +741,7 @@ Camp 8:  UX Polish                ██████         Desktop .dmg shippi
 - Friendly repo name display (basename instead of full path) across all surfaces.
 
 **Runtime coverage:**
-- Auto-start dispatch for all 4 runtimes (Claude positional arg, Codex/Gemini initialPrompt, Goose -t/-s).
+- Auto-start dispatch for all 5 runtimes (Claude positional arg, Codex/Gemini initialPrompt, Goose -t/-s).
 - Gemini + Goose autonomous dispatch test suites.
 - Poller `not_found` fix for Codex/Gemini; conductor action-stage fix.
 - Channel prompt auto-accept hardening (faster polling, double-tap Enter).

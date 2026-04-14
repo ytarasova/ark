@@ -57,17 +57,18 @@
       <p class="subtitle">Keyboard-driven terminal interface for managing agents.</p>
 
       <h2>Layout</h2>
-      <p>The TUI has 9 tabs accessible via number keys <kbd>1</kbd>-<kbd>9</kbd>:</p>
+      <p>The TUI has 10 tabs accessible via number keys <kbd>1</kbd>-<kbd>9</kbd> and <kbd>0</kbd>:</p>
       <ol>
         <li><strong>Sessions</strong> - manage agent sessions</li>
         <li><strong>Agents</strong> - create, edit, copy, delete agent definitions</li>
+        <li><strong>Events</strong> - live event stream across all sessions</li>
         <li><strong>Flows</strong> - view flow definitions and stage pipelines</li>
         <li><strong>Compute</strong> - manage compute resources</li>
         <li><strong>History</strong> - browse and import Claude Code sessions</li>
         <li><strong>Memory</strong> - cross-session memory store</li>
         <li><strong>Tools</strong> - browse and manage tools available to agents</li>
         <li><strong>Schedules</strong> - manage recurring cron-based sessions</li>
-        <li><strong>Costs</strong> - per-session token usage and cost tracking</li>
+        <li value="0"><strong>Costs</strong> - per-session token usage and cost tracking</li>
       </ol>
       <p>Each tab has a split pane: left (list) and right (detail). Press <kbd>Tab</kbd> to switch focus between panes.</p>
 
@@ -78,7 +79,7 @@
           <tr><th>Key</th><th>Action</th></tr>
         </thead>
         <tbody>
-          <tr><td><kbd>1</kbd>-<kbd>9</kbd></td><td>Switch to tab</td></tr>
+          <tr><td><kbd>1</kbd>-<kbd>9</kbd>, <kbd>0</kbd></td><td>Switch to tab</td></tr>
           <tr><td><kbd>Tab</kbd></td><td>Toggle pane focus (list / detail)</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Back to list pane</td></tr>
           <tr><td><kbd>e</kbd></td><td>Toggle event log</td></tr>
