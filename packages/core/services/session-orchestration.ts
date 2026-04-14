@@ -910,10 +910,24 @@ export async function executeAction(app: AppContext, sessionId: string, action: 
 
   switch (action) {
     case "create_pr": {
-      // Skip if a PR already exists (implementer may have created one)
+      // Skip if we already know about a PR
       if (s.pr_url) {
         app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: s.pr_url, skipped: "pr_already_exists" } });
         return await advance(app, sessionId, true);
+      }
+      // Also check if a PR exists on the branch (agent may have created one without reporting pr_url)
+      if (s.branch && s.workdir) {
+        try {
+          const { stdout: prUrl } = await execFileAsync("gh", ["pr", "view", s.branch, "--json", "url", "-q", ".url"], {
+            cwd: s.workdir, encoding: "utf-8", timeout: 10_000,
+          });
+          if (prUrl?.trim()) {
+            const url = prUrl.trim();
+            app.sessions.update(sessionId, { pr_url: url });
+            app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: url, skipped: "pr_found_on_branch" } });
+            return await advance(app, sessionId, true);
+          }
+        } catch { /* no PR exists for this branch -- proceed to create */ }
       }
       const result = await createWorktreePR(app, sessionId, { title: s.summary ?? undefined });
       if (result.ok) {
