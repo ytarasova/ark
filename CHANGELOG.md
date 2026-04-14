@@ -1,5 +1,91 @@
 # Changelog
 
+## Unreleased
+
+### TUI
+- **Events tab**: moved Events panel from session detail to its own dedicated tab (key `4`)
+- **Virtual scrolling**: replaced custom ScrollBox with ink-scroll-view, extracted useVirtualScroll hook with AvailableHeightContext for proper height management
+- **TreeList rewrite**: proper tree component with key-based selection, stable group headers
+- **Selection stability**: selection stays stable after delete/archive, resets on group-by toggle
+- **Layout fixes**: SplitPane content height via AvailableHeightContext, collapsed EventLog single-line
+
+### Developer Experience
+- **Hot-reload dev targets**: `make dev-daemon` and `make dev-arkd` for auto-restart on file changes
+- **Dev mode checks**: `dev-tui` and `dev-web` check for running daemon before starting
+- **Makefile cleanup**: renamed `make tui` to `tui-standalone`, clarified target descriptions
+
+### Fixes
+- **Action stages**: await safeAsync for action stages in mediateStageHandoff
+- **Auto-PR dedup**: create_pr action skips if PR already exists
+- **Message read state**: mark messages as read when session reaches terminal state
+- **Costs tab**: accessible via key `0`
+
+## v0.13.0 (2026-04-13)
+
+### Daemon-Client Architecture
+- **Server daemon**: TUI connects as thin WebSocket client to server daemon (port 19400) -- no in-process AppContext
+- **Unified settings**: renamed writeHooksConfig to writeSettings (Claude settings bundle)
+- **`ark daemon` CLI**: `ark daemon start/stop/status` commands for managing the server daemon
+- **Web daemon detection**: `ark web` auto-detects running daemon
+
+### Flow Engine
+- **Autonomous SDLC flow**: plan -> implement -> verify -> review -> PR -> merge pipeline
+- **Action stage chaining**: consecutive action stages (create_pr + auto_merge) chain correctly
+- **Auto-merge CI wait**: auto_merge waits for CI checks before completing session
+- **DAG conditional routing**: graph flow engine supports conditional edges based on stage outcome
+- **On-outcome routing**: `on_outcome` field in flow stage definitions for branching
+- **Orchestrator-mediated handoff**: stage transitions go through `mediateStageHandoff()`
+- **DAG flow edges**: `depends_on` creates implicit graph-flow edges
+- **On-failure retry loop**: wired `on_failure` retry in conductor DAG engine
+- **Brainstorm flow**: interactive ideation flow for exploring ideas
+- **Per-stage compute templates**: flow definitions can specify compute per stage
+- **Stage isolation**: fresh runtime per stage for clean execution
+
+### Agent System
+- **Auto-start dispatch**: Claude, Codex, Gemini, and Goose agents start working immediately on dispatch (no manual prompt acceptance)
+- **Tool enforcement**: `agent.tools` field enforced via Claude Code `permissions.allow`
+- **Tool hints**: inject tool descriptions into agent system prompt
+- **Commit-before-completion**: agents must commit before reporting completed
+- **Per-stage commit verification**: tracks `stage_start_sha` to detect real changes
+- **Optimized agent prompts**: all 12 agent prompts tuned for production quality
+- **SessionEnd completion fallback**: agents complete even without explicit report
+
+### Worktree Enhancements
+- **Copy globs**: `worktree.copy` glob list for syncing untracked files to worktrees
+- **Setup script**: `worktree.setup` script for post-creation initialization
+- **MCP config merge**: `.mcp.json` from original repo merged into worktree
+- **Auto-cleanup**: worktrees cleaned up on session stop and delete
+- **Auto-rebase**: rebase onto base branch before PR creation
+
+### Infrastructure
+- **Status poller**: enabled for all runtimes (crash detection, not just Claude)
+- **Hook/report extraction**: extracted hook/report status logic into session-hooks.ts
+- **Process tree tracking**: executor tracks process tree when launching agents
+- **Artifact tracking**: session store tracks artifacts produced by agents
+- **Channel MCP always allowed**: ark-channel MCP tools always permitted in agent permissions
+- **Stale hook filtering**: ignore hook events from previous stage agent sessions
+
+### TUI
+- **Group headers**: visible, distinct styling, scroll-to-header behavior
+- **Session grouping by status**: group sessions by running/waiting/completed/failed
+- **Status filter tabs (web)**: full status filter tabs in web session list
+- **Stage timeline**: per-stage status timeline in SessionDetail pane
+- **Delete confirmation**: visible confirmation message in Sessions tab
+- **Friendly repo names**: display short repo name instead of full path
+- **Chat thread shortcuts**: missing keyboard shortcuts added for chat threads
+- **Filter reset**: Esc resets all session filters
+
+### Documentation
+- **Pilot onboarding guide**: getting started guide for new Ark users
+- **Ark-on-Ark dogfooding**: instructions for using Ark to build Ark
+- **Comprehensive docs suite**: 6 new documentation pages
+
+### Testing
+- **E2E completion paths**: tests for manual, auto, and hook-fallback completion
+- **Gemini and Goose runtime tests**: verify autonomous dispatch works across runtimes
+- **Stage validation tests**: e2e tests for stage commit verification
+- **Resolved 8 root causes**: fixed pre-existing test failures across the suite
+
 ## v0.12.0 (2026-04-10)
 
 ### Knowledge Graph
@@ -168,6 +254,230 @@ make desktop   # Launch Electron app
 - Fixed `ArkClient.close()` causing unhandled rejections during teardown
 - Replaced `console.log` in arkd and ec2 provision with structured logging
 
-## v0.8.0
+## v0.8.0 (2026-04-05)
 
-Previous release.
+### JSON-RPC Protocol
+- **Protocol server**: `packages/server/` with router and notification system serving session lifecycle, resource queries, config, history, tools, and metrics
+- **JSONL codec and transport**: framed message protocol for server communication
+- **ArkClient library**: `packages/protocol/` with typed RPC calls and push notifications
+- **Server CLI**: `ark server` command with stdio and WebSocket modes
+
+### TUI Migration
+- **Push-based architecture**: TUI fully migrated from polling to ArkClient protocol
+- **useArkStore hook**: reactive store replacing manual refresh cycles
+- **Action hooks migrated**: all TUI session/compute actions routed through ArkClient
+- **Loading unification**: single TabBar spinner replaces inline refreshing indicators
+
+### Executor System
+- **Executor interface**: 5-method contract (launch, kill, status, send, capture) in `packages/core/executor.ts`
+- **Executor registry**: pluggable executor dispatch at session start
+- **Claude Code executor**: wraps existing launch/kill/status/send/capture
+- **Subprocess executor**: generic command executor for non-interactive agents
+
+### Web UI
+- **Memory management**: list, add, search, and forget memories from the browser
+
+### Documentation
+- **User guide**: quickstart, use cases, executor system, protocol server
+- **CLI, TUI, and configuration references**: updated for protocol server and executors
+
+## v0.7.0 (2026-04-04)
+
+### Graph Flows
+- **Graph-based flows**: composable termination conditions and flow state persistence
+- **Cross-session memory**: knowledge ingestion, handoff, and message filtering
+- **Task ledger**: recipe evaluation and headless ACP protocol
+
+### Skills & Recipes
+- **Skill CLI**: `ark skill create/delete` commands
+- **Recipe CLI**: `ark recipe create/delete` with `--from-session` for extracting recipes from completed sessions
+- **Skill extraction**: auto-extract reusable procedures from completed sessions
+
+### Intelligence
+- **Guardrails**: pattern-based tool authorization wired into PreToolUse hook pipeline
+- **Sub-agent fan-out**: dynamic task decomposition with fork/join
+- **Hybrid search**: unified search with LLM re-ranking and `--hybrid` CLI flag
+- **Structured review output**: machine-parseable JSON with P0-P3 severity levels
+- **Prompt injection guard**: detection at session dispatch boundary
+
+### Observability
+- **OTLP span export**: JSON span exporter wired into session lifecycle
+- **Auto-rollback health poller**: reverts deployments on health check failure
+- **Telemetry flush**: configurable HTTP endpoint for telemetry data
+
+### Web UI
+- **Full CLI parity**: 50+ endpoints in web API, covering agents, tools, flows, compute, and history
+- **Extension catalog**: evals framework and observability hooks
+
+### TUI
+- **Advance stage**: `A` key to manually advance a session's flow stage
+- **Worktree finish**: `W` key for merge/PR workflow
+- **Profile + status counts**: shown in StatusBar
+
+### Testing
+- **E2E CLI rewrite**: in-process test calls replaced subprocess tests (215s -> 2.6s, 0 failures)
+
+## v0.6.0 (2026-04-03)
+
+### Web Dashboard
+- **Rich React dashboard**: full session management with costs, live updates, and token auth
+- **SSE live updates**: event-driven broadcast replaces polling
+- **Session replay**: step through completed session timelines
+- **Cost views**: model breakdown, per-session costs, and fleet summary
+
+### MCP Socket Pool
+- **Shared MCP processes**: Unix socket pool for concurrent MCP server connections
+
+### Cost Tracking
+- **Pricing engine**: per-model cost calculation with CLI summary and TUI display
+- **Costs tab**: dedicated TUI tab with model breakdown
+
+### Session Lifecycle
+- **Soft-delete with undo**: 90-second TTL, Ctrl+Z undo in TUI, `ark session undelete` CLI
+- **Checkpoint system**: crash detection with automatic session recovery
+- **Multi-instance coordination**: SQLite heartbeat for concurrent Ark instances
+- **Content-based status detection**: tmux output pattern matching (busy/waiting/idle)
+
+### Compute
+- **Docker sandbox**: containerized agent execution
+- **Direct AWS SDK**: replaced Pulumi with direct EC2 provisioning
+
+### TUI Enhancements
+- **Hotkey remapping**: customizable keyboard shortcuts
+- **Profiles and themes**: UI state persistence across restarts
+- **Status filters**: `!/@/#/$` shortcuts for filtering sessions by status
+- **Fuzzy search**: `/` key for searching sessions
+- **Fork unification**: combined fork/clone into single feature with conversation continuity
+
+### Integrations
+- **Messaging bridge**: Telegram, Slack, and Discord integration for notifications
+- **Conductor learning system**: auto-promotion of patterns to policy
+- **Multi-tool abstraction**: Claude and Gemini drivers with unified interface
+- **Auto-update**: automatic version checking and update prompts
+
+### Worktree
+- **Worktree finish**: merge, cleanup, and delete workflow from TUI (`W` key)
+
+## v0.5.0 (2026-04-01)
+
+### Tools Tab
+- **Unified tool discovery**: TUI Tools tab showing skills, recipes, MCP servers, and commands in a single view
+- **Skill CRUD**: three-tier resolution (project > global > builtin), create/edit/delete via CLI and TUI
+- **Recipe CRUD**: variable instantiation, `sessionToRecipe` for extracting templates from sessions
+- **MCP server and command management**: unified CRUD for all tool types
+
+### Intelligence Features
+- **Guardrail rules**: pattern-based tool authorization blocking dangerous commands
+- **Structured review output**: P0-P3 severity JSON from reviewer agents
+- **Sub-agent fan-out**: dynamic task decomposition into parallel child sessions
+- **Fail-loopback**: retry failed stages with error context injection (max 3 retries)
+- **Skill injection**: skill prompts automatically injected into agent system prompt at dispatch
+
+### Remote Sync
+- **Config sync**: commands, skills, and CLAUDE.md synced to remote compute targets on dispatch
+
+### Code Quality
+- **safeAsync/withProvider helpers**: eliminated nested try/catch patterns across core, TUI, and compute
+- **Clean tsc build**: resolved all TypeScript type errors
+- **Standardized TUI patterns**: useConfirmation hook, consistent prop naming, empty states
+
+## v0.4.0 (2026-04-01)
+
+### Focus System
+- **useFocus context**: TUI keyboard input ownership with focus stack -- overlays push/pop focus, app shortcuts only fire when no child component owns focus
+
+### Agent Management
+- **Custom agents**: create, edit, delete, and copy agent definitions via CLI and TUI
+- **Three-tier resolution**: project `.ark/agents/` > global `~/.ark/agents/` > builtin `agents/`
+- **CLI commands**: `ark agent create/edit/delete/copy`
+
+### TUI Refactoring
+- **SessionsTab decomposition**: split into SessionDetail, GroupManager, TalkToSession, CloneSession, MoveToGroup sub-components
+- **Confirmation prompts**: destructive actions (delete, stop) require confirmation
+- **Helper modules**: `statusBarHints.ts` for centralized hint generation, `sessionFormatting.ts` for display formatting
+- **Extracted hooks**: useAuthStatus, useEventLog, useGroupActions
+
+### Code Quality
+- **Silent catch cleanup**: error logging added to all catches across 7 modules (session, github-pr, app, conductor, claude, claude-sessions, EC2)
+- **Circular dependency fix**: removed import cycles between core modules
+- **Type safety**: DB row types, consistent return types, deduplicated FTS escaping
+- **CI test isolation**: shared test context across all test files
+
+## v0.3.0 (2026-03-28)
+
+### ArkD Universal Daemon
+- **ArkD**: typed JSON-over-HTTP API on port 19300 -- agent lifecycle, file ops, metrics, channel relay
+- **Snapshot endpoint**: capture agent state via ArkD
+- **ArkdBackedProvider base class**: shared implementation for all remote compute providers
+
+### Compute Providers
+- **8 providers**: local, docker, devcontainer, firecracker, ec2, ec2-docker, ec2-devcontainer, ec2-firecracker -- all isolation modes via ArkdBackedProvider
+
+### Conductor Transport
+- **ArkD as relay**: channel reports go through arkd, arkd forwards to conductor
+- **Comprehensive test coverage**: integration tests for the full relay pipeline
+
+### PR Monitoring
+- **Pull-based polling**: monitors GitHub PRs via gh CLI for review activity
+- **Auto-detect PR URL**: extracts PR URL from agent reports
+- **pr-review flow**: dedicated flow for PR review workflows
+
+### Session Details
+- **Rich details**: files changed, commits, and clickable links in session view
+- **Auto-generated names**: forked/cloned sessions get unique names automatically
+
+## v0.2.0 (2026-03-27)
+
+### EC2 Compute
+- **EC2 provider**: full lifecycle management -- provision, start, stop, destroy with SSH
+- **Auth sync**: sync Claude and GitHub credentials to remote instances
+- **SSH connection pool**: per-type queues for efficient remote command execution
+- **Remote MCP channel**: channel communication over SSH tunnel
+- **Cloud-init provisioning**: automated instance setup with tool verification and remediation
+
+### Provider Interface
+- **Capability flags**: providers declare supported operations
+- **Extended methods**: checkSession, getOutput, reboot, connectivity test
+- **Provider-based dispatch**: session dispatch uses provider methods instead of isLocal/isRemote branching
+
+### Messaging & Chat
+- **Text input navigation**: Option+Backspace word deletion, Ctrl+arrow word navigation
+- **Chat overlay**: `t` for chat, `T` for threads, Tab toggles focus between messages and input
+- **useMessages hook**: centralized message state management
+- **Reliable message sending**: retry with paste marker detection
+- **Auto-accept channel prompt**: handles resume fallback double-prompt
+
+### TUI Polish
+- **Status bar layout**: consistent shortcuts with `|` separators across all tabs
+- **Fork/clone shortcuts**: `c` to fork, `C` to clone
+- **TreeList navigation**: j/k matches visual group order
+- **Dispatch progress**: shown as events in session detail
+- **Loading spinner**: shown on TUI startup
+- **OS notifications**: stage completion triggers terminal bell
+
+### Remote Dispatch
+- **Auth token passing**: remote agents receive auth token, refreshed periodically
+- **Claude auth setup**: interactive setup-token flow for remote instances
+- **Config sync**: Claude configs synced to remote EC2 clone on dispatch
+
+### Web UI
+- **Landing page**: wider layout, top nav, sidebar hover
+- **Copy buttons**: consistent copy-to-clipboard across all views
+- **Chat display**: messages don't overflow into input area
+
+### DevContainer Support
+- **JSONC parsing**: handle comments in devcontainer.json
+- **Explicit opt-in**: devcontainer/compose require explicit configuration
+
+## v0.1.0 (2026-03-25)
+
+### Initial Release
+- **Ark**: autonomous agent orchestration platform for AI coding agents
+- **Claude Code agent**: launch Claude Code in tmux sessions with isolated worktrees
+- **Session lifecycle**: create, dispatch, stop, and monitor agent sessions
+- **TUI dashboard**: React + Ink terminal interface with session list and detail pane
+- **Agent completion summary**: structured summary in TUI detail pane
+- **Flow engine**: multi-stage pipelines with manual and automatic gates
+- **Conductor**: HTTP server for channel relay and hook status
+- **Paste support**: Cmd+V paste in TUI text inputs
+- **Install script**: `make install` with tagged release support

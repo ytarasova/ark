@@ -1,173 +1,225 @@
-# PLAN: Audit async/await usage across the codebase
+# Plan: Comprehensive CHANGELOG.md overhaul
 
 ## Summary
 
-Audit every async/await pattern in the Ark codebase to find spots where Promises are not properly awaited, categorize them as bugs vs. intentional fire-and-forget, and fix the bugs. The codebase uses `safeAsync()` and `.catch()` as intentional fire-and-forget patterns in several places (polling, notifications, plugin loading) which are acceptable -- the real issues are unawaited async calls that silently discard errors or cause race conditions.
-
-## Findings
-
-### BUG -- Must Fix (7 items)
-
-| # | File | Line(s) | Pattern | Risk |
-|---|------|---------|---------|------|
-| 1 | `packages/core/services/session-hooks.ts` | 617 | `dispatch(app, sessionId).catch(...)` without await in `mediateStageHandoff` | Race: caller returns before dispatch finishes; `dispatched=true` is set but dispatch may fail asynchronously. The handoff return value is sent before we know if dispatch succeeded. |
-| 2 | `packages/core/conductor/conductor.ts` | 174 | `session.dispatch(app, sessionId).catch(...)` without await in hook status handler | Response `{ status: "ok", mapped: "retry" }` returned before dispatch attempt completes. If dispatch fails, the conductor has already reported success. |
-| 3 | `packages/core/conductor/conductor.ts` | 700 | `session.dispatch(app, sessionId).catch(...)` without await in report handler | Same as #2 -- early return before dispatch completes. |
-| 4 | `packages/core/conductor/conductor.ts` | 685, 714 | `sendOSNotification(...)` (async) called without await | `sendOSNotification` returns `Promise<void>`. While it internally catches errors, the unawaited promise could produce unhandled-rejection warnings in strict runtimes. |
-| 5 | `packages/core/conductor/conductor.ts` | 770 | `safeAsync("auto-pr: ...")` without await | Auto-PR creation is fire-and-forget. If it fails, no event is logged to the session. The function containing this is async and could easily await it. |
-| 6 | `packages/core/executors/status-poller.ts` | 74 | `sendOSNotification(...)` without await inside async callback | Same as #4 -- unawaited async call. |
-| 7 | `packages/core/__tests__/e2e-session-lifecycle.test.ts` | 328 | `complete(app, session.id)` without await in test | Test assertion on line 329 reads status synchronously after an unawaited async call. This is a real test bug -- the assertion may pass by accident (synchronous DB write inside complete) but is fragile. |
-
-### INTENTIONAL -- Acceptable fire-and-forget (document with comments)
-
-| # | File | Line(s) | Pattern | Why acceptable |
-|---|------|---------|---------|----------------|
-| A | `packages/core/app.ts` | 482 | `pricingRegistry.refreshFromRemote().catch(() => {})` | Non-blocking boot optimization. Local prices are fine. |
-| B | `packages/core/app.ts` | 540-547 | `loadPluginExecutors(...).then(...).catch(...)` | Plugin loading is best-effort. Has `.catch()`. |
-| C | `packages/core/app.ts` | 646 | `safeAsync("boot: cleanup logs", ...)` without await | Log cleanup is non-critical. Errors are caught by safeAsync. |
-| D | `packages/core/conductor/conductor.ts` | 410, 443, 449, 457-459 | `setInterval(() => safeAsync(...))` | Polling timers -- fire-and-forget by nature. safeAsync catches errors. |
-| E | `packages/core/integrations/github-pr.ts` | 196-208 | Nested `safeAsync().then(...)` | Channel delivery steering is fire-and-forget. Has error handling. |
-| F | `packages/core/integrations/issue-poller.ts` | 149, 152 | `safeAsync(...)` without await in `startIssuePoller` | Interval-based polling. safeAsync catches errors. |
-| G | `packages/core/conductor/conductor.ts` | 323-329 | `watchMergedPR(...).catch(...)` | Long-running rollback watcher. Fire-and-forget with `.catch()`. |
-| H | `packages/core/mcp-pool.ts` | 277 | `proxy.restart().catch(...)` inside setInterval | Health monitor restart. Has `.catch()`. |
-| I | `packages/core/executors/subprocess.ts` | 80 | `proc.exited.then(...)` | Process exit tracking callback. Standard pattern. |
-| J | `packages/cli/index.ts` | 123 | `checkForUpdate(...).then(...).catch(() => {})` | Non-blocking update check after CLI runs. |
-| K | `packages/arkd/server.ts` | 91, 99, 325 | `fetch(...).catch(() => {})` | Control plane registration/heartbeat/deregister. Best-effort. |
-| L | `packages/core/app.ts` | 851 | `setInterval(async () => { await safeAsync(...) })` | Metrics poller. `await` inside callback is correct; setInterval ignoring the promise is fine. |
-| M | `packages/core/executors/status-poller.ts` | 20 | `setInterval(async () => { ... })` | Status poller. Same pattern as L. |
-
-### NOT BUGS -- Correct patterns
-
-| Pattern | Locations | Why correct |
-|---------|-----------|-------------|
-| `.then()` in React `useEffect` | `packages/tui/hooks/useSessionDetailData.ts`, `packages/web/src/hooks/useSessionDetailData.ts` | Standard React async-in-useEffect pattern. All have `.catch()`. |
-| `Promise.all(arr.map(async ...))` | `packages/tui/hooks/useArkStore.ts:71-81,86-98`, `packages/tui/hooks/useEventLog.ts:29` | Correctly awaited `Promise.all` wrapping `.map(async ...)`. |
-| `.then()` in API client wrappers | `packages/web/src/hooks/useApi.ts` (30+ lines) | Return value transformers in API definitions. Consumers await or use in React Query. |
-| `postgres.ts` blocking pattern | `packages/core/database/postgres.ts:134-145,185-195,225-235` | Intentional sync-over-async using `Bun.sleepSync`. Bun processes I/O during sleepSync. Errors properly thrown after the loop. |
+The existing CHANGELOG.md covers v0.9.0 through v0.12.0 in detail but leaves v0.1.0 through v0.8.0 as a one-line stub ("Previous release") and is missing v0.13.0 and unreleased changes (v0.13.0..HEAD). This plan fills in all missing version entries by mining the git history for each tagged release, and adds an Unreleased section at the top for post-v0.13.0 work.
 
 ## Files to modify/create
 
 | File | Change |
 |------|--------|
-| `packages/core/services/session-hooks.ts` | Await dispatch at line 617, or restructure to return dispatch result |
-| `packages/core/conductor/conductor.ts` | Await sendOSNotification at 685, 714; await safeAsync at 770; add fire-and-forget comments at 174, 700 |
-| `packages/core/executors/status-poller.ts` | Await sendOSNotification at line 74 |
-| `packages/core/__tests__/e2e-session-lifecycle.test.ts` | Add `await` to `complete(app, session.id)` at line 328 |
+| `CHANGELOG.md` | Rewrite to include all 14 versions (v0.1.0 through v0.13.0) plus an Unreleased section. Backfill v0.1.0--v0.8.0, add v0.13.0, add Unreleased. Preserve existing v0.9.0--v0.12.0 content. |
 
 ## Implementation steps
 
-### Step 1: Fix unawaited `dispatch` in session-hooks.ts (Bug #1)
+### 1. Add Unreleased section (top of file, after `# Changelog`)
 
-**File:** `packages/core/services/session-hooks.ts:617`
+Add a section for commits after v0.13.0 (currently ~35 commits). Group by theme:
 
-Change:
-```ts
-dispatch(app, sessionId).catch(err => {
-  logError("handoff", `auto-dispatch failed for ${sessionId}/${toStage}: ${err?.message ?? err}`);
-});
-dispatched = true;
+```
+## Unreleased
+
+### TUI
+- **Events tab**: moved Events panel from session detail to its own dedicated tab (key `4`)
+- **Virtual scrolling**: replaced custom ScrollBox with ink-scroll-view, extracted useVirtualScroll hook with AvailableHeightContext for proper height management
+- **TreeList rewrite**: proper tree component with key-based selection, stable group headers
+- **Selection stability**: selection stays stable after delete/archive, resets on group-by toggle
+- **Layout fixes**: SplitPane content height via AvailableHeightContext, collapsed EventLog single-line
+
+### Developer Experience
+- **Hot-reload dev targets**: `make dev-daemon` and `make dev-arkd` for auto-restart on file changes
+- **Dev mode checks**: `dev-tui` and `dev-web` check for running daemon before starting
+- **Makefile cleanup**: renamed `make tui` to `tui-standalone`, clarified target descriptions
+
+### Fixes
+- **Action stages**: await safeAsync for action stages in mediateStageHandoff
+- **Auto-PR dedup**: create_pr action skips if PR already exists
+- **Message read state**: mark messages as read when session reaches terminal state
+- **Costs tab**: accessible via key `0`
 ```
 
-To:
-```ts
-const dispatchResult = await safeAsync(`handoff: auto-dispatch ${sessionId}/${toStage}`, () =>
-  dispatch(app, sessionId),
-);
-dispatched = dispatchResult;
+### 2. Add v0.13.0 section
+
+Covers commits from v0.11.0..v0.13.0 (~50 commits). Key themes:
+
+```
+## v0.13.0 (2026-04-13)
+
+### Daemon-Client Architecture
+- **Server daemon**: TUI connects as thin WebSocket client to server daemon (port 19400)
+- **Unified settings**: renamed writeHooksConfig to writeSettings (Claude settings bundle)
+
+### Flow Engine
+- **Action stage chaining**: consecutive action stages (create_pr + auto_merge) chain correctly
+- **Auto-merge CI wait**: auto_merge waits for CI checks before completing session
+- **DAG flow edges**: depends_on creates implicit graph-flow edges
+- **Process tree tracking**: executor tracks process tree when launching agents
+
+### Worktree Enhancements
+- **Copy globs**: worktree.copy glob list for syncing untracked files
+- **Setup script**: worktree.setup script for post-creation initialization
+
+### Infrastructure
+- **Status poller**: enabled for all runtimes (crash detection, not just Claude)
+- **Hook/report extraction**: extracted hook/report status logic into session-hooks.ts
+- **Test stability**: resolved pre-existing test failures across 8 root causes
+
+### TUI
+- **Group headers**: visible, distinct styling, scroll-to-header behavior
+- **Onboarding**: pilot onboarding guide, Ark-on-Ark dogfooding docs
 ```
 
-This ensures the handoff return value accurately reflects whether dispatch succeeded.
+### 3. Backfill v0.8.0 section
 
-### Step 2: Document conductor dispatch retries as intentional fire-and-forget (Bugs #2, #3)
+Replace the one-line `## v0.8.0 — Previous release.` with a full section. Covers commits v0.7.0..v0.8.0 (~30 commits). Key themes:
 
-**File:** `packages/core/conductor/conductor.ts:174`
+- JSON-RPC protocol server (`packages/server/`, `packages/protocol/`)
+- ArkClient library with typed RPC and notifications
+- TUI fully migrated from polling to push-based ArkClient protocol
+- Executor interface and registry (Claude Code, subprocess executors)
+- Memory management in web UI
+- Documentation updates (guide, CLI ref, TUI ref, config)
+- Loading unification under single TabBar spinner
 
-The dispatch at line 174 is inside an HTTP handler that returns a Response. Awaiting it would block the HTTP response. This is intentional -- the HTTP response confirms the retry was *initiated*, not that it succeeded. **Add a `// fire-and-forget: HTTP response confirms retry was initiated, not completed` comment.**
+### 4. Backfill v0.7.0 section
 
-**File:** `packages/core/conductor/conductor.ts:700`
+Covers commits v0.6.0..v0.7.0 (~50 commits). Key themes:
 
-Same pattern -- inside `applyReport` which is called from an HTTP handler. The retry dispatch is intentionally non-blocking because the HTTP response needs to return quickly. **Add a matching comment.**
+- Graph-based flows and composable termination conditions
+- Skills and recipes (three-tier resolution, CLI CRUD, injection at dispatch)
+- Guardrails (pattern-based tool authorization)
+- Sub-agent fan-out with dynamic task decomposition
+- Hybrid search with LLM re-ranking
+- OTLP span export, auto-rollback health poller
+- Web UI expanded to full CLI parity (50+ endpoints)
+- TUI parity: advance stage, worktree finish, profile + status counts
+- Evals framework, structured review output
+- E2E CLI tests rewritten as in-process (215s to 2.6s)
 
-### Step 3: Fix unawaited `sendOSNotification` in conductor.ts (Bug #4)
+### 5. Backfill v0.6.0 section
 
-**File:** `packages/core/conductor/conductor.ts:685,714`
+Covers commits v0.5.1..v0.6.0 (~60 commits). Key themes:
 
-These are inside async functions. Add `await`:
-```ts
-await sendOSNotification("Ark: Verification failed", ...);
-// and
-await sendOSNotification(`Ark: ${notifyTitle}`, notifyBody);
+- Rich React web dashboard with full session management, costs, live updates
+- MCP Socket Pool (shared MCP processes via Unix sockets)
+- Web SSE live updates
+- Cost tracking (pricing, CLI summary, TUI display)
+- Soft-delete with undo (90s TTL, Ctrl+Z in TUI)
+- Session replay view
+- Checkpoint system with crash detection and recovery
+- Multi-instance coordination via SQLite heartbeat
+- Docker sandbox, hotkey remapping, auto-update
+- Messaging bridge (Telegram/Slack)
+- Conductor learning system with auto-promotion to policy
+- Profiles, themes, UI state persistence
+
+### 6. Backfill v0.5.0/v0.5.1 section
+
+Covers commits v0.4.0..v0.5.1 (~30 commits). Key themes:
+
+- Tools tab with unified tool discovery (skills, recipes, MCP servers, commands)
+- Skill CRUD with three-tier resolution (project > global > builtin)
+- Recipe CRUD with variable instantiation and sessionToRecipe
+- Guardrail rules for tool authorization
+- Structured review output (P0-P3 severity)
+- Sub-agent fan-out with dynamic task decomposition
+- Fail-loopback with error context injection
+- Remote sync (commands, skills, CLAUDE.md to remote targets)
+- Refactoring: safeAsync/withProvider helpers, eliminated nested try/catch
+
+### 7. Backfill v0.4.0 section
+
+Covers commits v0.3.0..v0.4.0 (~50 commits). Key themes:
+
+- Focus system for TUI keyboard input ownership (useFocus context)
+- Custom agent management: create/edit/delete/copy via CLI and TUI
+- Three-tier agent resolution (project > global > builtin)
+- SessionsTab decomposition (SessionDetail, GroupManager, TalkToSession, CloneSession, MoveToGroup)
+- Confirmation prompts for destructive TUI actions
+- Comprehensive refactoring: extract helpers, fix type safety, remove circular deps
+- Silent catch cleanup: error logging added to all catches across 7 modules
+- CI test isolation with shared test context
+
+### 8. Backfill v0.3.0 section
+
+Covers commits v0.2.0..v0.3.0 (~15 commits). Key themes:
+
+- ArkD universal agent daemon: typed JSON-over-HTTP API on port 19300
+- 8 compute providers via ArkdBackedProvider base class
+- ArkD as conductor transport layer
+- PR monitoring: pull-based polling via gh CLI
+- Rich session details: files changed, commits, clickable links
+- Auto-detect PR URL from agent reports, pr-review flow
+
+### 9. Backfill v0.2.0 section
+
+Covers commits v0.1.0..v0.2.0 (~100 commits). Key themes:
+
+- EC2 compute provider with SSH, auth sync, credential management
+- Provider interface: capability flags, session checking, extended methods
+- Channel/conductor messaging: text input nav, threads, chat overlay
+- TUI polish: status bar layout, fork/clone shortcuts, TreeList navigation
+- Remote dispatch: auth token, Claude auth setup, remote MCP channel
+- SSH connection pool, reboot, connectivity test
+- Web UI: landing page, sidebar hover, copy buttons
+- OS notifications, spinner states, Ctrl+Q tmux detach
+- DevContainer and Docker compose support
+
+### 10. Backfill v0.1.0 section
+
+Covers initial commits (~8 commits). Key themes:
+
+- Initial release: Ark autonomous agent orchestration platform
+- Claude Code agent launch in tmux sessions
+- Session lifecycle: create, dispatch, stop
+- TUI dashboard (React + Ink)
+- Agent completion summary
+- Paste support, progress reports, quit fix
+
+### 11. Preserve existing content
+
+Sections v0.9.0, v0.9.1, v0.10.0, v0.11.0, v0.12.0 remain unchanged (lines 3-173 of current file). Only structural adjustments needed:
+- Add date to v0.8.0: `## v0.8.0 (2026-04-05)`
+- No content changes to v0.9.0 through v0.12.0
+
+### 12. Overall structure
+
+Final file structure (top to bottom):
 ```
-
-`sendOSNotification` is best-effort and never throws (catches internally), so awaiting it is safe and eliminates unhandled-rejection risk with zero performance cost.
-
-### Step 4: Fix unawaited `safeAsync` for auto-PR in conductor.ts (Bug #5)
-
-**File:** `packages/core/conductor/conductor.ts:770`
-
-Change:
-```ts
-safeAsync(`auto-pr: ${sessionId}`, async () => {
+# Changelog
+## Unreleased
+## v0.13.0 (2026-04-13)
+## v0.12.0 (2026-04-10)   [existing]
+## v0.11.0 (2026-04-09)   [existing]
+## v0.10.0 (2026-04-07)   [existing]
+## v0.9.1 (2026-04-07)    [existing]
+## v0.9.0 (2026-04-07)    [existing]
+## v0.8.0 (2026-04-05)    [rewritten]
+## v0.7.0 (2026-04-04)    [new]
+## v0.6.0 (2026-04-03)    [new]
+## v0.5.0 (2026-04-01)    [new]
+## v0.4.0 (2026-04-01)    [new]
+## v0.3.0 (2026-03-28)    [new]
+## v0.2.0 (2026-03-27)    [new]
+## v0.1.0 (2026-03-25)    [new]
 ```
-To:
-```ts
-await safeAsync(`auto-pr: ${sessionId}`, async () => {
-```
-
-This is inside `applyReport` which is already async. Awaiting ensures auto-PR errors are properly tracked.
-
-### Step 5: Fix unawaited `sendOSNotification` in status-poller.ts (Bug #6)
-
-**File:** `packages/core/executors/status-poller.ts:74`
-
-Change:
-```ts
-sendOSNotification(`Ark: ${title}`, session.summary ?? sessionId);
-```
-To:
-```ts
-await sendOSNotification(`Ark: ${title}`, session.summary ?? sessionId);
-```
-
-### Step 6: Fix unawaited `complete` in test (Bug #7)
-
-**File:** `packages/core/__tests__/e2e-session-lifecycle.test.ts:328`
-
-Change:
-```ts
-complete(app, session.id);
-```
-To:
-```ts
-await complete(app, session.id);
-```
-
-### Step 7: Add `// fire-and-forget` comments to intentional patterns
-
-For items A-M in the "Intentional" list, verify or add a `// fire-and-forget:` comment explaining why the Promise is intentionally not awaited. Many already have these comments. Add where missing:
-
-- `app.ts:540` -- add `// fire-and-forget: plugin loading is best-effort, never blocks boot`
-- `conductor.ts:323` -- add `// fire-and-forget: long-running rollback watcher, errors logged via .catch()`
-- `issue-poller.ts:149` -- add `// fire-and-forget: initial poll runs in background`
 
 ## Testing strategy
 
-1. **Run the full test suite** (`make test`) after all changes to ensure nothing breaks.
-2. **Specifically verify `e2e-session-lifecycle.test.ts`** passes with the `await` fix.
-3. **Verify `session-hooks.ts` change** by running `make test-file F=packages/core/__tests__/completion-paths.test.ts` -- this tests the mediateStageHandoff flow.
-4. **Verify conductor changes** don't break report handling: `make test-file F=packages/core/__tests__/conductor-e2e.test.ts`.
-5. No new tests needed -- these are correctness fixes to existing code.
+1. **Structure validation**: Verify every git tag has a corresponding `## v<X>` section in CHANGELOG.md
+2. **Content accuracy**: Spot-check 3-4 entries per version against `git log v<prev>..v<current> --oneline` to confirm key features are mentioned
+3. **No regression**: Ensure v0.9.0 through v0.12.0 sections are byte-identical to the current file (diff against main)
+4. **Formatting**: Verify markdown renders correctly (headings, bullet lists, code blocks)
+5. **Date accuracy**: Confirm each version date matches the tag commit date from `git log --format="%ai" <tag> -1`
 
 ## Risk assessment
 
-- **Low risk:** Steps 3, 5, 6, 7 -- adding `await` to already-async contexts with non-throwing functions, or fixing a test. Cannot break anything.
-- **Medium risk:** Step 1 -- changing the dispatch in mediateStageHandoff from fire-and-forget to awaited. This means the handoff function will now wait for dispatch to complete before returning. Callers (`applyReport`, `applyHookStatus`) need to handle the slightly longer execution time. Since these are already async, this should be fine. **The bigger concern is that `dispatch` might throw on tmux/Claude CLI failures**, but `safeAsync` wraps it safely.
-- **Low risk:** Steps 2, 4 -- conductor changes. Adding `await` to `safeAsync` in `applyReport` only makes the function wait for PR creation, which is fine. The HTTP handler that calls `applyReport` is already async. Adding comments has zero risk.
-- **No breaking changes.** All changes are internal behavior improvements, not API changes.
-- **Edge case:** If `dispatch()` hangs indefinitely in Step 1, `mediateStageHandoff` would also hang. In practice, dispatch either succeeds quickly (tmux spawn) or fails quickly (binary not found, session not ready). Consider adding a timeout wrapper if this becomes an issue.
+- **Accuracy of backfilled entries**: The git commit messages are the sole source of truth for v0.1.0--v0.8.0. Some commits may be grouped or described imprecisely. Mitigation: keep descriptions factual and tied to commit messages rather than speculating about intent.
+- **Size**: The file will grow from ~174 lines to roughly 350-400 lines. This is appropriate for a project with 14 releases and 1200+ commits.
+- **No breaking changes**: This is a documentation-only change to a single markdown file.
+- **v0.12.0 tag missing**: There is no v0.12.0 git tag (tags jump from v0.11.0 to v0.13.0). The existing CHANGELOG has a v0.12.0 section dated 2026-04-10. Keep it as-is since it documents real features (knowledge graph, LLM router, etc.) even though no tag was cut.
 
 ## Open questions
 
-1. **Should conductor dispatch retries (lines 174, 700) remain fire-and-forget?** They're inside HTTP handlers where awaiting would delay the response. The current pattern is arguably correct for this context -- the HTTP response confirms "retry initiated", not "retry completed". I've kept them as-is with documentation comments, but the team should confirm this is the desired behavior.
-
-2. **Should we add a lint rule to catch future unawaited async calls?** TypeScript's `@typescript-eslint/no-floating-promises` rule would catch most of these patterns automatically. However, the project currently has no ESLint config for this rule. Worth considering as a follow-up.
+1. **v0.12.0 phantom tag**: The CHANGELOG documents v0.12.0 (2026-04-10) but there is no v0.12.0 git tag. Should we create a retroactive tag, or just note the discrepancy? Recommendation: leave as-is, it's a documentation artifact.
+2. **Granularity level**: The existing v0.9.0--v0.12.0 entries are detailed (20-40 lines each). Should backfilled versions match that granularity, or be more concise since they're historical? Recommendation: aim for 15-25 lines per version -- enough to understand what shipped, not so much that it's overwhelming for historical releases.
