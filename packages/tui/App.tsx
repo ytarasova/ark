@@ -157,7 +157,8 @@ function AppInner({ arkDir: arkDirProp }: { arkDir?: string }) {
       <TabBar active={tab} loading={asyncState.loading || store.initialLoading} loadingLabel={store.initialLoading ? "Loading..." : asyncState.label} />
 
       <Box flexDirection="column" flexGrow={1}>
-      {tab === "sessions" ? (
+      {/* Sessions tab stays mounted to preserve state (grouping, filters, selection) */}
+      <Box flexDirection="column" flexGrow={1} display={tab === "sessions" ? "flex" : "none"}>
         <SessionsTab
           {...store}
           pane={pane}
@@ -175,7 +176,8 @@ function AppInner({ arkDir: arkDirProp }: { arkDir?: string }) {
             />
           ) : undefined}
         />
-      ) : tab === "agents" ? (
+      </Box>
+      {tab === "agents" ? (
         <AgentsTab
           {...store}
           pane={pane}
