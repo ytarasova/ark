@@ -146,6 +146,9 @@ function AppInner({ arkDir: arkDirProp }: { arkDir?: string }) {
     if (input >= "1" && input <= "9") {
       const tab = TABS[parseInt(input) - 1];
       if (tab) switchTab(tab);
+    } else if (input === "0") {
+      const tab = TABS[9]; // 0 = 10th tab (costs)
+      if (tab) switchTab(tab);
     }
   });
 

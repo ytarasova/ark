@@ -83,7 +83,7 @@ dev-web: ## Vite dev server + API proxy (starts daemon if not running)
 		(echo "Daemon not running. Start it with: make dev-daemon" && exit 1)
 	cd packages/web && npx vite --port 5173
 
-tui: ## Launch the terminal UI (from source)
+tui: ## Launch TUI standalone (embedded mode, no daemon needed)
 	./ark tui
 
 self: ## Dispatch full SDLC (plan->implement->review->PR) against THIS repo

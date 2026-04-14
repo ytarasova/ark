@@ -17,7 +17,7 @@ const TAB_KEYS: Record<Tab, string> = {
   memory: "7",
   tools: "8",
   schedules: "9",
-  costs: "",
+  costs: "0",
 };
 
 interface TabBarProps {
