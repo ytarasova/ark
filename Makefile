@@ -10,7 +10,7 @@
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-daemon dev-arkd dev-tui dev-web tui web desktop \
+.PHONY: help install dev dev-daemon dev-arkd dev-tui dev-web tui-standalone web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-watch lint \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
@@ -23,7 +23,7 @@ ARK_BIN := /usr/local/bin/ark
 help: ## Show available commands
 	@echo ""
 	@echo "  \033[1mDevelopment\033[0m"
-	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|tui|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-tui|dev-web|tui-standalone|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
 	@grep -E '^(test|test-file|test-e2e|test-watch):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -83,7 +83,7 @@ dev-web: ## Vite dev server + API proxy (starts daemon if not running)
 		(echo "Daemon not running. Start it with: make dev-daemon" && exit 1)
 	cd packages/web && npx vite --port 5173
 
-tui: ## Launch TUI standalone (embedded mode, no daemon needed)
+tui-standalone: ## Launch TUI standalone (embedded mode, no daemon needed)
 	./ark tui
 
 self: ## Dispatch full SDLC (plan->implement->review->PR) against THIS repo
