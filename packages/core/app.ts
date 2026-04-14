@@ -535,8 +535,7 @@ export class AppContext {
       registerExecutor(ex);
     }
 
-    // User-provided executor plugins from <arkDir>/plugins/executors/*.js.
-    // Best-effort: failures here never block boot, they just log.
+    // fire-and-forget: plugin loading is best-effort, never blocks boot
     loadPluginExecutors(this.config.arkDir, (msg) => logWarn("plugins", msg))
       .then((plugins) => {
         for (const ex of plugins) {

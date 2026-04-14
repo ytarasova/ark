@@ -404,12 +404,13 @@ describe("Conductor channel report delivery", () => {
 
     expect(resp.status).toBe(200);
 
-    // Auto gate: conductor should have advanced to next stage
+    // Auto gate: conductor should have advanced to next stage and auto-dispatched
     // Give a moment for the async advance to complete
     await new Promise(r => setTimeout(r, 100));
     const updated = app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
-    expect(updated?.status).toBe("ready");
+    // Status is "running" because auto-dispatch is now properly awaited
+    expect(updated?.status).toBe("running");
   });
 
   it("POST /hooks/status with SessionEnd on auto-gate advances session via HTTP", async () => {
@@ -434,9 +435,10 @@ describe("Conductor channel report delivery", () => {
     // Give a moment for the async advance to complete
     await new Promise(r => setTimeout(r, 100));
     const updated = app.sessions.get(session.id);
-    // Auto-gate SessionEnd triggers advance to next stage
+    // Auto-gate SessionEnd triggers advance to next stage and auto-dispatch
     expect(updated?.stage).toBe("verify");
-    expect(updated?.status).toBe("ready");
+    // Status is "running" because auto-dispatch is now properly awaited
+    expect(updated?.status).toBe("running");
   });
 
   it("POST /hooks/status with SessionEnd on manual-gate keeps session running via HTTP", async () => {

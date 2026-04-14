@@ -145,7 +145,7 @@ export async function pollIssues(app: AppContext, opts?: IssuePollerOptions): Pr
 export function startIssuePoller(app: AppContext, opts?: IssuePollerOptions): { stop: () => void } {
   const intervalMs = opts?.intervalMs ?? 60_000;
 
-  // Run immediately on start
+  // fire-and-forget: initial poll runs in background
   safeAsync("issue-poller: initial poll", () => pollIssues(app, opts));
 
   const timer = setInterval(

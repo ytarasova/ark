@@ -614,10 +614,10 @@ export async function mediateStageHandoff(
   if (autoDispatch && updated?.status === "ready" && toStage) {
     const nextAction = flow.getStageAction(app, updated.flow, toStage);
     if (nextAction.type === "agent" || nextAction.type === "fork") {
-      dispatch(app, sessionId).catch(err => {
-        logError("handoff", `auto-dispatch failed for ${sessionId}/${toStage}: ${err?.message ?? err}`);
-      });
-      dispatched = true;
+      const dispatchResult = await safeAsync(`handoff: auto-dispatch ${sessionId}/${toStage}`, () =>
+        dispatch(app, sessionId),
+      );
+      dispatched = dispatchResult;
     } else if (nextAction.type === "action") {
       await safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
         const verify = await runVerification(app, sessionId);

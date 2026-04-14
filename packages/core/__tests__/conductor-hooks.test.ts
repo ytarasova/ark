@@ -280,9 +280,9 @@ describe("Conductor /hooks/status endpoint", () => {
     expect(body.mapped).toBe("ready");
 
     const updated = getApp().sessions.get(session.id);
-    // advance() should have moved to the next stage (verify)
+    // advance() should have moved to the next stage (verify) and auto-dispatched
     expect(updated?.stage).toBe("verify");
-    expect(updated?.status).toBe("ready");
+    expect(updated?.status).toBe("running");
   });
 
   it("Stop hook does not index transcript when claude session ID does not match", async () => {
@@ -368,9 +368,9 @@ describe("Conductor /hooks/status endpoint", () => {
     await postHook(session.id, { hook_event_name: "SessionEnd" });
 
     const updated = getApp().sessions.get(session.id);
-    // advance() moves to verify stage (next after implement in default flow)
+    // advance() moves to verify stage (next after implement in default flow) and auto-dispatches
     expect(updated?.stage).toBe("verify");
-    expect(updated?.status).toBe("ready");
+    expect(updated?.status).toBe("running");
   });
 
   it("UserPromptSubmit clears breakpoint_reason when resuming from waiting", async () => {

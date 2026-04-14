@@ -171,6 +171,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
       eventBus.emit("hook_status", sessionId, {
         data: { event, status: "ready", retry: true, ...payload } as Record<string, unknown>,
       });
+      // fire-and-forget: HTTP response confirms retry was initiated, not completed
       session.dispatch(app, sessionId).catch(err => {
         logError("conductor", `on_failure retry dispatch (hook) failed for ${sessionId}: ${err?.message ?? err}`);
       });
@@ -320,6 +321,7 @@ async function handlePRMergeWebhook(req: Request): Promise<Response> {
     });
   };
 
+  // fire-and-forget: long-running rollback watcher, errors logged via .catch()
   watchMergedPR(_app, {
     sessionId: matchedSession.id, sha: pr.merge_commit_sha, owner: repo.owner.login,
     repo: repo.name, prNumber: pr.number, prTitle: pr.title,
@@ -682,7 +684,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
       });
       if (handoff.blockedByVerification) {
         const s = app.sessions.get(sessionId);
-        sendOSNotification("Ark: Verification failed", `${s?.summary ?? sessionId} - ${handoff.message.slice(0, 100)}`);
+        await sendOSNotification("Ark: Verification failed", `${s?.summary ?? sessionId} - ${handoff.message.slice(0, 100)}`);
         return;
       }
     } catch (handoffErr: any) {
@@ -697,6 +699,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     });
     if (retryResult.ok) {
       logInfo("conductor", `on_failure retry triggered for ${sessionId}: ${retryResult.message}`);
+      // fire-and-forget: HTTP response confirms retry was initiated, not completed
       session.dispatch(app, sessionId).catch(err => {
         logError("conductor", `on_failure retry dispatch failed for ${sessionId}: ${err?.message ?? err}`);
       });
@@ -711,7 +714,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
   if (finalSession && (report.type === "completed" || report.type === "error")) {
     const notifyTitle = report.type === "completed" ? "Stage completed" : "Session failed";
     const notifyBody = `${finalSession.summary ?? sessionId} - ${finalSession.stage ?? ""}`;
-    sendOSNotification(`Ark: ${notifyTitle}`, notifyBody);
+    await sendOSNotification(`Ark: ${notifyTitle}`, notifyBody);
   }
 
   // PR URL detection (agent-provided)
@@ -767,7 +770,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
       const autoPR = repoConfig.auto_pr !== false;
 
       if (autoPR) {
-        safeAsync(`auto-pr: ${sessionId}`, async () => {
+        await safeAsync(`auto-pr: ${sessionId}`, async () => {
           const prResult = await session.createWorktreePR(app, sessionId, {
             title: s.summary ?? undefined,
           });
