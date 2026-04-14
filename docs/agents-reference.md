@@ -100,6 +100,126 @@ General-purpose agent with no predefined system prompt. A blank slate for custom
 
 ---
 
+## SDLC Pipeline Agents
+
+These agents are specialized for the Intent-to-Software Lifecycle (ISLC) pipeline. They run Jira-integrated workflows with structured artifacts at each stage.
+
+### ticket-intake
+
+Fetches a Jira ticket, validates it against an 11-field sanity gate, and extracts a 27-section specification for downstream stages.
+
+| Field | Value |
+|-------|-------|
+| Model | `sonnet` |
+| Max turns | 50 |
+| Tools | Bash, Read, Write, Edit, Glob, Grep |
+| Skills | sanity-gate, spec-extraction |
+| Context | CLAUDE.md |
+
+**System prompt summary**: Fetches the Jira ticket, runs the sanity gate (PASS/FAIL/WARN per field), extracts the 27-section spec to `.workflow/<ticket>/spec.md`, and persists state. Reports error if any sanity gate field fails.
+
+**Used by flows**: islc, islc-quick
+
+### spec-planner
+
+Decomposes a specification into ordered, independently-executable subtasks and creates Jira sub-tasks.
+
+| Field | Value |
+|-------|-------|
+| Model | `opus` |
+| Max turns | 100 |
+| Tools | Bash, Read, Write, Edit, Glob, Grep, WebSearch |
+| MCP servers | atlassian |
+| Memories | code-style, architecture |
+| Context | CLAUDE.md |
+
+**System prompt summary**: Reads the specification, breaks work into subtasks (max 4h each), creates Jira sub-tasks, writes an execution plan with dependency graph to `.workflow/<ticket>/plan.md`.
+
+**Used by flows**: islc
+
+### plan-auditor
+
+Cross-checks the execution plan against the specification to verify every requirement is covered.
+
+| Field | Value |
+|-------|-------|
+| Model | `sonnet` |
+| Max turns | 50 |
+| Tools | Bash, Read, Write, Edit, Glob, Grep |
+| Skills | plan-audit |
+| Context | CLAUDE.md |
+
+**System prompt summary**: Extracts atomic requirements from the spec, maps them to subtasks, identifies coverage gaps. Produces AUDIT: PASS or AUDIT: FAIL with a coverage matrix in `.workflow/<ticket>/audit-report.md`.
+
+**Used by flows**: islc (optional stage)
+
+### task-implementer
+
+Implements a single subtask from the ISLC execution plan. Runs as one of N parallel fan-out children.
+
+| Field | Value |
+|-------|-------|
+| Model | `opus` |
+| Max turns | 200 |
+| Tools | Bash, Read, Write, Edit, Glob, Grep, WebSearch |
+| Memories | code-style, architecture, testing-patterns |
+| Context | CLAUDE.md, PLAN.md |
+
+**System prompt summary**: Loads the plan and spec, transitions its Jira sub-task to "In Progress", implements the code changes with tests, creates atomic commits, then transitions the sub-task to "Done".
+
+**Used by flows**: islc, islc-quick (fan-out execute stage)
+
+### verifier
+
+Runs multi-layered verification: tests, security scanning, code quality, AC validation, and optional design/UAT review.
+
+| Field | Value |
+|-------|-------|
+| Model | `sonnet` |
+| Max turns | 100 |
+| Tools | Bash, Read, Write, Edit, Glob, Grep |
+| Skills | security-scan, self-review |
+| Memories | code-style, testing-patterns |
+| Context | CLAUDE.md |
+
+**System prompt summary**: Runs the full test suite, performs security scanning, checks code quality, validates acceptance criteria, and optionally compares against Figma designs. Writes `.workflow/<ticket>/verify-report.md` with verdict: PASS, FAIL, or PASS WITH WARNINGS.
+
+**Used by flows**: islc, autonomous-sdlc
+
+### closer
+
+Finalizes the ISLC workflow by creating a PR, transitioning the Jira ticket, and publishing a Confluence implementation page.
+
+| Field | Value |
+|-------|-------|
+| Model | `sonnet` |
+| Max turns | 50 |
+| Tools | Bash, Read, Write, Edit, Glob, Grep |
+| MCP servers | atlassian |
+| Context | CLAUDE.md |
+
+**System prompt summary**: Runs a self-review checklist, pushes the branch, creates a structured PR via `gh pr create`, transitions the Jira ticket to "In Review", and publishes a 10-section Confluence implementation page.
+
+**Used by flows**: islc, islc-quick, conditional
+
+### retro
+
+Automated retrospective agent that analyzes the completed ISLC workflow run and produces an actionable report.
+
+| Field | Value |
+|-------|-------|
+| Model | `sonnet` |
+| Max turns | 50 |
+| Tools | Bash, Read, Write, Edit, Glob, Grep |
+| MCP servers | atlassian |
+| Context | CLAUDE.md |
+
+**System prompt summary**: Reconstructs the workflow timeline, assesses spec/plan/execution quality (EXCELLENT/GOOD/NEEDS IMPROVEMENT), generates 3-7 improvement recommendations, and writes `.workflow/<ticket>/retro-report.md`. Optionally appends to the Confluence page.
+
+**Used by flows**: islc (optional stage)
+
+---
+
 ## CLI Agents
 
 These agents use the `cli-agent` executor, which launches third-party CLI tools in tmux with the same worktree isolation and session tracking as Claude Code agents.
@@ -166,9 +286,12 @@ ark session start --repo . --summary "Fix bug" --agent implementer --runtime cod
 
 # Override: run implementer on gemini
 ark session start --repo . --summary "Fix bug" --agent implementer --runtime gemini --dispatch
+
+# Override: run worker on goose
+ark session start --repo . --summary "Fix bug" --agent worker --runtime goose --dispatch
 ```
 
-Built-in runtimes: `claude`, `claude-max`, `codex`, `gemini`. At dispatch, runtime config (type, command, task_delivery, env) is merged with agent config. Agent-level values take precedence.
+Built-in runtimes: `claude`, `claude-max`, `codex`, `gemini`, `goose`. At dispatch, runtime config (type, command, task_delivery, env) is merged with agent config. Agent-level values take precedence.
 
 ## Runtime Billing Modes and Cost Tracking
 

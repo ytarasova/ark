@@ -99,7 +99,7 @@ packages/
 agents/      → 12 agent definitions (ticket-intake, spec-planner, plan-auditor, implementer,
                task-implementer, verifier, reviewer, documenter, closer, retro, planner, worker)
 runtimes/    → 5 runtime definitions (claude, claude-max, codex, gemini, goose)
-flows/       → 10 flow definitions (default, quick, bare, autonomous, parallel, fan-out, pr-review, dag-parallel, islc, islc-quick)
+flows/       → 13 flow definitions (default, quick, bare, autonomous, autonomous-sdlc, parallel, fan-out, pr-review, dag-parallel, islc, islc-quick, brainstorm, conditional)
 skills/      → 7 builtin skills (code-review, plan-audit, sanity-gate, security-scan, self-review, spec-extraction, test-writing)
 recipes/     → 8 recipe templates (quick-fix, feature-build, code-review, fix-bug, new-feature, ideate, islc, islc-quick)
 mcp-configs/ → MCP config stubs (Atlassian, GitHub, Linear, Figma)
@@ -426,7 +426,7 @@ At dispatch to remote compute, Ark syncs `.claude/commands/`, `.claude/skills/`,
 
 **Compute tab (5):** `Enter`:provision `s`:start/stop `c`:clean `n`:new `x`:delete
 
-**Global:** `1-9`:switch tabs `Tab`:toggle pane `q`:quit
+**Global:** `1-9`,`0`:switch tabs `Tab`:toggle pane `q`:quit
 
 ## TUI Design System
 

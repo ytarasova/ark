@@ -89,7 +89,7 @@
         <li>LLM Router wired into executor dispatch flow (<code>ANTHROPIC_BASE_URL</code> / <code>OPENAI_BASE_URL</code> injection).</li>
         <li>Axon replaced by ops-codegraph (<code>@optave/codegraph</code>, TypeScript + Rust, 33 languages, no Python dependency).</li>
         <li>Codebase auto-index on dispatch -- local honors config, remote always indexes via arkd <code>/codegraph/index</code>.</li>
-        <li>Aider runtime dropped. Active runtimes: claude, claude-max, codex, gemini.</li>
+        <li>Aider runtime dropped. Active runtimes: claude, claude-max, codex, gemini, goose.</li>
         <li>Polymorphic transcript parsers (Claude/Codex/Gemini) via TranscriptParserRegistry and DI.</li>
         <li>Workdir-based session identification (no "latest by mtime" hacks).</li>
         <li><code>cost_mode</code> column (api/subscription/free) in <code>usage_records</code>.</li>
@@ -114,14 +114,14 @@
           <tr><td>Knowledge graph</td><td><span class="pill done">done</span></td><td>Unified store (codebase + sessions + memories + learnings + skills). MCP tools. Context injection at dispatch. 79 tests.</td></tr>
           <tr><td>Agent eval system</td><td><span class="pill done">done</span></td><td><code>evaluateSession</code>, <code>getAgentStats</code>, <code>detectDrift</code>. Auto-evaluates on session completion. 10 tests.</td></tr>
           <tr><td>Universal cost tracking</td><td><span class="pill done">done</span></td><td>PricingRegistry (300+ models via LiteLLM JSON), UsageRecorder, multi-dim attribution. 28 tests.</td></tr>
-          <tr><td>Runtime/role separation</td><td><span class="pill done">done</span></td><td>Agents define roles. Runtimes define backends. 4 runtimes: Claude, Claude Max, Codex, Gemini. 12 agent roles.</td></tr>
+          <tr><td>Runtime/role separation</td><td><span class="pill done">done</span></td><td>Agents define roles. Runtimes define backends. 5 runtimes: Claude, Claude Max, Codex, Gemini, Goose. 12 agent roles.</td></tr>
           <tr><td>Module reorganization</td><td><span class="pill done">done</span></td><td>91 flat files reorganized into 13 domain directories. Barrel exports. All imports updated.</td></tr>
-          <tr><td>SDLC flows</td><td><span class="pill done">done</span></td><td>7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 9 flow definitions.</td></tr>
+          <tr><td>SDLC flows</td><td><span class="pill done">done</span></td><td>7-stage pipeline (intake, plan, audit, execute, verify, close, retro). 13 flow definitions.</td></tr>
           <tr><td>Skills</td><td><span class="pill done">done</span></td><td>7 builtin: spec-extraction, sanity-gate, plan-audit, security-scan, self-review, code-review, test-writing.</td></tr>
           <tr><td>Recipes</td><td><span class="pill done">done</span></td><td>8 templates: islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature.</td></tr>
           <tr><td>CLI</td><td><span class="pill done">done</span></td><td>17 command modules. <code>dashboard/knowledge/eval/router/runtime/tenant/auth</code> all working.</td></tr>
           <tr><td>Web UI</td><td><span class="pill done">done</span></td><td>Dashboard, Sessions, Agents, Flows, Compute, History, Knowledge, Tools, Schedules, Costs, Settings, Login. Recharts.</td></tr>
-          <tr><td>TUI</td><td><span class="pill done">done</span></td><td>9-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary. ASCII cost charts.</td></tr>
+          <tr><td>TUI</td><td><span class="pill done">done</span></td><td>10-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary. ASCII cost charts.</td></tr>
           <tr><td>ESLint</td><td><span class="pill done">done</span></td><td>0 errors, 0 warnings. CI lint step.</td></tr>
           <tr><td>Process leak prevention</td><td><span class="pill done">done</span></td><td>stopAll via provider, awaited dispatches, proper shutdown order.</td></tr>
           <tr><td>Auth</td><td><span class="pill done">done</span></td><td>API keys (create/validate/revoke/rotate), <code>tenant_id</code> on all entities, per-tenant AppContext, auth middleware.</td></tr>
