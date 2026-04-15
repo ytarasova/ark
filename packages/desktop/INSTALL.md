@@ -23,19 +23,19 @@ Verify with `ark --version`.
 Grab the artifact for your platform from the
 [latest release](https://github.com/ytarasova/ark/releases/latest):
 
-| Platform        | Artifact                           |
-|-----------------|------------------------------------|
-| macOS (Apple)   | `Ark-<version>-arm64.dmg`          |
-| macOS (Intel)   | `Ark-<version>.dmg`                |
-| Windows         | `Ark Setup <version>.exe`          |
-| Linux (AppImage)| `Ark-<version>.AppImage`           |
-| Linux (Debian)  | `ark-desktop_<version>_amd64.deb`  |
+| Platform         | Artifact                          |
+| ---------------- | --------------------------------- |
+| macOS (Apple)    | `Ark-<version>-arm64.dmg`         |
+| macOS (Intel)    | `Ark-<version>.dmg`               |
+| Windows          | `Ark Setup <version>.exe`         |
+| Linux (AppImage) | `Ark-<version>.AppImage`          |
+| Linux (Debian)   | `ark-desktop_<version>_amd64.deb` |
 
 ## macOS first-launch workaround (IMPORTANT)
 
 The current release is **unsigned and unnotarized** (no Apple Developer ID is
 configured yet). macOS Gatekeeper will refuse to open the app with a message
-like *"Ark is damaged and can't be opened"*.
+like _"Ark is damaged and can't be opened"_.
 
 To bypass quarantine on first launch, run this once in Terminal after dragging
 Ark to `/Applications`:
@@ -56,7 +56,7 @@ is available. Track: https://github.com/ytarasova/ark/issues (search "signing").
 ## Windows
 
 Run `Ark Setup <version>.exe`. SmartScreen may warn about an unverified
-publisher -- click *More info* -> *Run anyway*. A code-signing certificate is
+publisher -- click _More info_ -> _Run anyway_. A code-signing certificate is
 not configured yet.
 
 ## Linux
@@ -90,11 +90,16 @@ sudo dpkg -i ark-desktop_<version>_amd64.deb
 
 **"Ark Not Found" dialog**: install the Ark CLI first (see Prerequisites).
 
-**Port already in use**: the desktop app auto-picks a free port starting at
-8420. If you see the server fail to start, another Ark process may already be
+**Port already in use**: the desktop app auto-picks a free port starting at 8420. If you see the server fail to start, another Ark process may already be
 running. Close it and relaunch. Ark Desktop now enforces a single-instance
 lock, so opening the app a second time will focus the existing window rather
 than spawn another server.
 
 **Server startup timeout**: check the Terminal where you launched Ark Desktop
 for error output from the embedded `ark web` process.
+
+## Testing
+
+Ark Desktop has Playwright-for-Electron smoke tests under
+[`tests/`](./tests/). See [`tests/README.md`](./tests/README.md) for the
+local run command, CI job name, and what each spec covers.

@@ -15,5 +15,14 @@
     "lib": ["ES2022"]
   },
   "include": ["packages/**/*.ts", "packages/**/*.tsx"],
-  "exclude": ["node_modules", "dist", "tests", "packages/web", "packages/e2e", "**/__tests__/**", "packages/test-setup.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "packages/web",
+    "packages/e2e",
+    "packages/desktop/tests",
+    "**/__tests__/**",
+    "packages/test-setup.ts"
+  ]
 }

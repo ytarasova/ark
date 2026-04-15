@@ -130,7 +130,7 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
       </Card>
 
       {/* System Health Widget */}
-      <Card>
+      <Card data-testid="system-health-card">
         <CardHeader className="pb-2">
           <CardTitle className="text-[13px] font-semibold text-muted-foreground uppercase tracking-[0.08em] flex items-center gap-2">
             <Heart size={14} className="opacity-50" />
