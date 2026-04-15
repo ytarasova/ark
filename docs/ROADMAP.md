@@ -7,7 +7,7 @@
 > Prompt caching: 99.9% hit rate, $3,430 saved (86% reduction) across 47 agent sessions
 >
 > **2026-04-14 "ark init" meeting (Yana, Zineng, Abhimanyu, Atul) -- key decisions:**
-> - **TUI retired** -- consensus to drop TUI from the product surface. Focus on **Web UI + CLI + Electron desktop app**. TUI code stays in repo but receives no further investment.
+> - **TUI retired and removed** -- consensus was to drop TUI from the product surface (2026-04-14). Code deletion shipped in v0.16.0 (2026-04-15): `packages/tui/`, `packages/tui-e2e/`, `ark tui` command, ink deps, Makefile targets, and docs. Product surfaces are **Web UI + CLI + Electron desktop app**.
 > - **Web UI is the primary interface** -- everything doable from web without touching CLI. Missing: conversation interface, repo dropdown, session creation wizard.
 > - **Electron desktop app** -- wrap web UI, build DMGs for macOS + Linux (Intel + ARM). No Windows. Near-term deliverable.
 > - **ACP (Agent Communication Protocol) POC** -- explore as parallel agent interface. Claude Code/Codex don't officially support it; Gemini does. Not a replacement for channels.
@@ -158,7 +158,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Recipes** | 10 templates (islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature, self-dogfood, self-quick). | Yes |
 | **CLI** | 25 command modules. `ark dashboard/knowledge/eval/router/runtime/tenant/auth/daemon` all working. | Yes |
 | **Web UI** | Dashboard (widget grid + Recharts cost charts + daemon health), Sessions (status filter tabs), Agents+Runtimes, Flows, Compute, History, Memory/Knowledge, Tools, Schedules, Costs, Settings, Login. 28 doc pages. | Yes |
-| **TUI** | 10-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary in empty state. ASCII cost charts. Agents+Runtimes sub-groups. | Yes |
+| ~~**TUI**~~ | ~~10-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary in empty state. ASCII cost charts. Agents+Runtimes sub-groups.~~ | Retired (v0.16.0, 2026-04-15) |
 | **ESLint** | 0 errors, 0 warnings. CI lint step. | Yes |
 | **Process leak prevention** | stopAll via provider, awaited dispatches, proper shutdown order. | Yes |
 | **Auth** | API keys (create/validate/revoke/rotate), tenant_id on all entities, per-tenant AppContext, auth middleware. | Yes |
@@ -199,14 +199,14 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Compute: Docker** | `DockerProvider` + `LocalDockerProvider`. | Works locally when Docker is running. Not tested in CI. | Low |
 | **Compute: EC2+ArkD** | `RemoteArkdBase` with 4 isolation modes. | Requires AWS credentials. Provisioning flow untested end-to-end. | Medium |
 | **Control plane** | Worker registry, scheduler, tenant policies, hosted entry point. 20 unit tests. | Never deployed as a running service. Docker-compose untested. Helm chart untested. Worker registration flow untested. | High |
-| **Remote client** | `--server`/`--token` for CLI, TUI, Web. WebSocket transport. Web proxy mode. | Never tested with a real remote server. | High |
+| **Remote client** | `--server`/`--token` for CLI and Web. WebSocket transport. Web proxy mode. | Never tested with a real remote server. | High |
 | **Auth middleware** | Token extraction, tenant scoping in web server. | Never tested with real multi-user sessions. No session management. | Medium |
 | **SDLC flow E2E** | Full pipeline defined with agents, skills, recipes. Flow progression mechanics exercised by `flows.pw.ts` + `flows.spec.ts` -- walks `default` flow through all 9 stages via `session/advance`, asserts each transition. | Never processed a real Jira ticket end-to-end with a real Claude agent. MCP integrations (Atlassian, Bitbucket, Figma) still untested against live services. | Medium |
 | **OTLP observability** | `otlp.ts` sends spans to OTLP/HTTP endpoint. | Never tested against real Jaeger/Tempo/Honeycomb. | Medium |
 | **Knowledge: ops-codegraph indexer** | Calls ops-codegraph (33 languages via tree-sitter), parses output, stores in knowledge graph. | Never tested with real codegraph installed in CI. Mock-tested only. | Medium |
 | **Cost: router feed-back** | Router has in-memory cost tracking. UsageRecorder exists. | Router doesn't call `app.usageRecorder.record()` yet. Not wired. | Medium |
 | **Cost: non-Claude runtimes** | UsageRecorder supports any model/provider. | Codex/Gemini/Aider executors don't report usage yet. Only Claude transcript parsing works. | High |
-| **Dashboard** | Web widget grid, TUI summary, CLI command. | Data sources are partially mocked. No real fleet to visualize. | Low |
+| **Dashboard** | Web widget grid, CLI command. | Data sources are partially mocked. No real fleet to visualize. | Low |
 | **Deployment** | Dockerfile, docker-compose, Helm chart. | Never built the Docker image. Never `helm install`-ed. Never pushed to registry. | High |
 
 ### NOT BUILT -- Identified gaps, no code exists
@@ -764,7 +764,7 @@ Ark's endgame is a **complete background agent platform** covering all 11 layers
 
 | Gap | Tool / Approach | Effort | Priority |
 |-----|----------------|--------|----------|
-| TUI removal (complete deletion) | Delete packages/tui/ (15.8K lines), packages/tui-e2e/, 7 ink deps | 0.5 day | **SP1** |
+| ~~TUI removal (complete deletion)~~ | **DONE (v0.16.0, 2026-04-15)** -- `packages/tui/`, `packages/tui-e2e/`, ink deps, Makefile targets, docs all removed | 0 | done |
 | Desktop app distribution (.dmg, .app, AppImage, .deb) | Replace Electron with **Tauri v2** (10x smaller, Rust backend, web UI wraps cleanly) | 2-3 days | **SP1** |
 | Web UI production-grade overhaul | Borrow from **Open Agents** (tool renderers, git panel, todo panel, structured questions, model selector, stream recovery). 6K lines -> 30K+ | 5-7 days | **SP1** |
 | GitHub App integration (webhooks, not just `gh` CLI) | Build GitHub App: inbound webhooks (PR events, issue events trigger sessions), outbound (create issues, comment on PRs, deployment status) | 2-3 days | **SP3** |

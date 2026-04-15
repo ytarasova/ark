@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -79,7 +78,7 @@
 
       <h2>Deployment modes</h2>
       <ul>
-        <li><strong>Local machine</strong> -- start with <code>ark arkd</code>, or let the TUI auto-start it on demand.</li>
+        <li><strong>Local machine</strong> -- start with <code>ark arkd</code>, or let the server daemon auto-start it on demand.</li>
         <li><strong>Docker / devcontainer</strong> -- arkd is baked into the image and starts automatically when the container boots.</li>
         <li><strong>EC2 instance</strong> -- installed via cloud-init on first boot, started as a systemd service.</li>
         <li><strong>Kubernetes pod</strong> -- runs as a sidecar container next to the agent container.</li>
@@ -96,7 +95,7 @@
       </ol>
       <p>This is why every compute target runs arkd. It gives the control plane a single HTTP endpoint per target (port 19300) regardless of how many sessions are active on it. Direct agent-to-conductor connections would not work through NAT, firewalls, or cross-cloud routing.</p>
       <div class="callout info">
-        <p>Human steering (from TUI or Web) flows in the reverse direction: conductor -&gt; arkd -&gt; ark-channel -&gt; agent MCP notification.</p>
+        <p>Human steering (from the Web UI or Desktop app) flows in the reverse direction: conductor -&gt; arkd -&gt; ark-channel -&gt; agent MCP notification.</p>
       </div>
 
       <h2>Codegraph endpoint</h2>

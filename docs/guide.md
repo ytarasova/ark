@@ -20,7 +20,7 @@ This guide covers every user-visible concept. Start at the top for the 60-second
 12. Auth and Multi-Tenancy
 13. Git Worktrees
 14. Search
-15. Dashboards (CLI, TUI, Web)
+15. Dashboards (CLI, Web)
 16. Knowledge Export and Import
 17. MCP Integration
 18. Remote Client Mode
@@ -52,7 +52,7 @@ ark session start \
   --dispatch
 
 # 4. Watch it work
-ark tui               # interactive dashboard
+ark web               # web dashboard (or launch the Electron desktop app)
 # or
 ark session list
 ark session events <sessionId>
@@ -62,7 +62,7 @@ You now have:
 - a git worktree at `~/.ark/worktrees/<sessionId>/`
 - a tmux session (`ark-s-<id>`) running Claude Code inside it
 - an MCP channel, knowledge context injected into the prompt, and hook-based status reporting
-- events streaming to the CLI, TUI, and Web dashboards
+- events streaming to the CLI and Web dashboards
 
 Requirements: bun, tmux, git, and (for auto-PR) the `gh` CLI. Ark is bun-only -- it uses `bun:sqlite`, `Bun.serve`, and Bun FFI.
 
@@ -773,7 +773,7 @@ ark worktree merge <sessionId>       # merge into base branch
 ark worktree pr <sessionId>          # push and create a PR via `gh`
 ```
 
-The TUI has a `W` shortcut that opens a worktree overlay with a diff preview. It tracks which files you have already reviewed and flags any files modified since your last review.
+The web dashboard shows a diff preview per session, with a "Finish" action that triggers the same merge/PR flow.
 
 ### Auto-PR
 
@@ -796,9 +796,9 @@ Search uses FTS5 when the `transcript_index` virtual table exists, and falls bac
 
 ---
 
-## 15. Dashboards (CLI, TUI, Web)
+## 15. Dashboards (CLI, Web)
 
-Ark has three UI surfaces and a desktop shell. Surface parity is a hard rule -- every feature that exists in one surface must exist in the others.
+Ark has two UI surfaces plus a desktop shell. Surface parity is a hard rule -- every feature that exists in one surface must exist in the other.
 
 ### CLI
 
@@ -812,32 +812,6 @@ ark compute list
 
 Seventeen command modules cover sessions, compute, flows, skills, recipes, agents, runtimes, auth, router, knowledge, search, worktree, history, todo, config, tenant, and costs.
 
-### TUI
-
-```bash
-ark tui
-make tui                # same, via Makefile
-```
-
-React plus Ink terminal dashboard with 10 tabs: Sessions, Agents, Events, Flows, Compute, History, Memory, Tools, Schedules, Costs. Smart polling, SSE updates, overlay-driven forms, full keyboard navigation. Keybindings live in the status bar, not inside panels.
-
-Common shortcuts:
-
-| Key | Action |
-|-----|--------|
-| `1-9`, `0` | Switch tabs |
-| `j/k` | Navigate rows |
-| `n` | New session |
-| `Enter` | Dispatch/restart |
-| `s` | Stop session |
-| `I` | Interrupt agent |
-| `t` | Talk to session |
-| `a` | Attach tmux |
-| `V` | Run verification |
-| `W` | Worktree overlay |
-| `Z` | Archive/restore |
-| `q` | Quit |
-
 ### Web
 
 ```bash
@@ -845,7 +819,7 @@ ark web                 # starts Vite dev server
 make web-build          # production build
 ```
 
-Vite + React + shadcn/ui. SSE live updates, Recharts cost dashboard, widget grid, session detail pages.
+Vite + React + shadcn/ui. SSE live updates, Recharts cost dashboard, widget grid, session detail pages. Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings pages.
 
 ### Desktop
 
@@ -900,7 +874,7 @@ The pool is transparent -- agents see a normal MCP server and Ark routes request
 
 ## 18. Remote Client Mode
 
-The CLI, TUI, and Web can all connect to a remote Ark server instead of running locally. They open a WebSocket `ArkClient` and delegate every operation.
+The CLI and Web can connect to a remote Ark server instead of running locally. They open a WebSocket `ArkClient` and delegate every operation.
 
 ```bash
 # Env vars
@@ -908,12 +882,11 @@ export ARK_SERVER=https://ark.company.com
 export ARK_TOKEN=ark_default_9f8a7b...
 
 ark session list
-ark tui
 ark web
 
 # Or pass flags explicitly
 ark --server https://ark.company.com --token ark_default_xxx session list
-ark tui --server https://ark.company.com --token ark_default_xxx
+ark --server https://ark.company.com --token ark_default_xxx web
 ```
 
 When remote mode is active, the CLI does not boot a local AppContext -- all state lives on the server.
@@ -1076,9 +1049,9 @@ ark costs-export --format csv --out last-week.csv
 ark router status
 
 # Connect to a hosted server
-ark --server https://ark.company.com --token ark_default_xxx tui
+ark --server https://ark.company.com --token ark_default_xxx web
 ```
 
 ---
 
-That is the full tour. Every concept is documented here: sessions, flows, agents, runtimes, skills, recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/TUI/Web/Desktop, knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.
+That is the full tour. Every concept is documented here: sessions, flows, agents, runtimes, skills, recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop, knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.

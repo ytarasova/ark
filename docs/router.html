@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -130,7 +129,7 @@
       <h2>Cost Tracking</h2>
       <p>The router tracks per-request costs and feeds them into Ark's <code>UsageRecorder</code> via an <code>onUsage</code> callback. Costs are attributed by model, provider, and session. View accumulated costs with:</p>
       <pre><code><span class="prompt">$</span> ark router costs</code></pre>
-      <p>The cost dashboard is also available in the TUI (Costs tab) and Web UI.</p>
+      <p>The cost dashboard is also available in the Web UI (Costs view).</p>
 
       <h2>Feedback Loop</h2>
       <p>The router logs every routing decision for analysis. Per-model quality tracking uses Bayesian scoring to refine model selection over time. The feedback system maintains the last 10,000 decision records.</p>

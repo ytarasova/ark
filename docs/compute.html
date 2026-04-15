@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -208,7 +207,7 @@ ark compute sync dev-box      # sync environment (push/pull)
 ark compute metrics dev-box   # show CPU, memory, disk, network</code></pre>
 
       <h2>Monitoring</h2>
-      <p>The TUI Compute tab (press <kbd>4</kbd>) shows real-time metrics for running computes:</p>
+      <p>The web dashboard's <strong>Compute</strong> view shows real-time metrics for running computes:</p>
       <ul>
         <li>CPU, memory, disk usage</li>
         <li>Network I/O</li>
@@ -220,8 +219,8 @@ ark compute metrics dev-box   # show CPU, memory, disk, network</code></pre>
       <h2>Dispatching to Remote Compute</h2>
       <p>When creating a session, specify the compute target:</p>
       <pre><code>ark session start --repo . --summary "Deploy" --compute dev-box</code></pre>
-      <p>Or select it in the TUI's New Session form.</p>
-      <p>The agent will be launched on the remote compute. Attach via <kbd>a</kbd> in the TUI to get a remote tmux session. Press <kbd>Ctrl+B</kbd> <kbd>d</kbd> to detach from the tmux session without interrupting the agent.</p>
+      <p>Or pick the compute in the web dashboard's New Session form.</p>
+      <p>The agent will be launched on the remote compute. Use <code>ark compute ssh dev-box</code> from the CLI, or the web dashboard's embedded terminal, to attach to a remote tmux session. Press <kbd>Ctrl+B</kbd> <kbd>d</kbd> to detach from tmux without interrupting the agent.</p>
 
       <h2>E2B Provider</h2>
       <p>Managed Firecracker sandboxes via the <a href="https://e2b.dev">E2B</a> SDK. Sub-second boot with full isolation.</p>

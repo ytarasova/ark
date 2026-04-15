@@ -55,7 +55,6 @@ graph TB
         WebUI["Web UI<br/>(Vite + SSE)"]:::surface
         CLI["CLI<br/>(ark command)"]:::surface
         Desktop["Desktop<br/>(Electron / Tauri)"]:::surface
-        TUI_retired["TUI (retired)<br/>React + Ink"]:::retired
     end
     surfaces -- "WebSocket / stdio<br/>JSON-RPC 2.0" --> ArkServer
 
@@ -168,7 +167,6 @@ graph TB
     classDef server fill:#ddd6fe,stroke:#7c3aed,color:#4c1d95,stroke-width:3px
     classDef conductor fill:#dbeafe,stroke:#2563eb,color:#1e40af,stroke-width:2px
     classDef surface fill:#e0e7ff,stroke:#4f46e5,color:#312e81
-    classDef retired fill:#f1f5f9,stroke:#94a3b8,color:#94a3b8,stroke-dasharray:4
     classDef local fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
     classDef hosted fill:#fce7f3,stroke:#db2777,color:#9d174d
     classDef hierarchy fill:#ecfdf5,stroke:#059669,color:#065f46
@@ -185,7 +183,7 @@ graph TB
 - **Executors** define HOW agents launch (4 built-in: claude-code, cli-agent, goose, subprocess). **Compute Providers** define WHERE they run (11 total across local/EC2/K8s/E2B).
 - **Components** (skills, agents, flows, recipes, runtimes) follow three-tier resolution: built-in -> tenant -> user.
 - **LLM Router (:8430)** injects base URLs into agent environments so all LLM traffic routes transparently.
-- **TUI is retired** (Apr 14, 2026) -- product surfaces are Web UI + CLI + Desktop app.
+- **TUI was retired and removed in v0.16.0** (2026-04-15) -- product surfaces are Web UI + CLI + Desktop app.
 
 ### 1.2 Message Flow
 
@@ -228,7 +226,7 @@ Ark is deployed in two modes with the same binary and the same code paths. The `
 | Database | SQLite at `~/.ark/ark.db` (WAL mode, 5s busy timeout) |
 | Stores | File-backed three-tier (builtin > global `~/.ark/` > project `.ark/`) |
 | Auth | None (single user, tenant = `"default"`) |
-| Conductor | Started by TUI only (CLI talks to DB directly) |
+| Conductor | Started by the server daemon (`ark server daemon start`); CLI talks to DB directly and skips the conductor |
 | ArkD | Started on-demand per compute operation |
 | Channels | Unix sockets + localhost HTTP |
 | SSE bus | In-memory |
@@ -288,7 +286,7 @@ await scoped.sessions.list(); // WHERE tenant_id = 'acme-corp'
 
 ### 3.1 AppContext (`packages/core/app.ts`)
 
-The root of the dependency graph. An Awilix DI container that owns every singleton: repositories, services, stores, providers, parsers, observability. Created by CLI, TUI, and hosted entry points; disposed on shutdown.
+The root of the dependency graph. An Awilix DI container that owns every singleton: repositories, services, stores, providers, parsers, observability. Created by CLI, server daemon, and hosted entry points; disposed on shutdown.
 
 ```ts
 class AppContext {
@@ -321,7 +319,7 @@ class AppContext {
 }
 ```
 
-CLI creates it with `skipConductor: true`. TUI and hosted mode start the conductor. Tests use `AppContext.forTest()` which creates a temp dir and isolated DB.
+CLI creates it with `skipConductor: true`. The server daemon and hosted mode start the conductor. Tests use `AppContext.forTest()` which creates a temp dir and isolated DB.
 
 ### 3.2 IDatabase abstraction (`packages/core/database/`)
 
@@ -536,7 +534,7 @@ See [Section 7](#7-channels----agent-communication). ArkD is the hop between the
 The HTTP surface of the control plane. Lives in `packages/core/conductor.ts` (with helpers under `packages/core/conductor/`).
 
 - **Port:** `19100` (hardcoded -- referenced in `conductor.ts`, `channel.ts`, tests, and `constants.ts`)
-- **Started by:** TUI (for local mode) and hosted mode entry (`hosted.ts`)
+- **Started by:** the server daemon (`ark server daemon start`, for local mode) and hosted mode entry (`hosted.ts`)
 - **NOT started by:** the CLI -- CLI sessions talk directly to the DB through `AppContext`
 
 ### 5.1 Routes
@@ -683,13 +681,13 @@ Conductor (:19100)
   |
   | session-orchestration.applyReport(app, ...)
   v
-Database + SSE bus (TUI/Web get live updates)
+Database + SSE bus (Web/Desktop get live updates)
 ```
 
 Reverse path (human steering):
 
 ```
-Human sends message in TUI/Web
+Human sends message in Web/Desktop
   |
   v
 Conductor
@@ -1064,13 +1062,13 @@ Pub/sub for in-process listeners. Used by:
 
 - Session-orchestration to emit lifecycle events (`dispatched`, `stage_advanced`, `completed`, etc.)
 - Metrics polling to emit sample events
-- TUI to subscribe to events for live refresh
+- Server daemon to fan out events over SSE/WebSocket to UI clients
 
 All listeners are in-process; the event bus does not cross process boundaries.
 
 ### 14.2 SSE bus
 
-Server-Sent Events bus for UI live updates (TUI, Web, Desktop).
+Server-Sent Events bus for UI live updates (Web, Desktop).
 
 | Mode | Implementation | File |
 |---|---|---|
@@ -1140,7 +1138,7 @@ In hosted mode, the `resource_definitions`, `sessions`, `knowledge`, `usage_reco
 
 - **Tenant-scoped from day one.** Every entity has `tenant_id`. `forTenant(id)` is a cheap view that re-uses the same repositories and stores. No separate "tenant-aware" code path.
 
-- **Conductor separate from CLI.** CLI talks to the DB directly via `AppContext`; only TUI and hosted mode run the conductor. Keeps short-lived CLI commands from racing HTTP server boot.
+- **Conductor separate from CLI.** CLI talks to the DB directly via `AppContext`; only the server daemon and hosted mode run the conductor. Keeps short-lived CLI commands from racing HTTP server boot.
 
 - **Channels through arkd, not direct.** Agent `->` arkd `->` conductor gives one HTTP endpoint per compute target. Scales to N sessions on one host without N open conductor connections.
 

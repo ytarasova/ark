@@ -38,7 +38,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -93,7 +92,7 @@
         <li>Polymorphic transcript parsers (Claude/Codex/Gemini) via TranscriptParserRegistry and DI.</li>
         <li>Workdir-based session identification (no "latest by mtime" hacks).</li>
         <li><code>cost_mode</code> column (api/subscription/free) in <code>usage_records</code>.</li>
-        <li>Compute templates (CLI + TUI + Web + RPC, tenant-scoped).</li>
+        <li>Compute templates (CLI + Web + RPC, tenant-scoped).</li>
         <li>Full multi-tenant entity scoping: <code>user_id</code> on sessions, <code>tenant_id</code> on groups/schedules/pools.</li>
         <li>DB-backed resource stores for control plane mode (<code>DbResourceStore</code>, <code>resource_definitions</code> table).</li>
         <li>Tenant integration policies (<code>router_required</code>, <code>auto_index_required</code>, <code>router_policy</code>, <code>tensorzero_enabled</code>).</li>
@@ -121,7 +120,7 @@
           <tr><td>Recipes</td><td><span class="pill done">done</span></td><td>8 templates: islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature.</td></tr>
           <tr><td>CLI</td><td><span class="pill done">done</span></td><td>17 command modules. <code>dashboard/knowledge/eval/router/runtime/tenant/auth</code> all working.</td></tr>
           <tr><td>Web UI</td><td><span class="pill done">done</span></td><td>Dashboard, Sessions, Agents, Flows, Compute, History, Knowledge, Tools, Schedules, Costs, Settings, Login. Recharts.</td></tr>
-          <tr><td>TUI</td><td><span class="pill done">done</span></td><td>10-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary. ASCII cost charts.</td></tr>
+          <tr><td>TUI</td><td><span class="pill partial">retired</span></td><td>Retired in v0.16.0 (2026-04-15). <code>packages/tui/</code>, <code>packages/tui-e2e/</code>, and <code>ark tui</code> command removed. Surfaces: Web UI + CLI + Electron desktop.</td></tr>
           <tr><td>ESLint</td><td><span class="pill done">done</span></td><td>0 errors, 0 warnings. CI lint step.</td></tr>
           <tr><td>Process leak prevention</td><td><span class="pill done">done</span></td><td>stopAll via provider, awaited dispatches, proper shutdown order.</td></tr>
           <tr><td>Auth</td><td><span class="pill done">done</span></td><td>API keys (create/validate/revoke/rotate), <code>tenant_id</code> on all entities, per-tenant AppContext, auth middleware.</td></tr>
@@ -146,13 +145,13 @@
           <tr><td>Compute: Docker</td><td><span class="pill partial">partial</span></td><td>Works locally when Docker is running. Not tested in CI.</td></tr>
           <tr><td>Compute: EC2 + ArkD</td><td><span class="pill partial">partial</span></td><td><code>RemoteArkdBase</code> with 4 isolation modes. Provisioning flow untested end-to-end.</td></tr>
           <tr><td>Control plane</td><td><span class="pill partial">partial</span></td><td>Worker registry, scheduler, tenant policies, hosted entry point. 20 unit tests. Never deployed as a running service.</td></tr>
-          <tr><td>Remote client</td><td><span class="pill partial">partial</span></td><td><code>--server</code>/<code>--token</code> for CLI, TUI, Web. WebSocket transport. Never tested with a real remote server.</td></tr>
+          <tr><td>Remote client</td><td><span class="pill partial">partial</span></td><td><code>--server</code>/<code>--token</code> for CLI and Web. WebSocket transport. Never tested with a real remote server.</td></tr>
           <tr><td>Auth middleware</td><td><span class="pill partial">partial</span></td><td>Token extraction, tenant scoping. Never tested with real multi-user sessions.</td></tr>
           <tr><td>SDLC flow E2E</td><td><span class="pill partial">partial</span></td><td>Full pipeline defined with agents, skills, recipes. Never processed a real Jira ticket end-to-end.</td></tr>
           <tr><td>OTLP observability</td><td><span class="pill partial">partial</span></td><td><code>otlp.ts</code> sends spans to OTLP/HTTP. Never tested against real Jaeger/Tempo/Honeycomb.</td></tr>
           <tr><td>Cost: router feed-back</td><td><span class="pill partial">partial</span></td><td>Router has in-memory cost tracking. Wiring to <code>app.usageRecorder.record()</code> in progress.</td></tr>
           <tr><td>Cost: non-Claude runtimes</td><td><span class="pill partial">partial</span></td><td>Transcript parsers for Codex and Gemini exist; end-to-end verification on real transcripts in progress.</td></tr>
-          <tr><td>Dashboard</td><td><span class="pill partial">partial</span></td><td>Web widget grid, TUI summary, CLI command. Data sources partially mocked.</td></tr>
+          <tr><td>Dashboard</td><td><span class="pill partial">partial</span></td><td>Web widget grid, CLI command. Data sources partially mocked.</td></tr>
           <tr><td>Deployment</td><td><span class="pill partial">partial</span></td><td>Dockerfile, docker-compose, Helm chart. Never built or pushed image. Never <code>helm install</code>-ed.</td></tr>
         </tbody>
       </table>
@@ -207,7 +206,7 @@
           <tr><td>Deploy Helm chart on K8s, verify</td><td>1 day</td><td>Production</td></tr>
           <tr><td>Build and publish Docker image to registry</td><td>0.5 day</td><td>Deployment</td></tr>
           <tr><td>End-to-end: real Jira ticket through full SDLC flow</td><td>2-3 days</td><td>"Send to dev" workflow</td></tr>
-          <tr><td>Test remote client mode (TUI/CLI to remote server)</td><td>1 day</td><td>Multi-user</td></tr>
+          <tr><td>Test remote client mode (CLI/Web to remote server)</td><td>1 day</td><td>Multi-user</td></tr>
           <tr><td>Test ops-codegraph indexer with real large repo</td><td>0.5 day</td><td>Knowledge graph</td></tr>
         </tbody>
       </table>
@@ -251,7 +250,7 @@
           <tr><th>Task</th><th>Effort</th><th>Status</th></tr>
         </thead>
         <tbody>
-          <tr><td>Dashboard overview (Web/TUI/CLI)</td><td>1-2 days</td><td><span class="pill done">done</span></td></tr>
+          <tr><td>Dashboard overview (Web/CLI)</td><td>1-2 days</td><td><span class="pill done">done</span></td></tr>
           <tr><td>Cost charts (Recharts)</td><td>1 day</td><td><span class="pill done">done</span></td></tr>
           <tr><td>Smart polling (pause when tab hidden)</td><td>0.5 day</td><td><span class="pill done">done</span></td></tr>
           <tr><td>Live feed sidebar (Web)</td><td>1 day</td><td><span class="pill not-built">not started</span></td></tr>
@@ -276,7 +275,7 @@
           <tr><td>Injection attempt tracking</td><td>0.5 day</td></tr>
           <tr><td>Exec approval queue (interactive approve/deny)</td><td>1-2 days</td></tr>
           <tr><td>Trust scoring per agent</td><td>1 day</td></tr>
-          <tr><td>Security dashboard panel (Web + TUI)</td><td>1 day</td></tr>
+          <tr><td>Security dashboard panel (Web)</td><td>1 day</td></tr>
         </tbody>
       </table>
 
@@ -292,7 +291,7 @@
           <tr><td>GitHub Issues bidirectional sync</td><td>2-3 days</td></tr>
           <tr><td>Slack commands + thread-based interaction</td><td>2-3 days</td></tr>
           <tr><td>Linear integration</td><td>1-2 days</td></tr>
-          <tr><td>Webhook/alert management panels (Web + TUI)</td><td>1 day</td></tr>
+          <tr><td>Webhook/alert management panels (Web)</td><td>1 day</td></tr>
         </tbody>
       </table>
 
@@ -305,7 +304,7 @@
         <tbody>
           <tr><td>Task table (new schema, separate from sessions)</td><td>1 day</td></tr>
           <tr><td>Kanban board UI (Web)</td><td>2-3 days</td></tr>
-          <tr><td>Task list view (TUI)</td><td>1 day</td></tr>
+          <tr><td>Task list view (Web)</td><td>1 day</td></tr>
           <tr><td><code>ark task create/list/assign/dispatch</code> CLI</td><td>1 day</td></tr>
           <tr><td>Quality gate / Aegis review (agent-to-agent review)</td><td>2-3 days</td></tr>
           <tr><td>Task &#x2192; session mapping</td><td>1 day</td></tr>

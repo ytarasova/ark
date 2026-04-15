@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -89,7 +88,7 @@
         </thead>
         <tbody>
           <tr><td><code>auto</code></td><td>Advances automatically when the agent completes without errors</td></tr>
-          <tr><td><code>manual</code></td><td>Waits for human approval -- press <kbd>Enter</kbd> in the TUI or run <code>ark session advance</code></td></tr>
+          <tr><td><code>manual</code></td><td>Waits for human approval -- use the Web UI advance button or run <code>ark session advance</code></td></tr>
           <tr><td><code>review</code></td><td>Waits for a GitHub PR approval via webhook</td></tr>
           <tr><td><code>condition</code></td><td>Evaluates an expression before advancing</td></tr>
         </tbody>
@@ -113,7 +112,7 @@
 <span class="prompt">$</span> ark session complete s-a1b2c3         <span class="yaml-comment"># blocked if todos/scripts fail</span>
 <span class="prompt">$</span> ark session complete s-a1b2c3 --force <span class="yaml-comment"># override verification</span></code></pre>
       <div class="callout info">
-        <p>Todos are shown in the TUI detail panel. Press <kbd>V</kbd> to run verification from the TUI.</p>
+        <p>Todos are shown in the web dashboard's Session Detail panel. Use <code>ark session verify &lt;id&gt;</code> from the CLI to run verification.</p>
       </div>
 
       <h3>Fail-Loopback</h3>

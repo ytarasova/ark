@@ -287,7 +287,6 @@
     <nav class="top-nav">
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Concepts</a>
-      <a href="tui.html">TUI Guide</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -319,7 +318,7 @@
       <span class="pill green">TensorZero gateway</span>
       <span class="pill purple">multi-tenant control plane</span>
       <span class="pill">billing modes</span>
-      <span class="pill green">TUI + web + desktop</span>
+      <span class="pill green">web UI + desktop</span>
       <span class="pill purple">fan-out / auto-join</span>
       <span class="pill">cost tracking</span>
       <span class="pill green">Helm chart</span>
@@ -345,9 +344,9 @@
     <div class="install-section">
       <h2>Quick Start</h2>
       <div class="code-box">
-        <button class="copy-btn" onclick="copy(this, 'ark tui')">Copy</button>
+        <button class="copy-btn" onclick="copy(this, 'ark web')">Copy</button>
         <code>
-          <span class="prompt">$</span> ark tui<span class="comment">              # terminal dashboard</span><br>
+          <span class="prompt">$</span> ark web<span class="comment">              # web dashboard</span><br>
           <span class="prompt">$</span> ark exec --repo . --summary "Fix auth bug"<br>
           <span class="prompt">$</span> ark search "authentication"
         </code>
@@ -370,8 +369,8 @@
         </div>
         <div class="card">
           <div class="icon">&#9000;</div>
-          <h3>TUI + Web + Desktop</h3>
-          <p>Terminal UI (10 tabs), web dashboard with cost charts, and Electron desktop app. Live agent output.</p>
+          <h3>Web + Desktop</h3>
+          <p>Web dashboard with cost charts and Electron desktop app. Live agent output over SSE.</p>
         </div>
         <div class="card">
           <div class="icon">&#9889;</div>
@@ -413,15 +412,11 @@
       <div class="grid">
         <a href="quickstart.html" class="card" style="text-decoration:none">
           <h3>Quick Start</h3>
-          <p>Install, create your first session, and launch the TUI in under 2 minutes.</p>
+          <p>Install, create your first session, and launch the web UI in under 2 minutes.</p>
         </a>
         <a href="concepts.html" class="card" style="text-decoration:none">
           <h3>Core Concepts</h3>
           <p>Flows, agents, stages, gates, autonomy, channels, and the conductor.</p>
-        </a>
-        <a href="tui.html" class="card" style="text-decoration:none">
-          <h3>TUI Guide</h3>
-          <p>All 10 tabs, keyboard shortcuts, and navigation.</p>
         </a>
         <a href="web.html" class="card" style="text-decoration:none">
           <h3>Web Dashboard</h3>
@@ -485,7 +480,7 @@
         </a>
         <a href="troubleshooting.html" class="card" style="text-decoration:none">
           <h3>Troubleshooting</h3>
-          <p>Common issues, diagnostic tools, and solutions for sessions, compute, TUI, and router.</p>
+          <p>Common issues, diagnostic tools, and solutions for sessions, compute, web UI, and router.</p>
         </a>
       </div>
     </div>
