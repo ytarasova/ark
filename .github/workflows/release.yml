@@ -451,37 +451,68 @@ jobs:
           fi
 
       - name: Test ark web serves dashboard
+        shell: bash
         env:
           PLAT: ${{ matrix.name }}
         run: |
-          # Regression guard for Bug-014: compiled ark binary must resolve its
-          # web asset dir to <prefix>/web when launched from <prefix>/bin/ark.
-          # The tarball already has this layout -- boot and probe over HTTP.
+          # Regression guard for Bug-011 (was Bug-014): compiled ark binary
+          # must resolve its web asset dir to <prefix>/web when launched from
+          # <prefix>/bin/ark. Boot from the installed tarball layout, probe
+          # over HTTP, dump diagnostics on any failure.
+          set -x
+          set +e    # handle failures explicitly to always dump diagnostics
+
+          # Pre-flight: verify the tarball contains what we need.
+          echo "--- tarball layout ---"
+          ls -la "./ark-$PLAT/" || true
+          ls -la "./ark-$PLAT/bin/" || true
+          ls -la "./ark-$PLAT/web/" 2>&1 || echo "NO web/ DIR IN TARBALL"
+          test -f "./ark-$PLAT/web/index.html" && echo "index.html present" || echo "index.html MISSING"
+
           PORT=18420
           "./ark-$PLAT/bin/ark" web --port "$PORT" > /tmp/ark-web.log 2>&1 &
           PID=$!
+          echo "launched ark web, pid=$PID"
           trap 'kill $PID 2>/dev/null || true' EXIT
 
-          # Condition-based readiness poll (20s max)
-          for i in $(seq 1 40); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$PORT/" 2>/dev/null || echo "000")
-            [ "$code" != "000" ] && break
+          # Condition-based readiness poll (20s max, bash-native range)
+          READY=0
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 \
+                   21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$PORT/" 2>/dev/null)
+            curl_exit=$?
+            if [ "$curl_exit" = "0" ] && [ -n "$code" ] && [ "$code" != "000" ]; then
+              READY=1
+              break
+            fi
+            # Don't keep polling if the server already died
+            if ! kill -0 $PID 2>/dev/null; then
+              echo "server pid=$PID died during readiness poll (iter $i)"
+              break
+            fi
             sleep 0.5
           done
 
-          status=$(curl -s -o /tmp/index.html -w "%{http_code}" "http://localhost:$PORT/")
-          echo "GET / -> $status"
-          if [ "$status" != "200" ]; then
-            echo "FAIL: expected 200 serving /, got $status"
-            echo "--- server log ---"
-            cat /tmp/ark-web.log
+          echo "--- server log ---"
+          cat /tmp/ark-web.log || true
+          echo "--- end server log ---"
+
+          if [ "$READY" != "1" ]; then
+            echo "FAIL: server never became reachable on port $PORT"
+            exit 1
+          fi
+
+          status=$(curl -s -o /tmp/index.html -w "%{http_code}" "http://localhost:$PORT/" 2>/dev/null)
+          curl_exit=$?
+          echo "GET / -> status=$status curl_exit=$curl_exit"
+          if [ "$curl_exit" != "0" ] || [ "$status" != "200" ]; then
+            echo "FAIL: expected 200 serving /, got status=$status curl_exit=$curl_exit"
+            head -c 400 /tmp/index.html 2>/dev/null || echo "(no body captured)"
             exit 1
           fi
           if ! grep -q '<title>Ark</title>' /tmp/index.html; then
             echo "FAIL: response body missing <title>Ark</title>"
             head -c 400 /tmp/index.html; echo
-            echo "--- server log ---"
-            cat /tmp/ark-web.log
             exit 1
           fi
           echo "PASS: ark web serves dashboard from installed tarball layout"
