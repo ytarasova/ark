@@ -48,7 +48,7 @@ test("compute RPC returns array", async () => {
 
 test("create compute target via API and verify in UI", async () => {
   // Create a compute target via RPC
-  const createData = await ws.rpc("compute/create", { name: "e2e-test-compute", provider: "local", config: {} });
+  const createData = await ws.rpc("compute/create", { name: "e2e-test-compute", provider: "docker", config: {} });
   expect(createData.compute).toBeTruthy();
 
   // Reload and go to Compute page
@@ -59,8 +59,8 @@ test("create compute target via API and verify in UI", async () => {
   // The compute target should appear in the list
   await expect(page.locator("text=e2e-test-compute")).toBeVisible({ timeout: 10_000 });
 
-  // Should show "local" provider badge
-  await expect(page.locator("text=local").first()).toBeVisible();
+  // Should show "docker" provider badge
+  await expect(page.locator("text=docker").first()).toBeVisible();
 });
 
 test("click compute target shows detail panel", async () => {
@@ -72,7 +72,7 @@ test("click compute target shows detail panel", async () => {
   // Detail panel should show Details section
   await expect(page.locator("text=Details").first()).toBeVisible({ timeout: 5_000 });
 
-  // Should show Provider field with "local" value
+  // Should show Provider field
   await expect(page.locator("text=Provider").first()).toBeVisible();
 });
 
@@ -108,7 +108,9 @@ test("create compute via New Compute inline form", async () => {
   await expect(nameInput).toBeVisible();
   await nameInput.fill("e2e-ui-compute");
 
-  // Provider defaults to "local" -- leave as-is
+  // Select "docker" provider (local is a singleton and already exists)
+  const providerSelect = page.locator("select", { has: page.locator('option[value="docker"]') }).first();
+  await providerSelect.selectOption("docker");
 
   // Submit
   await page.click('button:has-text("Create Compute")');

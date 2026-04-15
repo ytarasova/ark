@@ -127,7 +127,7 @@ test("complete action changes session status", async () => {
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
-  await page.locator("text=Complete test").click();
+  await page.locator("text=Complete test").first().click();
   await expect(page.locator("text=Details").first()).toBeVisible({ timeout: 5_000 });
 
   // Complete the session via RPC (the UI button only shows for running/waiting/blocked)
@@ -137,7 +137,7 @@ test("complete action changes session status", async () => {
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
-  await page.locator("text=Complete test").click();
+  await page.locator("text=Complete test").first().click();
 
   // Verify completed status badge is shown (uppercase "COMPLETED")
   await expect(page.locator("text=completed").first()).toBeVisible({ timeout: 5_000 });

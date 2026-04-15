@@ -154,13 +154,18 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
       - name: Run install tests
         run: make test-install
 
   web-e2e:
     runs-on: macos-latest
     timeout-minutes: 15
-    continue-on-error: true  # WIP: fixtures use Bun APIs incompatible with Playwright/Node runner
+    continue-on-error: true # WIP: fixtures use Bun APIs incompatible with Playwright/Node runner
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
