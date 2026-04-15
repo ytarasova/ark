@@ -78,7 +78,7 @@ describe("web server", () => {
     server = startWebServer(getApp(), { port: 18426 });
     const resp = await fetch("http://localhost:18426/api/health");
     expect(resp.status).toBe(200);
-    const body = await resp.json() as { ok: boolean; version: string; uptime: number };
+    const body = (await resp.json()) as { ok: boolean; version: string; uptime: number };
     expect(body.ok).toBe(true);
     expect(typeof body.version).toBe("string");
     expect(typeof body.uptime).toBe("number");

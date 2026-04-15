@@ -253,7 +253,9 @@ export function registerMiscCommands(program: Command, _app: AppContext | null) 
 
           // Conductor: start unless something already listens on the port
           try {
-            const probe = await fetch(`http://localhost:${DEFAULT_CONDUCTOR_PORT}/health`, { signal: AbortSignal.timeout(500) }).catch(() => null);
+            const probe = await fetch(`http://localhost:${DEFAULT_CONDUCTOR_PORT}/health`, {
+              signal: AbortSignal.timeout(500),
+            }).catch(() => null);
             if (probe?.ok) {
               console.log(chalk.dim(`Conductor already running on :${DEFAULT_CONDUCTOR_PORT} -- reusing`));
             } else {
@@ -267,7 +269,9 @@ export function registerMiscCommands(program: Command, _app: AppContext | null) 
 
           // ArkD: start unless something already listens on the port
           try {
-            const probe = await fetch(`http://localhost:${DEFAULT_ARKD_PORT}/health`, { signal: AbortSignal.timeout(500) }).catch(() => null);
+            const probe = await fetch(`http://localhost:${DEFAULT_ARKD_PORT}/health`, {
+              signal: AbortSignal.timeout(500),
+            }).catch(() => null);
             if (probe?.ok) {
               console.log(chalk.dim(`ArkD already running on :${DEFAULT_ARKD_PORT} -- reusing`));
             } else {
