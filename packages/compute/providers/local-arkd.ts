@@ -20,7 +20,8 @@ import {
 import type {
   Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
 } from "../types.js";
-import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL, CHANNEL_SCRIPT_PATH } from "../../core/constants.js";
+import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL } from "../../core/constants.js";
+import { channelLaunchSpec } from "../../core/install-paths.js";
 
 // ── Shared local base ───────────────────────────────────────────────────────
 
@@ -44,9 +45,11 @@ abstract class LocalArkdBase extends ArkdBackedProvider {
   }
 
   buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
+    // channelLaunchSpec() self-spawns in compiled mode, uses bun+source in dev.
+    const spec = channelLaunchSpec();
     return {
-      command: join(homedir(), ".bun", "bin", "bun"),
-      args: [CHANNEL_SCRIPT_PATH],
+      command: spec.command,
+      args: spec.args,
       env: {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,

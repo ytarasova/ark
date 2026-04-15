@@ -18,6 +18,7 @@ import chalk from "chalk";
 import * as core from "../core/index.js";
 import { AppContext, setApp } from "../core/app.js";
 import { loadConfig } from "../core/config.js";
+import { VERSION } from "../core/version.js";
 import { closeArkClient, setRemoteServer, isRemoteMode } from "./client.js";
 
 import { registerSessionCommands } from "./commands/session.js";
@@ -72,7 +73,7 @@ if (!isRemoteMode()) {
 const program = new Command()
   .name("ark")
   .description("Ark - autonomous agent ecosystem")
-  .version("0.1.0")
+  .version(VERSION)
   .option("-p, --profile <name>", "Use a specific profile")
   .option("--server <url>", "Connect to a remote Ark control plane (e.g. https://ark.company.com)")
   .option("--token <key>", "API key for authentication with the remote server");

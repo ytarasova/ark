@@ -170,6 +170,8 @@ test-install: ## Run install.sh regression tests (docs/install.sh)
 	@./scripts/tests/install/test-installed-binary-runs.sh
 	@./scripts/tests/install/test-api-failure-path.sh
 	@./scripts/tests/install/test-installed-builtin-flows.sh
+	@./scripts/tests/install/test-web-proxy-serves.sh
+	@./scripts/tests/install/test-channel-subprocess.sh
 
 test-watch: ## Run unit tests in watch mode
 	$(BUN) test --watch
@@ -190,6 +192,7 @@ build-cli: ## Build native macOS CLI+TUI binary (current arch)
 	  test -f shims/react-devtools-core.js && \
 	  cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js && \
 	  echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json || true
+	@$(BUN) run scripts/inject-version.ts
 	$(BUN) build --compile packages/cli/index.ts --outfile ark-native
 	@echo "Built: ark-native ($$(du -h ark-native | cut -f1))"
 

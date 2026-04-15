@@ -18,7 +18,8 @@ import type { AppContext } from "../../../core/app.js";
 import * as tmux from "../../../core/infra/tmux.js";
 import { collectLocalMetrics } from "./metrics.js";
 import { safeAsync } from "../../../core/safe.js";
-import { DEFAULT_CONDUCTOR_URL, CHANNEL_SCRIPT_PATH } from "../../../core/constants.js";
+import { DEFAULT_CONDUCTOR_URL } from "../../../core/constants.js";
+import { channelLaunchSpec } from "../../../core/install-paths.js";
 
 /** Check if a port is listening locally. */
 async function checkLocalPort(port: number): Promise<boolean> {
@@ -132,9 +133,14 @@ export class LocalProvider implements ComputeProvider {
   }
 
   buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
+    // channelLaunchSpec() returns the compiled-binary self-spawn in prod and
+    // the bun-runtime + source-path spawn in dev. Replaces the old approach
+    // that hardcoded bun + CHANNEL_SCRIPT_PATH, which broke in compiled
+    // binaries because the path lived in Bun's virtual FS.
+    const spec = channelLaunchSpec();
     return {
-      command: join(homedir(), ".bun", "bin", "bun"),
-      args: [CHANNEL_SCRIPT_PATH],
+      command: spec.command,
+      args: spec.args,
       env: {
         ARK_SESSION_ID: sessionId,
         ARK_STAGE: stage,
