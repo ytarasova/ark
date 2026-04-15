@@ -876,13 +876,78 @@ Ark's endgame is a **complete background agent platform** covering all 11 layers
 | Gap | Tool / Approach | Effort | Priority |
 |-----|----------------|--------|----------|
 | **A2A** (Agent-to-Agent protocol, Google) | Agents discover and communicate with other agents. Ark already has fan-out/fork -- A2A standardizes the wire format | 2-3 days | **SP6** |
-| **ACP** (Agent Communication Protocol) | Standard agent interface. Goose uses it via Claude SDP adapter. Ark channel system maps to ACP semantics | 2-3 days | **SP6** |
+| **ACP** (Agent Client Protocol) | JSON-RPC 2.0 over stdio. Editor/orchestrator = "Client", LLM runtime = "Agent". Native in Gemini CLI, Codex CLI, Copilot CLI, Cursor CLI, Goose. Claude Code wrapped via `@zed-industries/claude-agent-acp` shim (v0.28.0). See dedicated subsection below for Ark adoption plan | ~1,500 LOC touched / ~500 LOC net deletion | **SP6** |
 | **AGENTS.md** | Standard file that describes what agents can do in a repo. Ark should both read (discover repo agent config) and write (declare Ark's capabilities) | 0.5 day | **SP6** |
 | **OpenTelemetry / Agent Trace** | Wire OTLP spans (code exists in `otlp.ts` but never tested). Per-session traces with tool call spans, LLM call spans, stage transitions | 1-2 days | **SP6** |
 | **Agent Skills** protocol | Standard skill discovery and invocation. Ark's skill system maps but isn't protocol-compliant | 1 day | **SP6** |
 | **Agent Auth** protocol | Standardized token exchange for agent-to-service authentication | 1-2 days | **SP6** |
 | **Devcontainer** spec compliance | Ensure Ark's devcontainer compute provider fully implements the spec (features, lifecycle hooks, port forwarding) | 1 day | **SP4** |
 | **OCI** (Open Container Initiative) | Ensure Docker/K8s providers are OCI-compliant for image management | 0.5 day | **SP4** |
+
+### Layer 10a: ACP (Agent Client Protocol) -- adoption plan
+
+> Added 2026-04-15 after multi-agent research pass. Spec: [agentclientprotocol.com](https://agentclientprotocol.com) (v0.11.7, still shipping breaking changes). Repo: [agentclientprotocol/agent-client-protocol](https://github.com/agentclientprotocol/agent-client-protocol).
+
+**Why it matters for Ark.** Ark currently carries per-runtime glue for each of Claude Code, Codex, Gemini CLI, and Goose: transcript parsers, hook configs, launchers, channel MCP wiring, permission policies. ACP collapses that to a generic JSON-RPC client + a ~80-line adapter per runtime. Goose's entire Claude Code adapter is **82 lines** (`crates/goose/src/providers/claude_acp.rs`) vs. Ark's ~700-line `packages/core/claude/claude.ts`.
+
+**Protocol surface.**
+- Transport: stdio (mandatory), streamable HTTP in draft. Newline-delimited JSON-RPC.
+- Agent methods: `initialize`, `authenticate`, `session/new`, `session/load`, `session/prompt`, `session/set_mode`, `session/cancel`.
+- Client callbacks: `session/request_permission`, `fs/read_text_file`, `fs/write_text_file`, `terminal/create|output|wait_for_exit|kill|release`.
+- Agent notifications: `session/update` streams `agent_message_chunk`, `tool_call`, `tool_call_update`, `current_mode_update`, `plan` entries, `stopReason`.
+
+**Runtime support matrix (as of 2026-04-15).**
+| Runtime | ACP support | Adapter |
+|---|---|---|
+| Gemini CLI | Native (`--acp`) | none |
+| GitHub Copilot CLI | Native (public preview 2026-01-28) | none |
+| Cursor CLI | Native | none |
+| Codex CLI | Native OR via `codex-acp` shim | optional |
+| Goose | Native (both client + server sides) | none |
+| Claude Code | Shim-wrapped via `@zed-industries/claude-agent-acp` v0.28.0 | required (3,611 LOC TS over Claude Agent SDK) |
+| Amp, Pi | Shim-wrapped | required |
+
+**Recommended adoption path -- Option B (executor boundary only).**
+
+1. **Keep arkd HTTP surface intact.** ACP covers only agent-side calls. Metrics, directory ops (`list`/`stat`/`mkdir`), exec, port probing, codegraph indexing, control-plane registration -- all remain on arkd's HTTP API (:19300). Forcing ACP at the arkd boundary would require custom protocol extensions for half the surface.
+2. **Add an `acp` executor** alongside `claude-code`, `goose`, `subprocess` in `packages/core/executor.ts`. Spawns the agent (via shim where needed), speaks ACP over stdio, streams `session/update` into the conductor.
+3. **Migrate Goose first.** Native ACP, immediate win: deletes `--with-extension` plumbing and `buildGooseCommand` extension wiring in `packages/core/executors/goose.ts:64-67`.
+4. **Hold on Claude Code.** Until either Anthropic ships native ACP OR the Zed adapter stabilizes remote-compute support. Ark's hook-based status detection in `claude.ts` is already working in production.
+5. **Keep `packages/core/conductor/channel.ts`** until every enabled executor speaks ACP. It remains the only cross-runtime messaging path during migration.
+6. **Rename existing `packages/core/acp.ts`** (114 LOC, custom non-Zed protocol) to avoid name collision with the real ACP client.
+
+**Migration cost breakdown.**
+| Component | Change |
+|---|---|
+| New ACP client library | +300-500 LOC (JSON-RPC transport, handshake, `session/*`, `session/update` parser) |
+| `packages/core/executor.ts` | Extend interface with `prompt()`, `cancel()`, `onUpdate()` streaming |
+| `packages/core/executors/claude-code.ts` (153 LOC) | Swap tmux-direct for spawn-of-`claude-agent-acp` |
+| `packages/core/executors/goose.ts` (201 LOC) | Replace `--with-extension` MCP wiring with ACP spawn |
+| `packages/core/conductor/channel.ts` (222 LOC) + `channel-types.ts` (86 LOC) | Deletable once ACP `session/update` replaces `report` |
+| `packages/core/claude/claude.ts` (701 LOC) | ~200 LOC hooks/settings/channel-config become dead code |
+| `packages/core/conductor/` `/hooks/status` endpoint | Deletable |
+| Tests | `channel.test.ts`, `conductor-hooks.test.ts`, `autonomy.test.ts`, `e2e-autonomy.test.ts`, ~10 others |
+| **Total** | **~1,500 LOC touched, ~500 LOC net deletion** |
+
+**Caveats to resolve.**
+- **Protocol instability.** v0.11.x still shipping breaking changes. `sacp` Rust crate pinned to a git rev, not crates.io, because the unstable channel isn't published. Plan for 6-12 months of protocol upgrades.
+- **Tmux UX regression.** ACP agents are stdio children of the client. Ark's `tmux attach -t ark-s-<id>` workflow does not map. Need either a PTY wrapper, a detachable-client design, or acceptance that "attach" becomes "connect via web UI."
+- **Vendor leakage.** `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS` is set inside the Claude shim's "generic" ACP layer. Expect similar quirks for Codex-ACP, Amp-ACP. Ark's "generic" ACP executor will still carry per-runtime env var nuances.
+- **Known gaps in Goose's ACP client (as of 2026-04-15).** No session fork or resume. ACP session ID differs from Goose session ID -- telemetry correlation is weak.
+- **Extra IPC hop for Claude.** Goose -> stdio -> `claude-agent-acp` (TS/Node) -> in-process -> Claude Agent SDK -> Claude CLI. Three hops vs. Ark's current two. Measurable latency impact TBD.
+
+**Deliverables (SP6).**
+1. Design doc + name-collision rename: `packages/core/acp.ts` -> `packages/core/rpc-facade.ts` (or similar). **0.5 day**.
+2. ACP client library + protocol types (JSON-RPC transport, handshake, `session/*`). **2-3 days**.
+3. `acp` executor + Goose adapter. **2 days**.
+4. Channel retirement for ACP-native executors (feature-flag gated). **1-2 days**.
+5. Claude Code ACP adapter (spawn `claude-agent-acp`, map permission modes, wire MCP servers via `NewSessionRequest.mcpServers`). **2-3 days**. Gated by Anthropic native ACP timing or Zed adapter remote-compute support.
+6. Tests + migration guide + CLAUDE.md updates. **1-2 days**.
+
+**Reference implementations to study.**
+- [`github.com/block/goose` `crates/goose/src/providers/claude_acp.rs`](https://github.com/block/goose/blob/main/crates/goose/src/providers/claude_acp.rs) -- 82-line Claude adapter (upper bound for Ark's per-runtime adapter size).
+- [`github.com/block/goose` `crates/goose/src/acp/provider.rs`](https://github.com/block/goose/blob/main/crates/goose/src/acp/provider.rs) -- generic ACP consumer (~1,700 LOC Rust; Ark's TS equivalent will be smaller).
+- [`github.com/zed-industries/claude-agent-acp`](https://github.com/zed-industries/claude-agent-acp) -- the Claude shim itself. If Ark ships its own Claude ACP adapter instead of depending on this npm package, most of the translation logic comes from here.
 
 ### Layer 10b: Verification Artifacts & Session Recording
 **Current:** Events table logs stage transitions. Transcript parsers extract Claude/Codex/Gemini/Goose conversations. Artifacts table tracks files/commits/PRs. No video, no terminal recording, no structured test output capture.
