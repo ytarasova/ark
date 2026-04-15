@@ -176,3 +176,15 @@
 .no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* macOS Electron: push the sidebar header down so the "ark" brand and the
+   collapse chevron don't overlap the native traffic-light buttons
+   (red/yellow/green) at the top-left of the window. The body class is
+   added by packages/desktop/preload.js when running under Electron on
+   darwin. The 22px top padding clears the standard 28px traffic-light
+   strip; height auto + min-height keeps the row visually balanced. */
+body.is-macos .drag-region {
+  padding-top: 22px;
+  height: auto;
+  min-height: 66px;
+}

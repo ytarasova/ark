@@ -74,6 +74,31 @@ describe("web server", () => {
     expect(resp.status).toBe(404);
   });
 
+  it("/api/health returns 200 with version + uptime", async () => {
+    server = startWebServer(getApp(), { port: 18426 });
+    const resp = await fetch("http://localhost:18426/api/health");
+    expect(resp.status).toBe(200);
+    const body = await resp.json() as { ok: boolean; version: string; uptime: number };
+    expect(body.ok).toBe(true);
+    expect(typeof body.version).toBe("string");
+    expect(typeof body.uptime).toBe("number");
+    expect(body.uptime).toBeGreaterThanOrEqual(0);
+  });
+
+  it("/api/health works in read-only mode (no auth required)", async () => {
+    server = startWebServer(getApp(), { port: 18427, readOnly: true });
+    const resp = await fetch("http://localhost:18427/api/health");
+    expect(resp.status).toBe(200);
+  });
+
+  it("/api/health works even when token auth is enabled", async () => {
+    // Health is intentionally unauthenticated so the desktop app can probe
+    // it before the user has supplied a token.
+    server = startWebServer(getApp(), { port: 18428, token: "secret" });
+    const resp = await fetch("http://localhost:18428/api/health");
+    expect(resp.status).toBe(200);
+  });
+
   it("enforces token auth when configured", async () => {
     server = startWebServer(getApp(), { port: 18424, token: "secret123" });
     // No auth should be rejected

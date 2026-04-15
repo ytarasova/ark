@@ -213,6 +213,7 @@ export function registerMiscCommands(program: Command, _app: AppContext | null) 
     .option("--read-only", "Read-only mode")
     .option("--token <token>", "Bearer token for auth")
     .option("--api-only", "API only, skip static file serving (for dev with Vite)")
+    .option("--with-daemon", "Also start conductor + arkd in-process (for desktop app / standalone use)")
     .action(async (opts) => {
       const globalOpts = program.opts();
       const remoteUrl = globalOpts.server || process.env.ARK_SERVER;
@@ -237,6 +238,51 @@ export function registerMiscCommands(program: Command, _app: AppContext | null) 
         });
         await new Promise(() => {});
       } else {
+        // Optionally start conductor + arkd before serving the web UI.
+        // Used by the desktop app so the user gets a fully working instance
+        // without manually running `ark daemon start` / `ark conductor start`.
+        // If the ports are already in use (user has external daemons), the
+        // start calls fail silently and the existing daemons are reused --
+        // the dashboard probes localhost:19100 / 19300 and finds them online.
+        const auxiliary: { stop: () => void }[] = [];
+        if (opts.withDaemon) {
+          const arkApp = core.getApp();
+          const { startConductor } = await import("../../core/conductor/conductor.js");
+          const { startArkd } = await import("../../arkd/index.js");
+          const { DEFAULT_CONDUCTOR_PORT, DEFAULT_ARKD_PORT } = await import("../../core/constants.js");
+
+          // Conductor: start unless something already listens on the port
+          try {
+            const probe = await fetch(`http://localhost:${DEFAULT_CONDUCTOR_PORT}/health`, { signal: AbortSignal.timeout(500) }).catch(() => null);
+            if (probe?.ok) {
+              console.log(chalk.dim(`Conductor already running on :${DEFAULT_CONDUCTOR_PORT} -- reusing`));
+            } else {
+              const conductor = startConductor(arkApp, DEFAULT_CONDUCTOR_PORT, { quiet: true });
+              auxiliary.push(conductor);
+              console.log(chalk.dim(`Started conductor on :${DEFAULT_CONDUCTOR_PORT}`));
+            }
+          } catch (e: any) {
+            console.log(chalk.yellow(`Could not start conductor: ${e?.message ?? e}`));
+          }
+
+          // ArkD: start unless something already listens on the port
+          try {
+            const probe = await fetch(`http://localhost:${DEFAULT_ARKD_PORT}/health`, { signal: AbortSignal.timeout(500) }).catch(() => null);
+            if (probe?.ok) {
+              console.log(chalk.dim(`ArkD already running on :${DEFAULT_ARKD_PORT} -- reusing`));
+            } else {
+              const arkd = startArkd(DEFAULT_ARKD_PORT, {
+                conductorUrl: `http://localhost:${DEFAULT_CONDUCTOR_PORT}`,
+                quiet: true,
+              });
+              auxiliary.push(arkd);
+              console.log(chalk.dim(`Started arkd on :${DEFAULT_ARKD_PORT}`));
+            }
+          } catch (e: any) {
+            console.log(chalk.yellow(`Could not start arkd: ${e?.message ?? e}`));
+          }
+        }
+
         const server = core.startWebServer(core.getApp(), {
           port: Number(opts.port),
           readOnly: opts.readOnly,
@@ -245,10 +291,19 @@ export function registerMiscCommands(program: Command, _app: AppContext | null) 
         });
         console.log(chalk.green(`Ark web dashboard: ${server.url}`));
         console.log(chalk.dim("Press Ctrl+C to stop"));
-        process.on("SIGINT", () => {
+        const shutdown = () => {
           server.stop();
+          for (const aux of auxiliary) {
+            try {
+              aux.stop();
+            } catch {
+              /* ignore */
+            }
+          }
           process.exit(0);
-        });
+        };
+        process.on("SIGINT", shutdown);
+        process.on("SIGTERM", shutdown);
         await new Promise(() => {});
       }
     });

@@ -71,7 +71,7 @@ function waitForServer(port, timeout = 15000) {
         reject(new Error("Server startup timeout"));
         return;
       }
-      const req = http.get(`http://localhost:${port}/api/status`, (res) => {
+      const req = http.get(`http://localhost:${port}/api/health`, (res) => {
         if (res.statusCode === 200) resolve();
         else setTimeout(check, 300);
       });
@@ -99,9 +99,13 @@ async function startServer() {
 
   serverPort = await findFreePort(DEFAULT_PORT);
 
-  // Launch `ark web --port <port>` as a child process
-  // The ark script is a bash wrapper, so spawn it directly (not via bun)
-  serverProcess = spawn(arkBin, ["web", "--port", String(serverPort)], {
+  // Launch `ark web --with-daemon --port <port>` as a child process.
+  // --with-daemon starts the conductor (:19100) and arkd (:19300) in-process,
+  // so the user gets a fully functional Ark instance without manually running
+  // `ark daemon start`. If those ports are already in use (the user has an
+  // external daemon), `ark web` reuses them instead.
+  // The ark script is a bash wrapper, so spawn it directly (not via bun).
+  serverProcess = spawn(arkBin, ["web", "--with-daemon", "--port", String(serverPort)], {
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}` },
   });
@@ -140,14 +144,17 @@ function stopServer() {
 // ── Window ─────────────────────────────────────────────────────────────────
 
 function createWindow() {
+  const isMac = process.platform === "darwin";
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 900,
     minHeight: 600,
     title: APP_TITLE,
-    titleBarStyle: "hidden",
-    trafficLightPosition: { x: 16, y: 16 },
+    // On macOS, "hiddenInset" gives the traffic lights their own native inset
+    // region above the sidebar header so they don't overlap the "ark" brand.
+    // On Windows/Linux, "hidden" hides the chrome (no traffic-light equivalent).
+    titleBarStyle: isMac ? "hiddenInset" : "hidden",
     titleBarOverlay: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),

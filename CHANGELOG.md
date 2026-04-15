@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.15.5 (2026-04-15)
+
+### Desktop App
+- **Health probe endpoint**: added `GET /api/health` to the web server (`packages/core/hosted/web.ts`) returning `{ ok, version, uptime }`. Unauthenticated, no DB hits, safe to call before token auth is configured. The desktop main process (`packages/desktop/main.js`) now probes this endpoint instead of the nonexistent `/api/status`, eliminating the spurious "Startup Error: The Ark server failed to start within 15 seconds" dialog that appeared on every launch even though the server was up.
+- **Daemon auto-start**: new `--with-daemon` flag on `ark web` (`packages/cli/commands/misc.ts`) starts the conductor (:19100) and arkd (:19300) in-process before serving the dashboard. The desktop app now passes this flag, so launching Ark Desktop gives the user a fully working instance with no manual `ark daemon start` required. Dashboard "System Health" widget shows Conductor and ArkD as online out of the box. If the user already has external daemons running on those ports, `--with-daemon` detects them via a `/health` probe and reuses them instead of failing. Both daemons shut down cleanly when the desktop app quits (SIGTERM handler).
+- **Traffic-light overlap fix**: macOS native window controls (red/yellow/green) no longer cover the "ark" sidebar brand. `BrowserWindow` now uses `titleBarStyle: "hiddenInset"` on macOS (preserving native traffic-light position), and the preload script tags `<body>` with `is-electron` and `is-macos` classes so platform-specific CSS in `packages/web/src/styles.css` adds 22px of top padding to the sidebar header (clears the 28px traffic-light strip).
+
+### Known Limitations (v0.15.5)
+- Same as v0.15.4: unsigned macOS DMG, unsigned Windows installer, no auto-updater, no system tray, requires `ark` CLI on `PATH`.
+
 ## v0.15.4 (2026-04-15)
 
 ### Desktop App
