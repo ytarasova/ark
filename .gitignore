@@ -10,6 +10,7 @@ dist/
 !eslint.config.js
 .env
 .worktrees/
+.claude/worktrees/
 
 # Ark session hook config (written at dispatch, cleaned on stop)
 .claude/settings.local.json
