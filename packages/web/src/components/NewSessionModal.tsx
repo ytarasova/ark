@@ -3,6 +3,7 @@ import { api } from "../hooks/useApi.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { selectClassName } from "./ui/styles.js";
+import { FolderPickerModal } from "./FolderPickerModal.js";
 
 interface NewSessionModalProps {
   onClose: () => void;
@@ -34,6 +35,7 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
   const [flows, setFlows] = useState<{ name: string }[]>([]);
   const [computes, setComputes] = useState<{ name: string }[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     api.getAgents().then(setAgents).catch(() => {});
@@ -67,11 +69,21 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
           </div>
           <div className="mb-3.5">
             <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Repository</label>
-            <Input
-              value={form.repo}
-              onChange={(e) => update("repo", e.target.value)}
-              placeholder="/path/to/repo or ."
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                value={form.repo}
+                onChange={(e) => update("repo", e.target.value)}
+                placeholder="/path/to/repo or ."
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPickerOpen(true)}
+              >
+                Browse…
+              </Button>
+            </div>
           </div>
           <div className="mb-3.5">
             <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Ticket</label>
@@ -169,6 +181,16 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
             </Button>
           </div>
         </form>
+      {pickerOpen && (
+        <FolderPickerModal
+          initialPath={form.repo && form.repo !== "." ? form.repo : undefined}
+          onSelect={(path) => {
+            update("repo", path);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }

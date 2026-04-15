@@ -14,6 +14,7 @@ import { registerWebHandlers } from "./handlers/web.js";
 import { registerKnowledgeHandlers } from "./handlers/knowledge.js";
 import { registerEvalHandlers } from "./handlers/eval.js";
 import { registerDashboardHandlers } from "./handlers/dashboard.js";
+import { registerFsHandlers } from "./handlers/fs.js";
 
 export function registerAllHandlers(router: Router, app: AppContext): void {
   router.handle("initialize", async (_params, _notify) => ({
@@ -34,4 +35,5 @@ export function registerAllHandlers(router: Router, app: AppContext): void {
   registerKnowledgeHandlers(router, app);
   registerEvalHandlers(router, app);
   registerDashboardHandlers(router, app);
+  registerFsHandlers(router, app);
 }

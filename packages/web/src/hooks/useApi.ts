@@ -209,4 +209,12 @@ export const api = {
 
   // Repo Map
   getRepoMap: (dir?: string) => rpc<any>("repo-map/get", { dir }),
+
+  // Filesystem (local mode only -- for the folder picker in New Session)
+  listDir: (path?: string) => rpc<{
+    cwd: string;
+    parent: string | null;
+    home: string;
+    entries: { name: string; path: string; isGitRepo?: boolean }[];
+  }>("fs/list-dir", path === undefined ? {} : { path }),
 };
