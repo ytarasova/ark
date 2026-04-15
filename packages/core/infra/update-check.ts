@@ -11,6 +11,7 @@ const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
+import { VERSION } from "../version.js";
 
 interface UpdateState {
   lastCheck: string;
@@ -22,14 +23,15 @@ function statePath(arkDir: string): string {
   return join(arkDir, "update-check.json");
 }
 
-/** Get the current version from package.json. Falls back to 0.0.0 when run from a compiled bundle without the file. */
+/**
+ * Get the current ark version. Baked into the binary at build time by
+ * `scripts/inject-version.ts` (run before `bun build --compile`). The old
+ * implementation read `package.json` via `__dirname` at runtime, which broke
+ * in compiled binaries because (a) `__dirname` resolves into Bun's virtual
+ * FS, and (b) `package.json` is not shipped in the release tarball.
+ */
 export function getCurrentVersion(): string {
-  try {
-    const pkg = JSON.parse(readFileSync(join(__dirname, "../../package.json"), "utf-8"));
-    return pkg.version ?? "0.0.0";
-  } catch {
-    return "0.0.0";
-  }
+  return VERSION;
 }
 
 /** Check if an update is available. Returns the latest version or null. */

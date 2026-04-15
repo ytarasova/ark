@@ -8,8 +8,13 @@
 
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { resolveWebDist } from "../install-paths.js";
 
-const WEB_DIST = join(import.meta.dir, "../../../packages/web/dist");
+// Shared install-aware resolver. In a compiled binary this points at
+// <prefix>/web/, in dev mode at <repo>/packages/web/dist. Fixes the same
+// bug class as web.ts -- `import.meta.dir` does not point at the on-disk
+// binary location in `bun build --compile` output.
+const WEB_DIST = resolveWebDist();
 
 export interface WebProxyOptions {
   port?: number;

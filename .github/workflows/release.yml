@@ -41,6 +41,9 @@ jobs:
           cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js
           echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json
 
+      - name: Inject version from package.json
+        run: bun run scripts/inject-version.ts
+
       - name: Build Ark binary
         env:
           TARGET: ${{ matrix.target }}

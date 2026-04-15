@@ -12,7 +12,8 @@ import { join, resolve } from "path";
 import { homedir } from "os";
 
 import * as tmux from "../infra/tmux.js";
-import { DEFAULT_CONDUCTOR_URL, DEFAULT_CHANNEL_BASE_URL, CHANNEL_SCRIPT_PATH } from "../constants.js";
+import { DEFAULT_CONDUCTOR_URL, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
+import { channelLaunchSpec } from "../install-paths.js";
 
 // ── Model mapping ────────────────────────────────────────────────────────────
 
@@ -98,7 +99,6 @@ export function channelMcpConfig(
   sessionId: string, stage: string, channelPort: number,
   opts?: { conductorUrl?: string; tenantId?: string },
 ): Record<string, unknown> {
-  const bunPath = join(homedir(), ".bun", "bin", "bun");
   const env: Record<string, string> = {
     ARK_SESSION_ID: sessionId,
     ARK_STAGE: stage,
@@ -106,9 +106,15 @@ export function channelMcpConfig(
     ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
   };
   if (opts?.tenantId) env.ARK_TENANT_ID = opts.tenantId;
+  // channelLaunchSpec() returns:
+  //   compiled mode: { command: process.execPath, args: ["channel"] }
+  //   dev mode:      { command: bun, args: [<repo>/packages/cli/index.ts, "channel"] }
+  // This replaces the old `bun + CHANNEL_SCRIPT_PATH` approach which broke in
+  // compiled binaries because channel.ts lived in Bun's virtual FS, not on disk.
+  const spec = channelLaunchSpec();
   return {
-    command: bunPath,
-    args: [CHANNEL_SCRIPT_PATH],
+    command: spec.command,
+    args: spec.args,
     env,
   };
 }

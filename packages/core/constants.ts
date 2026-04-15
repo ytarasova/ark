@@ -6,8 +6,6 @@
  * first, falling back to the documented default.
  */
 
-import { join } from "path";
-
 /** Default conductor URL (env: ARK_CONDUCTOR_URL) */
 export const DEFAULT_CONDUCTOR_URL = process.env.ARK_CONDUCTOR_URL || "http://localhost:19100";
 
@@ -38,5 +36,8 @@ export const DEFAULT_SERVER_URL = process.env.ARK_SERVER_URL || `http://localhos
 /** Docker host conductor URL (for devcontainer/docker dispatch) */
 export const DOCKER_CONDUCTOR_URL = "http://host.docker.internal:19100";
 
-/** Absolute path to the channel MCP server script (packages/core/conductor/channel.ts). */
-export const CHANNEL_SCRIPT_PATH = join(import.meta.dir, "conductor", "channel.ts");
+// Note: the old `CHANNEL_SCRIPT_PATH` constant was removed -- it computed a
+// filesystem path from `import.meta.dir` which resolves into Bun's virtual
+// FS in compiled binaries and cannot be passed to a subprocess. Callers
+// should use `channelLaunchSpec()` from `./install-paths.js` to get the
+// correct command + args for launching the channel MCP server.

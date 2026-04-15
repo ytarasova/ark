@@ -10,44 +10,9 @@ import { Database } from "bun:sqlite";
 import { mkdirSync, rmSync, existsSync, mkdtempSync, readFileSync } from "fs";
 import type { IDatabase } from "./database/index.js";
 import { BunSqliteAdapter } from "./database/index.js";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
+import { join } from "path";
 import { tmpdir } from "os";
-
-/**
- * Resolve the directory that contains the builtin resource definitions
- * (flows, skills, agents, recipes, runtimes). Two layouts are supported:
- *
- *   1. Installed tarball: the binary lives at `<prefix>/bin/ark` and the
- *      builtins live at `<prefix>/{flows,skills,agents,recipes,runtimes}/`.
- *      `dirname(process.execPath)/..` correctly points at `<prefix>` here.
- *      `process.execPath` is well-defined inside Bun-compiled binaries.
- *
- *   2. Source tree: this file lives at `<repo>/packages/core/app.ts` and the
- *      builtins live at `<repo>/{flows,skills,...}/`. `import.meta.url` walked
- *      back three segments lands on `<repo>`.
- *
- * Why this function exists at all: the prior implementation used only the
- * `import.meta.url` walk. In a `bun build --compile` binary, `import.meta.url`
- * resolves into `/$bunfs/root/...` (Bun's virtual FS for embedded modules)
- * NOT to the on-disk binary location, so every store lost its builtin tier.
- * Same root-cause shape as the WEB_DIST resolution bug fixed in
- * `packages/core/hosted/web.ts`.
- */
-export function resolveStoreBaseDir(): string {
-  // Prefer the installed-tarball layout when the marker dir actually exists
-  // next to the executable. The presence check avoids falsely picking this
-  // path in dev mode where `process.execPath` is the bun runtime, not ark.
-  try {
-    const installed = join(dirname(process.execPath), "..");
-    if (existsSync(join(installed, "flows", "definitions"))) {
-      return installed;
-    }
-  } catch { /* fall through to source-tree resolution */ }
-
-  // Source-tree fallback: <repo>/packages/core/app.ts -> <repo>
-  return join(fileURLToPath(import.meta.url), "..", "..", "..");
-}
+import { resolveStoreBaseDir } from "./install-paths.js";
 
 import { asClass, asValue } from "awilix";
 import { createAppContainer, type AppContainer } from "./container.js";
