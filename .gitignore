@@ -9,6 +9,7 @@ dist/
 !packages/desktop/preload.js
 !eslint.config.js
 .env
+.litellm/
 .worktrees/
 
 # Ark session hook config (written at dispatch, cleaned on stop)
