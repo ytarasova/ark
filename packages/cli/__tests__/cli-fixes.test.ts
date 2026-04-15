@@ -95,8 +95,8 @@ describe("forkCloneHandler deduplication", () => {
     const source = readFileSync(join(cliDir, "commands", "session.ts"), "utf-8");
 
     // Both fork and clone should use .action(forkCloneHandler)
-    const forkMatch = source.match(/session\.command\("fork"\)[\s\S]*?\.action\((\w+)\)/);
-    const cloneMatch = source.match(/session\.command\("clone"\)[\s\S]*?\.action\((\w+)\)/);
+    const forkMatch = source.match(/session\s*\.command\("fork"\)[\s\S]*?\.action\((\w+)\)/);
+    const cloneMatch = source.match(/session\s*\.command\("clone"\)[\s\S]*?\.action\((\w+)\)/);
 
     expect(forkMatch).toBeTruthy();
     expect(cloneMatch).toBeTruthy();
