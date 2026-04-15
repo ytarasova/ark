@@ -19,8 +19,8 @@ interface TerminalProps {
 function buildWsUrl(sessionId: string): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const token = new URLSearchParams(window.location.search).get("token");
-  let url = `${proto}//${window.location.host}/api/terminal?session=${sessionId}`;
-  if (token) url += `&token=${token}`;
+  let url = `${proto}//${window.location.host}/api/terminal?session=${encodeURIComponent(sessionId)}`;
+  if (token) url += `&token=${encodeURIComponent(token)}`;
   return url;
 }
 
@@ -30,6 +30,8 @@ export function TerminalPanel({ sessionId, onClose }: TerminalProps) {
   const wsRef = useRef<WebSocket | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const [status, setStatus] = useState<"connecting" | "connected" | "disconnected" | "error">("connecting");
+  const statusRef = useRef(status);
+  statusRef.current = status;
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
@@ -115,7 +117,7 @@ export function TerminalPanel({ sessionId, onClose }: TerminalProps) {
     };
 
     ws.onclose = () => {
-      if (status !== "error") setStatus("disconnected");
+      if (statusRef.current !== "error") setStatus("disconnected");
     };
 
     ws.onerror = () => {

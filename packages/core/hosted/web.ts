@@ -25,7 +25,7 @@ import { type SSEBus, createSSEBus } from "./sse-bus.js";
 import { extractTenantContext, canWrite, type AuthConfig } from "../auth/index.js";
 import type { TenantContext } from "../../types/index.js";
 import { resolveWebDist } from "../install-paths.js";
-import { startTerminalBridge, handleTerminalInput, cleanupTerminalBridge } from "./terminal-bridge.js";
+import { startTerminalBridge, handleTerminalInput, cleanupTerminalBridge, sanitizeSessionName } from "./terminal-bridge.js";
 
 const WEB_DIST: string = resolveWebDist();
 
@@ -182,6 +182,10 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
         if (readOnly) return new Response("Read-only mode", { status: 403 });
         const sessionId = url.searchParams.get("session");
         if (!sessionId) return new Response("Missing session param", { status: 400 });
+        // Sanitize sessionId to prevent command injection in tmux/script commands
+        try { sanitizeSessionName(sessionId); } catch {
+          return new Response("Invalid session ID", { status: 400 });
+        }
         // Validate session exists
         const session = requestApp.sessions.get(sessionId);
         if (!session) return new Response("Session not found", { status: 404 });
