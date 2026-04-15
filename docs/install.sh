@@ -7,6 +7,15 @@ set -euo pipefail
 #   curl -fsSL https://ytarasova.github.io/ark/install.sh | bash -s -- --latest  # bleeding edge from main
 #   ARK_VERSION=v0.1.0 curl ... | bash                                        # pin specific version
 
+# Print helpers MUST be defined before any code path that may call them.
+# Bash evaluates function declarations in order, so a call earlier in the
+# file than the declaration resolves to "command not found" -- which is
+# exactly what bit us when version resolution failed and tried to call
+# `error` before it existed. Do not move these below the version block.
+info()  { printf "\033[36m%s\033[0m\n" "$*"; }
+warn()  { printf "\033[33m%s\033[0m\n" "$*"; }
+error() { printf "\033[31m%s\033[0m\n" "$*" >&2; exit 1; }
+
 REPO="ytarasova/ark"
 INSTALL_DIR="${ARK_HOME:-$HOME/.ark}"
 BIN_DIR="$INSTALL_DIR/bin"
@@ -24,18 +33,24 @@ if [ -n "${ARK_VERSION:-}" ]; then
 elif [ "$USE_MAIN" = true ]; then
   VERSION="latest"
 else
-  # Resolve latest tagged release via GitHub API
-  VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases" \
-    | grep -o '"tag_name": *"v[^"]*"' | head -1 | cut -d'"' -f4) \
-    || true
+  # Resolve latest tagged release via the /releases/latest HTTP redirect.
+  # GitHub 302-redirects that URL to /releases/tag/<tag>, so we just read
+  # the Location header. This is NOT the REST API -- it's plain github.com
+  # traffic, which has no anonymous rate limit (unlike api.github.com which
+  # caps at 60 req/hr and returns 403 when exhausted). Also faster: ~500B
+  # of headers vs ~100KB of JSON with all release asset metadata.
+  # `|| true` keeps us alive under `set -euo pipefail` when any stage of
+  # the pipeline fails (curl timeout, grep finds nothing, etc). A missing
+  # tag is handled by the `-z` check below, not by an aborted script.
+  VERSION=$(curl -sI "https://github.com/$REPO/releases/latest" 2>/dev/null \
+    | grep -i '^location:' \
+    | sed 's|.*/tag/||' \
+    | tr -d '\r\n ' \
+    || true)
   if [ -z "$VERSION" ]; then
-    error "Could not determine latest release. Use ARK_VERSION=v0.1.0 to pin."
+    error "Could not determine latest release (github.com unreachable). Set ARK_VERSION=v0.15.1 and retry: ARK_VERSION=v0.15.1 bash -c \"\$(curl -fsSL https://ytarasova.github.io/ark/install.sh)\""
   fi
 fi
-
-info()  { printf "\033[36m%s\033[0m\n" "$*"; }
-warn()  { printf "\033[33m%s\033[0m\n" "$*"; }
-error() { printf "\033[31m%s\033[0m\n" "$*" >&2; exit 1; }
 
 # ── Detect platform ─────────────────────────────────────────────────────────
 
