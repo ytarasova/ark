@@ -698,7 +698,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     app.events.log(sessionId, evt.type, evt.opts);
   }
 
-  // Store message for TUI chat view
+  // Store message for chat view
   if (result.message) {
     app.messages.send(sessionId, result.message.role, result.message.content, result.message.type);
   }

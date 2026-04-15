@@ -11,8 +11,8 @@
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-daemon dev-arkd dev-tui dev-web tui-standalone claude-tfy web desktop \
-        test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-install test-watch lint \
+.PHONY: help install dev dev-daemon dev-arkd dev-web claude-tfy web desktop \
+        test test-file test-e2e test-e2e-fast test-e2e-web test-install test-watch lint \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
         vendor-tmux vendor-tensorzero vendor-codegraph \
@@ -32,7 +32,7 @@ CLAUDE_CONTINUE_FLAGS := $(if $(filter 0,$(CLAUDE_CONTINUE)),,--continue)
 help: ## Show available commands
 	@echo ""
 	@echo "  \033[1mDevelopment\033[0m"
-	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-tui|dev-web|tui-standalone|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
 	@grep -E '^(test|test-file|test-e2e|test-install|test-watch):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -61,7 +61,6 @@ dev: ## Hot-reload: ark web (:8420) + Vite dev server (:5173) with HMR
 	@echo "  API:  http://localhost:8420  (bun --watch, auto-restarts on changes)"
 	@echo "  Web:  http://localhost:5173  (Vite HMR, proxies /api to :8420)"
 	@echo "  CLI:  ./ark <command>        (runs from source, no build)"
-	@echo "  TUI:  ./ark tui             (runs from source, no build)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
 	  $(BUN) --watch packages/cli/index.ts web --port 8420 --api-only 2>&1 | sed 's/^/[api] /' & \
@@ -82,11 +81,6 @@ dev-arkd: ## Hot-reload: arkd agent daemon (:19300)
 	@echo ""
 	$(BUN) --watch packages/cli/index.ts arkd
 
-dev-tui: ## Hot-reload: TUI connecting to dev daemon (starts daemon if not running)
-	@curl -sf http://localhost:19400/health >/dev/null 2>&1 || \
-		(echo "Daemon not running. Start it with: make dev-daemon" && exit 1)
-	ARK_SERVER_PORT=19400 ./ark tui
-
 dev-web: ## Hot-reload: API server (:8420) + Vite frontend (:5173)
 	@echo "\033[1mArk Web (hot-reload)\033[0m"
 	@echo "  API:  http://localhost:8420"
@@ -96,9 +90,6 @@ dev-web: ## Hot-reload: API server (:8420) + Vite frontend (:5173)
 	  $(BUN) --watch packages/cli/index.ts web --port 8420 --api-only 2>&1 | sed 's/^/[api] /' & \
 	  sleep 1 && cd packages/web && npx vite --port 5173 2>&1 | sed 's/^/[web] /' & \
 	  wait
-
-tui-standalone: ## Launch TUI standalone (embedded mode, no daemon needed)
-	./ark tui
 
 # TrueFoundry: https://truefoundry.com/docs/ai-gateway/claude-code (ANTHROPIC_BASE_URL + Bearer in ANTHROPIC_CUSTOM_HEADERS).
 # Claude Code gateway requirements: https://code.claude.com/docs/en/llm-gateway (Messages /v1/messages, forward anthropic-* headers).
@@ -142,17 +133,12 @@ desktop: build-web ## Launch the Electron desktop app
 # ── Testing ──────────────────────────────────────────────────────────────────
 
 test: build-web ## Run all unit tests (sequential -- never parallel)
-	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/tui packages/arkd packages/web --concurrency 1
+	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/arkd packages/web --concurrency 1
 
 test-file: ## Run a single test: make test-file F=packages/core/__tests__/foo.test.ts
 	$(BUN) test $(F) --concurrency 1
 
-test-e2e: test-tui-e2e test-web-e2e ## Run all end-to-end tests (TUI browser harness + web Playwright)
-
-test-tui-e2e: ## Run TUI end-to-end tests via browser harness (xterm.js + real pty + real tmux)
-	@cd packages/tui-e2e && npm install --silent 2>/dev/null && \
-	  node node_modules/@playwright/test/cli.js install chromium 2>/dev/null; \
-	  node node_modules/@playwright/test/cli.js test
+test-e2e: test-web-e2e ## Run all end-to-end tests (web Playwright)
 
 test-web-e2e: build-web ## Run web end-to-end tests (Playwright against the web dashboard)
 	@# `bunx --bun playwright test` runs Playwright under Bun, which is
@@ -186,7 +172,7 @@ lint-fix: ## Auto-fix lint issues
 
 build: build-cli build-web ## Build CLI binary + web frontend
 
-build-cli: ## Build native macOS CLI+TUI binary (current arch)
+build-cli: ## Build native macOS CLI binary (current arch)
 	@echo "Building native binary..."
 	@mkdir -p node_modules/react-devtools-core 2>/dev/null; \
 	  test -f shims/react-devtools-core.js && \

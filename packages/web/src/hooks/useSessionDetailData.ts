@@ -1,8 +1,7 @@
 /**
  * Web session detail data fetcher.
  *
- * Mirrors packages/tui/hooks/useSessionDetailData.ts -- consolidates the
- * fetching effects for session detail, todos, messages, flow stages,
+ * Consolidates the fetching effects for session detail, todos, messages, flow stages,
  * cost, and the running-output poller. Returns the live state plus
  * setters needed by the parent component for optimistic updates.
  */

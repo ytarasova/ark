@@ -299,7 +299,7 @@ export async function indexTranscripts(app: AppContext, opts?: { transcriptsDir?
       fileCount++;
       opts?.onProgress?.(indexed, fileCount);
 
-      // Yield after every file so TUI stays responsive
+      // Yield after every file so UI stays responsive
       await new Promise(r => setTimeout(r, 0));
     }
   }

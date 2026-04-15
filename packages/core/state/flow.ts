@@ -6,8 +6,8 @@
  * Fork stages split into parallel children.
  *
  * All exported functions accept an AppContext so no caller needs to reach
- * for getApp(). The TUI's remote-capable render paths should fetch flow
- * definitions via the Ark JSON-RPC client instead of calling these directly.
+ * for getApp(). Remote-capable render paths should fetch flow definitions
+ * via the Ark JSON-RPC client instead of calling these directly.
  */
 
 import { substituteVars } from "../template.js";

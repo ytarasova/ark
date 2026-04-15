@@ -278,7 +278,7 @@ export interface ReportResult {
   busEvents?: Array<{ type: string; sessionId: string; data: Record<string, unknown> }>;
   /** Events to log to the store */
   logEvents?: Array<{ type: string; opts: { stage?: string; actor?: string; data?: Record<string, unknown> } }>;
-  /** Message to store for TUI chat view */
+  /** Message to store for chat view */
   message?: { role: MessageRole; content: string; type: MessageType };
   /** PR URL detected from report */
   prUrl?: string;
@@ -310,7 +310,7 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
     },
   });
 
-  // Build message content for TUI chat view
+  // Build message content for chat view
   const r = report as unknown as Record<string, unknown>;
   const contentByType: Record<string, string | undefined> = {
     completed: (r.summary || r.message) as string | undefined,

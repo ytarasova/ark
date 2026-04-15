@@ -125,31 +125,6 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       }
     });
 
-  // ── TUI command ─────────────────────────────────────────────────────────────
-
-  program.command("tui").description("Launch TUI dashboard").action(async () => {
-    const globalOpts = program.opts();
-    const serverUrl = globalOpts.server || process.env.ARK_SERVER;
-    const token = globalOpts.token || process.env.ARK_TOKEN;
-
-    // In remote mode, skip local prereq checks (tmux etc. not needed)
-    if (!serverUrl) {
-      const { checkPrereqs, hasRequiredPrereqs, formatPrereqCheck } = await import("../../core/prereqs.js");
-      const prereqs = checkPrereqs();
-      if (!hasRequiredPrereqs(prereqs)) {
-        console.log(chalk.red("Missing required tools:"));
-        console.log(formatPrereqCheck(prereqs));
-        process.exit(1);
-      }
-    }
-
-    // Pass remote config to TUI via env vars (picked up by tui/index.tsx)
-    if (serverUrl) process.env.ARK_TUI_SERVER = serverUrl;
-    if (token) process.env.ARK_TUI_TOKEN = token;
-
-    await import("../../tui/index.js");
-  });
-
   // ── ArkD (universal agent daemon) ────────────────────────────────────────────
 
   program.command("arkd")
@@ -354,6 +329,5 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
       console.log(chalk.bold("\nReady! Try:"));
       console.log(`  ark session start --repo . --summary "My first task" --dispatch`);
-      console.log(`  ark tui`);
     });
 }

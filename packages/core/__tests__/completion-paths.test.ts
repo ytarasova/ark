@@ -62,7 +62,7 @@ describe("Manual completion path (bare flow)", () => {
     expect(result.updates.status).toBeUndefined();
     // Completion data should still be saved
     expect(result.updates.config?.completion_summary).toBe("All tasks done");
-    // Message should be generated for TUI
+    // Message should be generated for the UI
     expect(result.message).toBeTruthy();
     expect(result.message!.content).toContain("All tasks done");
     expect(result.message!.type).toBe("completed");

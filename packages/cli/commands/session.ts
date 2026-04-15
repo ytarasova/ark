@@ -525,7 +525,7 @@ export function registerSessionCommands(program: Command) {
     .argument("<id>")
     .action(async (id) => {
       const ark = await getArkClient();
-      const { formatEvent } = await import("../../tui/helpers/formatEvent.js");
+      const { formatEvent } = await import("../helpers.js");
       const events = await ark.sessionEvents(id);
       for (const e of events) {
         const ts = e.created_at.slice(11, 16);

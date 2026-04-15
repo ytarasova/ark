@@ -2,7 +2,7 @@
  * CLI singleton ArkClient -- in-process server with in-memory transport,
  * or remote WebSocket client when --server / ARK_SERVER is set.
  *
- * Same pattern as ArkClientProvider.tsx in the TUI, adapted for non-React use.
+ * Singleton pattern adapted for non-React CLI use.
  */
 
 import { ArkClient } from "../protocol/client.js";

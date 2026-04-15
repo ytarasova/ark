@@ -3,7 +3,7 @@
  * Serves a React SPA + single JSON-RPC endpoint + SSE live updates on one port.
  *
  * All API traffic goes through POST /api/rpc, dispatching to the shared RPC
- * router used by TUI, CLI, and web alike.
+ * router used by CLI and web alike.
  *
  * Non-RPC endpoints:
  *   - GET  /api/events/stream   SSE for live session updates

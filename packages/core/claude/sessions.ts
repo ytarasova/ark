@@ -245,7 +245,7 @@ export function getClaudeSession(app: AppContext, sessionId: string, _opts?: Lis
 
 /**
  * Refresh the cache by scanning ~/.claude/projects/.
- * Async with periodic yields so the TUI stays responsive.
+ * Async with periodic yields so the UI stays responsive.
  */
 export async function refreshClaudeSessionsCache(app: AppContext, opts?: { baseDir?: string; onProgress?: (processed: number, total: number) => void }): Promise<number> {
   const baseDir = opts?.baseDir ?? join(homedir(), ".claude", "projects");
@@ -328,7 +328,7 @@ export async function refreshClaudeSessionsCache(app: AppContext, opts?: { baseD
       count++;
 
       opts?.onProgress?.(fileCount, totalFiles);
-      // Yield after every file so TUI stays responsive
+      // Yield after every file so UI stays responsive
       await new Promise(r => setTimeout(r, 0));
     }
   }

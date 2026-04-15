@@ -27,9 +27,7 @@ ark --version  # verify installation
 ```bash
 make dev            # Hot-reload: API server (:8420) + Vite dev server (:5173)
 make dev-daemon     # Hot-reload: server daemon (conductor :19100 + arkd :19300 + WS :19400)
-make dev-tui        # Hot-reload: TUI connecting to dev daemon
 make dev-web        # Hot-reload: API server + Vite frontend
-make tui-standalone # TUI without daemon (embedded mode)
 ./ark <command>     # Run CLI directly from source
 ```
 
@@ -37,7 +35,7 @@ make tui-standalone # TUI without daemon (embedded mode)
 
 - TypeScript with `strict: false` (implicit `any` allowed, no strict null checks)
 - ES modules (`"type": "module"`)
-- React + Ink for TUI, React + Vite + Tailwind for Web
+- React + Vite + Tailwind for Web
 - YAML for agent/flow/runtime/recipe definitions
 - SQLite for local, PostgreSQL for hosted mode (`IDatabase` abstraction, no ORM)
 - Never use em dashes (U+2014) -- use hyphens (`-`) or double dashes (`--`) instead
@@ -62,7 +60,7 @@ Tests use `bun:test`. **Always use make targets** -- never call `bun test` direc
 ```bash
 make test                                                  # All tests (sequential)
 make test-file F=packages/core/__tests__/session.test.ts   # Single file
-make test-e2e                                              # Playwright E2E (TUI + Web)
+make test-e2e                                              # Playwright E2E (Web)
 make test-watch                                            # Watch mode
 ```
 
@@ -106,7 +104,7 @@ make dev   # or just tsc
 make test-e2e
 ```
 
-TUI E2E tests use a browser harness (xterm.js + real pty + real tmux). Web E2E tests use Playwright.
+Web E2E tests use Playwright.
 
 ## Schema Changes
 

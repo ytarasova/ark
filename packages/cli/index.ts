@@ -6,7 +6,6 @@
  * ark session list
  * ark session dispatch s-abc123
  * ark session attach s-abc123
- * ark tui
  *
  * Remote mode:
  *   ark --server https://ark.company.com --token xxx session list

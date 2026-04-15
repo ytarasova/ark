@@ -176,7 +176,7 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
   if (comments.length > 0) {
     const prompt = formatReviewPrompt(prTitle, prNumber, comments, payload.review?.state);
 
-    // Store as a message so TUI shows it
+    // Store as a message so the UI shows it
     app.messages.send(session.id, "system", prompt, "text");
 
     app.events.log(session.id, "webhook_review_steer", {

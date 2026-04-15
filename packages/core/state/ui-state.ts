@@ -1,5 +1,5 @@
 /**
- * Persists TUI state (cursor, tab, scroll) across restarts.
+ * Persists UI state (cursor, tab, scroll) across restarts.
  * Saved to ~/.ark/ui-state.json.
  */
 
