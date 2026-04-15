@@ -181,10 +181,6 @@ build: build-cli build-web ## Build CLI binary + web frontend
 
 build-cli: ## Build native macOS CLI binary (current arch)
 	@echo "Building native binary..."
-	@mkdir -p node_modules/react-devtools-core 2>/dev/null; \
-	  test -f shims/react-devtools-core.js && \
-	  cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js && \
-	  echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json || true
 	@$(BUN) run scripts/inject-version.ts
 	$(BUN) build --compile packages/cli/index.ts --outfile ark-native
 	@echo "Built: ark-native ($$(du -h ark-native | cut -f1))"
@@ -201,10 +197,7 @@ package: package-cli package-desktop ## Package CLI + Electron for all platforms
 
 package-cli: build-web ## Build self-contained CLI bundles for macOS + Linux (4 targets)
 	@echo "Building Ark bundles for all platforms..."
-	@mkdir -p dist node_modules/react-devtools-core 2>/dev/null; \
-	  test -f shims/react-devtools-core.js && \
-	  cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js && \
-	  echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json || true
+	@mkdir -p dist
 	$(BUN) build --compile --target bun-darwin-arm64 packages/cli/index.ts --outfile dist/bin/ark-darwin-arm64
 	$(BUN) build --compile --target bun-darwin-x64   packages/cli/index.ts --outfile dist/bin/ark-darwin-x64
 	$(BUN) build --compile --target bun-linux-arm64  packages/cli/index.ts --outfile dist/bin/ark-linux-arm64
