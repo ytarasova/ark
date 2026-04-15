@@ -90,10 +90,24 @@ tar -xzf "$TMPDIR/ark.tar.gz" -C "$TMPDIR" || error "Extraction failed"
 # ── Install ─────────────────────────────────────────────────────────────────
 
 mkdir -p "$INSTALL_DIR"
+# Remove any pre-existing symlinks so `cp` does not write through them to
+# their targets. Example: `make install` creates $INSTALL_DIR/bin/ark as a
+# symlink into the source repo, and without this cleanup `cp -R` would
+# clobber the source-tree file.
+find "$INSTALL_DIR" -type l -delete 2>/dev/null || true
 # Copy bin/ (ark + tmux + codegraph + tensorzero), agents/, flows/, etc.
 cp -R "$TMPDIR/ark-$PLATFORM"/* "$INSTALL_DIR/"
 chmod +x "$BIN_DIR/ark" "$BIN_DIR/tmux" "$BIN_DIR/codegraph" 2>/dev/null || true
 chmod +x "$BIN_DIR/tensorzero-gateway" 2>/dev/null || true
+
+# macOS: the Bun-compiled ark binary ships with a malformed LC_CODE_SIGNATURE
+# that the kernel rejects with SIGKILL at launch time. Strip and ad-hoc
+# re-sign so the binary actually runs. No-op on Linux.
+if [ "$OS" = "darwin" ] && command -v codesign &>/dev/null; then
+  codesign --remove-signature "$BIN_DIR/ark" 2>/dev/null || true
+  codesign --force --sign - "$BIN_DIR/ark" 2>/dev/null \
+    || warn "Could not ad-hoc sign $BIN_DIR/ark -- you may need to run 'codesign --force --sign - $BIN_DIR/ark' manually."
+fi
 
 info "Installed:"
 for bin in ark tmux codegraph tensorzero-gateway; do
