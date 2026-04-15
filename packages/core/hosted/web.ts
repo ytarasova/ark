@@ -6,6 +6,7 @@
  * router used by CLI and web alike.
  *
  * Non-RPC endpoints:
+ *   - GET  /api/health          Lightweight health probe (no auth, no DB)
  *   - GET  /api/events/stream   SSE for live session updates
  *   - WS   /api/terminal?session=<id>  WebSocket terminal bridge (xterm.js)
  *   - POST /api/webhooks/...    GitHub issue webhooks
@@ -35,8 +36,10 @@ import {
   cleanupTerminalBridge,
   sanitizeSessionName,
 } from "./terminal-bridge.js";
+import { VERSION } from "../version.js";
 
 const WEB_DIST: string = resolveWebDist();
+const SERVER_BOOT_TIME = Date.now();
 
 export interface WebServerOptions {
   port?: number;
@@ -223,6 +226,16 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       // CORS preflight
       if (req.method === "OPTIONS") {
         return new Response(null, { status: 204, headers: CORS });
+      }
+
+      // Health probe -- unauthenticated, used by desktop app and external monitors
+      // to verify the web server is up. Lightweight: no DB or service checks.
+      if (url.pathname === "/api/health" && req.method === "GET") {
+        return jsonResponse({
+          ok: true,
+          version: VERSION,
+          uptime: Math.round((Date.now() - SERVER_BOOT_TIME) / 1000),
+        });
       }
 
       // Token auth (legacy simple token) -- checked first for backward compat
