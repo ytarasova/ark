@@ -13,7 +13,7 @@
 
 import { readFileSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
-import { join } from "path";
+import { dirname, join } from "path";
 import type { AppContext } from "../app.js";
 import { eventBus } from "../hooks.js";
 import { Router } from "../../server/router.js";
@@ -24,7 +24,31 @@ import { type SSEBus, createSSEBus } from "./sse-bus.js";
 import { extractTenantContext, canWrite, type AuthConfig } from "../auth/index.js";
 import type { TenantContext } from "../../types/index.js";
 
-const WEB_DIST = join(import.meta.dir, "../../../packages/web/dist");
+export interface ResolveWebDistOptions {
+  execDir: string;
+  sourceDir: string;
+  existsCheck: (path: string) => boolean;
+}
+
+/**
+ * Resolve the directory containing the built web dashboard assets.
+ * Installed tarball places the binary at `<root>/bin/ark` with web at `<root>/web`.
+ * Running from source, assets live at `packages/web/dist` relative to this file.
+ * Returns the installed path as the last-resort default so errors point somewhere real.
+ */
+export function resolveWebDist(opts: ResolveWebDistOptions): string {
+  const installed = join(opts.execDir, "..", "web");
+  if (opts.existsCheck(installed)) return installed;
+  const source = join(opts.sourceDir, "..", "..", "..", "packages", "web", "dist");
+  if (opts.existsCheck(source)) return source;
+  return installed;
+}
+
+const WEB_DIST: string = resolveWebDist({
+  execDir: dirname(process.execPath),
+  sourceDir: import.meta.dir,
+  existsCheck: existsSync,
+});
 
 export interface WebServerOptions {
   port?: number;
