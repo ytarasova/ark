@@ -202,6 +202,7 @@ test-install: ## Run install.sh regression tests (docs/install.sh)
 	@./scripts/tests/install/test-symlink-preservation.sh
 	@./scripts/tests/install/test-installed-binary-runs.sh
 	@./scripts/tests/install/test-api-failure-path.sh
+	@./scripts/tests/install/test-installed-builtin-flows.sh
 
 test-watch: ## Run unit tests in watch mode
 	$(BUN) test --watch
