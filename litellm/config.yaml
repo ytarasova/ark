@@ -1,0 +1,16 @@
+# LiteLLM proxy for Claude Code (Anthropic API) to SambaNova OpenAI-compatible endpoints.
+# Run: make litellm  (loads ../.env)
+# https://docs.litellm.ai/docs/tutorials/claude_non_anthropic_models
+
+model_list:
+  - model_name: MiniMax-M2.5
+    litellm_params:
+      model: custom_openai/MiniMax-M2.5
+      api_key: os.environ/SAMBANOVA_API_KEY
+      api_base: https://api.sambanova.ai/v1
+
+litellm_settings:
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
