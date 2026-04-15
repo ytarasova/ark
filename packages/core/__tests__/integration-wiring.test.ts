@@ -214,7 +214,7 @@ describe("ingestRemoteIndex", () => {
         addedFiles.add(node.file);
       }
       store.addNode({
-        id: `symbol:${node.file}::${node.name}`,
+        id: `symbol:${node.file}::${node.name}:${node.line}`,
         type: "symbol",
         label: node.name,
         metadata: { kind: node.kind, file: node.file, line_start: node.line, line_end: node.end_line, exported: node.exported === 1 },
@@ -226,12 +226,12 @@ describe("ingestRemoteIndex", () => {
     expect(store.getNode("file:src/db.ts")).not.toBeNull();
 
     // Verify symbols
-    const boot = store.getNode("symbol:src/app.ts::boot");
+    const boot = store.getNode("symbol:src/app.ts::boot:10");
     expect(boot).not.toBeNull();
     expect(boot!.metadata.kind).toBe("function");
     expect(boot!.metadata.exported).toBe(true);
 
-    const db = store.getNode("symbol:src/db.ts::Database");
+    const db = store.getNode("symbol:src/db.ts::Database:5");
     expect(db).not.toBeNull();
     expect(db!.metadata.kind).toBe("class");
   });

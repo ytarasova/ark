@@ -1,220 +1,121 @@
-# Plan: Chat Conversation Interface -- Add Send Message Capability
+# PLAN: Fix Knowledge Graph Pipeline -- Codegraph Indexes
 
 ## Summary
 
-The Web UI's chat/conversation interface is minimal: a collapsible single-line input that disappears after sending, no user message persistence, and 5-second polling. This plan upgrades it to a proper chat panel with persistent message history, optimistic sends, auto-scroll, and faster polling -- matching the TUI's `TalkToSession` experience and closing the surface parity gap between Web UI and TUI.
+The knowledge graph indexing pipeline crashes with `UNIQUE constraint failed: knowledge.id` when indexing any non-trivial codebase. The root cause is twofold: (1) `KnowledgeStore.addNode()` uses plain `INSERT INTO` with no conflict handling, and (2) symbol IDs are constructed as `symbol:${file}::${name}` which is not unique -- codegraph produces many symbols with the same (file, name) pair (e.g., 50 `app` parameters across different functions in `session-orchestration.ts`). The fix makes `addNode` idempotent via `INSERT OR REPLACE` and includes the line number in symbol IDs for uniqueness.
 
 ## Files to modify/create
 
 | File | Change |
 |------|--------|
-| `packages/core/services/session-orchestration.ts` | Persist user message to `messages` table before sending to tmux (line ~2325) |
-| `packages/server/handlers/messaging.ts` | Return the send result (ok + message) from the `message/send` handler |
-| `packages/web/src/components/ChatPanel.tsx` | **New file** -- dedicated chat panel component (message thread + input bar) |
-| `packages/web/src/hooks/useMessages.ts` | **New file** -- web-side message hook with polling, send, optimistic updates |
-| `packages/web/src/components/SessionDetail.tsx` | Replace inline send form with ChatPanel; wire chatOpen toggle |
-| `packages/web/src/hooks/useSessionDetailData.ts` | Remove message fetching (now owned by ChatPanel's useMessages hook) |
-| `packages/web/src/hooks/useApi.ts` | Add `markRead` method to api object |
+| `packages/core/knowledge/store.ts:38` | Change `INSERT INTO knowledge` to `INSERT OR REPLACE INTO knowledge` in `addNode()` |
+| `packages/core/knowledge/indexer.ts:129,145,174-175` | Include line number in nodeIdMap and symbol ID: `symbol:${file}::${name}:${line}` |
+| `packages/core/services/session-orchestration.ts:66,77-78` | Include line number in `ingestRemoteIndex` symbol IDs |
+| `packages/core/__tests__/integration-wiring.test.ts:217,229,234` | Update symbol ID expectations to include line number |
+| `packages/core/knowledge/__tests__/indexer.test.ts:83,90` | Update `getNode` calls to use new symbol ID format |
 
 ## Implementation steps
 
-### Step 1: Persist user messages on send (backend)
+### Step 1: Make `addNode` idempotent (store.ts)
 
-In `packages/core/services/session-orchestration.ts`, function `send()` (lines 2309-2328):
+In `packages/core/knowledge/store.ts`, line 38, change:
+```sql
+INSERT INTO knowledge (id, type, label, content, metadata, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+```
+to:
+```sql
+INSERT OR REPLACE INTO knowledge (id, type, label, content, metadata, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+```
 
-**Before** the `sendReliable()` call (after injection check passes, around line 2324), insert:
+This is the critical crash fix. It makes `addNode` safe to call with an existing ID -- the node gets upserted instead of throwing.
+
+### Step 2: Fix symbol ID uniqueness in indexer (indexer.ts)
+
+In `packages/core/knowledge/indexer.ts`:
+
+**Line 129** -- add `line` to the nodeIdMap value:
 ```ts
-app.messages.send(sessionId, "user", message, "text");
+// Before:
+nodeIdMap.set(node.id, { kind: node.kind, name: node.name, file: node.file });
+// After:
+nodeIdMap.set(node.id, { kind: node.kind, name: node.name, file: node.file, line: node.line });
 ```
 
-This ensures every user-sent message appears in the conversation history, matching how agent messages are already persisted via the conductor channel (`conductor.ts` line ~664).
-
-### Step 2: Return send result from `message/send` RPC
-
-In `packages/server/handlers/messaging.ts`, the `message/send` handler (lines 7-11):
-
-Change the handler to return the actual result from `sessionService.send()`:
+**Line 145** -- include line number in symbol ID:
 ```ts
-router.handle("message/send", async (p) => {
-  const { sessionId, content } = extract<MessageSendParams>(p, ["sessionId", "content"]);
-  const result = await app.sessionService.send(sessionId, content);
-  return result;
-});
+// Before:
+const symbolId = `symbol:${node.file}::${node.name}`;
+// After:
+const symbolId = `symbol:${node.file}::${node.name}:${node.line}`;
 ```
 
-The result already has `{ ok: boolean, message: string }` from `session-orchestration.send()`. This lets the client know if delivery failed (no active session, prompt injection blocked, etc.).
-
-### Step 3: Add `markRead` to web API
-
-In `packages/web/src/hooks/useApi.ts`, add after the `send` method (line 76):
+**Lines 174-175** -- update edge source/target IDs:
 ```ts
-markRead: (id: string) => rpc<any>("message/markRead", { sessionId: id }),
+// Before:
+const sourceId = `symbol:${src.file}::${src.name}`;
+const targetId = `symbol:${tgt.file}::${tgt.name}`;
+// After:
+const sourceId = `symbol:${src.file}::${src.name}:${src.line}`;
+const targetId = `symbol:${tgt.file}::${tgt.name}:${tgt.line}`;
 ```
 
-### Step 4: Create `useMessages` hook for the web
+### Step 3: Fix symbol ID uniqueness in remote ingestion (session-orchestration.ts)
 
-Create `packages/web/src/hooks/useMessages.ts`:
+In `packages/core/services/session-orchestration.ts`, function `ingestRemoteIndex()`:
 
+**Line 66** -- change symbol ID:
 ```ts
-interface UseMessagesOpts {
-  sessionId: string;
-  enabled: boolean;    // only poll when chat panel is open
-  pollMs?: number;     // default 2000ms
-}
-
-interface UseMessagesResult {
-  messages: Message[];
-  send: (content: string) => Promise<void>;
-  sending: boolean;
-}
+// Before:
+id: `symbol:${node.file}::${node.name}`,
+// After:
+id: `symbol:${node.file}::${node.name}:${node.line}`,
 ```
 
-Behavior:
-- On mount and at `pollMs` intervals (when `enabled`): call `api.getMessages(sessionId)`, then `api.markRead(sessionId)`
-- `send(content)`: optimistically add a user message to local state, call `api.send(sessionId, content)`, then refetch on next poll
-- On `sessionId` change: reset messages and reload immediately
-- Only poll when `enabled` is true (stops 2s polling when chat panel is closed)
-- Optimistic messages use a negative temp `id` and get deduped on next poll by matching `role + content + created_at` proximity
-
-### Step 5: Create `ChatPanel` component
-
-Create `packages/web/src/components/ChatPanel.tsx`:
-
-```
-<div className="flex flex-col h-full">
-  {/* Header: "Chat: <summary>" + close button */}
-  <div className="h-10 border-b px-4 flex items-center justify-between shrink-0">
-    <span>Chat: {session.summary || session.id}</span>
-    <Button variant="ghost" size="icon-xs" onClick={onClose}><X /></Button>
-  </div>
-
-  {/* Messages: scrollable, auto-scroll to bottom */}
-  <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5">
-    {messages.length === 0 && <EmptyState />}
-    {messages.map(m => <ChatBubble key={m.id} message={m} />)}
-    <div ref={bottomRef} />
-  </div>
-
-  {/* Input bar: always visible at bottom */}
-  <div className="border-t p-2 flex gap-2 shrink-0">
-    <Input placeholder="Message to agent..."
-      value={msg} onChange={...}
-      onKeyDown={Enter -> send}
-      autoFocus />
-    <Button size="xs" disabled={!msg.trim() || sending}
-      onClick={send}>Send</Button>
-  </div>
-</div>
+**Lines 77-78** -- change edge source/target IDs:
+```ts
+// Before:
+`symbol:${srcNode.file}::${srcNode.name}`,
+`symbol:${tgtNode.file}::${tgtNode.name}`,
+// After:
+`symbol:${srcNode.file}::${srcNode.name}:${srcNode.line}`,
+`symbol:${tgtNode.file}::${tgtNode.name}:${tgtNode.line}`,
 ```
 
-Chat bubble styling (reuse existing patterns from SessionDetail.tsx lines 556-575):
-- User messages: `bg-primary/10 border-primary/20 self-end` (right-aligned)
-- Agent/system messages: `bg-secondary border-border self-start` (left-aligned)
-- Badge for non-text types (progress, question, completed, error)
-- Timestamp via `relTime()`
-- Empty state: "No messages yet. Type below to send."
+### Step 4: Update tests
 
-Auto-scroll: use a `useEffect` that scrolls `bottomRef` into view when messages change, unless user has scrolled up (track via `onScroll` event checking if scrollTop + clientHeight < scrollHeight - threshold).
+**`packages/core/knowledge/__tests__/indexer.test.ts`:**
+- Line 83: `store.getNode("symbol:src/app.ts::boot")` -> `store.getNode("symbol:src/app.ts::boot:10")`
+- Line 90: `store.getNode("symbol:src/db.ts::Database")` -> `store.getNode("symbol:src/db.ts::Database:5")`
 
-### Step 6: Integrate ChatPanel into SessionDetail
+**`packages/core/__tests__/integration-wiring.test.ts`:**
+- Line 217: `` id: `symbol:${node.file}::${node.name}` `` -> `` id: `symbol:${node.file}::${node.name}:${node.line}` ``
+- Line 229: `store.getNode("symbol:src/app.ts::boot")` -> `store.getNode("symbol:src/app.ts::boot:10")`
+- Line 234: `store.getNode("symbol:src/db.ts::Database")` -> `store.getNode("symbol:src/db.ts::Database:5")`
 
-In `packages/web/src/components/SessionDetail.tsx`:
+### Step 5: Verify
 
-1. **Simplify SessionActions** (lines 30-109): Remove the inline send form (state variables `sendMsg`, `showSendInternal`, lines 32-33, 79-106). The "Send" button now only toggles `chatOpen` via `onChatOpenChange`:
-```tsx
-{(s === "running" || s === "waiting") && (
-  <Button variant={chatOpen ? "default" : "outline"} size="xs"
-    onClick={() => onChatOpenChange?.(!chatOpen)}>
-    {chatOpen ? "Close Chat" : "Chat"}
-  </Button>
-)}
-```
-
-2. **Conditional render**: When `chatOpen` is true, render `ChatPanel` in place of the scrollable detail content area:
-```tsx
-<div className="flex flex-col h-full bg-background">
-  {/* Header */}
-  <div className="h-[52px] ...">...</div>
-
-  {chatOpen ? (
-    <ChatPanel
-      sessionId={sessionId}
-      session={s}
-      onClose={() => onChatOpenChange?.(false)}
-      onToast={onToast}
-    />
-  ) : (
-    <div className="flex-1 overflow-y-auto p-5">
-      {/* existing detail content (metadata, todos, events, etc.) */}
-      {/* Keep the Conversation section here for non-active sessions */}
-    </div>
-  )}
-</div>
-```
-
-3. **Keep Conversation section for non-active sessions**: The existing message display at lines 547-579 remains in the detail view for completed/stopped sessions where chat isn't available. But when chat is open, it's not shown (ChatPanel owns message display).
-
-### Step 7: Clean up useSessionDetailData
-
-In `packages/web/src/hooks/useSessionDetailData.ts`:
-
-- Remove `messages` state (line 36) and both message-fetching effects (lines 55-60 for initial load, line 88-89 in the poll)
-- Remove `messages` from the return type and return value
-- In `SessionDetail.tsx`, remove `messages` from the destructured hook result (line 112)
-- For the "Conversation" section in the detail view (non-chat mode), fetch messages inline or keep a lightweight read-only version
-
-**However**, to keep the Conversation section working in the detail view for non-active sessions, we have two options:
-- (a) Keep the message fetch in `useSessionDetailData` but only for non-active sessions (no polling needed for completed sessions)
-- (b) Have `SessionDetail` conditionally fetch messages for the static Conversation display
-
-**Recommendation**: option (a) -- keep a single initial fetch of messages in `useSessionDetailData` (no polling), remove the polling effect. ChatPanel handles its own fast polling when active.
+1. `make test-file F=packages/core/knowledge/__tests__/indexer.test.ts`
+2. `make test-file F=packages/core/knowledge/__tests__/store.test.ts`
+3. `make test-file F=packages/core/__tests__/integration-wiring.test.ts`
+4. Run `ark knowledge index --repo /Users/paytmlabs/Projects/ark` -- must succeed (was crashing before)
+5. Run `ark knowledge stats` -- verify nodes and edges are populated
+6. Run `ark knowledge index --repo /Users/paytmlabs/Projects/ark` again -- must succeed (re-index upsert path)
 
 ## Testing strategy
 
-1. **Manual verification (critical path)**:
-   - Start a running session, open chat (`t` key or click Chat button), send a message -- verify it appears immediately
-   - Verify the message reaches the agent (check tmux pane: `tmux capture-pane -t ark-s-<id> -p`)
-   - Wait for agent response -- verify it appears in chat within ~2 seconds
-   - Send several messages, confirm auto-scroll keeps latest visible
-   - Scroll up manually, confirm new messages don't yank viewport down
-   - Close chat (Escape or click close), reopen -- verify full history preserved
-   - Switch to a different session -- verify chat resets
-
-2. **Backend persistence test**:
-   - Send a message via RPC: `{"method":"message/send","params":{"sessionId":"s-xxx","content":"hello"}}`
-   - Query messages: `{"method":"session/messages","params":{"sessionId":"s-xxx"}}`
-   - Verify the user message appears with `role:"user"`, `type:"text"`
-   - Send from agent (via channel report), query again -- verify interleaved correctly
-
-3. **Edge cases**:
-   - Send to a stopped/completed session -- verify error toast
-   - Empty message -- verify send button disabled, Enter does nothing
-   - Very long message -- verify wrapping in bubble, no horizontal overflow
-   - Rapid sends -- verify no duplicate optimistic messages
-   - Session transitions running->completed while chat open -- verify input disables gracefully
-   - Prompt injection -- verify blocked message shows error toast
-
-4. **Keyboard shortcuts** (already wired, verify still working):
-   - `t` toggles chat open/close (SessionsPage.tsx:91-98)
-   - `Escape` closes chat (SessionsPage.tsx:113)
-   - `Enter` in input sends message
+- **Existing tests**: All 10 indexer tests, 45 store tests, 12 context tests, integration-wiring tests should still pass after updates.
+- **New regression test**: Add a test in `indexer.test.ts` that verifies indexing a codegraph DB with duplicate (file, name) pairs does not crash. Insert two mock nodes with the same file and name but different line numbers, verify both appear as separate knowledge nodes.
+- **Idempotency test**: Add a test in `store.test.ts` that calls `addNode` twice with the same ID and verifies upsert behavior (no throw, second call updates the node).
+- **E2E**: Run `ark knowledge index` on the actual Ark repo (9847 nodes, 738 files) to verify it completes without error.
 
 ## Risk assessment
 
-1. **User message double-persistence** -- Low risk. Currently zero user messages are persisted. After this change, exactly one `INSERT` per send in `session-orchestration.send()`. No other code path persists user messages. The TUI's `useMessages` hook calls `ark.messageSend()` which hits the same `message/send` RPC, so this fix benefits both surfaces.
-
-2. **Polling load** -- Low risk. The 2s poll only runs when chat is open (one session at a time). We remove the message fetch from the 5s detail poll, so net polling stays similar. Messages are a lightweight query (50 rows max, single-table SELECT with LIMIT).
-
-3. **Optimistic message ordering** -- The optimistic message has a temp negative `id`. On next 2s poll, the real DB message replaces it. Brief flicker is possible if poll races with render, but content will be identical. Dedup by matching `role === "user" && content === optimistic.content` within a 5-second window.
-
-4. **No breaking API changes** -- The `message/send` RPC response changes from always `{ ok: true }` to `{ ok: boolean, message: string }`. Extra fields are additive. The existing web UI already handles `res.ok !== false` (SessionDetail.tsx:236-240). The TUI's `useMessages` hook calls `ark.messageSend()` which uses `ArkClient.messageSend()` -- it ignores the response entirely (`await this.rpc(...)` with no return processing), so no breakage.
-
-5. **ChatPanel layout** -- Medium risk. The panel replaces the detail view content area. If the panel's flex layout doesn't fill height correctly, the input bar could float or the messages area could overflow. Test across different viewport heights. The existing `SessionDetail` already uses `flex flex-col h-full`, so the structure is proven.
+- **Knowledge graph data reset**: Changing the symbol ID format from `symbol:file::name` to `symbol:file::name:line` means existing indexed data becomes orphaned. Since the schema docs say "rm ~/.ark/ark.db" is the migration strategy and knowledge is fully re-indexable, this is acceptable. No production data at risk.
+- **Edge mapping correctness**: With line-number-based IDs, edges connect specific symbol instances rather than "any symbol named X in file Y". This is more correct -- an edge from codegraph that says node 42 calls node 87 maps to those specific symbols.
+- **INSERT OR REPLACE on addNode**: Safe because all ID-bearing callers use deterministic IDs where upsert is the desired behavior. Random-ID callers (memory/add, knowledge/remember) generate UUIDs that won't collide.
+- **No breaking API changes**: MCP tools (`knowledge/search`, `knowledge/context`, etc.) search by label/content, not by ID format. The context builder also searches by label. No external API depends on the symbol ID format.
+- **PostgreSQL compatibility**: `INSERT OR REPLACE` is SQLite syntax. The IDatabase abstraction handles this -- check that the Postgres adapter has equivalent behavior. If it uses `ON CONFLICT DO UPDATE`, verify the migration. (Low risk: hosted mode uses DB-backed resource stores, not file-level knowledge indexing.)
 
 ## Open questions
 
-1. **Should chat be a side panel or replace the detail view?** This plan uses full replacement (chat replaces detail when open). A split layout (detail + chat side by side) would require wider minimum widths. **Recommendation**: full replacement is simpler and matches TUI behavior.
-
-2. **Should we add SSE for messages?** Currently the SSE stream only sends session status. Adding per-session message events would eliminate polling. **Recommendation**: defer to follow-up; 2s polling is adequate for chat and matches TUI.
-
-3. **Should chat work for non-running sessions (read-only)?** Currently the Chat button only appears for running/waiting sessions. Completed sessions show the static Conversation section in detail view. **Recommendation**: keep this split -- chat with input for active sessions, read-only conversation display for inactive sessions.
+None -- the fix is straightforward and all affected code paths are identified.

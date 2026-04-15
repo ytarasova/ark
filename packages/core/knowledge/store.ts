@@ -35,7 +35,7 @@ export class KnowledgeStore {
     const id = opts.id ?? `${opts.type}:${randomUUID().slice(0, 8)}`;
     const now = new Date().toISOString();
     this.db.prepare(
-      "INSERT INTO knowledge (id, type, label, content, metadata, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT OR REPLACE INTO knowledge (id, type, label, content, metadata, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(id, opts.type, opts.label, opts.content ?? null, JSON.stringify(opts.metadata ?? {}), this.tenantId, now, now);
     return id;
   }
