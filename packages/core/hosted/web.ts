@@ -7,6 +7,7 @@
  *
  * Non-RPC endpoints:
  *   - GET  /api/events/stream   SSE for live session updates
+ *   - WS   /api/terminal?session=<id>  WebSocket terminal bridge (xterm.js)
  *   - POST /api/webhooks/...    GitHub issue webhooks
  *   - GET  /*                   Static file serving (SPA)
  */
@@ -24,6 +25,7 @@ import { type SSEBus, createSSEBus } from "./sse-bus.js";
 import { extractTenantContext, canWrite, type AuthConfig } from "../auth/index.js";
 import type { TenantContext } from "../../types/index.js";
 import { resolveWebDist } from "../install-paths.js";
+import { startTerminalBridge, handleTerminalInput, cleanupTerminalBridge, sanitizeSessionName } from "./terminal-bridge.js";
 
 const WEB_DIST: string = resolveWebDist();
 
@@ -145,7 +147,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
   // ── Server ───────────────────────────────────────────────────────────────
   const server = Bun.serve({
     port,
-    async fetch(req) {
+    async fetch(req, server) {
       const url = new URL(req.url);
 
       // CORS preflight
@@ -174,6 +176,24 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       const requestApp = tenantCtx && tenantCtx.tenantId !== "default"
         ? app.forTenant(tenantCtx.tenantId)
         : app;
+
+      // WebSocket terminal bridge
+      if (url.pathname === "/api/terminal") {
+        if (readOnly) return new Response("Read-only mode", { status: 403 });
+        const sessionId = url.searchParams.get("session");
+        if (!sessionId) return new Response("Missing session param", { status: 400 });
+        // Sanitize sessionId to prevent command injection in tmux/script commands
+        try { sanitizeSessionName(sessionId); } catch {
+          return new Response("Invalid session ID", { status: 400 });
+        }
+        // Validate session exists
+        const session = requestApp.sessions.get(sessionId);
+        if (!session) return new Response("Session not found", { status: 404 });
+        const tmuxName = `ark-${sessionId}`;
+        const upgraded = server.upgrade(req, { data: { sessionId, tmuxName } } as any);
+        if (upgraded) return undefined as any;
+        return new Response("WebSocket upgrade failed", { status: 500 });
+      }
 
       // SSE endpoint
       if (url.pathname === "/api/events/stream") {
@@ -281,6 +301,24 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       }
 
       return new Response("Not Found", { status: 404, headers: CORS });
+    },
+    websocket: {
+      open(ws) {
+        const { sessionId, tmuxName } = ws.data as { sessionId: string; tmuxName: string };
+        const bridge = startTerminalBridge(ws, tmuxName);
+        if (bridge) {
+          ws.send(JSON.stringify({ type: "connected", sessionId }));
+        } else {
+          ws.send(JSON.stringify({ type: "error", message: "tmux session not found" }));
+          ws.close();
+        }
+      },
+      message(ws, data) {
+        handleTerminalInput(ws, data as any);
+      },
+      close(ws) {
+        cleanupTerminalBridge(ws);
+      },
     },
   });
 

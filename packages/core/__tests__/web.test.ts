@@ -241,4 +241,48 @@ describe("web server", () => {
     expect(result.arkd.url.length).toBeGreaterThan(0);
     expect(typeof result.router.online).toBe("boolean");
   });
+
+  // --- Terminal WebSocket endpoint tests ---
+
+  it("terminal endpoint returns 400 without session param", async () => {
+    server = startWebServer(getApp(), { port: 18548 });
+    const resp = await fetch("http://localhost:18548/api/terminal");
+    expect(resp.status).toBe(400);
+  });
+
+  it("terminal endpoint returns 404 for nonexistent session", async () => {
+    server = startWebServer(getApp(), { port: 18549 });
+    const resp = await fetch("http://localhost:18549/api/terminal?session=s-nonexistent");
+    expect(resp.status).toBe(404);
+  });
+
+  it("terminal endpoint is blocked in read-only mode", async () => {
+    const s = getApp().sessions.create({ summary: "terminal-readonly-test" });
+    server = startWebServer(getApp(), { port: 18550, readOnly: true });
+    const resp = await fetch(`http://localhost:18550/api/terminal?session=${s.id}`);
+    expect(resp.status).toBe(403);
+  });
+
+  it("terminal WebSocket upgrade works for valid session", async () => {
+    const s = getApp().sessions.create({ summary: "terminal-ws-test" });
+    server = startWebServer(getApp(), { port: 18551 });
+    // Attempt WebSocket connection -- the tmux session won't exist,
+    // so the bridge will send an error and close, but upgrade should succeed
+    const ws = new WebSocket(`ws://localhost:18551/api/terminal?session=${s.id}`);
+    const messages: string[] = [];
+    await new Promise<void>((resolve) => {
+      ws.onmessage = (e) => {
+        messages.push(typeof e.data === "string" ? e.data : "binary");
+      };
+      ws.onclose = () => resolve();
+      ws.onerror = () => resolve();
+      // Timeout after 2s in case nothing happens
+      setTimeout(() => { try { ws.close(); } catch {} resolve(); }, 2000);
+    });
+    // Should have received either a connected or error message
+    expect(messages.length).toBeGreaterThanOrEqual(1);
+    const firstMsg = JSON.parse(messages[0]);
+    // Since there's no real tmux session, we expect either "connected" (tmux exists) or "error"
+    expect(["connected", "error"]).toContain(firstMsg.type);
+  });
 });
