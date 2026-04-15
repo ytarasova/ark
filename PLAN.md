@@ -1,122 +1,220 @@
-# PLAN: Local folder picker for Repository field in web New Session modal
+# Plan: Chat Conversation Interface -- Add Send Message Capability
 
-## 1. Summary
+## Summary
 
-The web dashboard's "New Session" modal currently requires the user to type the
-repository path as free-text into an `<Input>`. Add a "Browse…" button next to
-the Repository field that opens a folder-picker modal backed by a new server-side
-JSON-RPC `fs/list-dir` handler. Because `ark web` / Electron desktop always runs
-on the same machine as the filesystem, a server-side directory listing + custom
-picker UI works uniformly in both environments and avoids browser sandbox
-limitations (`<input type=file webkitdirectory>` cannot return absolute paths).
-The picker is gated to local (non-hosted) mode only to avoid exposing the host
-filesystem in multi-tenant deployments.
+The Web UI's chat/conversation interface is minimal: a collapsible single-line input that disappears after sending, no user message persistence, and 5-second polling. This plan upgrades it to a proper chat panel with persistent message history, optimistic sends, auto-scroll, and faster polling -- matching the TUI's `TalkToSession` experience and closing the surface parity gap between Web UI and TUI.
 
-## 2. Files to modify/create
+## Files to modify/create
 
-### Create
-- `packages/server/handlers/fs.ts` -- new `fs/list-dir` RPC handler: lists directories under an absolute path, returns entries + parent. Refuses to run in hosted mode (`app.config.databaseUrl` set).
-- `packages/server/__tests__/fs-handler.test.ts` -- unit tests for the handler: happy path, home-dir default, non-existent path, hosted-mode refusal, `isGitRepo` flag.
-- `packages/web/src/components/FolderPickerModal.tsx` -- modal component: breadcrumb, entry list (dirs only), "Select this folder" button, "Cancel".
-- `packages/web/src/components/ui/modal.tsx` -- lightweight shared `Modal` wrapper (backdrop + centered panel). Currently no reusable modal primitive exists; NewSessionModal is rendered inside a side panel. The folder picker needs a true overlay so we extract a small primitive rather than duplicating styles.
+| File | Change |
+|------|--------|
+| `packages/core/services/session-orchestration.ts` | Persist user message to `messages` table before sending to tmux (line ~2325) |
+| `packages/server/handlers/messaging.ts` | Return the send result (ok + message) from the `message/send` handler |
+| `packages/web/src/components/ChatPanel.tsx` | **New file** -- dedicated chat panel component (message thread + input bar) |
+| `packages/web/src/hooks/useMessages.ts` | **New file** -- web-side message hook with polling, send, optimistic updates |
+| `packages/web/src/components/SessionDetail.tsx` | Replace inline send form with ChatPanel; wire chatOpen toggle |
+| `packages/web/src/hooks/useSessionDetailData.ts` | Remove message fetching (now owned by ChatPanel's useMessages hook) |
+| `packages/web/src/hooks/useApi.ts` | Add `markRead` method to api object |
 
-### Modify
-- `packages/server/register.ts` -- import and call `registerFsHandlers(router, app)`.
-- `packages/web/src/hooks/useApi.ts` -- add `api.listDir(path?: string)` -> `{ cwd, parent, home, entries: { name, path, isGitRepo? }[] }`.
-- `packages/web/src/components/NewSessionModal.tsx` -- add "Browse…" button next to the Repository `<Input>`; clicking it opens `<FolderPickerModal>`; selected path is written back into `form.repo`.
-- `packages/web/__tests__/NewSessionModal.test.tsx` (or add new file if absent) -- verify clicking Browse opens the picker and that a selected path flows back into the input.
+## Implementation steps
 
-### No changes needed
-- Electron `main.js` / `preload.js` -- server-side picker works inside the embedded BrowserWindow too; no native dialog IPC added in this iteration.
+### Step 1: Persist user messages on send (backend)
 
-## 3. Implementation steps
+In `packages/core/services/session-orchestration.ts`, function `send()` (lines 2309-2328):
 
-### Step 1 -- Backend handler `packages/server/handlers/fs.ts`
-1. Export `registerFsHandlers(router: Router, app: AppContext)`.
-2. Register `fs/list-dir`:
-   - Params: `{ path?: string }` (optional; defaults to `os.homedir()`).
-   - Refuse with a clear error when `app.config.databaseUrl` is truthy (hosted mode) -- local FS must not be exposed to tenants.
-   - Normalize the incoming path via `path.resolve()` to get an absolute canonical form.
-   - Read entries via `fs.readdirSync(dir, { withFileTypes: true })`.
-   - Filter to directories only (ignore files). Include hidden dirs (`.config`, etc.) -- users legitimately use them. Wrap per-entry access in try/catch so one unreadable dir does not break the listing.
-   - Sort alphabetically, case-insensitive.
-   - Return `{ cwd: string, parent: string | null, home: string, entries: Array<{ name: string; path: string; isGitRepo?: boolean }> }`. `isGitRepo` is set when `<entry>/.git` exists -- cheap `existsSync` check -- so the UI can badge likely repos. `parent` is `null` when `cwd === path.parse(cwd).root`.
-   - Errors (ENOENT, EACCES) surface as the RPC error `{ code: -32602, message }`.
-3. Wire into `packages/server/register.ts` alongside the other handler registrations.
+**Before** the `sendReliable()` call (after injection check passes, around line 2324), insert:
+```ts
+app.messages.send(sessionId, "user", message, "text");
+```
 
-Note: `fs/list-dir` is a READ method; do NOT add it to the `WRITE_METHODS` set in `packages/core/hosted/web.ts`. It is still allowed in readOnly mode because reading is fine there; the hosted-mode refusal lives inside the handler itself.
+This ensures every user-sent message appears in the conversation history, matching how agent messages are already persisted via the conductor channel (`conductor.ts` line ~664).
 
-### Step 2 -- API client `packages/web/src/hooks/useApi.ts`
-1. Add to the `api` object:
-   ```ts
-   listDir: (path?: string) => rpc<{
-     cwd: string;
-     parent: string | null;
-     home: string;
-     entries: { name: string; path: string; isGitRepo?: boolean }[];
-   }>("fs/list-dir", { path }),
-   ```
+### Step 2: Return send result from `message/send` RPC
 
-### Step 3 -- Modal primitive `packages/web/src/components/ui/modal.tsx`
-1. Small wrapper: fixed backdrop (`bg-black/60`), centered panel, `onClose` handler on backdrop click + Escape key.
-2. Signature: `<Modal open onClose title>{children}</Modal>`. Deliberately small -- enough for the folder picker; existing side-panel NewSessionModal stays untouched.
+In `packages/server/handlers/messaging.ts`, the `message/send` handler (lines 7-11):
 
-### Step 4 -- Folder picker `packages/web/src/components/FolderPickerModal.tsx`
-1. Props: `{ initialPath?: string; onSelect: (absPath: string) => void; onClose: () => void }`.
-2. State: `cwd`, `parent`, `entries`, `loading`, `error`.
-3. On mount and whenever `cwd` changes, call `api.listDir(cwd)` and update state. When `initialPath` is undefined or ".", call `listDir()` with no arg so the server defaults to the user's home directory.
-4. UI:
-   - Header: current path as text + a text input for typing a path + Enter-to-jump.
-   - Body: scrollable list; `..` row at the top when `parent` is non-null; one row per directory entry. Rows show folder icon + name; git repos show a small "git" badge.
-   - Footer: "Select this folder" button (returns current `cwd` via `onSelect`) + "Cancel".
-5. Keyboard: Enter on a focused row enters it; Backspace goes up when focus is in the list.
-6. Error surface: if `api.listDir` rejects, show the error message inside the modal (do NOT close).
+Change the handler to return the actual result from `sessionService.send()`:
+```ts
+router.handle("message/send", async (p) => {
+  const { sessionId, content } = extract<MessageSendParams>(p, ["sessionId", "content"]);
+  const result = await app.sessionService.send(sessionId, content);
+  return result;
+});
+```
 
-### Step 5 -- Integrate into `NewSessionModal.tsx`
-1. Add state: `const [pickerOpen, setPickerOpen] = useState(false)`.
-2. Replace the single `<Input>` for Repository with a flex row: `<Input ... />` + `<Button type="button" variant="outline" size="sm" onClick={() => setPickerOpen(true)}>Browse…</Button>`.
-3. When picker calls `onSelect(path)`: `update("repo", path); setPickerOpen(false);`.
-4. Render `{pickerOpen && <FolderPickerModal initialPath={form.repo === "." ? undefined : form.repo} onSelect={...} onClose={() => setPickerOpen(false)} />}`.
-5. No change to form submission -- the picked path is written into the existing `form.repo` string, so the rest of the flow (RPC `session/start` with `repo`) is unchanged.
+The result already has `{ ok: boolean, message: string }` from `session-orchestration.send()`. This lets the client know if delivery failed (no active session, prompt injection blocked, etc.).
 
-### Step 6 -- Tests
-1. `packages/server/__tests__/fs-handler.test.ts` (bun:test):
-   - Use the `AppContext.forTest()` pattern.
-   - Create a temp dir, build a subdirectory tree (including a `.git/` child inside one sub-folder), assert listing, parent navigation, alphabetical order, `isGitRepo` flag, non-existent path error, and hosted-mode refusal by setting `app.config.databaseUrl = "postgres://fake"` before the call.
-2. Web component test (`packages/web/__tests__`):
-   - First check the directory for existing test infrastructure (vitest/bun:test + happy-dom). Reuse whatever pattern is already there rather than inventing a new harness.
-   - Mount `<NewSessionModal>`, click "Browse…", mock `api.listDir` to return two entries, click one, click "Select this folder", assert the repo field now contains the selected absolute path.
+### Step 3: Add `markRead` to web API
 
-## 4. Testing strategy
+In `packages/web/src/hooks/useApi.ts`, add after the `send` method (line 76):
+```ts
+markRead: (id: string) => rpc<any>("message/markRead", { sessionId: id }),
+```
 
-- **Unit -- handler (`bun:test`)**: cover
-  1. Default to `os.homedir()` when no path passed.
-  2. Listing returns only directories, sorted case-insensitively, with `parent` set correctly (and null at filesystem root).
-  3. `isGitRepo` flag appears on dirs containing `.git`.
-  4. Non-existent path -> RPC error with non-empty message.
-  5. Hosted mode (`config.databaseUrl` set) -> refusal error, no filesystem access attempted.
-- **Unit -- web API client**: not strictly needed -- `api.listDir` is a thin one-liner. Skip unless existing hooks file has tests.
-- **Component -- NewSessionModal**: assert that Browse opens the picker and selection populates the input. Mock `api.listDir`.
-- **Manual verification**:
-  1. `make dev` then `make desktop` (Electron) -- open New Session, click Browse, navigate to a real repo, confirm path appears in Repository field, submit, session starts against that repo.
-  2. `./ark web --port 8420` in a browser -- same flow, confirm picker works.
-  3. Confirm the existing free-text typing path still works (regression).
-- **Full suite**: `make test` before declaring done. Tests must run sequentially (ports collide -- see CLAUDE.md).
+### Step 4: Create `useMessages` hook for the web
 
-## 5. Risk assessment
+Create `packages/web/src/hooks/useMessages.ts`:
 
-- **Hosted mode exposure**: exposing a filesystem browser in a multi-tenant deployment would let any authenticated tenant enumerate the host filesystem. Mitigation: explicit refusal when `app.config.databaseUrl` is set, plus a unit test.
-- **Path traversal / symlinks**: the handler always resolves via `path.resolve()` before listing, so relative `..` input is normalized. Because hosted mode is blocked and local mode already gives the agent shell access, further sandboxing (chroot) is not warranted.
-- **Permission errors on sub-entries**: one unreadable dir must not break the whole listing -- wrap per-entry `statSync` / `.git` check in try/catch.
-- **Large directories**: listing directories only (skipping files) keeps payload small even in e.g. `/usr/local`. No pagination needed for v1.
-- **Breaking change**: none. The Repository field still accepts typed input; Browse is additive.
-- **Electron native dialog parity**: users familiar with native macOS open dialogs may expect one. This plan intentionally does NOT add an Electron IPC bridge -- the server-side picker is uniform across browser and desktop and avoids bridge code that would diverge from `ark web`. Listed in Open questions below.
-- **Modal primitive**: introducing `ui/modal.tsx` is a small new abstraction, but it's justified -- the existing `NewSessionModal` is rendered in a side panel, not a true overlay, and the folder picker requires an overlay. Keeping the primitive minimal (backdrop + Escape to close) avoids scope creep.
+```ts
+interface UseMessagesOpts {
+  sessionId: string;
+  enabled: boolean;    // only poll when chat panel is open
+  pollMs?: number;     // default 2000ms
+}
 
-## 6. Open questions
+interface UseMessagesResult {
+  messages: Message[];
+  send: (content: string) => Promise<void>;
+  sending: boolean;
+}
+```
 
-1. **Electron native dialog**: should we also wire `dialog.showOpenDialog({ properties: ["openDirectory"] })` through `preload.js` and prefer it when `window.arkDesktop?.isElectron` is true? Nicer UX for desktop users but adds an IPC surface. Default: NO for this iteration.
-2. **Git repo validation**: should the picker refuse to return a path that is not a git repo, or just badge it and let the user decide? Default: badge only (some Ark flows are fine on non-git dirs).
-3. **Starting directory**: when the user clicks Browse with `form.repo === "."`, should we open at `process.cwd()` (the ark server's cwd, not necessarily what the user intuits) or `os.homedir()`? Default: `os.homedir()` -- more predictable across how the server was launched. Confirm with reviewer.
-4. **Recent repos**: should the picker show a "Recent" section pulled from recent sessions' `repo` values? Nice-to-have, not in scope.
-5. **Hidden directories**: include `.config`, `.ssh`, etc. in the listing? Default: YES -- users legitimately use hidden dirs; hiding them would surprise power users.
+Behavior:
+- On mount and at `pollMs` intervals (when `enabled`): call `api.getMessages(sessionId)`, then `api.markRead(sessionId)`
+- `send(content)`: optimistically add a user message to local state, call `api.send(sessionId, content)`, then refetch on next poll
+- On `sessionId` change: reset messages and reload immediately
+- Only poll when `enabled` is true (stops 2s polling when chat panel is closed)
+- Optimistic messages use a negative temp `id` and get deduped on next poll by matching `role + content + created_at` proximity
+
+### Step 5: Create `ChatPanel` component
+
+Create `packages/web/src/components/ChatPanel.tsx`:
+
+```
+<div className="flex flex-col h-full">
+  {/* Header: "Chat: <summary>" + close button */}
+  <div className="h-10 border-b px-4 flex items-center justify-between shrink-0">
+    <span>Chat: {session.summary || session.id}</span>
+    <Button variant="ghost" size="icon-xs" onClick={onClose}><X /></Button>
+  </div>
+
+  {/* Messages: scrollable, auto-scroll to bottom */}
+  <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5">
+    {messages.length === 0 && <EmptyState />}
+    {messages.map(m => <ChatBubble key={m.id} message={m} />)}
+    <div ref={bottomRef} />
+  </div>
+
+  {/* Input bar: always visible at bottom */}
+  <div className="border-t p-2 flex gap-2 shrink-0">
+    <Input placeholder="Message to agent..."
+      value={msg} onChange={...}
+      onKeyDown={Enter -> send}
+      autoFocus />
+    <Button size="xs" disabled={!msg.trim() || sending}
+      onClick={send}>Send</Button>
+  </div>
+</div>
+```
+
+Chat bubble styling (reuse existing patterns from SessionDetail.tsx lines 556-575):
+- User messages: `bg-primary/10 border-primary/20 self-end` (right-aligned)
+- Agent/system messages: `bg-secondary border-border self-start` (left-aligned)
+- Badge for non-text types (progress, question, completed, error)
+- Timestamp via `relTime()`
+- Empty state: "No messages yet. Type below to send."
+
+Auto-scroll: use a `useEffect` that scrolls `bottomRef` into view when messages change, unless user has scrolled up (track via `onScroll` event checking if scrollTop + clientHeight < scrollHeight - threshold).
+
+### Step 6: Integrate ChatPanel into SessionDetail
+
+In `packages/web/src/components/SessionDetail.tsx`:
+
+1. **Simplify SessionActions** (lines 30-109): Remove the inline send form (state variables `sendMsg`, `showSendInternal`, lines 32-33, 79-106). The "Send" button now only toggles `chatOpen` via `onChatOpenChange`:
+```tsx
+{(s === "running" || s === "waiting") && (
+  <Button variant={chatOpen ? "default" : "outline"} size="xs"
+    onClick={() => onChatOpenChange?.(!chatOpen)}>
+    {chatOpen ? "Close Chat" : "Chat"}
+  </Button>
+)}
+```
+
+2. **Conditional render**: When `chatOpen` is true, render `ChatPanel` in place of the scrollable detail content area:
+```tsx
+<div className="flex flex-col h-full bg-background">
+  {/* Header */}
+  <div className="h-[52px] ...">...</div>
+
+  {chatOpen ? (
+    <ChatPanel
+      sessionId={sessionId}
+      session={s}
+      onClose={() => onChatOpenChange?.(false)}
+      onToast={onToast}
+    />
+  ) : (
+    <div className="flex-1 overflow-y-auto p-5">
+      {/* existing detail content (metadata, todos, events, etc.) */}
+      {/* Keep the Conversation section here for non-active sessions */}
+    </div>
+  )}
+</div>
+```
+
+3. **Keep Conversation section for non-active sessions**: The existing message display at lines 547-579 remains in the detail view for completed/stopped sessions where chat isn't available. But when chat is open, it's not shown (ChatPanel owns message display).
+
+### Step 7: Clean up useSessionDetailData
+
+In `packages/web/src/hooks/useSessionDetailData.ts`:
+
+- Remove `messages` state (line 36) and both message-fetching effects (lines 55-60 for initial load, line 88-89 in the poll)
+- Remove `messages` from the return type and return value
+- In `SessionDetail.tsx`, remove `messages` from the destructured hook result (line 112)
+- For the "Conversation" section in the detail view (non-chat mode), fetch messages inline or keep a lightweight read-only version
+
+**However**, to keep the Conversation section working in the detail view for non-active sessions, we have two options:
+- (a) Keep the message fetch in `useSessionDetailData` but only for non-active sessions (no polling needed for completed sessions)
+- (b) Have `SessionDetail` conditionally fetch messages for the static Conversation display
+
+**Recommendation**: option (a) -- keep a single initial fetch of messages in `useSessionDetailData` (no polling), remove the polling effect. ChatPanel handles its own fast polling when active.
+
+## Testing strategy
+
+1. **Manual verification (critical path)**:
+   - Start a running session, open chat (`t` key or click Chat button), send a message -- verify it appears immediately
+   - Verify the message reaches the agent (check tmux pane: `tmux capture-pane -t ark-s-<id> -p`)
+   - Wait for agent response -- verify it appears in chat within ~2 seconds
+   - Send several messages, confirm auto-scroll keeps latest visible
+   - Scroll up manually, confirm new messages don't yank viewport down
+   - Close chat (Escape or click close), reopen -- verify full history preserved
+   - Switch to a different session -- verify chat resets
+
+2. **Backend persistence test**:
+   - Send a message via RPC: `{"method":"message/send","params":{"sessionId":"s-xxx","content":"hello"}}`
+   - Query messages: `{"method":"session/messages","params":{"sessionId":"s-xxx"}}`
+   - Verify the user message appears with `role:"user"`, `type:"text"`
+   - Send from agent (via channel report), query again -- verify interleaved correctly
+
+3. **Edge cases**:
+   - Send to a stopped/completed session -- verify error toast
+   - Empty message -- verify send button disabled, Enter does nothing
+   - Very long message -- verify wrapping in bubble, no horizontal overflow
+   - Rapid sends -- verify no duplicate optimistic messages
+   - Session transitions running->completed while chat open -- verify input disables gracefully
+   - Prompt injection -- verify blocked message shows error toast
+
+4. **Keyboard shortcuts** (already wired, verify still working):
+   - `t` toggles chat open/close (SessionsPage.tsx:91-98)
+   - `Escape` closes chat (SessionsPage.tsx:113)
+   - `Enter` in input sends message
+
+## Risk assessment
+
+1. **User message double-persistence** -- Low risk. Currently zero user messages are persisted. After this change, exactly one `INSERT` per send in `session-orchestration.send()`. No other code path persists user messages. The TUI's `useMessages` hook calls `ark.messageSend()` which hits the same `message/send` RPC, so this fix benefits both surfaces.
+
+2. **Polling load** -- Low risk. The 2s poll only runs when chat is open (one session at a time). We remove the message fetch from the 5s detail poll, so net polling stays similar. Messages are a lightweight query (50 rows max, single-table SELECT with LIMIT).
+
+3. **Optimistic message ordering** -- The optimistic message has a temp negative `id`. On next 2s poll, the real DB message replaces it. Brief flicker is possible if poll races with render, but content will be identical. Dedup by matching `role === "user" && content === optimistic.content` within a 5-second window.
+
+4. **No breaking API changes** -- The `message/send` RPC response changes from always `{ ok: true }` to `{ ok: boolean, message: string }`. Extra fields are additive. The existing web UI already handles `res.ok !== false` (SessionDetail.tsx:236-240). The TUI's `useMessages` hook calls `ark.messageSend()` which uses `ArkClient.messageSend()` -- it ignores the response entirely (`await this.rpc(...)` with no return processing), so no breakage.
+
+5. **ChatPanel layout** -- Medium risk. The panel replaces the detail view content area. If the panel's flex layout doesn't fill height correctly, the input bar could float or the messages area could overflow. Test across different viewport heights. The existing `SessionDetail` already uses `flex flex-col h-full`, so the structure is proven.
+
+## Open questions
+
+1. **Should chat be a side panel or replace the detail view?** This plan uses full replacement (chat replaces detail when open). A split layout (detail + chat side by side) would require wider minimum widths. **Recommendation**: full replacement is simpler and matches TUI behavior.
+
+2. **Should we add SSE for messages?** Currently the SSE stream only sends session status. Adding per-session message events would eliminate polling. **Recommendation**: defer to follow-up; 2s polling is adequate for chat and matches TUI.
+
+3. **Should chat work for non-running sessions (read-only)?** Currently the Chat button only appears for running/waiting sessions. Completed sessions show the static Conversation section in detail view. **Recommendation**: keep this split -- chat with input for active sessions, read-only conversation display for inactive sessions.
