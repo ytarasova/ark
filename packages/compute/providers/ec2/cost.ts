@@ -2,10 +2,7 @@
  * EC2 cost tracking - pricing tables and AWS Cost Explorer integration.
  */
 
-import {
-  CostExplorerClient,
-  GetCostAndUsageCommand,
-} from "@aws-sdk/client-cost-explorer";
+import { CostExplorerClient, GetCostAndUsageCommand } from "@aws-sdk/client-cost-explorer";
 
 // ── Pricing tables (us-east-1 on-demand, approximate) ───────────────────────
 
@@ -43,12 +40,9 @@ export function hourlyRate(instanceType: string): number {
 /**
  * Estimate daily cost: compute (hourly rate x 24) + storage (EBS pro-rated).
  */
-export function estimateDailyCost(
-  instanceType: string,
-  diskGb: number,
-): number {
+export function estimateDailyCost(instanceType: string, diskGb: number): number {
   const compute = hourlyRate(instanceType) * 24;
-  const storage = diskGb * EBS_GB_MONTH / 30;
+  const storage = (diskGb * EBS_GB_MONTH) / 30;
   return compute + storage;
 }
 
@@ -68,10 +62,7 @@ const costCache = new Map<string, CacheEntry>();
  *
  * Results are cached for 4 hours. Returns null on any error.
  */
-export async function fetchAwsCost(
-  hostName: string,
-  opts?: { region?: string },
-): Promise<number | null> {
+export async function fetchAwsCost(hostName: string, opts?: { region?: string }): Promise<number | null> {
   const cacheKey = `${hostName}:${opts?.region ?? "us-east-1"}`;
   const cached = costCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
@@ -103,9 +94,7 @@ export async function fetchAwsCost(
     });
 
     const resp = await client.send(command);
-    const amount = parseFloat(
-      resp.ResultsByTime?.[0]?.Total?.BlendedCost?.Amount ?? "0",
-    );
+    const amount = parseFloat(resp.ResultsByTime?.[0]?.Total?.BlendedCost?.Amount ?? "0");
 
     costCache.set(cacheKey, { value: amount, ts: Date.now() });
     return amount;

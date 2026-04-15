@@ -2,7 +2,14 @@ import { describe, it, expect } from "bun:test";
 import { DockerProvider, containerName } from "../providers/docker/index.js";
 
 const provider = new DockerProvider();
-const fakeCompute = { name: "docker-test", provider: "docker", status: "running", config: {}, created_at: "", updated_at: "" };
+const fakeCompute = {
+  name: "docker-test",
+  provider: "docker",
+  status: "running",
+  config: {},
+  created_at: "",
+  updated_at: "",
+};
 
 describe("DockerProvider", () => {
   it("has name 'docker'", () => {
@@ -10,7 +17,17 @@ describe("DockerProvider", () => {
   });
 
   it("implements all ComputeProvider methods", () => {
-    for (const method of ["provision", "destroy", "start", "stop", "launch", "attach", "getMetrics", "probePorts", "syncEnvironment"]) {
+    for (const method of [
+      "provision",
+      "destroy",
+      "start",
+      "stop",
+      "launch",
+      "attach",
+      "getMetrics",
+      "probePorts",
+      "syncEnvironment",
+    ]) {
       expect(typeof (provider as Record<string, unknown>)[method]).toBe("function");
     }
   });

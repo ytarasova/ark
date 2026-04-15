@@ -27,7 +27,7 @@ describe("session handlers", () => {
     const req = createRequest(1, "session/start", { summary: "test session", repo: ".", flow: "bare" });
     const res = await router.dispatch(req);
     const result = (res as JsonRpcResponse).result as Record<string, unknown>;
-    expect((result.session as Record<string, unknown>)).toBeDefined();
+    expect(result.session as Record<string, unknown>).toBeDefined();
     expect((result.session as Record<string, unknown>).summary).toBe("test session");
   });
 
@@ -39,7 +39,9 @@ describe("session handlers", () => {
   });
 
   it("session/read returns session detail", async () => {
-    const startRes = await router.dispatch(createRequest(1, "session/start", { summary: "read-test", repo: ".", flow: "bare" }));
+    const startRes = await router.dispatch(
+      createRequest(1, "session/start", { summary: "read-test", repo: ".", flow: "bare" }),
+    );
     const startResult = (startRes as JsonRpcResponse).result as Record<string, unknown>;
     const id = (startResult.session as Record<string, unknown>).id;
     const res = await router.dispatch(createRequest(2, "session/read", { sessionId: id }));
@@ -55,16 +57,22 @@ describe("session handlers", () => {
   });
 
   it("session/update modifies session fields", async () => {
-    const startRes = await router.dispatch(createRequest(1, "session/start", { summary: "update-test", repo: ".", flow: "bare" }));
+    const startRes = await router.dispatch(
+      createRequest(1, "session/start", { summary: "update-test", repo: ".", flow: "bare" }),
+    );
     const startResult = (startRes as JsonRpcResponse).result as Record<string, unknown>;
     const id = (startResult.session as Record<string, unknown>).id;
-    const res = await router.dispatch(createRequest(2, "session/update", { sessionId: id, fields: { summary: "updated" } }));
+    const res = await router.dispatch(
+      createRequest(2, "session/update", { sessionId: id, fields: { summary: "updated" } }),
+    );
     const result = (res as JsonRpcResponse).result as Record<string, unknown>;
     expect((result.session as Record<string, unknown>).summary).toBe("updated");
   });
 
   it("session/delete soft-deletes a session", async () => {
-    const startRes = await router.dispatch(createRequest(1, "session/start", { summary: "del-test", repo: ".", flow: "bare" }));
+    const startRes = await router.dispatch(
+      createRequest(1, "session/start", { summary: "del-test", repo: ".", flow: "bare" }),
+    );
     const startResult = (startRes as JsonRpcResponse).result as Record<string, unknown>;
     const id = (startResult.session as Record<string, unknown>).id;
     const res = await router.dispatch(createRequest(2, "session/delete", { sessionId: id }));

@@ -120,9 +120,7 @@ export function registerFsHandlers(router: Router, app: AppContext): void {
       entries.push(entry);
     }
 
-    entries.sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-    );
+    entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 
     const parsed = parse(cwd);
     const parent = cwd === parsed.root ? null : resolve(cwd, "..");

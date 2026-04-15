@@ -1,10 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  getClipboardImage,
-  uploadToSession,
-  watchClipboard,
-} from "../providers/ec2/clipboard.js";
+import { getClipboardImage, uploadToSession, watchClipboard } from "../providers/ec2/clipboard.js";
 
 describe("EC2 clipboard sync", () => {
   // -----------------------------------------------------------------------

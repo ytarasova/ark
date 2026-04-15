@@ -6,11 +6,7 @@ import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync, readFileSync } from "fs";
 import { join } from "path";
 import { withTestContext } from "./test-helpers.js";
-import {
-  discoverTools,
-  addMcpServer, removeMcpServer,
-  addCommand, removeCommand, getCommand,
-} from "../tools.js";
+import { discoverTools, addMcpServer, removeMcpServer, addCommand, removeCommand, getCommand } from "../tools.js";
 
 const { getCtx } = withTestContext();
 
@@ -24,15 +20,18 @@ function makeProjectDir(): string {
 describe("discoverTools", () => {
   it("finds MCP servers from .mcp.json", () => {
     const dir = makeProjectDir();
-    writeFileSync(join(dir, ".mcp.json"), JSON.stringify({
-      mcpServers: {
-        "my-server": { command: "node", args: ["server.js"] },
-        "other-server": { command: "python", args: ["-m", "mcp"] },
-      },
-    }));
+    writeFileSync(
+      join(dir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          "my-server": { command: "node", args: ["server.js"] },
+          "other-server": { command: "python", args: ["-m", "mcp"] },
+        },
+      }),
+    );
 
     const tools = discoverTools(dir);
-    const mcpTools = tools.filter(t => t.kind === "mcp-server");
+    const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools.length).toBe(2);
     expect(mcpTools[0].name).toBe("my-server");
     expect(mcpTools[1].name).toBe("other-server");
@@ -47,10 +46,10 @@ describe("discoverTools", () => {
     writeFileSync(join(cmdDir, "lint.md"), "# Lint the code\nRun eslint...");
 
     const tools = discoverTools(dir);
-    const cmds = tools.filter(t => t.kind === "command");
+    const cmds = tools.filter((t) => t.kind === "command");
     expect(cmds.length).toBe(2);
-    expect(cmds.find(c => c.name === "deploy")?.description).toBe("Deploy to production");
-    expect(cmds.find(c => c.name === "lint")?.description).toBe("Lint the code");
+    expect(cmds.find((c) => c.name === "deploy")?.description).toBe("Deploy to production");
+    expect(cmds.find((c) => c.name === "lint")?.description).toBe("Lint the code");
   });
 
   it("finds claude skills from .claude/skills/", () => {
@@ -60,7 +59,7 @@ describe("discoverTools", () => {
     writeFileSync(join(skillDir, "review.md"), "# Code review skill\nReview code for...");
 
     const tools = discoverTools(dir);
-    const skills = tools.filter(t => t.kind === "claude-skill");
+    const skills = tools.filter((t) => t.kind === "claude-skill");
     expect(skills.length).toBe(1);
     expect(skills[0].name).toBe("review");
     expect(skills[0].description).toBe("Code review skill");
@@ -71,15 +70,15 @@ describe("discoverTools", () => {
     writeFileSync(join(dir, "CLAUDE.md"), "# Project\nThis is a project.");
 
     const tools = discoverTools(dir);
-    const ctx = tools.filter(t => t.kind === "context");
+    const ctx = tools.filter((t) => t.kind === "context");
     expect(ctx.length).toBe(1);
     expect(ctx[0].name).toBe("CLAUDE.md");
   });
 
   it("finds ark skills and recipes", () => {
     const tools = discoverTools();
-    const arkSkills = tools.filter(t => t.kind === "ark-skill");
-    const arkRecipes = tools.filter(t => t.kind === "ark-recipe");
+    const arkSkills = tools.filter((t) => t.kind === "ark-skill");
+    const arkRecipes = tools.filter((t) => t.kind === "ark-recipe");
     // Builtin skills and recipes should exist
     expect(arkSkills.length).toBeGreaterThanOrEqual(0);
     expect(arkRecipes.length).toBeGreaterThanOrEqual(0);
@@ -88,13 +87,15 @@ describe("discoverTools", () => {
   it("handles missing .mcp.json gracefully", () => {
     const dir = makeProjectDir();
     const tools = discoverTools(dir);
-    const mcpTools = tools.filter(t => t.kind === "mcp-server");
+    const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools.length).toBe(0);
   });
 
   it("handles JSONC (comments) in .mcp.json", () => {
     const dir = makeProjectDir();
-    writeFileSync(join(dir, ".mcp.json"), `{
+    writeFileSync(
+      join(dir, ".mcp.json"),
+      `{
   // This is a comment
   "mcpServers": {
     /* block comment */
@@ -103,31 +104,35 @@ describe("discoverTools", () => {
       "args": ["server.js"]
     }
   }
-}`);
+}`,
+    );
 
     const tools = discoverTools(dir);
-    const mcpTools = tools.filter(t => t.kind === "mcp-server");
+    const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools.length).toBe(1);
     expect(mcpTools[0].name).toBe("test-server");
   });
 
   it("sorts by kind then name", () => {
     const dir = makeProjectDir();
-    writeFileSync(join(dir, ".mcp.json"), JSON.stringify({
-      mcpServers: { "z-server": { command: "z" }, "a-server": { command: "a" } },
-    }));
+    writeFileSync(
+      join(dir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: { "z-server": { command: "z" }, "a-server": { command: "a" } },
+      }),
+    );
     const cmdDir = join(dir, ".claude", "commands");
     mkdirSync(cmdDir, { recursive: true });
     writeFileSync(join(cmdDir, "beta.md"), "# Beta");
     writeFileSync(join(cmdDir, "alpha.md"), "# Alpha");
 
     const tools = discoverTools(dir);
-    const mcpIdx = tools.findIndex(t => t.kind === "mcp-server");
-    const cmdIdx = tools.findIndex(t => t.kind === "command");
+    const mcpIdx = tools.findIndex((t) => t.kind === "mcp-server");
+    const cmdIdx = tools.findIndex((t) => t.kind === "command");
     // MCP servers come before commands
     expect(mcpIdx).toBeLessThan(cmdIdx);
     // Within MCP servers, sorted by name
-    const mcpTools = tools.filter(t => t.kind === "mcp-server");
+    const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools[0].name).toBe("a-server");
     expect(mcpTools[1].name).toBe("z-server");
   });
@@ -139,14 +144,14 @@ describe("MCP server CRUD", () => {
 
     addMcpServer(dir, "test-server", { command: "node", args: ["srv.js"] });
     let tools = discoverTools(dir);
-    let mcp = tools.filter(t => t.kind === "mcp-server");
+    let mcp = tools.filter((t) => t.kind === "mcp-server");
     expect(mcp.length).toBe(1);
     expect(mcp[0].name).toBe("test-server");
     expect(mcp[0].config).toEqual({ command: "node", args: ["srv.js"] });
 
     removeMcpServer(dir, "test-server");
     tools = discoverTools(dir);
-    mcp = tools.filter(t => t.kind === "mcp-server");
+    mcp = tools.filter((t) => t.kind === "mcp-server");
     expect(mcp.length).toBe(0);
   });
 
@@ -163,16 +168,19 @@ describe("MCP server CRUD", () => {
 
   it("addMcpServer handles JSONC in existing file", () => {
     const dir = makeProjectDir();
-    writeFileSync(join(dir, ".mcp.json"), `{
+    writeFileSync(
+      join(dir, ".mcp.json"),
+      `{
   // existing config
   "mcpServers": {
     "old": { "command": "old" }
   }
-}`);
+}`,
+    );
 
     addMcpServer(dir, "new-server", { command: "new" });
     const tools = discoverTools(dir);
-    const mcp = tools.filter(t => t.kind === "mcp-server");
+    const mcp = tools.filter((t) => t.kind === "mcp-server");
     expect(mcp.length).toBe(2);
   });
 
@@ -191,7 +199,7 @@ describe("command CRUD", () => {
     expect(getCommand(dir, "deploy")).toBe("# Deploy\nDeploy to production.");
 
     const tools = discoverTools(dir);
-    const cmds = tools.filter(t => t.kind === "command");
+    const cmds = tools.filter((t) => t.kind === "command");
     expect(cmds.length).toBe(1);
     expect(cmds[0].name).toBe("deploy");
 

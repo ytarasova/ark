@@ -22,8 +22,11 @@ import { realpathSync } from "fs";
 import type { TranscriptParser, ParseResult, FindOpts } from "../transcript-parser.js";
 
 function normalizePath(p: string): string {
-  try { return realpathSync(resolve(p)); }
-  catch { return resolve(p); }
+  try {
+    return realpathSync(resolve(p));
+  } catch {
+    return resolve(p);
+  }
 }
 
 export class CodexTranscriptParser implements TranscriptParser {
@@ -42,8 +45,11 @@ export class CodexTranscriptParser implements TranscriptParser {
     if (!existsSync(transcriptPath)) return { usage };
 
     let content: string;
-    try { content = readFileSync(transcriptPath, "utf-8"); }
-    catch { return { usage }; }
+    try {
+      content = readFileSync(transcriptPath, "utf-8");
+    } catch {
+      return { usage };
+    }
 
     let model: string | undefined;
     let lastTotal: any = null;
@@ -61,7 +67,9 @@ export class CodexTranscriptParser implements TranscriptParser {
             lastTotal = info.total_token_usage;
           }
         }
-      } catch { /* skip malformed lines */ }
+      } catch {
+        /* skip malformed lines */
+      }
     }
 
     if (lastTotal) {
@@ -87,11 +95,19 @@ export class CodexTranscriptParser implements TranscriptParser {
 
     const walk = (dir: string): void => {
       let entries: string[];
-      try { entries = readdirSync(dir); } catch { return; }
+      try {
+        entries = readdirSync(dir);
+      } catch {
+        return;
+      }
       for (const name of entries) {
         const full = join(dir, name);
         let st;
-        try { st = statSync(full); } catch { continue; }
+        try {
+          st = statSync(full);
+        } catch {
+          continue;
+        }
         if (st.isDirectory()) {
           walk(full);
         } else if (name.startsWith("rollout-") && name.endsWith(".jsonl")) {
@@ -117,7 +133,9 @@ export class CodexTranscriptParser implements TranscriptParser {
         if (normalizePath(fileCwd) === targetCwd) {
           return path;
         }
-      } catch { /* skip files we can't read/parse */ }
+      } catch {
+        /* skip files we can't read/parse */
+      }
     }
 
     return null;

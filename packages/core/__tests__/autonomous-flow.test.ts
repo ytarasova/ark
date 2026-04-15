@@ -104,7 +104,11 @@ describe("autonomous flow via conductor", () => {
   });
 
   afterEach(() => {
-    try { server.stop(); } catch { /* cleanup */ }
+    try {
+      server.stop();
+    } catch {
+      /* cleanup */
+    }
   });
 
   async function postHook(sessionId: string, payload: Record<string, unknown>): Promise<Response> {

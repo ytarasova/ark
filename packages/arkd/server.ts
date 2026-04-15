@@ -6,11 +6,9 @@
  */
 
 declare const Bun: {
-  serve(options: {
-    port: number;
-    hostname: string;
-    fetch(req: Request): Promise<Response> | Response;
-  }): { stop(): void };
+  serve(options: { port: number; hostname: string; fetch(req: Request): Promise<Response> | Response }): {
+    stop(): void;
+  };
   spawn(opts: {
     cmd: string[];
     cwd?: string;
@@ -35,24 +33,43 @@ import { join } from "path";
 import { hostname, platform, uptime, totalmem, freemem, cpus } from "os";
 import { DEFAULT_CHANNEL_BASE_URL } from "../core/constants.js";
 import type {
-  ReadFileReq, ReadFileRes,
-  WriteFileReq, WriteFileRes,
-  ListDirReq, ListDirRes, DirEntry,
-  StatReq, StatRes,
-  MkdirReq, MkdirRes,
-  ExecReq, ExecRes,
-  AgentLaunchReq, AgentLaunchRes,
-  AgentKillReq, AgentKillRes,
-  AgentStatusReq, AgentStatusRes,
-  AgentCaptureReq, AgentCaptureRes,
+  ReadFileReq,
+  ReadFileRes,
+  WriteFileReq,
+  WriteFileRes,
+  ListDirReq,
+  ListDirRes,
+  DirEntry,
+  StatReq,
+  StatRes,
+  MkdirReq,
+  MkdirRes,
+  ExecReq,
+  ExecRes,
+  AgentLaunchReq,
+  AgentLaunchRes,
+  AgentKillReq,
+  AgentKillRes,
+  AgentStatusReq,
+  AgentStatusRes,
+  AgentCaptureReq,
+  AgentCaptureRes,
   MetricsRes,
-  ProbePortsReq, ProbePortsRes,
+  ProbePortsReq,
+  ProbePortsRes,
   HealthRes,
-  SnapshotRes, SnapshotMetrics, SnapshotSession, SnapshotProcess, SnapshotContainer,
+  SnapshotRes,
+  SnapshotMetrics,
+  SnapshotSession,
+  SnapshotProcess,
+  SnapshotContainer,
   ChannelReportRes,
-  ChannelRelayReq, ChannelRelayRes,
-  ChannelDeliverReq, ChannelDeliverRes,
-  ConfigReq, ConfigRes,
+  ChannelRelayReq,
+  ChannelRelayRes,
+  ChannelDeliverReq,
+  ChannelDeliverRes,
+  ConfigReq,
+  ConfigRes,
 } from "./types.js";
 
 const VERSION = "0.1.0";
@@ -92,7 +109,9 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(registerPayload),
-    }).catch(() => { /* control plane not ready yet -- heartbeat will retry */ });
+    }).catch(() => {
+      /* control plane not ready yet -- heartbeat will retry */
+    });
 
     // Heartbeat every 30s
     heartbeatTimer = setInterval(() => {
@@ -100,7 +119,9 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: workerId }),
-      }).catch(() => { /* control plane unreachable */ });
+      }).catch(() => {
+        /* control plane unreachable */
+      });
     }, 30_000);
   }
 
@@ -134,7 +155,7 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
 
         // ── File: read ────────────────────────────────────────────────
         if (req.method === "POST" && path === "/file/read") {
-          const body = await req.json() as ReadFileReq;
+          const body = (await req.json()) as ReadFileReq;
           try {
             const content = await readFile(body.path, "utf-8");
             return json<ReadFileRes>({ content, size: Buffer.byteLength(content) });
@@ -146,14 +167,14 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
 
         // ── File: write ───────────────────────────────────────────────
         if (req.method === "POST" && path === "/file/write") {
-          const body = await req.json() as WriteFileReq;
+          const body = (await req.json()) as WriteFileReq;
           await writeFile(body.path, body.content, body.mode ? { mode: body.mode } : undefined);
           return json<WriteFileRes>({ ok: true, bytesWritten: Buffer.byteLength(body.content) });
         }
 
         // ── File: stat ────────────────────────────────────────────────
         if (req.method === "POST" && path === "/file/stat") {
-          const body = await req.json() as StatReq;
+          const body = (await req.json()) as StatReq;
           try {
             const s = await stat(body.path);
             const type = s.isFile() ? "file" : s.isDirectory() ? "dir" : "symlink";
@@ -171,64 +192,69 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
 
         // ── File: mkdir ───────────────────────────────────────────────
         if (req.method === "POST" && path === "/file/mkdir") {
-          const body = await req.json() as MkdirReq;
+          const body = (await req.json()) as MkdirReq;
           await mkdir(body.path, { recursive: body.recursive ?? true });
           return json<MkdirRes>({ ok: true });
         }
 
         // ── File: list ────────────────────────────────────────────────
         if (req.method === "POST" && path === "/file/list") {
-          const body = await req.json() as ListDirReq;
+          const body = (await req.json()) as ListDirReq;
           const entries = await listDirectory(body.path, body.recursive);
           return json<ListDirRes>({ entries });
         }
 
         // ── Exec ──────────────────────────────────────────────────────
         if (req.method === "POST" && path === "/exec") {
-          const body = await req.json() as ExecReq;
+          const body = (await req.json()) as ExecReq;
           const result = await runExec(body);
           return json(result);
         }
 
         // ── Agent: launch ─────────────────────────────────────────────
         if (req.method === "POST" && path === "/agent/launch") {
-          const body = await req.json() as AgentLaunchReq;
+          const body = (await req.json()) as AgentLaunchReq;
           const result = await agentLaunch(body);
           return json(result);
         }
 
         // ── Agent: kill ───────────────────────────────────────────────
         if (req.method === "POST" && path === "/agent/kill") {
-          const body = await req.json() as AgentKillReq;
+          const body = (await req.json()) as AgentKillReq;
           const result = await agentKill(body);
           return json(result);
         }
 
         // ── Agent: status ─────────────────────────────────────────────
         if (req.method === "POST" && path === "/agent/status") {
-          const body = await req.json() as AgentStatusReq;
+          const body = (await req.json()) as AgentStatusReq;
           const result = await agentStatus(body);
           return json(result);
         }
 
         // ── Agent: capture ────────────────────────────────────────────
         if (req.method === "POST" && path === "/agent/capture") {
-          const body = await req.json() as AgentCaptureReq;
+          const body = (await req.json()) as AgentCaptureReq;
           const result = await agentCapture(body);
           return json(result);
         }
 
         // ── Ports: probe ──────────────────────────────────────────────
         if (req.method === "POST" && path === "/ports/probe") {
-          const body = await req.json() as ProbePortsReq;
+          const body = (await req.json()) as ProbePortsReq;
           const result = await probePorts(body);
           return json(result);
         }
 
         // ── Channel: report (agent → conductor via arkd) ─────────────
-        if (req.method === "POST" && path.startsWith("/channel/") && !path.endsWith("/relay") && !path.endsWith("/deliver")) {
+        if (
+          req.method === "POST" &&
+          path.startsWith("/channel/") &&
+          !path.endsWith("/relay") &&
+          !path.endsWith("/deliver")
+        ) {
           const sessionId = path.split("/")[2]!;
-          const report = await req.json() as Record<string, unknown>;
+          const report = (await req.json()) as Record<string, unknown>;
           const tenantId = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
           const result = await channelReport(sessionId, report, conductorUrl, tenantId);
           return json(result);
@@ -236,7 +262,7 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
 
         // ── Channel: relay (agent → agent via conductor) ─────────────
         if (req.method === "POST" && path === "/channel/relay") {
-          const body = await req.json() as ChannelRelayReq;
+          const body = (await req.json()) as ChannelRelayReq;
           const tenantId = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
           const result = await channelRelay(body, conductorUrl, tenantId);
           return json(result);
@@ -244,14 +270,14 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
 
         // ── Channel: deliver (conductor → agent on this compute) ─────
         if (req.method === "POST" && path === "/channel/deliver") {
-          const body = await req.json() as ChannelDeliverReq;
+          const body = (await req.json()) as ChannelDeliverReq;
           const result = await channelDeliver(body);
           return json(result);
         }
 
         // ── Codegraph: index ─────────────────────────────────────────
         if (req.method === "POST" && path === "/codegraph/index") {
-          const body = await req.json() as { repoPath: string; incremental?: boolean };
+          const body = (await req.json()) as { repoPath: string; incremental?: boolean };
           const repoPath = body.repoPath;
 
           // Find codegraph binary: node_modules/.bin -> PATH
@@ -274,7 +300,10 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
           }
 
           if (buildExitCode !== 0) {
-            return json({ ok: false, error: `codegraph build exited ${buildExitCode}: ${buildStderr.slice(0, 500)}` }, 500);
+            return json(
+              { ok: false, error: `codegraph build exited ${buildExitCode}: ${buildStderr.slice(0, 500)}` },
+              500,
+            );
           }
 
           const dbPath = join(repoPath, ".codegraph", "graph.db");
@@ -282,7 +311,9 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
             const { Database } = await import("bun:sqlite");
             const db = new Database(dbPath);
 
-            const nodes = db.query("SELECT id, kind, name, file, line, end_line, visibility, exported, qualified_name FROM nodes").all();
+            const nodes = db
+              .query("SELECT id, kind, name, file, line, end_line, visibility, exported, qualified_name FROM nodes")
+              .all();
             const edges = db.query("SELECT source_id, target_id, kind FROM edges").all();
 
             const files = new Set(nodes.map((n: any) => n.file)).size;
@@ -297,7 +328,7 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
 
         // ── Config: runtime config update ────────────────────────────
         if (req.method === "POST" && path === "/config") {
-          const body = await req.json() as ConfigReq;
+          const body = (await req.json()) as ConfigReq;
           if (body.conductorUrl !== undefined) conductorUrl = body.conductorUrl || null;
           return json<ConfigRes>({ ok: true, conductorUrl });
         }
@@ -334,11 +365,15 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: workerId }),
-        }).catch(() => { /* best effort */ });
+        }).catch(() => {
+          /* best effort */
+        });
       }
       server.stop();
     },
-    setConductorUrl(url: string) { conductorUrl = url; },
+    setConductorUrl(url: string) {
+      conductorUrl = url;
+    },
   };
 }
 
@@ -356,13 +391,15 @@ async function listDirectory(dirPath: string, recursive?: boolean): Promise<DirE
   const items = await readdir(dirPath, { withFileTypes: true });
   for (const item of items) {
     const fullPath = join(dirPath, item.name);
-    const type = item.isFile() ? "file" as const
-      : item.isDirectory() ? "dir" as const
-      : "symlink" as const;
+    const type = item.isFile() ? ("file" as const) : item.isDirectory() ? ("dir" as const) : ("symlink" as const);
 
     let size = 0;
     if (item.isFile()) {
-      try { size = (await stat(fullPath)).size; } catch { /* stat may fail for broken symlinks */ }
+      try {
+        size = (await stat(fullPath)).size;
+      } catch {
+        /* stat may fail for broken symlinks */
+      }
     }
 
     entries.push({ name: item.name, path: fullPath, type, size });
@@ -413,11 +450,7 @@ async function runExec(req: ExecReq): Promise<ExecRes> {
     proc.kill();
   }, timeout);
 
-  const [stdout, stderr, exitCode] = await Promise.all([
-    readStream(proc.stdout),
-    readStream(proc.stderr),
-    proc.exited,
-  ]);
+  const [stdout, stderr, exitCode] = await Promise.all([readStream(proc.stdout), readStream(proc.stderr), proc.exited]);
 
   clearTimeout(timer);
 
@@ -484,13 +517,14 @@ async function isTmuxRunning(sessionName: string): Promise<boolean> {
 // ── Metrics ──────────────────────────────────────────────────────────────────
 
 async function collectMetrics(): Promise<MetricsRes> {
-  const totalGb = totalmem() / (1024 ** 3);
-  const freeGb = freemem() / (1024 ** 3);
+  const totalGb = totalmem() / 1024 ** 3;
+  const freeGb = freemem() / 1024 ** 3;
   const usedGb = totalGb - freeGb;
 
   // CPU: average across cores (1s sample would block, use instant load)
   const cores = cpus();
-  let totalIdle = 0, totalTick = 0;
+  let totalIdle = 0,
+    totalTick = 0;
   for (const c of cores) {
     const times = c.times as Record<string, number>;
     for (const type in times) {
@@ -511,7 +545,9 @@ async function collectMetrics(): Promise<MetricsRes> {
       const parts = lines[1].split(/\s+/);
       diskPct = parseInt(parts[4]?.replace("%", "") ?? "0", 10);
     }
-  } catch { /* disk usage command may not be available */ }
+  } catch {
+    /* disk usage command may not be available */
+  }
 
   // Uptime
   const uptimeSec = uptime();
@@ -571,7 +607,8 @@ async function getMacCpu(): Promise<number> {
 
 async function getLinuxCpu(): Promise<number> {
   const cores = cpus();
-  let totalIdle = 0, totalTick = 0;
+  let totalIdle = 0,
+    totalTick = 0;
   for (const c of cores) {
     const times = c.times as Record<string, number>;
     for (const type in times) totalTick += times[type];
@@ -581,10 +618,7 @@ async function getLinuxCpu(): Promise<number> {
 }
 
 async function getMacMemory(): Promise<{ totalGb: number; usedGb: number; pct: number }> {
-  const [totalStr, vmOut] = await Promise.all([
-    spawnRead(["sysctl", "-n", "hw.memsize"]),
-    spawnRead(["vm_stat"]),
-  ]);
+  const [totalStr, vmOut] = await Promise.all([spawnRead(["sysctl", "-n", "hw.memsize"]), spawnRead(["vm_stat"])]);
   const totalBytes = parseInt(totalStr, 10);
   if (!totalBytes || isNaN(totalBytes)) return { totalGb: 0, usedGb: 0, pct: 0 };
   if (!vmOut) return { totalGb: totalBytes / 1e9, usedGb: 0, pct: 0 };
@@ -600,15 +634,15 @@ async function getMacMemory(): Promise<{ totalGb: number; usedGb: number; pct: n
   const inactive = getPages("Pages inactive");
   const freeBytes = (free + inactive) * pageSize;
   const usedBytes = totalBytes - freeBytes;
-  const totalGb = Math.round((totalBytes / (1024 ** 3)) * 100) / 100;
-  const usedGb = Math.round((Math.max(0, usedBytes) / (1024 ** 3)) * 100) / 100;
+  const totalGb = Math.round((totalBytes / 1024 ** 3) * 100) / 100;
+  const usedGb = Math.round((Math.max(0, usedBytes) / 1024 ** 3) * 100) / 100;
   const pct = totalBytes > 0 ? Math.round((usedGb / totalGb) * 10000) / 100 : 0;
   return { totalGb, usedGb, pct };
 }
 
 function getNodeMemory(): Promise<{ totalGb: number; usedGb: number; pct: number }> {
-  const totalGb = Math.round((totalmem() / (1024 ** 3)) * 100) / 100;
-  const freeGb = freemem() / (1024 ** 3);
+  const totalGb = Math.round((totalmem() / 1024 ** 3) * 100) / 100;
+  const freeGb = freemem() / 1024 ** 3;
   const usedGb = Math.round((totalGb - freeGb) * 100) / 100;
   const pct = Math.round((usedGb / totalGb) * 100);
   return Promise.resolve({ totalGb, usedGb, pct });
@@ -652,13 +686,16 @@ async function collectTmuxSessions(): Promise<SnapshotSession[]> {
     const attached = line.includes("(attached)");
 
     const panePid = await spawnRead(["tmux", "list-panes", "-t", name, "-F", "#{pane_pid}"]);
-    let cpu = 0, mem = 0, mode = "unknown", projectPath = "";
+    let cpu = 0,
+      mem = 0,
+      mode = "unknown",
+      projectPath = "";
 
     if (panePid) {
       const firstPid = panePid.split("\n")[0].trim();
       if (firstPid) {
         const childrenOut = await spawnRead(["pgrep", "-P", firstPid]);
-        const childPids = childrenOut.split("\n").filter(p => p.trim());
+        const childPids = childrenOut.split("\n").filter((p) => p.trim());
         for (const cpid of childPids) {
           const info = await spawnRead(["ps", "-p", cpid, "-o", "pcpu,pmem,args"]);
           if (info.toLowerCase().includes("claude")) {
@@ -753,16 +790,17 @@ async function probePorts(req: ProbePortsReq): Promise<ProbePortsRes> {
     req.ports.map(async (port) => {
       let listening = false;
       try {
-        const cmd = platform() === "darwin"
-          ? ["lsof", "-i", `:${port}`, "-sTCP:LISTEN"]
-          : ["ss", "-tlnH", `sport = :${port}`];
+        const cmd =
+          platform() === "darwin" ? ["lsof", "-i", `:${port}`, "-sTCP:LISTEN"] : ["ss", "-tlnH", `sport = :${port}`];
         const proc = Bun.spawn({ cmd, stdout: "pipe", stderr: "pipe" });
         const out = await readStream(proc.stdout);
         await proc.exited;
         listening = out.trim().length > 0;
-      } catch { /* port check command may fail */ }
+      } catch {
+        /* port check command may fail */
+      }
       return { port, listening };
-    })
+    }),
   );
   return { results };
 }
@@ -816,11 +854,7 @@ async function channelRelay(
  * Proxy an HTTP request to the conductor, streaming the response back.
  * Used for LLM router passthrough (agent -> arkd -> conductor -> router).
  */
-async function proxyToCondutor(
-  req: Request,
-  conductorUrl: string | null,
-  path: string,
-): Promise<Response> {
+async function proxyToCondutor(req: Request, conductorUrl: string | null, path: string): Promise<Response> {
   if (!conductorUrl) {
     return json({ error: "no conductor URL configured" }, 502);
   }

@@ -78,7 +78,7 @@ describe("SessionRepository", () => {
     repo.create({ summary: "second" });
     const sessions = repo.list();
     expect(sessions.length).toBe(2);
-    const summaries = sessions.map(s => s.summary).sort();
+    const summaries = sessions.map((s) => s.summary).sort();
     expect(summaries).toEqual(["first", "second"]);
   });
 
@@ -96,7 +96,7 @@ describe("SessionRepository", () => {
       const s = repo.create({});
       repo.update(s.id, { status: status as SessionStatus });
       const filtered = repo.list({ status: status as SessionStatus });
-      expect(filtered.some(r => r.id === s.id)).toBe(true);
+      expect(filtered.some((r) => r.id === s.id)).toBe(true);
     }
   });
 
@@ -121,8 +121,8 @@ describe("SessionRepository", () => {
     const s2 = repo.create({ summary: "old" });
     repo.update(s2.id, { status: "archived" as SessionStatus });
     const all = repo.list();
-    expect(all.some(s => s.id === s1.id)).toBe(true);
-    expect(all.some(s => s.id === s2.id)).toBe(false);
+    expect(all.some((s) => s.id === s1.id)).toBe(true);
+    expect(all.some((s) => s.id === s2.id)).toBe(false);
   });
 
   it("list returns archived sessions when status filter is archived", () => {
@@ -130,8 +130,8 @@ describe("SessionRepository", () => {
     const s2 = repo.create({ summary: "old" });
     repo.update(s2.id, { status: "archived" as SessionStatus });
     const archived = repo.list({ status: "archived" });
-    expect(archived.some(s => s.id === s2.id)).toBe(true);
-    expect(archived.some(s => s.id === s1.id)).toBe(false);
+    expect(archived.some((s) => s.id === s2.id)).toBe(true);
+    expect(archived.some((s) => s.id === s1.id)).toBe(false);
   });
 
   it("list excludes deleting sessions", () => {
@@ -200,7 +200,10 @@ describe("SessionRepository", () => {
   it("delete also removes associated events", () => {
     const s = repo.create({});
     // Insert an event directly
-    db.prepare("INSERT INTO events (track_id, type, created_at) VALUES (?, 'test', ?)").run(s.id, new Date().toISOString());
+    db.prepare("INSERT INTO events (track_id, type, created_at) VALUES (?, 'test', ?)").run(
+      s.id,
+      new Date().toISOString(),
+    );
     repo.delete(s.id);
     const events = db.prepare("SELECT * FROM events WHERE track_id = ?").all(s.id);
     expect(events.length).toBe(0);
@@ -346,8 +349,8 @@ describe("SessionRepository", () => {
     repo.createGroup("team-beta");
     const groups = repo.getGroups();
     expect(groups.length).toBe(2);
-    expect(groups.map(g => g.name)).toContain("team-alpha");
-    expect(groups.map(g => g.name)).toContain("team-beta");
+    expect(groups.map((g) => g.name)).toContain("team-alpha");
+    expect(groups.map((g) => g.name)).toContain("team-beta");
   });
 
   it("createGroup is idempotent (INSERT OR IGNORE)", () => {

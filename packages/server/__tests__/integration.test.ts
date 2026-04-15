@@ -25,13 +25,21 @@ function createInMemoryPair(): { client: ArkClient; server: ArkServer } {
   let serverHandler: (msg: JsonRpcMessage) => void = () => {};
 
   const clientTransport: Transport = {
-    send(msg) { setTimeout(() => serverHandler(msg), 0); },
-    onMessage(h) { clientHandler = h; },
+    send(msg) {
+      setTimeout(() => serverHandler(msg), 0);
+    },
+    onMessage(h) {
+      clientHandler = h;
+    },
     close() {},
   };
   const serverTransport: Transport = {
-    send(msg) { setTimeout(() => clientHandler(msg), 0); },
-    onMessage(h) { serverHandler = h; },
+    send(msg) {
+      setTimeout(() => clientHandler(msg), 0);
+    },
+    onMessage(h) {
+      serverHandler = h;
+    },
     close() {},
   };
 
@@ -107,22 +115,22 @@ describe("end-to-end: server + client", () => {
     // Create -> should emit session/created
     const session = await client.sessionStart({ summary: "notify-test", repo: ".", flow: "bare" });
     await Bun.sleep(50);
-    expect(received.some(r => r.type === "created")).toBe(true);
-    expect(received.find(r => r.type === "created").data.session.id).toBe(session.id);
+    expect(received.some((r) => r.type === "created")).toBe(true);
+    expect(received.find((r) => r.type === "created").data.session.id).toBe(session.id);
 
     // Update -> should emit session/updated
     received.length = 0;
     await client.sessionUpdate(session.id, { summary: "updated" });
     await Bun.sleep(50);
-    expect(received.some(r => r.type === "updated")).toBe(true);
-    expect(received.find(r => r.type === "updated").data.session.summary).toBe("updated");
+    expect(received.some((r) => r.type === "updated")).toBe(true);
+    expect(received.find((r) => r.type === "updated").data.session.summary).toBe("updated");
 
     // Delete -> should emit session/deleted
     received.length = 0;
     await client.sessionDelete(session.id);
     await Bun.sleep(50);
-    expect(received.some(r => r.type === "deleted")).toBe(true);
-    expect(received.find(r => r.type === "deleted").data.sessionId).toBe(session.id);
+    expect(received.some((r) => r.type === "deleted")).toBe(true);
+    expect(received.find((r) => r.type === "deleted").data.sessionId).toBe(session.id);
 
     client.close();
   });

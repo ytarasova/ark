@@ -44,8 +44,11 @@ export class ClaudeTranscriptParser implements TranscriptParser {
     if (!existsSync(transcriptPath)) return { usage };
 
     let content: string;
-    try { content = readFileSync(transcriptPath, "utf-8"); }
-    catch { return { usage }; }
+    try {
+      content = readFileSync(transcriptPath, "utf-8");
+    } catch {
+      return { usage };
+    }
 
     for (const line of content.split("\n")) {
       if (!line.trim()) continue;
@@ -58,7 +61,9 @@ export class ClaudeTranscriptParser implements TranscriptParser {
         usage.output_tokens += u.output_tokens ?? 0;
         usage.cache_read_tokens = (usage.cache_read_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
         usage.cache_write_tokens = (usage.cache_write_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
-      } catch { /* skip malformed lines */ }
+      } catch {
+        /* skip malformed lines */
+      }
     }
 
     return { usage, transcript_path: transcriptPath };
@@ -91,12 +96,20 @@ export class ClaudeTranscriptParser implements TranscriptParser {
     const startMs = opts.startTime?.getTime();
     let latest: { path: string; mtime: number } | null = null;
     let entries: string[];
-    try { entries = readdirSync(projectDir); } catch { return null; }
+    try {
+      entries = readdirSync(projectDir);
+    } catch {
+      return null;
+    }
     for (const name of entries) {
       if (!name.endsWith(".jsonl")) continue;
       const full = join(projectDir, name);
       let st;
-      try { st = statSync(full); } catch { continue; }
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
       if (startMs && st.mtime.getTime() < startMs) continue;
       if (!latest || st.mtime.getTime() > latest.mtime) {
         latest = { path: full, mtime: st.mtime.getTime() };

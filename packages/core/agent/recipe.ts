@@ -26,13 +26,13 @@ export interface RecipeParameter {
   description?: string;
   required?: boolean;
   default?: string;
-  options?: string[];  // for "select" type
+  options?: string[]; // for "select" type
 }
 
 export interface SubRecipeRef {
-  name: string;        // identifier for this sub-recipe
-  recipe: string;      // recipe name to invoke
-  values?: Record<string, string>;  // pre-filled parameter values
+  name: string; // identifier for this sub-recipe
+  recipe: string; // recipe name to invoke
+  values?: Record<string, string>; // pre-filled parameter values
 }
 
 export interface RecipeDefinition {
@@ -78,7 +78,11 @@ export function instantiateRecipe(recipe: RecipeDefinition, values: Record<strin
 // ── Sub-recipe resolution ─────────────────────────────────────────────────
 
 /** Resolve a sub-recipe reference into a full recipe instance. */
-export function resolveSubRecipe(app: AppContext, ref: SubRecipeRef, parentVars?: Record<string, string>): {
+export function resolveSubRecipe(
+  app: AppContext,
+  ref: SubRecipeRef,
+  parentVars?: Record<string, string>,
+): {
   recipe: RecipeDefinition | null;
   instance: RecipeInstance | null;
 } {
@@ -99,7 +103,10 @@ export function listSubRecipes(app: AppContext, recipeName: string): SubRecipeRe
 // ── Validation ──────────────────────────────────────────────────────────────
 
 /** Validate parameter values against recipe parameter definitions. */
-export function validateRecipeParams(recipe: RecipeDefinition, values: Record<string, string>): { ok: boolean; errors: string[] } {
+export function validateRecipeParams(
+  recipe: RecipeDefinition,
+  values: Record<string, string>,
+): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
   for (const param of recipe.parameters ?? []) {
     const val = values[param.key];
@@ -131,9 +138,7 @@ export function sessionToRecipe(session: Session, name: string): RecipeDefinitio
     agent: session.agent ?? undefined,
     compute: session.compute_name ?? undefined,
     group: session.group_name ?? undefined,
-    variables: [
-      { name: "summary", description: "Task description", required: true },
-    ],
+    variables: [{ name: "summary", description: "Task description", required: true }],
     defaults: {
       summary: session.summary ?? "",
     },

@@ -8,11 +8,7 @@
  *   stopAll sessions -> stop infra -> container.dispose() -> close db
  */
 
-import {
-  createContainer,
-  InjectionMode,
-  type AwilixContainer,
-} from "awilix";
+import { createContainer, InjectionMode, type AwilixContainer } from "awilix";
 import type { IDatabase } from "./database/index.js";
 import type { ArkConfig } from "./config.js";
 import type { SessionRepository } from "./repositories/session.js";

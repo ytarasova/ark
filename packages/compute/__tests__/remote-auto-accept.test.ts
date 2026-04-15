@@ -83,7 +83,7 @@ describe("remote autoAcceptChannelPrompt", () => {
 
     await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 5, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter(c => c.cmd.includes("send-keys"));
+    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(2);
     expect(sendKeysCalls[0].cmd).toContain("send-keys -t 'ark-test' 1");
     expect(sendKeysCalls[1].cmd).toContain("send-keys -t 'ark-test' Enter");
@@ -94,24 +94,24 @@ describe("remote autoAcceptChannelPrompt", () => {
 
     await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 5, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter(c => c.cmd.includes("send-keys"));
+    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(0);
   });
 
   it("handles double prompt from resume fallback", async () => {
     sshResponses = [
-      ok(PROMPT_OUTPUT),   // 1st prompt
-      ok(STARTUP_OUTPUT),  // resume failing
-      ok(PROMPT_OUTPUT),   // 2nd prompt
-      ok(WORKING_OUTPUT),  // finally working
+      ok(PROMPT_OUTPUT), // 1st prompt
+      ok(STARTUP_OUTPUT), // resume failing
+      ok(PROMPT_OUTPUT), // 2nd prompt
+      ok(WORKING_OUTPUT), // finally working
     ];
 
     await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 10, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter(c => c.cmd.includes("send-keys"));
+    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     // Should have sent keys for BOTH prompts: "1", Enter, "1", Enter
-    const enterCalls = sendKeysCalls.filter(c => c.cmd.includes("Enter"));
-    const oneCalls = sendKeysCalls.filter(c => c.cmd.endsWith(" 1"));
+    const enterCalls = sendKeysCalls.filter((c) => c.cmd.includes("Enter"));
+    const oneCalls = sendKeysCalls.filter((c) => c.cmd.endsWith(" 1"));
     expect(enterCalls.length).toBeGreaterThanOrEqual(2);
     expect(oneCalls.length).toBeGreaterThanOrEqual(2);
   });
@@ -125,7 +125,7 @@ describe("remote autoAcceptChannelPrompt", () => {
 
     await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 5, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter(c => c.cmd.includes("send-keys"));
+    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(2);
   });
 
@@ -138,7 +138,7 @@ describe("remote autoAcceptChannelPrompt", () => {
 
     await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 5, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter(c => c.cmd.includes("send-keys"));
+    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(0);
   });
 
@@ -147,15 +147,15 @@ describe("remote autoAcceptChannelPrompt", () => {
     // which could match before the channel prompt appeared
     const earlyOutput = `Welcome to Ubuntu\nClaude Code v1.2.3`;
     sshResponses = [
-      ok(earlyOutput),     // should NOT stop polling here
-      ok(PROMPT_OUTPUT),   // prompt appears
-      ok(WORKING_OUTPUT),  // actually working
+      ok(earlyOutput), // should NOT stop polling here
+      ok(PROMPT_OUTPUT), // prompt appears
+      ok(WORKING_OUTPUT), // actually working
     ];
 
     await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 10, delayMs: 1 });
 
     // Should have continued past the "Welcome" output and accepted the prompt
-    const sendKeysCalls = sshCalls.filter(c => c.cmd.includes("send-keys"));
+    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(2);
   });
 
@@ -164,7 +164,7 @@ describe("remote autoAcceptChannelPrompt", () => {
 
     await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 3, delayMs: 1 });
 
-    const captureCalls = sshCalls.filter(c => c.cmd.includes("capture-pane"));
+    const captureCalls = sshCalls.filter((c) => c.cmd.includes("capture-pane"));
     expect(captureCalls.length).toBeGreaterThan(0);
     expect(captureCalls[0].cmd).toContain("tail -30");
   });
@@ -174,7 +174,7 @@ describe("remote autoAcceptChannelPrompt", () => {
 
     await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 3, delayMs: 1 });
 
-    const sendKeysCalls = sshCalls.filter(c => c.cmd.includes("send-keys"));
+    const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(0);
   });
 });

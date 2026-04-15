@@ -31,15 +31,12 @@ function hasTerminalNotifier(): boolean {
 export async function sendOSNotification(title: string, body: string): Promise<void> {
   try {
     if (process.platform === "darwin" && hasTerminalNotifier()) {
-      execFile("terminal-notifier", [
-        "-title", title,
-        "-message", body,
-        "-group", "ark",
-        "-sound", "default",
-      ]);
+      execFile("terminal-notifier", ["-title", title, "-message", body, "-group", "ark", "-sound", "default"]);
     } else {
       // Terminal bell - works everywhere, triggers tmux/terminal notification
       process.stderr.write("\x07");
     }
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 }

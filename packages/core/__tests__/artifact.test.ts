@@ -24,7 +24,7 @@ describe("ArtifactRepository", () => {
 
     const listed = app.artifacts.list(session.id);
     expect(listed.length).toBe(2);
-    expect(listed.map(a => a.value)).toEqual(["src/index.ts", "src/util.ts"]);
+    expect(listed.map((a) => a.value)).toEqual(["src/index.ts", "src/util.ts"]);
   });
 
   it("filters list by artifact type", () => {
@@ -102,7 +102,7 @@ describe("ArtifactRepository", () => {
     // Query for shared.ts across all sessions
     const results = app.artifacts.query({ type: "file", value: "shared.ts" });
     expect(results.length).toBe(2);
-    const sessionIds = results.map(a => a.session_id);
+    const sessionIds = results.map((a) => a.session_id);
     expect(sessionIds).toContain(s1.id);
     expect(sessionIds).toContain(s2.id);
   });
@@ -220,7 +220,7 @@ describe("ArtifactRepository", () => {
     const all = app.artifacts.list(session.id);
     expect(all.length).toBe(4);
 
-    const types = new Set(all.map(a => a.type));
+    const types = new Set(all.map((a) => a.type));
     expect(types.has("file")).toBe(true);
     expect(types.has("commit")).toBe(true);
     expect(types.has("pr")).toBe(true);

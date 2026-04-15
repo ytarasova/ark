@@ -5,7 +5,8 @@ import { getArkClient } from "./_shared.js";
 export function registerProfileCommands(program: Command) {
   const profile = program.command("profile").description("Manage profiles");
 
-  profile.command("list")
+  profile
+    .command("list")
     .description("List profiles")
     .action(async () => {
       const ark = await getArkClient();
@@ -16,7 +17,8 @@ export function registerProfileCommands(program: Command) {
       }
     });
 
-  profile.command("create")
+  profile
+    .command("create")
     .description("Create a profile")
     .argument("<name>")
     .argument("[description]")
@@ -25,10 +27,13 @@ export function registerProfileCommands(program: Command) {
       try {
         await ark.profileCreate(name, desc);
         console.log(chalk.green(`Created profile: ${name}`));
-      } catch (e: any) { console.log(chalk.red(e.message)); }
+      } catch (e: any) {
+        console.log(chalk.red(e.message));
+      }
     });
 
-  profile.command("delete")
+  profile
+    .command("delete")
     .description("Delete a profile")
     .argument("<name>")
     .action(async (name: string) => {
@@ -36,6 +41,8 @@ export function registerProfileCommands(program: Command) {
       try {
         await ark.profileDelete(name);
         console.log(chalk.green(`Deleted profile: ${name}`));
-      } catch (e: any) { console.log(chalk.red(e.message)); }
+      } catch (e: any) {
+        console.log(chalk.red(e.message));
+      }
     });
 }

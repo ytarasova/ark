@@ -1,10 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  INSTANCE_SIZES,
-  resolveInstanceType,
-  provisionStack,
-  destroyStack,
-} from "../providers/ec2/provision.js";
+import { INSTANCE_SIZES, resolveInstanceType, provisionStack, destroyStack } from "../providers/ec2/provision.js";
 
 describe("INSTANCE_SIZES", () => {
   it("has entries for xs through xxxl (7 sizes)", () => {

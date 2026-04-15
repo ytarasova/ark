@@ -58,7 +58,7 @@ describe("ComputeService", () => {
     svc.create({ name: "d1", provider: "docker" });
     svc.create({ name: "e1", provider: "ec2" });
     const dockers = svc.list({ provider: "docker" });
-    expect(dockers.every(c => c.provider === "docker")).toBe(true);
+    expect(dockers.every((c) => c.provider === "docker")).toBe(true);
   });
 
   // ── update ─────────────────────────────────────────────────────────────────

@@ -65,7 +65,7 @@ describe.skipIf(!hasDocker || !hasKey)("TensorZero integration", () => {
     });
 
     expect(resp.ok).toBe(true);
-    const data = await resp.json() as any;
+    const data = (await resp.json()) as any;
     expect(data.choices).toBeDefined();
     expect(data.choices[0].message.content).toBeTruthy();
   }, 60_000); // 60s timeout for Docker pull + API call

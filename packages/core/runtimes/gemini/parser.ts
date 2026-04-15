@@ -40,8 +40,11 @@ export class GeminiTranscriptParser implements TranscriptParser {
     if (!existsSync(transcriptPath)) return { usage };
 
     let content: string;
-    try { content = readFileSync(transcriptPath, "utf-8"); }
-    catch { return { usage }; }
+    try {
+      content = readFileSync(transcriptPath, "utf-8");
+    } catch {
+      return { usage };
+    }
 
     let model: string | undefined;
 
@@ -57,7 +60,9 @@ export class GeminiTranscriptParser implements TranscriptParser {
         // Output = candidates (output) + thoughts (reasoning) + tool (tool use prompt)
         usage.output_tokens += (t.output ?? 0) + (t.thoughts ?? 0) + (t.tool ?? 0);
         usage.cache_read_tokens += t.cached ?? 0;
-      } catch { /* skip malformed lines */ }
+      } catch {
+        /* skip malformed lines */
+      }
     }
 
     return { usage, model, transcript_path: transcriptPath };
@@ -76,17 +81,29 @@ export class GeminiTranscriptParser implements TranscriptParser {
     const candidates: Array<{ path: string; mtime: number }> = [];
 
     let projects: string[];
-    try { projects = readdirSync(this.tmpDir); } catch { return null; }
+    try {
+      projects = readdirSync(this.tmpDir);
+    } catch {
+      return null;
+    }
 
     for (const proj of projects) {
       const chatsDir = join(this.tmpDir, proj, "chats");
       let entries: string[];
-      try { entries = readdirSync(chatsDir); } catch { continue; }
+      try {
+        entries = readdirSync(chatsDir);
+      } catch {
+        continue;
+      }
       for (const name of entries) {
         if (!name.startsWith("session-") || !name.endsWith(".jsonl")) continue;
         const full = join(chatsDir, name);
         let st;
-        try { st = statSync(full); } catch { continue; }
+        try {
+          st = statSync(full);
+        } catch {
+          continue;
+        }
         if (startMs && st.mtime.getTime() < startMs) continue;
         candidates.push({ path: full, mtime: st.mtime.getTime() });
       }
@@ -102,7 +119,9 @@ export class GeminiTranscriptParser implements TranscriptParser {
         if (entry.projectHash === targetHash) {
           return path;
         }
-      } catch { /* skip files we can't read/parse */ }
+      } catch {
+        /* skip files we can't read/parse */
+      }
     }
 
     return null;

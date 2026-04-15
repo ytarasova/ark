@@ -26,19 +26,20 @@ const BADGE: Record<string, string> = {
 
 export function StatusDot({ status }: { status?: string }) {
   return (
-    <span className={cn(
-      "inline-block w-2 h-2 rounded-full shrink-0",
-      DOT[status || "pending"] || "bg-muted-foreground/30"
-    )} />
+    <span
+      className={cn("inline-block w-2 h-2 rounded-full shrink-0", DOT[status || "pending"] || "bg-muted-foreground/30")}
+    />
   );
 }
 
 export function StatusBadge({ status }: { status?: string }) {
   return (
-    <span className={cn(
-      "inline-block px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase tracking-wider border",
-      BADGE[status || "pending"] || "bg-secondary text-muted-foreground border-border"
-    )}>
+    <span
+      className={cn(
+        "inline-block px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase tracking-wider border",
+        BADGE[status || "pending"] || "bg-secondary text-muted-foreground border-border",
+      )}
+    >
       {status || "unknown"}
     </span>
   );

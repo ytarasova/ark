@@ -40,11 +40,12 @@ export function extractSkillCandidates(conversation: ConversationTurn[]): SkillC
   for (const turn of conversation) {
     if (turn.role !== "assistant") continue;
     const lines = turn.content.split("\n");
-    const numberedSteps = lines.filter(l => /^\s*\d+[\.\)]\s/.test(l));
+    const numberedSteps = lines.filter((l) => /^\s*\d+[\.\)]\s/.test(l));
     if (numberedSteps.length >= 3) {
       // Extract the procedure as a skill candidate
       const firstStep = numberedSteps[0].replace(/^\s*\d+[\.\)]\s*/, "");
-      const name = firstStep.toLowerCase()
+      const name = firstStep
+        .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "")
         .slice(0, 30);
@@ -52,7 +53,7 @@ export function extractSkillCandidates(conversation: ConversationTurn[]): SkillC
       candidates.push({
         name: name || "extracted-procedure",
         description: `Extracted procedure with ${numberedSteps.length} steps`,
-        prompt: numberedSteps.map(s => s.trim()).join("\n"),
+        prompt: numberedSteps.map((s) => s.trim()).join("\n"),
         confidence: Math.min(numberedSteps.length / 5, 1),
       });
     }
@@ -73,14 +74,20 @@ export function extractAndSaveSkills(sessionId: string, conversation: Conversati
     if (candidate.confidence < MIN_CONFIDENCE) continue;
     try {
       const skillName = `extracted-${sessionId}-${saved}`;
-      app.skills.save(skillName, {
-        name: skillName,
-        description: candidate.description,
-        prompt: candidate.prompt,
-        tags: ["extracted", `session:${sessionId}`],
-      }, "global");
+      app.skills.save(
+        skillName,
+        {
+          name: skillName,
+          description: candidate.description,
+          prompt: candidate.prompt,
+          tags: ["extracted", `session:${sessionId}`],
+        },
+        "global",
+      );
       saved++;
-    } catch { /* best-effort -- fs errors shouldn't block completion */ }
+    } catch {
+      /* best-effort -- fs errors shouldn't block completion */
+    }
   }
 
   return saved;

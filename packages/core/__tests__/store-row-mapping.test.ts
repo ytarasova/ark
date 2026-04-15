@@ -12,13 +12,30 @@ import { safeParseConfig } from "../util.js";
 import type { SessionStatus, MessageRole, MessageType } from "../../types/index.js";
 
 interface SessionRow {
-  id: string; ticket: string | null; summary: string | null; repo: string | null;
-  branch: string | null; compute_name: string | null; session_id: string | null;
-  claude_session_id: string | null; stage: string | null; status: string; flow: string;
-  agent: string | null; workdir: string | null; pr_url: string | null; pr_id: string | null;
-  error: string | null; parent_id: string | null; fork_group: string | null;
-  group_name: string | null; breakpoint_reason: string | null; attached_by: string | null;
-  config: string; created_at: string; updated_at: string;
+  id: string;
+  ticket: string | null;
+  summary: string | null;
+  repo: string | null;
+  branch: string | null;
+  compute_name: string | null;
+  session_id: string | null;
+  claude_session_id: string | null;
+  stage: string | null;
+  status: string;
+  flow: string;
+  agent: string | null;
+  workdir: string | null;
+  pr_url: string | null;
+  pr_id: string | null;
+  error: string | null;
+  parent_id: string | null;
+  fork_group: string | null;
+  group_name: string | null;
+  breakpoint_reason: string | null;
+  attached_by: string | null;
+  config: string;
+  created_at: string;
+  updated_at: string;
 }
 
 function rowToSession(row: SessionRow) {

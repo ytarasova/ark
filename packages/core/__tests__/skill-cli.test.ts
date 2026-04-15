@@ -23,7 +23,7 @@ describe("skill create/delete via core", () => {
 
   it("skills.delete on a builtin name does not remove builtins", () => {
     const builtins = getApp().skills.list();
-    const builtinName = builtins.find(s => s._source === "builtin")?.name;
+    const builtinName = builtins.find((s) => s._source === "builtin")?.name;
     if (builtinName) {
       getApp().skills.delete(builtinName, "global");
       expect(getApp().skills.get(builtinName)).not.toBeNull();

@@ -10,16 +10,40 @@ export interface InjectionResult {
 }
 
 const INJECTION_PATTERNS: Array<{ pattern: RegExp; name: string; severity: "low" | "medium" | "high" }> = [
-  { pattern: /ignore (?:all )?(?:previous|above|prior) (?:instructions|prompts)/i, name: "ignore-instructions", severity: "high" },
-  { pattern: /disregard (?:all )?(?:previous|your) (?:instructions|rules|guidelines)/i, name: "disregard-rules", severity: "high" },
+  {
+    pattern: /ignore (?:all )?(?:previous|above|prior) (?:instructions|prompts)/i,
+    name: "ignore-instructions",
+    severity: "high",
+  },
+  {
+    pattern: /disregard (?:all )?(?:previous|your) (?:instructions|rules|guidelines)/i,
+    name: "disregard-rules",
+    severity: "high",
+  },
   { pattern: /you are now (?:a|an) (?:different|new)/i, name: "role-override", severity: "high" },
   { pattern: /pretend (?:you are|to be|that)/i, name: "pretend-role", severity: "medium" },
-  { pattern: /forget (?:all|everything|your) (?:previous|instructions|rules)/i, name: "forget-instructions", severity: "high" },
+  {
+    pattern: /forget (?:all|everything|your) (?:previous|instructions|rules)/i,
+    name: "forget-instructions",
+    severity: "high",
+  },
   { pattern: /system:\s*you are/i, name: "fake-system-prompt", severity: "high" },
   { pattern: /\[SYSTEM\]/i, name: "fake-system-tag", severity: "medium" },
-  { pattern: /act as (?:if|though) you (?:have|had) no (?:restrictions|rules|limits)/i, name: "remove-restrictions", severity: "high" },
-  { pattern: /reveal (?:your|the) (?:system|initial|original) (?:prompt|instructions)/i, name: "prompt-extraction", severity: "medium" },
-  { pattern: /what (?:are|were) your (?:original|system|initial) instructions/i, name: "instruction-extraction", severity: "low" },
+  {
+    pattern: /act as (?:if|though) you (?:have|had) no (?:restrictions|rules|limits)/i,
+    name: "remove-restrictions",
+    severity: "high",
+  },
+  {
+    pattern: /reveal (?:your|the) (?:system|initial|original) (?:prompt|instructions)/i,
+    name: "prompt-extraction",
+    severity: "medium",
+  },
+  {
+    pattern: /what (?:are|were) your (?:original|system|initial) instructions/i,
+    name: "instruction-extraction",
+    severity: "low",
+  },
 ];
 
 /** Scan text for potential prompt injection patterns. */

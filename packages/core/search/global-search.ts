@@ -15,16 +15,16 @@ export interface GlobalSearchResult {
   modifiedAt: Date;
 }
 
-const CLAUDE_PROJECTS_DIR = join(
-  process.env.HOME ?? process.env.USERPROFILE ?? "~",
-  ".claude", "projects"
-);
+const CLAUDE_PROJECTS_DIR = join(process.env.HOME ?? process.env.USERPROFILE ?? "~", ".claude", "projects");
 
 /** Search all Claude conversations for a query string. */
-export function searchAllConversations(query: string, opts?: {
-  maxResults?: number;
-  recentDays?: number;
-}): GlobalSearchResult[] {
+export function searchAllConversations(
+  query: string,
+  opts?: {
+    maxResults?: number;
+    recentDays?: number;
+  },
+): GlobalSearchResult[] {
   const maxResults = opts?.maxResults ?? 50;
   const recentDays = opts?.recentDays ?? 90;
   const cutoff = Date.now() - recentDays * 24 * 60 * 60 * 1000;
@@ -45,7 +45,7 @@ export function searchAllConversations(query: string, opts?: {
 
       // Scan JSONL files in the project directory
       try {
-        const files = readdirSync(projectDir).filter(f => f.endsWith(".jsonl"));
+        const files = readdirSync(projectDir).filter((f) => f.endsWith(".jsonl"));
         for (const file of files) {
           if (results.length >= maxResults) break;
           const filePath = join(projectDir, file);
@@ -55,9 +55,7 @@ export function searchAllConversations(query: string, opts?: {
             if (stat.mtimeMs < cutoff) continue;
 
             // Read last 64KB for large files
-            const content = stat.size > 65536
-              ? readLastBytes(filePath, 65536)
-              : readFileSync(filePath, "utf-8");
+            const content = stat.size > 65536 ? readLastBytes(filePath, 65536) : readFileSync(filePath, "utf-8");
 
             const lines = content.split("\n");
             for (let i = 0; i < lines.length; i++) {
@@ -67,8 +65,8 @@ export function searchAllConversations(query: string, opts?: {
 
               try {
                 const jsonEntry = JSON.parse(line);
-                const text = jsonEntry.message?.content
-                  ?? (typeof jsonEntry.content === "string" ? jsonEntry.content : "");
+                const text =
+                  jsonEntry.message?.content ?? (typeof jsonEntry.content === "string" ? jsonEntry.content : "");
 
                 if (typeof text === "string" && text.toLowerCase().includes(queryLower)) {
                   results.push({
@@ -80,13 +78,21 @@ export function searchAllConversations(query: string, opts?: {
                     modifiedAt: new Date(stat.mtimeMs),
                   });
                 }
-              } catch { /* malformed JSONL line */ }
+              } catch {
+                /* malformed JSONL line */
+              }
             }
-          } catch { /* file read error */ }
+          } catch {
+            /* file read error */
+          }
         }
-      } catch { /* directory read error */ }
+      } catch {
+        /* directory read error */
+      }
     }
-  } catch { /* projects dir error */ }
+  } catch {
+    /* projects dir error */
+  }
 
   // Sort by recency
   results.sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime());

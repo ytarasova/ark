@@ -23,9 +23,9 @@ export function handleKnowledgeTool(
       const limit = params.limit as number | undefined;
       const results = store.search(query, { types, limit });
       return {
-        content: results.map(r =>
-          `[${r.type}] ${r.label}: ${r.content?.slice(0, 200) ?? ""} (score: ${r.score.toFixed(2)})`
-        ).join("\n\n"),
+        content: results
+          .map((r) => `[${r.type}] ${r.label}: ${r.content?.slice(0, 200) ?? ""} (score: ${r.score.toFixed(2)})`)
+          .join("\n\n"),
         metadata: { count: results.length },
       };
     }
@@ -41,7 +41,7 @@ export function handleKnowledgeTool(
       }
       let content = `## ${filePath}\n`;
       for (const [type, items] of Object.entries(grouped)) {
-        content += `\n### ${type}s\n${items.map(i => `- ${i}`).join("\n")}`;
+        content += `\n### ${type}s\n${items.map((i) => `- ${i}`).join("\n")}`;
       }
       return { content };
     }
@@ -49,20 +49,25 @@ export function handleKnowledgeTool(
     case "knowledge/impact": {
       const filePath = params.file as string;
       const dependents = store.neighbors(`file:${filePath}`, {
-        relation: "depends_on", direction: "in", maxDepth: 3, types: ["file"],
+        relation: "depends_on",
+        direction: "in",
+        maxDepth: 3,
+        types: ["file"],
       });
       const coChanges = store.neighbors(`file:${filePath}`, {
-        relation: "co_changes", maxDepth: 1, types: ["file"],
+        relation: "co_changes",
+        maxDepth: 1,
+        types: ["file"],
       });
       return {
         content: [
           `## Impact analysis: ${filePath}`,
           "",
           `### Dependents (${dependents.length})`,
-          dependents.map(d => `- ${d.label}`).join("\n"),
+          dependents.map((d) => `- ${d.label}`).join("\n"),
           "",
           `### Co-changes (${coChanges.length})`,
-          coChanges.map(c => `- ${c.label}`).join("\n"),
+          coChanges.map((c) => `- ${c.label}`).join("\n"),
         ].join("\n"),
       };
     }
@@ -70,14 +75,16 @@ export function handleKnowledgeTool(
     case "knowledge/history": {
       const filePath = params.file as string;
       const sessions = store.neighbors(`file:${filePath}`, {
-        relation: "modified_by", direction: "out", types: ["session"],
+        relation: "modified_by",
+        direction: "out",
+        types: ["session"],
       });
       return {
         content: [
           `## History: ${filePath}`,
           "",
           `${sessions.length} sessions modified this file:`,
-          sessions.map(s => `- ${s.label} (${s.metadata.outcome ?? "unknown"})`).join("\n"),
+          sessions.map((s) => `- ${s.label} (${s.metadata.outcome ?? "unknown"})`).join("\n"),
         ].join("\n"),
       };
     }
@@ -99,9 +106,10 @@ export function handleKnowledgeTool(
       const query = params.query as string;
       const results = store.search(query, { types: ["memory", "learning"], limit: 10 });
       return {
-        content: results.length > 0
-          ? results.map(r => `- [${r.type}] ${r.content ?? r.label}`).join("\n")
-          : "No relevant memories found.",
+        content:
+          results.length > 0
+            ? results.map((r) => `- [${r.type}] ${r.content ?? r.label}`).join("\n")
+            : "No relevant memories found.",
       };
     }
 
@@ -123,7 +131,8 @@ export const KNOWLEDGE_TOOLS = [
       properties: {
         query: { type: "string", description: "Search query" },
         types: {
-          type: "array", items: { type: "string" },
+          type: "array",
+          items: { type: "string" },
           description: "Filter by node types (file, symbol, session, memory, learning, skill)",
         },
         limit: { type: "number", description: "Max results (default 20)" },
@@ -172,7 +181,8 @@ export const KNOWLEDGE_TOOLS = [
       properties: {
         content: { type: "string", description: "Memory content" },
         tags: {
-          type: "array", items: { type: "string" },
+          type: "array",
+          items: { type: "string" },
           description: "Tags for categorization",
         },
         importance: { type: "number", description: "Importance 0-1 (default 0.5)" },

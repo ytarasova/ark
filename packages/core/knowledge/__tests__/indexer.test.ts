@@ -45,14 +45,24 @@ describe("indexCodebase", () => {
     // Create a mock codegraph DB with the real schema
     const dbPath = join(cgDir, "graph.db");
     const db = new Database(dbPath);
-    db.run("CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, file TEXT NOT NULL, line INTEGER, end_line INTEGER, parent_id INTEGER, exported INTEGER DEFAULT 0, qualified_name TEXT, scope TEXT, visibility TEXT, role TEXT)");
-    db.run("CREATE TABLE IF NOT EXISTS edges (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, kind TEXT NOT NULL, confidence REAL DEFAULT 1.0, dynamic INTEGER DEFAULT 0)");
+    db.run(
+      "CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, file TEXT NOT NULL, line INTEGER, end_line INTEGER, parent_id INTEGER, exported INTEGER DEFAULT 0, qualified_name TEXT, scope TEXT, visibility TEXT, role TEXT)",
+    );
+    db.run(
+      "CREATE TABLE IF NOT EXISTS edges (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, kind TEXT NOT NULL, confidence REAL DEFAULT 1.0, dynamic INTEGER DEFAULT 0)",
+    );
     db.run("CREATE TABLE IF NOT EXISTS build_meta (key TEXT PRIMARY KEY, value TEXT)");
 
     // Insert mock nodes
-    db.run("INSERT INTO nodes (id, name, kind, file, line, end_line, exported, qualified_name) VALUES (1, 'app.ts', 'function', 'src/app.ts', 1, 50, 0, 'src/app.ts')");
-    db.run("INSERT INTO nodes (id, name, kind, file, line, end_line, exported, qualified_name) VALUES (2, 'boot', 'function', 'src/app.ts', 10, 30, 1, 'src/app.ts::boot')");
-    db.run("INSERT INTO nodes (id, name, kind, file, line, end_line, exported, qualified_name) VALUES (3, 'Database', 'class', 'src/db.ts', 5, 45, 1, 'src/db.ts::Database')");
+    db.run(
+      "INSERT INTO nodes (id, name, kind, file, line, end_line, exported, qualified_name) VALUES (1, 'app.ts', 'function', 'src/app.ts', 1, 50, 0, 'src/app.ts')",
+    );
+    db.run(
+      "INSERT INTO nodes (id, name, kind, file, line, end_line, exported, qualified_name) VALUES (2, 'boot', 'function', 'src/app.ts', 10, 30, 1, 'src/app.ts::boot')",
+    );
+    db.run(
+      "INSERT INTO nodes (id, name, kind, file, line, end_line, exported, qualified_name) VALUES (3, 'Database', 'class', 'src/db.ts', 5, 45, 1, 'src/db.ts::Database')",
+    );
 
     // Insert mock edges
     db.run("INSERT INTO edges (source_id, target_id, kind) VALUES (2, 3, 'calls')");
@@ -104,13 +114,23 @@ describe("indexCodebase", () => {
 
     const dbPath = join(cgDir, "graph.db");
     const db = new Database(dbPath);
-    db.run("CREATE TABLE nodes (id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, file TEXT NOT NULL, line INTEGER, end_line INTEGER, parent_id INTEGER, exported INTEGER DEFAULT 0, qualified_name TEXT, scope TEXT, visibility TEXT, role TEXT)");
-    db.run("CREATE TABLE edges (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, kind TEXT NOT NULL, confidence REAL DEFAULT 1.0, dynamic INTEGER DEFAULT 0)");
+    db.run(
+      "CREATE TABLE nodes (id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, file TEXT NOT NULL, line INTEGER, end_line INTEGER, parent_id INTEGER, exported INTEGER DEFAULT 0, qualified_name TEXT, scope TEXT, visibility TEXT, role TEXT)",
+    );
+    db.run(
+      "CREATE TABLE edges (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, kind TEXT NOT NULL, confidence REAL DEFAULT 1.0, dynamic INTEGER DEFAULT 0)",
+    );
 
     // Two symbols with the same name in the same file, different lines
-    db.run("INSERT INTO nodes (id, name, kind, file, line, end_line, exported) VALUES (1, 'app', 'parameter', 'src/orchestration.ts', 10, 10, 0)");
-    db.run("INSERT INTO nodes (id, name, kind, file, line, end_line, exported) VALUES (2, 'app', 'parameter', 'src/orchestration.ts', 25, 25, 0)");
-    db.run("INSERT INTO nodes (id, name, kind, file, line, end_line, exported) VALUES (3, 'boot', 'function', 'src/orchestration.ts', 1, 50, 1)");
+    db.run(
+      "INSERT INTO nodes (id, name, kind, file, line, end_line, exported) VALUES (1, 'app', 'parameter', 'src/orchestration.ts', 10, 10, 0)",
+    );
+    db.run(
+      "INSERT INTO nodes (id, name, kind, file, line, end_line, exported) VALUES (2, 'app', 'parameter', 'src/orchestration.ts', 25, 25, 0)",
+    );
+    db.run(
+      "INSERT INTO nodes (id, name, kind, file, line, end_line, exported) VALUES (3, 'boot', 'function', 'src/orchestration.ts', 1, 50, 1)",
+    );
     db.close();
 
     const fakeExec: ExecFn = () => "";
@@ -141,8 +161,12 @@ describe("indexCodebase", () => {
     const cgDir = join(tmpDir, ".codegraph");
     mkdirSync(cgDir, { recursive: true });
     const db = new Database(join(cgDir, "graph.db"));
-    db.run("CREATE TABLE nodes (id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, file TEXT NOT NULL, line INTEGER, end_line INTEGER, parent_id INTEGER, exported INTEGER DEFAULT 0, qualified_name TEXT, scope TEXT, visibility TEXT, role TEXT)");
-    db.run("CREATE TABLE edges (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, kind TEXT NOT NULL, confidence REAL DEFAULT 1.0, dynamic INTEGER DEFAULT 0)");
+    db.run(
+      "CREATE TABLE nodes (id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, file TEXT NOT NULL, line INTEGER, end_line INTEGER, parent_id INTEGER, exported INTEGER DEFAULT 0, qualified_name TEXT, scope TEXT, visibility TEXT, role TEXT)",
+    );
+    db.run(
+      "CREATE TABLE edges (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, kind TEXT NOT NULL, confidence REAL DEFAULT 1.0, dynamic INTEGER DEFAULT 0)",
+    );
     db.close();
 
     const fakeExec: ExecFn = (cmd: string) => {
@@ -206,9 +230,10 @@ describe("indexCoChanges", () => {
 
     const edges = store.getEdges("file:src/a.ts", { relation: "co_changes" });
     expect(edges.length).toBeGreaterThanOrEqual(1);
-    const coEdge = edges.find(e =>
-      (e.source_id === "file:src/a.ts" && e.target_id === "file:src/b.ts") ||
-      (e.source_id === "file:src/b.ts" && e.target_id === "file:src/a.ts")
+    const coEdge = edges.find(
+      (e) =>
+        (e.source_id === "file:src/a.ts" && e.target_id === "file:src/b.ts") ||
+        (e.source_id === "file:src/b.ts" && e.target_id === "file:src/a.ts"),
     );
     expect(coEdge).not.toBeUndefined();
     expect(coEdge!.weight).toBeGreaterThan(0);
@@ -235,7 +260,9 @@ describe("indexCoChanges", () => {
   });
 
   it("handles git log failure gracefully", () => {
-    const fakeExec: ExecFn = () => { throw new Error("not a git repo"); };
+    const fakeExec: ExecFn = () => {
+      throw new Error("not a git repo");
+    };
     const count = indexCoChanges("/not/a/repo", store, { exec: fakeExec });
     expect(count).toBe(0);
   });

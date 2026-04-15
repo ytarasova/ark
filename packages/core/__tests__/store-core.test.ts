@@ -121,7 +121,7 @@ describe("getChildren", () => {
     getApp().sessions.update(child2.id, { parent_id: parent.id });
 
     const children = getApp().sessions.getChildren(parent.id);
-    const childIds = children.map(c => c.id);
+    const childIds = children.map((c) => c.id);
 
     expect(childIds).toContain(child1.id);
     expect(childIds).toContain(child2.id);

@@ -29,7 +29,11 @@ describe("executor registry", () => {
   it("lists all registered executors", () => {
     registerExecutor(stubExecutor("a"));
     registerExecutor(stubExecutor("b"));
-    expect(listExecutors().map(e => e.name).sort()).toEqual(["a", "b"]);
+    expect(
+      listExecutors()
+        .map((e) => e.name)
+        .sort(),
+    ).toEqual(["a", "b"]);
   });
 
   it("overwrites executor with same name", () => {

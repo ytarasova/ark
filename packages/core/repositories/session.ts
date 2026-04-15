@@ -47,8 +47,11 @@ function now(): string {
 
 function safeParseConfig(raw: unknown): SessionConfig {
   if (typeof raw === "object" && raw !== null) return raw as SessionConfig;
-  try { return JSON.parse(String(raw ?? "{}")); }
-  catch { return {}; }
+  try {
+    return JSON.parse(String(raw ?? "{}"));
+  } catch {
+    return {};
+  }
 }
 
 function rowToSession(row: SessionRow): Session {
@@ -61,10 +64,29 @@ function rowToSession(row: SessionRow): Session {
 
 // Valid session columns (from schema). Used to whitelist dynamic SQL column names.
 const SESSION_COLUMNS = new Set([
-  "ticket", "summary", "repo", "branch", "compute_name", "session_id",
-  "claude_session_id", "stage", "status", "flow", "agent", "workdir",
-  "pr_url", "pr_id", "error", "parent_id", "fork_group", "group_name",
-  "breakpoint_reason", "attached_by", "config", "user_id", "updated_at",
+  "ticket",
+  "summary",
+  "repo",
+  "branch",
+  "compute_name",
+  "session_id",
+  "claude_session_id",
+  "stage",
+  "status",
+  "flow",
+  "agent",
+  "workdir",
+  "pr_url",
+  "pr_id",
+  "error",
+  "parent_id",
+  "fork_group",
+  "group_name",
+  "breakpoint_reason",
+  "attached_by",
+  "config",
+  "user_id",
+  "updated_at",
 ]);
 
 // ── Repository ──────────────────────────────────────────────────────────────
@@ -74,8 +96,12 @@ export class SessionRepository {
 
   constructor(private db: IDatabase) {}
 
-  setTenant(tenantId: string): void { this.tenantId = tenantId; }
-  getTenant(): string { return this.tenantId; }
+  setTenant(tenantId: string): void {
+    this.tenantId = tenantId;
+  }
+  getTenant(): string {
+    return this.tenantId;
+  }
 
   create(opts: CreateSessionOpts): Session {
     const id = this.generateId();
@@ -84,22 +110,39 @@ export class SessionRepository {
       ? `feat/${opts.ticket}-${(opts.summary ?? "work").toLowerCase().replace(/\s+/g, "-").slice(0, 30)}`
       : null;
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO sessions (id, ticket, summary, repo, branch, compute_name,
         workdir, stage, status, flow, agent, group_name, config, user_id, tenant_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id, opts.ticket ?? null, opts.summary ?? null, opts.repo ?? null,
-      branch, opts.compute_name ?? null, opts.workdir ?? null,
-      opts.flow ?? "default", opts.agent ?? null, opts.group_name ?? null,
-      JSON.stringify(opts.config ?? {}), opts.user_id ?? null, this.tenantId, ts, ts,
-    );
+    `,
+      )
+      .run(
+        id,
+        opts.ticket ?? null,
+        opts.summary ?? null,
+        opts.repo ?? null,
+        branch,
+        opts.compute_name ?? null,
+        opts.workdir ?? null,
+        opts.flow ?? "default",
+        opts.agent ?? null,
+        opts.group_name ?? null,
+        JSON.stringify(opts.config ?? {}),
+        opts.user_id ?? null,
+        this.tenantId,
+        ts,
+        ts,
+      );
 
     return this.get(id)!;
   }
 
   get(id: string): Session | null {
-    const row = this.db.prepare("SELECT * FROM sessions WHERE id = ? AND tenant_id = ?").get(id, this.tenantId) as SessionRow | undefined;
+    const row = this.db.prepare("SELECT * FROM sessions WHERE id = ? AND tenant_id = ?").get(id, this.tenantId) as
+      | SessionRow
+      | undefined;
     if (!row) return null;
     return rowToSession(row);
   }
@@ -113,12 +156,30 @@ export class SessionRepository {
       sql += " AND status != 'archived'";
     }
 
-    if (filters?.status) { sql += " AND status = ?"; params.push(filters.status); }
-    if (filters?.repo) { sql += " AND repo = ?"; params.push(filters.repo); }
-    if (filters?.group_name) { sql += " AND group_name = ?"; params.push(filters.group_name); }
-    if (filters?.groupPrefix) { sql += " AND group_name LIKE ?"; params.push(filters.groupPrefix + "%"); }
-    if (filters?.parent_id) { sql += " AND parent_id = ?"; params.push(filters.parent_id); }
-    if (filters?.flow) { sql += " AND flow = ?"; params.push(filters.flow); }
+    if (filters?.status) {
+      sql += " AND status = ?";
+      params.push(filters.status);
+    }
+    if (filters?.repo) {
+      sql += " AND repo = ?";
+      params.push(filters.repo);
+    }
+    if (filters?.group_name) {
+      sql += " AND group_name = ?";
+      params.push(filters.group_name);
+    }
+    if (filters?.groupPrefix) {
+      sql += " AND group_name LIKE ?";
+      params.push(filters.groupPrefix + "%");
+    }
+    if (filters?.parent_id) {
+      sql += " AND parent_id = ?";
+      params.push(filters.parent_id);
+    }
+    if (filters?.flow) {
+      sql += " AND flow = ?";
+      params.push(filters.flow);
+    }
 
     sql += " ORDER BY created_at DESC LIMIT ?";
     params.push(filters?.limit ?? 100);
@@ -183,22 +244,24 @@ export class SessionRepository {
       for (const [key, value] of Object.entries(extra)) {
         if (!SESSION_COLUMNS.has(key)) continue;
         updates.push(`${key} = ?`);
-        values.push(key === "config" ? JSON.stringify(value) : value ?? null);
+        values.push(key === "config" ? JSON.stringify(value) : (value ?? null));
       }
     }
     values.push(id, expected, this.tenantId);
 
-    const result = this.db.prepare(
-      `UPDATE sessions SET ${updates.join(", ")} WHERE id = ? AND status = ? AND tenant_id = ?`
-    ).run(...values);
+    const result = this.db
+      .prepare(`UPDATE sessions SET ${updates.join(", ")} WHERE id = ? AND status = ? AND tenant_id = ?`)
+      .run(...values);
     return result.changes > 0;
   }
 
   purgeDeleted(olderThanMs?: number): number {
     const cutoff = olderThanMs ?? 90_000;
-    const deleted = (this.db.prepare(
-      "SELECT * FROM sessions WHERE tenant_id = ? AND status = 'deleting' ORDER BY updated_at DESC"
-    ).all(this.tenantId) as SessionRow[]).map(rowToSession);
+    const deleted = (
+      this.db
+        .prepare("SELECT * FROM sessions WHERE tenant_id = ? AND status = 'deleting' ORDER BY updated_at DESC")
+        .all(this.tenantId) as SessionRow[]
+    ).map(rowToSession);
 
     let count = 0;
     const cutoffTime = Date.now() - cutoff;
@@ -213,16 +276,19 @@ export class SessionRepository {
   }
 
   channelPort(sessionId: string): number {
-    return 19200 + parseInt(sessionId.replace("s-", ""), 16) % 10000;
+    return 19200 + (parseInt(sessionId.replace("s-", ""), 16) % 10000);
   }
 
   mergeConfig(sessionId: string, patch: Partial<SessionConfig>): void {
     this.db.transaction(() => {
-      const row = this.db.prepare("SELECT config FROM sessions WHERE id = ? AND tenant_id = ?").get(sessionId, this.tenantId) as { config: string } | undefined;
+      const row = this.db
+        .prepare("SELECT config FROM sessions WHERE id = ? AND tenant_id = ?")
+        .get(sessionId, this.tenantId) as { config: string } | undefined;
       if (!row) return;
       const existing = safeParseConfig(row.config);
       const merged = { ...existing, ...patch };
-      this.db.prepare("UPDATE sessions SET config = ?, updated_at = ? WHERE id = ? AND tenant_id = ?")
+      this.db
+        .prepare("UPDATE sessions SET config = ?, updated_at = ? WHERE id = ? AND tenant_id = ?")
         .run(JSON.stringify(merged), new Date().toISOString(), sessionId, this.tenantId);
     });
   }
@@ -230,13 +296,17 @@ export class SessionRepository {
   search(query: string, opts?: { limit?: number }): Session[] {
     const limit = opts?.limit ?? 50;
     const pattern = `%${query}%`;
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT * FROM sessions
       WHERE tenant_id = ?
         AND (ticket LIKE ? OR summary LIKE ? OR repo LIKE ? OR id LIKE ?)
         AND status != 'deleting'
       ORDER BY created_at DESC LIMIT ?
-    `).all(this.tenantId, pattern, pattern, pattern, pattern, limit) as SessionRow[];
+    `,
+      )
+      .all(this.tenantId, pattern, pattern, pattern, pattern, limit) as SessionRow[];
     return rows.map(rowToSession);
   }
 
@@ -245,38 +315,52 @@ export class SessionRepository {
   }
 
   getGroups(): Array<{ name: string; created_at: string }> {
-    return this.db.prepare(`
+    return this.db
+      .prepare(
+        `
       SELECT name, created_at FROM groups
       WHERE tenant_id = ?
       ORDER BY name
-    `).all(this.tenantId) as Array<{ name: string; created_at: string }>;
+    `,
+      )
+      .all(this.tenantId) as Array<{ name: string; created_at: string }>;
   }
 
   /** Return all group names — union of groups table + distinct session group_names, sorted. */
   getGroupNames(): string[] {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT name FROM groups WHERE tenant_id = ?
       UNION
       SELECT DISTINCT group_name FROM sessions WHERE group_name IS NOT NULL AND tenant_id = ?
       ORDER BY 1
-    `).all(this.tenantId, this.tenantId) as { name: string }[];
+    `,
+      )
+      .all(this.tenantId, this.tenantId) as { name: string }[];
     return rows.map((r) => r.name);
   }
 
   createGroup(name: string): void {
-    this.db.prepare("INSERT OR IGNORE INTO groups (name, tenant_id, created_at) VALUES (?, ?, ?)").run(name, this.tenantId, now());
+    this.db
+      .prepare("INSERT OR IGNORE INTO groups (name, tenant_id, created_at) VALUES (?, ?, ?)")
+      .run(name, this.tenantId, now());
   }
 
   deleteGroup(name: string): void {
     this.db.prepare("DELETE FROM groups WHERE name = ? AND tenant_id = ?").run(name, this.tenantId);
-    this.db.prepare("UPDATE sessions SET group_name = NULL WHERE group_name = ? AND tenant_id = ?").run(name, this.tenantId);
+    this.db
+      .prepare("UPDATE sessions SET group_name = NULL WHERE group_name = ? AND tenant_id = ?")
+      .run(name, this.tenantId);
   }
 
   /** List sessions in 'deleting' status (soft-deleted). */
   listDeleted(): Session[] {
-    return (this.db.prepare(
-      "SELECT * FROM sessions WHERE tenant_id = ? AND status = 'deleting' ORDER BY updated_at DESC"
-    ).all(this.tenantId) as SessionRow[]).map(rowToSession);
+    return (
+      this.db
+        .prepare("SELECT * FROM sessions WHERE tenant_id = ? AND status = 'deleting' ORDER BY updated_at DESC")
+        .all(this.tenantId) as SessionRow[]
+    ).map(rowToSession);
   }
 
   /** Generate a unique session ID (s-<6 hex chars>). Public for backward compat. */
@@ -290,9 +374,9 @@ export class SessionRepository {
 
   /** Check whether a channel port is in use by any running/waiting session. */
   isChannelPortAvailable(port: number, excludeSessionId?: string): boolean {
-    const sessions = this.db.prepare(
-      "SELECT id FROM sessions WHERE tenant_id = ? AND status IN ('running', 'waiting') AND id != ?"
-    ).all(this.tenantId, excludeSessionId ?? "") as { id: string }[];
-    return !sessions.some(s => this.channelPort(s.id) === port);
+    const sessions = this.db
+      .prepare("SELECT id FROM sessions WHERE tenant_id = ? AND status IN ('running', 'waiting') AND id != ?")
+      .all(this.tenantId, excludeSessionId ?? "") as { id: string }[];
+    return !sessions.some((s) => this.channelPort(s.id) === port);
   }
 }

@@ -40,9 +40,7 @@ export const claudeCodeExecutor: Executor = {
     const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
     const usesDevcontainer = arcJson?.devcontainer ?? false;
     const { DEFAULT_CONDUCTOR_URL, DOCKER_CONDUCTOR_URL } = await import("../constants.js");
-    const conductorUrl = usesDevcontainer
-      ? DOCKER_CONDUCTOR_URL
-      : DEFAULT_CONDUCTOR_URL;
+    const conductorUrl = usesDevcontainer ? DOCKER_CONDUCTOR_URL : DEFAULT_CONDUCTOR_URL;
 
     // Channel config + launcher
     const channelPort = app.sessions.channelPort(session.id);
@@ -60,7 +58,12 @@ export const claudeCodeExecutor: Executor = {
     // Resolve the original repo path so MCP servers from the source repo's
     // .mcp.json can be merged into the worktree's .mcp.json.
     const originalRepoDir = session.repo ? resolve(session.repo) : undefined;
-    const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir, originalRepoDir });
+    const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, {
+      conductorUrl,
+      channelConfig,
+      tracksDir: app.config.tracksDir,
+      originalRepoDir,
+    });
 
     // Status hooks + permissions allow-list
     claude.writeSettings(session.id, conductorUrl, effectiveWorkdir, {
@@ -99,7 +102,11 @@ export const claudeCodeExecutor: Executor = {
     if (compute && provider && !provider.supportsWorktree) {
       const { prepareRemoteEnvironment } = await import("../services/session-orchestration.js");
       const { finalLaunchContent, ports } = await prepareRemoteEnvironment(
-        app, session, compute, provider, effectiveWorkdir,
+        app,
+        session,
+        compute,
+        provider,
+        effectiveWorkdir,
         { launchContent, onLog: log },
       );
 

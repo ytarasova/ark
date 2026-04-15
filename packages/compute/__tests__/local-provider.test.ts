@@ -6,8 +6,22 @@ import type { Compute, Session } from "../../types/index.js";
 
 let app: AppContext;
 const provider = new LocalProvider();
-beforeEach(async () => { if (app) { await app.shutdown(); clearApp(); } app = AppContext.forTest(); setApp(app); await app.boot(); provider.setApp(app); });
-afterEach(async () => { if (app) { await app.shutdown(); clearApp(); } });
+beforeEach(async () => {
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
+  app = AppContext.forTest();
+  setApp(app);
+  await app.boot();
+  provider.setApp(app);
+});
+afterEach(async () => {
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
+});
 
 const fakeCompute: Compute = {
   name: "local",
@@ -79,9 +93,7 @@ describe("LocalProvider", () => {
   }, 30_000);
 
   it("probePorts returns status for each port", async () => {
-    const result = await provider.probePorts(fakeCompute, [
-      { port: 99999, source: "test" },
-    ]);
+    const result = await provider.probePorts(fakeCompute, [{ port: 99999, source: "test" }]);
     expect(result).toHaveLength(1);
     expect(result[0].port).toBe(99999);
     expect(result[0].listening).toBe(false);
@@ -96,9 +108,7 @@ describe("LocalProvider", () => {
     });
     try {
       const port = server.port;
-      const result = await provider.probePorts(fakeCompute, [
-        { port, source: "test" },
-      ]);
+      const result = await provider.probePorts(fakeCompute, [{ port, source: "test" }]);
       expect(result).toHaveLength(1);
       expect(result[0].port).toBe(port);
       expect(result[0].listening).toBe(true);
@@ -143,10 +153,14 @@ describe("LocalProvider", () => {
       });
       expect(returnedName).toBe(tmuxName);
       // Wait for tmux session to be registered
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 500));
       execFileSync("tmux", ["has-session", "-t", tmuxName], { stdio: "pipe" });
     } finally {
-      try { execFileSync("tmux", ["kill-session", "-t", tmuxName], { stdio: "pipe" }); } catch { /* cleanup */ }
+      try {
+        execFileSync("tmux", ["kill-session", "-t", tmuxName], { stdio: "pipe" });
+      } catch {
+        /* cleanup */
+      }
     }
   }, 10_000);
 

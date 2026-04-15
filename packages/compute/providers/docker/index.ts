@@ -15,15 +15,27 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 import type {
-  ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
-  ComputeSnapshot, ComputeMetrics, ComputeProcess, PortDecl, PortStatus,
+  ComputeProvider,
+  ProvisionOpts,
+  LaunchOpts,
+  SyncOpts,
+  ComputeSnapshot,
+  ComputeMetrics,
+  ComputeProcess,
+  PortDecl,
+  PortStatus,
 } from "../../types.js";
 import type { Compute, Session } from "../../../types/index.js";
 import type { AppContext } from "../../../core/app.js";
 import { tmuxBin } from "../../../core/infra/tmux.js";
 import { buildDevcontainer, detectDevcontainer } from "./devcontainer.js";
 import {
-  pullImage, createContainer, startContainer, stopContainer, removeContainer, DEFAULT_IMAGE,
+  pullImage,
+  createContainer,
+  startContainer,
+  stopContainer,
+  removeContainer,
+  DEFAULT_IMAGE,
 } from "./helpers.js";
 import { safeAsync } from "../../../core/safe.js";
 
@@ -51,7 +63,8 @@ export function containerName(hostName: string): string {
 async function checkHostPort(port: number): Promise<boolean> {
   try {
     const { stdout } = await execFileAsync("lsof", ["-i", `:${port}`, "-sTCP:LISTEN"], {
-      encoding: "utf-8", timeout: 5000,
+      encoding: "utf-8",
+      timeout: 5000,
     });
     return stdout.trim().length > 0;
   } catch {
@@ -74,9 +87,7 @@ async function assertDockerAvailable(): Promise<void> {
 
 export class DockerProvider implements ComputeProvider {
   readonly name = "docker";
-  readonly isolationModes = [
-    { value: "container", label: "Docker container (isolated)" },
-  ];
+  readonly isolationModes = [{ value: "container", label: "Docker container (isolated)" }];
   readonly canReboot = false;
   readonly canDelete = true;
   readonly supportsWorktree = false;
@@ -125,9 +136,7 @@ export class DockerProvider implements ComputeProvider {
         await startContainer(name);
 
         // Read back the real container ID
-        const containerId = await run("docker", [
-          "inspect", "--format", "{{.Id}}", name,
-        ]);
+        const containerId = await run("docker", ["inspect", "--format", "{{.Id}}", name]);
 
         this.app.computes.mergeConfig(compute.name, {
           image,
@@ -240,21 +249,11 @@ export class DockerProvider implements ComputeProvider {
 
     // Run all independent docker commands in parallel - non-blocking
     const [statsOut, dfOut, startedAt, psOut, dockerStatsOut] = await Promise.all([
-      run("docker", [
-        "stats", "--no-stream", "--format",
-        "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}",
-        name,
-      ]),
+      run("docker", ["stats", "--no-stream", "--format", "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}", name]),
       run("docker", ["exec", name, "df", "-h", "/"]),
-      run("docker", [
-        "inspect", "--format", "{{.State.StartedAt}}", name,
-      ]),
+      run("docker", ["inspect", "--format", "{{.State.StartedAt}}", name]),
       run("docker", ["exec", name, "ps", "aux"]),
-      run("docker", [
-        "stats", "--no-stream", "--format",
-        "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}",
-        name,
-      ]),
+      run("docker", ["stats", "--no-stream", "--format", "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}", name]),
     ]);
 
     // -- Container-level CPU / MEM from docker stats --
@@ -269,9 +268,7 @@ export class DockerProvider implements ComputeProvider {
         cpu = parseFloat(parts[0].replace("%", "")) || 0;
         memPct = parseFloat(parts[2].replace("%", "")) || 0;
         // MemUsage looks like "123.4MiB / 7.776GiB"
-        const memMatch = parts[1].match(
-          /([\d.]+)\s*(MiB|GiB|KiB)\s*\/\s*([\d.]+)\s*(MiB|GiB|KiB)/,
-        );
+        const memMatch = parts[1].match(/([\d.]+)\s*(MiB|GiB|KiB)\s*\/\s*([\d.]+)\s*(MiB|GiB|KiB)/);
         if (memMatch) {
           memUsedGb = toGb(parseFloat(memMatch[1]), memMatch[2]);
           memTotalGb = toGb(parseFloat(memMatch[3]), memMatch[4]);
@@ -359,19 +356,24 @@ export class DockerProvider implements ComputeProvider {
   async probePorts(compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
     const name = containerName(compute.name);
 
-    return Promise.all(ports.map(async (decl) => {
-      // Try inside the container first
-      const hexPort = decl.port.toString(16).padStart(4, "0").toUpperCase();
-      const out = await run("docker", [
-        "exec", name, "bash", "-c",
-        `cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk '{print $2}' | grep -i ':${hexPort}'`,
-      ]);
-      if (out) return { ...decl, listening: true };
+    return Promise.all(
+      ports.map(async (decl) => {
+        // Try inside the container first
+        const hexPort = decl.port.toString(16).padStart(4, "0").toUpperCase();
+        const out = await run("docker", [
+          "exec",
+          name,
+          "bash",
+          "-c",
+          `cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk '{print $2}' | grep -i ':${hexPort}'`,
+        ]);
+        if (out) return { ...decl, listening: true };
 
-      // Fallback: check on the host side (port mapping)
-      const listening = await checkHostPort(decl.port);
-      return { ...decl, listening };
-    }));
+        // Fallback: check on the host side (port mapping)
+        const listening = await checkHostPort(decl.port);
+        return { ...decl, listening };
+      }),
+    );
   }
 
   // ── Sync ─────────────────────────────────────────────────────────────────
@@ -391,7 +393,12 @@ export class DockerProvider implements ComputeProvider {
     return [tmuxBin(), "attach", "-t", session.session_id];
   }
 
-  buildChannelConfig(sessionId: string, stage: string, channelPort: number, _opts?: { conductorUrl?: string }): Record<string, unknown> {
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    _opts?: { conductorUrl?: string },
+  ): Record<string, unknown> {
     return {
       sessionId,
       stage,
@@ -409,9 +416,13 @@ export class DockerProvider implements ComputeProvider {
 /** Convert a numeric value in MiB/GiB/KiB to GiB. */
 function toGb(value: number, unit: string): number {
   switch (unit) {
-    case "GiB": return Math.round(value * 100) / 100;
-    case "MiB": return Math.round((value / 1024) * 100) / 100;
-    case "KiB": return Math.round((value / (1024 * 1024)) * 100) / 100;
-    default: return 0;
+    case "GiB":
+      return Math.round(value * 100) / 100;
+    case "MiB":
+      return Math.round((value / 1024) * 100) / 100;
+    case "KiB":
+      return Math.round((value / (1024 * 1024)) * 100) / 100;
+    default:
+      return 0;
   }
 }

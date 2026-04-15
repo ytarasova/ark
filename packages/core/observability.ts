@@ -5,8 +5,8 @@
 
 export interface ObservabilityConfig {
   enabled: boolean;
-  endpoint?: string;       // HTTP endpoint to POST events to
-  apiKey?: string;         // Auth header value
+  endpoint?: string; // HTTP endpoint to POST events to
+  apiKey?: string; // Auth header value
   provider?: "laminar" | "langfuse" | "custom";
 }
 
@@ -47,7 +47,7 @@ export async function flush(): Promise<void> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ..._config.apiKey ? { Authorization: `Bearer ${_config.apiKey}` } : {},
+        ...(_config.apiKey ? { Authorization: `Bearer ${_config.apiKey}` } : {}),
       },
       body: JSON.stringify({ events }),
     });
@@ -59,7 +59,9 @@ export async function flush(): Promise<void> {
 }
 
 /** Get buffered events (for testing). */
-export function getEventBuffer(): ObservabilityEvent[] { return [..._buffer]; }
+export function getEventBuffer(): ObservabilityEvent[] {
+  return [..._buffer];
+}
 
 /** Clear the buffer and config. */
 export function resetObservability(): void {

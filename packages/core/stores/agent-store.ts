@@ -106,7 +106,10 @@ export class FileAgentStore implements AgentStore {
     const projDir = projectRoot ? join(projectRoot, ".ark", "agents") : this.projectDir;
     const dir = scope === "project" && projDir ? projDir : this.userDir;
     const path = join(dir, `${name}.yaml`);
-    if (existsSync(path)) { unlinkSync(path); return true; }
+    if (existsSync(path)) {
+      unlinkSync(path);
+      return true;
+    }
     return false;
   }
 }

@@ -43,15 +43,9 @@ interface GhPRState {
  * Fetch PR state via gh CLI.
  * Returns null if the CLI call fails (network error, rate limit, etc.).
  */
-export async function fetchPRState(
-  prUrl: string,
-  ghExec: GhExecFn = _ghExec,
-): Promise<GhPRState | null> {
+export async function fetchPRState(prUrl: string, ghExec: GhExecFn = _ghExec): Promise<GhPRState | null> {
   try {
-    const { stdout } = await ghExec([
-      "pr", "view", prUrl,
-      "--json", "state,mergedAt",
-    ]);
+    const { stdout } = await ghExec(["pr", "view", prUrl, "--json", "state,mergedAt"]);
     return JSON.parse(stdout) as GhPRState;
   } catch {
     return null;

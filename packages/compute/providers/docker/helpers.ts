@@ -24,16 +24,17 @@ export async function pullImage(image: string): Promise<void> {
  * Create a persistent Docker container with standard credential mounts.
  * Mounts ~/.ssh, ~/.claude (read-only), and optionally ~/.aws.
  */
-export async function createContainer(
-  name: string,
-  image: string,
-  extraVolumes: string[] = [],
-): Promise<void> {
+export async function createContainer(name: string, image: string, extraVolumes: string[] = []): Promise<void> {
   const home = homedir();
   const createArgs = [
-    "create", "--name", name, "-it",
-    "-v", `${join(home, ".ssh")}:/root/.ssh:ro`,
-    "-v", `${join(home, ".claude")}:/root/.claude:ro`,
+    "create",
+    "--name",
+    name,
+    "-it",
+    "-v",
+    `${join(home, ".ssh")}:/root/.ssh:ro`,
+    "-v",
+    `${join(home, ".claude")}:/root/.claude:ro`,
   ];
 
   const awsDir = join(home, ".aws");

@@ -8,8 +8,14 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
 
     // Fleet status counts
     const counts: Record<string, number> = {
-      running: 0, waiting: 0, stopped: 0, failed: 0, completed: 0,
-      ready: 0, archived: 0, total: sessions.length,
+      running: 0,
+      waiting: 0,
+      stopped: 0,
+      failed: 0,
+      completed: 0,
+      ready: 0,
+      archived: 0,
+      total: sessions.length,
     };
     for (const s of sessions) {
       if (s.status in counts) counts[s.status]++;
@@ -51,9 +57,9 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
         byModel[model] = (byModel[model] ?? 0) + c.cost;
       }
 
-      const todaySessions = sessions.filter(s => s.updated_at >= todayStart);
-      const weekSessions = sessions.filter(s => s.updated_at >= weekStart.toISOString());
-      const monthSessions = sessions.filter(s => s.updated_at >= monthStart);
+      const todaySessions = sessions.filter((s) => s.updated_at >= todayStart);
+      const weekSessions = sessions.filter((s) => s.updated_at >= weekStart.toISOString());
+      const monthSessions = sessions.filter((s) => s.updated_at >= monthStart);
       todayCost = getAllSessionCosts(app, todaySessions).total;
       weekCost = getAllSessionCosts(app, weekSessions).total;
       monthCost = getAllSessionCosts(app, monthSessions).total;
@@ -84,7 +90,7 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
     recentEvents.sort((a, b) => b.created_at.localeCompare(a.created_at));
 
     // Top cost sessions for charts
-    const topCostSessions = costSessions.slice(0, 10).map(c => ({
+    const topCostSessions = costSessions.slice(0, 10).map((c) => ({
       sessionId: c.sessionId,
       summary: c.summary,
       model: c.model,

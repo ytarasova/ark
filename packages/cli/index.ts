@@ -120,9 +120,12 @@ await program.parseAsync(process.argv);
 
 // Non-blocking update check (only in local mode)
 if (app) {
-  core.checkForUpdate(app.config.arkDir).then(latest => {
-    if (latest) console.error(chalk.yellow(`Update available: v${latest}`));
-  }).catch(() => {});
+  core
+    .checkForUpdate(app.config.arkDir)
+    .then((latest) => {
+      if (latest) console.error(chalk.yellow(`Update available: v${latest}`));
+    })
+    .catch(() => {});
 }
 
 closeArkClient();

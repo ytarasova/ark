@@ -3,8 +3,15 @@ import { AppContext, setApp, clearApp } from "../app.js";
 import { fanOut } from "../services/session-orchestration.js";
 
 let app: AppContext;
-beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
-afterAll(async () => { await app?.shutdown(); clearApp(); });
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 describe("fan-out compute inheritance", () => {
   test("children inherit parent compute_name", () => {
@@ -25,8 +32,11 @@ describe("fan-out compute inheritance", () => {
   test("children inherit parent workdir and repo", () => {
     const parent = app.sessions.create({ summary: "Parent", flow: "bare" });
     app.sessions.update(parent.id, {
-      status: "running", stage: "implement",
-      compute_name: "fc-host", workdir: "/home/ubuntu/myrepo", repo: "myrepo",
+      status: "running",
+      stage: "implement",
+      compute_name: "fc-host",
+      workdir: "/home/ubuntu/myrepo",
+      repo: "myrepo",
     });
 
     const result = fanOut(app, parent.id, { tasks: [{ summary: "Child" }] });

@@ -24,7 +24,11 @@ export const cliAgentExecutor: Executor = {
 
     const command = agent.command;
     if (!command || command.length === 0) {
-      return { ok: false, handle: "", message: "Agent has no command defined. Add `command: [\"tool\", \"args\"]` to agent YAML." };
+      return {
+        ok: false,
+        handle: "",
+        message: 'Agent has no command defined. Add `command: ["tool", "args"]` to agent YAML.',
+      };
     }
 
     // Worktree setup (reuse the shared function if available)
@@ -36,13 +40,15 @@ export const cliAgentExecutor: Executor = {
         const result = await setupSessionWorktree(app, session, null, null, log);
         if (result) effectiveWorkdir = result;
       }
-    } catch { /* worktree setup optional */ }
+    } catch {
+      /* worktree setup optional */
+    }
 
     // Build tmux session name
     const tmuxName = `ark-${sessionId}`;
 
     // Determine task delivery method
-    const taskDelivery = (agent as Record<string, unknown>).task_delivery as string ?? "stdin";
+    const taskDelivery = ((agent as Record<string, unknown>).task_delivery as string) ?? "stdin";
 
     // Save task to file for file-based delivery
     const trackDir = join(app.config.tracksDir, sessionId);

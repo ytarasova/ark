@@ -30,7 +30,8 @@ describe("detectHandoff", () => {
   });
 
   it("detects JSON block with handoff field", () => {
-    const output = 'Here is my recommendation:\n```json\n{"handoff": "reviewer", "reason": "PR ready for review"}\n```\nEnd of output.';
+    const output =
+      'Here is my recommendation:\n```json\n{"handoff": "reviewer", "reason": "PR ready for review"}\n```\nEnd of output.';
     const signal = detectHandoff(output);
     expect(signal).not.toBeNull();
     expect(signal!.targetAgent).toBe("reviewer");
@@ -38,7 +39,8 @@ describe("detectHandoff", () => {
   });
 
   it("detects JSON block with context", () => {
-    const output = '```json\n{"handoff": "implementer", "reason": "Plan approved", "context": {"files": ["src/main.ts"]}}\n```';
+    const output =
+      '```json\n{"handoff": "implementer", "reason": "Plan approved", "context": {"files": ["src/main.ts"]}}\n```';
     const signal = detectHandoff(output);
     expect(signal).not.toBeNull();
     expect(signal!.targetAgent).toBe("implementer");

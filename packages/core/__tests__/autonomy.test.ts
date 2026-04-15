@@ -112,9 +112,12 @@ describe("writeSettings autonomy", () => {
   it("autonomy 'edit' preserves existing settings alongside deny rules", () => {
     const claudeDir = join(getCtx().arkDir, ".claude");
     mkdirSync(claudeDir, { recursive: true });
-    writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
-      permissions: { allow: ["Read"] },
-    }));
+    writeFileSync(
+      join(claudeDir, "settings.local.json"),
+      JSON.stringify({
+        permissions: { allow: ["Read"] },
+      }),
+    );
 
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, { autonomy: "edit" });
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
@@ -145,9 +148,7 @@ describe("flow autonomy field", () => {
   it("autonomy field is undefined when not set in YAML", () => {
     writeUserFlow("no-autonomy-flow", {
       name: "no-autonomy-flow",
-      stages: [
-        { name: "work", agent: "worker", gate: "auto" },
-      ],
+      stages: [{ name: "work", agent: "worker", gate: "auto" }],
     });
 
     const flow = getApp().flows.get("no-autonomy-flow");

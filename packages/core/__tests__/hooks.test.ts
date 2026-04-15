@@ -12,7 +12,9 @@ beforeEach(() => {
 describe("EventBus.on", () => {
   it("calls handler when matching event is emitted", () => {
     const received: string[] = [];
-    eventBus.on("session:start", (e) => { received.push(e.sessionId); });
+    eventBus.on("session:start", (e) => {
+      received.push(e.sessionId);
+    });
 
     eventBus.emit("session:start", "s-abc123");
 
@@ -21,7 +23,9 @@ describe("EventBus.on", () => {
 
   it("does not call handler for non-matching events", () => {
     let called = false;
-    eventBus.on("session:stop", () => { called = true; });
+    eventBus.on("session:stop", () => {
+      called = true;
+    });
 
     eventBus.emit("session:start", "s-abc123");
 
@@ -30,7 +34,9 @@ describe("EventBus.on", () => {
 
   it("returns unsubscribe function", () => {
     const received: string[] = [];
-    const unsub = eventBus.on("test", (e) => { received.push(e.sessionId); });
+    const unsub = eventBus.on("test", (e) => {
+      received.push(e.sessionId);
+    });
 
     eventBus.emit("test", "s-1");
     unsub();
@@ -41,8 +47,12 @@ describe("EventBus.on", () => {
 
   it("supports multiple handlers for the same event", () => {
     let count = 0;
-    eventBus.on("multi", () => { count++; });
-    eventBus.on("multi", () => { count++; });
+    eventBus.on("multi", () => {
+      count++;
+    });
+    eventBus.on("multi", () => {
+      count++;
+    });
 
     eventBus.emit("multi", "s-1");
 
@@ -53,7 +63,9 @@ describe("EventBus.on", () => {
 describe("EventBus.onAll", () => {
   it("receives all event types via wildcard", () => {
     const types: string[] = [];
-    eventBus.onAll((e) => { types.push(e.type); });
+    eventBus.onAll((e) => {
+      types.push(e.type);
+    });
 
     eventBus.emit("a", "s-1");
     eventBus.emit("b", "s-2");
@@ -67,7 +79,9 @@ describe("EventBus.before", () => {
     eventBus.before("cancelable", () => ({ cancelled: true, reason: "blocked" }));
 
     let received = false;
-    eventBus.on("cancelable", () => { received = true; });
+    eventBus.on("cancelable", () => {
+      received = true;
+    });
 
     const result = eventBus.emit("cancelable", "s-1");
 
@@ -79,7 +93,9 @@ describe("EventBus.before", () => {
     eventBus.before("allowed", () => ({ cancelled: false }));
 
     let received = false;
-    eventBus.on("allowed", () => { received = true; });
+    eventBus.on("allowed", () => {
+      received = true;
+    });
 
     const result = eventBus.emit("allowed", "s-1");
 
@@ -91,7 +107,9 @@ describe("EventBus.before", () => {
     eventBus.before("void", () => {});
 
     let received = false;
-    eventBus.on("void", () => { received = true; });
+    eventBus.on("void", () => {
+      received = true;
+    });
 
     const result = eventBus.emit("void", "s-1");
 
@@ -111,7 +129,9 @@ describe("EventBus.before", () => {
 describe("EventBus.emit", () => {
   it("assigns sequential IDs to events", () => {
     const ids: number[] = [];
-    eventBus.on("seq", (e) => { ids.push(e.id); });
+    eventBus.on("seq", (e) => {
+      ids.push(e.id);
+    });
 
     eventBus.emit("seq", "s-1");
     eventBus.emit("seq", "s-2");
@@ -123,7 +143,9 @@ describe("EventBus.emit", () => {
 
   it("includes stage and data in events", () => {
     let captured: any = null;
-    eventBus.on("detailed", (e) => { captured = e; });
+    eventBus.on("detailed", (e) => {
+      captured = e;
+    });
 
     eventBus.emit("detailed", "s-1", { stage: "plan", data: { key: "value" } });
 
@@ -133,7 +155,9 @@ describe("EventBus.emit", () => {
 
   it("includes ISO timestamp", () => {
     let captured: any = null;
-    eventBus.on("timed", (e) => { captured = e; });
+    eventBus.on("timed", (e) => {
+      captured = e;
+    });
 
     eventBus.emit("timed", "s-1");
 
@@ -143,8 +167,12 @@ describe("EventBus.emit", () => {
 
   it("handles handler errors without stopping other handlers", () => {
     const received: string[] = [];
-    eventBus.on("error-test", () => { throw new Error("handler crash"); });
-    eventBus.on("error-test", (e) => { received.push(e.sessionId); });
+    eventBus.on("error-test", () => {
+      throw new Error("handler crash");
+    });
+    eventBus.on("error-test", (e) => {
+      received.push(e.sessionId);
+    });
 
     eventBus.emit("error-test", "s-1");
 
@@ -175,7 +203,9 @@ describe("EventBus.replay", () => {
 describe("EventBus.clear", () => {
   it("removes all handlers", () => {
     let called = false;
-    eventBus.on("cleared", () => { called = true; });
+    eventBus.on("cleared", () => {
+      called = true;
+    });
     eventBus.clear();
 
     eventBus.emit("cleared", "s-1");

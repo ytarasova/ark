@@ -32,7 +32,7 @@ export function hasPasteMarker(content: string): boolean {
  * Looks for a prompt character (> or $) on the last non-empty line.
  */
 export function isReadyForInput(content: string): boolean {
-  const lines = content.split("\n").filter(l => l.trim());
+  const lines = content.split("\n").filter((l) => l.trim());
   if (lines.length === 0) return false;
   const lastLine = lines[lines.length - 1].trim();
   return lastLine.endsWith(">") || lastLine.endsWith("$") || lastLine.endsWith("%");
@@ -60,8 +60,10 @@ export async function sendReliable(
       try {
         const content = await tmux.capturePaneAsync(sessionName, { lines: 10 });
         if (isReadyForInput(content)) break;
-      } catch { /* session may not exist yet */ }
-      await new Promise(r => setTimeout(r, 500));
+      } catch {
+        /* session may not exist yet */
+      }
+      await new Promise((r) => setTimeout(r, 500));
     }
   }
 
@@ -70,7 +72,7 @@ export async function sendReliable(
 
   // 3. Verify delivery with retry
   for (let attempt = 1; attempt <= o.maxRetries; attempt++) {
-    await new Promise(r => setTimeout(r, o.retryDelayMs));
+    await new Promise((r) => setTimeout(r, o.retryDelayMs));
 
     try {
       const content = await tmux.capturePaneAsync(sessionName, { lines: 20 });

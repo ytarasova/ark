@@ -16,7 +16,10 @@ async function rpcResult(port: number, method: string, params: Record<string, un
 
 describe("daemon/status RPC handler", () => {
   let server: { stop: () => void; url: string } | null = null;
-  afterEach(() => { server?.stop(); server = null; });
+  afterEach(() => {
+    server?.stop();
+    server = null;
+  });
 
   it("returns correct shape with conductor, arkd, and router fields", async () => {
     server = startWebServer(getApp(), { port: 18560 });

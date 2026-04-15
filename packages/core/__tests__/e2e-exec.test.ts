@@ -33,7 +33,11 @@ const sessionIds: string[] = [];
 
 afterEach(() => {
   for (const id of sessionIds) {
-    try { app.sessions.delete(id); } catch { /* already gone */ }
+    try {
+      app.sessions.delete(id);
+    } catch {
+      /* already gone */
+    }
   }
   sessionIds.length = 0;
 });

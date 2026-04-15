@@ -7,11 +7,31 @@ import { filterMessages, parseMessageFilter, type FilteredMessage } from "../mes
 
 const messages: FilteredMessage[] = [
   { role: "user", content: "Start the task", agent: "planner", timestamp: "2024-01-01T00:00:00Z" },
-  { role: "assistant", content: "Planning complete with detailed analysis", agent: "planner", timestamp: "2024-01-01T00:01:00Z" },
-  { role: "assistant", content: "Implementation started on the feature", agent: "implementer", timestamp: "2024-01-01T00:02:00Z" },
-  { role: "assistant", content: "Review findings and suggestions listed", agent: "reviewer", timestamp: "2024-01-01T00:03:00Z" },
+  {
+    role: "assistant",
+    content: "Planning complete with detailed analysis",
+    agent: "planner",
+    timestamp: "2024-01-01T00:01:00Z",
+  },
+  {
+    role: "assistant",
+    content: "Implementation started on the feature",
+    agent: "implementer",
+    timestamp: "2024-01-01T00:02:00Z",
+  },
+  {
+    role: "assistant",
+    content: "Review findings and suggestions listed",
+    agent: "reviewer",
+    timestamp: "2024-01-01T00:03:00Z",
+  },
   { role: "user", content: "Looks good, proceed", timestamp: "2024-01-01T00:04:00Z" },
-  { role: "assistant", content: "Final implementation with all fixes applied", agent: "implementer", timestamp: "2024-01-01T00:05:00Z" },
+  {
+    role: "assistant",
+    content: "Final implementation with all fixes applied",
+    agent: "implementer",
+    timestamp: "2024-01-01T00:05:00Z",
+  },
 ];
 
 describe("filterMessages", () => {
@@ -32,7 +52,7 @@ describe("filterMessages", () => {
   describe("fromAgents", () => {
     it("includes only messages from specified agents", () => {
       const result = filterMessages(messages, { fromAgents: ["implementer"] });
-      expect(result.length).toBe(3);  // 2 implementer + 1 user (no agent field)
+      expect(result.length).toBe(3); // 2 implementer + 1 user (no agent field)
       for (const m of result) {
         expect(!m.agent || m.agent === "implementer").toBe(true);
       }
@@ -40,9 +60,9 @@ describe("filterMessages", () => {
 
     it("includes messages without agent field (user messages)", () => {
       const result = filterMessages(messages, { fromAgents: ["reviewer"] });
-      const agents = result.map(m => m.agent);
+      const agents = result.map((m) => m.agent);
       expect(agents).toContain("reviewer");
-      expect(agents).toContain(undefined);  // user message with no agent
+      expect(agents).toContain(undefined); // user message with no agent
     });
   });
 
@@ -50,7 +70,7 @@ describe("filterMessages", () => {
     it("excludes messages from specified agents", () => {
       const result = filterMessages(messages, { excludeAgents: ["planner"] });
       expect(result.length).toBe(4);
-      expect(result.every(m => m.agent !== "planner")).toBe(true);
+      expect(result.every((m) => m.agent !== "planner")).toBe(true);
     });
 
     it("keeps messages without agent field", () => {

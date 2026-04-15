@@ -12,14 +12,14 @@ export interface AgentEvalResult {
   model: string;
   sessionId: string;
   metrics: {
-    completed: boolean;           // did the session reach "completed" status?
-    testsPassed: boolean | null;  // did verify scripts pass? null if no verify
-    prCreated: boolean;           // was a PR created?
-    turnCount: number;            // total conversation turns
-    durationMs: number;           // wall clock time
-    tokenCost: number;            // USD cost
-    filesChanged: number;         // files modified
-    retryCount: number;           // how many retries before success
+    completed: boolean; // did the session reach "completed" status?
+    testsPassed: boolean | null; // did verify scripts pass? null if no verify
+    prCreated: boolean; // was a PR created?
+    turnCount: number; // total conversation turns
+    durationMs: number; // wall clock time
+    tokenCost: number; // USD cost
+    filesChanged: number; // files modified
+    retryCount: number; // how many retries before success
   };
   timestamp: string;
 }
@@ -67,19 +67,20 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
   const events = app.events.list(session.id);
 
   // Count turns (stage_started events approximate turns)
-  const turnCount = events.filter(e => e.type === "agent_progress" || e.type === "stage_started").length;
+  const turnCount = events.filter((e) => e.type === "agent_progress" || e.type === "stage_started").length;
 
   // Check if tests passed (look for verification events)
-  const verifyEvents = events.filter(e => e.type === "verification_result");
-  const testsPassed = verifyEvents.length > 0
-    ? verifyEvents.every(e => {
-        const data = e.data as Record<string, unknown> | undefined;
-        return data?.result === "PASS";
-      })
-    : null;
+  const verifyEvents = events.filter((e) => e.type === "verification_result");
+  const testsPassed =
+    verifyEvents.length > 0
+      ? verifyEvents.every((e) => {
+          const data = e.data as Record<string, unknown> | undefined;
+          return data?.result === "PASS";
+        })
+      : null;
 
   const prCreated = !!session.pr_url;
-  const retryCount = events.filter(e => e.type === "retry_with_context").length;
+  const retryCount = events.filter((e) => e.type === "retry_with_context").length;
 
   const created = new Date(session.created_at).getTime();
   const updated = new Date(session.updated_at).getTime();
@@ -136,7 +137,10 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
  * Get aggregate stats for an agent role, or across all agents when
  * `agentRole` is omitted.
  */
-export function getAgentStats(app: AppContext, agentRole?: string): {
+export function getAgentStats(
+  app: AppContext,
+  agentRole?: string,
+): {
   totalSessions: number;
   completionRate: number;
   avgDurationMs: number;
@@ -145,12 +149,21 @@ export function getAgentStats(app: AppContext, agentRole?: string): {
   testPassRate: number;
   prRate: number;
 } {
-  const evalNodes = app.knowledge.listNodes({ type: "session" })
-    .map(n => ({ node: n, meta: asEvalMeta(n.metadata) }))
+  const evalNodes = app.knowledge
+    .listNodes({ type: "session" })
+    .map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }))
     .filter(({ meta }) => meta.eval && (!agentRole || meta.agentRole === agentRole));
 
   if (evalNodes.length === 0) {
-    return { totalSessions: 0, completionRate: 0, avgDurationMs: 0, avgCost: 0, avgTurns: 0, testPassRate: 0, prRate: 0 };
+    return {
+      totalSessions: 0,
+      completionRate: 0,
+      avgDurationMs: 0,
+      avgCost: 0,
+      avgTurns: 0,
+      testPassRate: 0,
+      prRate: 0,
+    };
   }
 
   const completed = evalNodes.filter(({ meta }) => meta.completed).length;
@@ -176,14 +189,20 @@ export function getAgentStats(app: AppContext, agentRole?: string): {
  * Detect drift: compare recent performance to baseline.
  * Returns positive if improving, negative if degrading.
  */
-export function detectDrift(app: AppContext, agentRole: string, recentDays: number = 7, baselineDays: number = 28): {
+export function detectDrift(
+  app: AppContext,
+  agentRole: string,
+  recentDays: number = 7,
+  baselineDays: number = 28,
+): {
   completionRateDelta: number;
   avgCostDelta: number;
   avgTurnsDelta: number;
   alert: boolean;
 } {
-  const allEvals = app.knowledge.listNodes({ type: "session" })
-    .map(n => ({ node: n, meta: asEvalMeta(n.metadata) }))
+  const allEvals = app.knowledge
+    .listNodes({ type: "session" })
+    .map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }))
     .filter(({ meta }) => meta.eval && meta.agentRole === agentRole);
 
   const now = Date.now();
@@ -214,7 +233,7 @@ export function detectDrift(app: AppContext, agentRole: string, recentDays: numb
   const turnsDelta = baselineTurns > 0 ? (recentTurns - baselineTurns) / baselineTurns : 0;
 
   // Alert if completion rate dropped >10% or cost increased >20%
-  const alert = completionDelta < -0.10 || costDelta > 0.20;
+  const alert = completionDelta < -0.1 || costDelta > 0.2;
 
   return {
     completionRateDelta: completionDelta,
@@ -228,8 +247,9 @@ export function detectDrift(app: AppContext, agentRole: string, recentDays: numb
  * List eval nodes, optionally filtered by agent role.
  */
 export function listEvals(app: AppContext, agentRole?: string, limit: number = 20): AgentEvalResult[] {
-  let evalNodes = app.knowledge.listNodes({ type: "session", limit: limit * 2 })
-    .map(n => ({ node: n, meta: asEvalMeta(n.metadata) }))
+  let evalNodes = app.knowledge
+    .listNodes({ type: "session", limit: limit * 2 })
+    .map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }))
     .filter(({ meta }) => meta.eval);
 
   if (agentRole) {
@@ -237,10 +257,10 @@ export function listEvals(app: AppContext, agentRole?: string, limit: number = 2
   }
 
   return evalNodes.slice(0, limit).map(({ node, meta }) => {
-    const metrics = node.content ? JSON.parse(node.content) as Record<string, unknown> : {};
+    const metrics = node.content ? (JSON.parse(node.content) as Record<string, unknown>) : {};
     const pickNum = (k: string): number => {
       if (typeof meta[k as keyof EvalNodeMetadata] === "number") return meta[k as keyof EvalNodeMetadata] as number;
-      return typeof metrics[k] === "number" ? metrics[k] as number : 0;
+      return typeof metrics[k] === "number" ? (metrics[k] as number) : 0;
     };
     return {
       agentRole: meta.agentRole,

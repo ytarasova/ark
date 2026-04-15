@@ -20,7 +20,11 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  try { rmSync(TEST_DIR, { recursive: true, force: true }); } catch { /* already gone */ }
+  try {
+    rmSync(TEST_DIR, { recursive: true, force: true });
+  } catch {
+    /* already gone */
+  }
 });
 
 function writeTranscript(projectSlug: string, fileName: string, workdir: string, messages: object[]): string {
@@ -29,7 +33,7 @@ function writeTranscript(projectSlug: string, fileName: string, workdir: string,
   const path = join(chatsDir, fileName);
   const projectHash = createHash("sha256").update(resolve(workdir)).digest("hex");
   const header = { sessionId: "test-session", projectHash, startTime: new Date().toISOString() };
-  const content = [header, ...messages].map(m => JSON.stringify(m)).join("\n");
+  const content = [header, ...messages].map((m) => JSON.stringify(m)).join("\n");
   writeFileSync(path, content);
   return path;
 }
@@ -46,7 +50,12 @@ describe("GeminiTranscriptParser.parse", () => {
   it("accumulates token deltas across gemini messages (non-cumulative)", () => {
     const path = writeTranscript("proj1", "session-accum.jsonl", "/tmp/wd-gemini-1", [
       { type: "user", content: "hi" },
-      { type: "gemini", model: "gemini-pro", content: "hello", tokens: { input: 100, output: 50, cached: 10, thoughts: 5, tool: 2 } },
+      {
+        type: "gemini",
+        model: "gemini-pro",
+        content: "hello",
+        tokens: { input: 100, output: 50, cached: 10, thoughts: 5, tool: 2 },
+      },
       { type: "gemini", content: "again", tokens: { input: 200, output: 80, cached: 20 } },
     ]);
     const result = parser.parse(path);
@@ -75,10 +84,13 @@ describe("GeminiTranscriptParser.parse", () => {
     const dir = join(TMP_DIR, "proj-bad", "chats");
     mkdirSync(dir, { recursive: true });
     const path = join(dir, "session-bad.jsonl");
-    writeFileSync(path,
-      JSON.stringify({ projectHash: "xxx" }) + "\n" +
-      "not-json\n" +
-      JSON.stringify({ type: "gemini", tokens: { input: 1, output: 2 } }) + "\n"
+    writeFileSync(
+      path,
+      JSON.stringify({ projectHash: "xxx" }) +
+        "\n" +
+        "not-json\n" +
+        JSON.stringify({ type: "gemini", tokens: { input: 1, output: 2 } }) +
+        "\n",
     );
     const result = parser.parse(path);
     expect(result.usage.input_tokens).toBe(1);

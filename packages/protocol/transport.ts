@@ -71,7 +71,9 @@ export function createWebSocketTransport(
       try {
         const msg = JSON.parse(typeof event.data === "string" ? event.data : new TextDecoder().decode(event.data));
         for (const h of handlers) h(msg);
-      } catch { /* ignore malformed messages */ }
+      } catch {
+        /* ignore malformed messages */
+      }
     };
 
     socket.onclose = () => {
@@ -99,7 +101,11 @@ export function createWebSocketTransport(
           const pending = buffer;
           buffer = [];
           for (const msg of pending) {
-            try { ws.send(JSON.stringify(msg)); } catch { /* drop if send fails */ }
+            try {
+              ws.send(JSON.stringify(msg));
+            } catch {
+              /* drop if send fails */
+            }
           }
         };
         next.onerror = () => {

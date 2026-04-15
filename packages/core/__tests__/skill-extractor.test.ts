@@ -12,9 +12,17 @@ describe("skill extraction", () => {
   it("identifies numbered-step procedures as skill candidates", () => {
     const conversation = [
       { role: "user", content: "Review the PR changes and check for security issues" },
-      { role: "assistant", content: "I'll review the changes...\n1. Check for SQL injection\n2. Check for XSS vulnerabilities\n3. Verify authentication flows\n4. Review authorization checks" },
+      {
+        role: "assistant",
+        content:
+          "I'll review the changes...\n1. Check for SQL injection\n2. Check for XSS vulnerabilities\n3. Verify authentication flows\n4. Review authorization checks",
+      },
       { role: "user", content: "Now write tests for the security fixes" },
-      { role: "assistant", content: "Writing security tests...\n1. Test SQL injection prevention\n2. Test XSS sanitization\n3. Test auth token validation" },
+      {
+        role: "assistant",
+        content:
+          "Writing security tests...\n1. Test SQL injection prevention\n2. Test XSS sanitization\n3. Test auth token validation",
+      },
     ];
 
     const candidates = extractSkillCandidates(conversation);
@@ -49,7 +57,10 @@ describe("skill extraction", () => {
 
     const sixSteps = [
       { role: "user", content: "Do something bigger" },
-      { role: "assistant", content: "1. Step one\n2. Step two\n3. Step three\n4. Step four\n5. Step five\n6. Step six" },
+      {
+        role: "assistant",
+        content: "1. Step one\n2. Step two\n3. Step three\n4. Step four\n5. Step five\n6. Step six",
+      },
       { role: "user", content: "Continue" },
       { role: "assistant", content: "Done." },
     ];

@@ -14,28 +14,28 @@ import type { ChatCompletionRequest, Difficulty } from "./types.js";
 // ── Classification result ────────────────────────────────────────────────────
 
 export interface ClassificationResult {
-  score: number;                // 0-1 complexity score
-  task_type: string;            // "code", "reasoning", "extraction", "generation", "chat"
+  score: number; // 0-1 complexity score
+  task_type: string; // "code", "reasoning", "extraction", "generation", "chat"
   difficulty: Difficulty;
   has_tools: boolean;
-  context_length: number;       // estimated token count
-  turn_count: number;           // number of messages
-  signals: string[];            // e.g. ["long_context", "multi_tool", "code_generation"]
+  context_length: number; // estimated token count
+  turn_count: number; // number of messages
+  signals: string[]; // e.g. ["long_context", "multi_tool", "code_generation"]
 }
 
 // ── Signal patterns ──────────────────────────────────────────────────────────
 
 const CODE_PATTERNS = [
-  /```[\s\S]*?```/,                    // fenced code blocks
-  /\bfunction\s+\w+/,                  // function declarations
-  /\bclass\s+\w+/,                     // class declarations
-  /\bimport\s+[\{*]/,                  // import statements
-  /\bconst\s+\w+\s*=/,                // const assignments
-  /\b(async|await)\b/,                // async/await
-  /\.(ts|js|py|go|rs|java|cpp)\b/,    // file extensions
+  /```[\s\S]*?```/, // fenced code blocks
+  /\bfunction\s+\w+/, // function declarations
+  /\bclass\s+\w+/, // class declarations
+  /\bimport\s+[\{*]/, // import statements
+  /\bconst\s+\w+\s*=/, // const assignments
+  /\b(async|await)\b/, // async/await
+  /\.(ts|js|py|go|rs|java|cpp)\b/, // file extensions
   /\b(npm|pip|cargo|maven|gradle)\b/, // package managers
-  /\b(git|docker|kubectl)\b/,         // devops tools
-  /\bdef\s+\w+\(/,                    // Python function defs
+  /\b(git|docker|kubectl)\b/, // devops tools
+  /\bdef\s+\w+\(/, // Python function defs
 ];
 
 const REASONING_PATTERNS = [
@@ -58,7 +58,7 @@ const EXTRACTION_PATTERNS = [
 const SIMPLE_CHAT_PATTERNS = [
   /^(hi|hello|hey|thanks|thank you|ok|sure|yes|no|bye|good)\b/i,
   /^(what is|who is|when was|where is)\s/i,
-  /\?$/,                               // simple questions
+  /\?$/, // simple questions
 ];
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ export function classify(request: ChatCompletionRequest): ClassificationResult {
 
   // Get full text content for analysis
   const fullText = messages
-    .map(m => typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""))
+    .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? "")))
     .join("\n");
   const lastUserMsg = getLastUserMessage(messages);
 
@@ -102,7 +102,7 @@ export function classify(request: ChatCompletionRequest): ClassificationResult {
     score += 0.15;
   } else if (turnCount > 10) {
     signals.push("multi_turn");
-    score += 0.10;
+    score += 0.1;
   } else if (turnCount > 4) {
     signals.push("few_turns");
     score += 0.05;
@@ -113,10 +113,10 @@ export function classify(request: ChatCompletionRequest): ClassificationResult {
   if (hasTools) {
     if (toolCount > 5) {
       signals.push("multi_tool");
-      score += 0.20;
+      score += 0.2;
     } else {
       signals.push("has_tools");
-      score += 0.10;
+      score += 0.1;
     }
   }
 
@@ -134,7 +134,7 @@ export function classify(request: ChatCompletionRequest): ClassificationResult {
 
   if (codeHits >= 4) {
     signals.push("heavy_code");
-    score += 0.20;
+    score += 0.2;
   } else if (codeHits >= 2) {
     signals.push("code_generation");
     score += 0.12;
@@ -152,10 +152,10 @@ export function classify(request: ChatCompletionRequest): ClassificationResult {
 
   if (reasoningHits >= 3) {
     signals.push("deep_reasoning");
-    score += 0.20;
+    score += 0.2;
   } else if (reasoningHits >= 1) {
     signals.push("reasoning");
-    score += 0.10;
+    score += 0.1;
   }
 
   // ── Signal: extraction / simple tasks ──────────────────────────────────
@@ -186,13 +186,13 @@ export function classify(request: ChatCompletionRequest): ClassificationResult {
 
   // ── Signal: system prompt complexity ───────────────────────────────────
 
-  const systemMsg = messages.find(m => m.role === "system");
+  const systemMsg = messages.find((m) => m.role === "system");
   if (systemMsg) {
     const sysText = typeof systemMsg.content === "string" ? systemMsg.content : JSON.stringify(systemMsg.content ?? "");
     const sysTokens = Math.ceil(sysText.length / 4);
     if (sysTokens > 2000) {
       signals.push("complex_system_prompt");
-      score += 0.10;
+      score += 0.1;
     } else if (sysTokens > 500) {
       signals.push("detailed_system_prompt");
       score += 0.05;
@@ -241,7 +241,7 @@ function detectTaskType(signals: string[]): string {
 
 function scoreToDifficulty(score: number): Difficulty {
   if (score < 0.15) return "trivial";
-  if (score < 0.30) return "simple";
+  if (score < 0.3) return "simple";
   if (score < 0.55) return "moderate";
   if (score < 0.75) return "complex";
   return "expert";

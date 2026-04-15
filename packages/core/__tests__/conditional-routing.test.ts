@@ -98,7 +98,7 @@ describe("conditional routing - default/fallback edges", () => {
     ],
     edges: [
       { from: "check", to: "fast-path", condition: "session.complexity === 'low'" },
-      { from: "check", to: "slow-path" },  // default edge (no condition)
+      { from: "check", to: "slow-path" }, // default edge (no condition)
       { from: "fast-path", to: "done" },
       { from: "slow-path", to: "done" },
     ],

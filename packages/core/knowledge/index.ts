@@ -1,6 +1,12 @@
 export * from "./types.js";
 export { KnowledgeStore } from "./store.js";
-export { indexCodebase, isCodegraphInstalled, findCodegraphBinary, indexCoChanges, indexSessionCompletion } from "./indexer.js";
+export {
+  indexCodebase,
+  isCodegraphInstalled,
+  findCodegraphBinary,
+  indexCoChanges,
+  indexSessionCompletion,
+} from "./indexer.js";
 export type { IndexResult, ExecFn } from "./indexer.js";
 export { buildContext, formatContextAsMarkdown } from "./context.js";
 export { exportToMarkdown, importFromMarkdown } from "./export.js";

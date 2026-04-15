@@ -25,11 +25,13 @@ beforeEach(() => {
 describe("session/fan-out handler", () => {
   it("creates child sessions with parent_id set and parent goes to waiting", async () => {
     // Create parent session
-    const startRes = await router.dispatch(createRequest(1, "session/start", {
-      summary: "parent session",
-      repo: ".",
-      flow: "bare",
-    }));
+    const startRes = await router.dispatch(
+      createRequest(1, "session/start", {
+        summary: "parent session",
+        repo: ".",
+        flow: "bare",
+      }),
+    );
     const startResult = (startRes as JsonRpcResponse).result as Record<string, unknown>;
     const parentId = (startResult.session as Record<string, unknown>).id as string;
     expect(parentId).toMatch(/^s-/);
@@ -39,10 +41,7 @@ describe("session/fan-out handler", () => {
     const fanOutRes = await router.dispatch(
       createRequest(2, "session/fan-out", {
         sessionId: parentId,
-        tasks: [
-          { summary: "child task one" },
-          { summary: "child task two", agent: "worker" },
-        ],
+        tasks: [{ summary: "child task one" }, { summary: "child task two", agent: "worker" }],
       }),
       (_method, data) => notifications.push(data),
     );
@@ -70,21 +69,20 @@ describe("session/fan-out handler", () => {
   });
 
   it("children summaries match tasks provided", async () => {
-    const startRes = await router.dispatch(createRequest(1, "session/start", {
-      summary: "parent for summaries test",
-      repo: ".",
-      flow: "bare",
-    }));
+    const startRes = await router.dispatch(
+      createRequest(1, "session/start", {
+        summary: "parent for summaries test",
+        repo: ".",
+        flow: "bare",
+      }),
+    );
     const startResult = (startRes as JsonRpcResponse).result as Record<string, unknown>;
     const parentId = (startResult.session as Record<string, unknown>).id as string;
 
     const fanOutRes = await router.dispatch(
       createRequest(2, "session/fan-out", {
         sessionId: parentId,
-        tasks: [
-          { summary: "first task" },
-          { summary: "second task" },
-        ],
+        tasks: [{ summary: "first task" }, { summary: "second task" }],
       }),
     );
 
@@ -111,11 +109,13 @@ describe("session/fan-out handler", () => {
   });
 
   it("returns error when no tasks provided", async () => {
-    const startRes = await router.dispatch(createRequest(1, "session/start", {
-      summary: "parent empty tasks",
-      repo: ".",
-      flow: "bare",
-    }));
+    const startRes = await router.dispatch(
+      createRequest(1, "session/start", {
+        summary: "parent empty tasks",
+        repo: ".",
+        flow: "bare",
+      }),
+    );
     const startResult = (startRes as JsonRpcResponse).result as Record<string, unknown>;
     const parentId = (startResult.session as Record<string, unknown>).id as string;
 

@@ -13,18 +13,18 @@ import type { IDatabase } from "./database/index.js";
 
 export interface TenantComputePolicy {
   tenant_id: string;
-  allowed_providers: string[];         // ["k8s", "k8s-kata", "ec2", "e2b"]
-  default_provider: string;            // "k8s"
-  max_concurrent_sessions: number;     // 20
+  allowed_providers: string[]; // ["k8s", "k8s-kata", "ec2", "e2b"]
+  default_provider: string; // "k8s"
+  max_concurrent_sessions: number; // 20
   max_cost_per_day_usd: number | null; // budget limit
-  compute_pools: ComputePoolRef[];     // pools assigned to this tenant
+  compute_pools: ComputePoolRef[]; // pools assigned to this tenant
   // Integration settings
-  router_enabled: boolean | null;       // null = inherit from global config
-  router_required: boolean;             // tenant MUST use router (control plane enforced)
-  router_policy: string | null;         // "quality" | "balanced" | "cost" | null = inherit
-  auto_index: boolean | null;           // null = inherit from global config
-  auto_index_required: boolean;         // tenant MUST auto-index
-  tensorzero_enabled: boolean | null;   // null = inherit from global config
+  router_enabled: boolean | null; // null = inherit from global config
+  router_required: boolean; // tenant MUST use router (control plane enforced)
+  router_policy: string | null; // "quality" | "balanced" | "cost" | null = inherit
+  auto_index: boolean | null; // null = inherit from global config
+  auto_index_required: boolean; // tenant MUST auto-index
+  tensorzero_enabled: boolean | null; // null = inherit from global config
 }
 
 export interface ComputePoolRef {
@@ -32,12 +32,12 @@ export interface ComputePoolRef {
   provider: string;
   min: number;
   max: number;
-  config: Record<string, unknown>;     // provider-specific (size, image, region, etc.)
+  config: Record<string, unknown>; // provider-specific (size, image, region, etc.)
 }
 
 /** Default policy for tenants without an explicit policy record. */
 const DEFAULT_POLICY: Omit<TenantComputePolicy, "tenant_id"> = {
-  allowed_providers: [],               // empty = all allowed
+  allowed_providers: [], // empty = all allowed
   default_provider: "k8s",
   max_concurrent_sessions: 10,
   max_cost_per_day_usd: null,
@@ -83,15 +83,19 @@ export class TenantPolicyManager {
       ["tensorzero_enabled", "INTEGER"],
     ];
     for (const [col, def] of cols) {
-      try { this.db.prepare(`ALTER TABLE tenant_policies ADD COLUMN ${col} ${def}`).run(); } catch { /* exists */ }
+      try {
+        this.db.prepare(`ALTER TABLE tenant_policies ADD COLUMN ${col} ${def}`).run();
+      } catch {
+        /* exists */
+      }
     }
   }
 
   /** Get the policy for a tenant, or null if no explicit policy exists. */
   getPolicy(tenantId: string): TenantComputePolicy | null {
-    const row = this.db.prepare(
-      "SELECT * FROM tenant_policies WHERE tenant_id = ?"
-    ).get(tenantId) as TenantPolicyRow | undefined;
+    const row = this.db.prepare("SELECT * FROM tenant_policies WHERE tenant_id = ?").get(tenantId) as
+      | TenantPolicyRow
+      | undefined;
     return row ? this._hydrateRow(row) : null;
   }
 
@@ -108,18 +112,18 @@ export class TenantPolicyManager {
     const now = new Date().toISOString();
     const providers = JSON.stringify(policy.allowed_providers);
     const pools = JSON.stringify(policy.compute_pools);
-    const routerEnabled = policy.router_enabled == null ? null : (policy.router_enabled ? 1 : 0);
+    const routerEnabled = policy.router_enabled == null ? null : policy.router_enabled ? 1 : 0;
     const routerRequired = policy.router_required ? 1 : 0;
-    const autoIndex = policy.auto_index == null ? null : (policy.auto_index ? 1 : 0);
+    const autoIndex = policy.auto_index == null ? null : policy.auto_index ? 1 : 0;
     const autoIndexRequired = policy.auto_index_required ? 1 : 0;
-    const tensorzeroEnabled = policy.tensorzero_enabled == null ? null : (policy.tensorzero_enabled ? 1 : 0);
+    const tensorzeroEnabled = policy.tensorzero_enabled == null ? null : policy.tensorzero_enabled ? 1 : 0;
 
-    const existing = this.db.prepare(
-      "SELECT tenant_id FROM tenant_policies WHERE tenant_id = ?"
-    ).get(policy.tenant_id);
+    const existing = this.db.prepare("SELECT tenant_id FROM tenant_policies WHERE tenant_id = ?").get(policy.tenant_id);
 
     if (existing) {
-      this.db.prepare(`
+      this.db
+        .prepare(
+          `
         UPDATE tenant_policies
         SET allowed_providers = ?, default_provider = ?,
             max_concurrent_sessions = ?, max_cost_per_day_usd = ?,
@@ -128,16 +132,27 @@ export class TenantPolicyManager {
             auto_index = ?, auto_index_required = ?, tensorzero_enabled = ?,
             updated_at = ?
         WHERE tenant_id = ?
-      `).run(
-        providers, policy.default_provider,
-        policy.max_concurrent_sessions, policy.max_cost_per_day_usd ?? null,
-        pools,
-        routerEnabled, routerRequired, policy.router_policy ?? null,
-        autoIndex, autoIndexRequired, tensorzeroEnabled,
-        now, policy.tenant_id,
-      );
+      `,
+        )
+        .run(
+          providers,
+          policy.default_provider,
+          policy.max_concurrent_sessions,
+          policy.max_cost_per_day_usd ?? null,
+          pools,
+          routerEnabled,
+          routerRequired,
+          policy.router_policy ?? null,
+          autoIndex,
+          autoIndexRequired,
+          tensorzeroEnabled,
+          now,
+          policy.tenant_id,
+        );
     } else {
-      this.db.prepare(`
+      this.db
+        .prepare(
+          `
         INSERT INTO tenant_policies
           (tenant_id, allowed_providers, default_provider,
            max_concurrent_sessions, max_cost_per_day_usd, compute_pools,
@@ -145,31 +160,37 @@ export class TenantPolicyManager {
            auto_index, auto_index_required, tensorzero_enabled,
            created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        policy.tenant_id, providers, policy.default_provider,
-        policy.max_concurrent_sessions, policy.max_cost_per_day_usd ?? null,
-        pools,
-        routerEnabled, routerRequired, policy.router_policy ?? null,
-        autoIndex, autoIndexRequired, tensorzeroEnabled,
-        now, now,
-      );
+      `,
+        )
+        .run(
+          policy.tenant_id,
+          providers,
+          policy.default_provider,
+          policy.max_concurrent_sessions,
+          policy.max_cost_per_day_usd ?? null,
+          pools,
+          routerEnabled,
+          routerRequired,
+          policy.router_policy ?? null,
+          autoIndex,
+          autoIndexRequired,
+          tensorzeroEnabled,
+          now,
+          now,
+        );
     }
   }
 
   /** Delete a tenant policy. Returns true if a policy was deleted. */
   deletePolicy(tenantId: string): boolean {
-    const result = this.db.prepare(
-      "DELETE FROM tenant_policies WHERE tenant_id = ?"
-    ).run(tenantId);
+    const result = this.db.prepare("DELETE FROM tenant_policies WHERE tenant_id = ?").run(tenantId);
     return result.changes > 0;
   }
 
   /** List all tenant policies. */
   listPolicies(): TenantComputePolicy[] {
-    const rows = this.db.prepare(
-      "SELECT * FROM tenant_policies ORDER BY tenant_id"
-    ).all() as TenantPolicyRow[];
-    return rows.map(r => this._hydrateRow(r));
+    const rows = this.db.prepare("SELECT * FROM tenant_policies ORDER BY tenant_id").all() as TenantPolicyRow[];
+    return rows.map((r) => this._hydrateRow(r));
   }
 
   // ── Validation helpers ──────────────────────────────────────────────────
@@ -190,10 +211,12 @@ export class TenantPolicyManager {
    */
   getActiveSessions(tenantId: string): number {
     try {
-      const row = this.db.prepare(
-        `SELECT COUNT(*) as cnt FROM sessions
-         WHERE status = 'running' AND tenant_id = ?`
-      ).get(tenantId) as { cnt: number } | undefined;
+      const row = this.db
+        .prepare(
+          `SELECT COUNT(*) as cnt FROM sessions
+         WHERE status = 'running' AND tenant_id = ?`,
+        )
+        .get(tenantId) as { cnt: number } | undefined;
       if (row) return row.cnt;
     } catch {
       // tenant_id column may not exist on sessions table in some setups
@@ -220,12 +243,15 @@ export class TenantPolicyManager {
   }
 
   /** Get effective integration settings: tenant policy -> global config fallback. */
-  getEffectiveIntegrationSettings(tenantId: string, globalConfig: {
-    routerEnabled: boolean;
-    autoIndex: boolean;
-    tensorZeroEnabled: boolean;
-    routerPolicy: string;
-  }): {
+  getEffectiveIntegrationSettings(
+    tenantId: string,
+    globalConfig: {
+      routerEnabled: boolean;
+      autoIndex: boolean;
+      tensorZeroEnabled: boolean;
+      routerPolicy: string;
+    },
+  ): {
     routerEnabled: boolean;
     routerPolicy: string;
     autoIndex: boolean;
@@ -245,8 +271,16 @@ export class TenantPolicyManager {
   private _hydrateRow(row: TenantPolicyRow): TenantComputePolicy {
     let allowedProviders: string[] = [];
     let computePools: ComputePoolRef[] = [];
-    try { allowedProviders = JSON.parse(row.allowed_providers); } catch { /* default */ }
-    try { computePools = JSON.parse(row.compute_pools); } catch { /* default */ }
+    try {
+      allowedProviders = JSON.parse(row.allowed_providers);
+    } catch {
+      /* default */
+    }
+    try {
+      computePools = JSON.parse(row.compute_pools);
+    } catch {
+      /* default */
+    }
 
     return {
       tenant_id: row.tenant_id,

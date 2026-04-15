@@ -91,7 +91,9 @@ export function resolveInstallPrefixWith(env: ResolveEnv): string | null {
     if (env.existsCheck(join(prefix, "flows", "definitions"))) {
       return prefix;
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
   return null;
 }
 

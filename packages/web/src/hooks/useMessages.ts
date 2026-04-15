@@ -35,12 +35,18 @@ export function useMessages({ sessionId, enabled, pollMs = 2000 }: UseMessagesOp
       const data = await api.getMessages(sessionId);
       const list: Message[] = Array.isArray(data?.messages) ? data.messages : Array.isArray(data) ? data : [];
       if (activeRef.current) {
-        setMessages(prev => {
+        setMessages((prev) => {
           // Remove optimistic messages that now have real counterparts
-          const optimistic = prev.filter(m => m.id < 0 && !list.some(
-            r => r.role === m.role && r.content === m.content &&
-              Math.abs(new Date(r.created_at).getTime() - new Date(m.created_at).getTime()) < 5000
-          ));
+          const optimistic = prev.filter(
+            (m) =>
+              m.id < 0 &&
+              !list.some(
+                (r) =>
+                  r.role === m.role &&
+                  r.content === m.content &&
+                  Math.abs(new Date(r.created_at).getTime() - new Date(m.created_at).getTime()) < 5000,
+              ),
+          );
           // If we got real data, use it plus any unmatched optimistic messages
           if (list.length > 0 || optimistic.length === 0) {
             return [...list, ...optimistic];
@@ -73,39 +79,42 @@ export function useMessages({ sessionId, enabled, pollMs = 2000 }: UseMessagesOp
     setMessages([]);
   }, [sessionId]);
 
-  const send = useCallback(async (content: string): Promise<{ ok: boolean; message?: string }> => {
-    if (!content.trim() || !sessionId) return { ok: false, message: "Empty message" };
+  const send = useCallback(
+    async (content: string): Promise<{ ok: boolean; message?: string }> => {
+      if (!content.trim() || !sessionId) return { ok: false, message: "Empty message" };
 
-    // Optimistic add
-    const tempId = optimisticId--;
-    const optimistic: Message = {
-      id: tempId,
-      session_id: sessionId,
-      role: "user",
-      content,
-      type: "text",
-      created_at: new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, optimistic]);
+      // Optimistic add
+      const tempId = optimisticId--;
+      const optimistic: Message = {
+        id: tempId,
+        session_id: sessionId,
+        role: "user",
+        content,
+        type: "text",
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, optimistic]);
 
-    setSending(true);
-    try {
-      const res = await api.send(sessionId, content);
-      setSending(false);
-      if (res.ok === false) {
-        // Remove the optimistic message on failure
-        setMessages(prev => prev.filter(m => m.id !== tempId));
-        return { ok: false, message: res.message || "Send failed" };
+      setSending(true);
+      try {
+        const res = await api.send(sessionId, content);
+        setSending(false);
+        if (res.ok === false) {
+          // Remove the optimistic message on failure
+          setMessages((prev) => prev.filter((m) => m.id !== tempId));
+          return { ok: false, message: res.message || "Send failed" };
+        }
+        // Trigger immediate refetch to get the real message
+        fetchMessages();
+        return { ok: true };
+      } catch (err: any) {
+        setSending(false);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        return { ok: false, message: err.message || "Send failed" };
       }
-      // Trigger immediate refetch to get the real message
-      fetchMessages();
-      return { ok: true };
-    } catch (err: any) {
-      setSending(false);
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      return { ok: false, message: err.message || "Send failed" };
-    }
-  }, [sessionId, fetchMessages]);
+    },
+    [sessionId, fetchMessages],
+  );
 
   return { messages, send, sending };
 }

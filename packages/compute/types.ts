@@ -72,7 +72,10 @@ export interface ComputeProvider {
   checkStatus?(compute: Compute): Promise<string | null>;
 
   /** Reboot the compute instance and wait for it to come back. */
-  reboot?(compute: Compute, opts?: { onLog?: (msg: string) => void; onProgress?: (msg: string) => void }): Promise<void>;
+  reboot?(
+    compute: Compute,
+    opts?: { onLog?: (msg: string) => void; onProgress?: (msg: string) => void },
+  ): Promise<void>;
 
   /** Get the ArkD daemon URL for this compute target. */
   getArkdUrl?(compute: Compute): string;
@@ -90,7 +93,12 @@ export interface ComputeProvider {
   // ── Session lifecycle (extended) ──────────────────────────────────────
   checkSession(compute: Compute, tmuxSessionId: string): Promise<boolean>;
   getAttachCommand(compute: Compute, session: Session): string[];
-  buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown>;
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown>;
   buildLaunchEnv(session: Session): Record<string, string>;
 }
 

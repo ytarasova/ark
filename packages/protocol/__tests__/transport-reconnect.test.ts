@@ -23,12 +23,16 @@ beforeAll(() => {
       return new Response("test server", { status: 200 });
     },
     websocket: {
-      open(ws) { serverSockets.add(ws); },
+      open(ws) {
+        serverSockets.add(ws);
+      },
       message(ws, data) {
         // Echo back
         ws.send(data);
       },
-      close(ws) { serverSockets.delete(ws); },
+      close(ws) {
+        serverSockets.delete(ws);
+      },
     },
   });
   serverPort = server.port;
@@ -117,7 +121,7 @@ describe("WebSocket transport", () => {
     await Bun.sleep(2000);
 
     // Should have reconnected
-    expect(statuses.filter(s => s === "connected").length).toBeGreaterThanOrEqual(2);
+    expect(statuses.filter((s) => s === "connected").length).toBeGreaterThanOrEqual(2);
 
     transport.close();
   });

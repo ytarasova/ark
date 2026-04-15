@@ -14,10 +14,7 @@
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  ListToolsRequestSchema,
-  CallToolRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { DEFAULT_ARKD_URL } from "../constants.js";
 
@@ -61,8 +58,7 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: "report",
-      description:
-        "Report progress, completion, questions, or errors back to the Ark conductor.",
+      description: "Report progress, completion, questions, or errors back to the Ark conductor.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -91,7 +87,8 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           outcome: {
             type: "string",
-            description: "Stage outcome label for flow routing (e.g., 'approved', 'rejected'). Used with on_outcome in flow definitions.",
+            description:
+              "Stage outcome label for flow routing (e.g., 'approved', 'rejected'). Used with on_outcome in flow definitions.",
           },
         },
         required: ["type", "message"],
@@ -99,8 +96,7 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "send_to_agent",
-      description:
-        "Send a message to another Ark agent session (for coordination or handoff)",
+      description: "Send a message to another Ark agent session (for coordination or handoff)",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -133,18 +129,27 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       const outcomeVal = args.outcome as string | undefined;
       switch (reportType) {
         case "completed":
-          return { ...base, type: "completed" as const, summary: message,
-            filesChanged: (args.filesChanged as string[]) ?? [], commits: (args.commits as string[]) ?? [],
+          return {
+            ...base,
+            type: "completed" as const,
+            summary: message,
+            filesChanged: (args.filesChanged as string[]) ?? [],
+            commits: (args.commits as string[]) ?? [],
             ...(prUrl ? { pr_url: prUrl } : {}),
-            ...(outcomeVal ? { outcome: outcomeVal } : {}) };
+            ...(outcomeVal ? { outcome: outcomeVal } : {}),
+          };
         case "question":
           return { ...base, type: "question" as const, question: message };
         case "error":
           return { ...base, type: "error" as const, error: message };
         default:
-          return { ...base, type: "progress" as const, message,
+          return {
+            ...base,
+            type: "progress" as const,
+            message,
             filesChanged: (args.filesChanged as string[]) ?? [],
-            ...(prUrl ? { pr_url: prUrl } : {}) };
+            ...(prUrl ? { pr_url: prUrl } : {}),
+          };
       }
     })();
 
@@ -156,7 +161,9 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         headers: outboundHeaders(),
         body: JSON.stringify(report),
       });
-    } catch { /* arkd not reachable */ }
+    } catch {
+      /* arkd not reachable */
+    }
 
     return { content: [{ type: "text", text: `Reported: ${reportType}` }] };
   }
@@ -174,7 +181,9 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         headers: outboundHeaders(),
         body: JSON.stringify(relayPayload),
       });
-    } catch { /* arkd not reachable */ }
+    } catch {
+      /* arkd not reachable */
+    }
     return { content: [{ type: "text", text: `Sent to ${args.target_session}` }] };
   }
 

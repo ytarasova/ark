@@ -42,9 +42,7 @@ describe("global search", () => {
   it("results are sorted by recency (newest first)", () => {
     const results = searchAllConversations("the", { maxResults: 20, recentDays: 365 });
     for (let i = 1; i < results.length; i++) {
-      expect(results[i - 1].modifiedAt.getTime()).toBeGreaterThanOrEqual(
-        results[i].modifiedAt.getTime()
-      );
+      expect(results[i - 1].modifiedAt.getTime()).toBeGreaterThanOrEqual(results[i].modifiedAt.getTime());
     }
   });
 
@@ -62,10 +60,7 @@ describe("global search", () => {
 });
 
 describe("global search with fixture data", () => {
-  const fixtureDir = join(
-    process.env.HOME ?? "~",
-    ".claude", "projects", "-test-ark-global-search"
-  );
+  const fixtureDir = join(process.env.HOME ?? "~", ".claude", "projects", "-test-ark-global-search");
 
   beforeEach(() => {
     mkdirSync(fixtureDir, { recursive: true });
@@ -73,13 +68,17 @@ describe("global search with fixture data", () => {
       JSON.stringify({ message: { content: "This is a unique-test-sentinel value" } }),
       JSON.stringify({ message: { content: "Another line with different text" } }),
       JSON.stringify({ content: "Top-level content field also works" }),
-      "not-valid-json{{{",  // malformed line — should be skipped
+      "not-valid-json{{{", // malformed line — should be skipped
     ];
     writeFileSync(join(fixtureDir, "test-session.jsonl"), lines.join("\n"));
   });
 
   afterEach(() => {
-    try { rmSync(fixtureDir, { recursive: true }); } catch { /* cleanup */ }
+    try {
+      rmSync(fixtureDir, { recursive: true });
+    } catch {
+      /* cleanup */
+    }
   });
 
   it("finds matches in fixture JSONL", () => {

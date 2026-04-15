@@ -26,8 +26,11 @@ function now(): string {
 
 function safeParseConfig(raw: unknown): ComputeConfig {
   if (typeof raw === "object" && raw !== null) return raw as ComputeConfig;
-  try { return JSON.parse(String(raw ?? "{}")); }
-  catch { return {}; }
+  try {
+    return JSON.parse(String(raw ?? "{}"));
+  } catch {
+    return {};
+  }
 }
 
 function rowToCompute(row: ComputeRow): Compute {
@@ -40,9 +43,7 @@ function rowToCompute(row: ComputeRow): Compute {
 }
 
 // Valid compute columns (from schema).
-const COMPUTE_COLUMNS = new Set([
-  "provider", "status", "config", "updated_at",
-]);
+const COMPUTE_COLUMNS = new Set(["provider", "status", "config", "updated_at"]);
 
 // Providers that allow only one compute instance per tenant.
 const SINGLETON_PROVIDERS = new Set(["local"]);
@@ -54,8 +55,12 @@ export class ComputeRepository {
 
   constructor(private db: IDatabase) {}
 
-  setTenant(tenantId: string): void { this.tenantId = tenantId; }
-  getTenant(): string { return this.tenantId; }
+  setTenant(tenantId: string): void {
+    this.tenantId = tenantId;
+  }
+  getTenant(): string {
+    return this.tenantId;
+  }
 
   create(opts: CreateComputeOpts): Compute {
     const ts = now();
@@ -63,9 +68,9 @@ export class ComputeRepository {
 
     // Singleton providers allow only one compute instance per tenant.
     if (SINGLETON_PROVIDERS.has(provider)) {
-      const existing = this.db.prepare(
-        "SELECT name FROM compute WHERE provider = ? AND tenant_id = ?"
-      ).get(provider, this.tenantId) as { name: string } | undefined;
+      const existing = this.db
+        .prepare("SELECT name FROM compute WHERE provider = ? AND tenant_id = ?")
+        .get(provider, this.tenantId) as { name: string } | undefined;
       if (existing) {
         throw new Error(`Provider '${provider}' is a singleton -- compute '${existing.name}' already exists`);
       }
@@ -73,23 +78,22 @@ export class ComputeRepository {
 
     const initialStatus: ComputeStatus = provider === "local" ? "running" : "stopped";
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO compute (name, provider, status, config, tenant_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      opts.name,
-      provider,
-      initialStatus,
-      JSON.stringify(opts.config ?? {}),
-      this.tenantId,
-      ts, ts,
-    );
+    `,
+      )
+      .run(opts.name, provider, initialStatus, JSON.stringify(opts.config ?? {}), this.tenantId, ts, ts);
 
     return this.get(opts.name)!;
   }
 
   get(name: string): Compute | null {
-    const row = this.db.prepare("SELECT * FROM compute WHERE name = ? AND tenant_id = ?").get(name, this.tenantId) as ComputeRow | undefined;
+    const row = this.db.prepare("SELECT * FROM compute WHERE name = ? AND tenant_id = ?").get(name, this.tenantId) as
+      | ComputeRow
+      | undefined;
     if (!row) return null;
     return rowToCompute(row);
   }
@@ -98,8 +102,14 @@ export class ComputeRepository {
     let sql = "SELECT * FROM compute WHERE tenant_id = ?";
     const params: any[] = [this.tenantId];
 
-    if (filters?.provider) { sql += " AND provider = ?"; params.push(filters.provider); }
-    if (filters?.status) { sql += " AND status = ?"; params.push(filters.status); }
+    if (filters?.provider) {
+      sql += " AND provider = ?";
+      params.push(filters.provider);
+    }
+    if (filters?.status) {
+      sql += " AND status = ?";
+      params.push(filters.status);
+    }
 
     sql += " ORDER BY created_at DESC LIMIT ?";
     params.push(filters?.limit ?? 100);
@@ -136,11 +146,14 @@ export class ComputeRepository {
 
   mergeConfig(name: string, patch: Partial<ComputeConfig>): Compute | null {
     this.db.transaction(() => {
-      const row = this.db.prepare("SELECT config FROM compute WHERE name = ? AND tenant_id = ?").get(name, this.tenantId) as { config: string } | undefined;
+      const row = this.db
+        .prepare("SELECT config FROM compute WHERE name = ? AND tenant_id = ?")
+        .get(name, this.tenantId) as { config: string } | undefined;
       if (!row) return;
       const existing = safeParseConfig(row.config);
       const merged = { ...existing, ...patch };
-      this.db.prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ? AND tenant_id = ?")
+      this.db
+        .prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ? AND tenant_id = ?")
         .run(JSON.stringify(merged), new Date().toISOString(), name, this.tenantId);
     });
     return this.get(name);

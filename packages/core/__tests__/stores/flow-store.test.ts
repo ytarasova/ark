@@ -86,7 +86,7 @@ describe("FileFlowStore.list", () => {
     writeFlow(projectDir, "p-only", { name: "p-only", stages: [{ name: "s3", gate: "auto" }] });
 
     const flows = store.list();
-    const names = flows.map(f => f.name);
+    const names = flows.map((f) => f.name);
     expect(names).toContain("b-only");
     expect(names).toContain("u-only");
     expect(names).toContain("p-only");
@@ -97,7 +97,7 @@ describe("FileFlowStore.list", () => {
     writeFlow(userDir, "overlap", { name: "overlap", description: "user", stages: [] });
 
     const flows = store.list();
-    const overlap = flows.find(f => f.name === "overlap");
+    const overlap = flows.find((f) => f.name === "overlap");
     expect(overlap).toBeDefined();
     expect(overlap!.source).toBe("user");
     expect(overlap!.description).toBe("user");
@@ -108,7 +108,7 @@ describe("FileFlowStore.list", () => {
     writeFlow(projectDir, "overlap", { name: "overlap", description: "project", stages: [] });
 
     const flows = store.list();
-    const overlap = flows.find(f => f.name === "overlap");
+    const overlap = flows.find((f) => f.name === "overlap");
     expect(overlap!.source).toBe("project");
   });
 
@@ -121,7 +121,7 @@ describe("FileFlowStore.list", () => {
       ],
     });
     const flows = store.list();
-    const multi = flows.find(f => f.name === "multi");
+    const multi = flows.find((f) => f.name === "multi");
     expect(multi!.stages).toEqual(["plan", "impl"]);
   });
 });
@@ -171,6 +171,6 @@ describe("FileFlowStore without projectDir", () => {
     const storeNoProject = new FileFlowStore({ builtinDir, userDir });
     expect(storeNoProject.get("proj-only")).toBeNull();
     const flows = storeNoProject.list();
-    expect(flows.find(f => f.name === "proj-only")).toBeUndefined();
+    expect(flows.find((f) => f.name === "proj-only")).toBeUndefined();
   });
 });

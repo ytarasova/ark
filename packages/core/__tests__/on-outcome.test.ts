@@ -14,13 +14,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import {
-  getStage,
-  getNextStage,
-  resolveNextStage,
-  validateDAG,
-  type StageDefinition,
-} from "../state/flow.js";
+import { getStage, getNextStage, resolveNextStage, validateDAG, type StageDefinition } from "../state/flow.js";
 import { AppContext, setApp, clearApp } from "../app.js";
 import { applyReport, advance } from "../services/session-orchestration.js";
 
@@ -101,9 +95,7 @@ describe("resolveNextStage", () => {
   it("returns null at the last stage even with outcome", () => {
     writeFlow("outcome-last", {
       name: "outcome-last",
-      stages: [
-        { name: "final", agent: "closer", gate: "auto", on_outcome: { done: "nonexistent" } },
-      ],
+      stages: [{ name: "final", agent: "closer", gate: "auto", on_outcome: { done: "nonexistent" } }],
     });
     // "nonexistent" stage doesn't exist, falls back to linear -- which is null (last stage)
     expect(resolveNextStage(app, "outcome-last", "final", "done")).toBeNull();
@@ -157,7 +149,13 @@ describe("validateDAG with on_outcome", () => {
   it("validates both depends_on and on_outcome together", () => {
     const stages: StageDefinition[] = [
       { name: "plan", agent: "planner", gate: "auto" },
-      { name: "review", agent: "reviewer", gate: "auto", depends_on: ["plan"], on_outcome: { approved: "deploy", rejected: "plan" } },
+      {
+        name: "review",
+        agent: "reviewer",
+        gate: "auto",
+        depends_on: ["plan"],
+        on_outcome: { approved: "deploy", rejected: "plan" },
+      },
       { name: "deploy", agent: "deployer", gate: "auto", depends_on: ["review"] },
     ];
     expect(() => validateDAG(stages)).not.toThrow();

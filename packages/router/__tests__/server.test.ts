@@ -39,7 +39,7 @@ describe("Router Server", () => {
   test("/health returns ok", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/health`);
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = (await resp.json()) as any;
     expect(body.ok).toBe(true);
     expect(body.uptime_ms).toBeGreaterThanOrEqual(0);
   });
@@ -47,7 +47,7 @@ describe("Router Server", () => {
   test("/v1/router/stats returns stats", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/v1/router/stats`);
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = (await resp.json()) as any;
     expect(body.total_requests).toBeGreaterThanOrEqual(0);
     expect(typeof body.routed_requests).toBe("number");
     expect(typeof body.errors).toBe("number");
@@ -63,7 +63,7 @@ describe("Router Server", () => {
   test("/v1/models returns model list", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/v1/models`);
     expect(resp.status).toBe(200);
-    const body = await resp.json() as any;
+    const body = (await resp.json()) as any;
     expect(body.object).toBe("list");
     expect(Array.isArray(body.data)).toBe(true);
   });
@@ -78,7 +78,7 @@ describe("Router Server", () => {
       }),
     });
     expect(resp.status).toBe(400);
-    const body = await resp.json() as any;
+    const body = (await resp.json()) as any;
     expect(body.error.message).toContain("not found");
   });
 

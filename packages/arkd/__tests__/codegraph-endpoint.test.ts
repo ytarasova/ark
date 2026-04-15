@@ -21,7 +21,9 @@ beforeAll(() => {
   mkdirSync(repoDir, { recursive: true });
 
   // Create a minimal TS file for codegraph to parse
-  writeFileSync(join(repoDir, "index.ts"), `
+  writeFileSync(
+    join(repoDir, "index.ts"),
+    `
 export function hello(name: string): string {
   return "hello " + name;
 }
@@ -31,14 +33,19 @@ export class Greeter {
     return hello(name);
   }
 }
-`);
+`,
+  );
 
   server = startArkd(TEST_PORT, { quiet: true });
 });
 
 afterAll(() => {
   server.stop();
-  try { rmSync(repoDir, { recursive: true, force: true }); } catch { /* cleanup */ }
+  try {
+    rmSync(repoDir, { recursive: true, force: true });
+  } catch {
+    /* cleanup */
+  }
 });
 
 describe("POST /codegraph/index", () => {
@@ -61,7 +68,7 @@ describe("POST /codegraph/index", () => {
         body: JSON.stringify({ repoPath: repoDir, incremental: false }),
       });
 
-      const data = await resp.json() as any;
+      const data = (await resp.json()) as any;
 
       expect(data.ok).toBe(true);
       expect(Array.isArray(data.nodes)).toBe(true);
@@ -85,7 +92,7 @@ describe("POST /codegraph/index", () => {
       body: JSON.stringify({ repoPath: "/nonexistent/path/xyz" }),
     });
 
-    const data = await resp.json() as any;
+    const data = (await resp.json()) as any;
     // Either codegraph fails or DB read fails -- both return ok: false
     expect(data.ok).toBe(false);
     expect(data.error).toBeDefined();

@@ -55,7 +55,7 @@ describe("EventRepository", () => {
     repo.log("s-aaa", "evt3");
     const events = repo.list("s-aaa");
     expect(events.length).toBe(2);
-    expect(events.every(e => e.track_id === "s-aaa")).toBe(true);
+    expect(events.every((e) => e.track_id === "s-aaa")).toBe(true);
   });
 
   it("list returns events in ASC order by id", () => {
@@ -73,7 +73,7 @@ describe("EventRepository", () => {
     repo.log("s-aaa", "stage_start");
     const starts = repo.list("s-aaa", { type: "stage_start" });
     expect(starts.length).toBe(2);
-    expect(starts.every(e => e.type === "stage_start")).toBe(true);
+    expect(starts.every((e) => e.type === "stage_start")).toBe(true);
   });
 
   it("list respects limit", () => {

@@ -27,7 +27,10 @@ function writeUserFlow(name: string, def: Record<string, unknown>): void {
 }
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
@@ -35,7 +38,10 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
 });
 
 // -- Flow YAML -> resolveFlow -> autonomy preserved ---------------------------
@@ -57,7 +63,7 @@ describe("E2E: flow YAML autonomy through resolveFlow", () => {
     expect(raw!.stages[1].autonomy).toBe("full");
 
     // resolveFlow preserves autonomy after variable substitution
-    const resolved = resolveFlow(getApp(),"review-pipeline", { ticket: "PROJ-42" });
+    const resolved = resolveFlow(getApp(), "review-pipeline", { ticket: "PROJ-42" });
     expect(resolved).not.toBeNull();
     expect(resolved!.stages[0].autonomy).toBe("read-only");
     expect(resolved!.stages[0].task).toBe("Review PROJ-42");
@@ -76,7 +82,7 @@ describe("E2E: flow YAML autonomy through resolveFlow", () => {
       ],
     });
 
-    const resolved = resolveFlow(getApp(),"tiered-flow", { ticket: "X" });
+    const resolved = resolveFlow(getApp(), "tiered-flow", { ticket: "X" });
     expect(resolved!.stages[0].autonomy).toBe("read-only");
     expect(resolved!.stages[1].autonomy).toBe("edit");
     expect(resolved!.stages[2].autonomy).toBe("execute");
@@ -86,12 +92,10 @@ describe("E2E: flow YAML autonomy through resolveFlow", () => {
   it("flow without autonomy field leaves it undefined", () => {
     writeUserFlow("no-autonomy", {
       name: "no-autonomy",
-      stages: [
-        { name: "work", agent: "worker", gate: "auto", task: "Do work" },
-      ],
+      stages: [{ name: "work", agent: "worker", gate: "auto", task: "Do work" }],
     });
 
-    const resolved = resolveFlow(getApp(),"no-autonomy", {});
+    const resolved = resolveFlow(getApp(), "no-autonomy", {});
     expect(resolved!.stages[0].autonomy).toBeUndefined();
   });
 });
@@ -153,36 +157,28 @@ describe("E2E: writeSettings writes permission deny rules", () => {
   it("edit writes deny: ['Bash'] to settings.local.json", () => {
     writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "edit" });
 
-    const settings = JSON.parse(
-      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
-    );
+    const settings = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions.deny).toEqual(["Bash"]);
   });
 
   it("full does NOT add permissions.deny", () => {
     writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "full" });
 
-    const settings = JSON.parse(
-      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
-    );
+    const settings = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions).toBeUndefined();
   });
 
   it("execute does NOT add permissions.deny", () => {
     writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "execute" });
 
-    const settings = JSON.parse(
-      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
-    );
+    const settings = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions).toBeUndefined();
   });
 
   it("no autonomy does NOT add permissions.deny", () => {
     writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir);
 
-    const settings = JSON.parse(
-      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
-    );
+    const settings = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions).toBeUndefined();
   });
 
@@ -190,9 +186,12 @@ describe("E2E: writeSettings writes permission deny rules", () => {
     // Pre-populate settings with existing allow rules
     const claudeDir = join(app.config.arkDir, ".claude");
     mkdirSync(claudeDir, { recursive: true });
-    writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
-      permissions: { allow: ["Read", "Glob"] },
-    }));
+    writeFileSync(
+      join(claudeDir, "settings.local.json"),
+      JSON.stringify({
+        permissions: { allow: ["Read", "Glob"] },
+      }),
+    );
 
     writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "edit" });
 
@@ -207,9 +206,7 @@ describe("E2E: writeSettings writes permission deny rules", () => {
     // removeSettings should not throw
     removeSettings(app.config.arkDir);
     // After removal, hooks should be gone
-    const settings = JSON.parse(
-      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
-    );
+    const settings = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.hooks).toBeUndefined();
   });
 });
@@ -282,7 +279,7 @@ describe("E2E: full autonomy pipeline", () => {
     });
 
     const vars = buildSessionVars({ id: "s-pipe", ticket: "PIPE-1", repo: "/app" });
-    const flow = resolveFlow(getApp(),"full-pipeline", vars);
+    const flow = resolveFlow(getApp(), "full-pipeline", vars);
     expect(flow).not.toBeNull();
 
     // Stage 0: read-only
@@ -294,9 +291,7 @@ describe("E2E: full autonomy pipeline", () => {
     expect(args0).not.toContain("--dangerously-skip-permissions");
 
     writeSettings("s-pipe-0", "http://localhost:19100", app.config.arkDir, { autonomy: s0.autonomy });
-    const settings0 = JSON.parse(
-      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
-    );
+    const settings0 = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings0.permissions.deny).toEqual(["Bash", "Write", "Edit"]);
 
     // Clean up for stage 1
@@ -311,9 +306,7 @@ describe("E2E: full autonomy pipeline", () => {
     expect(args1).toContain("--dangerously-skip-permissions");
 
     writeSettings("s-pipe-1", "http://localhost:19100", app.config.arkDir, { autonomy: s1.autonomy });
-    const settings1 = JSON.parse(
-      readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"),
-    );
+    const settings1 = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings1.permissions).toBeUndefined();
   });
 });

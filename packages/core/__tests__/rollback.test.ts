@@ -1,14 +1,21 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import {
-  pollCheckSuites, shouldRollback, createRevertPayload,
-  type CheckSuiteResult, type RollbackConfig,
+  pollCheckSuites,
+  shouldRollback,
+  createRevertPayload,
+  type CheckSuiteResult,
+  type RollbackConfig,
 } from "../integrations/rollback.js";
 
 withTestContext();
 
 const defaultConfig: RollbackConfig = {
-  enabled: true, timeout: 10, on_timeout: "ignore", auto_merge: false, health_url: null,
+  enabled: true,
+  timeout: 10,
+  on_timeout: "ignore",
+  auto_merge: false,
+  health_url: null,
 };
 
 describe("rollback — shouldRollback", () => {
@@ -29,9 +36,7 @@ describe("rollback — shouldRollback", () => {
   });
 
   it("returns false for in-progress checks", () => {
-    const suites: CheckSuiteResult[] = [
-      { id: 1, conclusion: null, status: "in_progress" },
-    ];
+    const suites: CheckSuiteResult[] = [{ id: 1, conclusion: null, status: "in_progress" }];
     expect(shouldRollback(suites, defaultConfig)).toBe(false);
   });
 });
@@ -39,8 +44,11 @@ describe("rollback — shouldRollback", () => {
 describe("rollback — createRevertPayload", () => {
   it("creates correct revert PR payload", () => {
     const payload = createRevertPayload({
-      owner: "org", repo: "my-repo", originalPrNumber: 42,
-      originalPrTitle: "feat: add auth", originalBranch: "feat/auth",
+      owner: "org",
+      repo: "my-repo",
+      originalPrNumber: 42,
+      originalPrTitle: "feat: add auth",
+      originalBranch: "feat/auth",
       failedChecks: ["CI / build", "CI / lint"],
     });
     expect(payload.title).toBe("Revert: feat: add auth");

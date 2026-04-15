@@ -59,9 +59,10 @@ async function syncSshPush(key: string, ip: string): Promise<void> {
   await sshExec(key, ip, "rm -f ~/.ssh/ark-* 2>/dev/null");
 
   // Fix permissions and populate known_hosts for github.com
-  await sshExec(key, ip,
-    "chmod 600 ~/.ssh/id_* 2>/dev/null; " +
-    "ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null",
+  await sshExec(
+    key,
+    ip,
+    "chmod 600 ~/.ssh/id_* 2>/dev/null; " + "ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null",
   );
 }
 
@@ -104,10 +105,7 @@ async function syncGhPush(key: string, ip: string): Promise<void> {
     const token = stdout.trim();
     if (!token) return;
     const encoded = Buffer.from(token).toString("base64");
-    await sshExec(key, ip,
-      `echo ${encoded} | base64 -d | gh auth login --with-token 2>/dev/null`,
-      { timeout: 15_000 },
-    );
+    await sshExec(key, ip, `echo ${encoded} | base64 -d | gh auth login --with-token 2>/dev/null`, { timeout: 15_000 });
   });
 }
 
@@ -155,10 +153,20 @@ async function syncClaudePush(key: string, ip: string): Promise<void> {
         const tmpFile = join(tmp, ".claude.json");
         writeFileSync(tmpFile, JSON.stringify(remote, null, 2));
         // scp directly — rsync has edge cases with dotfiles and --update
-        await execFileAsync("scp", [
-          "-i", key, "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
-          tmpFile, `${REMOTE_USER}@${ip}:${REMOTE_HOME}/.claude.json`,
-        ], { encoding: "utf-8", timeout: 30_000 });
+        await execFileAsync(
+          "scp",
+          [
+            "-i",
+            key,
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "ConnectTimeout=10",
+            tmpFile,
+            `${REMOTE_USER}@${ip}:${REMOTE_HOME}/.claude.json`,
+          ],
+          { encoding: "utf-8", timeout: 30_000 },
+        );
       } finally {
         await execFileAsync("rm", ["-rf", tmp]);
       }
@@ -221,17 +229,19 @@ export async function refreshRemoteToken(key: string, ip: string): Promise<void>
   if (!token) return;
   // Write token to the remote's environment for running tmux sessions
   // The token is picked up by Claude when it refreshes its auth
-  await sshExec(key, ip,
+  await sshExec(
+    key,
+    ip,
     `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN '${token}' 2>/dev/null; done`,
     { timeout: 10_000 },
   );
 }
 
 export const SYNC_STEPS: SyncStep[] = [
-  { name: "ssh",    push: syncSshPush,    pull: syncSshPull },
-  { name: "aws",    push: syncAwsPush,    pull: syncAwsPull },
-  { name: "git",    push: syncGitPush,    pull: syncGitPull },
-  { name: "gh",     push: syncGhPush,     pull: syncGhPull },
+  { name: "ssh", push: syncSshPush, pull: syncSshPull },
+  { name: "aws", push: syncAwsPush, pull: syncAwsPull },
+  { name: "git", push: syncGitPush, pull: syncGitPull },
+  { name: "gh", push: syncGhPush, pull: syncGhPull },
   { name: "claude", push: syncClaudePush, pull: syncClaudePull },
 ];
 
@@ -251,9 +261,7 @@ export async function syncToHost(
   const synced: string[] = [];
   const failed: string[] = [];
 
-  const steps = opts.categories
-    ? SYNC_STEPS.filter((s) => opts.categories!.includes(s.name))
-    : SYNC_STEPS;
+  const steps = opts.categories ? SYNC_STEPS.filter((s) => opts.categories!.includes(s.name)) : SYNC_STEPS;
 
   const total = steps.length;
   for (let i = 0; i < steps.length; i++) {

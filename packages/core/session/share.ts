@@ -45,7 +45,10 @@ export function exportSessionToFile(app: AppContext, sessionId: string, filePath
 }
 
 /** Import a session from a JSON file. */
-export function importSessionFromFile(app: AppContext, filePath: string): { ok: boolean; sessionId?: string; message: string } {
+export function importSessionFromFile(
+  app: AppContext,
+  filePath: string,
+): { ok: boolean; sessionId?: string; message: string } {
   try {
     const raw = readFileSync(filePath, "utf-8");
     const data = JSON.parse(raw) as SessionExport;

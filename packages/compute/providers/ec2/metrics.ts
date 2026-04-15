@@ -3,13 +3,7 @@
  * Ported from BigBox's dashboard/fetch.py + parse.py to TypeScript.
  */
 
-import type {
-  DockerContainer,
-  ComputeMetrics,
-  ComputeProcess,
-  ComputeSession,
-  ComputeSnapshot,
-} from "../../types.js";
+import type { DockerContainer, ComputeMetrics, ComputeProcess, ComputeSession, ComputeSnapshot } from "../../types.js";
 import { sshExec, sshExecAsync } from "./ssh.js";
 import { REMOTE_PROJECTS_DIR } from "./constants.js";
 
@@ -27,12 +21,12 @@ const CLAUDE_CMD = [
   "  cwd=$(tmux display-message -t \"$sess\" -p '#{pane_current_path}' 2>/dev/null);",
   // Find the actual claude process among descendants of the pane shell
   "  cpid=$(pgrep -a -P $pid 2>/dev/null | grep -m1 claude | awk '{print $1}');",
-  "  [ -z \"$cpid\" ] && cpid=$pid;",
+  '  [ -z "$cpid" ] && cpid=$pid;',
   "  cpu=$(ps -p $cpid -o %cpu= 2>/dev/null | tr -d ' ');",
   "  mem=$(ps -p $cpid -o %mem= 2>/dev/null | tr -d ' ');",
   "  cmd=$(ps -p $cpid -o args= 2>/dev/null);",
   '  mode="interactive";',
-  "  echo \"$cmd\" | grep -q 'dangerously' && mode=\"agentic\";",
+  '  echo "$cmd" | grep -q \'dangerously\' && mode="agentic";',
   '  printf "%s\\t%s%%\\t%s%%\\t%s\\t%s\\n" "$sess" "$cpu" "$mem" "$cwd" "$mode";',
   "done",
 ].join(" ");
@@ -46,7 +40,7 @@ const PROCESSES_CMD = [
   "| grep -vE 'sshd|grep|awk|ps aux|mpstat'",
   "| awk 'NR>1 && $3>0.1{print $2}' | head -8); do",
   "  cmd=$(ps -p $pid -o comm= 2>/dev/null);",
-  "  [ -z \"$cmd\" ] && continue;",
+  '  [ -z "$cmd" ] && continue;',
   "  cpu=$(ps -p $pid -o %cpu= 2>/dev/null | tr -d ' ');",
   "  mem=$(ps -p $pid -o %mem= 2>/dev/null | tr -d ' ');",
   "  cwd=$(readlink /proc/$pid/cwd 2>/dev/null | sed 's|/home/ubuntu/Projects/||');",
@@ -55,16 +49,14 @@ const PROCESSES_CMD = [
 ].join(" ");
 
 /** Reads /proc/net/dev for eth0/ens interfaces, outputs "rx_mb tx_mb" in MiB. */
-const NETWORK_CMD =
-  "cat /proc/net/dev | awk '/eth0|ens/{printf \"%.1f %.1f\\n\", $2/1048576, $10/1048576}'";
+const NETWORK_CMD = "cat /proc/net/dev | awk '/eth0|ens/{printf \"%.1f %.1f\\n\", $2/1048576, $10/1048576}'";
 
 /** Docker stats for all containers: tab-delimited name, cpu%, mem_usage. Falls back to "(none)". */
 const DOCKER_CMD =
   "docker stats --no-stream --format '{{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}' 2>/dev/null || echo \"(none)\"";
 
 /** Lists running containers: tab-delimited name, image. Used to build image lookup for docker stats. */
-const DOCKER_PS_CMD =
-  "docker ps --format '{{.Names}}\\t{{.Image}}' 2>/dev/null";
+const DOCKER_PS_CMD = "docker ps --format '{{.Names}}\\t{{.Image}}' 2>/dev/null";
 
 // ---------------------------------------------------------------------------
 // Exported SSH command strings
@@ -72,12 +64,12 @@ const DOCKER_PS_CMD =
 
 /** Single SSH command that outputs section-delimited fast metrics. */
 export const SSH_FAST_CMD: string = [
-  "echo \"=== CPU ===\" && { cpu=$(mpstat 1 1 2>/dev/null | tail -1 | awk 'NF>0{printf \"%.1f\", 100 - $NF}'); [ -n \"$cpu\" ] && echo \"$cpu\" || top -bn1 | awk '/^%?Cpu/{printf \"%.1f\\n\", 100 - $8}'; }",
-  "echo \"=== MEMORY ===\" && free | awk '/Mem:/{printf \"%.1f %.1f\\n\", $3/1024, $2/1024}'",
+  'echo "=== CPU ===" && { cpu=$(mpstat 1 1 2>/dev/null | tail -1 | awk \'NF>0{printf "%.1f", 100 - $NF}\'); [ -n "$cpu" ] && echo "$cpu" || top -bn1 | awk \'/^%?Cpu/{printf "%.1f\\n", 100 - $8}\'; }',
+  'echo "=== MEMORY ===" && free | awk \'/Mem:/{printf "%.1f %.1f\\n", $3/1024, $2/1024}\'',
   "echo \"=== DISK ===\" && df / | tail -1 | awk '{print $5}' | tr -d '%'",
-  "echo \"=== UPTIME ===\" && uptime -p",
-  "echo \"=== IDLE ===\" && cat /tmp/ark-idle-count 2>/dev/null || echo 0",
-  "echo \"=== TMUX ===\" && tmux list-sessions 2>/dev/null || echo \"(none)\"",
+  'echo "=== UPTIME ===" && uptime -p',
+  'echo "=== IDLE ===" && cat /tmp/ark-idle-count 2>/dev/null || echo 0',
+  'echo "=== TMUX ===" && tmux list-sessions 2>/dev/null || echo "(none)"',
   `echo "=== CLAUDE ===" && ${CLAUDE_CMD}`,
   `echo "=== PROCESSES ===" && ${PROCESSES_CMD}`,
   `echo "=== NETWORK ===" && ${NETWORK_CMD}`,
@@ -169,10 +161,7 @@ function parseMetrics(s: Record<string, string[]>): ComputeMetrics {
 
 function parseSessions(s: Record<string, string[]>): ComputeSession[] {
   // Build Claude info lookup from CLAUDE section
-  const claude: Record<
-    string,
-    { cpu: number; mem: number; cwd: string; mode: string }
-  > = {};
+  const claude: Record<string, { cpu: number; mem: number; cwd: string; mode: string }> = {};
 
   for (const ln of s["CLAUDE"] ?? []) {
     const p = ln.split("\t");
@@ -224,8 +213,8 @@ function parseProcesses(s: Record<string, string[]>): ComputeProcess[] {
 /** Strip ANSI escape codes and control characters from metrics output. */
 function sanitize(s: string): string {
   return s
-    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")  // ANSI escape sequences
-    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")  // control chars (keep \n \r \t)
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "") // ANSI escape sequences
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "") // control chars (keep \n \r \t)
     .trim();
 }
 
@@ -254,10 +243,7 @@ function parseDocker(s: Record<string, string[]>): DockerContainer[] {
     // Extract service name (last part before -N replica suffix)
     const parts = name.split("-");
     const lastPart = parts[parts.length - 1];
-    const service =
-      parts.length >= 3 && /^\d+$/.test(lastPart)
-        ? parts[parts.length - 2]
-        : name;
+    const service = parts.length >= 3 && /^\d+$/.test(lastPart) ? parts[parts.length - 2] : name;
     out.push({ name, cpu, memory, image: imageShort, project: service });
   }
   return out;

@@ -49,7 +49,7 @@ Here are the issues I found:
   });
 
   it("returns null for invalid JSON in code fence", () => {
-    const output = '```json\n{not valid json}\n```';
+    const output = "```json\n{not valid json}\n```";
     expect(parseReviewOutput(output)).toBeNull();
   });
 

@@ -120,53 +120,80 @@ export function killSessionAsync(name: string): Promise<boolean> {
 /** Get the PID of the first pane in a tmux session (async) */
 export async function getPanePidAsync(name: string): Promise<number | null> {
   try {
-    const { stdout } = await execFileAsync(tmuxBin(),
-      ["list-panes", "-t", name, "-F", "#{pane_pid}"],
-      { encoding: "utf-8" });
+    const { stdout } = await execFileAsync(tmuxBin(), ["list-panes", "-t", name, "-F", "#{pane_pid}"], {
+      encoding: "utf-8",
+    });
     const pid = parseInt(stdout.trim().split("\n")[0], 10);
     return isNaN(pid) ? null : pid;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /** Create a new tmux session running a command (async) */
-export async function createSessionAsync(name: string, command: string, opts?: {
-  width?: number;
-  height?: number;
-  arkDir?: string;
-}): Promise<void> {
+export async function createSessionAsync(
+  name: string,
+  command: string,
+  opts?: {
+    width?: number;
+    height?: number;
+    arkDir?: string;
+  },
+): Promise<void> {
   await killSessionAsync(name);
   const conf = ensureTmuxConf(opts?.arkDir ?? join(tmpdir(), "ark"));
   await execFileAsync(tmuxBin(), [
-    "-f", conf,
-    "new-session", "-d", "-s", name,
-    "-x", String(opts?.width ?? 220),
-    "-y", String(opts?.height ?? 50),
-    "bash", "-c", command,
+    "-f",
+    conf,
+    "new-session",
+    "-d",
+    "-s",
+    name,
+    "-x",
+    String(opts?.width ?? 220),
+    "-y",
+    String(opts?.height ?? 50),
+    "bash",
+    "-c",
+    command,
   ]);
 }
 
 /** Create a tmux session with a shell, then send a command via send-keys (async) */
-export async function createSessionWithSendKeysAsync(name: string, command: string, opts?: {
-  width?: number;
-  height?: number;
-  arkDir?: string;
-}): Promise<void> {
+export async function createSessionWithSendKeysAsync(
+  name: string,
+  command: string,
+  opts?: {
+    width?: number;
+    height?: number;
+    arkDir?: string;
+  },
+): Promise<void> {
   await killSessionAsync(name);
   const conf = ensureTmuxConf(opts?.arkDir ?? join(tmpdir(), "ark"));
   await execFileAsync(tmuxBin(), [
-    "-f", conf,
-    "new-session", "-d", "-s", name,
-    "-x", String(opts?.width ?? 220),
-    "-y", String(opts?.height ?? 50),
+    "-f",
+    conf,
+    "new-session",
+    "-d",
+    "-s",
+    name,
+    "-x",
+    String(opts?.width ?? 220),
+    "-y",
+    String(opts?.height ?? 50),
   ]);
   await execFileAsync(tmuxBin(), ["send-keys", "-t", name, command, "Enter"]);
 }
 
 /** Capture pane output (async) */
-export async function capturePaneAsync(name: string, opts?: {
-  lines?: number;
-  ansi?: boolean;
-}): Promise<string> {
+export async function capturePaneAsync(
+  name: string,
+  opts?: {
+    lines?: number;
+    ansi?: boolean;
+  },
+): Promise<string> {
   try {
     const args = ["capture-pane", "-t", name, "-p", "-S", `-${opts?.lines ?? 50}`];
     if (opts?.ansi) args.splice(4, 0, "-e");
@@ -186,10 +213,14 @@ export async function sendTextAsync(name: string, text: string): Promise<void> {
     await execFileAsync(tmuxBin(), ["paste-buffer", "-b", "ark-msg", "-t", name]);
     // Let Claude Code's bracketed-paste handling flush before the Enter lands,
     // otherwise Enter can fire against an empty prompt state.
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     await execFileAsync(tmuxBin(), ["send-keys", "-t", name, "Enter"]);
   } finally {
-    try { unlinkSync(tmpFile); } catch { /* OS tmpdir cleanup is acceptable fallback */ }
+    try {
+      unlinkSync(tmpFile);
+    } catch {
+      /* OS tmpdir cleanup is acceptable fallback */
+    }
   }
 }
 
@@ -199,12 +230,15 @@ export async function sendKeysAsync(name: string, ...keys: string[]): Promise<vo
 }
 
 /** Get the attach command for a session */
-export function attachCommand(name: string, opts?: {
-  compute?: string;
-  host?: string;
-  user?: string;
-  sshKey?: string;
-}): string {
+export function attachCommand(
+  name: string,
+  opts?: {
+    compute?: string;
+    host?: string;
+    user?: string;
+    sshKey?: string;
+  },
+): string {
   if (opts?.host) {
     const keyFlag = opts.sshKey ? `-i ${opts.sshKey} ` : "";
     return `ssh ${keyFlag}-t ${opts.user ?? "ubuntu"}@${opts.host} tmux attach -t ${name}`;
@@ -218,7 +252,8 @@ export async function listArkSessionsAsync(): Promise<TmuxSession[]> {
     const { stdout } = await execFileAsync(tmuxBin(), ["list-sessions", "-F", "#{session_name}"], {
       encoding: "utf-8",
     });
-    return stdout.split("\n")
+    return stdout
+      .split("\n")
       .filter((s) => s.startsWith("ark-") || s.startsWith("s-"))
       .map((name) => ({ name, alive: true }));
   } catch {

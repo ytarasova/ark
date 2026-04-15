@@ -1,5 +1,14 @@
 import { describe, it, expect } from "bun:test";
-import { parseGraphFlow, getSuccessors, getPredecessors, isJoinNode, isFanOutNode, topologicalSort, validateGraphFlow, resolveNextStages } from "../state/graph-flow.js";
+import {
+  parseGraphFlow,
+  getSuccessors,
+  getPredecessors,
+  isJoinNode,
+  isFanOutNode,
+  topologicalSort,
+  validateGraphFlow,
+  resolveNextStages,
+} from "../state/graph-flow.js";
 
 describe("graph flow", () => {
   const flow = parseGraphFlow({
@@ -61,18 +70,23 @@ describe("graph flow", () => {
 
   it("detects missing node references", () => {
     const bad = parseGraphFlow({
-      name: "bad", nodes: [{ name: "a", agent: "x" }],
+      name: "bad",
+      nodes: [{ name: "a", agent: "x" }],
       edges: [{ from: "a", to: "nonexistent" }],
     });
     const result = validateGraphFlow(bad);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("nonexistent"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("nonexistent"))).toBe(true);
   });
 
   it("auto-generates linear edges when no edges specified", () => {
     const linear = parseGraphFlow({
       name: "linear",
-      nodes: [{ name: "a", agent: "x" }, { name: "b", agent: "y" }, { name: "c", agent: "z" }],
+      nodes: [
+        { name: "a", agent: "x" },
+        { name: "b", agent: "y" },
+        { name: "c", agent: "z" },
+      ],
     });
     expect(linear.edges).toHaveLength(2);
     expect(linear.edges[0]).toEqual({ from: "a", to: "b" });
@@ -81,7 +95,11 @@ describe("graph flow", () => {
   it("evaluates conditional edges", () => {
     const conditional = parseGraphFlow({
       name: "cond",
-      nodes: [{ name: "check", agent: "x" }, { name: "pass", agent: "y" }, { name: "fail", agent: "z" }],
+      nodes: [
+        { name: "check", agent: "x" },
+        { name: "pass", agent: "y" },
+        { name: "fail", agent: "z" },
+      ],
       edges: [
         { from: "check", to: "pass", condition: "session.status === 'approved'" },
         { from: "check", to: "fail", condition: "session.status !== 'approved'" },
@@ -196,9 +214,7 @@ describe("depends_on edge synthesis", () => {
         { name: "a", agent: "x", depends_on: ["nonexistent"] },
         { name: "b", agent: "x" },
       ],
-      edges: [
-        { from: "a", to: "b" },
-      ],
+      edges: [{ from: "a", to: "b" }],
     });
     // Explicit edges are used, depends_on is ignored
     expect(flow.edges).toHaveLength(1);

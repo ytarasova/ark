@@ -19,15 +19,15 @@ export interface Theme {
 }
 
 const DARK: Theme = {
-  accent: "#82aaff",          // blue -- tabs, titles, cursor text
-  highlight: "#45475a",       // subtle raised surface -- selected rows, status bar
-  running: "#c3e88d",         // bright green
-  waiting: "#ffcb6b",         // warm yellow
-  error: "#ff5370",           // vivid red
-  idle: "#b4befe",            // periwinkle -- clearly visible
-  surface: "#313244",         // distinct from terminal bg
-  text: "#eef0fc",            // near-white -- maximum readability
-  dimText: "#a6adc8",         // visible muted text
+  accent: "#82aaff", // blue -- tabs, titles, cursor text
+  highlight: "#45475a", // subtle raised surface -- selected rows, status bar
+  running: "#c3e88d", // bright green
+  waiting: "#ffcb6b", // warm yellow
+  error: "#ff5370", // vivid red
+  idle: "#b4befe", // periwinkle -- clearly visible
+  surface: "#313244", // distinct from terminal bg
+  text: "#eef0fc", // near-white -- maximum readability
+  dimText: "#a6adc8", // visible muted text
 };
 
 const LIGHT: Theme = {
@@ -66,4 +66,6 @@ export function getTheme(): Theme {
   return _cached;
 }
 
-export function getThemeMode(): ThemeMode { return _mode; }
+export function getThemeMode(): ThemeMode {
+  return _mode;
+}

@@ -3,8 +3,15 @@ import { AppContext, setApp, clearApp } from "../app.js";
 import { fanOut, checkAutoJoin } from "../services/session-orchestration.js";
 
 let app: AppContext;
-beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
-afterAll(async () => { await app?.shutdown(); clearApp(); });
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 describe("auto-join", () => {
   test("parent advances when all children complete", async () => {

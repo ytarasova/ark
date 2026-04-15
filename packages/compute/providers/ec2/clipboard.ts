@@ -26,8 +26,7 @@ export async function getClipboardImage(): Promise<string | null> {
       timeout: 5_000,
     });
 
-    const hasImage =
-      info.includes("«class PNGf»") || info.includes("public.png");
+    const hasImage = info.includes("«class PNGf»") || info.includes("public.png");
     if (!hasImage) return null;
 
     await execFileAsync(
@@ -89,9 +88,7 @@ export function watchClipboard(
       lastHash = hash;
 
       const filename = `clipboard-${Date.now()}.png`;
-      const remoteDest = remoteWorkdir.endsWith("/")
-        ? `${remoteWorkdir}${filename}`
-        : `${remoteWorkdir}/${filename}`;
+      const remoteDest = remoteWorkdir.endsWith("/") ? `${remoteWorkdir}${filename}` : `${remoteWorkdir}/${filename}`;
 
       await uploadToSession(key, ip, imgPath, remoteDest);
       opts?.onUpload?.(filename);

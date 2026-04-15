@@ -16,7 +16,13 @@ let execFileResult: { stdout: string; stderr: string } = { stdout: "{}", stderr:
 let execFileShouldThrow = false;
 
 import { getApp } from "../app.js";
-import { pollPRReviews, checkSessionPR, fetchPRReviews, processReviewFeedback, setGhExec } from "../integrations/pr-poller.js";
+import {
+  pollPRReviews,
+  checkSessionPR,
+  fetchPRReviews,
+  processReviewFeedback,
+  setGhExec,
+} from "../integrations/pr-poller.js";
 import { withTestContext } from "./test-helpers.js";
 
 // ── Test setup ───────────────────────────────────────────────────────────────
@@ -41,7 +47,9 @@ function makeGhOutput(overrides: Record<string, any> = {}): string {
   });
 }
 
-function createReviewSession(opts: { pr_url?: string; status?: string; flow?: string; stage?: string; config?: Record<string, any> } = {}): store.Session {
+function createReviewSession(
+  opts: { pr_url?: string; status?: string; flow?: string; stage?: string; config?: Record<string, any> } = {},
+): store.Session {
   const session = getApp().sessions.create({
     summary: "test pr poller",
     flow: opts.flow ?? "review-flow",
@@ -79,7 +87,6 @@ beforeEach(() => {
   });
 });
 
-
 // ── pollPRReviews ────────────────────────────────────────────────────────────
 
 describe("pollPRReviews", () => {
@@ -88,11 +95,11 @@ describe("pollPRReviews", () => {
     getApp().sessions.update(session.id, { status: "running", stage: "review" });
     // No pr_url set
 
-    await pollPRReviews(getApp(), );
+    await pollPRReviews(getApp());
 
     // Should not have created any pr_ events
     const events = getApp().events.list(session.id);
-    const prEvents = events.filter(e => e.type.startsWith("pr_"));
+    const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
@@ -104,10 +111,10 @@ describe("pollPRReviews", () => {
       stage: "implement", // auto gate, not review
     });
 
-    await pollPRReviews(getApp(), );
+    await pollPRReviews(getApp());
 
     const events = getApp().events.list(session.id);
-    const prEvents = events.filter(e => e.type.startsWith("pr_"));
+    const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
@@ -118,15 +125,18 @@ describe("pollPRReviews", () => {
       },
     });
 
-    execFileResult = { stdout: makeGhOutput({ reviews: [
-      { author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" },
-    ]}), stderr: "" };
+    execFileResult = {
+      stdout: makeGhOutput({
+        reviews: [{ author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
+      }),
+      stderr: "",
+    };
 
-    await pollPRReviews(getApp(), );
+    await pollPRReviews(getApp());
 
     // Should have been skipped due to cooldown - no pr_approved event
     const events = getApp().events.list(session.id);
-    const approvals = events.filter(e => e.type === "pr_approved");
+    const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(0);
   });
 });
@@ -137,16 +147,17 @@ describe("checkSessionPR", () => {
   it("detects new approval and logs pr_approved event", async () => {
     const session = createReviewSession();
 
-    execFileResult = { stdout: makeGhOutput({
-      reviews: [
-        { author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" },
-      ],
-    }), stderr: "" };
+    execFileResult = {
+      stdout: makeGhOutput({
+        reviews: [{ author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
+      }),
+      stderr: "",
+    };
 
     await checkSessionPR(getApp(), session);
 
     const events = getApp().events.list(session.id);
-    const approvals = events.filter(e => e.type === "pr_approved");
+    const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(1);
 
     const eventData = approvals[0].data as Record<string, any>;
@@ -156,22 +167,30 @@ describe("checkSessionPR", () => {
   it("detects changes_requested and stores feedback message", async () => {
     const session = createReviewSession();
 
-    execFileResult = { stdout: makeGhOutput({
-      reviews: [
-        { author: { login: "bob" }, body: "Fix the error handling", state: "CHANGES_REQUESTED", submittedAt: "2026-03-27T12:00:00Z" },
-      ],
-    }), stderr: "" };
+    execFileResult = {
+      stdout: makeGhOutput({
+        reviews: [
+          {
+            author: { login: "bob" },
+            body: "Fix the error handling",
+            state: "CHANGES_REQUESTED",
+            submittedAt: "2026-03-27T12:00:00Z",
+          },
+        ],
+      }),
+      stderr: "",
+    };
 
     await checkSessionPR(getApp(), session);
 
     // Should have logged pr_review_feedback event
     const events = getApp().events.list(session.id);
-    const feedback = events.filter(e => e.type === "pr_review_feedback");
+    const feedback = events.filter((e) => e.type === "pr_review_feedback");
     expect(feedback).toHaveLength(1);
 
     // Should have stored a message
     const messages = getApp().messages.list(session.id);
-    const systemMsgs = messages.filter(m => m.role === "system");
+    const systemMsgs = messages.filter((m) => m.role === "system");
     expect(systemMsgs.length).toBeGreaterThanOrEqual(1);
     expect(systemMsgs[systemMsgs.length - 1].content).toContain("Fix the error handling");
   });
@@ -185,7 +204,7 @@ describe("checkSessionPR", () => {
 
     // No events should have been created
     const events = getApp().events.list(session.id);
-    const prEvents = events.filter(e => e.type.startsWith("pr_"));
+    const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
@@ -197,7 +216,7 @@ describe("checkSessionPR", () => {
 
     // Only timestamp update, no review events
     const events = getApp().events.list(session.id);
-    const prEvents = events.filter(e => e.type.startsWith("pr_"));
+    const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
@@ -208,7 +227,7 @@ describe("checkSessionPR", () => {
     await checkSessionPR(getApp(), session);
 
     const events = getApp().events.list(session.id);
-    const statusEvents = events.filter(e => e.type === "pr_status");
+    const statusEvents = events.filter((e) => e.type === "pr_status");
     expect(statusEvents).toHaveLength(1);
 
     const eventData = statusEvents[0].data as Record<string, any>;
@@ -224,17 +243,18 @@ describe("checkSessionPR", () => {
     });
 
     // Same single review that was already counted
-    execFileResult = { stdout: makeGhOutput({
-      reviews: [
-        { author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T11:00:00Z" },
-      ],
-    }), stderr: "" };
+    execFileResult = {
+      stdout: makeGhOutput({
+        reviews: [{ author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T11:00:00Z" }],
+      }),
+      stderr: "",
+    };
 
     await checkSessionPR(getApp(), session);
 
     // Should not create pr_approved because review_count hasn't increased
     const events = getApp().events.list(session.id);
-    const approvals = events.filter(e => e.type === "pr_approved");
+    const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(0);
   });
 });
@@ -248,9 +268,7 @@ describe("fetchPRReviews", () => {
         title: "My PR",
         number: 99,
         state: "OPEN",
-        reviews: [
-          { author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" },
-        ],
+        reviews: [{ author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
       }),
     });
 
@@ -263,7 +281,9 @@ describe("fetchPRReviews", () => {
   });
 
   it("returns null on gh CLI failure", async () => {
-    const mockExec = async () => { throw new Error("not found"); };
+    const mockExec = async () => {
+      throw new Error("not found");
+    };
     const result = await fetchPRReviews("https://github.com/org/repo/pull/404", mockExec);
     expect(result).toBeNull();
   });
@@ -282,14 +302,16 @@ describe("processReviewFeedback", () => {
     const session = createReviewSession();
     const config = { review_count: 1, last_review_time: "2026-03-27T12:00:00Z" };
     const data = {
-      title: "PR", number: 42, state: "OPEN",
+      title: "PR",
+      number: 42,
+      state: "OPEN",
       reviews: [{ author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
     };
 
     await processReviewFeedback(getApp(), session, data, config);
 
     const events = getApp().events.list(session.id);
-    const prEvents = events.filter(e => e.type.startsWith("pr_"));
+    const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
@@ -297,14 +319,16 @@ describe("processReviewFeedback", () => {
     const session = createReviewSession();
     const config = { review_count: 0, last_review_time: "" };
     const data = {
-      title: "PR", number: 42, state: "OPEN",
+      title: "PR",
+      number: 42,
+      state: "OPEN",
       reviews: [{ author: { login: "alice" }, body: "LGTM", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
     };
 
     await processReviewFeedback(getApp(), session, data, config);
 
     const events = getApp().events.list(session.id);
-    const approvals = events.filter(e => e.type === "pr_approved");
+    const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(1);
   });
 
@@ -312,19 +336,28 @@ describe("processReviewFeedback", () => {
     const session = createReviewSession({ status: "blocked" });
     const config = { review_count: 0, last_review_time: "" };
     const data = {
-      title: "Fix bug", number: 42, state: "OPEN",
-      reviews: [{ author: { login: "bob" }, body: "Needs rework", state: "CHANGES_REQUESTED", submittedAt: "2026-03-27T12:00:00Z" }],
+      title: "Fix bug",
+      number: 42,
+      state: "OPEN",
+      reviews: [
+        {
+          author: { login: "bob" },
+          body: "Needs rework",
+          state: "CHANGES_REQUESTED",
+          submittedAt: "2026-03-27T12:00:00Z",
+        },
+      ],
     };
 
     await processReviewFeedback(getApp(), session, data, config);
 
     const events = getApp().events.list(session.id);
-    const feedback = events.filter(e => e.type === "pr_review_feedback");
+    const feedback = events.filter((e) => e.type === "pr_review_feedback");
     expect(feedback).toHaveLength(1);
 
     // Should have stored a message
     const messages = getApp().messages.list(session.id);
-    const systemMsgs = messages.filter(m => m.role === "system");
+    const systemMsgs = messages.filter((m) => m.role === "system");
     expect(systemMsgs.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -332,7 +365,9 @@ describe("processReviewFeedback", () => {
     const session = createReviewSession();
     const config = { review_count: 0, last_review_time: "" };
     const data = {
-      title: "PR", number: 42, state: "OPEN",
+      title: "PR",
+      number: 42,
+      state: "OPEN",
       reviews: [{ author: { login: "alice" }, body: "ok", state: "APPROVED", submittedAt: "2026-03-27T12:00:00Z" }],
     };
 

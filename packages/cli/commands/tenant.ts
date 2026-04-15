@@ -30,7 +30,10 @@ export function registerTenantCommands(program: Command) {
         const pm = new TenantPolicyManager(app.db);
 
         const allowedProviders = opts.providers
-          ? opts.providers.split(",").map((s: string) => s.trim()).filter(Boolean)
+          ? opts.providers
+              .split(",")
+              .map((s: string) => s.trim())
+              .filter(Boolean)
           : [];
 
         pm.setPolicy({
@@ -73,7 +76,9 @@ export function registerTenantCommands(program: Command) {
         }
 
         console.log(chalk.bold(`Policy for tenant '${tenantId}'`));
-        console.log(`  Allowed providers: ${p.allowed_providers.length > 0 ? p.allowed_providers.join(", ") : "(all)"}`);
+        console.log(
+          `  Allowed providers: ${p.allowed_providers.length > 0 ? p.allowed_providers.join(", ") : "(all)"}`,
+        );
         console.log(`  Default provider:  ${p.default_provider}`);
         console.log(`  Max sessions:      ${p.max_concurrent_sessions}`);
         if (p.max_cost_per_day_usd !== null) {
@@ -104,14 +109,14 @@ export function registerTenantCommands(program: Command) {
           return;
         }
 
-        console.log(`  ${"TENANT".padEnd(20)} ${"PROVIDERS".padEnd(25)} ${"DEFAULT".padEnd(10)} ${"MAX SESS".padEnd(10)} COST/DAY`);
+        console.log(
+          `  ${"TENANT".padEnd(20)} ${"PROVIDERS".padEnd(25)} ${"DEFAULT".padEnd(10)} ${"MAX SESS".padEnd(10)} COST/DAY`,
+        );
         for (const p of policies) {
-          const providers = p.allowed_providers.length > 0
-            ? p.allowed_providers.join(",")
-            : "(all)";
+          const providers = p.allowed_providers.length > 0 ? p.allowed_providers.join(",") : "(all)";
           const cost = p.max_cost_per_day_usd !== null ? `$${p.max_cost_per_day_usd}` : "-";
           console.log(
-            `  ${p.tenant_id.padEnd(20)} ${providers.padEnd(25)} ${p.default_provider.padEnd(10)} ${String(p.max_concurrent_sessions).padEnd(10)} ${cost}`
+            `  ${p.tenant_id.padEnd(20)} ${providers.padEnd(25)} ${p.default_provider.padEnd(10)} ${String(p.max_concurrent_sessions).padEnd(10)} ${cost}`,
           );
         }
       } catch (e: any) {

@@ -178,9 +178,9 @@ export class TensorZeroManager {
     } catch {
       throw new Error(
         "TensorZero gateway not found. Either:\n" +
-        "  - Install the vendored binary (in bin/tensorzero-gateway)\n" +
-        "  - Install Docker and try again\n" +
-        "  - Run TensorZero as a sidecar (control plane mode)"
+          "  - Install the vendored binary (in bin/tensorzero-gateway)\n" +
+          "  - Install Docker and try again\n" +
+          "  - Run TensorZero as a sidecar (control plane mode)",
       );
     }
 
@@ -196,15 +196,24 @@ export class TensorZeroManager {
     if (this.opts.openaiKey) envArgs.push("-e", `OPENAI_API_KEY=${this.opts.openaiKey}`);
     if (this.opts.geminiKey) envArgs.push("-e", `GEMINI_API_KEY=${this.opts.geminiKey}`);
 
-    execFileSync("docker", [
-      "run", "-d",
-      "--name", "ark-tensorzero",
-      "-v", `${dirname(configPath)}:/app/config`,
-      "-p", `${this.port}:${this.port}`,
-      ...envArgs,
-      "tensorzero/gateway",
-      "--config-file", "/app/config/tensorzero.toml",
-    ], { stdio: "pipe" });
+    execFileSync(
+      "docker",
+      [
+        "run",
+        "-d",
+        "--name",
+        "ark-tensorzero",
+        "-v",
+        `${dirname(configPath)}:/app/config`,
+        "-p",
+        `${this.port}:${this.port}`,
+        ...envArgs,
+        "tensorzero/gateway",
+        "--config-file",
+        "/app/config/tensorzero.toml",
+      ],
+      { stdio: "pipe" },
+    );
 
     this.container = "ark-tensorzero";
     await this.waitForHealthy(30);
@@ -213,7 +222,7 @@ export class TensorZeroManager {
   private async waitForHealthy(timeoutSecs: number): Promise<void> {
     for (let i = 0; i < timeoutSecs; i++) {
       if (await this.isHealthy()) return;
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, 1000));
     }
     throw new Error(`TensorZero failed to become healthy within ${timeoutSecs}s`);
   }

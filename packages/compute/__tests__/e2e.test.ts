@@ -13,11 +13,7 @@ import { tmpdir } from "os";
 
 import { getApp } from "../../core/app.js";
 
-import {
-  getProvider,
-  listProviders,
-  resolvePortDecls,
-} from "../index.js";
+import { getProvider, listProviders, resolvePortDecls } from "../index.js";
 
 import { AppContext, setApp, clearApp } from "../../core/app.js";
 
@@ -69,7 +65,11 @@ const tmuxSessions: string[] = [];
 
 function cleanupComputes() {
   for (const name of computeNames) {
-    try { getApp().computes.delete(name); } catch { /* already gone */ }
+    try {
+      getApp().computes.delete(name);
+    } catch {
+      /* already gone */
+    }
   }
   computeNames.length = 0;
 }
@@ -80,7 +80,9 @@ function cleanupTmux() {
       execFileSync("tmux", ["kill-session", "-t", name], {
         stdio: ["pipe", "pipe", "pipe"],
       });
-    } catch { /* session already dead */ }
+    } catch {
+      /* session already dead */
+    }
   }
   tmuxSessions.length = 0;
 }
@@ -180,9 +182,7 @@ describe("E2E: Launch and probe a session", () => {
 
     try {
       // Probe that port -- should be listening
-      const probeUp = await provider.probePorts(compute, [
-        { port, source: "test" },
-      ]);
+      const probeUp = await provider.probePorts(compute, [{ port, source: "test" }]);
       expect(probeUp).toHaveLength(1);
       expect(probeUp[0].port).toBe(port);
       expect(probeUp[0].listening).toBe(true);
@@ -194,14 +194,16 @@ describe("E2E: Launch and probe a session", () => {
       await new Promise((r) => setTimeout(r, 500));
 
       // Probe again -- should not be listening
-      const probeDown = await provider.probePorts(compute, [
-        { port, source: "test" },
-      ]);
+      const probeDown = await provider.probePorts(compute, [{ port, source: "test" }]);
       expect(probeDown).toHaveLength(1);
       expect(probeDown[0].port).toBe(port);
       expect(probeDown[0].listening).toBe(false);
     } finally {
-      try { server.stop(true); } catch { /* already stopped */ }
+      try {
+        server.stop(true);
+      } catch {
+        /* already stopped */
+      }
     }
   });
 });
@@ -218,7 +220,11 @@ describe("E2E: arc.json port resolution and probing", () => {
 
   afterEach(() => {
     cleanupComputes();
-    try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* ok */ }
+    try {
+      rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      /* ok */
+    }
   });
 
   it("resolves ports from arc.json and devcontainer.json, probes them", async () => {
@@ -227,18 +233,12 @@ describe("E2E: arc.json port resolution and probing", () => {
     const devPort = 59171;
 
     // Create arc.json declaring a port
-    writeFileSync(
-      join(tempDir, "arc.json"),
-      JSON.stringify({ ports: [{ port: arcPort, name: "web" }] }),
-    );
+    writeFileSync(join(tempDir, "arc.json"), JSON.stringify({ ports: [{ port: arcPort, name: "web" }] }));
 
     // Create .devcontainer/devcontainer.json with forwardPorts
     const devcontainerDir = join(tempDir, ".devcontainer");
     mkdirSync(devcontainerDir, { recursive: true });
-    writeFileSync(
-      join(devcontainerDir, "devcontainer.json"),
-      JSON.stringify({ forwardPorts: [devPort] }),
-    );
+    writeFileSync(join(devcontainerDir, "devcontainer.json"), JSON.stringify({ forwardPorts: [devPort] }));
 
     // Resolve ports -- should find 2
     const portDecls = resolvePortDecls(tempDir);
@@ -303,9 +303,7 @@ describe("E2E: Compute to provider resolution flow", () => {
 
     // Verify computes can be listed
     const computes = getApp().computes.list();
-    const testComputes = computes.filter((h) =>
-      h.name === "local" || h.name === "my-ec2"
-    );
+    const testComputes = computes.filter((h) => h.name === "local" || h.name === "my-ec2");
     expect(testComputes.length).toBe(2);
 
     // Clean up ec2 compute only (local is a singleton)

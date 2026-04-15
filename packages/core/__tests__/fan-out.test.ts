@@ -1,10 +1,23 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext, setApp, clearApp } from "../app.js";
-import { fanOut, checkAutoJoin, spawnSubagent, spawnParallelSubagents, joinFork } from "../services/session-orchestration.js";
+import {
+  fanOut,
+  checkAutoJoin,
+  spawnSubagent,
+  spawnParallelSubagents,
+  joinFork,
+} from "../services/session-orchestration.js";
 
 let app: AppContext;
-beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
-afterAll(async () => { await app?.shutdown(); clearApp(); });
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+}, 30_000);
 
 describe("sub-agent fan-out", () => {
   it("creates correct number of children", () => {
@@ -26,10 +39,7 @@ describe("sub-agent fan-out", () => {
     const parent = app.sessions.create({ summary: "build feature", flow: "bare" });
 
     const result = fanOut(app, parent.id, {
-      tasks: [
-        { summary: "task A" },
-        { summary: "task B" },
-      ],
+      tasks: [{ summary: "task A" }, { summary: "task B" }],
     });
 
     for (const childId of result.childIds!) {
@@ -42,10 +52,7 @@ describe("sub-agent fan-out", () => {
   it("children share fork_group", () => {
     const parent = app.sessions.create({ summary: "test", flow: "bare" });
     const result = fanOut(app, parent.id, {
-      tasks: [
-        { summary: "task 1" },
-        { summary: "task 2" },
-      ],
+      tasks: [{ summary: "task 1" }, { summary: "task 2" }],
     });
 
     const child1 = app.sessions.get(result.childIds![0])!;
@@ -452,7 +459,9 @@ describe("spawnSubagent", () => {
   it("inherits parent compute and workdir", () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
     app.sessions.update(parent.id, {
-      status: "running", compute_name: "ec2-box", workdir: "/home/ubuntu/repo",
+      status: "running",
+      compute_name: "ec2-box",
+      workdir: "/home/ubuntu/repo",
     });
 
     const result = spawnSubagent(app, parent.id, { task: "subtask" });
@@ -474,7 +483,8 @@ describe("spawnSubagent", () => {
     app.sessions.update(parent.id, { agent: "implementer" });
 
     const result = spawnSubagent(app, parent.id, {
-      task: "review this", agent: "reviewer",
+      task: "review this",
+      agent: "reviewer",
     });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.agent).toBe("reviewer");
@@ -493,7 +503,8 @@ describe("spawnSubagent", () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
 
     const result = spawnSubagent(app, parent.id, {
-      task: "cheap task", model: "haiku",
+      task: "cheap task",
+      model: "haiku",
     });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.config?.model_override).toBe("haiku");
@@ -504,7 +515,8 @@ describe("spawnSubagent", () => {
     app.sessions.update(parent.id, { agent: "implementer" });
 
     const result = spawnSubagent(app, parent.id, {
-      task: "do thing", model: "haiku",
+      task: "do thing",
+      model: "haiku",
     });
 
     const events = app.events.list(result.sessionId!);
@@ -518,7 +530,8 @@ describe("spawnSubagent", () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare" });
 
     const result = spawnSubagent(app, parent.id, {
-      task: "subtask with MCP", extensions: ["slack", "github"],
+      task: "subtask with MCP",
+      extensions: ["slack", "github"],
     });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.config?.extensions).toEqual(["slack", "github"]);
@@ -559,7 +572,8 @@ describe("spawnSubagent", () => {
     const parent = app.sessions.create({ summary: "parent", flow: "bare", group_name: "team-a" });
 
     const result = spawnSubagent(app, parent.id, {
-      task: "subtask", group_name: "team-b",
+      task: "subtask",
+      group_name: "team-b",
     });
     const child = app.sessions.get(result.sessionId!)!;
     expect(child.group_name).toBe("team-b");

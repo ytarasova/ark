@@ -9,8 +9,8 @@ import { join, extname, relative } from "path";
 export interface RepoMapEntry {
   path: string;
   type: "file";
-  exports: string[];  // function/class/type names
-  size: number;       // bytes
+  exports: string[]; // function/class/type names
+  size: number; // bytes
 }
 
 export interface RepoMap {
@@ -21,15 +21,44 @@ export interface RepoMap {
 }
 
 const SKIP_DIRS = new Set([
-  "node_modules", "dist", "build", ".git", ".next", ".nuxt",
-  "__pycache__", ".venv", "venv", "target", ".ark", ".claude",
-  "coverage", ".nyc_output", ".turbo",
+  "node_modules",
+  "dist",
+  "build",
+  ".git",
+  ".next",
+  ".nuxt",
+  "__pycache__",
+  ".venv",
+  "venv",
+  "target",
+  ".ark",
+  ".claude",
+  "coverage",
+  ".nyc_output",
+  ".turbo",
 ]);
 
 const CODE_EXTENSIONS = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java",
-  ".rb", ".php", ".c", ".cpp", ".h", ".hpp", ".cs", ".swift",
-  ".kt", ".scala", ".vue", ".svelte",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".py",
+  ".go",
+  ".rs",
+  ".java",
+  ".rb",
+  ".php",
+  ".c",
+  ".cpp",
+  ".h",
+  ".hpp",
+  ".cs",
+  ".swift",
+  ".kt",
+  ".scala",
+  ".vue",
+  ".svelte",
 ]);
 
 const EXPORT_PATTERNS: Record<string, RegExp[]> = {
@@ -40,15 +69,8 @@ const EXPORT_PATTERNS: Record<string, RegExp[]> = {
     /export\s+interface\s+(\w+)/g,
     /export\s+type\s+(\w+)/g,
   ],
-  ".tsx": [
-    /export\s+(?:async\s+)?function\s+(\w+)/g,
-    /export\s+class\s+(\w+)/g,
-    /export\s+(?:const|let)\s+(\w+)/g,
-  ],
-  ".js": [
-    /export\s+(?:async\s+)?function\s+(\w+)/g,
-    /export\s+class\s+(\w+)/g,
-  ],
+  ".tsx": [/export\s+(?:async\s+)?function\s+(\w+)/g, /export\s+class\s+(\w+)/g, /export\s+(?:const|let)\s+(\w+)/g],
+  ".js": [/export\s+(?:async\s+)?function\s+(\w+)/g, /export\s+class\s+(\w+)/g],
   ".py": [/^def\s+(\w+)/gm, /^class\s+(\w+)/gm],
   ".go": [/^func\s+(\w+)/gm, /^type\s+(\w+)\s+struct/gm],
   ".rs": [/pub\s+fn\s+(\w+)/g, /pub\s+struct\s+(\w+)/g, /pub\s+enum\s+(\w+)/g],
@@ -68,8 +90,11 @@ export function generateRepoMap(rootDir: string, opts?: { maxFiles?: number; max
     if (!existsSync(dir)) return;
 
     let items: string[];
-    try { items = readdirSync(dir); }
-    catch { return; }
+    try {
+      items = readdirSync(dir);
+    } catch {
+      return;
+    }
 
     for (const item of items) {
       if (entries.length >= maxFiles) break;
@@ -78,8 +103,11 @@ export function generateRepoMap(rootDir: string, opts?: { maxFiles?: number; max
 
       const fullPath = join(dir, item);
       let stat;
-      try { stat = statSync(fullPath); }
-      catch { continue; }
+      try {
+        stat = statSync(fullPath);
+      } catch {
+        continue;
+      }
 
       if (stat.isDirectory()) {
         scan(fullPath, depth + 1);

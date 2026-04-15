@@ -61,7 +61,7 @@ describe("compute template RPC handlers", () => {
     app.computeTemplates.create({ name: "from-db", provider: "ec2", config: {} });
 
     const list = app.computeTemplates.list();
-    expect(list.some(t => t.name === "from-db")).toBe(true);
+    expect(list.some((t) => t.name === "from-db")).toBe(true);
   });
 
   it("template config merges correctly with user overrides", () => {

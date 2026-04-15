@@ -30,21 +30,21 @@ describe("provider isolation modes", () => {
     const modes = provider!.isolationModes;
     expect(modes.length).toBe(2);
 
-    const values = modes.map(m => m.value);
+    const values = modes.map((m) => m.value);
     expect(values).toContain("worktree");
     expect(values).toContain("inplace");
   });
 
   it("LocalProvider worktree mode has correct label", () => {
     const provider = app.getProvider("local")!;
-    const worktree = provider.isolationModes.find(m => m.value === "worktree");
+    const worktree = provider.isolationModes.find((m) => m.value === "worktree");
     expect(worktree).toBeTruthy();
     expect(worktree!.label).toContain("worktree");
   });
 
   it("LocalProvider inplace mode has correct label", () => {
     const provider = app.getProvider("local")!;
-    const inplace = provider.isolationModes.find(m => m.value === "inplace");
+    const inplace = provider.isolationModes.find((m) => m.value === "inplace");
     expect(inplace).toBeTruthy();
     expect(inplace!.label).toContain("direct");
   });

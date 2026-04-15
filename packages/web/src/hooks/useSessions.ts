@@ -21,9 +21,25 @@ export function useSessions(serverStatus?: string) {
       for (const u of sseData) {
         const existing = map.get(u.id);
         if (existing) {
-          map.set(u.id, { ...existing, status: u.status, summary: u.summary, agent: u.agent, repo: u.repo, group_name: u.group, updated_at: u.updated });
+          map.set(u.id, {
+            ...existing,
+            status: u.status,
+            summary: u.summary,
+            agent: u.agent,
+            repo: u.repo,
+            group_name: u.group,
+            updated_at: u.updated,
+          });
         } else {
-          map.set(u.id, { id: u.id, status: u.status, summary: u.summary, agent: u.agent, repo: u.repo, group_name: u.group, updated_at: u.updated });
+          map.set(u.id, {
+            id: u.id,
+            status: u.status,
+            summary: u.summary,
+            agent: u.agent,
+            repo: u.repo,
+            group_name: u.group,
+            updated_at: u.updated,
+          });
         }
       }
       return Array.from(map.values());

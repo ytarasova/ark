@@ -223,7 +223,7 @@ describe("full relay chain", () => {
         commits: ["def456"],
       }),
     });
-    const result = await resp.json() as Record<string, unknown>;
+    const result = (await resp.json()) as Record<string, unknown>;
     expect(result.ok).toBe(true);
     expect(result.forwarded).toBe(true);
 
@@ -245,7 +245,7 @@ describe("full relay chain", () => {
         payload: { type: "task", task: "Review the PR", sessionId: "s-deliver", stage: "review" },
       }),
     });
-    const result = await resp.json() as Record<string, unknown>;
+    const result = (await resp.json()) as Record<string, unknown>;
     expect(result.ok).toBe(true);
     expect(result.delivered).toBe(true);
 

@@ -121,10 +121,7 @@ describe("buildGooseCommand", () => {
     const argv = buildGooseCommand({
       agent: makeAgent({
         recipe: "/repo/recipes/islc-orchestrate.yaml",
-        sub_recipes: [
-          "/repo/recipes/islc-plan.yaml",
-          "/repo/recipes/islc-execute.yaml",
-        ],
+        sub_recipes: ["/repo/recipes/islc-plan.yaml", "/repo/recipes/islc-execute.yaml"],
       }),
       task: "",
       sessionId: "s-1",
@@ -133,10 +130,7 @@ describe("buildGooseCommand", () => {
       if (flag === "--sub-recipe") acc.push(argv[i + 1]);
       return acc;
     }, []);
-    expect(subs).toEqual([
-      "/repo/recipes/islc-plan.yaml",
-      "/repo/recipes/islc-execute.yaml",
-    ]);
+    expect(subs).toEqual(["/repo/recipes/islc-plan.yaml", "/repo/recipes/islc-execute.yaml"]);
   });
 
   it("passes every recipe param as --params k=v when agent has a recipe", () => {

@@ -6,7 +6,8 @@ import { getApp } from "../../core/app.js";
 export function registerConductorCommands(program: Command) {
   const conductorCmd = program.command("conductor").description("Conductor operations");
 
-  conductorCmd.command("start")
+  conductorCmd
+    .command("start")
     .description("Start the conductor server")
     .option("-p, --port <port>", "Port", "19100")
     .action(async (opts) => {
@@ -17,7 +18,8 @@ export function registerConductorCommands(program: Command) {
       setInterval(() => {}, 60_000);
     });
 
-  conductorCmd.command("learnings")
+  conductorCmd
+    .command("learnings")
     .description("Show conductor learnings")
     .action(async () => {
       const app = getApp();
@@ -25,8 +27,8 @@ export function registerConductorCommands(program: Command) {
 
       if (learnings.length > 0) {
         // Split into "promoted" (recurrence >= 3) and active
-        const promoted = learnings.filter(l => ((l.metadata.recurrence as number) ?? 1) >= 3);
-        const active = learnings.filter(l => ((l.metadata.recurrence as number) ?? 1) < 3);
+        const promoted = learnings.filter((l) => ((l.metadata.recurrence as number) ?? 1) >= 3);
+        const active = learnings.filter((l) => ((l.metadata.recurrence as number) ?? 1) < 3);
 
         if (promoted.length > 0) {
           console.log(chalk.bold("\nPolicies (promoted from learnings):\n"));
@@ -50,7 +52,8 @@ export function registerConductorCommands(program: Command) {
       }
     });
 
-  conductorCmd.command("learn")
+  conductorCmd
+    .command("learn")
     .description("Record a conductor learning")
     .argument("<title>")
     .argument("[description]")
@@ -58,7 +61,7 @@ export function registerConductorCommands(program: Command) {
       const app = getApp();
       // Check for existing learning with same label and increment recurrence
       const existing = app.knowledge.search(title, { types: ["learning"], limit: 5 });
-      const match = existing.find(n => n.label === title);
+      const match = existing.find((n) => n.label === title);
       if (match) {
         const recurrence = ((match.metadata.recurrence as number) ?? 1) + 1;
         app.knowledge.updateNode(match.id, {
@@ -81,17 +84,26 @@ export function registerConductorCommands(program: Command) {
       }
     });
 
-  conductorCmd.command("bridge")
+  conductorCmd
+    .command("bridge")
     .description("Start the messaging bridge (Telegram/Slack)")
     .action(async () => {
       const bridge = core.createBridge(getApp().config.arkDir);
       if (!bridge) {
         console.log(chalk.red("No bridge config found. Create ~/.ark/bridge.json with telegram/slack settings."));
         console.log(chalk.dim("\nExample ~/.ark/bridge.json:"));
-        console.log(chalk.dim(JSON.stringify({
-          telegram: { botToken: "123:ABC...", chatId: "12345" },
-          slack: { webhookUrl: "https://hooks.slack.com/services/..." },
-        }, null, 2)));
+        console.log(
+          chalk.dim(
+            JSON.stringify(
+              {
+                telegram: { botToken: "123:ABC...", chatId: "12345" },
+                slack: { webhookUrl: "https://hooks.slack.com/services/..." },
+              },
+              null,
+              2,
+            ),
+          ),
+        );
         return;
       }
 
@@ -102,7 +114,7 @@ export function registerConductorCommands(program: Command) {
           await bridge.notifyStatusSummary(getApp());
         } else if (text === "/sessions" || text === "sessions") {
           const sessions = getApp().sessions.list({ limit: 20 });
-          const lines = sessions.map(s => `\u2022 ${s.summary ?? s.id} (${s.status})`);
+          const lines = sessions.map((s) => `\u2022 ${s.summary ?? s.id} (${s.status})`);
           await bridge.notify(lines.join("\n") || "No sessions");
         } else {
           await bridge.notify(`Unknown command: ${text}`);
@@ -115,7 +127,8 @@ export function registerConductorCommands(program: Command) {
       await new Promise(() => {});
     });
 
-  conductorCmd.command("notify")
+  conductorCmd
+    .command("notify")
     .description("Send a test notification via bridge")
     .argument("<message>")
     .action(async (message) => {

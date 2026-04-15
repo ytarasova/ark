@@ -33,7 +33,11 @@ function writePidFile(info: ServerPidInfo, arkDir?: string): void {
 
 function removePidFile(arkDir?: string): void {
   const pidPath = pidFilePath(arkDir);
-  try { unlinkSync(pidPath); } catch { /* already gone */ }
+  try {
+    unlinkSync(pidPath);
+  } catch {
+    /* already gone */
+  }
 }
 
 function isProcessRunning(pid: number): boolean {
@@ -63,7 +67,8 @@ export function registerServerDaemonCommands(serverCmd: Command) {
 
   // ── daemon start ──────────────────────────────────────────────────────────
 
-  daemonCmd.command("start")
+  daemonCmd
+    .command("start")
     .description("Start the Ark server daemon (AppContext + conductor + arkd + WebSocket)")
     .option("-p, --port <port>", "WebSocket server port", "19400")
     .option("-d, --detach", "Run in background (detached mode)")
@@ -116,7 +121,10 @@ export function registerServerDaemonCommands(serverCmd: Command) {
         while (Date.now() < deadline) {
           await Bun.sleep(500);
           const check = await probeHealth(port);
-          if (check.ok) { healthy = true; break; }
+          if (check.ok) {
+            healthy = true;
+            break;
+          }
         }
 
         if (healthy) {
@@ -167,7 +175,8 @@ export function registerServerDaemonCommands(serverCmd: Command) {
 
   // ── daemon stop ───────────────────────────────────────────────────────────
 
-  daemonCmd.command("stop")
+  daemonCmd
+    .command("stop")
     .description("Stop the server daemon")
     .action(async () => {
       const info = readPidFile();
@@ -190,7 +199,8 @@ export function registerServerDaemonCommands(serverCmd: Command) {
 
   // ── daemon status ─────────────────────────────────────────────────────────
 
-  daemonCmd.command("status")
+  daemonCmd
+    .command("status")
     .description("Check server daemon status")
     .action(async () => {
       const info = readPidFile();

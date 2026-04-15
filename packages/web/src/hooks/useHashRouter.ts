@@ -1,8 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 
 const VALID_VIEWS = new Set([
-  "dashboard", "sessions", "agents", "flows", "compute",
-  "history", "memory", "tools", "schedules", "costs", "settings",
+  "dashboard",
+  "sessions",
+  "agents",
+  "flows",
+  "compute",
+  "history",
+  "memory",
+  "tools",
+  "schedules",
+  "costs",
+  "settings",
 ]);
 
 export interface RouteState {
@@ -44,7 +53,7 @@ export function useHashRouter() {
   }, []);
 
   const setSubId = useCallback((subId: string | null) => {
-    setRoute(prev => {
+    setRoute((prev) => {
       writeHash(prev.view, subId);
       return { ...prev, subId };
     });

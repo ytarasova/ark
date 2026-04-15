@@ -73,14 +73,22 @@ export function startTerminalBridge(ws: ServerWebSocket<unknown>, sessionName: s
         const { value, done } = await reader.read();
         if (done) break;
         if (value && session.alive) {
-          try { ws.sendBinary(value); } catch { break; }
+          try {
+            ws.sendBinary(value);
+          } catch {
+            break;
+          }
         }
       }
     } catch {
       // Process ended or read error
     } finally {
       session.alive = false;
-      try { ws.close(); } catch { /* already closed */ }
+      try {
+        ws.close();
+      } catch {
+        /* already closed */
+      }
     }
   })();
 
@@ -92,7 +100,9 @@ export function startTerminalBridge(ws: ServerWebSocket<unknown>, sessionName: s
         const { done } = await reader.read();
         if (done) break;
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   })();
 
   // Detect process exit
@@ -101,7 +111,9 @@ export function startTerminalBridge(ws: ServerWebSocket<unknown>, sessionName: s
     try {
       ws.send(JSON.stringify({ type: "disconnected" }));
       ws.close();
-    } catch { /* already closed */ }
+    } catch {
+      /* already closed */
+    }
   });
 
   return session;
@@ -143,13 +155,26 @@ function handleResize(sessionName: string, cols: number, rows: number): void {
     const tmuxBin = tmux.tmuxBin();
     // sessionName was validated at bridge creation; cols/rows are coerced to string digits
     const proc = spawn({
-      cmd: [tmuxBin, "resize-window", "-t", sessionName, "-x", String(Math.max(1, cols | 0)), "-y", String(Math.max(1, rows | 0))],
+      cmd: [
+        tmuxBin,
+        "resize-window",
+        "-t",
+        sessionName,
+        "-x",
+        String(Math.max(1, cols | 0)),
+        "-y",
+        String(Math.max(1, rows | 0)),
+      ],
       stdout: "pipe",
       stderr: "pipe",
     });
     // Consume pipes to prevent resource leaks
-    proc.exited.catch(() => { /* best-effort */ });
-  } catch { /* resize is best-effort */ }
+    proc.exited.catch(() => {
+      /* best-effort */
+    });
+  } catch {
+    /* resize is best-effort */
+  }
 }
 
 /** Clean up a terminal session when WebSocket closes. */
@@ -161,5 +186,9 @@ export function cleanupTerminalBridge(ws: ServerWebSocket<unknown>): void {
   activeSessions.delete(ws);
 
   // Kill the script/tmux attach process (this detaches, doesn't kill the tmux session)
-  try { session.proc.kill(); } catch { /* already dead */ }
+  try {
+    session.proc.kill();
+  } catch {
+    /* already dead */
+  }
 }

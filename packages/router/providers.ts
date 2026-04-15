@@ -21,8 +21,8 @@ import type {
 
 // ── Circuit Breaker ──────────────────────────────────────────────────────────
 
-const BREAKER_THRESHOLD = 5;          // failures before opening
-const BREAKER_RESET_MS = 30_000;      // time before half-open
+const BREAKER_THRESHOLD = 5; // failures before opening
+const BREAKER_RESET_MS = 30_000; // time before half-open
 
 class CircuitBreaker {
   private state: CircuitBreakerState = {
@@ -142,7 +142,7 @@ export class Provider {
       throw new Error(`OpenAI API error ${resp.status}: ${text}`);
     }
 
-    return await resp.json() as ChatCompletionResponse;
+    return (await resp.json()) as ChatCompletionResponse;
   }
 
   private async *streamOpenAI(request: ChatCompletionRequest, modelId: string): AsyncGenerator<ChatCompletionChunk> {
@@ -166,7 +166,7 @@ export class Provider {
   private openaiHeaders(): Record<string, string> {
     return {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${this.config.api_key}`,
+      Authorization: `Bearer ${this.config.api_key}`,
     };
   }
 
@@ -223,7 +223,10 @@ export class Provider {
       if (msg.role === "assistant" && msg.tool_calls?.length) {
         const content: unknown[] = [];
         if (msg.content) {
-          content.push({ type: "text", text: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content) });
+          content.push({
+            type: "text",
+            text: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
+          });
         }
         for (const tc of msg.tool_calls) {
           content.push({
@@ -241,11 +244,13 @@ export class Provider {
       if (msg.role === "tool" && msg.tool_call_id) {
         messages.push({
           role: "user",
-          content: [{
-            type: "tool_result",
-            tool_use_id: msg.tool_call_id,
-            content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
-          }],
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: msg.tool_call_id,
+              content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
+            },
+          ],
         });
         continue;
       }
@@ -269,7 +274,7 @@ export class Provider {
 
     // Convert tools
     if (request.tools?.length) {
-      body.tools = request.tools.map(t => ({
+      body.tools = request.tools.map((t) => ({
         name: t.function.name,
         description: t.function.description ?? "",
         input_schema: t.function.parameters ?? { type: "object", properties: {} },
@@ -313,25 +318,30 @@ export class Provider {
     }
 
     const finishReason: "stop" | "length" | "tool_calls" =
-      resp.stop_reason === "end_turn" ? "stop"
-      : resp.stop_reason === "tool_use" ? "tool_calls"
-      : resp.stop_reason === "max_tokens" ? "length"
-      : "stop";
+      resp.stop_reason === "end_turn"
+        ? "stop"
+        : resp.stop_reason === "tool_use"
+          ? "tool_calls"
+          : resp.stop_reason === "max_tokens"
+            ? "length"
+            : "stop";
 
     return {
       id: resp.id || `chatcmpl-${Date.now()}`,
       object: "chat.completion",
       created: Math.floor(Date.now() / 1000),
       model: modelId,
-      choices: [{
-        index: 0,
-        message: {
-          role: "assistant",
-          content: textContent || null,
-          ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content: textContent || null,
+            ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
+          },
+          finish_reason: finishReason,
         },
-        finish_reason: finishReason,
-      }],
+      ],
       usage: {
         prompt_tokens: resp.usage?.input_tokens ?? 0,
         completion_tokens: resp.usage?.output_tokens ?? 0,
@@ -364,7 +374,11 @@ export class Provider {
           if (data === "[DONE]") return;
 
           let event: any;
-          try { event = JSON.parse(data); } catch { continue; }
+          try {
+            event = JSON.parse(data);
+          } catch {
+            continue;
+          }
 
           // Convert Anthropic SSE events to OpenAI chunk format
           if (event.type === "content_block_delta") {
@@ -374,11 +388,13 @@ export class Provider {
                 object: "chat.completion.chunk",
                 created,
                 model: modelId,
-                choices: [{
-                  index: 0,
-                  delta: { content: event.delta.text },
-                  finish_reason: null,
-                }],
+                choices: [
+                  {
+                    index: 0,
+                    delta: { content: event.delta.text },
+                    finish_reason: null,
+                  },
+                ],
               };
             } else if (event.delta?.type === "input_json_delta") {
               // Tool call argument streaming -- accumulate as content for simplicity
@@ -387,35 +403,45 @@ export class Provider {
                 object: "chat.completion.chunk",
                 created,
                 model: modelId,
-                choices: [{
-                  index: 0,
-                  delta: { content: event.delta.partial_json },
-                  finish_reason: null,
-                }],
+                choices: [
+                  {
+                    index: 0,
+                    delta: { content: event.delta.partial_json },
+                    finish_reason: null,
+                  },
+                ],
               };
             }
           } else if (event.type === "message_delta") {
             const stopReason = event.delta?.stop_reason;
-            const finishReason = stopReason === "end_turn" ? "stop"
-              : stopReason === "tool_use" ? "tool_calls"
-              : stopReason === "max_tokens" ? "length"
-              : null;
+            const finishReason =
+              stopReason === "end_turn"
+                ? "stop"
+                : stopReason === "tool_use"
+                  ? "tool_calls"
+                  : stopReason === "max_tokens"
+                    ? "length"
+                    : null;
 
             yield {
               id: chunkId,
               object: "chat.completion.chunk",
               created,
               model: modelId,
-              choices: [{
-                index: 0,
-                delta: {},
-                finish_reason: finishReason,
-              }],
-              usage: event.usage ? {
-                prompt_tokens: event.usage.input_tokens ?? 0,
-                completion_tokens: event.usage.output_tokens ?? 0,
-                total_tokens: (event.usage.input_tokens ?? 0) + (event.usage.output_tokens ?? 0),
-              } : undefined,
+              choices: [
+                {
+                  index: 0,
+                  delta: {},
+                  finish_reason: finishReason,
+                },
+              ],
+              usage: event.usage
+                ? {
+                    prompt_tokens: event.usage.input_tokens ?? 0,
+                    completion_tokens: event.usage.output_tokens ?? 0,
+                    total_tokens: (event.usage.input_tokens ?? 0) + (event.usage.output_tokens ?? 0),
+                  }
+                : undefined,
             };
           }
         }
@@ -492,7 +518,11 @@ export class Provider {
           if (!data) continue;
 
           let event: any;
-          try { event = JSON.parse(data); } catch { continue; }
+          try {
+            event = JSON.parse(data);
+          } catch {
+            continue;
+          }
 
           const text = event.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
           const finishReason = event.candidates?.[0]?.finishReason;
@@ -502,13 +532,13 @@ export class Provider {
             object: "chat.completion.chunk",
             created,
             model: modelId,
-            choices: [{
-              index: 0,
-              delta: text ? { content: text } : {},
-              finish_reason: finishReason === "STOP" ? "stop"
-                : finishReason === "MAX_TOKENS" ? "length"
-                : null,
-            }],
+            choices: [
+              {
+                index: 0,
+                delta: text ? { content: text } : {},
+                finish_reason: finishReason === "STOP" ? "stop" : finishReason === "MAX_TOKENS" ? "length" : null,
+              },
+            ],
           };
         }
       }
@@ -550,13 +580,15 @@ export class Provider {
 
     // Convert tools for Gemini
     if (request.tools?.length) {
-      body.tools = [{
-        functionDeclarations: request.tools.map(t => ({
-          name: t.function.name,
-          description: t.function.description ?? "",
-          parameters: t.function.parameters ?? { type: "OBJECT", properties: {} },
-        })),
-      }];
+      body.tools = [
+        {
+          functionDeclarations: request.tools.map((t) => ({
+            name: t.function.name,
+            description: t.function.description ?? "",
+            parameters: t.function.parameters ?? { type: "OBJECT", properties: {} },
+          })),
+        },
+      ];
     }
 
     return body;
@@ -566,9 +598,7 @@ export class Provider {
     const candidate = resp.candidates?.[0];
     const text = candidate?.content?.parts?.[0]?.text ?? "";
     const finishReason: "stop" | "length" =
-      candidate?.finishReason === "STOP" ? "stop"
-      : candidate?.finishReason === "MAX_TOKENS" ? "length"
-      : "stop";
+      candidate?.finishReason === "STOP" ? "stop" : candidate?.finishReason === "MAX_TOKENS" ? "length" : "stop";
 
     const usage = resp.usageMetadata ?? {};
 
@@ -577,11 +607,13 @@ export class Provider {
       object: "chat.completion",
       created: Math.floor(Date.now() / 1000),
       model: modelId,
-      choices: [{
-        index: 0,
-        message: { role: "assistant", content: text },
-        finish_reason: finishReason,
-      }],
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: text },
+          finish_reason: finishReason,
+        },
+      ],
       usage: {
         prompt_tokens: usage.promptTokenCount ?? 0,
         completion_tokens: usage.candidatesTokenCount ?? 0,
@@ -662,18 +694,18 @@ export class ProviderRegistry {
 
   /** Get all models across all providers. */
   listModels(): ModelConfig[] {
-    return this.listProviders().flatMap(p => p.config.models);
+    return this.listProviders().flatMap((p) => p.config.models);
   }
 
   /** Get models filtered by tier. */
   getModelsByTier(tier: "frontier" | "standard" | "economy"): ModelConfig[] {
-    return this.listModels().filter(m => m.tier === tier);
+    return this.listModels().filter((m) => m.tier === tier);
   }
 
   /** Find which provider owns a specific model. */
   findProviderForModel(modelId: string): Provider | undefined {
     for (const p of this.providers.values()) {
-      if (p.config.models.some(m => m.id === modelId)) return p;
+      if (p.config.models.some((m) => m.id === modelId)) return p;
     }
     return undefined;
   }
@@ -681,7 +713,7 @@ export class ProviderRegistry {
   /** Find a model config by ID. */
   findModel(modelId: string): ModelConfig | undefined {
     for (const p of this.providers.values()) {
-      const m = p.config.models.find(m => m.id === modelId);
+      const m = p.config.models.find((m) => m.id === modelId);
       if (m) return m;
     }
     return undefined;

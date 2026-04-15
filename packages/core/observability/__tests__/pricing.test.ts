@@ -76,7 +76,7 @@ describe("PricingRegistry", () => {
         output_tokens: 100_000,
       });
       // input: 1M * 15/1M = 15.00, output: 100K * 75/1M = 7.50
-      expect(cost).toBeCloseTo(22.50, 2);
+      expect(cost).toBeCloseTo(22.5, 2);
     });
 
     it("calculates sonnet cost with cache tokens", () => {
@@ -91,7 +91,7 @@ describe("PricingRegistry", () => {
       // output: 100K * 15/1M = 1.50
       // cacheRead: 500K * 0.3/1M = 0.15
       // cacheWrite: 200K * 3.75/1M = 0.75
-      expect(cost).toBeCloseTo(5.40, 2);
+      expect(cost).toBeCloseTo(5.4, 2);
     });
 
     it("returns 0 for unknown model", () => {
@@ -119,7 +119,7 @@ describe("PricingRegistry", () => {
         output_tokens: 500_000,
       });
       // input: 1M * 2/1M = 2.00, output: 500K * 8/1M = 4.00
-      expect(cost).toBeCloseTo(6.00, 2);
+      expect(cost).toBeCloseTo(6.0, 2);
     });
 
     it("calculates gemini cost correctly", () => {
@@ -129,7 +129,7 @@ describe("PricingRegistry", () => {
         output_tokens: 1_000_000,
       });
       // input: 10M * 0.15/1M = 1.50, output: 1M * 0.6/1M = 0.60
-      expect(cost).toBeCloseTo(2.10, 2);
+      expect(cost).toBeCloseTo(2.1, 2);
     });
 
     it("uses fallback cache pricing when model lacks cache prices", () => {
@@ -142,7 +142,7 @@ describe("PricingRegistry", () => {
         cache_write_tokens: 1_000_000,
       });
       // read: 1M * (2/1M * 0.1) = 0.20, write: 1M * (2/1M * 1.25) = 2.50
-      expect(cost).toBeCloseTo(2.70, 2);
+      expect(cost).toBeCloseTo(2.7, 2);
     });
   });
 });

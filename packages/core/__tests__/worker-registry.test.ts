@@ -127,8 +127,8 @@ describe("WorkerRegistry", () => {
 
     const online = registry.list({ status: "online" });
     const offline = registry.list({ status: "offline" });
-    expect(offline.some(w => w.id === "w-online")).toBe(true);
-    expect(online.some(w => w.id === "w-online")).toBe(false);
+    expect(offline.some((w) => w.id === "w-online")).toBe(true);
+    expect(online.some((w) => w.id === "w-online")).toBe(false);
   });
 
   it("lists workers filtered by tenant", () => {
@@ -160,9 +160,9 @@ describe("WorkerRegistry", () => {
 
     const forA = registry.list({ tenantId: "tenant-a" });
     // Should include tenant-a workers + shared (null tenant) workers
-    expect(forA.some(w => w.id === "w-tenant-a")).toBe(true);
-    expect(forA.some(w => w.id === "w-shared")).toBe(true);
-    expect(forA.some(w => w.id === "w-tenant-b")).toBe(false);
+    expect(forA.some((w) => w.id === "w-tenant-a")).toBe(true);
+    expect(forA.some((w) => w.id === "w-shared")).toBe(true);
+    expect(forA.some((w) => w.id === "w-tenant-b")).toBe(false);
   });
 
   it("getAvailable returns only online workers below capacity", () => {
@@ -181,7 +181,7 @@ describe("WorkerRegistry", () => {
     registry.incrementSessions("w-avail-1");
 
     const available = registry.getAvailable();
-    expect(available.some(w => w.id === "w-avail-1")).toBe(false);
+    expect(available.some((w) => w.id === "w-avail-1")).toBe(false);
   });
 
   it("getAvailable filters by compute_name", () => {
@@ -204,8 +204,8 @@ describe("WorkerRegistry", () => {
     });
 
     const gpuWorkers = registry.getAvailable({ computeName: "gpu-cluster" });
-    expect(gpuWorkers.some(w => w.id === "w-gpu-1")).toBe(true);
-    expect(gpuWorkers.some(w => w.id === "w-cpu-1")).toBe(false);
+    expect(gpuWorkers.some((w) => w.id === "w-gpu-1")).toBe(true);
+    expect(gpuWorkers.some((w) => w.id === "w-cpu-1")).toBe(false);
   });
 
   it("getLeastLoaded picks the worker with lowest load ratio", () => {

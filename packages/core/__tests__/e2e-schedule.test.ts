@@ -8,20 +8,33 @@
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import {
-  createSchedule, listSchedules, getSchedule, deleteSchedule,
-  enableSchedule, updateScheduleLastRun, cronMatches,
+  createSchedule,
+  listSchedules,
+  getSchedule,
+  deleteSchedule,
+  enableSchedule,
+  updateScheduleLastRun,
+  cronMatches,
 } from "../index.js";
 import { AppContext, setApp, clearApp, getApp } from "../app.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
-  app = AppContext.forTest(); setApp(app); await app.boot();
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
+  app = AppContext.forTest();
+  setApp(app);
+  await app.boot();
 });
 
 afterAll(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
 });
 
 // -- Full lifecycle -----------------------------------------------------------

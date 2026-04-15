@@ -51,20 +51,24 @@ export class DbResourceStore<T extends { name: string }> {
     private defaults: Omit<T, "name">,
   ) {}
 
-  setTenant(id: string): void { this.tenantId = id; }
-  getTenant(): string { return this.tenantId; }
+  setTenant(id: string): void {
+    this.tenantId = id;
+  }
+  getTenant(): string {
+    return this.tenantId;
+  }
 
   list(): T[] {
-    const rows = this.db.prepare(
-      "SELECT * FROM resource_definitions WHERE kind = ? AND tenant_id = ? ORDER BY name"
-    ).all(this.kind, this.tenantId) as ResourceRow[];
-    return rows.map(r => this.rowToResource(r));
+    const rows = this.db
+      .prepare("SELECT * FROM resource_definitions WHERE kind = ? AND tenant_id = ? ORDER BY name")
+      .all(this.kind, this.tenantId) as ResourceRow[];
+    return rows.map((r) => this.rowToResource(r));
   }
 
   get(name: string): T | null {
-    const row = this.db.prepare(
-      "SELECT * FROM resource_definitions WHERE name = ? AND kind = ? AND tenant_id = ?"
-    ).get(name, this.kind, this.tenantId) as ResourceRow | undefined;
+    const row = this.db
+      .prepare("SELECT * FROM resource_definitions WHERE name = ? AND kind = ? AND tenant_id = ?")
+      .get(name, this.kind, this.tenantId) as ResourceRow | undefined;
     return row ? this.rowToResource(row) : null;
   }
 
@@ -74,29 +78,35 @@ export class DbResourceStore<T extends { name: string }> {
     // markers the file-backed store adds so callers can see which tier a
     // resource came from; they have no business in the DB row.
     const { _source: _s, _path: _p, ...data } = resource as T & { _source?: string; _path?: string };
-    void _s; void _p;
+    void _s;
+    void _p;
     const content = YAML.stringify(data);
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO resource_definitions (name, kind, content, tenant_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT (name, kind, tenant_id) DO UPDATE SET content = ?, updated_at = ?
-    `).run(name, this.kind, content, this.tenantId, ts, ts, content, ts);
+    `,
+      )
+      .run(name, this.kind, content, this.tenantId, ts, ts, content, ts);
   }
 
   delete(name: string): boolean {
-    const result = this.db.prepare(
-      "DELETE FROM resource_definitions WHERE name = ? AND kind = ? AND tenant_id = ?"
-    ).run(name, this.kind, this.tenantId);
+    const result = this.db
+      .prepare("DELETE FROM resource_definitions WHERE name = ? AND kind = ? AND tenant_id = ?")
+      .run(name, this.kind, this.tenantId);
     return result.changes > 0;
   }
 
   /** Export all resources as YAML (for file-backed export). */
   exportAll(): Array<{ name: string; yaml: string }> {
-    return this.list().map(r => {
+    return this.list().map((r) => {
       const rec = r as T & { name: string; _source?: string; _path?: string };
       const { _source: _s, _path: _p, ...data } = rec;
-      void _s; void _p;
+      void _s;
+      void _p;
       return { name: rec.name, yaml: YAML.stringify(data) };
     });
   }

@@ -52,20 +52,14 @@ export function ChatPanel({ sessionId, session, onClose, onToast }: ChatPanelPro
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="h-10 border-b border-border px-4 flex items-center justify-between shrink-0">
-        <span className="text-xs font-medium text-foreground truncate">
-          Chat: {session.summary || session.id}
-        </span>
+        <span className="text-xs font-medium text-foreground truncate">Chat: {session.summary || session.id}</span>
         <Button variant="ghost" size="icon-xs" onClick={onClose}>
           <X size={14} />
         </Button>
       </div>
 
       {/* Messages */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5"
-        onScroll={handleScroll}
-      >
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5" onScroll={handleScroll}>
         {messages.length === 0 && (
           <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground">
             No messages yet. Type below to send.
@@ -78,22 +72,24 @@ export function ChatPanel({ sessionId, session, onClose, onToast }: ChatPanelPro
               "rounded-lg px-3 py-2 text-[12px] leading-relaxed max-w-[85%]",
               m.role === "user"
                 ? "bg-primary/10 border border-primary/20 self-end text-foreground"
-                : "bg-secondary border border-border self-start text-card-foreground"
+                : "bg-secondary border border-border self-start text-card-foreground",
             )}
           >
             <div className="flex items-center gap-2 mb-0.5">
-              <span className={cn(
-                "text-[10px] font-semibold uppercase",
-                m.role === "user" ? "text-primary" : "text-muted-foreground"
-              )}>
+              <span
+                className={cn(
+                  "text-[10px] font-semibold uppercase",
+                  m.role === "user" ? "text-primary" : "text-muted-foreground",
+                )}
+              >
                 {m.role}
               </span>
               {m.type && m.type !== "text" && (
-                <Badge variant="secondary" className="text-[9px] py-0 px-1">{m.type}</Badge>
+                <Badge variant="secondary" className="text-[9px] py-0 px-1">
+                  {m.type}
+                </Badge>
               )}
-              {m.created_at && (
-                <span className="text-[10px] text-muted-foreground">{relTime(m.created_at)}</span>
-              )}
+              {m.created_at && <span className="text-[10px] text-muted-foreground">{relTime(m.created_at)}</span>}
             </div>
             <div className="whitespace-pre-wrap break-words">{m.content}</div>
           </div>
@@ -117,11 +113,7 @@ export function ChatPanel({ sessionId, session, onClose, onToast }: ChatPanelPro
             }}
             autoFocus
           />
-          <Button
-            size="xs"
-            disabled={!msg.trim() || sending}
-            onClick={handleSend}
-          >
+          <Button size="xs" disabled={!msg.trim() || sending} onClick={handleSend}>
             {sending ? "..." : "Send"}
           </Button>
         </div>

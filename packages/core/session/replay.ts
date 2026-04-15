@@ -11,11 +11,11 @@ import type { AppContext } from "../app.js";
 export interface ReplayStep {
   index: number;
   timestamp: string;
-  elapsed: string;       // time since session start (e.g. "00:03:42")
-  type: string;          // event type
+  elapsed: string; // time since session start (e.g. "00:03:42")
+  type: string; // event type
   stage: string | null;
   actor: string | null;
-  summary: string;       // human-readable one-line summary
+  summary: string; // human-readable one-line summary
   detail: string | null; // expanded detail (multi-line)
   data: Record<string, unknown> | null;
 }
@@ -127,9 +127,7 @@ export function buildReplay(app: AppContext, sessionId: string): ReplayStep[] {
   const events = app.events.list(sessionId, { limit: 1000 }) as Event[];
   const session = app.sessions.get(sessionId);
   if (events.length === 0) return [];
-  const baseTime = session
-    ? new Date(session.created_at).getTime()
-    : new Date(events[0].created_at).getTime();
+  const baseTime = session ? new Date(session.created_at).getTime() : new Date(events[0].created_at).getTime();
 
   return events.map((ev, i): ReplayStep => {
     const evTime = new Date(ev.created_at).getTime();

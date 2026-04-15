@@ -22,7 +22,11 @@ const LIVE_SERVERS = new Set<Subprocess>();
 let exitHookInstalled = false;
 
 function killServer(proc: Subprocess): void {
-  try { proc.kill("SIGKILL"); } catch { /* already gone */ }
+  try {
+    proc.kill("SIGKILL");
+  } catch {
+    /* already gone */
+  }
   LIVE_SERVERS.delete(proc);
 }
 
@@ -31,14 +35,27 @@ function installExitHook(): void {
   exitHookInstalled = true;
   const reap = () => {
     for (const proc of LIVE_SERVERS) {
-      try { proc.kill("SIGKILL"); } catch { /* already gone */ }
+      try {
+        proc.kill("SIGKILL");
+      } catch {
+        /* already gone */
+      }
     }
     LIVE_SERVERS.clear();
   };
   process.on("exit", reap);
-  process.on("SIGINT", () => { reap(); process.exit(130); });
-  process.on("SIGTERM", () => { reap(); process.exit(143); });
-  process.on("uncaughtException", (err) => { reap(); throw err; });
+  process.on("SIGINT", () => {
+    reap();
+    process.exit(130);
+  });
+  process.on("SIGTERM", () => {
+    reap();
+    process.exit(143);
+  });
+  process.on("uncaughtException", (err) => {
+    reap();
+    throw err;
+  });
 }
 
 export interface WebServerEnv {
@@ -125,7 +142,7 @@ export async function setupWebServer(): Promise<WebServerEnv> {
 
   async function rpc<T = any>(method: string, params: Record<string, unknown> = {}): Promise<T> {
     const res = await rpcRaw(method, params);
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     if (data.error) throw new Error(data.error.message || "RPC error");
     return data.result as T;
   }
@@ -140,13 +157,21 @@ export async function setupWebServer(): Promise<WebServerEnv> {
     teardown: async () => {
       // SIGTERM first for a clean shutdown, then SIGKILL after 500ms if the
       // subprocess is hung mid-boot or ignoring signals.
-      try { serverProcess.kill("SIGTERM"); } catch { /* already gone */ }
+      try {
+        serverProcess.kill("SIGTERM");
+      } catch {
+        /* already gone */
+      }
       const killed = await Promise.race([
         serverProcess.exited.then(() => true),
-        new Promise<false>(r => setTimeout(() => r(false), 500)),
+        new Promise<false>((r) => setTimeout(() => r(false), 500)),
       ]);
       if (!killed) {
-        try { serverProcess.kill("SIGKILL"); } catch { /* already gone */ }
+        try {
+          serverProcess.kill("SIGKILL");
+        } catch {
+          /* already gone */
+        }
       }
       LIVE_SERVERS.delete(serverProcess);
       await env.teardown();

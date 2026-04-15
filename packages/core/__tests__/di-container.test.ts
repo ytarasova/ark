@@ -407,7 +407,7 @@ describe("cross-service integration through container", () => {
 
     // Verify events trail
     const allEvents = app.events.list(session.id);
-    const types = allEvents.map(e => e.type);
+    const types = allEvents.map((e) => e.type);
     expect(types).toContain("session_created");
     expect(types).toContain("session_paused");
     expect(types).toContain("session_resumed");

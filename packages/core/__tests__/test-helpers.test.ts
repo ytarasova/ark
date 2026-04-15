@@ -55,10 +55,13 @@ describe("waitFor", () => {
   it("polls until condition becomes true", async () => {
     let count = 0;
     const start = Date.now();
-    await waitFor(() => {
-      count++;
-      return count >= 3;
-    }, { interval: 10 });
+    await waitFor(
+      () => {
+        count++;
+        return count >= 3;
+      },
+      { interval: 10 },
+    );
     const elapsed = Date.now() - start;
     expect(count).toBeGreaterThanOrEqual(3);
     // Should have taken at least 2 intervals (2 * 10ms)
@@ -66,20 +69,20 @@ describe("waitFor", () => {
   });
 
   it("throws after timeout if condition never becomes true", async () => {
-    await expect(
-      waitFor(() => false, { timeout: 100, interval: 10 })
-    ).rejects.toThrow("waitFor timed out after 100ms");
+    await expect(waitFor(() => false, { timeout: 100, interval: 10 })).rejects.toThrow("waitFor timed out after 100ms");
   });
 
   it("throws with custom message on timeout", async () => {
-    await expect(
-      waitFor(() => false, { timeout: 50, interval: 10, message: "custom failure" })
-    ).rejects.toThrow("custom failure");
+    await expect(waitFor(() => false, { timeout: 50, interval: 10, message: "custom failure" })).rejects.toThrow(
+      "custom failure",
+    );
   });
 
   it("works with async conditions", async () => {
     let ready = false;
-    setTimeout(() => { ready = true; }, 50);
+    setTimeout(() => {
+      ready = true;
+    }, 50);
     await waitFor(async () => ready, { timeout: 1000, interval: 10 });
     expect(ready).toBe(true);
   });
@@ -88,7 +91,9 @@ describe("waitFor", () => {
     const start = Date.now();
     try {
       await waitFor(() => false, { timeout: 150, interval: 10 });
-    } catch { /* expected timeout */ }
+    } catch {
+      /* expected timeout */
+    }
     const elapsed = Date.now() - start;
     expect(elapsed).toBeGreaterThanOrEqual(140);
     expect(elapsed).toBeLessThan(500);
@@ -97,11 +102,16 @@ describe("waitFor", () => {
   it("respects custom interval option", async () => {
     let callCount = 0;
     try {
-      await waitFor(() => {
-        callCount++;
-        return false;
-      }, { timeout: 100, interval: 40 });
-    } catch { /* expected timeout */ }
+      await waitFor(
+        () => {
+          callCount++;
+          return false;
+        },
+        { timeout: 100, interval: 40 },
+      );
+    } catch {
+      /* expected timeout */
+    }
     // With 100ms timeout and 40ms interval, expect roughly 2-3 checks
     expect(callCount).toBeGreaterThanOrEqual(2);
     expect(callCount).toBeLessThanOrEqual(5);

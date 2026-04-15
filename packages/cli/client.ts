@@ -37,14 +37,22 @@ function createInMemoryPair(): { clientTransport: Transport; serverTransport: Tr
   let serverHandler: (msg: JsonRpcMessage) => void = () => {};
 
   const clientTransport: Transport = {
-    send(msg) { queueMicrotask(() => serverHandler(msg)); },
-    onMessage(h) { clientHandler = h; },
+    send(msg) {
+      queueMicrotask(() => serverHandler(msg));
+    },
+    onMessage(h) {
+      clientHandler = h;
+    },
     close() {},
   };
 
   const serverTransport: Transport = {
-    send(msg) { queueMicrotask(() => clientHandler(msg)); },
-    onMessage(h) { serverHandler = h; },
+    send(msg) {
+      queueMicrotask(() => clientHandler(msg));
+    },
+    onMessage(h) {
+      serverHandler = h;
+    },
     close() {},
   };
 

@@ -71,7 +71,7 @@ export function buildContext(
             path: node.label,
             language: (node.metadata.language as string) ?? "",
             dependents: store.getEdges(node.id, { direction: "in" }).length,
-            recent_sessions: sessions.slice(0, 3).map(e => ({
+            recent_sessions: sessions.slice(0, 3).map((e) => ({
               id: e.target_id.replace("session:", ""),
               summary: store.getNode(e.target_id)?.label ?? "",
               date: e.created_at,
@@ -142,36 +142,32 @@ export function formatContextAsMarkdown(ctx: ContextPackage, opts?: { maxChars?:
   }
 
   if (ctx.memories.length > 0) {
-    const s = "## Relevant Knowledge\n" +
-      ctx.memories.map(m => `- ${m.content}`).join("\n");
+    const s = "## Relevant Knowledge\n" + ctx.memories.map((m) => `- ${m.content}`).join("\n");
     addSection(s);
   }
 
   if (ctx.sessions.length > 0) {
-    const s = "## Related Past Sessions\n" +
-      ctx.sessions.map(s =>
-        `- **${s.id}**: ${s.summary} (${s.outcome}, changed: ${s.files_changed.join(", ")})`
-      ).join("\n");
+    const s =
+      "## Related Past Sessions\n" +
+      ctx.sessions
+        .map((s) => `- **${s.id}**: ${s.summary} (${s.outcome}, changed: ${s.files_changed.join(", ")})`)
+        .join("\n");
     addSection(s);
   }
 
   if (ctx.files.length > 0) {
-    const s = "## Key Files\n" +
-      ctx.files.map(f =>
-        `- \`${f.path}\` (${f.language}, ${f.dependents} dependents)`
-      ).join("\n");
+    const s =
+      "## Key Files\n" + ctx.files.map((f) => `- \`${f.path}\` (${f.language}, ${f.dependents} dependents)`).join("\n");
     addSection(s);
   }
 
   if (ctx.learnings.length > 0) {
-    const s = "## Learnings\n" +
-      ctx.learnings.map(l => `- **${l.title}**: ${l.description}`).join("\n");
+    const s = "## Learnings\n" + ctx.learnings.map((l) => `- **${l.title}**: ${l.description}`).join("\n");
     addSection(s);
   }
 
   if (ctx.skills.length > 0) {
-    const s = "## Applicable Skills\n" +
-      ctx.skills.map(s => `- **${s.name}**: ${s.description}`).join("\n");
+    const s = "## Applicable Skills\n" + ctx.skills.map((s) => `- **${s.name}**: ${s.description}`).join("\n");
     addSection(s);
   }
 

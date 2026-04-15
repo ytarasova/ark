@@ -60,7 +60,7 @@ describe("updateEntry", () => {
     updateEntry(getApp(), CID, entry.id, { status: "completed", content: "write tests - done" });
 
     const ledger = loadLedger(getApp(), CID);
-    const updated = ledger.entries.find(e => e.id === entry.id)!;
+    const updated = ledger.entries.find((e) => e.id === entry.id)!;
     expect(updated.status).toBe("completed");
     expect(updated.content).toBe("write tests - done");
     // updatedAt should be a valid ISO timestamp (may be same ms as creation)
@@ -97,7 +97,7 @@ describe("detectStall", () => {
 
     // Should have added a stall entry
     const reloaded = loadLedger(getApp(), CID);
-    const stallEntries = reloaded.entries.filter(e => e.type === "stall");
+    const stallEntries = reloaded.entries.filter((e) => e.type === "stall");
     expect(stallEntries.length).toBe(1);
     expect(reloaded.stallCount).toBeGreaterThan(0);
   });

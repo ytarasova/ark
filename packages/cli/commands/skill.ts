@@ -9,7 +9,8 @@ import { getArkClient } from "./_shared.js";
 export function registerSkillCommands(program: Command) {
   const skillCmd = program.command("skill").description("Manage skills");
 
-  skillCmd.command("list")
+  skillCmd
+    .command("list")
     .description("List available skills")
     .action(async () => {
       const ark = await getArkClient();
@@ -23,13 +24,17 @@ export function registerSkillCommands(program: Command) {
       }
     });
 
-  skillCmd.command("show")
+  skillCmd
+    .command("show")
     .description("Show skill details")
     .argument("<name>", "Skill name")
     .action(async (name: string) => {
       const ark = await getArkClient();
       const skill = await ark.skillRead(name);
-      if (!skill) { console.log(chalk.red(`Skill not found: ${name}`)); return; }
+      if (!skill) {
+        console.log(chalk.red(`Skill not found: ${name}`));
+        return;
+      }
       console.log(chalk.bold(`\n${skill.name}`) + chalk.dim(` (${skill._source})`));
       console.log(`  Description: ${skill.description}`);
       if (skill.tags?.length) console.log(`  Tags:        ${skill.tags.join(", ")}`);
@@ -39,7 +44,8 @@ export function registerSkillCommands(program: Command) {
       }
     });
 
-  skillCmd.command("create")
+  skillCmd
+    .command("create")
     .description("Create a new skill")
     .argument("[name]", "Skill name (required unless --from)")
     .option("--from <file>", "Create from YAML file")
@@ -53,28 +59,47 @@ export function registerSkillCommands(program: Command) {
 
       if (opts.from) {
         let content: string;
-        try { content = readFileSync(opts.from, "utf-8"); }
-        catch { console.error(chalk.red(`Cannot read file: ${opts.from}`)); process.exit(1); }
+        try {
+          content = readFileSync(opts.from, "utf-8");
+        } catch {
+          console.error(chalk.red(`Cannot read file: ${opts.from}`));
+          process.exit(1);
+        }
         const skill = YAML.parse(content);
-        if (!skill.name) { console.error(chalk.red("YAML must have a 'name' field")); process.exit(1); }
+        if (!skill.name) {
+          console.error(chalk.red("YAML must have a 'name' field"));
+          process.exit(1);
+        }
         getApp().skills.save(skill.name, skill, scope, projectRoot);
         console.log(chalk.green(`Created skill: ${skill.name} (${scope})`));
         return;
       }
 
-      if (!name) { console.error(chalk.red("Name required (or use --from)")); process.exit(1); }
-      if (!opts.prompt) { console.error(chalk.red("--prompt required")); process.exit(1); }
+      if (!name) {
+        console.error(chalk.red("Name required (or use --from)"));
+        process.exit(1);
+      }
+      if (!opts.prompt) {
+        console.error(chalk.red("--prompt required"));
+        process.exit(1);
+      }
 
-      getApp().skills.save(name, {
+      getApp().skills.save(
         name,
-        description: opts.description ?? "",
-        prompt: opts.prompt,
-        tags: opts.tags?.split(",").map((t: string) => t.trim()) ?? [],
-      }, scope, projectRoot);
+        {
+          name,
+          description: opts.description ?? "",
+          prompt: opts.prompt,
+          tags: opts.tags?.split(",").map((t: string) => t.trim()) ?? [],
+        },
+        scope,
+        projectRoot,
+      );
       console.log(chalk.green(`Created skill: ${name} (${scope})`));
     });
 
-  skillCmd.command("delete")
+  skillCmd
+    .command("delete")
     .description("Delete a skill (global or project only)")
     .argument("<name>", "Skill name")
     .option("-s, --scope <scope>", "Scope: global or project", "global")

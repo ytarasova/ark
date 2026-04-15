@@ -9,7 +9,8 @@ import { getArkClient } from "./_shared.js";
 export function registerWorktreeCommands(program: Command) {
   const worktree = program.command("worktree").description("Git worktree operations");
 
-  worktree.command("diff")
+  worktree
+    .command("diff")
     .description("Preview changes in a session worktree")
     .argument("<session-id>", "Session ID")
     .option("--base <branch>", "Base branch to compare against", "main")
@@ -21,7 +22,12 @@ export function registerWorktreeCommands(program: Command) {
         return;
       }
       console.log(chalk.bold(`${result.branch} vs ${result.baseBranch}`));
-      console.log(chalk.green(`+${result.insertions}`) + " " + chalk.red(`-${result.deletions}`) + ` (${result.filesChanged} files)`);
+      console.log(
+        chalk.green(`+${result.insertions}`) +
+          " " +
+          chalk.red(`-${result.deletions}`) +
+          ` (${result.filesChanged} files)`,
+      );
       if (result.modifiedSinceReview?.length > 0) {
         console.log();
         console.log(chalk.yellow(`Modified since last review:`));
@@ -33,7 +39,8 @@ export function registerWorktreeCommands(program: Command) {
       console.log(result.stat);
     });
 
-  worktree.command("finish")
+  worktree
+    .command("finish")
     .description("Merge worktree branch, remove worktree, delete session")
     .argument("<session-id>")
     .option("--into <branch>", "Target branch to merge into", "main")
@@ -45,7 +52,8 @@ export function registerWorktreeCommands(program: Command) {
       console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
     });
 
-  worktree.command("pr")
+  worktree
+    .command("pr")
     .description("Create a GitHub PR from a session worktree")
     .argument("<session-id>", "Session ID")
     .option("--title <title>", "PR title")
@@ -66,12 +74,13 @@ export function registerWorktreeCommands(program: Command) {
       }
     });
 
-  worktree.command("list")
+  worktree
+    .command("list")
     .description("List sessions with active worktrees")
     .action(async () => {
       const ark = await getArkClient();
       const sessions = await ark.sessionList({ limit: 500 });
-      const withWorktrees = sessions.filter(s => {
+      const withWorktrees = sessions.filter((s) => {
         const wtDir = join(core.getApp().config.worktreesDir, s.id);
         return existsSync(wtDir);
       });
@@ -88,7 +97,8 @@ export function registerWorktreeCommands(program: Command) {
       }
     });
 
-  worktree.command("cleanup")
+  worktree
+    .command("cleanup")
     .description("Find and remove orphaned worktrees")
     .option("--dry-run", "Only show what would be removed")
     .action(async (opts) => {

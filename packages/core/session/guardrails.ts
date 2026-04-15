@@ -48,9 +48,9 @@ export const DEFAULT_RULES: GuardrailRule[] = [
   { tool: "Bash", pattern: ":\\(\\)\\{\\s*:|:&\\s*\\};:", action: "block" },
   { tool: "Bash", pattern: "mkfs\\.|fdisk|dd\\s+if=", action: "block" },
   { tool: "Bash", pattern: "git\\s+push.*--force|git\\s+push.*-f\\b", action: "block" },
-  { tool: "Read", pattern: "\\.env\"", action: "warn" },
+  { tool: "Read", pattern: '\\.env"', action: "warn" },
   { tool: "Read", pattern: "credentials", action: "warn" },
-  { tool: "Write", pattern: "\\.env\"", action: "warn" },
+  { tool: "Write", pattern: '\\.env"', action: "warn" },
   { tool: "Write", pattern: "credentials", action: "warn" },
 ];
 
@@ -69,7 +69,9 @@ export function evaluateToolCall(
       if (new RegExp(rule.pattern).test(inputStr)) {
         return { action: rule.action, rule };
       }
-    } catch { /* skip invalid regex */ }
+    } catch {
+      /* skip invalid regex */
+    }
   }
 
   return { action: "allow" };

@@ -50,7 +50,12 @@ export function findProjectRoot(cwd?: string): string | null {
 
 // ── Template substitution ───────────────────────────────────────────────────
 
-export function resolveAgent(app: AppContext, name: string, session: Record<string, unknown>, projectRoot?: string): AgentDefinition | null {
+export function resolveAgent(
+  app: AppContext,
+  name: string,
+  session: Record<string, unknown>,
+  projectRoot?: string,
+): AgentDefinition | null {
   const agent = app.agents.get(name, projectRoot);
   if (!agent) return null;
 
@@ -118,7 +123,7 @@ export function resolveAgentWithRuntime(
 
   // model: if the agent model isn't in the runtime's model list, use runtime default
   if (runtime.models && runtime.models.length > 0) {
-    const validModels = runtime.models.map(m => m.id);
+    const validModels = runtime.models.map((m) => m.id);
     if (!validModels.includes(agent.model) && runtime.default_model) {
       agent.model = runtime.default_model;
     }
@@ -131,14 +136,17 @@ export function resolveAgentWithRuntime(
 
 import * as claude from "../claude/claude.js";
 
-export function buildClaudeArgs(agent: AgentDefinition, opts?: {
-  task?: string;
-  sessionId?: string;
-  headless?: boolean;
-  autonomy?: string;
-  projectRoot?: string;
-  app?: AppContext;
-}): string[] {
+export function buildClaudeArgs(
+  agent: AgentDefinition,
+  opts?: {
+    task?: string;
+    sessionId?: string;
+    headless?: boolean;
+    autonomy?: string;
+    projectRoot?: string;
+    app?: AppContext;
+  },
+): string[] {
   let systemPrompt = agent.system_prompt;
 
   // Tool hints: tell the agent what's available so it doesn't probe around.

@@ -24,7 +24,7 @@ describe("fail-loopback", () => {
     session.retryWithContext(getApp(), s.id);
 
     const events = getApp().events.list(s.id);
-    const retryEvent = events.find(e => e.type === "retry_with_context");
+    const retryEvent = events.find((e) => e.type === "retry_with_context");
     expect(retryEvent).toBeDefined();
     expect(retryEvent!.data!.error).toBe("Something broke");
     expect(retryEvent!.data!.attempt).toBe(1);

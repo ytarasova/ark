@@ -1,5 +1,14 @@
 import { describe, it, expect } from "bun:test";
-import { evaluateTermination, parseTermination, maxTurns, maxTokens, timeout, textMention, and, or } from "../termination.js";
+import {
+  evaluateTermination,
+  parseTermination,
+  maxTurns,
+  maxTokens,
+  timeout,
+  textMention,
+  and,
+  or,
+} from "../termination.js";
 import type { TerminationContext } from "../termination.js";
 import type { Session } from "../../types/index.js";
 

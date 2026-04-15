@@ -76,7 +76,7 @@ describe("ComputeRepository", () => {
     repo.create({ name: "e1", provider: "ec2" });
     const dockers = repo.list({ provider: "docker" });
     expect(dockers.length).toBe(2);
-    expect(dockers.every(c => c.provider === "docker")).toBe(true);
+    expect(dockers.every((c) => c.provider === "docker")).toBe(true);
   });
 
   it("list filters by status", () => {
@@ -84,7 +84,7 @@ describe("ComputeRepository", () => {
     repo.create({ name: "stop1", provider: "docker" }); // stopped
     const running = repo.list({ status: "running" });
     expect(running.length).toBeGreaterThanOrEqual(1);
-    expect(running.every(c => c.status === "running")).toBe(true);
+    expect(running.every((c) => c.status === "running")).toBe(true);
   });
 
   it("list respects limit", () => {

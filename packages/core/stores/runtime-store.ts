@@ -86,7 +86,10 @@ export class FileRuntimeStore implements RuntimeStore {
   delete(name: string, scope: "global" | "project" = "global"): boolean {
     const dir = scope === "project" && this.projectDir ? this.projectDir : this.userDir;
     const path = join(dir, `${name}.yaml`);
-    if (existsSync(path)) { unlinkSync(path); return true; }
+    if (existsSync(path)) {
+      unlinkSync(path);
+      return true;
+    }
     return false;
   }
 }

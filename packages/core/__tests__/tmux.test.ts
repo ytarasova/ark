@@ -8,13 +8,7 @@
 import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, statSync } from "fs";
 import { join } from "path";
-import {
-  hasTmux,
-  attachCommand,
-  writeLauncher,
-  sessionExists,
-  listArkSessionsAsync,
-} from "../infra/tmux.js";
+import { hasTmux, attachCommand, writeLauncher, sessionExists, listArkSessionsAsync } from "../infra/tmux.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -60,9 +54,7 @@ describe("attachCommand", () => {
       host: "myhost.dev",
       sshKey: "/home/user/.ssh/my-key.pem",
     });
-    expect(cmd).toBe(
-      "ssh -i /home/user/.ssh/my-key.pem -t ubuntu@myhost.dev tmux attach -t s-1"
-    );
+    expect(cmd).toBe("ssh -i /home/user/.ssh/my-key.pem -t ubuntu@myhost.dev tmux attach -t s-1");
   });
 
   it("combines SSH key and custom user", () => {
@@ -71,9 +63,7 @@ describe("attachCommand", () => {
       user: "ec2-user",
       sshKey: "/keys/id_rsa",
     });
-    expect(cmd).toBe(
-      "ssh -i /keys/id_rsa -t ec2-user@ec2.aws.com tmux attach -t s-1"
-    );
+    expect(cmd).toBe("ssh -i /keys/id_rsa -t ec2-user@ec2.aws.com tmux attach -t s-1");
   });
 
   it("ignores sshKey and user when host is not set", () => {

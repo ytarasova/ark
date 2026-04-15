@@ -10,12 +10,16 @@ import type { Session, Compute } from "../../types/index.js";
 import * as tmux from "../infra/tmux.js";
 
 export class TmuxLauncher implements SessionLauncher {
-  async launch(session: Session, script: string, opts: {
-    env?: Record<string, string>;
-    workdir?: string;
-    compute?: Compute;
-    arkDir?: string;
-  }): Promise<LaunchResult> {
+  async launch(
+    session: Session,
+    script: string,
+    opts: {
+      env?: Record<string, string>;
+      workdir?: string;
+      compute?: Compute;
+      arkDir?: string;
+    },
+  ): Promise<LaunchResult> {
     const tmuxName = `ark-${session.id}`;
     await tmux.createSessionAsync(tmuxName, script, {
       arkDir: opts.arkDir,

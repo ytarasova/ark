@@ -72,25 +72,24 @@ export class FileSkillStore implements SkillStore {
   }
 
   get(name: string, projectRoot?: string): SkillDefinition | null {
-    return this.list(projectRoot).find(s => s.name === name) ?? null;
+    return this.list(projectRoot).find((s) => s.name === name) ?? null;
   }
 
   save(name: string, skill: SkillDefinition, scope: "global" | "project" = "global", projectRoot?: string): void {
-    const dir = scope === "project" && projectRoot
-      ? join(projectRoot, ".ark", "skills")
-      : this.userDir;
+    const dir = scope === "project" && projectRoot ? join(projectRoot, ".ark", "skills") : this.userDir;
     mkdirSync(dir, { recursive: true });
     const { _source, ...data } = skill;
     writeFileSync(join(dir, `${name}.yaml`), stringifyYaml(data));
   }
 
   delete(name: string, scope: "global" | "project" = "global", projectRoot?: string): boolean {
-    const dir = scope === "project" && projectRoot
-      ? join(projectRoot, ".ark", "skills")
-      : this.userDir;
+    const dir = scope === "project" && projectRoot ? join(projectRoot, ".ark", "skills") : this.userDir;
     for (const ext of [".yaml", ".yml"]) {
       const path = join(dir, `${name}${ext}`);
-      if (existsSync(path)) { unlinkSync(path); return true; }
+      if (existsSync(path)) {
+        unlinkSync(path);
+        return true;
+      }
     }
     return false;
   }

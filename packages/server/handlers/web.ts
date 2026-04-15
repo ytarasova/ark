@@ -48,10 +48,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
     const conductorUrl = app.config.conductorUrl ?? DEFAULT_CONDUCTOR_URL;
     const arkdUrl = process.env.ARK_ARKD_URL || DEFAULT_ARKD_URL;
 
-    const [conductor, arkd] = await Promise.all([
-      probeHealth(conductorUrl),
-      probeHealth(arkdUrl),
-    ]);
+    const [conductor, arkd] = await Promise.all([probeHealth(conductorUrl), probeHealth(arkdUrl)]);
 
     return {
       conductor: { online: conductor, url: conductorUrl },
@@ -92,7 +89,11 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
 
   // ── MCP attach/detach by directory (web-specific contract) ───────────────
   router.handle("mcp/attach-by-dir", async (p) => {
-    const { dir, name, config } = extract<{ dir: string; name: string; config: Record<string, unknown> }>(p, ["dir", "name", "config"]);
+    const { dir, name, config } = extract<{ dir: string; name: string; config: Record<string, unknown> }>(p, [
+      "dir",
+      "name",
+      "config",
+    ]);
     addMcpServer(dir, name, config);
     return { ok: true };
   });
@@ -106,7 +107,11 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   // ── Knowledge ingestion ──────────────────────────────────────────────────
   router.handle("knowledge/ingest", async (p) => {
     const { path: inputPath, directory } = extract<{
-      path: string; directory?: boolean; scope?: string; tags?: string[]; recursive?: boolean;
+      path: string;
+      directory?: boolean;
+      scope?: string;
+      tags?: string[];
+      recursive?: boolean;
     }>(p, ["path"]);
     try {
       const { indexCodebase } = await import("../../core/knowledge/indexer.js");
@@ -132,10 +137,13 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("learning/add", async (p) => {
-    const { title, description } = extract<{ title: string; description: string; dir?: string }>(p, ["title", "description"]);
+    const { title, description } = extract<{ title: string; description: string; dir?: string }>(p, [
+      "title",
+      "description",
+    ]);
     // Check for existing learning with same label and increment recurrence
     const existing = app.knowledge.search(title, { types: ["learning"], limit: 5 });
-    const match = existing.find(n => n.label === title);
+    const match = existing.find((n) => n.label === title);
     if (match) {
       const recurrence = ((match.metadata.recurrence as number) ?? 1) + 1;
       app.knowledge.updateNode(match.id, {
@@ -172,7 +180,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   // ── Worktree list & cleanup ──────────────────────────────────────────────
   router.handle("worktree/list", async () => {
     const sessions = app.sessions.list({ limit: 500 });
-    const withWorktrees = sessions.filter(s => s.workdir && s.branch);
+    const withWorktrees = sessions.filter((s) => s.workdir && s.branch);
     return { worktrees: withWorktrees };
   });
 
@@ -186,8 +194,13 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
     const body = extract<{
       version: number;
       session: {
-        ticket?: string; summary?: string; repo?: string; flow?: string;
-        config?: any; group_name?: string; agent?: string;
+        ticket?: string;
+        summary?: string;
+        repo?: string;
+        flow?: string;
+        config?: any;
+        group_name?: string;
+        agent?: string;
       };
     }>(p, ["version", "session"]);
     if (body.version !== 1) {

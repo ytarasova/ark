@@ -70,7 +70,8 @@ export async function detectStatus(app: AppContext, sessionId: string): Promise<
  * which writes events and config to the store via app. This is intentional --
  * handoff detection is best-effort and should not block the hook response.
  */
-export function applyHookStatus(app: AppContext,
+export function applyHookStatus(
+  app: AppContext,
   session: Session,
   hookEvent: string,
   payload: Record<string, unknown>,
@@ -78,7 +79,7 @@ export function applyHookStatus(app: AppContext,
   const result: HookStatusResult = { events: [] };
 
   // Check if this session uses manual gate (interactive - user controls lifecycle)
-  const stageDef = session.stage ? flow.getStage(app,session.flow, session.stage) : null;
+  const stageDef = session.stage ? flow.getStage(app, session.flow, session.stage) : null;
   const isManualGate = stageDef?.gate === "manual";
 
   const isAutoGate = stageDef && stageDef.gate !== "manual";
@@ -106,17 +107,23 @@ export function applyHookStatus(app: AppContext,
         if (startSha) {
           // Per-stage check: compare HEAD against the sha recorded when this stage started
           const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
-            cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+            cwd: session.workdir,
+            encoding: "utf-8",
+            timeout: 5000,
           }).trim();
           hasNewCommits = headSha !== startSha;
         } else {
           // Fallback: check for any commits on branch vs origin/main
           const log = execFileSync("git", ["log", "--oneline", "origin/main..HEAD"], {
-            cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+            cwd: session.workdir,
+            encoding: "utf-8",
+            timeout: 5000,
           }).trim();
           hasNewCommits = !!log;
         }
-      } catch { hasNewCommits = true; /* allow on git error */ }
+      } catch {
+        hasNewCommits = true; /* allow on git error */
+      }
     } else {
       hasNewCommits = true; /* no workdir = skip check */
     }
@@ -216,11 +223,16 @@ export function applyHookStatus(app: AppContext,
         };
         if (evaluateTermination(condition, ctx)) {
           result.newStatus = "completed";
-          result.events = [...(result.events ?? []), { type: "termination_triggered", opts: { actor: "system", data: { condition: termConfig } } }];
+          result.events = [
+            ...(result.events ?? []),
+            { type: "termination_triggered", opts: { actor: "system", data: { condition: termConfig } } },
+          ];
         }
       }
     }
-  } catch { /* skip termination check on error */ }
+  } catch {
+    /* skip termination check on error */
+  }
 
   // Track token usage from transcript on Stop and SessionEnd
   const transcriptPath = payload.transcript_path as string | undefined;
@@ -229,17 +241,19 @@ export function applyHookStatus(app: AppContext,
       const parser = app.transcriptParsers.get("claude");
       if (parser) {
         const { usage } = parser.parse(transcriptPath);
-        const total = usage.input_tokens + usage.output_tokens + (usage.cache_read_tokens ?? 0) + (usage.cache_write_tokens ?? 0);
+        const total =
+          usage.input_tokens + usage.output_tokens + (usage.cache_read_tokens ?? 0) + (usage.cache_write_tokens ?? 0);
         if (total > 0) {
           recordSessionUsage(app, session, usage, "anthropic", "transcript");
         }
       }
-    } catch (e: any) { logError("session", "transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) }); }
+    } catch (e: any) {
+      logError("session", "transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) });
+    }
 
     // Index transcript for FTS5 search -- only if the transcript belongs to THIS session's agent
     const hookClaudeSession = payload.session_id as string | undefined;
-    if (hookClaudeSession && session.claude_session_id &&
-        transcriptPath.includes(hookClaudeSession)) {
+    if (hookClaudeSession && session.claude_session_id && transcriptPath.includes(hookClaudeSession)) {
       result.shouldIndex = true;
       result.indexTranscript = { transcriptPath, sessionId: session.id };
     }
@@ -247,17 +261,26 @@ export function applyHookStatus(app: AppContext,
 
   // Check for agent-initiated handoff on session end (fire-and-forget async)
   if (hookEvent === "SessionEnd" || hookEvent === "Stop") {
-    getOutput(app, session.id, { lines: 50 }).then(output => {
-      try {
-        const handoff = detectHandoff(output);
-        if (handoff) {
-          app.events.log(session.id, "handoff_detected", {
-            actor: "system", data: { targetAgent: handoff.targetAgent, reason: handoff.reason },
-          });
-          app.sessions.mergeConfig(session.id, { _pending_handoff: { agent: handoff.targetAgent, instructions: handoff.reason } });
+    getOutput(app, session.id, { lines: 50 })
+      .then((output) => {
+        try {
+          const handoff = detectHandoff(output);
+          if (handoff) {
+            app.events.log(session.id, "handoff_detected", {
+              actor: "system",
+              data: { targetAgent: handoff.targetAgent, reason: handoff.reason },
+            });
+            app.sessions.mergeConfig(session.id, {
+              _pending_handoff: { agent: handoff.targetAgent, instructions: handoff.reason },
+            });
+          }
+        } catch {
+          /* skip handoff detection on error */
         }
-      } catch { /* skip handoff detection on error */ }
-    }).catch(() => { /* skip if output unavailable */ });
+      })
+      .catch(() => {
+        /* skip if output unavailable */
+      });
   }
 
   return result;
@@ -314,9 +337,9 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
   const r = report as unknown as Record<string, unknown>;
   const contentByType: Record<string, string | undefined> = {
     completed: (r.summary || r.message) as string | undefined,
-    question:  (r.question || r.message) as string | undefined,
-    error:     (r.error || r.message) as string | undefined,
-    progress:  (r.message || r.summary) as string | undefined,
+    question: (r.question || r.message) as string | undefined,
+    error: (r.error || r.message) as string | undefined,
+    progress: (r.message || r.summary) as string | undefined,
   };
   let content = contentByType[report.type] || JSON.stringify(report);
 
@@ -366,13 +389,17 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
           if (startSha) {
             // Per-stage check: compare HEAD against the sha recorded when this stage started
             const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
-              cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+              cwd: session.workdir,
+              encoding: "utf-8",
+              timeout: 5000,
             }).trim();
             hasNewCommits = headSha !== startSha;
           } else {
             // Fallback: check for any commits on branch vs origin/main
             const newCommits = execFileSync("git", ["log", "--oneline", `origin/main..HEAD`], {
-              cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+              cwd: session.workdir,
+              encoding: "utf-8",
+              timeout: 5000,
             }).trim();
             hasNewCommits = !!newCommits;
           }
@@ -388,23 +415,28 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
             });
             result.message = {
               role: "system",
-              content: "Completion rejected: no new commits found for this stage. You must commit your changes, push, and create a PR before reporting completed.",
+              content:
+                "Completion rejected: no new commits found for this stage. You must commit your changes, push, and create a PR before reporting completed.",
               type: "error",
             };
             // Don't advance -- session stays running so agent can finish
             break;
           }
-        } catch { /* git check failed (e.g. no remote) -- continue to next check */ }
+        } catch {
+          /* git check failed (e.g. no remote) -- continue to next check */
+        }
 
         // Check for uncommitted changes -- agent must commit ALL work before completing.
         // Catches staged-but-uncommitted and modified-but-unstaged tracked files.
         try {
           const status = execFileSync("git", ["status", "--porcelain"], {
-            cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+            cwd: session.workdir,
+            encoding: "utf-8",
+            timeout: 5000,
           }).trim();
           if (status) {
             // Filter out untracked files (??) -- only reject for tracked file changes
-            const uncommitted = status.split("\n").filter(l => {
+            const uncommitted = status.split("\n").filter((l) => {
               if (!l || l.startsWith("??")) return false;
               // Ignore Ark infrastructure files modified at dispatch
               const file = l.slice(3).trim();
@@ -430,11 +462,13 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
               break;
             }
           }
-        } catch { /* git check failed -- allow completion to proceed */ }
+        } catch {
+          /* git check failed -- allow completion to proceed */
+        }
       }
 
       // Check gate type -- manual gates keep session running (user decides when done)
-      const stageDef = flow.getStage(app,session.flow, session.stage ?? "");
+      const stageDef = flow.getStage(app, session.flow, session.stage ?? "");
       const isManualGate = stageDef?.gate === "manual";
 
       if (isManualGate) {
@@ -460,8 +494,7 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
     case "question": {
       const qr = report as unknown as Record<string, unknown>;
       result.updates.status = "waiting";
-      result.updates.breakpoint_reason =
-        (qr.question ?? qr.message) as string | null;
+      result.updates.breakpoint_reason = (qr.question ?? qr.message) as string | null;
       break;
     }
     case "error": {
@@ -553,7 +586,7 @@ export async function mediateStageHandoff(
   // Step 1: Pre-advance verification (verify scripts + unresolved todos)
   if (fromStage && session.flow) {
     const stageDef = flow.getStage(app, session.flow, fromStage);
-    const hasTodos = app.todos.list(sessionId).some(t => !t.done);
+    const hasTodos = app.todos.list(sessionId).some((t) => !t.done);
     const repoVerify = session.workdir ? loadRepoConfig(session.workdir).verify : undefined;
     if (stageDef?.verify?.length || repoVerify?.length || hasTodos) {
       const verify = await runVerification(app, sessionId);
@@ -564,7 +597,8 @@ export async function mediateStageHandoff(
           breakpoint_reason: `Verification failed before advancing: ${verify.message.slice(0, 200)}`,
         });
         app.messages.send(
-          sessionId, "system",
+          sessionId,
+          "system",
           `Advance blocked: verification failed for stage '${fromStage}'. ${verify.message}`,
           "error",
         );
@@ -689,16 +723,17 @@ export function parseOnFailure(directive: string | undefined): { retry: true; ma
   return { retry: true, maxRetries: parseInt(match[1], 10) };
 }
 
-export function retryWithContext(app: AppContext,
+export function retryWithContext(
+  app: AppContext,
   sessionId: string,
-  opts?: { maxRetries?: number }
+  opts?: { maxRetries?: number },
 ): { ok: boolean; message: string } {
   const s = app.sessions.get(sessionId);
   if (!s) return { ok: false, message: "Session not found" };
   if (s.status !== "failed") return { ok: false, message: "Session is not in failed state" };
 
   const maxRetries = opts?.maxRetries ?? 3;
-  const priorRetries = app.events.list(sessionId).filter(e => e.type === "retry_with_context").length;
+  const priorRetries = app.events.list(sessionId).filter((e) => e.type === "retry_with_context").length;
   if (priorRetries >= maxRetries) {
     return { ok: false, message: `Max retries (${maxRetries}) reached` };
   }

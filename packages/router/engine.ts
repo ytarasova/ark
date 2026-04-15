@@ -45,10 +45,7 @@ export class RoutingEngine {
   }
 
   /** Make a routing decision for a request. */
-  route(
-    request: ChatCompletionRequest,
-    classification: ClassificationResult,
-  ): RoutingDecision {
+  route(request: ChatCompletionRequest, classification: ClassificationResult): RoutingDecision {
     const t0 = performance.now();
     const policy = request.routing?.policy ?? this.config.policy;
     const qualityFloor = request.routing?.quality_floor ?? this.config.quality_floor;
@@ -88,7 +85,7 @@ export class RoutingEngine {
     }
 
     // Get eligible models
-    let candidates = this.registry.listModels().filter(m => {
+    let candidates = this.registry.listModels().filter((m) => {
       if (excludedModels.has(m.id)) return false;
       if (preferredProviders?.length && !preferredProviders.includes(m.provider)) return false;
       if (classification.has_tools && !m.supports_tools) return false;
@@ -100,7 +97,7 @@ export class RoutingEngine {
 
     if (candidates.length === 0) {
       // Fallback: use all models (ignore filters)
-      candidates = this.registry.listModels().filter(m => {
+      candidates = this.registry.listModels().filter((m) => {
         const provider = this.registry.findProviderForModel(m.id);
         return !provider?.breaker.isOpen();
       });
@@ -109,9 +106,9 @@ export class RoutingEngine {
     // Select model based on policy
     const selected = this.selectByPolicy(policy, candidates, classification, qualityFloor);
     const alternatives = candidates
-      .filter(m => m.id !== selected.id)
+      .filter((m) => m.id !== selected.id)
       .slice(0, 5)
-      .map(m => ({
+      .map((m) => ({
         model: m.id,
         reason_skipped: this.skipReason(m, selected, policy, qualityFloor),
       }));
@@ -168,17 +165,17 @@ export class RoutingEngine {
 
   /** Quality policy: always pick highest quality. */
   private selectQuality(candidates: ModelConfig[]): ModelConfig {
-    return candidates.reduce((best, m) => m.quality > best.quality ? m : best, candidates[0]);
+    return candidates.reduce((best, m) => (m.quality > best.quality ? m : best), candidates[0]);
   }
 
   /** Cost policy: always pick cheapest. Upgrade to standard if tools needed. */
   private selectCost(candidates: ModelConfig[], classification: ClassificationResult): ModelConfig {
-    const economy = candidates.filter(m => m.tier === "economy");
+    const economy = candidates.filter((m) => m.tier === "economy");
     if (economy.length > 0 && !classification.has_tools) {
       return this.cheapest(economy);
     }
     // If tools needed, prefer standard tier (better tool support)
-    const standard = candidates.filter(m => m.tier === "standard" || m.tier === "economy");
+    const standard = candidates.filter((m) => m.tier === "standard" || m.tier === "economy");
     if (standard.length > 0) {
       return this.cheapest(standard);
     }
@@ -205,8 +202,8 @@ export class RoutingEngine {
     }
 
     // Filter by quality floor and target tier
-    const meetsFloor = candidates.filter(m => m.quality >= qualityFloor);
-    const inTier = meetsFloor.filter(m => m.tier === targetTier);
+    const meetsFloor = candidates.filter((m) => m.quality >= qualityFloor);
+    const inTier = meetsFloor.filter((m) => m.tier === targetTier);
 
     if (inTier.length > 0) {
       return this.cheapest(inTier);
@@ -215,7 +212,7 @@ export class RoutingEngine {
     // No models in target tier meet quality floor -- try upgrading
     const higherTiers = this.higherTiers(targetTier);
     for (const tier of higherTiers) {
-      const upgraded = meetsFloor.filter(m => m.tier === tier);
+      const upgraded = meetsFloor.filter((m) => m.tier === tier);
       if (upgraded.length > 0) {
         return this.cheapest(upgraded);
       }
@@ -242,9 +239,12 @@ export class RoutingEngine {
 
   private higherTiers(tier: string): string[] {
     switch (tier) {
-      case "economy": return ["standard", "frontier"];
-      case "standard": return ["frontier"];
-      default: return [];
+      case "economy":
+        return ["standard", "frontier"];
+      case "standard":
+        return ["frontier"];
+      default:
+        return [];
     }
   }
 

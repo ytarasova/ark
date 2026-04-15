@@ -21,9 +21,7 @@ describe("resolveWebDistWith", () => {
   it("returns installed layout when <prefix>/web/index.html exists", () => {
     const env = makeEnv({
       execPath: "/home/user/.ark/bin/ark",
-      existsCheck: (p) =>
-        p === "/home/user/.ark/flows/definitions" ||
-        p === "/home/user/.ark/web/index.html",
+      existsCheck: (p) => p === "/home/user/.ark/flows/definitions" || p === "/home/user/.ark/web/index.html",
     });
     expect(resolveWebDistWith(env)).toBe("/home/user/.ark/web");
   });

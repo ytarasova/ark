@@ -183,11 +183,7 @@ export function TerminalPanel({ sessionId, onClose }: TerminalProps) {
         </Button>
       </div>
       {/* Terminal container */}
-      <div
-        ref={containerRef}
-        className="w-full"
-        style={{ height: "360px", padding: "4px" }}
-      />
+      <div ref={containerRef} className="w-full" style={{ height: "360px", padding: "4px" }} />
     </div>
   );
 }

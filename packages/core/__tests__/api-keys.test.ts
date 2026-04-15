@@ -70,13 +70,13 @@ describe("ApiKeyManager", () => {
     it("updates last_used_at on successful validation", () => {
       const { key, id } = app.apiKeys.create("acme", "track-usage", "admin");
       const keysBefore = app.apiKeys.list("acme");
-      const before = keysBefore.find(k => k.id === id);
+      const before = keysBefore.find((k) => k.id === id);
       expect(before!.lastUsedAt).toBeNull();
 
       app.apiKeys.validate(key);
 
       const keysAfter = app.apiKeys.list("acme");
-      const after = keysAfter.find(k => k.id === id);
+      const after = keysAfter.find((k) => k.id === id);
       expect(after!.lastUsedAt).not.toBeNull();
     });
 
@@ -104,7 +104,7 @@ describe("ApiKeyManager", () => {
 
       const keysA = app.apiKeys.list("tenant-a");
       expect(keysA.length).toBe(2);
-      expect(keysA.every(k => k.tenantId === "tenant-a")).toBe(true);
+      expect(keysA.every((k) => k.tenantId === "tenant-a")).toBe(true);
 
       const keysB = app.apiKeys.list("tenant-b");
       expect(keysB.length).toBe(1);

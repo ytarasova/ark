@@ -24,10 +24,7 @@ export class Dispatcher {
    * Dispatch a non-streaming request with fallback.
    * If the selected provider fails, tries another provider in the same tier.
    */
-  async dispatch(
-    request: ChatCompletionRequest,
-    decision: RoutingDecision,
-  ): Promise<ChatCompletionResponse> {
+  async dispatch(request: ChatCompletionRequest, decision: RoutingDecision): Promise<ChatCompletionResponse> {
     const { selected_model, selected_provider } = decision;
 
     // Try primary provider
@@ -36,7 +33,9 @@ export class Dispatcher {
       try {
         return await primary.complete(request, selected_model);
       } catch (err) {
-        console.error(`[router] Primary dispatch failed (${selected_provider}/${selected_model}): ${(err as Error).message}`);
+        console.error(
+          `[router] Primary dispatch failed (${selected_provider}/${selected_model}): ${(err as Error).message}`,
+        );
       }
     }
 
@@ -44,8 +43,9 @@ export class Dispatcher {
     const selectedModel = this.registry.findModel(selected_model);
     const tier = selectedModel?.tier ?? "standard";
 
-    const fallbackModels = this.registry.listModels()
-      .filter(m => m.tier === tier && m.id !== selected_model)
+    const fallbackModels = this.registry
+      .listModels()
+      .filter((m) => m.tier === tier && m.id !== selected_model)
       .sort((a, b) => a.quality - b.quality); // prefer lower quality first for cost
 
     for (const fallbackModel of fallbackModels) {
@@ -59,7 +59,9 @@ export class Dispatcher {
         response.model = fallbackModel.id;
         return response;
       } catch (err) {
-        console.error(`[router] Fallback ${fallbackModel.provider}/${fallbackModel.id} failed: ${(err as Error).message}`);
+        console.error(
+          `[router] Fallback ${fallbackModel.provider}/${fallbackModel.id} failed: ${(err as Error).message}`,
+        );
       }
     }
 
@@ -84,7 +86,9 @@ export class Dispatcher {
         yield* primary.stream(request, selected_model);
         return;
       } catch (err) {
-        console.error(`[router] Primary stream failed (${selected_provider}/${selected_model}): ${(err as Error).message}`);
+        console.error(
+          `[router] Primary stream failed (${selected_provider}/${selected_model}): ${(err as Error).message}`,
+        );
       }
     }
 
@@ -92,8 +96,9 @@ export class Dispatcher {
     const selectedModel = this.registry.findModel(selected_model);
     const tier = selectedModel?.tier ?? "standard";
 
-    const fallbackModels = this.registry.listModels()
-      .filter(m => m.tier === tier && m.id !== selected_model)
+    const fallbackModels = this.registry
+      .listModels()
+      .filter((m) => m.tier === tier && m.id !== selected_model)
       .sort((a, b) => a.quality - b.quality);
 
     for (const fallbackModel of fallbackModels) {
@@ -105,7 +110,9 @@ export class Dispatcher {
         yield* provider.stream(request, fallbackModel.id);
         return;
       } catch (err) {
-        console.error(`[router] Stream fallback ${fallbackModel.provider}/${fallbackModel.id} failed: ${(err as Error).message}`);
+        console.error(
+          `[router] Stream fallback ${fallbackModel.provider}/${fallbackModel.id} failed: ${(err as Error).message}`,
+        );
       }
     }
 
@@ -130,7 +137,7 @@ export class Dispatcher {
   ): Promise<ChatCompletionResponse & { cascaded?: boolean }> {
     // Sort models by cost (cheapest first)
     const sorted = [...models].sort((a, b) => {
-      return (a.cost_input + a.cost_output) - (b.cost_input + b.cost_output);
+      return a.cost_input + a.cost_output - (b.cost_input + b.cost_output);
     });
 
     for (let i = 0; i < sorted.length; i++) {
@@ -153,7 +160,9 @@ export class Dispatcher {
         }
 
         // Low confidence -- escalate to next model
-        console.error(`[router] Cascade: ${model.id} confidence=${confidence.toFixed(2)} < ${confidenceThreshold}, escalating`);
+        console.error(
+          `[router] Cascade: ${model.id} confidence=${confidence.toFixed(2)} < ${confidenceThreshold}, escalating`,
+        );
         continue;
       } catch (err) {
         console.error(`[router] Cascade: ${model.id} failed: ${(err as Error).message}`);
@@ -227,10 +236,7 @@ export class TensorZeroDispatcher {
   /**
    * Dispatch a non-streaming request through TensorZero.
    */
-  async dispatch(
-    request: ChatCompletionRequest,
-    decision: RoutingDecision,
-  ): Promise<ChatCompletionResponse> {
+  async dispatch(request: ChatCompletionRequest, decision: RoutingDecision): Promise<ChatCompletionResponse> {
     const resp = await fetch(`${this.tensorZeroUrl}/openai/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -250,17 +256,14 @@ export class TensorZeroDispatcher {
       throw new Error(`TensorZero error (${resp.status}): ${err}`);
     }
 
-    return await resp.json() as ChatCompletionResponse;
+    return (await resp.json()) as ChatCompletionResponse;
   }
 
   /**
    * Dispatch a streaming request through TensorZero.
    * Returns an async generator of SSE chunks.
    */
-  async *stream(
-    request: ChatCompletionRequest,
-    decision: RoutingDecision,
-  ): AsyncGenerator<ChatCompletionChunk> {
+  async *stream(request: ChatCompletionRequest, decision: RoutingDecision): AsyncGenerator<ChatCompletionChunk> {
     const resp = await fetch(`${this.tensorZeroUrl}/openai/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -3,8 +3,15 @@ import { AppContext, setApp, clearApp } from "../app.js";
 import { getStages, getStage, validateDAG } from "../state/flow.js";
 
 let app: AppContext;
-beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
-afterAll(async () => { await app?.shutdown(); clearApp(); });
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 describe("dag-parallel flow", () => {
   test("loads with correct stages", () => {

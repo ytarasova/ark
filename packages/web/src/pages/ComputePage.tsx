@@ -15,8 +15,21 @@ export function ComputePage({ view, onNavigate, readOnly, daemonStatus }: Comput
   const [showNew, setShowNew] = useState(false);
 
   return (
-    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="Compute" padded={false} daemonStatus={daemonStatus}
-      headerRight={!readOnly ? <Button size="sm" onClick={() => setShowNew(true)}>+ New Compute</Button> : undefined}>
+    <Layout
+      view={view}
+      onNavigate={onNavigate}
+      readOnly={readOnly}
+      title="Compute"
+      padded={false}
+      daemonStatus={daemonStatus}
+      headerRight={
+        !readOnly ? (
+          <Button size="sm" onClick={() => setShowNew(true)}>
+            + New Compute
+          </Button>
+        ) : undefined
+      }
+    >
       <ComputeView showCreate={showNew} onCloseCreate={() => setShowNew(false)} />
     </Layout>
   );

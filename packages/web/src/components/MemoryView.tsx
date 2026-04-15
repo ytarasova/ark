@@ -43,7 +43,10 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
   }, [addRequested]);
 
   const handleSearch = async () => {
-    if (!search.trim()) { setSearchResults(null); return; }
+    if (!search.trim()) {
+      setSearchResults(null);
+      return;
+    }
     setLoading(true);
     try {
       const results = await api.knowledgeSearch(search.trim(), { types: ["memory", "learning"], limit: 20 });
@@ -64,7 +67,12 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
   const handleAdd = async () => {
     if (!newContent.trim()) return;
     await api.addMemory(newContent.trim(), {
-      tags: newTags ? newTags.split(",").map(t => t.trim()).filter(Boolean) : undefined,
+      tags: newTags
+        ? newTags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : undefined,
       scope: newScope || "global",
     });
     setNewContent("");
@@ -76,7 +84,7 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
   const handleForget = async (id: string) => {
     await api.forgetMemory(id);
     queryClient.invalidateQueries({ queryKey: ["memories"] });
-    if (searchResults) setSearchResults(searchResults.filter(m => m.id !== id));
+    if (searchResults) setSearchResults(searchResults.filter((m) => m.id !== id));
     if (selected?.id === id) setSelected(null);
   };
 
@@ -118,14 +126,17 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
                   className="w-full h-7 pl-7 pr-2 text-[12px] bg-secondary"
                   placeholder="Search knowledge..."
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleSearch()}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 />
               </div>
               {searchResults && (
                 <button
                   className="text-[10px] text-muted-foreground hover:text-foreground shrink-0"
-                  onClick={() => { setSearchResults(null); setSearch(""); }}
+                  onClick={() => {
+                    setSearchResults(null);
+                    setSearch("");
+                  }}
                 >
                   Clear
                 </button>
@@ -142,9 +153,13 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
             <button
               className={cn(
                 "text-[10px] px-2 py-0.5 rounded transition-colors",
-                showStats ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                showStats ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
               )}
-              onClick={() => { setShowStats(!showStats); setShowAdd(false); setSelected(null); }}
+              onClick={() => {
+                setShowStats(!showStats);
+                setShowAdd(false);
+                setSelected(null);
+              }}
             >
               <BarChart3 size={10} className="inline mr-0.5" /> Stats
             </button>
@@ -177,26 +192,31 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
               className={cn(
                 "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
                 "hover:bg-accent",
-                selected?.id === m.id && "bg-accent border-l-2 border-l-primary"
+                selected?.id === m.id && "bg-accent border-l-2 border-l-primary",
               )}
-              onClick={() => { setSelected(m); setShowAdd(false); setShowStats(false); }}
+              onClick={() => {
+                setSelected(m);
+                setShowAdd(false);
+                setShowStats(false);
+              }}
             >
               <span className="text-foreground truncate text-[12px] leading-snug">
-                {(() => { const c = getContent(m); return c.length > 60 ? c.slice(0, 60) + "..." : c; })()}
+                {(() => {
+                  const c = getContent(m);
+                  return c.length > 60 ? c.slice(0, 60) + "..." : c;
+                })()}
               </span>
               <div className="flex items-center gap-1.5 mt-1">
                 {m.type && (
-                  <Badge variant="secondary" className="text-[9px] px-1 py-0">{m.type}</Badge>
+                  <Badge variant="secondary" className="text-[9px] px-1 py-0">
+                    {m.type}
+                  </Badge>
                 )}
                 {m.tags?.length > 0 && (
-                  <span className="text-[10px] text-muted-foreground truncate">
-                    {m.tags.slice(0, 3).join(", ")}
-                  </span>
+                  <span className="text-[10px] text-muted-foreground truncate">{m.tags.slice(0, 3).join(", ")}</span>
                 )}
                 {m.score !== undefined && (
-                  <span className="text-[9px] text-muted-foreground/60 font-mono">
-                    {m.score.toFixed(2)}
-                  </span>
+                  <span className="text-[9px] text-muted-foreground/60 font-mono">{m.score.toFixed(2)}</span>
                 )}
                 <span className="flex-1" />
                 <span className="text-[10px] text-muted-foreground/60 font-mono shrink-0">
@@ -215,17 +235,23 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-black/40 border border-border rounded-lg p-3.5">
-                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.04em]">Total Nodes</div>
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.04em]">
+                        Total Nodes
+                      </div>
                       <div className="text-2xl font-bold text-foreground mt-1">{stats.nodes ?? 0}</div>
                     </div>
                     <div className="bg-black/40 border border-border rounded-lg p-3.5">
-                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.04em]">Total Edges</div>
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.04em]">
+                        Total Edges
+                      </div>
                       <div className="text-2xl font-bold text-foreground mt-1">{stats.edges ?? 0}</div>
                     </div>
                   </div>
                   {stats.by_node_type && Object.keys(stats.by_node_type).length > 0 && (
                     <div>
-                      <h3 className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-[0.08em]">Nodes by Type</h3>
+                      <h3 className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-[0.08em]">
+                        Nodes by Type
+                      </h3>
                       <div className="grid grid-cols-[120px_1fr] gap-y-1 gap-x-3 text-[13px]">
                         {Object.entries(stats.by_node_type).map(([type, count]) => (
                           <React.Fragment key={type}>
@@ -238,7 +264,9 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
                   )}
                   {stats.by_edge_type && Object.keys(stats.by_edge_type).length > 0 && (
                     <div>
-                      <h3 className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-[0.08em]">Edges by Relation</h3>
+                      <h3 className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-[0.08em]">
+                        Edges by Relation
+                      </h3>
                       <div className="grid grid-cols-[120px_1fr] gap-y-1 gap-x-3 text-[13px]">
                         {Object.entries(stats.by_edge_type).map(([rel, count]) => (
                           <React.Fragment key={rel}>
@@ -258,39 +286,45 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
             <div className="flex flex-col h-full p-5 overflow-y-auto">
               <h2 className="text-base font-semibold text-foreground mb-5">Add Memory</h2>
               <div className="mb-3.5">
-                <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Content *</label>
+                <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+                  Content *
+                </label>
                 <textarea
                   autoFocus
                   className="w-full min-h-[120px] resize-none bg-transparent border border-input rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   value={newContent}
-                  onChange={e => setNewContent(e.target.value)}
+                  onChange={(e) => setNewContent(e.target.value)}
                   placeholder="What should Ark remember?"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3 mb-3.5">
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Tags (comma-separated)</label>
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+                    Tags (comma-separated)
+                  </label>
                   <Input
                     value={newTags}
-                    onChange={e => setNewTags(e.target.value)}
+                    onChange={(e) => setNewTags(e.target.value)}
                     placeholder="e.g. aws, deploy, config"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Scope</label>
-                  <select
-                    className={selectClassName}
-                    value={newScope}
-                    onChange={e => setNewScope(e.target.value)}
-                  >
+                  <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+                    Scope
+                  </label>
+                  <select className={selectClassName} value={newScope} onChange={(e) => setNewScope(e.target.value)}>
                     <option value="global">global</option>
                     <option value="project">project</option>
                   </select>
                 </div>
               </div>
               <div className="flex gap-2 pt-4 border-t border-border mt-auto">
-                <Button variant="outline" size="sm" onClick={() => setShowAdd(false)}>Cancel</Button>
-                <Button size="sm" onClick={handleAdd}>Save Memory</Button>
+                <Button variant="outline" size="sm" onClick={() => setShowAdd(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleAdd}>
+                  Save Memory
+                </Button>
               </div>
             </div>
           ) : selected ? (
@@ -299,13 +333,17 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
                 {selected.type ? `${selected.type.charAt(0).toUpperCase() + selected.type.slice(1)}` : "Memory"}
               </h2>
               <div className="mb-4">
-                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Content</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                  Content
+                </h3>
                 <div className="bg-black/40 border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
                   {getContent(selected)}
                 </div>
               </div>
               <div className="mb-4">
-                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Details</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                  Details
+                </h3>
                 <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
                   <span className="text-muted-foreground">ID</span>
                   <span className="text-card-foreground font-mono">{selected.id}</span>
@@ -313,20 +351,26 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
                     <>
                       <span className="text-muted-foreground">Type</span>
                       <span className="text-card-foreground">
-                        <Badge variant="secondary" className="text-[10px]">{selected.type}</Badge>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {selected.type}
+                        </Badge>
                       </span>
                     </>
                   )}
                   <span className="text-muted-foreground">Scope</span>
                   <span className="text-card-foreground">
-                    <Badge variant="secondary" className="text-[10px]">{selected.scope || selected.metadata?.scope || "global"}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {selected.scope || selected.metadata?.scope || "global"}
+                    </Badge>
                   </span>
                   {(selected.tags?.length > 0 || (selected.metadata?.tags as any)?.length > 0) && (
                     <>
                       <span className="text-muted-foreground">Tags</span>
                       <span className="flex gap-1 flex-wrap">
                         {(selected.tags ?? selected.metadata?.tags ?? []).map((t: string) => (
-                          <Badge key={t} variant="default" className="text-[11px]">{t}</Badge>
+                          <Badge key={t} variant="default" className="text-[11px]">
+                            {t}
+                          </Badge>
                         ))}
                       </span>
                     </>

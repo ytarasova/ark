@@ -14,7 +14,8 @@ import { getArkClient } from "./_shared.js";
  *   - the `costs-export` CSV/JSON dump
  */
 export function registerCostsCommands(program: Command) {
-  program.command("costs")
+  program
+    .command("costs")
     .description("Show cost summary across sessions")
     .option("-n, --limit <n>", "Number of rows to show", "20")
     .option("--by <dimension>", "Group by: model, provider, runtime, agent, session, tenant, user")
@@ -47,7 +48,14 @@ export function registerCostsCommands(program: Command) {
 
       // Grouped summary mode
       if (opts.by) {
-        const groupBy = opts.by === "agent" ? "agent_role" : opts.by === "session" ? "session_id" : opts.by === "tenant" ? "tenant_id" : opts.by;
+        const groupBy =
+          opts.by === "agent"
+            ? "agent_role"
+            : opts.by === "session"
+              ? "session_id"
+              : opts.by === "tenant"
+                ? "tenant_id"
+                : opts.by;
         const { summary, total } = await ark.costsSummary({
           groupBy,
           tenantId: opts.tenant,
@@ -59,7 +67,11 @@ export function registerCostsCommands(program: Command) {
           return;
         }
         console.log(chalk.bold(`\nTotal cost: ${core.formatCost(total)}\n`));
-        console.log(chalk.dim(opts.by.padEnd(30) + "Cost".padEnd(12) + "In Tokens".padEnd(14) + "Out Tokens".padEnd(14) + "Records"));
+        console.log(
+          chalk.dim(
+            opts.by.padEnd(30) + "Cost".padEnd(12) + "In Tokens".padEnd(14) + "Out Tokens".padEnd(14) + "Records",
+          ),
+        );
         console.log(chalk.dim("\u2500".repeat(80)));
         const limit = Number(opts.limit);
         for (const row of summary.slice(0, limit)) {
@@ -101,14 +113,16 @@ export function registerCostsCommands(program: Command) {
       }
     });
 
-  program.command("costs-sync")
+  program
+    .command("costs-sync")
     .description("Backfill cost data from Claude transcripts")
     .action(() => {
       const result = core.syncCosts(core.getApp());
       console.log(chalk.green(`Synced: ${result.synced} sessions, Skipped: ${result.skipped}`));
     });
 
-  program.command("costs-export")
+  program
+    .command("costs-export")
     .description("Export cost data")
     .option("--format <format>", "csv or json", "json")
     .option("-o, --output <file>", "Output file")
@@ -116,7 +130,10 @@ export function registerCostsCommands(program: Command) {
       const ark = await getArkClient();
       const sessions = await ark.sessionList({ limit: 500 });
       const app = core.getApp();
-      const data = opts.format === "csv" ? core.exportCostsCsv(app, sessions) : JSON.stringify(core.getAllSessionCosts(app, sessions), null, 2);
+      const data =
+        opts.format === "csv"
+          ? core.exportCostsCsv(app, sessions)
+          : JSON.stringify(core.getAllSessionCosts(app, sessions), null, 2);
       if (opts.output) {
         writeFileSync(opts.output, data);
         console.log(chalk.green(`Exported to ${opts.output}`));

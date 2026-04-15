@@ -4,8 +4,13 @@
 
 import { describe, it, expect } from "bun:test";
 import {
-  createSchedule, listSchedules, getSchedule, deleteSchedule,
-  enableSchedule, updateScheduleLastRun, cronMatches,
+  createSchedule,
+  listSchedules,
+  getSchedule,
+  deleteSchedule,
+  enableSchedule,
+  updateScheduleLastRun,
+  cronMatches,
 } from "../index.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
@@ -34,44 +39,44 @@ describe("schedule CRUD", () => {
 
   it("getSchedule by ID", () => {
     const sched = createSchedule(getApp(), { cron: "*/5 * * * *", repo: "my/repo" });
-    const found = getSchedule(getApp(),sched.id);
+    const found = getSchedule(getApp(), sched.id);
     expect(found).not.toBeNull();
     expect(found!.id).toBe(sched.id);
     expect(found!.repo).toBe("my/repo");
   });
 
   it("getSchedule returns null for missing ID", () => {
-    const found = getSchedule(getApp(),"sched-nonexistent");
+    const found = getSchedule(getApp(), "sched-nonexistent");
     expect(found).toBeNull();
   });
 
   it("deleteSchedule removes it", () => {
     const sched = createSchedule(getApp(), { cron: "0 0 * * *" });
-    expect(deleteSchedule(getApp(),sched.id)).toBe(true);
-    expect(getSchedule(getApp(),sched.id)).toBeNull();
+    expect(deleteSchedule(getApp(), sched.id)).toBe(true);
+    expect(getSchedule(getApp(), sched.id)).toBeNull();
   });
 
   it("deleteSchedule returns false for missing ID", () => {
-    expect(deleteSchedule(getApp(),"sched-nonexistent")).toBe(false);
+    expect(deleteSchedule(getApp(), "sched-nonexistent")).toBe(false);
   });
 
   it("enableSchedule toggles enabled flag", () => {
     const sched = createSchedule(getApp(), { cron: "0 0 * * *" });
     expect(sched.enabled).toBe(true);
 
-    enableSchedule(getApp(),sched.id, false);
-    expect(getSchedule(getApp(),sched.id)!.enabled).toBe(false);
+    enableSchedule(getApp(), sched.id, false);
+    expect(getSchedule(getApp(), sched.id)!.enabled).toBe(false);
 
-    enableSchedule(getApp(),sched.id, true);
-    expect(getSchedule(getApp(),sched.id)!.enabled).toBe(true);
+    enableSchedule(getApp(), sched.id, true);
+    expect(getSchedule(getApp(), sched.id)!.enabled).toBe(true);
   });
 
   it("updateScheduleLastRun updates timestamp", () => {
     const sched = createSchedule(getApp(), { cron: "0 0 * * *" });
     expect(sched.last_run).toBeNull();
 
-    updateScheduleLastRun(getApp(),sched.id);
-    const updated = getSchedule(getApp(),sched.id)!;
+    updateScheduleLastRun(getApp(), sched.id);
+    const updated = getSchedule(getApp(), sched.id)!;
     expect(updated.last_run).toBeTruthy();
     expect(updated.last_run).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });

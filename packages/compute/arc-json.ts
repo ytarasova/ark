@@ -10,12 +10,7 @@ import stripJsonComments from "strip-json-comments";
 import type { ArcJson, PortDecl } from "./types.js";
 
 /** Compose file name candidates in priority order (shared with compose.ts). */
-export const COMPOSE_FILE_NAMES = [
-  "docker-compose.yml",
-  "docker-compose.yaml",
-  "compose.yml",
-  "compose.yaml",
-] as const;
+export const COMPOSE_FILE_NAMES = ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"] as const;
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -30,8 +25,7 @@ export function parseArcJson(repoDir: string): ArcJson | null {
 /** Returns true if the repo has a devcontainer config. */
 export function hasDevcontainer(repoDir: string): boolean {
   return (
-    existsSync(join(repoDir, ".devcontainer", "devcontainer.json")) ||
-    existsSync(join(repoDir, ".devcontainer.json"))
+    existsSync(join(repoDir, ".devcontainer", "devcontainer.json")) || existsSync(join(repoDir, ".devcontainer.json"))
   );
 }
 
@@ -81,10 +75,7 @@ export function resolvePortDecls(repoDir: string): PortDecl[] {
  * the forwardPorts array.
  */
 function parseDevcontainerPorts(repoDir: string): number[] {
-  const candidates = [
-    join(repoDir, ".devcontainer", "devcontainer.json"),
-    join(repoDir, ".devcontainer.json"),
-  ];
+  const candidates = [join(repoDir, ".devcontainer", "devcontainer.json"), join(repoDir, ".devcontainer.json")];
 
   for (const filePath of candidates) {
     if (!existsSync(filePath)) continue;
@@ -94,7 +85,9 @@ function parseDevcontainerPorts(repoDir: string): number[] {
       if (Array.isArray(json.forwardPorts)) {
         return json.forwardPorts.filter((p: unknown): p is number => typeof p === "number");
       }
-    } catch { /* invalid JSON — skip */ }
+    } catch {
+      /* invalid JSON — skip */
+    }
   }
 
   return [];

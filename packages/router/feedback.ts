@@ -47,8 +47,7 @@ export class FeedbackTracker {
       (this.stats.requests_by_provider[decision.selected_provider] ?? 0) + 1;
 
     if (model) {
-      this.stats.requests_by_tier[model.tier] =
-        (this.stats.requests_by_tier[model.tier] ?? 0) + 1;
+      this.stats.requests_by_tier[model.tier] = (this.stats.requests_by_tier[model.tier] ?? 0) + 1;
     }
 
     this.stats.total_classification_ms += decision.latency_ms.classification;
@@ -117,13 +116,11 @@ export class FeedbackTracker {
     const groupBy = opts?.groupBy ?? "model";
     const since = opts?.since?.getTime() ?? 0;
 
-    const filtered = this.costs.filter(c => c.timestamp >= since);
+    const filtered = this.costs.filter((c) => c.timestamp >= since);
     const groups = new Map<string, CostSummary>();
 
     for (const c of filtered) {
-      const key = groupBy === "model" ? c.model
-        : groupBy === "provider" ? c.provider
-        : c.session_id ?? "unknown";
+      const key = groupBy === "model" ? c.model : groupBy === "provider" ? c.provider : (c.session_id ?? "unknown");
 
       const existing = groups.get(key) ?? {
         key,

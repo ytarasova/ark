@@ -16,7 +16,8 @@ export function useDaemonStatus(intervalMs = 15000): DaemonStatus | null {
   const [status, setStatus] = useState<DaemonStatus | null>(null);
 
   const load = () => {
-    api.getDaemonStatus()
+    api
+      .getDaemonStatus()
       .then(setStatus)
       .catch(() => {
         // If the RPC itself fails, the web server is down
@@ -28,7 +29,9 @@ export function useDaemonStatus(intervalMs = 15000): DaemonStatus | null {
       });
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
   useSmartPoll(load, intervalMs);
 
   return status;

@@ -7,12 +7,15 @@ withTestContext();
 
 describe("multi-instance coordination", () => {
   let cleanups: (() => void)[] = [];
-  afterEach(() => { cleanups.forEach(fn => fn()); cleanups = []; });
+  afterEach(() => {
+    cleanups.forEach((fn) => fn());
+    cleanups = [];
+  });
 
   it("registerInstance creates a heartbeat entry", () => {
     const inst = registerInstance(getApp(), "test-1");
     cleanups.push(inst.stop);
-    expect(activeInstanceCount(getApp(), )).toBe(1);
+    expect(activeInstanceCount(getApp())).toBe(1);
   });
 
   it("first registered instance is primary", () => {
@@ -27,7 +30,7 @@ describe("multi-instance coordination", () => {
   it("stop removes the instance", () => {
     const inst = registerInstance(getApp(), "inst-stop");
     inst.stop();
-    expect(activeInstanceCount(getApp(), )).toBe(0);
+    expect(activeInstanceCount(getApp())).toBe(0);
   });
 
   it("multiple instances are counted", () => {
@@ -35,10 +38,10 @@ describe("multi-instance coordination", () => {
     const b = registerInstance(getApp(), "b");
     const c = registerInstance(getApp(), "c");
     cleanups.push(a.stop, b.stop, c.stop);
-    expect(activeInstanceCount(getApp(), )).toBe(3);
+    expect(activeInstanceCount(getApp())).toBe(3);
   });
 
   it("activeInstanceCount returns 0 when no instances", () => {
-    expect(activeInstanceCount(getApp(), )).toBe(0);
+    expect(activeInstanceCount(getApp())).toBe(0);
   });
 });

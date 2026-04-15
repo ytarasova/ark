@@ -7,9 +7,7 @@ import { buildTunnelArgs } from "../providers/ec2/ports.js";
 
 describe("buildTunnelArgs", () => {
   it("builds correct -L forward tunnel args", () => {
-    const args = buildTunnelArgs("/key", "1.2.3.4", [
-      { port: 3000, name: "web", source: "test" },
-    ]);
+    const args = buildTunnelArgs("/key", "1.2.3.4", [{ port: 3000, name: "web", source: "test" }]);
     expect(args).toContain("-L");
     expect(args).toContain("3000:localhost:3000");
     expect(args).toContain("ubuntu@1.2.3.4");

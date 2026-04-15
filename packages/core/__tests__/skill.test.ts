@@ -12,7 +12,7 @@ describe("skill CRUD", () => {
   it("skills.list returns builtin skills", () => {
     const skills = getApp().skills.list();
     expect(skills.length).toBeGreaterThan(0);
-    expect(skills.some(s => s.name === "code-review")).toBe(true);
+    expect(skills.some((s) => s.name === "code-review")).toBe(true);
   });
 
   it("skills.get returns a skill by name", () => {
@@ -44,7 +44,12 @@ describe("skill CRUD", () => {
   it("project skills override global", () => {
     const projectRoot = getCtx().arkDir;
     getApp().skills.save("override-test", { name: "override-test", description: "global", prompt: "global" }, "global");
-    getApp().skills.save("override-test", { name: "override-test", description: "project", prompt: "project" }, "project", projectRoot);
+    getApp().skills.save(
+      "override-test",
+      { name: "override-test", description: "project", prompt: "project" },
+      "project",
+      projectRoot,
+    );
     const skill = getApp().skills.get("override-test", projectRoot);
     expect(skill!._source).toBe("project");
     expect(skill!.description).toBe("project");

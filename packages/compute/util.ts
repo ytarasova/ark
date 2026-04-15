@@ -10,7 +10,7 @@ import pWaitFor from "p-wait-for";
 
 /** Async delay using Bun.sleep (native) with setTimeout fallback */
 export const sleep = (ms: number): Promise<void> =>
-  typeof Bun !== "undefined" ? Bun.sleep(ms) : new Promise<void>(r => setTimeout(r, ms));
+  typeof Bun !== "undefined" ? Bun.sleep(ms) : new Promise<void>((r) => setTimeout(r, ms));
 
 /** Options for retry / poll */
 export interface RetryOpts {
@@ -30,10 +30,7 @@ export interface RetryOpts {
  * Retry an async action until it succeeds or max attempts reached.
  * Returns the result on success, null on exhaustion.
  */
-export async function retry<T>(
-  action: () => Promise<T>,
-  opts: RetryOpts = {},
-): Promise<T | null> {
+export async function retry<T>(action: () => Promise<T>, opts: RetryOpts = {}): Promise<T | null> {
   try {
     return await pRetry(
       (attemptNumber) => {
@@ -58,10 +55,7 @@ export async function retry<T>(
 /**
  * Poll a condition until it returns true or timeout.
  */
-export async function poll(
-  check: () => Promise<boolean> | boolean,
-  opts: RetryOpts = {},
-): Promise<boolean> {
+export async function poll(check: () => Promise<boolean> | boolean, opts: RetryOpts = {}): Promise<boolean> {
   try {
     await pWaitFor(check, {
       interval: opts.delayMs ?? 5000,

@@ -40,7 +40,10 @@ export function registerServerCommands(program: Command) {
         if (config.databaseUrl) console.log(chalk.dim(`  Database:   ${config.databaseUrl}`));
         console.log(chalk.dim("Press Ctrl+C to stop"));
 
-        process.on("SIGINT", async () => { await stop(); process.exit(0); });
+        process.on("SIGINT", async () => {
+          await stop();
+          process.exit(0);
+        });
         await new Promise(() => {});
         return;
       }
@@ -58,13 +61,20 @@ export function registerServerCommands(program: Command) {
 
       if (opts.stdio) {
         server.startStdio();
-        process.on("SIGINT", () => { serverApp.shutdown(); process.exit(0); });
+        process.on("SIGINT", () => {
+          serverApp.shutdown();
+          process.exit(0);
+        });
         await new Promise(() => {});
       } else {
         const port = parseInt(opts.port);
         const ws = server.startWebSocket(port);
         console.log(`Ark server listening on ws://localhost:${port}`);
-        process.on("SIGINT", () => { ws.stop(); serverApp.shutdown(); process.exit(0); });
+        process.on("SIGINT", () => {
+          ws.stop();
+          serverApp.shutdown();
+          process.exit(0);
+        });
         await new Promise(() => {});
       }
     });

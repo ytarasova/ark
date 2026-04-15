@@ -38,7 +38,7 @@ describe("MessageRepository", () => {
     repo.send("s-abc123", "agent", "answer");
     repo.send("s-abc123", "system", "notification");
     const messages = repo.list("s-abc123");
-    expect(messages.map(m => m.role)).toEqual(["user", "agent", "system"]);
+    expect(messages.map((m) => m.role)).toEqual(["user", "agent", "system"]);
   });
 
   // ── list ────────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ describe("MessageRepository", () => {
     repo.send("s-aaa", "agent", "msg3");
     const messages = repo.list("s-aaa");
     expect(messages.length).toBe(2);
-    expect(messages.every(m => m.session_id === "s-aaa")).toBe(true);
+    expect(messages.every((m) => m.session_id === "s-aaa")).toBe(true);
   });
 
   it("list returns messages in ASC order", () => {
@@ -93,7 +93,7 @@ describe("MessageRepository", () => {
     repo.send("s-aaa", "agent", "msg2");
     repo.markRead("s-aaa");
     const messages = repo.list("s-aaa");
-    expect(messages.every(m => m.read === true)).toBe(true);
+    expect(messages.every((m) => m.read === true)).toBe(true);
   });
 
   it("markRead is idempotent", () => {

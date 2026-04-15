@@ -60,36 +60,47 @@ const VALID_GROUP_COLS = new Set(["model", "provider", "runtime", "agent_role", 
 export class UsageRecorder {
   private tenantId: string = "default";
 
-  constructor(private db: IDatabase, private pricing: PricingRegistry) {}
+  constructor(
+    private db: IDatabase,
+    private pricing: PricingRegistry,
+  ) {}
 
-  setTenant(id: string): void { this.tenantId = id; }
-  getTenant(): string { return this.tenantId; }
+  setTenant(id: string): void {
+    this.tenantId = id;
+  }
+  getTenant(): string {
+    return this.tenantId;
+  }
 
   /** Record a usage event. Called by executors, router, or transcript parser. */
   record(opts: RecordOpts): void {
     const costMode = opts.costMode ?? "api";
     // Subscription and free modes record zero cost (tokens still tracked for productivity/rate limits)
     const cost = costMode === "api" ? this.pricing.calculateCost(opts.model, opts.usage) : 0;
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO usage_records (session_id, tenant_id, user_id, model, provider, runtime, agent_role,
         input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd, cost_mode, source)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      opts.sessionId,
-      opts.tenantId ?? this.tenantId,
-      opts.userId ?? "system",
-      opts.model,
-      opts.provider,
-      opts.runtime ?? null,
-      opts.agentRole ?? null,
-      opts.usage.input_tokens,
-      opts.usage.output_tokens,
-      opts.usage.cache_read_tokens ?? 0,
-      opts.usage.cache_write_tokens ?? 0,
-      cost,
-      costMode,
-      opts.source ?? "api",
-    );
+    `,
+      )
+      .run(
+        opts.sessionId,
+        opts.tenantId ?? this.tenantId,
+        opts.userId ?? "system",
+        opts.model,
+        opts.provider,
+        opts.runtime ?? null,
+        opts.agentRole ?? null,
+        opts.usage.input_tokens,
+        opts.usage.output_tokens,
+        opts.usage.cache_read_tokens ?? 0,
+        opts.usage.cache_write_tokens ?? 0,
+        cost,
+        costMode,
+        opts.source ?? "api",
+      );
   }
 
   /** Get total cost, aggregated token totals, and all records for a session. */
@@ -102,10 +113,14 @@ export class UsageRecorder {
     total_tokens: number;
     records: UsageRecord[];
   } {
-    const records = this.db.prepare(
-      "SELECT * FROM usage_records WHERE session_id = ? ORDER BY created_at",
-    ).all(sessionId) as UsageRecord[];
-    let cost = 0, input = 0, output = 0, cacheR = 0, cacheW = 0;
+    const records = this.db
+      .prepare("SELECT * FROM usage_records WHERE session_id = ? ORDER BY created_at")
+      .all(sessionId) as UsageRecord[];
+    let cost = 0,
+      input = 0,
+      output = 0,
+      cacheR = 0,
+      cacheW = 0;
     for (const r of records) {
       cost += r.cost_usd;
       input += r.input_tokens;
@@ -125,12 +140,7 @@ export class UsageRecorder {
   }
 
   /** Get cost summary with multi-dimensional grouping. */
-  getSummary(opts?: {
-    tenantId?: string;
-    since?: string;
-    until?: string;
-    groupBy?: string;
-  }): UsageSummaryRow[] {
+  getSummary(opts?: { tenantId?: string; since?: string; until?: string; groupBy?: string }): UsageSummaryRow[] {
     const groupCol = opts?.groupBy ?? "model";
     // Validate column name to prevent SQL injection
     if (!VALID_GROUP_COLS.has(groupCol)) {
@@ -185,9 +195,18 @@ export class UsageRecorder {
   getTotalCost(opts?: { tenantId?: string; since?: string; until?: string }): number {
     const conditions: string[] = ["1=1"];
     const params: any[] = [];
-    if (opts?.tenantId) { conditions.push("tenant_id = ?"); params.push(opts.tenantId); }
-    if (opts?.since) { conditions.push("created_at >= ?"); params.push(opts.since); }
-    if (opts?.until) { conditions.push("created_at <= ?"); params.push(opts.until); }
+    if (opts?.tenantId) {
+      conditions.push("tenant_id = ?");
+      params.push(opts.tenantId);
+    }
+    if (opts?.since) {
+      conditions.push("created_at >= ?");
+      params.push(opts.since);
+    }
+    if (opts?.until) {
+      conditions.push("created_at <= ?");
+      params.push(opts.until);
+    }
 
     const sql = `SELECT COALESCE(SUM(cost_usd), 0) as total FROM usage_records WHERE ${conditions.join(" AND ")}`;
     const row = this.db.prepare(sql).get(...params) as { total: number } | undefined;

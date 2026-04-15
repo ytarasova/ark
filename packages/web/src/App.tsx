@@ -56,16 +56,38 @@ function App() {
         <DashboardPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "sessions" && (
-        <SessionsPage view={view} onNavigate={onNavigate} readOnly={readOnly} onToast={showToast} daemonStatus={daemonStatus} initialSelectedId={subId} onSelectedChange={setSubId} />
+        <SessionsPage
+          view={view}
+          onNavigate={onNavigate}
+          readOnly={readOnly}
+          onToast={showToast}
+          daemonStatus={daemonStatus}
+          initialSelectedId={subId}
+          onSelectedChange={setSubId}
+        />
       )}
       {view === "agents" && (
-        <AgentsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} initialSelectedId={subId} onSelectedChange={setSubId} />
+        <AgentsPage
+          view={view}
+          onNavigate={onNavigate}
+          readOnly={readOnly}
+          daemonStatus={daemonStatus}
+          initialSelectedId={subId}
+          onSelectedChange={setSubId}
+        />
       )}
       {view === "tools" && (
         <ToolsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "flows" && (
-        <FlowsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} initialSelectedId={subId} onSelectedChange={setSubId} />
+        <FlowsPage
+          view={view}
+          onNavigate={onNavigate}
+          readOnly={readOnly}
+          daemonStatus={daemonStatus}
+          initialSelectedId={subId}
+          onSelectedChange={setSubId}
+        />
       )}
       {view === "history" && (
         <HistoryPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
@@ -77,7 +99,13 @@ function App() {
         <SchedulesPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "memory" && (
-        <MemoryPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} onToast={showToast} />
+        <MemoryPage
+          view={view}
+          onNavigate={onNavigate}
+          readOnly={readOnly}
+          daemonStatus={daemonStatus}
+          onToast={showToast}
+        />
       )}
       {view === "costs" && (
         <CostsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
@@ -85,14 +113,7 @@ function App() {
       {view === "settings" && (
         <SettingsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
-      {toast && (
-        <Toast
-          key={toastKey}
-          message={toast.msg}
-          type={toast.type}
-          onDone={() => setToast(null)}
-        />
-      )}
+      {toast && <Toast key={toastKey} message={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
     </>
   );
 }
@@ -102,5 +123,5 @@ const root = createRoot(document.getElementById("root")!);
 root.render(
   <QueryClientProvider client={queryClient}>
     <App />
-  </QueryClientProvider>
+  </QueryClientProvider>,
 );

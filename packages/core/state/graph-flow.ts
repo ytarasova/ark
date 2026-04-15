@@ -9,13 +9,13 @@ export interface FlowNode {
   agent: string;
   model?: string;
   gate?: "auto" | "manual" | "review";
-  on_failure?: string;  // retry, skip, or node name to jump to
+  on_failure?: string; // retry, skip, or node name to jump to
 }
 
 export interface FlowEdge {
   from: string;
   to: string;
-  condition?: string;  // JS expression evaluated against session data, e.g., "status === 'approved'"
+  condition?: string; // JS expression evaluated against session data, e.g., "status === 'approved'"
   label?: string;
 }
 
@@ -24,7 +24,7 @@ export interface GraphFlow {
   description?: string;
   nodes: FlowNode[];
   edges: FlowEdge[];
-  entrypoints?: string[];  // nodes with no incoming edges (auto-detected if not specified)
+  entrypoints?: string[]; // nodes with no incoming edges (auto-detected if not specified)
 }
 
 /** Parse a graph flow from YAML definition. */
@@ -71,8 +71,8 @@ export function parseGraphFlow(yaml: any): GraphFlow {
   }
 
   // Auto-detect entrypoints
-  const targets = new Set(edges.map(e => e.to));
-  const entrypoints = yaml.entrypoints ?? nodes.filter(n => !targets.has(n.name)).map(n => n.name);
+  const targets = new Set(edges.map((e) => e.to));
+  const entrypoints = yaml.entrypoints ?? nodes.filter((n) => !targets.has(n.name)).map((n) => n.name);
 
   return { name: yaml.name, description: yaml.description, nodes, edges, entrypoints };
 }
@@ -94,17 +94,17 @@ function evaluateCondition(condition: string, sessionData: Record<string, unknow
 /** Get successor nodes for a given node. */
 export function getSuccessors(flow: GraphFlow, nodeName: string, sessionData?: Record<string, unknown>): string[] {
   return flow.edges
-    .filter(e => {
+    .filter((e) => {
       if (e.from !== nodeName) return false;
       if (!e.condition) return true;
       return evaluateCondition(e.condition, sessionData ?? {});
     })
-    .map(e => e.to);
+    .map((e) => e.to);
 }
 
 /** Get predecessor nodes (for join detection). */
 export function getPredecessors(flow: GraphFlow, nodeName: string): string[] {
-  return flow.edges.filter(e => e.to === nodeName).map(e => e.from);
+  return flow.edges.filter((e) => e.to === nodeName).map((e) => e.from);
 }
 
 /** Check if a node is a join point (multiple incoming edges). */
@@ -114,7 +114,7 @@ export function isJoinNode(flow: GraphFlow, nodeName: string): boolean {
 
 /** Check if a node is a fan-out point (multiple outgoing edges). */
 export function isFanOutNode(flow: GraphFlow, nodeName: string): boolean {
-  return flow.edges.filter(e => e.from === nodeName).length > 1;
+  return flow.edges.filter((e) => e.from === nodeName).length > 1;
 }
 
 /** Get all nodes in topological order. */
@@ -131,7 +131,7 @@ export function topologicalSort(flow: GraphFlow): string[] {
   while (queue.length > 0) {
     const node = queue.shift()!;
     result.push(node);
-    for (const edge of flow.edges.filter(e => e.from === node)) {
+    for (const edge of flow.edges.filter((e) => e.from === node)) {
       const newDeg = (inDegree.get(edge.to) ?? 1) - 1;
       inDegree.set(edge.to, newDeg);
       if (newDeg === 0) queue.push(edge.to);
@@ -162,38 +162,36 @@ export function resolveNextStages(
   const completed = new Set([...completedStages, currentNode]);
   const skipped = new Set(skippedStages);
 
-  const outgoing = flow.edges.filter(e => e.from === currentNode);
+  const outgoing = flow.edges.filter((e) => e.from === currentNode);
   if (outgoing.length === 0) return [];
 
   // Separate conditional and unconditional (default) edges
-  const conditionalEdges = outgoing.filter(e => e.condition);
-  const defaultEdges = outgoing.filter(e => !e.condition);
+  const conditionalEdges = outgoing.filter((e) => e.condition);
+  const defaultEdges = outgoing.filter((e) => !e.condition);
 
   let successorNames: string[];
 
   if (conditionalEdges.length > 0) {
     // Evaluate conditional edges
-    const matched = conditionalEdges
-      .filter(e => evaluateCondition(e.condition!, sessionData))
-      .map(e => e.to);
+    const matched = conditionalEdges.filter((e) => evaluateCondition(e.condition!, sessionData)).map((e) => e.to);
 
     // If no conditional edges matched, use default edges as fallback
-    successorNames = matched.length > 0 ? matched : defaultEdges.map(e => e.to);
+    successorNames = matched.length > 0 ? matched : defaultEdges.map((e) => e.to);
   } else {
     // No conditional edges -- use all default edges
-    successorNames = defaultEdges.map(e => e.to);
+    successorNames = defaultEdges.map((e) => e.to);
   }
 
   // Filter out already-completed or skipped stages
-  successorNames = successorNames.filter(s => !completed.has(s) && !skipped.has(s));
+  successorNames = successorNames.filter((s) => !completed.has(s) && !skipped.has(s));
 
   // Check join barriers -- a successor is only ready if ALL its
   // active predecessors (not skipped) have completed
-  return successorNames.filter(successor => {
+  return successorNames.filter((successor) => {
     const preds = getPredecessors(flow, successor);
     // Only wait for predecessors that are on the active path (not skipped)
-    const activePreds = preds.filter(p => !skipped.has(p));
-    return activePreds.every(p => completed.has(p));
+    const activePreds = preds.filter((p) => !skipped.has(p));
+    return activePreds.every((p) => completed.has(p));
   });
 }
 
@@ -209,8 +207,8 @@ export function computeSkippedStages(
   existingSkipped: string[] = [],
 ): string[] {
   const chosen = new Set(chosenSuccessors);
-  const outgoing = flow.edges.filter(e => e.from === currentNode);
-  const unchosenTargets = outgoing.map(e => e.to).filter(t => !chosen.has(t));
+  const outgoing = flow.edges.filter((e) => e.from === currentNode);
+  const unchosenTargets = outgoing.map((e) => e.to).filter((t) => !chosen.has(t));
 
   // BFS from unchosen targets to find all exclusively-reachable nodes
   const reachableFromChosen = new Set<string>();
@@ -219,7 +217,7 @@ export function computeSkippedStages(
     const node = queue.shift()!;
     if (reachableFromChosen.has(node)) continue;
     reachableFromChosen.add(node);
-    for (const e of flow.edges.filter(ed => ed.from === node)) {
+    for (const e of flow.edges.filter((ed) => ed.from === node)) {
       queue.push(e.to);
     }
   }
@@ -235,7 +233,7 @@ export function computeSkippedStages(
     // Only skip if not reachable from the chosen path
     if (!reachableFromChosen.has(node)) {
       skipped.add(node);
-      for (const e of flow.edges.filter(ed => ed.from === node)) {
+      for (const e of flow.edges.filter((ed) => ed.from === node)) {
         unchosenQueue.push(e.to);
       }
     }
@@ -247,7 +245,7 @@ export function computeSkippedStages(
 /** Validate a graph flow for cycles and missing nodes. */
 export function validateGraphFlow(flow: GraphFlow): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  const nodeNames = new Set(flow.nodes.map(n => n.name));
+  const nodeNames = new Set(flow.nodes.map((n) => n.name));
 
   for (const edge of flow.edges) {
     if (!nodeNames.has(edge.from)) errors.push(`Edge references unknown node: ${edge.from}`);

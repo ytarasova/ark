@@ -8,28 +8,43 @@
 
 import type { AppContext } from "../../core/app.js";
 import type {
-  ComputeProvider, Compute, Session, LaunchOpts, SyncOpts,
-  IsolationMode, ComputeSnapshot, ComputeMetrics, PortDecl, PortStatus,
+  ComputeProvider,
+  Compute,
+  Session,
+  LaunchOpts,
+  SyncOpts,
+  IsolationMode,
+  ComputeSnapshot,
+  ComputeMetrics,
+  PortDecl,
+  PortStatus,
 } from "../types.js";
 import { DEFAULT_CONDUCTOR_URL } from "../../core/constants.js";
 
 export interface K8sConfig {
   provider: "k8s" | "k8s-kata";
-  namespace?: string;           // default: "ark"
-  image?: string;               // default: "ubuntu:22.04"
-  kubeconfig?: string;          // path to kubeconfig (default: in-cluster or ~/.kube/config)
-  runtimeClassName?: string;    // "kata-fc" for Firecracker, null for vanilla
+  namespace?: string; // default: "ark"
+  image?: string; // default: "ubuntu:22.04"
+  kubeconfig?: string; // path to kubeconfig (default: in-cluster or ~/.kube/config)
+  runtimeClassName?: string; // "kata-fc" for Firecracker, null for vanilla
   serviceAccount?: string;
   resources?: {
-    cpu?: string;               // e.g. "2"
-    memory?: string;            // e.g. "4Gi"
+    cpu?: string; // e.g. "2"
+    memory?: string; // e.g. "4Gi"
   };
   [key: string]: unknown;
 }
 
 const EMPTY_METRICS: ComputeMetrics = {
-  cpu: 0, memUsedGb: 0, memTotalGb: 0, memPct: 0, diskPct: 0,
-  netRxMb: 0, netTxMb: 0, uptime: "N/A", idleTicks: 0,
+  cpu: 0,
+  memUsedGb: 0,
+  memTotalGb: 0,
+  memPct: 0,
+  diskPct: 0,
+  netRxMb: 0,
+  netTxMb: 0,
+  uptime: "N/A",
+  idleTicks: 0,
 };
 
 export class K8sProvider implements ComputeProvider {
@@ -47,7 +62,9 @@ export class K8sProvider implements ComputeProvider {
   protected app: AppContext | null = null;
   private kubeApi: any | null = null;
 
-  setApp(app: AppContext): void { this.app = app; }
+  setApp(app: AppContext): void {
+    this.app = app;
+  }
 
   private async getK8sModule(): Promise<typeof import("@kubernetes/client-node")> {
     return await import("@kubernetes/client-node");
@@ -106,15 +123,19 @@ export class K8sProvider implements ComputeProvider {
         restartPolicy: "Never",
         ...(cfg.runtimeClassName ? { runtimeClassName: cfg.runtimeClassName } : {}),
         ...(cfg.serviceAccount ? { serviceAccountName: cfg.serviceAccount } : {}),
-        containers: [{
-          name: "agent",
-          image: cfg.image || "ubuntu:22.04",
-          command: ["/bin/bash", "-c", opts.launcherContent],
-          resources: cfg.resources ? {
-            requests: { cpu: cfg.resources.cpu, memory: cfg.resources.memory },
-            limits: { cpu: cfg.resources.cpu, memory: cfg.resources.memory },
-          } : undefined,
-        }],
+        containers: [
+          {
+            name: "agent",
+            image: cfg.image || "ubuntu:22.04",
+            command: ["/bin/bash", "-c", opts.launcherContent],
+            resources: cfg.resources
+              ? {
+                  requests: { cpu: cfg.resources.cpu, memory: cfg.resources.memory },
+                  limits: { cpu: cfg.resources.cpu, memory: cfg.resources.memory },
+                }
+              : undefined,
+          },
+        ],
       },
     };
 
@@ -128,7 +149,9 @@ export class K8sProvider implements ComputeProvider {
     const ns = cfg.namespace || "ark";
     try {
       await api.deleteNamespacedPod({ name: this.podName(session), namespace: ns });
-    } catch { /* pod may already be gone */ }
+    } catch {
+      /* pod may already be gone */
+    }
   }
 
   async cleanupSession(compute: Compute, session: Session): Promise<void> {
@@ -149,7 +172,9 @@ export class K8sProvider implements ComputeProvider {
         namespace: ns,
         labelSelector: `ark.dev/compute=${compute.name}`,
       });
-    } catch { /* namespace may not exist yet */ }
+    } catch {
+      /* namespace may not exist yet */
+    }
     this.app!.computes.update(compute.name, { status: "stopped" });
   }
 
@@ -218,7 +243,7 @@ export class K8sProvider implements ComputeProvider {
   }
 
   async probePorts(_compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
-    return ports.map(p => ({ ...p, listening: false }));
+    return ports.map((p) => ({ ...p, listening: false }));
   }
 
   async syncEnvironment(_compute: Compute, _opts: SyncOpts): Promise<void> {
@@ -231,7 +256,12 @@ export class K8sProvider implements ComputeProvider {
     return ["kubectl", "exec", "-it", "-n", ns, this.podName(session), "--", "/bin/bash"];
   }
 
-  buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown> {
     return {
       env: {
         ARK_SESSION_ID: sessionId,
@@ -253,9 +283,7 @@ export class K8sProvider implements ComputeProvider {
  */
 export class KataProvider extends K8sProvider {
   readonly name = "k8s-kata";
-  readonly isolationModes: IsolationMode[] = [
-    { value: "kata", label: "Kata Container (Firecracker microVM on K8s)" },
-  ];
+  readonly isolationModes: IsolationMode[] = [{ value: "kata", label: "Kata Container (Firecracker microVM on K8s)" }];
 
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
     // Ensure runtimeClassName defaults to "kata-fc" if not set

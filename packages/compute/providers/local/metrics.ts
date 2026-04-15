@@ -8,13 +8,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { tmuxBin } from "../../../core/infra/tmux.js";
 import { getProcessTree } from "../../../core/executors/process-tree.js";
-import type {
-  ComputeSnapshot,
-  ComputeMetrics,
-  ComputeSession,
-  ComputeProcess,
-  DockerContainer,
-} from "../../types.js";
+import type { ComputeSnapshot, ComputeMetrics, ComputeSession, ComputeProcess, DockerContainer } from "../../types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -36,9 +30,7 @@ async function run(cmd: string, args: string[]): Promise<string> {
 // ── CPU ─────────────────────────────────────────────────────────────────────
 
 function parseCpuOutput(out: string): number {
-  const match = out.match(
-    /CPU usage:\s*([\d.]+)%\s*user,\s*([\d.]+)%\s*sys/,
-  );
+  const match = out.match(/CPU usage:\s*([\d.]+)%\s*user,\s*([\d.]+)%\s*sys/);
   if (!match) return 0;
   return Math.round((parseFloat(match[1]) + parseFloat(match[2])) * 100) / 100;
 }
@@ -72,18 +64,15 @@ function parseMemoryOutput(totalStr: string, vmOut: string): { totalGb: number; 
   const freeBytes = (free + inactive) * pageSize;
   const usedBytes = totalBytes - freeBytes;
 
-  const totalGb = Math.round((totalBytes / (1024 ** 3)) * 100) / 100;
-  const usedGb = Math.round((Math.max(0, usedBytes) / (1024 ** 3)) * 100) / 100;
+  const totalGb = Math.round((totalBytes / 1024 ** 3) * 100) / 100;
+  const usedGb = Math.round((Math.max(0, usedBytes) / 1024 ** 3) * 100) / 100;
   const pct = totalBytes > 0 ? Math.round((usedGb / totalGb) * 10000) / 100 : 0;
 
   return { totalGb, usedGb, pct };
 }
 
 async function getMemory(): Promise<{ totalGb: number; usedGb: number; pct: number }> {
-  const [totalStr, vmOut] = await Promise.all([
-    run("sysctl", ["-n", "hw.memsize"]),
-    run("vm_stat", []),
-  ]);
+  const [totalStr, vmOut] = await Promise.all([run("sysctl", ["-n", "hw.memsize"]), run("vm_stat", [])]);
   return parseMemoryOutput(totalStr, vmOut);
 }
 
@@ -134,13 +123,7 @@ async function getTmuxSessions(): Promise<ComputeSession[]> {
     const attached = line.includes("(attached)");
     const status = attached ? "attached" : "detached";
 
-    const panePid = await run(tmuxBin(), [
-      "list-panes",
-      "-t",
-      name,
-      "-F",
-      "#{pane_pid}",
-    ]);
+    const panePid = await run(tmuxBin(), ["list-panes", "-t", name, "-F", "#{pane_pid}"]);
 
     let cpu = 0;
     let mem = 0;
@@ -151,22 +134,14 @@ async function getTmuxSessions(): Promise<ComputeSession[]> {
       const firstPid = parseInt(panePid.split("\n")[0].trim(), 10);
       if (!isNaN(firstPid)) {
         const tree = await getProcessTree(firstPid);
-        const agentProc = tree.children.find((c) =>
-          c.command.toLowerCase().includes("claude"),
-        );
+        const agentProc = tree.children.find((c) => c.command.toLowerCase().includes("claude"));
         if (agentProc) {
           cpu = agentProc.cpu ?? 0;
           mem = agentProc.mem ?? 0;
           mode = agentProc.command.includes("dangerously") ? "development" : "normal";
         }
 
-        const paneDir = await run(tmuxBin(), [
-          "display-message",
-          "-t",
-          name,
-          "-p",
-          "#{pane_current_path}",
-        ]);
+        const paneDir = await run(tmuxBin(), ["display-message", "-t", name, "-p", "#{pane_current_path}"]);
         if (paneDir) projectPath = paneDir;
       }
     }
@@ -230,9 +205,7 @@ function parseDockerContainers(statsOut: string, psOut: string): DockerContainer
         const name = parts[0].trim();
         const image = parts[1].trim();
         const labels = parts[2] || "";
-        const projectMatch = labels.match(
-          /com\.docker\.compose\.project=([^,]+)/,
-        );
+        const projectMatch = labels.match(/com\.docker\.compose\.project=([^,]+)/);
         const project = projectMatch ? projectMatch[1] : "";
         imageMap.set(name, { image, project });
       }
@@ -264,17 +237,8 @@ function parseDockerContainers(statsOut: string, psOut: string): DockerContainer
 
 async function getDockerContainers(): Promise<DockerContainer[]> {
   const [statsOut, psOut] = await Promise.all([
-    run("docker", [
-      "stats",
-      "--no-stream",
-      "--format",
-      "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}",
-    ]),
-    run("docker", [
-      "ps",
-      "--format",
-      "{{.Names}}\t{{.Image}}\t{{.Labels}}",
-    ]),
+    run("docker", ["stats", "--no-stream", "--format", "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"]),
+    run("docker", ["ps", "--format", "{{.Names}}\t{{.Image}}\t{{.Labels}}"]),
   ]);
   return parseDockerContainers(statsOut, psOut);
 }

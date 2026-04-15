@@ -44,12 +44,14 @@ export interface SessionCostSummary {
 export function getSessionCost(app: AppContext, session: Session): SessionCostSummary {
   const agg = app.usageRecorder.getSessionCost(session.id);
   const first = agg.records[0];
-  const usage: TokenUsage | null = first ? {
-    input_tokens: agg.input_tokens,
-    output_tokens: agg.output_tokens,
-    cache_read_tokens: agg.cache_read_tokens,
-    cache_write_tokens: agg.cache_write_tokens,
-  } : null;
+  const usage: TokenUsage | null = first
+    ? {
+        input_tokens: agg.input_tokens,
+        output_tokens: agg.output_tokens,
+        cache_read_tokens: agg.cache_read_tokens,
+        cache_write_tokens: agg.cache_write_tokens,
+      }
+    : null;
   return {
     sessionId: session.id,
     summary: session.summary,
@@ -60,8 +62,13 @@ export function getSessionCost(app: AppContext, session: Session): SessionCostSu
 }
 
 /** Get costs for all sessions, sorted by cost descending. */
-export function getAllSessionCosts(app: AppContext, sessions: Session[]): { sessions: SessionCostSummary[]; total: number } {
-  const costs = sessions.map(s => getSessionCost(app, s)).filter(c => c.cost > 0 || (c.usage?.input_tokens ?? 0) > 0);
+export function getAllSessionCosts(
+  app: AppContext,
+  sessions: Session[],
+): { sessions: SessionCostSummary[]; total: number } {
+  const costs = sessions
+    .map((s) => getSessionCost(app, s))
+    .filter((c) => c.cost > 0 || (c.usage?.input_tokens ?? 0) > 0);
   costs.sort((a, b) => b.cost - a.cost);
   const total = costs.reduce((sum, c) => sum + c.cost, 0);
   return { sessions: costs, total };
@@ -87,9 +94,9 @@ export function checkBudget(app: AppContext, sessions: Session[], budgets: Budge
   weekStart.setHours(0, 0, 0, 0);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  const dailySessions = sessions.filter(s => s.updated_at >= todayStart);
-  const weeklySessions = sessions.filter(s => s.updated_at >= weekStart.toISOString());
-  const monthlySessions = sessions.filter(s => s.updated_at >= monthStart);
+  const dailySessions = sessions.filter((s) => s.updated_at >= todayStart);
+  const weeklySessions = sessions.filter((s) => s.updated_at >= weekStart.toISOString());
+  const monthlySessions = sessions.filter((s) => s.updated_at >= monthStart);
 
   const dailySpent = getAllSessionCosts(app, dailySessions).total;
   const weeklySpent = getAllSessionCosts(app, weeklySessions).total;
@@ -124,25 +131,38 @@ export function syncCosts(app: AppContext): { synced: number; skipped: number } 
       skipped++;
       continue;
     }
-    if (!session.workdir) { skipped++; continue; }
+    if (!session.workdir) {
+      skipped++;
+      continue;
+    }
 
     // Resolve the runtime + parser
     const runtimeName = (session.config?.runtime as string | undefined) ?? session.agent ?? "claude";
     const runtime = app.runtimes.get(runtimeName);
     const kind = runtime?.billing?.transcript_parser ?? "claude";
     const parser = app.transcriptParsers.get(kind);
-    if (!parser) { skipped++; continue; }
+    if (!parser) {
+      skipped++;
+      continue;
+    }
 
     const transcriptPath = parser.findForSession({
       workdir: session.workdir,
       startTime: session.created_at ? new Date(session.created_at) : undefined,
     });
-    if (!transcriptPath) { skipped++; continue; }
+    if (!transcriptPath) {
+      skipped++;
+      continue;
+    }
 
     const { usage, model } = parser.parse(transcriptPath);
-    if (usage.input_tokens === 0 && usage.output_tokens === 0) { skipped++; continue; }
+    if (usage.input_tokens === 0 && usage.output_tokens === 0) {
+      skipped++;
+      continue;
+    }
 
-    const provider = kind === "claude" ? "anthropic" : kind === "codex" ? "openai" : kind === "gemini" ? "google" : kind;
+    const provider =
+      kind === "claude" ? "anthropic" : kind === "codex" ? "openai" : kind === "gemini" ? "google" : kind;
     app.usageRecorder.record({
       sessionId: session.id,
       model: model ?? (session.config?.model as string) ?? "unknown",
@@ -166,17 +186,19 @@ export function exportCostsCsv(app: AppContext, sessions: Session[]): string {
   for (const c of costs.sessions) {
     const u = c.usage;
     const total = u ? u.input_tokens + u.output_tokens + (u.cache_read_tokens ?? 0) + (u.cache_write_tokens ?? 0) : 0;
-    lines.push([
-      c.sessionId,
-      `"${(c.summary ?? "").replace(/"/g, '""')}"`,
-      c.model ?? "",
-      c.cost.toFixed(4),
-      u?.input_tokens ?? 0,
-      u?.output_tokens ?? 0,
-      u?.cache_read_tokens ?? 0,
-      u?.cache_write_tokens ?? 0,
-      total,
-    ].join(","));
+    lines.push(
+      [
+        c.sessionId,
+        `"${(c.summary ?? "").replace(/"/g, '""')}"`,
+        c.model ?? "",
+        c.cost.toFixed(4),
+        u?.input_tokens ?? 0,
+        u?.output_tokens ?? 0,
+        u?.cache_read_tokens ?? 0,
+        u?.cache_write_tokens ?? 0,
+        total,
+      ].join(","),
+    );
   }
   return lines.join("\n");
 }

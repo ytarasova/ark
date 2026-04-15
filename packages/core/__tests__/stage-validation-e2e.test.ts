@@ -14,17 +14,16 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { AppContext, setApp, clearApp } from "../app.js";
-import {
-  mediateStageHandoff,
-  runVerification,
-  complete,
-} from "../services/session-orchestration.js";
+import { mediateStageHandoff, runVerification, complete } from "../services/session-orchestration.js";
 import { startConductor } from "../conductor/conductor.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
@@ -36,17 +35,10 @@ afterEach(async () => {
 
 // ── Helper: create a workdir with a .ark.yaml containing verify scripts ──
 
-function createWorkdirWithVerifyScripts(
-  scripts: string[],
-  opts?: { extraYaml?: string },
-): string {
+function createWorkdirWithVerifyScripts(scripts: string[], opts?: { extraYaml?: string }): string {
   const dir = join(app.arkDir, `workdir-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   mkdirSync(dir, { recursive: true });
-  const yaml = [
-    "verify:",
-    ...scripts.map(s => `  - "${s}"`),
-    opts?.extraYaml ?? "",
-  ].join("\n");
+  const yaml = ["verify:", ...scripts.map((s) => `  - "${s}"`), opts?.extraYaml ?? ""].join("\n");
   writeFileSync(join(dir, ".ark.yaml"), yaml);
   return dir;
 }
@@ -122,7 +114,7 @@ describe("verify scripts from repo config (.ark.yaml)", () => {
 
 describe("verify scripts from flow stage definition", () => {
   it("default flow verify stage has verify scripts", () => {
-    const stage = app.flows.get("default")?.stages.find(s => s.name === "verify");
+    const stage = app.flows.get("default")?.stages.find((s) => s.name === "verify");
     expect(stage).toBeTruthy();
     expect(stage!.verify).toBeDefined();
     expect(stage!.verify!.length).toBeGreaterThan(0);
@@ -135,14 +127,17 @@ describe("verify scripts from flow stage definition", () => {
     // Create a temporary flow with stage-level verify that passes
     const flowDir = join(app.arkDir, "flows");
     mkdirSync(flowDir, { recursive: true });
-    writeFileSync(join(flowDir, "test-stage-verify.yaml"), [
-      "name: test-stage-verify",
-      "stages:",
-      "  - name: work",
-      "    agent: implementer",
-      "    gate: auto",
-      '    verify: ["true"]',
-    ].join("\n"));
+    writeFileSync(
+      join(flowDir, "test-stage-verify.yaml"),
+      [
+        "name: test-stage-verify",
+        "stages:",
+        "  - name: work",
+        "    agent: implementer",
+        "    gate: auto",
+        '    verify: ["true"]',
+      ].join("\n"),
+    );
 
     const session = app.sessions.create({
       summary: "stage verify precedence test",
@@ -329,7 +324,7 @@ describe("mediateStageHandoff with verify scripts", () => {
     await mediateStageHandoff(app, session.id, { source: "channel_report" });
 
     const events = app.events.list(session.id);
-    const blocked = events.find(e => e.type === "stage_handoff_blocked");
+    const blocked = events.find((e) => e.type === "stage_handoff_blocked");
     expect(blocked).toBeTruthy();
     expect(blocked!.data?.reason).toBe("verification_failed");
     expect(blocked!.data?.source).toBe("channel_report");
@@ -345,7 +340,7 @@ describe("mediateStageHandoff with verify scripts", () => {
     await mediateStageHandoff(app, session.id, { source: "test" });
 
     const msgs = app.messages.list(session.id);
-    const errorMsg = msgs.find(m => m.content.includes("Advance blocked"));
+    const errorMsg = msgs.find((m) => m.content.includes("Advance blocked"));
     expect(errorMsg).toBeTruthy();
     expect(errorMsg!.content).toContain("implement");
     expect(errorMsg!.content).toContain("verify failed");
@@ -437,7 +432,7 @@ describe("complete() with verification", () => {
     await complete(app, session.id);
 
     const events = app.events.list(session.id);
-    const completed = events.find(e => e.type === "stage_completed");
+    const completed = events.find((e) => e.type === "stage_completed");
     expect(completed).toBeTruthy();
     expect(completed!.data?.note).toBe("Manually completed");
   });
@@ -532,7 +527,7 @@ describe("full verification lifecycle", () => {
 
     // Verify events were logged for each handoff
     const events = app.events.list(session.id);
-    const handoffs = events.filter(e => e.type === "stage_handoff");
+    const handoffs = events.filter((e) => e.type === "stage_handoff");
     expect(handoffs.length).toBeGreaterThanOrEqual(2);
   });
 });
@@ -545,7 +540,14 @@ describe("conductor HTTP integration with stage validation", () => {
   let server: { stop(): void } | null = null;
 
   afterEach(() => {
-    if (server) { try { server.stop(); } catch { /* cleanup */ } server = null; }
+    if (server) {
+      try {
+        server.stop();
+      } catch {
+        /* cleanup */
+      }
+      server = null;
+    }
   });
 
   it("channel report is blocked by unresolved todos via conductor", async () => {
@@ -569,7 +571,7 @@ describe("conductor HTTP integration with stage validation", () => {
     });
 
     expect(resp.status).toBe(200);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 150));
 
     const updated = app.sessions.get(session.id);
     expect(updated?.status).toBe("blocked");
@@ -577,7 +579,7 @@ describe("conductor HTTP integration with stage validation", () => {
 
     // Verify stage_handoff_blocked event
     const events = app.events.list(session.id);
-    const blocked = events.find(e => e.type === "stage_handoff_blocked");
+    const blocked = events.find((e) => e.type === "stage_handoff_blocked");
     expect(blocked).toBeTruthy();
   });
 
@@ -602,7 +604,7 @@ describe("conductor HTTP integration with stage validation", () => {
     });
 
     expect(resp.status).toBe(200);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 150));
 
     const updated = app.sessions.get(session.id);
     expect(updated?.status).toBe("blocked");
@@ -629,7 +631,7 @@ describe("conductor HTTP integration with stage validation", () => {
     });
 
     expect(resp.status).toBe(200);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 150));
 
     const updated = app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
@@ -640,7 +642,7 @@ describe("conductor HTTP integration with stage validation", () => {
 
     // Verify stage_handoff event (not blocked)
     const events = app.events.list(session.id);
-    const handoff = events.find(e => e.type === "stage_handoff");
+    const handoff = events.find((e) => e.type === "stage_handoff");
     expect(handoff).toBeTruthy();
     expect(handoff!.data?.from_stage).toBe("implement");
     expect(handoff!.data?.to_stage).toBe("verify");
@@ -666,7 +668,7 @@ describe("conductor HTTP integration with stage validation", () => {
         commits: [],
       }),
     });
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 150));
     expect(app.sessions.get(session.id)?.status).toBe("blocked");
 
     // Resolve the todo and reset status
@@ -686,7 +688,7 @@ describe("conductor HTTP integration with stage validation", () => {
         commits: [],
       }),
     });
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 150));
 
     const updated = app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");

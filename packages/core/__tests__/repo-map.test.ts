@@ -25,7 +25,7 @@ describe("generateRepoMap", () => {
     expect(map.summary.length).toBeGreaterThan(0);
 
     // Should find some .ts files
-    const tsFiles = map.entries.filter(e => e.path.endsWith(".ts"));
+    const tsFiles = map.entries.filter((e) => e.path.endsWith(".ts"));
     expect(tsFiles.length).toBeGreaterThan(0);
 
     // Entries should be sorted by path
@@ -51,7 +51,9 @@ describe("extractExports", () => {
   it("extracts exported functions, classes, interfaces, types from .ts files", () => {
     const dir = makeTmpDir();
     const filePath = join(dir, "sample.ts");
-    writeFileSync(filePath, `
+    writeFileSync(
+      filePath,
+      `
 export function doSomething() {}
 export async function doAsync() {}
 export class MyClass {}
@@ -59,7 +61,8 @@ export interface MyInterface {}
 export type MyType = string;
 export const MY_CONST = 42;
 function privateFunc() {}
-`);
+`,
+    );
 
     const exports = extractExports(filePath, ".ts");
     expect(exports).toContain("doSomething");
@@ -74,13 +77,16 @@ function privateFunc() {}
   it("extracts Python defs and classes", () => {
     const dir = makeTmpDir();
     const filePath = join(dir, "sample.py");
-    writeFileSync(filePath, `
+    writeFileSync(
+      filePath,
+      `
 def hello():
     pass
 
 class World:
     pass
-`);
+`,
+    );
 
     const exports = extractExports(filePath, ".py");
     expect(exports).toContain("hello");

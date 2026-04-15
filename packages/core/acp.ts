@@ -4,7 +4,15 @@
  */
 
 import readline from "readline";
-import { startSession, dispatch, stop, resume, deleteSessionAsync, getOutput, send } from "./services/session-orchestration.js";
+import {
+  startSession,
+  dispatch,
+  stop,
+  resume,
+  deleteSessionAsync,
+  getOutput,
+  send,
+} from "./services/session-orchestration.js";
 import type { AppContext } from "./app.js";
 
 export interface AcpRequest {
@@ -68,7 +76,7 @@ export async function handleAcpRequest(app: AppContext, req: AcpRequest): Promis
       }
 
       case "session/list": {
-        const sessions = app.sessions.list({ limit: req.params?.limit as number ?? 100 });
+        const sessions = app.sessions.list({ limit: (req.params?.limit as number) ?? 100 });
         return { jsonrpc: "2.0", result: sessions, id };
       }
 

@@ -21,15 +21,18 @@ describe("loadRepoConfig", () => {
   });
 
   it("loads .ark.yaml with all fields", () => {
-    writeFileSync(join(tempDir, ".ark.yaml"), [
-      "flow: review",
-      "compute: gpu-box",
-      "group: backend",
-      "agent: coder",
-      "env:",
-      "  NODE_ENV: production",
-      "  DEBUG: 'true'",
-    ].join("\n"));
+    writeFileSync(
+      join(tempDir, ".ark.yaml"),
+      [
+        "flow: review",
+        "compute: gpu-box",
+        "group: backend",
+        "agent: coder",
+        "env:",
+        "  NODE_ENV: production",
+        "  DEBUG: 'true'",
+      ].join("\n"),
+    );
 
     const config = loadRepoConfig(tempDir);
     expect(config.flow).toBe("review");
@@ -93,33 +96,24 @@ describe("loadRepoConfig", () => {
   });
 
   it("parses worktree.copy list", () => {
-    writeFileSync(join(tempDir, ".ark.yaml"), [
-      "worktree:",
-      "  copy:",
-      '    - ".env"',
-      '    - "config/*.yaml"',
-    ].join("\n"));
+    writeFileSync(
+      join(tempDir, ".ark.yaml"),
+      ["worktree:", "  copy:", '    - ".env"', '    - "config/*.yaml"'].join("\n"),
+    );
 
     const config = loadRepoConfig(tempDir);
     expect(config.worktree?.copy).toEqual([".env", "config/*.yaml"]);
   });
 
   it("parses worktree.setup string", () => {
-    writeFileSync(join(tempDir, ".ark.yaml"), [
-      "worktree:",
-      '  setup: "bun install"',
-    ].join("\n"));
+    writeFileSync(join(tempDir, ".ark.yaml"), ["worktree:", '  setup: "bun install"'].join("\n"));
 
     const config = loadRepoConfig(tempDir);
     expect(config.worktree?.setup).toBe("bun install");
   });
 
   it("handles partial worktree config -- copy only", () => {
-    writeFileSync(join(tempDir, ".ark.yaml"), [
-      "worktree:",
-      "  copy:",
-      '    - ".envrc"',
-    ].join("\n"));
+    writeFileSync(join(tempDir, ".ark.yaml"), ["worktree:", "  copy:", '    - ".envrc"'].join("\n"));
 
     const config = loadRepoConfig(tempDir);
     expect(config.worktree?.copy).toEqual([".envrc"]);
@@ -127,10 +121,7 @@ describe("loadRepoConfig", () => {
   });
 
   it("handles partial worktree config -- setup only", () => {
-    writeFileSync(join(tempDir, ".ark.yaml"), [
-      "worktree:",
-      '  setup: "make deps"',
-    ].join("\n"));
+    writeFileSync(join(tempDir, ".ark.yaml"), ["worktree:", '  setup: "make deps"'].join("\n"));
 
     const config = loadRepoConfig(tempDir);
     expect(config.worktree?.setup).toBe("make deps");

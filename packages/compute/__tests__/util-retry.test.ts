@@ -30,7 +30,9 @@ describe("retry (p-retry wrapper)", () => {
 
   it("returns null after exhausting attempts", async () => {
     const result = await retry(
-      async () => { throw new Error("always fails"); },
+      async () => {
+        throw new Error("always fails");
+      },
       { maxAttempts: 3, delayMs: 100 },
     );
     expect(result).toBeNull();
@@ -39,7 +41,9 @@ describe("retry (p-retry wrapper)", () => {
   it("calls onRetry on each failed attempt", async () => {
     const retries: number[] = [];
     await retry(
-      async () => { throw new Error("fail"); },
+      async () => {
+        throw new Error("fail");
+      },
       {
         maxAttempts: 3,
         delayMs: 100,
@@ -82,7 +86,10 @@ describe("poll (p-wait-for wrapper)", () => {
   it("returns true when condition is met after a few checks", async () => {
     let count = 0;
     const result = await poll(
-      () => { count++; return count >= 3; },
+      () => {
+        count++;
+        return count >= 3;
+      },
       { maxAttempts: 10, delayMs: 100 },
     );
     expect(result).toBe(true);
@@ -97,7 +104,10 @@ describe("poll (p-wait-for wrapper)", () => {
   it("handles async check function", async () => {
     let count = 0;
     const result = await poll(
-      async () => { count++; return count >= 2; },
+      async () => {
+        count++;
+        return count >= 2;
+      },
       { maxAttempts: 5, delayMs: 100 },
     );
     expect(result).toBe(true);

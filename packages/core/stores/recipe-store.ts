@@ -72,25 +72,24 @@ export class FileRecipeStore implements RecipeStore {
   }
 
   get(name: string, projectRoot?: string): RecipeDefinition | null {
-    return this.list(projectRoot).find(r => r.name === name) ?? null;
+    return this.list(projectRoot).find((r) => r.name === name) ?? null;
   }
 
   save(name: string, recipe: RecipeDefinition, scope: "global" | "project" = "global", projectRoot?: string): void {
-    const dir = scope === "project" && projectRoot
-      ? join(projectRoot, ".ark", "recipes")
-      : this.userDir;
+    const dir = scope === "project" && projectRoot ? join(projectRoot, ".ark", "recipes") : this.userDir;
     mkdirSync(dir, { recursive: true });
     const { _source, ...data } = recipe;
     writeFileSync(join(dir, `${name}.yaml`), stringifyYaml(data));
   }
 
   delete(name: string, scope: "global" | "project" = "global", projectRoot?: string): boolean {
-    const dir = scope === "project" && projectRoot
-      ? join(projectRoot, ".ark", "recipes")
-      : this.userDir;
+    const dir = scope === "project" && projectRoot ? join(projectRoot, ".ark", "recipes") : this.userDir;
     for (const ext of [".yaml", ".yml"]) {
       const path = join(dir, `${name}${ext}`);
-      if (existsSync(path)) { unlinkSync(path); return true; }
+      if (existsSync(path)) {
+        unlinkSync(path);
+        return true;
+      }
     }
     return false;
   }

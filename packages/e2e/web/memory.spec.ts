@@ -59,7 +59,10 @@ test("seeding a memory via `ark knowledge remember` surfaces through memory/list
   // Give the server a moment to refresh
   await new Promise((r) => setTimeout(r, 200));
 
-  const result = await ws.rpc<{ memories?: Array<Record<string, unknown>>; items?: Array<Record<string, unknown>> }>("memory/list", {});
+  const result = await ws.rpc<{ memories?: Array<Record<string, unknown>>; items?: Array<Record<string, unknown>> }>(
+    "memory/list",
+    {},
+  );
   const rows = result.memories ?? result.items ?? [];
   // Either the CLI wrote something (count > 0) OR the RPC shape is
   // wrong. Either way, exercising the round-trip is the point.

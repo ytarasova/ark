@@ -6,7 +6,11 @@ import { getApp } from "../app.js";
 withTestContext();
 
 const config: RollbackConfig = {
-  enabled: true, timeout: 2, on_timeout: "ignore", auto_merge: false, health_url: null,
+  enabled: true,
+  timeout: 2,
+  on_timeout: "ignore",
+  auto_merge: false,
+  health_url: null,
 };
 
 describe("watchMergedPR integration", () => {
@@ -17,10 +21,20 @@ describe("watchMergedPR integration", () => {
       callCount++;
       return { check_suites: [{ id: 1, conclusion: "success", status: "completed" }] };
     };
-    const onRevert = async () => { throw new Error("should not be called"); };
+    const onRevert = async () => {
+      throw new Error("should not be called");
+    };
     const result = await watchMergedPR(getApp(), {
-      sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
-      prTitle: "test", branch: "feat/x", config, fetcher, onRevert,
+      sessionId: session.id,
+      sha: "abc",
+      owner: "org",
+      repo: "r",
+      prNumber: 1,
+      prTitle: "test",
+      branch: "feat/x",
+      config,
+      fetcher,
+      onRevert,
     });
     expect(result.action).toBe("none");
     expect(callCount).toBe(1);
@@ -32,10 +46,20 @@ describe("watchMergedPR integration", () => {
     const fetcher = async () => ({
       check_suites: [{ id: 1, conclusion: "failure", status: "completed" }] as CheckSuiteResult[],
     });
-    const onRevert = async () => { reverted = true; };
+    const onRevert = async () => {
+      reverted = true;
+    };
     const result = await watchMergedPR(getApp(), {
-      sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
-      prTitle: "test PR", branch: "feat/x", config, fetcher, onRevert,
+      sessionId: session.id,
+      sha: "abc",
+      owner: "org",
+      repo: "r",
+      prNumber: 1,
+      prTitle: "test PR",
+      branch: "feat/x",
+      config,
+      fetcher,
+      onRevert,
     });
     expect(result.action).toBe("rollback");
     expect(reverted).toBe(true);
@@ -48,8 +72,15 @@ describe("watchMergedPR integration", () => {
     });
     const shortConfig = { ...config, timeout: 0 };
     const result = await watchMergedPR(getApp(), {
-      sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
-      prTitle: "test", branch: "feat/x", config: shortConfig, fetcher,
+      sessionId: session.id,
+      sha: "abc",
+      owner: "org",
+      repo: "r",
+      prNumber: 1,
+      prTitle: "test",
+      branch: "feat/x",
+      config: shortConfig,
+      fetcher,
       onRevert: async () => {},
     });
     expect(result.action).toBe("none");
@@ -63,9 +94,18 @@ describe("watchMergedPR integration", () => {
     });
     const timeoutConfig = { ...config, timeout: 0, on_timeout: "rollback" as const };
     const result = await watchMergedPR(getApp(), {
-      sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
-      prTitle: "test", branch: "feat/x", config: timeoutConfig, fetcher,
-      onRevert: async () => { reverted = true; },
+      sessionId: session.id,
+      sha: "abc",
+      owner: "org",
+      repo: "r",
+      prNumber: 1,
+      prTitle: "test",
+      branch: "feat/x",
+      config: timeoutConfig,
+      fetcher,
+      onRevert: async () => {
+        reverted = true;
+      },
     });
     expect(result.action).toBe("rollback");
     expect(reverted).toBe(true);
@@ -79,10 +119,19 @@ describe("watchMergedPR integration", () => {
     });
     const healthConfig = { ...config, health_url: "http://localhost:19999/health" };
     const result = await watchMergedPR(getApp(), {
-      sessionId: session.id, sha: "abc", owner: "org", repo: "r", prNumber: 1,
-      prTitle: "test", branch: "feat/x", config: healthConfig, fetcher,
+      sessionId: session.id,
+      sha: "abc",
+      owner: "org",
+      repo: "r",
+      prNumber: 1,
+      prTitle: "test",
+      branch: "feat/x",
+      config: healthConfig,
+      fetcher,
       healthFetcher: async () => false,
-      onRevert: async () => { reverted = true; },
+      onRevert: async () => {
+        reverted = true;
+      },
     });
     expect(result.action).toBe("rollback");
     expect(reverted).toBe(true);

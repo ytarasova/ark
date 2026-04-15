@@ -124,7 +124,7 @@ describe("createSessionFromIssue", () => {
     const session = await createSessionFromIssue(getApp(), issue);
 
     const events = getApp().events.list(session!.id);
-    const imported = events.filter(e => e.type === "issue_imported");
+    const imported = events.filter((e) => e.type === "issue_imported");
     expect(imported).toHaveLength(1);
 
     const data = imported[0].data as Record<string, any>;
@@ -145,15 +145,12 @@ describe("createSessionFromIssue", () => {
 
 describe("pollIssues", () => {
   it("creates sessions for new issues", async () => {
-    ghOutput = makeGhOutput([
-      makeIssue({ number: 10, title: "Bug A" }),
-      makeIssue({ number: 11, title: "Bug B" }),
-    ]);
+    ghOutput = makeGhOutput([makeIssue({ number: 10, title: "Bug A" }), makeIssue({ number: 11, title: "Bug B" })]);
 
     await pollIssues(getApp(), { label: "ark" });
 
     const sessions = getApp().sessions.list();
-    const tickets = sessions.map(s => s.ticket);
+    const tickets = sessions.map((s) => s.ticket);
     expect(tickets).toContain("#10");
     expect(tickets).toContain("#11");
   });
@@ -161,16 +158,13 @@ describe("pollIssues", () => {
   it("skips issues that already have sessions", async () => {
     getApp().sessions.create({ ticket: "#10", summary: "existing" });
 
-    ghOutput = makeGhOutput([
-      makeIssue({ number: 10, title: "Bug A" }),
-      makeIssue({ number: 11, title: "Bug B" }),
-    ]);
+    ghOutput = makeGhOutput([makeIssue({ number: 10, title: "Bug A" }), makeIssue({ number: 11, title: "Bug B" })]);
 
     await pollIssues(getApp(), { label: "ark" });
 
     const sessions = getApp().sessions.list();
-    const ticket11 = sessions.filter(s => s.ticket === "#11");
-    const ticket10 = sessions.filter(s => s.ticket === "#10");
+    const ticket11 = sessions.filter((s) => s.ticket === "#11");
+    const ticket10 = sessions.filter((s) => s.ticket === "#10");
     expect(ticket11).toHaveLength(1);
     // Original + no duplicate
     expect(ticket10).toHaveLength(1);

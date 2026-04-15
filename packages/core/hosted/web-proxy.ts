@@ -70,7 +70,7 @@ export function startWebProxy(opts: WebProxyOptions): { stop: () => void; url: s
             headers: {
               "Content-Type": "text/event-stream",
               "Cache-Control": "no-cache",
-              "Connection": "keep-alive",
+              Connection: "keep-alive",
               ...CORS,
             },
           });
@@ -111,10 +111,7 @@ export function startWebProxy(opts: WebProxyOptions): { stop: () => void; url: s
           });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          return Response.json(
-            { ok: false, message: `Proxy error: ${message}` },
-            { status: 502, headers: CORS },
-          );
+          return Response.json({ ok: false, message: `Proxy error: ${message}` }, { status: 502, headers: CORS });
         }
       }
 
@@ -161,6 +158,8 @@ export function startWebProxy(opts: WebProxyOptions): { stop: () => void; url: s
 
   return {
     url: localUrl,
-    stop: () => { server.stop(); },
+    stop: () => {
+      server.stop();
+    },
   };
 }

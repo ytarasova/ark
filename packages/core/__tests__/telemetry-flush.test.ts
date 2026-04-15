@@ -1,8 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { track, flush, getBuffer, clearBuffer, disableTelemetry, configureTelemetry, resetTelemetry } from "../observability/telemetry.js";
+import {
+  track,
+  flush,
+  getBuffer,
+  clearBuffer,
+  disableTelemetry,
+  configureTelemetry,
+  resetTelemetry,
+} from "../observability/telemetry.js";
 
-beforeEach(() => { clearBuffer(); disableTelemetry(); });
-afterEach(() => { resetTelemetry(); });
+beforeEach(() => {
+  clearBuffer();
+  disableTelemetry();
+});
+afterEach(() => {
+  resetTelemetry();
+});
 
 describe("telemetry flush", () => {
   it("flush sends events and clears buffer", async () => {

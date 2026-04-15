@@ -26,7 +26,11 @@ interface StageForm {
   gate: string;
 }
 
-function FlowForm({ onClose, onSubmit, agents }: {
+function FlowForm({
+  onClose,
+  onSubmit,
+  agents,
+}: {
   onClose: () => void;
   onSubmit: (form: any) => void;
   agents: any[];
@@ -36,26 +40,26 @@ function FlowForm({ onClose, onSubmit, agents }: {
   const [stages, setStages] = useState<StageForm[]>([{ name: "", agent: "", gate: "auto" }]);
 
   function updateStage(i: number, field: keyof StageForm, val: string) {
-    setStages(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
+    setStages((prev) => prev.map((s, idx) => (idx === i ? { ...s, [field]: val } : s)));
   }
 
   function addStage() {
-    setStages(prev => [...prev, { name: "", agent: "", gate: "auto" }]);
+    setStages((prev) => [...prev, { name: "", agent: "", gate: "auto" }]);
   }
 
   function removeStage(i: number) {
-    setStages(prev => prev.filter((_, idx) => idx !== i));
+    setStages((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    const validStages = stages.filter(s => s.name.trim());
+    const validStages = stages.filter((s) => s.name.trim());
     if (validStages.length === 0) return;
     onSubmit({
       name: name.trim(),
       description: description.trim() || undefined,
-      stages: validStages.map(s => ({
+      stages: validStages.map((s) => ({
         name: s.name.trim(),
         agent: s.agent || undefined,
         gate: s.gate || "auto",
@@ -68,15 +72,25 @@ function FlowForm({ onClose, onSubmit, agents }: {
       <h2 className="text-base font-semibold text-foreground mb-5">New Flow</h2>
       <form onSubmit={handleSubmit} className="flex flex-col">
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Name *
+          </label>
           <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="my-flow" />
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Description</label>
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does this flow do?" />
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Description
+          </label>
+          <Input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="What does this flow do?"
+          />
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Stages *</label>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Stages *
+          </label>
           {stages.map((stage, i) => (
             <div key={i} className="flex gap-2 mb-2 items-center">
               <Input
@@ -92,7 +106,9 @@ function FlowForm({ onClose, onSubmit, agents }: {
               >
                 <option value="">-- agent --</option>
                 {agents.map((a: any) => (
-                  <option key={a.name} value={a.name}>{a.name}</option>
+                  <option key={a.name} value={a.name}>
+                    {a.name}
+                  </option>
                 ))}
               </select>
               <select
@@ -100,18 +116,28 @@ function FlowForm({ onClose, onSubmit, agents }: {
                 value={stage.gate}
                 onChange={(e) => updateStage(i, "gate", e.target.value)}
               >
-                {GATE_OPTIONS.map(g => (
-                  <option key={g} value={g}>{g}</option>
+                {GATE_OPTIONS.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
                 ))}
               </select>
-              <Button type="button" size="xs" variant="destructive" onClick={() => removeStage(i)}>x</Button>
+              <Button type="button" size="xs" variant="destructive" onClick={() => removeStage(i)}>
+                x
+              </Button>
             </div>
           ))}
-          <Button type="button" size="xs" variant="outline" onClick={addStage}>+ Add Stage</Button>
+          <Button type="button" size="xs" variant="outline" onClick={addStage}>
+            + Add Stage
+          </Button>
         </div>
         <div className="flex gap-2 pt-4 border-t border-border mt-auto">
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button type="submit" size="sm">Create Flow</Button>
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm">
+            Create Flow
+          </Button>
         </div>
       </form>
     </div>
@@ -125,7 +151,12 @@ interface FlowsViewProps {
   onSelectedChange?: (name: string | null) => void;
 }
 
-export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedName, onSelectedChange }: FlowsViewProps) {
+export function FlowsView({
+  showCreate = false,
+  onCloseCreate,
+  initialSelectedName,
+  onSelectedChange,
+}: FlowsViewProps) {
   const queryClient = useQueryClient();
   const { data: flows = [] } = useFlowsQuery();
   const { data: agents = [] } = useAgentsQuery();
@@ -186,12 +217,14 @@ export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedNa
               className={cn(
                 "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
                 "hover:bg-accent",
-                selected?.name === f.name && "bg-accent border-l-2 border-l-primary font-semibold"
+                selected?.name === f.name && "bg-accent border-l-2 border-l-primary font-semibold",
               )}
               onClick={() => setSelectedName(f.name)}
             >
               <span className="text-foreground truncate">{f.name}</span>
-              <Badge variant="secondary" className="text-[10px]">{stageCount} stage{stageCount !== 1 ? "s" : ""}</Badge>
+              <Badge variant="secondary" className="text-[10px]">
+                {stageCount} stage{stageCount !== 1 ? "s" : ""}
+              </Badge>
             </div>
           );
         })}
@@ -204,31 +237,35 @@ export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedNa
           <>
             <div className="p-5">
               <h2 className="text-lg font-semibold text-foreground mb-1">{selected.name}</h2>
-              {selected.description && (
-                <p className="text-sm text-muted-foreground mb-5">{selected.description}</p>
-              )}
+              {selected.description && <p className="text-sm text-muted-foreground mb-5">{selected.description}</p>}
 
               {/* Visual pipeline diagram */}
               {selected.stages && selected.stages.length > 0 && (
                 <div className="mb-5">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Pipeline</h3>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                    Pipeline
+                  </h3>
                   <Separator className="mb-3" />
                   <div className="flex items-center gap-0 flex-wrap">
                     {selected.stages.map((s: any, i: number) => {
                       const stageName = typeof s === "string" ? s : s.name;
-                      const gate = typeof s === "string" ? "auto" : (s.gate || "auto");
+                      const gate = typeof s === "string" ? "auto" : s.gate || "auto";
                       const isAction = !!(typeof s !== "string" && s.action);
                       const optional = typeof s !== "string" && s.optional;
                       return (
                         <span key={stageName || i} className="inline-flex items-center">
                           {i > 0 && <ChevronRight size={12} className="text-muted-foreground mx-0.5 shrink-0" />}
-                          <span className={cn(
-                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono border",
-                            gate === "manual" ? "border-amber-500/30 bg-amber-500/5 text-amber-300" :
-                            isAction ? "border-blue-500/30 bg-blue-500/5 text-blue-300" :
-                            "border-border bg-secondary text-foreground",
-                            optional && "opacity-60"
-                          )}>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono border",
+                              gate === "manual"
+                                ? "border-amber-500/30 bg-amber-500/5 text-amber-300"
+                                : isAction
+                                  ? "border-blue-500/30 bg-blue-500/5 text-blue-300"
+                                  : "border-border bg-secondary text-foreground",
+                              optional && "opacity-60",
+                            )}
+                          >
                             {stageName}
                             {optional && <span className="text-[9px] text-muted-foreground">?</span>}
                           </span>
@@ -242,10 +279,12 @@ export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedNa
                       <span className="w-2 h-2 rounded-sm border border-border bg-secondary" /> auto (no human needed)
                     </span>
                     <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-sm border border-amber-500/30 bg-amber-500/5" /> manual (requires approval)
+                      <span className="w-2 h-2 rounded-sm border border-amber-500/30 bg-amber-500/5" /> manual (requires
+                      approval)
                     </span>
                     <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-sm border border-blue-500/30 bg-blue-500/5" /> action (system step)
+                      <span className="w-2 h-2 rounded-sm border border-blue-500/30 bg-blue-500/5" /> action (system
+                      step)
                     </span>
                   </div>
                 </div>
@@ -254,7 +293,9 @@ export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedNa
               {/* Conditional edges diagram */}
               {selected.edges && selected.edges.length > 0 && (
                 <div className="mb-5">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Routing</h3>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                    Routing
+                  </h3>
                   <Separator className="mb-2" />
                   <div className="flex flex-col gap-1">
                     {selected.edges.map((e: any, i: number) => (
@@ -262,8 +303,16 @@ export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedNa
                         <span className="text-foreground">{e.from}</span>
                         <ChevronRight size={10} className="text-muted-foreground" />
                         <span className="text-foreground">{e.to}</span>
-                        {e.label && <Badge variant="info" className="text-[9px] py-0 px-1">{e.label}</Badge>}
-                        {e.condition && <span className="text-muted-foreground text-[10px] truncate max-w-[300px]">({e.condition})</span>}
+                        {e.label && (
+                          <Badge variant="info" className="text-[9px] py-0 px-1">
+                            {e.label}
+                          </Badge>
+                        )}
+                        {e.condition && (
+                          <span className="text-muted-foreground text-[10px] truncate max-w-[300px]">
+                            ({e.condition})
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -273,13 +322,15 @@ export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedNa
               {/* Stage details */}
               {selected.stages && selected.stages.length > 0 && (
                 <div className="mb-4">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Stages</h3>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                    Stages
+                  </h3>
                   <Separator className="mb-2" />
                   <div className="flex flex-col gap-3">
                     {selected.stages.map((s: any, i: number) => {
                       const stageName = typeof s === "string" ? s : s.name;
                       const agent = typeof s === "string" ? null : s.agent;
-                      const gate = typeof s === "string" ? "auto" : (s.gate || "auto");
+                      const gate = typeof s === "string" ? "auto" : s.gate || "auto";
                       const optional = typeof s !== "string" && s.optional;
                       const onFailure = typeof s !== "string" ? s.on_failure : null;
                       const verify = typeof s !== "string" ? s.verify : null;
@@ -292,9 +343,19 @@ export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedNa
                           <div className="flex items-center gap-2 mb-1.5">
                             <span className="text-[10px] font-mono text-muted-foreground w-5">{i + 1}</span>
                             <span className="text-[13px] font-semibold text-foreground">{stageName}</span>
-                            <Badge variant={GATE_VARIANT[gate] || "success"} className="text-[10px]">{gate}</Badge>
-                            {optional && <Badge variant="info" className="text-[10px]">optional</Badge>}
-                            {stageType && stageType !== "-" && <Badge variant="secondary" className="text-[10px]">{stageType}</Badge>}
+                            <Badge variant={GATE_VARIANT[gate] || "success"} className="text-[10px]">
+                              {gate}
+                            </Badge>
+                            {optional && (
+                              <Badge variant="info" className="text-[10px]">
+                                optional
+                              </Badge>
+                            )}
+                            {stageType && stageType !== "-" && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                {stageType}
+                              </Badge>
+                            )}
                           </div>
                           <div className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-1 text-[11px] ml-5">
                             {agent && (
@@ -361,9 +422,7 @@ export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedNa
             </div>
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-            Select a flow
-          </div>
+          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Select a flow</div>
         )}
       </div>
     </div>

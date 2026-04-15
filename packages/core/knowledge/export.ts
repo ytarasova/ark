@@ -67,10 +67,7 @@ export function exportToMarkdown(
  *     always-run-tests.md
  * ```
  */
-export function importFromMarkdown(
-  store: KnowledgeStore,
-  inputDir: string,
-): { imported: number } {
+export function importFromMarkdown(store: KnowledgeStore, inputDir: string): { imported: number } {
   if (!existsSync(inputDir)) return { imported: 0 };
   let imported = 0;
 
@@ -80,7 +77,7 @@ export function importFromMarkdown(
     if (!["memory", "learning", "skill", "recipe", "agent"].includes(type)) continue;
 
     const dirPath = join(inputDir, type);
-    for (const file of readdirSync(dirPath).filter(f => f.endsWith(".md"))) {
+    for (const file of readdirSync(dirPath).filter((f) => f.endsWith(".md"))) {
       const raw = readFileSync(join(dirPath, file), "utf-8");
       const { frontmatter, body } = parseFrontmatter(raw);
 
@@ -91,7 +88,12 @@ export function importFromMarkdown(
       // Preserve known metadata fields
       if (frontmatter.importance !== undefined) metadata.importance = Number(frontmatter.importance);
       if (frontmatter.scope) metadata.scope = frontmatter.scope;
-      if (frontmatter.tags) metadata.tags = Array.isArray(frontmatter.tags) ? frontmatter.tags : String(frontmatter.tags).split(",").map(t => t.trim());
+      if (frontmatter.tags)
+        metadata.tags = Array.isArray(frontmatter.tags)
+          ? frontmatter.tags
+          : String(frontmatter.tags)
+              .split(",")
+              .map((t) => t.trim());
       if (frontmatter.recurrence !== undefined) metadata.recurrence = Number(frontmatter.recurrence);
       if (frontmatter.source) metadata.source = frontmatter.source;
 
@@ -110,11 +112,13 @@ export function importFromMarkdown(
 // --- Helpers ---
 
 function sanitizeFilename(label: string): string {
-  return label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60) || "untitled";
+  return (
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 60) || "untitled"
+  );
 }
 
 function buildFrontmatter(node: KnowledgeNode): string {
@@ -144,7 +148,10 @@ function parseFrontmatter(raw: string): { frontmatter: Record<string, any>; body
 
     // Parse arrays: [a, b, c]
     if (value.startsWith("[") && value.endsWith("]")) {
-      value = value.slice(1, -1).split(",").map((s: string) => s.trim());
+      value = value
+        .slice(1, -1)
+        .split(",")
+        .map((s: string) => s.trim());
     }
     fm[key] = value;
   }

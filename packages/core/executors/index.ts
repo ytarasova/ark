@@ -24,12 +24,7 @@ import { gooseExecutor } from "./goose.js";
 export { claudeCodeExecutor, subprocessExecutor, cliAgentExecutor, gooseExecutor };
 
 /** Built-in executors shipped with every Ark bundle. */
-export const builtinExecutors: Executor[] = [
-  claudeCodeExecutor,
-  subprocessExecutor,
-  cliAgentExecutor,
-  gooseExecutor,
-];
+export const builtinExecutors: Executor[] = [claudeCodeExecutor, subprocessExecutor, cliAgentExecutor, gooseExecutor];
 
 /**
  * Discover and load user-provided executor plugins from
@@ -39,10 +34,7 @@ export const builtinExecutors: Executor[] = [
  *
  * Plugin loading is best-effort: an error in one plugin never blocks boot.
  */
-export async function loadPluginExecutors(
-  arkDir: string,
-  onLog?: (msg: string) => void,
-): Promise<Executor[]> {
+export async function loadPluginExecutors(arkDir: string, onLog?: (msg: string) => void): Promise<Executor[]> {
   const log = onLog ?? (() => {});
   const pluginDir = join(arkDir, "plugins", "executors");
   if (!existsSync(pluginDir)) return [];

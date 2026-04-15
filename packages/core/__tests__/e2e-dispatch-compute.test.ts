@@ -22,12 +22,20 @@ import * as claude from "../claude/claude.js";
 let app: AppContext;
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
-  app = AppContext.forTest(); setApp(app); await app.boot();
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
+  app = AppContext.forTest();
+  setApp(app);
+  await app.boot();
 });
 
 afterAll(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
 });
 
 // ── Worktree creation logic ──────────────────────────────────────────────────
@@ -114,7 +122,16 @@ describe("dispatch compute: config file writing", () => {
     expect(settings.hooks).toBeDefined();
 
     // Verify all expected hook events are present
-    const expectedEvents = ["SessionStart", "UserPromptSubmit", "Stop", "StopFailure", "SessionEnd", "Notification", "PreCompact", "PostCompact"];
+    const expectedEvents = [
+      "SessionStart",
+      "UserPromptSubmit",
+      "Stop",
+      "StopFailure",
+      "SessionEnd",
+      "Notification",
+      "PreCompact",
+      "PostCompact",
+    ];
     for (const event of expectedEvents) {
       expect(settings.hooks[event]).toBeDefined();
       expect(Array.isArray(settings.hooks[event])).toBe(true);

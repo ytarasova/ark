@@ -25,11 +25,56 @@ function makeConfig(overrides?: Partial<RouterConfig>): RouterConfig {
 }
 
 const TEST_MODELS: ModelConfig[] = [
-  { id: "frontier-a", provider: "test-a", tier: "frontier", cost_input: 15.0, cost_output: 75.0, max_context: 200000, supports_tools: true, quality: 0.98 },
-  { id: "standard-a", provider: "test-a", tier: "standard", cost_input: 3.0, cost_output: 15.0, max_context: 200000, supports_tools: true, quality: 0.92 },
-  { id: "economy-a", provider: "test-a", tier: "economy", cost_input: 0.8, cost_output: 4.0, max_context: 200000, supports_tools: true, quality: 0.82 },
-  { id: "economy-b", provider: "test-b", tier: "economy", cost_input: 0.1, cost_output: 0.4, max_context: 1000000, supports_tools: true, quality: 0.75 },
-  { id: "frontier-b", provider: "test-b", tier: "frontier", cost_input: 2.0, cost_output: 8.0, max_context: 1000000, supports_tools: true, quality: 0.95 },
+  {
+    id: "frontier-a",
+    provider: "test-a",
+    tier: "frontier",
+    cost_input: 15.0,
+    cost_output: 75.0,
+    max_context: 200000,
+    supports_tools: true,
+    quality: 0.98,
+  },
+  {
+    id: "standard-a",
+    provider: "test-a",
+    tier: "standard",
+    cost_input: 3.0,
+    cost_output: 15.0,
+    max_context: 200000,
+    supports_tools: true,
+    quality: 0.92,
+  },
+  {
+    id: "economy-a",
+    provider: "test-a",
+    tier: "economy",
+    cost_input: 0.8,
+    cost_output: 4.0,
+    max_context: 200000,
+    supports_tools: true,
+    quality: 0.82,
+  },
+  {
+    id: "economy-b",
+    provider: "test-b",
+    tier: "economy",
+    cost_input: 0.1,
+    cost_output: 0.4,
+    max_context: 1000000,
+    supports_tools: true,
+    quality: 0.75,
+  },
+  {
+    id: "frontier-b",
+    provider: "test-b",
+    tier: "frontier",
+    cost_input: 2.0,
+    cost_output: 8.0,
+    max_context: 1000000,
+    supports_tools: true,
+    quality: 0.95,
+  },
 ];
 
 function makeRegistry(): ProviderRegistry {
@@ -37,12 +82,12 @@ function makeRegistry(): ProviderRegistry {
   registry.register({
     name: "test-a",
     base_url: "http://localhost:9999",
-    models: TEST_MODELS.filter(m => m.provider === "test-a"),
+    models: TEST_MODELS.filter((m) => m.provider === "test-a"),
   });
   registry.register({
     name: "test-b",
     base_url: "http://localhost:9998",
-    models: TEST_MODELS.filter(m => m.provider === "test-b"),
+    models: TEST_MODELS.filter((m) => m.provider === "test-b"),
   });
   return registry;
 }

@@ -66,12 +66,15 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
   const [error, setError] = useState<string | null>(null);
 
   const load = () => {
-    api.getDashboardSummary()
+    api
+      .getDashboardSummary()
       .then(setData)
       .catch((e: any) => setError(e.message));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
   useSmartPoll(load, 5000);
 
   if (error) {
@@ -84,9 +87,7 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
 
   if (!data) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-        Loading dashboard...
-      </div>
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading dashboard...</div>
     );
   }
 
@@ -116,12 +117,8 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
                 )}
               >
                 <StatusDot status={status} />
-                <span className={cn("text-2xl font-bold font-mono", STATUS_COLORS[status])}>
-                  {counts[status] ?? 0}
-                </span>
-                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  {status}
-                </span>
+                <span className={cn("text-2xl font-bold font-mono", STATUS_COLORS[status])}>{counts[status] ?? 0}</span>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{status}</span>
               </button>
             ))}
           </div>
@@ -147,7 +144,12 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
             return (
               <div className="flex items-center justify-between">
                 <span className="text-[12px] text-muted-foreground">Conductor</span>
-                <span className={cn("text-[12px] font-medium flex items-center gap-1.5", online ? "text-emerald-400" : "text-red-400")}>
+                <span
+                  className={cn(
+                    "text-[12px] font-medium flex items-center gap-1.5",
+                    online ? "text-emerald-400" : "text-red-400",
+                  )}
+                >
                   <span className={cn("w-1.5 h-1.5 rounded-full", online ? "bg-emerald-400" : "bg-red-400")} />
                   {online ? "online" : "offline"}
                 </span>
@@ -160,8 +162,15 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
             return (
               <div className="flex items-center justify-between">
                 <span className="text-[12px] text-muted-foreground">ArkD</span>
-                <span className={cn("text-[12px] font-medium flex items-center gap-1.5", online ? "text-emerald-400" : "text-muted-foreground/50")}>
-                  <span className={cn("w-1.5 h-1.5 rounded-full", online ? "bg-emerald-400" : "bg-muted-foreground/30")} />
+                <span
+                  className={cn(
+                    "text-[12px] font-medium flex items-center gap-1.5",
+                    online ? "text-emerald-400" : "text-muted-foreground/50",
+                  )}
+                >
+                  <span
+                    className={cn("w-1.5 h-1.5 rounded-full", online ? "bg-emerald-400" : "bg-muted-foreground/30")}
+                  />
                   {online ? "online" : "offline"}
                 </span>
               </div>
@@ -169,16 +178,21 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
           })()}
           <div className="flex items-center justify-between">
             <span className="text-[12px] text-muted-foreground">Router</span>
-            <span className={cn("text-[12px] font-medium flex items-center gap-1.5", system.router ? "text-emerald-400" : "text-muted-foreground/50")}>
-              <span className={cn("w-1.5 h-1.5 rounded-full", system.router ? "bg-emerald-400" : "bg-muted-foreground/30")} />
+            <span
+              className={cn(
+                "text-[12px] font-medium flex items-center gap-1.5",
+                system.router ? "text-emerald-400" : "text-muted-foreground/50",
+              )}
+            >
+              <span
+                className={cn("w-1.5 h-1.5 rounded-full", system.router ? "bg-emerald-400" : "bg-muted-foreground/30")}
+              />
               {system.router ? "online" : "disabled"}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-[12px] text-muted-foreground">Compute</span>
-            <span className="text-[12px] font-medium text-foreground">
-              {activeCompute} active
-            </span>
+            <span className="text-[12px] font-medium text-foreground">{activeCompute} active</span>
           </div>
         </CardContent>
       </Card>
@@ -207,28 +221,34 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
             </div>
 
             {/* Budget bar */}
-            {hasBudget && (() => {
-              const b = costs.budget.daily?.limit
-                ? costs.budget.daily
-                : costs.budget.weekly?.limit
-                  ? costs.budget.weekly
-                  : costs.budget.monthly;
-              if (!b?.limit) return null;
-              const pct = Math.min(100, b.pct);
-              const barColor = b.exceeded ? "bg-red-400" : b.warning ? "bg-amber-400" : "bg-emerald-400";
-              return (
-                <div className="pt-2 border-t border-border/50">
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
-                    <span>Budget</span>
-                    <span>{fmtCost(b.spent)} / {fmtCost(b.limit)}</span>
+            {hasBudget &&
+              (() => {
+                const b = costs.budget.daily?.limit
+                  ? costs.budget.daily
+                  : costs.budget.weekly?.limit
+                    ? costs.budget.weekly
+                    : costs.budget.monthly;
+                if (!b?.limit) return null;
+                const pct = Math.min(100, b.pct);
+                const barColor = b.exceeded ? "bg-red-400" : b.warning ? "bg-amber-400" : "bg-emerald-400";
+                return (
+                  <div className="pt-2 border-t border-border/50">
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                      <span>Budget</span>
+                      <span>
+                        {fmtCost(b.spent)} / {fmtCost(b.limit)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all", barColor)}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className="text-right text-[10px] text-muted-foreground mt-0.5">{pct.toFixed(1)}%</div>
                   </div>
-                  <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                    <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${pct}%` }} />
-                  </div>
-                  <div className="text-right text-[10px] text-muted-foreground mt-0.5">{pct.toFixed(1)}%</div>
-                </div>
-              );
-            })()}
+                );
+              })()}
 
             {/* Cost by model breakdown */}
             {Object.keys(costs.byModel).length > 0 && (
@@ -240,8 +260,7 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
                       <span className="text-[11px] text-amber-400 font-mono uppercase">{model}</span>
                       <span className="text-[11px] font-mono text-muted-foreground">{fmtCost(cost)}</span>
                     </div>
-                  ))
-                }
+                  ))}
               </div>
             )}
           </div>
@@ -265,20 +284,19 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
         </CardHeader>
         <CardContent className="p-0">
           {recentEvents.length === 0 ? (
-            <div className="px-4 py-6 text-center text-[12px] text-muted-foreground">
-              No recent events
-            </div>
+            <div className="px-4 py-6 text-center text-[12px] text-muted-foreground">No recent events</div>
           ) : (
             <div className="divide-y divide-border/50">
               {recentEvents.slice(0, 10).map((ev, i) => (
-                <div key={`${ev.sessionId}-${ev.created_at}-${i}`} className="px-4 py-2 hover:bg-accent transition-colors">
+                <div
+                  key={`${ev.sessionId}-${ev.created_at}-${i}`}
+                  className="px-4 py-2 hover:bg-accent transition-colors"
+                >
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-muted-foreground font-mono shrink-0">
                       {new Date(ev.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
-                    <span className="text-[11px] text-foreground truncate">
-                      {ev.sessionSummary || ev.sessionId}
-                    </span>
+                    <span className="text-[11px] text-foreground truncate">{ev.sessionSummary || ev.sessionId}</span>
                   </div>
                   <div className="ml-[44px] text-[10px] text-muted-foreground">
                     {formatEventType(ev.type)}
@@ -301,11 +319,7 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
         </CardHeader>
         <CardContent className="space-y-2">
           {!readOnly && (
-            <Button
-              size="sm"
-              className="w-full justify-start gap-2 text-[12px]"
-              onClick={() => onNavigate("sessions")}
-            >
+            <Button size="sm" className="w-full justify-start gap-2 text-[12px]" onClick={() => onNavigate("sessions")}>
               <Plus size={14} />
               New Session
             </Button>
@@ -335,5 +349,5 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
 }
 
 function formatEventType(type: string): string {
-  return type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  return type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

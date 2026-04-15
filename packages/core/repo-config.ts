@@ -8,12 +8,12 @@ export interface RepoConfig {
   group?: string;
   agent?: string;
   env?: Record<string, string>;
-  verify?: string[];  // Default verification scripts for all stages
-  auto_pr?: boolean;  // Auto-create PR on agent completion (default: true for repos with remotes)
-  auto_rebase?: boolean;  // Auto-rebase onto base branch before PR creation (default: true)
+  verify?: string[]; // Default verification scripts for all stages
+  auto_pr?: boolean; // Auto-create PR on agent completion (default: true for repos with remotes)
+  auto_rebase?: boolean; // Auto-rebase onto base branch before PR creation (default: true)
   worktree?: {
-    copy?: string[];   // Glob patterns for untracked files to copy (e.g. [".env", ".envrc", "config/*.yaml"])
-    setup?: string;    // Shell command to run after worktree creation (e.g. "cp .env.example .env && bun install")
+    copy?: string[]; // Glob patterns for untracked files to copy (e.g. [".env", ".envrc", "config/*.yaml"])
+    setup?: string; // Shell command to run after worktree creation (e.g. "cp .env.example .env && bun install")
   };
 }
 
@@ -23,7 +23,9 @@ export function loadRepoConfig(dir: string): RepoConfig {
     if (existsSync(path)) {
       try {
         return (YAML.parse(readFileSync(path, "utf-8")) ?? {}) as RepoConfig;
-      } catch { return {}; }
+      } catch {
+        return {};
+      }
     }
   }
   return {};

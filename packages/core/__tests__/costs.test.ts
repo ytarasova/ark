@@ -33,13 +33,15 @@ describe("calculateCost", () => {
     // input: 1M * 3/1M = 3.00, output: 100K * 15/1M = 1.50
     // cacheRead: 500K * 0.30/1M = 0.15, cacheWrite: 200K * 3.75/1M = 0.75
     // Total: 5.40
-    expect(cost).toBeCloseTo(5.40, 2);
+    expect(cost).toBeCloseTo(5.4, 2);
   });
 
   it("calculates opus cost correctly", () => {
     const usage: TokenUsage = {
-      input_tokens: 100_000, output_tokens: 10_000,
-      cache_read_tokens: 0, cache_write_tokens: 0,
+      input_tokens: 100_000,
+      output_tokens: 10_000,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
     };
     const cost = calculateCost(usage, "opus");
     expect(cost).toBeCloseTo(2.25, 2);
@@ -48,13 +50,13 @@ describe("calculateCost", () => {
   it("calculates haiku cost correctly", () => {
     const usage: TokenUsage = { input_tokens: 1_000_000, output_tokens: 0 };
     const cost = calculateCost(usage, "haiku");
-    expect(cost).toBeCloseTo(0.80, 2);
+    expect(cost).toBeCloseTo(0.8, 2);
   });
 
   it("defaults to sonnet for unknown model", () => {
     const usage: TokenUsage = { input_tokens: 1_000_000, output_tokens: 0 };
-    expect(calculateCost(usage, "unknown")).toBeCloseTo(3.00, 2);
-    expect(calculateCost(usage, null)).toBeCloseTo(3.00, 2);
+    expect(calculateCost(usage, "unknown")).toBeCloseTo(3.0, 2);
+    expect(calculateCost(usage, null)).toBeCloseTo(3.0, 2);
   });
 });
 
@@ -71,7 +73,7 @@ describe("getSessionCost", () => {
     const s = app.sessions.create({ summary: "test" });
     recordUsage(s.id, "sonnet", { input_tokens: 1_000_000, output_tokens: 0 });
     const sc = getSessionCost(app, app.sessions.get(s.id)!);
-    expect(sc.cost).toBeCloseTo(3.00, 2);
+    expect(sc.cost).toBeCloseTo(3.0, 2);
   });
 
   it("returns 0 cost for session without records", () => {
@@ -115,8 +117,10 @@ describe("calculateCost edge cases", () => {
 
   it("handles cache-only usage", () => {
     const usage: TokenUsage = {
-      input_tokens: 0, output_tokens: 0,
-      cache_read_tokens: 1_000_000, cache_write_tokens: 500_000,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_tokens: 1_000_000,
+      cache_write_tokens: 500_000,
     };
     const cost = calculateCost(usage, "sonnet");
     // cacheRead: 1M * 0.30/1M = 0.30, cacheWrite: 500K * 3.75/1M = 1.875

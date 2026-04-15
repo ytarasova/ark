@@ -41,7 +41,9 @@ function findArkBin() {
     try {
       fs.accessSync(p, fs.constants.X_OK);
       return p;
-    } catch { /* not found */ }
+    } catch {
+      /* not found */
+    }
   }
   return null;
 }
@@ -85,10 +87,12 @@ function waitForServer(port, timeout = 15000) {
 async function startServer() {
   const arkBin = findArkBin();
   if (!arkBin) {
-    dialog.showErrorBox("Ark Not Found",
+    dialog.showErrorBox(
+      "Ark Not Found",
       "Could not find the `ark` CLI. Install it with:\n\n" +
-      "  cd <ark-repo> && make install\n\n" +
-      "Then restart Ark Desktop.");
+        "  cd <ark-repo> && make install\n\n" +
+        "Then restart Ark Desktop.",
+    );
     app.quit();
     return;
   }
@@ -118,9 +122,10 @@ async function startServer() {
   try {
     await waitForServer(serverPort);
   } catch {
-    dialog.showErrorBox("Startup Error",
-      "The Ark server failed to start within 15 seconds.\n\n" +
-      "Check that Bun and Ark are installed correctly.");
+    dialog.showErrorBox(
+      "Startup Error",
+      "The Ark server failed to start within 15 seconds.\n\n" + "Check that Bun and Ark are installed correctly.",
+    );
     app.quit();
   }
 }
@@ -177,18 +182,22 @@ function createWindow() {
 function buildMenu() {
   const isMac = process.platform === "darwin";
   const template = [
-    ...(isMac ? [{
-      label: APP_TITLE,
-      submenu: [
-        { role: "about" },
-        { type: "separator" },
-        { role: "hide" },
-        { role: "hideOthers" },
-        { role: "unhide" },
-        { type: "separator" },
-        { role: "quit" },
-      ],
-    }] : []),
+    ...(isMac
+      ? [
+          {
+            label: APP_TITLE,
+            submenu: [
+              { role: "about" },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit" },
+            ],
+          },
+        ]
+      : []),
     {
       label: "Edit",
       submenu: [

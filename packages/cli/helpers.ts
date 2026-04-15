@@ -4,7 +4,13 @@
 
 /** Sanitize a session summary: alphanumeric, dash, underscore only, max 60 chars. */
 export function sanitizeSummary(raw: string): string {
-  return raw.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || raw;
+  return (
+    raw
+      .replace(/[^a-zA-Z0-9_-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 60) || raw
+  );
 }
 
 /** Split an editor command string safely for execFileSync. */

@@ -39,7 +39,7 @@ export interface Tool {
 // ── Chat completion request/response ─────────────────────────────────────────
 
 export interface ChatCompletionRequest {
-  model: string;                     // "auto" for routing, or specific model
+  model: string; // "auto" for routing, or specific model
   messages: Message[];
   temperature?: number;
   max_tokens?: number;
@@ -54,9 +54,9 @@ export interface ChatCompletionRequest {
 
 export interface RoutingOptions {
   policy?: "quality" | "balanced" | "cost";
-  quality_floor?: number;            // 0-1, minimum quality threshold
+  quality_floor?: number; // 0-1, minimum quality threshold
   max_cost_per_token?: number;
-  sticky_session_id?: string;        // multi-turn session tracking
+  sticky_session_id?: string; // multi-turn session tracking
   preferred_providers?: string[];
   excluded_models?: string[];
 }
@@ -117,8 +117,8 @@ export interface RoutingDecision {
     total_overhead: number;
   };
   complexity: {
-    score: number;           // 0-1
-    task_type: string;       // generation, reasoning, code, extraction, chat
+    score: number; // 0-1
+    task_type: string; // generation, reasoning, code, extraction, chat
     has_tools: boolean;
     estimated_difficulty: Difficulty;
   };
@@ -129,23 +129,23 @@ export type Difficulty = "trivial" | "simple" | "moderate" | "complex" | "expert
 // ── Provider and model configuration ─────────────────────────────────────────
 
 export interface ProviderConfig {
-  name: string;                      // "anthropic", "openai", "google", "ollama"
+  name: string; // "anthropic", "openai", "google", "ollama"
   api_key?: string;
   base_url: string;
   models: ModelConfig[];
-  timeout_ms?: number;               // default: 30000
-  max_retries?: number;              // default: 2
+  timeout_ms?: number; // default: 30000
+  max_retries?: number; // default: 2
 }
 
 export interface ModelConfig {
-  id: string;                        // "claude-sonnet-4-6"
-  provider: string;                  // "anthropic", "openai", "google", "ollama"
+  id: string; // "claude-sonnet-4-6"
+  provider: string; // "anthropic", "openai", "google", "ollama"
   tier: "frontier" | "standard" | "economy";
-  cost_input: number;                // USD per 1M input tokens
-  cost_output: number;               // USD per 1M output tokens
-  max_context: number;               // max tokens in context window
+  cost_input: number; // USD per 1M input tokens
+  cost_output: number; // USD per 1M output tokens
+  max_context: number; // max tokens in context window
   supports_tools: boolean;
-  quality: number;                   // 0-1, initial quality estimate
+  quality: number; // 0-1, initial quality estimate
 }
 
 export type RoutingPolicy = "quality" | "balanced" | "cost";
@@ -153,9 +153,9 @@ export type RoutingPolicy = "quality" | "balanced" | "cost";
 export interface RouterConfig {
   port: number;
   policy: RoutingPolicy;
-  quality_floor: number;             // 0-1, default: 0.8
+  quality_floor: number; // 0-1, default: 0.8
   providers: ProviderConfig[];
-  sticky_session_ttl_ms: number;     // default: 3600000 (1 hour)
+  sticky_session_ttl_ms: number; // default: 3600000 (1 hour)
   cascade_enabled: boolean;
   cascade_confidence_threshold: number; // default: 0.7
   log_decisions: boolean;
@@ -174,7 +174,7 @@ export interface CostEntry {
 }
 
 export interface CostSummary {
-  key: string;                       // model name, provider, or session id
+  key: string; // model name, provider, or session id
   total_cost_usd: number;
   total_input_tokens: number;
   total_output_tokens: number;
@@ -183,8 +183,8 @@ export interface CostSummary {
 
 export interface RouterStats {
   total_requests: number;
-  routed_requests: number;           // model: "auto"
-  passthrough_requests: number;      // specific model
+  routed_requests: number; // model: "auto"
+  passthrough_requests: number; // specific model
   requests_by_model: Record<string, number>;
   requests_by_provider: Record<string, number>;
   requests_by_tier: Record<string, number>;
@@ -203,5 +203,5 @@ export interface CircuitBreakerState {
   failures: number;
   last_failure: number;
   state: "closed" | "open" | "half-open";
-  next_attempt: number;              // timestamp when to try again
+  next_attempt: number; // timestamp when to try again
 }

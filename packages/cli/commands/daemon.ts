@@ -34,7 +34,11 @@ function writePidFile(info: DaemonPidInfo, arkDir?: string): void {
 
 function removePidFile(arkDir?: string): void {
   const pidPath = pidFilePath(arkDir);
-  try { unlinkSync(pidPath); } catch { /* already gone */ }
+  try {
+    unlinkSync(pidPath);
+  } catch {
+    /* already gone */
+  }
 }
 
 function isProcessRunning(pid: number): boolean {
@@ -51,7 +55,8 @@ export function registerDaemonCommands(program: Command) {
 
   // ── daemon start ──────────────────────────────────────────────────────────
 
-  daemonCmd.command("start")
+  daemonCmd
+    .command("start")
     .description("Start the arkd agent daemon")
     .option("-p, --port <port>", "Port", "19300")
     .option("--hostname <host>", "Bind address", "0.0.0.0")
@@ -88,7 +93,7 @@ export function registerDaemonCommands(program: Command) {
         proc.unref();
 
         // Give the child a moment to start, then verify
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
 
         // Try to reach the daemon
         try {
@@ -96,7 +101,9 @@ export function registerDaemonCommands(program: Command) {
           if (resp.ok) {
             console.log(chalk.green(`Daemon started in background (pid ${proc.pid}, port ${port})`));
           } else {
-            console.log(chalk.yellow(`Daemon process spawned (pid ${proc.pid}) but health check returned ${resp.status}`));
+            console.log(
+              chalk.yellow(`Daemon process spawned (pid ${proc.pid}) but health check returned ${resp.status}`),
+            );
           }
         } catch {
           // Process started but health not reachable yet -- still write PID
@@ -146,7 +153,8 @@ export function registerDaemonCommands(program: Command) {
 
   // ── daemon stop ───────────────────────────────────────────────────────────
 
-  daemonCmd.command("stop")
+  daemonCmd
+    .command("stop")
     .description("Stop a running daemon")
     .option("-p, --port <port>", "Port of daemon to stop (uses PID file by default)")
     .action(async (opts) => {
@@ -184,7 +192,8 @@ export function registerDaemonCommands(program: Command) {
 
   // ── daemon status ─────────────────────────────────────────────────────────
 
-  daemonCmd.command("status")
+  daemonCmd
+    .command("status")
     .description("Check daemon status")
     .option("-p, --port <port>", "Port to check", "19300")
     .action(async (opts) => {
@@ -204,7 +213,7 @@ export function registerDaemonCommands(program: Command) {
       try {
         const resp = await fetch(`http://localhost:${port}/health`, { signal: AbortSignal.timeout(2000) });
         if (resp.ok) {
-          const data = await resp.json() as { status: string; version: string; hostname: string; platform: string };
+          const data = (await resp.json()) as { status: string; version: string; hostname: string; platform: string };
           console.log(chalk.green("Daemon is running"));
           console.log(`  Port:     ${port}`);
           console.log(`  Version:  ${data.version}`);

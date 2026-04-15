@@ -6,7 +6,7 @@
 import { loadConfig } from "./config.js";
 
 export interface HotkeyMap {
-  [action: string]: string | null;  // null = disabled
+  [action: string]: string | null; // null = disabled
 }
 
 // Default hotkey bindings
@@ -67,7 +67,7 @@ export function getHotkeys(): HotkeyMap {
 export function matchesHotkey(action: string, input: string, key: { ctrl?: boolean; meta?: boolean }): boolean {
   const hotkeys = getHotkeys();
   const binding = hotkeys[action];
-  if (binding === null || binding === "") return false;  // disabled
+  if (binding === null || binding === "") return false; // disabled
   if (!binding) return false;
 
   // Handle ctrl+ bindings

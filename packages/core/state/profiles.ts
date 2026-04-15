@@ -16,7 +16,9 @@ export interface Profile {
 let _arkDir: string | null = null;
 
 /** Set the ark directory for profile storage. Called during app boot. */
-export function setProfilesArkDir(arkDir: string): void { _arkDir = arkDir; }
+export function setProfilesArkDir(arkDir: string): void {
+  _arkDir = arkDir;
+}
 
 function profilesPath(): string {
   if (!_arkDir) throw new Error("Profiles arkDir not set. Call setProfilesArkDir() first.");
@@ -39,14 +41,20 @@ function saveProfiles(profiles: Profile[]): void {
 
 let _activeProfile = process.env.ARK_PROFILE ?? "default";
 
-export function getActiveProfile(): string { return _activeProfile; }
-export function setActiveProfile(name: string): void { _activeProfile = name; }
+export function getActiveProfile(): string {
+  return _activeProfile;
+}
+export function setActiveProfile(name: string): void {
+  _activeProfile = name;
+}
 
-export function listProfiles(): Profile[] { return loadProfiles(); }
+export function listProfiles(): Profile[] {
+  return loadProfiles();
+}
 
 export function createProfile(name: string, description?: string): Profile {
   const profiles = loadProfiles();
-  if (profiles.find(p => p.name === name)) {
+  if (profiles.find((p) => p.name === name)) {
     throw new Error(`Profile "${name}" already exists`);
   }
   const profile: Profile = { name, description, createdAt: new Date().toISOString() };
@@ -58,7 +66,7 @@ export function createProfile(name: string, description?: string): Profile {
 export function deleteProfile(name: string): boolean {
   if (name === "default") throw new Error("Cannot delete the default profile");
   const profiles = loadProfiles();
-  const idx = profiles.findIndex(p => p.name === name);
+  const idx = profiles.findIndex((p) => p.name === name);
   if (idx < 0) return false;
   profiles.splice(idx, 1);
   saveProfiles(profiles);

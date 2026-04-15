@@ -5,11 +5,12 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-const ark = (args: string) => execFileSync("bun", [join(projectRoot, "packages/cli/index.ts"), ...args.split(" ")], {
-  encoding: "utf-8",
-  timeout: 10_000,
-  cwd: projectRoot,
-}).trim();
+const ark = (args: string) =>
+  execFileSync("bun", [join(projectRoot, "packages/cli/index.ts"), ...args.split(" ")], {
+    encoding: "utf-8",
+    timeout: 10_000,
+    cwd: projectRoot,
+  }).trim();
 
 describe("ark skill CLI", () => {
   it("lists skills", () => {

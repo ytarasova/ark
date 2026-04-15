@@ -5,7 +5,16 @@
 import { appendFileSync, existsSync, statSync, renameSync, mkdirSync } from "fs";
 import { join } from "path";
 
-export type LogComponent = "session" | "conductor" | "mcp" | "status" | "web" | "bridge" | "pool" | "compute" | "general";
+export type LogComponent =
+  | "session"
+  | "conductor"
+  | "mcp"
+  | "status"
+  | "web"
+  | "bridge"
+  | "pool"
+  | "compute"
+  | "general";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 interface LogEntry {
@@ -22,12 +31,16 @@ let _arkDir: string | null = null;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_BACKUPS = 3;
 
-export function setLogLevel(level: LogLevel): void { _level = level; }
+export function setLogLevel(level: LogLevel): void {
+  _level = level;
+}
 export function setLogComponents(components: LogComponent[] | null): void {
   _components = components ? new Set(components) : null;
 }
 /** Set the ark directory for log file output. Called during app boot. */
-export function setLogArkDir(arkDir: string): void { _arkDir = arkDir; }
+export function setLogArkDir(arkDir: string): void {
+  _arkDir = arkDir;
+}
 
 const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
@@ -52,10 +65,21 @@ function rotate(): void {
     for (let i = MAX_BACKUPS - 1; i >= 1; i--) {
       const from = `${path}.${i}`;
       const to = `${path}.${i + 1}`;
-      if (existsSync(from)) try { renameSync(from, to); } catch { /* ignore */ }
+      if (existsSync(from))
+        try {
+          renameSync(from, to);
+        } catch {
+          /* ignore */
+        }
     }
-    try { renameSync(path, `${path}.1`); } catch { /* ignore */ }
-  } catch { /* ignore */ }
+    try {
+      renameSync(path, `${path}.1`);
+    } catch {
+      /* ignore */
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Write a structured log entry. */
@@ -76,7 +100,9 @@ export function log(level: LogLevel, component: LogComponent, message: string, d
     rotate();
     const path = logPath();
     if (path) appendFileSync(path, JSON.stringify(entry) + "\n");
-  } catch { /* don't crash on log failure */ }
+  } catch {
+    /* don't crash on log failure */
+  }
 }
 
 // Convenience methods

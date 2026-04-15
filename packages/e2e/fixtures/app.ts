@@ -63,7 +63,11 @@ export async function setupE2E(): Promise<E2EEnv> {
     teardown: async () => {
       // Kill all test tmux sessions
       for (const name of env.tmuxSessions) {
-        try { tmux.killSession(name); } catch { /* cleanup */ }
+        try {
+          tmux.killSession(name);
+        } catch {
+          /* cleanup */
+        }
       }
 
       // Shutdown AppContext (closes DB, removes temp dir)
@@ -74,12 +78,16 @@ export async function setupE2E(): Promise<E2EEnv> {
       try {
         const { rmSync } = await import("fs");
         rmSync(workdir, { recursive: true, force: true });
-      } catch { /* cleanup */ }
+      } catch {
+        /* cleanup */
+      }
 
       // Prune any leaked worktrees pointing to our temp dir
       try {
         execFileSync("git", ["worktree", "prune"], { stdio: "pipe", cwd: process.cwd() });
-      } catch { /* cleanup */ }
+      } catch {
+        /* cleanup */
+      }
     },
   };
 

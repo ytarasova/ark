@@ -284,11 +284,13 @@ export function initPostgresSchema(db: IDatabase): void {
 
 export function seedLocalComputePostgres(db: IDatabase): void {
   const ts = new Date().toISOString();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO compute (name, provider, status, config, created_at, updated_at)
     VALUES ($1, 'local', 'running', '{}', $2, $3)
     ON CONFLICT (name) DO NOTHING
-  `).run("local", ts, ts);
+  `,
+  ).run("local", ts, ts);
 }
 
 /** Run a DDL statement, ignoring errors (for idempotent migrations). */

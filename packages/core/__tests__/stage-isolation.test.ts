@@ -21,15 +21,15 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext, setApp, clearApp } from "../app.js";
-import {
-  advance,
-  mediateStageHandoff,
-} from "../services/session-orchestration.js";
+import { advance, mediateStageHandoff } from "../services/session-orchestration.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
@@ -145,7 +145,7 @@ describe("stage isolation: observability", () => {
     await advance(app, session.id);
 
     const events = app.events.list(session.id);
-    const stageReady = events.find(e => e.type === "stage_ready");
+    const stageReady = events.find((e) => e.type === "stage_ready");
     expect(stageReady).toBeTruthy();
     expect(stageReady!.data?.isolation).toBe("fresh");
     expect(stageReady!.data?.from_stage).toBe("implement");
@@ -293,7 +293,7 @@ describe("stage isolation: continue mode", () => {
     await advance(app, session.id);
 
     const events = app.events.list(session.id);
-    const stageReady = events.find(e => e.type === "stage_ready");
+    const stageReady = events.find((e) => e.type === "stage_ready");
     expect(stageReady).toBeTruthy();
     expect(stageReady!.data?.isolation).toBe("continue");
   });

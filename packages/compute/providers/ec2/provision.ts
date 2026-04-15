@@ -30,19 +30,19 @@ import { fromIni } from "@aws-sdk/credential-providers";
 // ---------------------------------------------------------------------------
 
 export interface SizeTier {
-  types: [string, string];   // [x64, arm]
+  types: [string, string]; // [x64, arm]
   vcpu: number;
   memGb: number;
-  label: string;             // human-readable
+  label: string; // human-readable
 }
 
 export const INSTANCE_SIZES: Record<string, SizeTier> = {
-  xs:   { types: ["m6i.large",    "m6g.large"],    vcpu: 2,  memGb: 8,   label: "Extra Small (2 vCPU, 8 GB)" },
-  s:    { types: ["m6i.xlarge",   "m6g.xlarge"],   vcpu: 4,  memGb: 16,  label: "Small (4 vCPU, 16 GB)" },
-  m:    { types: ["m6i.2xlarge",  "m6g.2xlarge"],  vcpu: 8,  memGb: 32,  label: "Medium (8 vCPU, 32 GB)" },
-  l:    { types: ["m6i.4xlarge",  "m6g.4xlarge"],  vcpu: 16, memGb: 64,  label: "Large (16 vCPU, 64 GB)" },
-  xl:   { types: ["m6i.8xlarge",  "m6g.8xlarge"],  vcpu: 32, memGb: 128, label: "X-Large (32 vCPU, 128 GB)" },
-  xxl:  { types: ["m6i.12xlarge", "m6g.12xlarge"], vcpu: 48, memGb: 192, label: "2X-Large (48 vCPU, 192 GB)" },
+  xs: { types: ["m6i.large", "m6g.large"], vcpu: 2, memGb: 8, label: "Extra Small (2 vCPU, 8 GB)" },
+  s: { types: ["m6i.xlarge", "m6g.xlarge"], vcpu: 4, memGb: 16, label: "Small (4 vCPU, 16 GB)" },
+  m: { types: ["m6i.2xlarge", "m6g.2xlarge"], vcpu: 8, memGb: 32, label: "Medium (8 vCPU, 32 GB)" },
+  l: { types: ["m6i.4xlarge", "m6g.4xlarge"], vcpu: 16, memGb: 64, label: "Large (16 vCPU, 64 GB)" },
+  xl: { types: ["m6i.8xlarge", "m6g.8xlarge"], vcpu: 32, memGb: 128, label: "X-Large (32 vCPU, 128 GB)" },
+  xxl: { types: ["m6i.12xlarge", "m6g.12xlarge"], vcpu: 48, memGb: 192, label: "2X-Large (48 vCPU, 192 GB)" },
   xxxl: { types: ["m6i.16xlarge", "m6g.16xlarge"], vcpu: 64, memGb: 256, label: "4X-Large (64 vCPU, 256 GB)" },
 };
 
@@ -56,11 +56,7 @@ const AMI_PATTERNS: Record<string, string> = {
 // resolveInstanceType
 // ---------------------------------------------------------------------------
 
-export function resolveInstanceType(
-  size?: string,
-  arch: string = "x64",
-  fallback: string = "m6i.2xlarge",
-): string {
+export function resolveInstanceType(size?: string, arch: string = "x64", fallback: string = "m6i.2xlarge"): string {
   if (!size) return fallback;
   if (size in INSTANCE_SIZES) {
     const tier = INSTANCE_SIZES[size];
@@ -118,18 +114,18 @@ function createClient(region: string, awsProfile?: string): EC2Client {
 
 async function findLatestAmi(client: EC2Client, arch: string): Promise<string> {
   const pattern = AMI_PATTERNS[arch] ?? AMI_PATTERNS["x64"];
-  const result = await client.send(new DescribeImagesCommand({
-    Owners: ["099720109477"], // Canonical
-    Filters: [
-      { Name: "name", Values: [pattern] },
-      { Name: "virtualization-type", Values: ["hvm"] },
-      { Name: "state", Values: ["available"] },
-    ],
-  }));
-
-  const images = (result.Images ?? []).sort((a, b) =>
-    (b.CreationDate ?? "").localeCompare(a.CreationDate ?? "")
+  const result = await client.send(
+    new DescribeImagesCommand({
+      Owners: ["099720109477"], // Canonical
+      Filters: [
+        { Name: "name", Values: [pattern] },
+        { Name: "virtualization-type", Values: ["hvm"] },
+        { Name: "state", Values: ["available"] },
+      ],
+    }),
   );
+
+  const images = (result.Images ?? []).sort((a, b) => (b.CreationDate ?? "").localeCompare(a.CreationDate ?? ""));
   if (images.length === 0) throw new Error(`No AMI found for pattern: ${pattern}`);
   return images[0].ImageId!;
 }
@@ -146,10 +142,7 @@ export async function ensurePulumi(_onLog?: (msg: string) => void): Promise<void
 // provisionStack
 // ---------------------------------------------------------------------------
 
-export async function provisionStack(
-  hostName: string,
-  opts: ProvisionStackOpts,
-): Promise<ProvisionResult> {
+export async function provisionStack(hostName: string, opts: ProvisionStackOpts): Promise<ProvisionResult> {
   const arch = opts.arch ?? "x64";
   const region = opts.region ?? "us-east-1";
   const instanceType = resolveInstanceType(opts.size, arch);
@@ -199,20 +192,29 @@ export async function provisionStack(
       }
     }
 
-    await client.send(new AuthorizeSecurityGroupIngressCommand({
-      GroupId: sgId,
-      IpPermissions: [{
-        IpProtocol: "tcp",
-        FromPort: 22,
-        ToPort: 22,
-        IpRanges: [{ CidrIp: ingressCidr, Description: "SSH" }],
-      }],
-    }));
+    await client.send(
+      new AuthorizeSecurityGroupIngressCommand({
+        GroupId: sgId,
+        IpPermissions: [
+          {
+            IpProtocol: "tcp",
+            FromPort: 22,
+            ToPort: 22,
+            IpRanges: [{ CidrIp: ingressCidr, Description: "SSH" }],
+          },
+        ],
+      }),
+    );
 
-    await client.send(new CreateTagsCommand({
-      Resources: [sgId],
-      Tags: [{ Key: "Name", Value: `ark-sg-${hostName}` }, { Key: "Component", Value: "ark" }],
-    }));
+    await client.send(
+      new CreateTagsCommand({
+        Resources: [sgId],
+        Tags: [
+          { Key: "Name", Value: `ark-sg-${hostName}` },
+          { Key: "Component", Value: "ark" },
+        ],
+      }),
+    );
 
     log(`Security group: ${sgId}`);
   }
@@ -227,10 +229,12 @@ export async function provisionStack(
     keyName = `ark-${hostName}`;
 
     try {
-      await client.send(new ImportKeyPairCommand({
-        KeyName: keyName,
-        PublicKeyMaterial: Buffer.from(pubKey),
-      }));
+      await client.send(
+        new ImportKeyPairCommand({
+          KeyName: keyName,
+          PublicKeyMaterial: Buffer.from(pubKey),
+        }),
+      );
       createdKey = true;
     } catch (e: any) {
       if (e.Code === "InvalidKeyPair.Duplicate") {
@@ -246,24 +250,30 @@ export async function provisionStack(
 
   // 4. Launch instance
   log(`Launching ${instanceType} instance...`);
-  const runResult = await client.send(new RunInstancesCommand({
-    ImageId: amiId,
-    InstanceType: instanceType as import("@aws-sdk/client-ec2")._InstanceType,
-    MinCount: 1,
-    MaxCount: 1,
-    KeyName: keyName,
-    SecurityGroupIds: sgId ? [sgId] : undefined,
-    SubnetId: opts.subnetId,
-    UserData: opts.userData ? Buffer.from(opts.userData).toString("base64") : undefined,
-    BlockDeviceMappings: [{
-      DeviceName: "/dev/sda1",
-      Ebs: { VolumeSize: 256, VolumeType: "gp3", DeleteOnTermination: true },
-    }],
-    TagSpecifications: [{
-      ResourceType: "instance",
-      Tags: tags,
-    }],
-  }));
+  const runResult = await client.send(
+    new RunInstancesCommand({
+      ImageId: amiId,
+      InstanceType: instanceType as import("@aws-sdk/client-ec2")._InstanceType,
+      MinCount: 1,
+      MaxCount: 1,
+      KeyName: keyName,
+      SecurityGroupIds: sgId ? [sgId] : undefined,
+      SubnetId: opts.subnetId,
+      UserData: opts.userData ? Buffer.from(opts.userData).toString("base64") : undefined,
+      BlockDeviceMappings: [
+        {
+          DeviceName: "/dev/sda1",
+          Ebs: { VolumeSize: 256, VolumeType: "gp3", DeleteOnTermination: true },
+        },
+      ],
+      TagSpecifications: [
+        {
+          ResourceType: "instance",
+          Tags: tags,
+        },
+      ],
+    }),
+  );
 
   const instanceId = runResult.Instances?.[0]?.InstanceId;
   if (!instanceId) throw new Error("Failed to launch EC2 instance — no instance ID returned");
@@ -280,9 +290,7 @@ export async function provisionStack(
   // 6. Get IP address
   const descResult = await client.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
   const instance = descResult.Reservations?.[0]?.Instances?.[0];
-  const ip = opts.subnetId
-    ? instance?.PrivateIpAddress ?? null
-    : instance?.PublicIpAddress ?? null;
+  const ip = opts.subnetId ? (instance?.PrivateIpAddress ?? null) : (instance?.PublicIpAddress ?? null);
 
   log(`Instance running: ${instanceId} (IP: ${ip ?? "pending"})`);
 
@@ -299,10 +307,7 @@ export async function provisionStack(
 // destroyStack
 // ---------------------------------------------------------------------------
 
-export async function destroyStack(
-  hostName: string,
-  opts?: DestroyStackOpts,
-): Promise<void> {
+export async function destroyStack(hostName: string, opts?: DestroyStackOpts): Promise<void> {
   const region = opts?.region ?? "us-east-1";
   const client = createClient(region, opts?.awsProfile);
 
@@ -320,7 +325,7 @@ export async function destroyStack(
   const sgId = opts?.sg_id;
   if (sgId) {
     // Wait a moment for instance to start terminating before deleting SG
-    await new Promise(r => setTimeout(r, 5000));
+    await new Promise((r) => setTimeout(r, 5000));
     try {
       await client.send(new DeleteSecurityGroupCommand({ GroupId: sgId }));
     } catch (e: any) {

@@ -20,12 +20,21 @@ import { eventBus } from "../hooks.js";
 import { Router } from "../../server/router.js";
 import { registerAllHandlers } from "../../server/register.js";
 import { DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
-import { handleIssueWebhook, type IssueWebhookConfig, type IssueWebhookPayload } from "../integrations/github-webhook.js";
+import {
+  handleIssueWebhook,
+  type IssueWebhookConfig,
+  type IssueWebhookPayload,
+} from "../integrations/github-webhook.js";
 import { type SSEBus, createSSEBus } from "./sse-bus.js";
 import { extractTenantContext, canWrite, type AuthConfig } from "../auth/index.js";
 import type { TenantContext } from "../../types/index.js";
 import { resolveWebDist } from "../install-paths.js";
-import { startTerminalBridge, handleTerminalInput, cleanupTerminalBridge, sanitizeSessionName } from "./terminal-bridge.js";
+import {
+  startTerminalBridge,
+  handleTerminalInput,
+  cleanupTerminalBridge,
+  sanitizeSessionName,
+} from "./terminal-bridge.js";
 
 const WEB_DIST: string = resolveWebDist();
 
@@ -54,32 +63,77 @@ function errorResponse(err: unknown, status = 500): Response {
 
 /** Set of RPC methods that mutate state -- blocked in readOnly mode. */
 const WRITE_METHODS = new Set([
-  "session/start", "session/dispatch", "session/stop", "session/advance",
-  "session/complete", "session/delete", "session/undelete", "session/fork",
-  "session/clone", "session/update", "session/handoff", "session/spawn",
-  "session/resume", "session/pause", "session/interrupt", "session/archive",
-  "session/restore", "session/import",
-  "message/send", "gate/approve",
-  "todo/add", "todo/toggle", "todo/delete",
+  "session/start",
+  "session/dispatch",
+  "session/stop",
+  "session/advance",
+  "session/complete",
+  "session/delete",
+  "session/undelete",
+  "session/fork",
+  "session/clone",
+  "session/update",
+  "session/handoff",
+  "session/spawn",
+  "session/resume",
+  "session/pause",
+  "session/interrupt",
+  "session/archive",
+  "session/restore",
+  "session/import",
+  "message/send",
+  "gate/approve",
+  "todo/add",
+  "todo/toggle",
+  "todo/delete",
   "verify/run",
-  "worktree/finish", "worktree/create-pr", "worktree/cleanup",
-  "skill/save", "skill/delete",
+  "worktree/finish",
+  "worktree/create-pr",
+  "worktree/cleanup",
+  "skill/save",
+  "skill/delete",
   "recipe/delete",
-  "agent/create", "agent/update", "agent/delete",
-  "flow/create", "flow/delete",
-  "compute/create", "compute/delete", "compute/update", "compute/provision",
-  "compute/start-instance", "compute/stop-instance", "compute/destroy",
-  "compute/clean", "compute/reboot",
-  "schedule/create", "schedule/delete", "schedule/enable", "schedule/disable",
-  "mcp/attach", "mcp/detach", "mcp/attach-by-dir", "mcp/detach-by-dir",
-  "memory/add", "memory/forget", "memory/clear",
-  "knowledge/ingest", "knowledge/index", "knowledge/import", "knowledge/export",
+  "agent/create",
+  "agent/update",
+  "agent/delete",
+  "flow/create",
+  "flow/delete",
+  "compute/create",
+  "compute/delete",
+  "compute/update",
+  "compute/provision",
+  "compute/start-instance",
+  "compute/stop-instance",
+  "compute/destroy",
+  "compute/clean",
+  "compute/reboot",
+  "schedule/create",
+  "schedule/delete",
+  "schedule/enable",
+  "schedule/disable",
+  "mcp/attach",
+  "mcp/detach",
+  "mcp/attach-by-dir",
+  "mcp/detach-by-dir",
+  "memory/add",
+  "memory/forget",
+  "memory/clear",
+  "knowledge/ingest",
+  "knowledge/index",
+  "knowledge/import",
+  "knowledge/export",
   "learning/add",
-  "group/create", "group/delete",
-  "profile/create", "profile/delete", "profile/set",
+  "group/create",
+  "group/delete",
+  "profile/create",
+  "profile/delete",
+  "profile/set",
   "config/write",
-  "history/import", "history/refresh", "history/index",
-  "history/rebuild-fts", "history/refresh-and-index",
+  "history/import",
+  "history/refresh",
+  "history/index",
+  "history/rebuild-fts",
+  "history/refresh-and-index",
   "tools/delete",
 ]);
 
@@ -101,7 +155,9 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       if (existsSync(buildScript)) {
         execFileSync("bun", ["run", buildScript], { stdio: "pipe", timeout: 30_000 });
       }
-    } catch { /* build failed - will serve 404s */ }
+    } catch {
+      /* build failed - will serve 404s */
+    }
   }
 
   // ── SSE (backed by pluggable SSEBus) ─────────────────────────────────────
@@ -117,18 +173,28 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
   sseBus.subscribe("sessions", (event, data) => {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of sseClients) {
-      try { client.enqueue(new TextEncoder().encode(msg)); }
-      catch { sseClients.delete(client); }
+      try {
+        client.enqueue(new TextEncoder().encode(msg));
+      } catch {
+        sseClients.delete(client);
+      }
     }
   });
 
   function broadcastSessions() {
     const sessions = app.sessions.list({ limit: 200 });
-    broadcast("sessions", sessions.map(s => ({
-      id: s.id, summary: s.summary, status: s.status,
-      agent: s.agent, repo: s.repo, group: s.group_name,
-      updated: s.updated_at,
-    })));
+    broadcast(
+      "sessions",
+      sessions.map((s) => ({
+        id: s.id,
+        summary: s.summary,
+        status: s.status,
+        agent: s.agent,
+        repo: s.repo,
+        group: s.group_name,
+        updated: s.updated_at,
+      })),
+    );
   }
 
   const statusInterval = setInterval(broadcastSessions, 3000);
@@ -142,7 +208,11 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
   // ── Auth config ──────────────────────────────────────────────────────────
   const authConfig: AuthConfig = app.config.auth ?? { enabled: false, apiKeyEnabled: false };
   let apiKeyMgr: import("./api-keys.js").ApiKeyManager | null = null;
-  try { apiKeyMgr = app.apiKeys; } catch { /* not booted yet or unavailable */ }
+  try {
+    apiKeyMgr = app.apiKeys;
+  } catch {
+    /* not booted yet or unavailable */
+  }
 
   // ── Server ───────────────────────────────────────────────────────────────
   const server = Bun.serve({
@@ -173,9 +243,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       }
 
       // Determine which app context to use for this request
-      const requestApp = tenantCtx && tenantCtx.tenantId !== "default"
-        ? app.forTenant(tenantCtx.tenantId)
-        : app;
+      const requestApp = tenantCtx && tenantCtx.tenantId !== "default" ? app.forTenant(tenantCtx.tenantId) : app;
 
       // WebSocket terminal bridge
       if (url.pathname === "/api/terminal") {
@@ -183,7 +251,9 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
         const sessionId = url.searchParams.get("session");
         if (!sessionId) return new Response("Missing session param", { status: 400 });
         // Sanitize sessionId to prevent command injection in tmux/script commands
-        try { sanitizeSessionName(sessionId); } catch {
+        try {
+          sanitizeSessionName(sessionId);
+        } catch {
           return new Response("Invalid session ID", { status: 400 });
         }
         // Validate session exists
@@ -198,14 +268,18 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       // SSE endpoint
       if (url.pathname === "/api/events/stream") {
         const stream = new ReadableStream({
-          start(controller) { sseClients.add(controller); },
-          cancel(controller) { sseClients.delete(controller); },
+          start(controller) {
+            sseClients.add(controller);
+          },
+          cancel(controller) {
+            sseClients.delete(controller);
+          },
         });
         return new Response(stream, {
           headers: {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
+            Connection: "keep-alive",
             ...CORS,
           },
         });
@@ -214,26 +288,43 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       // JSON-RPC endpoint
       if (url.pathname === "/api/rpc" && req.method === "POST") {
         try {
-          const body = await req.json() as { jsonrpc?: string; method?: string; id?: string | number; params?: unknown };
+          const body = (await req.json()) as {
+            jsonrpc?: string;
+            method?: string;
+            id?: string | number;
+            params?: unknown;
+          };
           if (!body || body.jsonrpc !== "2.0" || !body.method) {
-            return jsonResponse({
-              jsonrpc: "2.0", id: body?.id ?? null,
-              error: { code: -32600, message: "Invalid JSON-RPC request" },
-            }, 400);
+            return jsonResponse(
+              {
+                jsonrpc: "2.0",
+                id: body?.id ?? null,
+                error: { code: -32600, message: "Invalid JSON-RPC request" },
+              },
+              400,
+            );
           }
           // Read-only guard
           if (readOnly && WRITE_METHODS.has(body.method)) {
-            return jsonResponse({
-              jsonrpc: "2.0", id: body.id,
-              error: { code: -32603, message: "Read-only mode" },
-            }, 403);
+            return jsonResponse(
+              {
+                jsonrpc: "2.0",
+                id: body.id,
+                error: { code: -32603, message: "Read-only mode" },
+              },
+              403,
+            );
           }
           // Tenant write permission guard
           if (tenantCtx && WRITE_METHODS.has(body.method) && !canWrite(tenantCtx)) {
-            return jsonResponse({
-              jsonrpc: "2.0", id: body.id,
-              error: { code: -32603, message: "Insufficient permissions -- viewer role cannot write" },
-            }, 403);
+            return jsonResponse(
+              {
+                jsonrpc: "2.0",
+                id: body.id,
+                error: { code: -32603, message: "Insufficient permissions -- viewer role cannot write" },
+              },
+              403,
+            );
           }
           // Create a tenant-scoped router if needed
           let rpcRouter = router;
@@ -253,7 +344,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       if (url.pathname === "/api/webhooks/github/issues" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const payload = await req.json() as IssueWebhookPayload;
+          const payload = (await req.json()) as IssueWebhookPayload;
           const config: IssueWebhookConfig = {
             triggerLabel: url.searchParams.get("label") ?? "ark",
             autoDispatch: url.searchParams.get("dispatch") === "true",
@@ -331,7 +422,11 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       unsubEventBus();
       sseBus.clear();
       for (const client of sseClients) {
-        try { client.close(); } catch { /* ignore */ }
+        try {
+          client.close();
+        } catch {
+          /* ignore */
+        }
       }
       sseClients.clear();
       server.stop();

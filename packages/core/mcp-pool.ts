@@ -51,8 +51,12 @@ class SocketProxy {
     this.socketPath = `/tmp/ark-mcp-${def.name}.sock`;
   }
 
-  getStatus(): ProxyStatus { return this.status; }
-  getClientCount(): number { return this.clients.size; }
+  getStatus(): ProxyStatus {
+    return this.status;
+  }
+  getClientCount(): number {
+    return this.clients.size;
+  }
 
   async start(): Promise<void> {
     if (this.status === "running") return;
@@ -60,7 +64,11 @@ class SocketProxy {
 
     // Clean up stale socket (may not exist or be owned by another process; re-listen will error visibly below)
     if (existsSync(this.socketPath)) {
-      try { unlinkSync(this.socketPath); } catch { /* stale socket may vanish between existsSync and unlinkSync */ }
+      try {
+        unlinkSync(this.socketPath);
+      } catch {
+        /* stale socket may vanish between existsSync and unlinkSync */
+      }
     }
 
     // Start MCP process
@@ -118,7 +126,6 @@ class SocketProxy {
         const msg = chunk.toString().trim();
         if (msg) console.error(`mcp-pool[${this.name}]: ${msg}`);
       });
-
     } catch (e: any) {
       this.status = "failed";
       throw new Error(`Failed to start MCP ${this.name}: ${e.message}`);
@@ -147,7 +154,9 @@ class SocketProxy {
             if (msg.id !== undefined) {
               this.requestMap.set(msg.id, client);
             }
-          } catch { /* forward non-JSON too */ }
+          } catch {
+            /* forward non-JSON too */
+          }
 
           // Forward to MCP stdin
           this.mcpProcess?.stdin?.write(line + "\n");
@@ -183,7 +192,11 @@ class SocketProxy {
     this.status = "stopped";
 
     for (const client of this.clients) {
-      try { client.destroy(); } catch { /* client already destroyed/errored; nothing to do */ }
+      try {
+        client.destroy();
+      } catch {
+        /* client already destroyed/errored; nothing to do */
+      }
     }
     this.clients.clear();
     this.requestMap.clear();
@@ -204,7 +217,11 @@ class SocketProxy {
     }
 
     if (existsSync(this.socketPath)) {
-      try { unlinkSync(this.socketPath); } catch { /* shutdown cleanup; stale socket is harmless */ }
+      try {
+        unlinkSync(this.socketPath);
+      } catch {
+        /* shutdown cleanup; stale socket is harmless */
+      }
     }
   }
 
@@ -225,8 +242,11 @@ class SocketProxy {
   }
 
   private safeWrite(socket: Socket, data: string): void {
-    try { if (!socket.destroyed) socket.write(data); }
-    catch { /* socket may race-close between the destroyed check and write */ }
+    try {
+      if (!socket.destroyed) socket.write(data);
+    } catch {
+      /* socket may race-close between the destroyed check and write */
+    }
   }
 }
 
@@ -291,7 +311,7 @@ export class McpPool {
 
   /** Get status of all pooled MCPs. */
   getStatus(): Array<{ name: string; status: ProxyStatus; clients: number; socketPath: string }> {
-    return Array.from(this.proxies.values()).map(p => ({
+    return Array.from(this.proxies.values()).map((p) => ({
       name: p.name,
       status: p.getStatus(),
       clients: p.getClientCount(),

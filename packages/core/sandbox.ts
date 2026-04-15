@@ -6,10 +6,10 @@
 import { execSync } from "child_process";
 
 export interface SandboxConfig {
-  image?: string;       // Docker image (default: "ubuntu:22.04")
-  cpuLimit?: string;    // CPU limit (e.g., "2.0")
+  image?: string; // Docker image (default: "ubuntu:22.04")
+  cpuLimit?: string; // CPU limit (e.g., "2.0")
   memoryLimit?: string; // Memory limit (e.g., "4g")
-  mountSsh?: boolean;   // Mount ~/.ssh read-only
+  mountSsh?: boolean; // Mount ~/.ssh read-only
   extraVolumes?: string[];
   env?: Record<string, string>;
 }
@@ -17,11 +17,7 @@ export interface SandboxConfig {
 const DEFAULT_IMAGE = "ubuntu:22.04";
 
 /** Build docker run command for a sandboxed session. */
-export function buildSandboxCommand(
-  projectDir: string,
-  innerCommand: string,
-  config?: SandboxConfig,
-): string {
+export function buildSandboxCommand(projectDir: string, innerCommand: string, config?: SandboxConfig): string {
   const image = config?.image ?? DEFAULT_IMAGE;
   const parts = ["docker", "run", "--rm", "-it"];
 

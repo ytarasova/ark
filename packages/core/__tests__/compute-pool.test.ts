@@ -55,7 +55,7 @@ describe("ComputePoolManager", () => {
     const pools = manager.listPools();
     expect(pools.length).toBeGreaterThanOrEqual(2);
 
-    const dockerPool = pools.find(p => p.name === "test-pool-2");
+    const dockerPool = pools.find((p) => p.name === "test-pool-2");
     expect(dockerPool).toBeDefined();
     expect(dockerPool!.provider).toBe("docker");
     expect(dockerPool!.active).toBe(0);

@@ -25,7 +25,11 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* cleanup */
+  }
 });
 
 function pidFilePath(): string {
@@ -46,14 +50,22 @@ function writePidFile(info: DaemonPidInfo): void {
 function readPidFile(): DaemonPidInfo | null {
   const p = pidFilePath();
   if (!existsSync(p)) return null;
-  try { return JSON.parse(readFileSync(p, "utf-8")); } catch { return null; }
+  try {
+    return JSON.parse(readFileSync(p, "utf-8"));
+  } catch {
+    return null;
+  }
 }
 
 // ── PID file management tests ─────────────────────────────────────────────────
 
 describe("daemon PID file management", () => {
   afterEach(() => {
-    try { rmSync(pidFilePath()); } catch { /* may not exist */ }
+    try {
+      rmSync(pidFilePath());
+    } catch {
+      /* may not exist */
+    }
   });
 
   it("writes and reads a PID file", () => {
@@ -125,7 +137,7 @@ describe("daemon start/stop lifecycle", () => {
     const resp = await fetch(`${BASE}/health`);
     expect(resp.status).toBe(200);
 
-    const data = await resp.json() as { status: string; version: string };
+    const data = (await resp.json()) as { status: string; version: string };
     expect(data.status).toBe("ok");
     expect(data.version).toBe("0.1.0");
   });
@@ -157,7 +169,7 @@ describe("daemon start/stop lifecycle", () => {
     const resp = await fetch(`${BASE}/metrics`);
     expect(resp.status).toBe(200);
 
-    const data = await resp.json() as { cpu: number; memTotalGb: number; memPct: number };
+    const data = (await resp.json()) as { cpu: number; memTotalGb: number; memPct: number };
     expect(typeof data.cpu).toBe("number");
     expect(typeof data.memTotalGb).toBe("number");
     expect(typeof data.memPct).toBe("number");
@@ -170,7 +182,7 @@ describe("daemon start/stop lifecycle", () => {
     const resp = await fetch(`http://localhost:${configPort}/config`);
     expect(resp.status).toBe(200);
 
-    const data = await resp.json() as { ok: boolean; conductorUrl: string | null };
+    const data = (await resp.json()) as { ok: boolean; conductorUrl: string | null };
     expect(data.ok).toBe(true);
     expect(data.conductorUrl).toBe("http://localhost:19100");
   });
@@ -195,7 +207,7 @@ describe("daemon status detection", () => {
     try {
       const resp = await fetch(`http://localhost:${TEST_PORT + 1}/health`, { signal: AbortSignal.timeout(2000) });
       expect(resp.ok).toBe(true);
-      const data = await resp.json() as { status: string };
+      const data = (await resp.json()) as { status: string };
       expect(data.status).toBe("ok");
     } finally {
       server.stop();

@@ -87,7 +87,7 @@ describe("FileAgentStore.list", () => {
     writeAgent(builtinDir, "b-agent", { name: "b-agent" });
     writeAgent(userDir, "u-agent", { name: "u-agent" });
     const agents = store.list();
-    const names = agents.map(a => a.name);
+    const names = agents.map((a) => a.name);
     expect(names).toContain("b-agent");
     expect(names).toContain("u-agent");
   });
@@ -96,7 +96,7 @@ describe("FileAgentStore.list", () => {
     writeAgent(builtinDir, "overlap", { name: "overlap", description: "builtin" });
     writeAgent(userDir, "overlap", { name: "overlap", description: "global" });
     const agents = store.list();
-    const overlap = agents.filter(a => a.name === "overlap");
+    const overlap = agents.filter((a) => a.name === "overlap");
     expect(overlap).toHaveLength(1);
     expect(overlap[0]._source).toBe("global");
   });
@@ -109,7 +109,7 @@ describe("FileAgentStore.list", () => {
     writeAgent(projAgentDir, "p-agent", { name: "p-agent" });
 
     const agents = store.list(projRoot);
-    const names = agents.map(a => a.name);
+    const names = agents.map((a) => a.name);
     expect(names).toContain("b-agent");
     expect(names).toContain("p-agent");
   });
@@ -117,7 +117,7 @@ describe("FileAgentStore.list", () => {
   it("fills defaults for agents in listing", () => {
     writeAgent(builtinDir, "sparse", { name: "sparse" });
     const agents = store.list();
-    const sparse = agents.find(a => a.name === "sparse");
+    const sparse = agents.find((a) => a.name === "sparse");
     expect(sparse!.model).toBe("sonnet");
     expect(sparse!.max_turns).toBe(200);
   });

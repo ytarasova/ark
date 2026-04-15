@@ -3,7 +3,11 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { handleIssueWebhook, type IssueWebhookPayload, type IssueWebhookConfig } from "../integrations/github-webhook.js";
+import {
+  handleIssueWebhook,
+  type IssueWebhookPayload,
+  type IssueWebhookConfig,
+} from "../integrations/github-webhook.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -59,7 +63,7 @@ describe("handleIssueWebhook", () => {
     const result = await handleIssueWebhook(getApp(), payload, defaultConfig);
 
     const events = getApp().events.list(result.sessionId!);
-    const webhookEvents = events.filter(e => e.type === "issue_webhook_triggered");
+    const webhookEvents = events.filter((e) => e.type === "issue_webhook_triggered");
     expect(webhookEvents.length).toBe(1);
     expect(webhookEvents[0].actor).toBe("github");
     expect(webhookEvents[0].data!.issue_number).toBe(42);

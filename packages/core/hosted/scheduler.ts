@@ -53,9 +53,7 @@ export class SessionScheduler {
     // 3. Validate provider is allowed
     if (provider && this.policyManager && !this.policyManager.isProviderAllowed(tid, provider)) {
       const allowed = policy?.allowed_providers?.join(", ") ?? "all";
-      throw new Error(
-        `Provider "${provider}" not allowed for tenant "${tid}". Allowed: ${allowed}`
-      );
+      throw new Error(`Provider "${provider}" not allowed for tenant "${tid}". Allowed: ${allowed}`);
     }
 
     // 4. Find or provision a worker
@@ -108,20 +106,16 @@ export class SessionScheduler {
     policy: TenantComputePolicy,
   ): Promise<WorkerNode> {
     // Find the pool config for this provider
-    const poolRef = policy.compute_pools.find(p => p.provider === provider);
+    const poolRef = policy.compute_pools.find((p) => p.provider === provider);
     if (!poolRef) {
       throw new Error("No workers available for scheduling");
     }
 
     // Check pool limits
     const registry = this.app.workerRegistry;
-    const active = registry.list({ tenantId }).filter(
-      w => w.compute_name === provider
-    ).length;
+    const active = registry.list({ tenantId }).filter((w) => w.compute_name === provider).length;
     if (active >= poolRef.max) {
-      throw new Error(
-        `Pool "${poolRef.pool_name}" at max capacity (${poolRef.max})`
-      );
+      throw new Error(`Pool "${poolRef.pool_name}" at max capacity (${poolRef.max})`);
     }
 
     // Use the compute provider to provision
@@ -146,22 +140,15 @@ export class SessionScheduler {
     return this._waitForWorkerRegistration(computeName, 60_000);
   }
 
-  private async _waitForWorkerRegistration(
-    computeName: string,
-    timeoutMs: number,
-  ): Promise<WorkerNode> {
+  private async _waitForWorkerRegistration(computeName: string, timeoutMs: number): Promise<WorkerNode> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const workers = this.app.workerRegistry.list();
-      const online = workers.find(
-        w => w.compute_name === computeName && w.status === "online"
-      );
+      const online = workers.find((w) => w.compute_name === computeName && w.status === "online");
       if (online) return online;
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 2000));
     }
-    throw new Error(
-      `Worker for compute "${computeName}" did not register within ${timeoutMs / 1000}s`
-    );
+    throw new Error(`Worker for compute "${computeName}" did not register within ${timeoutMs / 1000}s`);
   }
 
   /** Resolve the provider name from a compute record. */
@@ -175,8 +162,6 @@ export class SessionScheduler {
    * Uses load ratio (active_sessions / capacity) as the primary criterion.
    */
   private _pickBest(workers: WorkerNode[]): WorkerNode {
-    return workers.sort((a, b) =>
-      (a.active_sessions / a.capacity) - (b.active_sessions / b.capacity)
-    )[0];
+    return workers.sort((a, b) => a.active_sessions / a.capacity - b.active_sessions / b.capacity)[0];
   }
 }
