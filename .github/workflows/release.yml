@@ -450,6 +450,42 @@ jobs:
             echo "No bundled codegraph"
           fi
 
+      - name: Test ark web serves dashboard
+        env:
+          PLAT: ${{ matrix.name }}
+        run: |
+          # Regression guard for Bug-014: compiled ark binary must resolve its
+          # web asset dir to <prefix>/web when launched from <prefix>/bin/ark.
+          # The tarball already has this layout -- boot and probe over HTTP.
+          PORT=18420
+          "./ark-$PLAT/bin/ark" web --port "$PORT" > /tmp/ark-web.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+
+          # Condition-based readiness poll (20s max)
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$PORT/" 2>/dev/null || echo "000")
+            [ "$code" != "000" ] && break
+            sleep 0.5
+          done
+
+          status=$(curl -s -o /tmp/index.html -w "%{http_code}" "http://localhost:$PORT/")
+          echo "GET / -> $status"
+          if [ "$status" != "200" ]; then
+            echo "FAIL: expected 200 serving /, got $status"
+            echo "--- server log ---"
+            cat /tmp/ark-web.log
+            exit 1
+          fi
+          if ! grep -q '<title>Ark</title>' /tmp/index.html; then
+            echo "FAIL: response body missing <title>Ark</title>"
+            head -c 400 /tmp/index.html; echo
+            echo "--- server log ---"
+            cat /tmp/ark-web.log
+            exit 1
+          fi
+          echo "PASS: ark web serves dashboard from installed tarball layout"
+
   # Electron desktop app
   desktop:
     strategy:
