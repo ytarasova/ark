@@ -38,7 +38,7 @@ import { logError, logInfo, logWarn } from "../observability/structured-log.js";
 import { sendOSNotification } from "../notify.js";
 import { watchMergedPR, type RollbackConfig } from "../integrations/rollback.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
-import { DEFAULT_CONDUCTOR_PORT, DEFAULT_CONDUCTOR_HOST, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
+import { DEFAULT_CONDUCTOR_PORT, DEFAULT_CONDUCTOR_HOST, DEFAULT_CHANNEL_BASE_URL, DEFAULT_ROUTER_URL } from "../constants.js";
 
 const DEFAULT_PORT = DEFAULT_CONDUCTOR_PORT;
 
@@ -395,6 +395,14 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
           }
         }
 
+        // ── LLM proxy: forward to router ──────────────────────────
+        if (req.method === "POST" && path === "/v1/chat/completions") {
+          return proxyToRouter(req, "/v1/chat/completions");
+        }
+        if (req.method === "GET" && path === "/v1/models") {
+          return proxyToRouter(req, "/v1/models");
+        }
+
         if (req.method === "GET") {
           return handleRestApi(path);
         }
@@ -645,6 +653,37 @@ function handleTenantPolicyList(): Response {
     return Response.json(pm.listPolicies());
   } catch (e: any) {
     return Response.json({ error: String(e) }, { status: 500 });
+  }
+}
+
+// ── LLM proxy ───────────────────────────────────────────────────────────────
+
+/**
+ * Proxy an HTTP request to the LLM router, streaming the response back.
+ * Used for the arkd -> conductor -> router proxy chain.
+ */
+async function proxyToRouter(req: Request, path: string): Promise<Response> {
+  const routerUrl = _app.config.router?.url ?? DEFAULT_ROUTER_URL;
+  try {
+    const headers: Record<string, string> = {};
+    for (const key of ["content-type", "authorization", "accept"]) {
+      const val = req.headers.get(key);
+      if (val) headers[key] = val;
+    }
+    const init: RequestInit = { method: req.method, headers };
+    if (req.method === "POST") init.body = req.body;
+    const upstream = await fetch(`${routerUrl}${path}`, init);
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        "Content-Type": upstream.headers.get("content-type") ?? "application/json",
+      },
+    });
+  } catch (e: any) {
+    return Response.json(
+      { error: `router proxy failed: ${e?.message ?? e}` },
+      { status: 502 },
+    );
   }
 }
 

@@ -27,24 +27,24 @@ describe("buildRouterEnv", () => {
     expect(buildRouterEnv(config, { mode: "openai" })).toEqual({});
   });
 
-  it("claude mode sets ANTHROPIC_BASE_URL only", () => {
+  it("claude mode sets ANTHROPIC_BASE_URL to arkd", () => {
     const config = makeConfig(true, "http://localhost:8430");
     const env = buildRouterEnv(config, { mode: "claude" });
-    expect(env.ANTHROPIC_BASE_URL).toBe("http://localhost:8430");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://localhost:19300");
     expect(env.OPENAI_BASE_URL).toBeUndefined();
   });
 
-  it("openai mode sets both OPENAI_BASE_URL and ANTHROPIC_BASE_URL", () => {
+  it("openai mode sets both OPENAI_BASE_URL and ANTHROPIC_BASE_URL to arkd", () => {
     const config = makeConfig(true, "http://localhost:8430");
     const env = buildRouterEnv(config, { mode: "openai" });
-    expect(env.OPENAI_BASE_URL).toBe("http://localhost:8430/v1");
-    expect(env.ANTHROPIC_BASE_URL).toBe("http://localhost:8430");
+    expect(env.OPENAI_BASE_URL).toBe("http://localhost:19300/v1");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://localhost:19300");
   });
 
-  it("uses custom router URL", () => {
+  it("always uses arkd URL regardless of router URL config", () => {
     const config = makeConfig(true, "https://router.example.com:9000");
     const env = buildRouterEnv(config, { mode: "claude" });
-    expect(env.ANTHROPIC_BASE_URL).toBe("https://router.example.com:9000");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://localhost:19300");
   });
 
   it("returns empty when config.router is undefined", () => {

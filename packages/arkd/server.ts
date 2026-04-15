@@ -305,6 +305,14 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
           return json<ConfigRes>({ ok: true, conductorUrl });
         }
 
+        // ── LLM proxy: forward to conductor ─────────────────────────
+        if (req.method === "POST" && path === "/v1/chat/completions") {
+          return proxyToCondutor(req, conductorUrl, "/v1/chat/completions");
+        }
+        if (req.method === "GET" && path === "/v1/models") {
+          return proxyToCondutor(req, conductorUrl, "/v1/models");
+        }
+
         return new Response("Not found", { status: 404 });
       } catch (e: any) {
         if (e instanceof SyntaxError) {
@@ -801,6 +809,38 @@ async function channelRelay(
     return { ok: true, forwarded: true };
   } catch {
     return { ok: false, forwarded: false };
+  }
+}
+
+/**
+ * Proxy an HTTP request to the conductor, streaming the response back.
+ * Used for LLM router passthrough (agent -> arkd -> conductor -> router).
+ */
+async function proxyToCondutor(
+  req: Request,
+  conductorUrl: string | null,
+  path: string,
+): Promise<Response> {
+  if (!conductorUrl) {
+    return json({ error: "no conductor URL configured" }, 502);
+  }
+  try {
+    const headers: Record<string, string> = {};
+    for (const key of ["content-type", "authorization", "accept"]) {
+      const val = req.headers.get(key);
+      if (val) headers[key] = val;
+    }
+    const init: RequestInit = { method: req.method, headers };
+    if (req.method === "POST") init.body = req.body;
+    const upstream = await fetch(`${conductorUrl}${path}`, init);
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        "Content-Type": upstream.headers.get("content-type") ?? "application/json",
+      },
+    });
+  } catch (e: any) {
+    return json({ error: `proxy failed: ${e?.message ?? e}` }, 502);
   }
 }
 
