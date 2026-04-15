@@ -12,7 +12,8 @@
 #   make package       Package everything for distribution
 
 .PHONY: help install dev dev-daemon dev-arkd dev-web claude-tfy web desktop \
-        test test-file test-e2e test-e2e-fast test-e2e-web test-install test-watch lint \
+        test test-file test-e2e test-e2e-fast test-e2e-web test-install test-watch lint lint-fix \
+        format format-check \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
         vendor-tmux vendor-tensorzero vendor-codegraph \
@@ -35,7 +36,7 @@ help: ## Show available commands
 	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
-	@grep -E '^(test|test-file|test-e2e|test-install|test-watch):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(test|test-file|test-e2e|test-install|test-watch|lint|format):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mBuilding & Packaging\033[0m"
 	@grep -E '^(build|build-cli|build-web|build-desktop|package|package-cli|package-desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -163,10 +164,16 @@ test-watch: ## Run unit tests in watch mode
 	$(BUN) test --watch
 
 lint: ## Lint the codebase (ESLint + TypeScript)
-	npx eslint packages/ --max-warnings 50
+	npx eslint packages/ --max-warnings 0
 
 lint-fix: ## Auto-fix lint issues
 	npx eslint packages/ --fix
+
+format: ## Format code with Prettier
+	npx prettier --write "packages/**/*.{ts,tsx,js,jsx,json,css}"
+
+format-check: ## Check code formatting (CI gate)
+	npx prettier --check "packages/**/*.{ts,tsx,js,jsx,json,css}"
 
 # ── Building ─────────────────────────────────────────────────────────────────
 

@@ -31,17 +31,7 @@ let page: Page;
 // these literal strings -- if a YAML changes, these tests should break
 // loudly so we know the flow contract moved.
 const BARE_STAGES = ["work"] as const;
-const DEFAULT_STAGES = [
-  "intake",
-  "plan",
-  "audit",
-  "implement",
-  "verify",
-  "pr",
-  "review",
-  "close",
-  "retro",
-] as const;
+const DEFAULT_STAGES = ["intake", "plan", "audit", "implement", "verify", "pr", "review", "close", "retro"] as const;
 
 test.beforeAll(async () => {
   ws = await setupWebServer();
@@ -108,26 +98,23 @@ test("advancing a default-flow session walks every stage in order", async () => 
   // edges are declared -- default.yaml is pure linear, so we expect
   // DEFAULT_STAGES[i] -> DEFAULT_STAGES[i+1] for each advance call.
   for (let i = 1; i < DEFAULT_STAGES.length; i++) {
-    const advanceRes = await ws.rpc<{ ok: boolean; message: string }>(
-      "session/advance",
-      { sessionId: id, force: true },
-    );
+    const advanceRes = await ws.rpc<{ ok: boolean; message: string }>("session/advance", {
+      sessionId: id,
+      force: true,
+    });
     expect(advanceRes.ok).toBe(true);
 
-    const { session: afterAdvance } = await ws.rpc<{ session: any }>(
-      "session/read",
-      { sessionId: id },
-    );
+    const { session: afterAdvance } = await ws.rpc<{ session: any }>("session/read", { sessionId: id });
     expect(afterAdvance.stage).toBe(DEFAULT_STAGES[i]);
     // While stages remain, status should reset to `ready` (not completed).
     expect(afterAdvance.status).toBe("ready");
   }
 
   // One more advance past the final stage completes the flow.
-  const finalAdvance = await ws.rpc<{ ok: boolean; message: string }>(
-    "session/advance",
-    { sessionId: id, force: true },
-  );
+  const finalAdvance = await ws.rpc<{ ok: boolean; message: string }>("session/advance", {
+    sessionId: id,
+    force: true,
+  });
   expect(finalAdvance.ok).toBe(true);
 
   const { session: done } = await ws.rpc<{ session: any }>("session/read", {
@@ -153,10 +140,7 @@ test("advancing a bare-flow session past its single stage completes the flow", a
   expect(session.status).toBe("ready");
 
   // `bare` has a manual gate so we must force.
-  const advanceRes = await ws.rpc<{ ok: boolean; message: string }>(
-    "session/advance",
-    { sessionId: id, force: true },
-  );
+  const advanceRes = await ws.rpc<{ ok: boolean; message: string }>("session/advance", { sessionId: id, force: true });
   expect(advanceRes.ok).toBe(true);
 
   const { session: done } = await ws.rpc<{ session: any }>("session/read", {
@@ -184,10 +168,7 @@ test("session detail pane renders the current flow stage", async () => {
   // initial stage -- this proves the UI is reading live state, not
   // hydrating from the creation snapshot.
   await ws.rpc("session/advance", { sessionId: session.id, force: true });
-  const { session: afterAdvance } = await ws.rpc<{ session: any }>(
-    "session/read",
-    { sessionId: session.id },
-  );
+  const { session: afterAdvance } = await ws.rpc<{ session: any }>("session/read", { sessionId: session.id });
   expect(afterAdvance.stage).toBe(DEFAULT_STAGES[1]); // plan
 
   // Reload so the UI fetches the latest session list + detail.
@@ -207,10 +188,6 @@ test("session detail pane renders the current flow stage", async () => {
   // the rendered detail view. `plan` is a short string that could
   // appear elsewhere in principle, so we check it's visible in the
   // detail region (identified by the `Details` heading above).
-  const detailPane = page
-    .locator("text=Details")
-    .first()
-    .locator("xpath=ancestor::*[self::div][1]//following::*");
   // Fallback: just assert the stage name is visible somewhere on the page.
   // The detail pane is the only place where `Stage` label + `plan` value
   // coexists, and `plan` is present in the flow pipeline breadcrumb too.
@@ -250,10 +227,7 @@ test("session flow field survives a web UI reload", async () => {
   // The `Flow` label + `default` value both live in the detail grid.
   // We verify via RPC (authoritative) and via the rendered page
   // (surface the user sees).
-  const { session: refetched } = await ws.rpc<{ session: any }>(
-    "session/read",
-    { sessionId: session.id },
-  );
+  const { session: refetched } = await ws.rpc<{ session: any }>("session/read", { sessionId: session.id });
   expect(refetched.flow).toBe("default");
   expect(refetched.stage).toBe(DEFAULT_STAGES[0]);
 

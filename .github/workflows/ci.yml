@@ -34,11 +34,10 @@ jobs:
         run: cd packages/web && bunx --bun vite build --logLevel error
 
       - name: Lint
-        # Use bunx --bun eslint to pin the version to whatever bun.lock
-        # has installed. Plain `npx eslint` was pulling whatever ESLint
-        # npx had cached (v10 on a fresh runner), which requires the new
-        # flat config and breaks instantly on this legacy repo.
-        run: bunx --bun eslint packages/ --max-warnings 50
+        run: bunx --bun eslint packages/ --max-warnings 0
+
+      - name: Format check
+        run: bunx --bun prettier --check "packages/**/*.{ts,tsx,js,jsx,json,css}"
 
       - name: Unit tests (excludes E2E and integration)
         run: |

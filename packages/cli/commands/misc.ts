@@ -8,7 +8,7 @@ import { AppContext } from "../../core/app.js";
 import { getArkClient } from "./_shared.js";
 import { splitEditorCommand } from "../helpers.js";
 
-export function registerMiscCommands(program: Command, app: AppContext | null) {
+export function registerMiscCommands(program: Command, _app: AppContext | null) {
   // ── PR commands ──────────────────────────────────────────────────────────────
 
   const pr = program.command("pr").description("Manage PR-bound sessions");
@@ -49,7 +49,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Watch (Issue Poller) ─────────────────────────────────────────────────────
 
-  program.command("watch")
+  program
+    .command("watch")
     .description("Watch GitHub issues with a label and auto-create sessions")
     .option("-l, --label <label>", "GitHub label to watch", "ark")
     .option("-d, --dispatch", "Auto-dispatch created sessions")
@@ -59,7 +60,11 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       const label = opts.label;
       const intervalMs = parseInt(opts.interval, 10);
 
-      console.log(chalk.blue(`Watching issues labeled '${label}' (poll every ${intervalMs / 1000}s)${opts.dispatch ? " -- auto-dispatch on" : ""}`));
+      console.log(
+        chalk.blue(
+          `Watching issues labeled '${label}' (poll every ${intervalMs / 1000}s)${opts.dispatch ? " -- auto-dispatch on" : ""}`,
+        ),
+      );
       console.log(chalk.dim("Press Ctrl+C to stop.\n"));
 
       const { getApp } = await import("../../core/app.js");
@@ -84,7 +89,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   const claudeCmd = program.command("claude").description("Interact with Claude Code sessions");
 
-  claudeCmd.command("list")
+  claudeCmd
+    .command("list")
     .description("List Claude Code sessions found on disk")
     .option("-p, --project <filter>", "Filter by project path")
     .option("-l, --limit <n>", "Max results", "20")
@@ -110,7 +116,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Doctor command ──────────────────────────────────────────────────────────
 
-  program.command("doctor")
+  program
+    .command("doctor")
     .description("Check system prerequisites")
     .action(async () => {
       const { checkPrereqs, formatPrereqCheck, hasRequiredPrereqs } = await import("../../core/prereqs.js");
@@ -127,7 +134,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── ArkD (universal agent daemon) ────────────────────────────────────────────
 
-  program.command("arkd")
+  program
+    .command("arkd")
     .description("Start the arkd agent daemon")
     .option("-p, --port <port>", "Port", "19300")
     .option("--hostname <host>", "Bind address (default: 0.0.0.0)", "0.0.0.0")
@@ -143,7 +151,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Channel (MCP stdio server for remote compute) ──────────────────────────
 
-  program.command("channel")
+  program
+    .command("channel")
     .description("Run the MCP channel server (used by remote agents)")
     .action(async () => {
       await import("../../core/conductor/channel.js");
@@ -156,7 +165,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Config ─────────────────────────────────────────────────────────────────
 
-  program.command("config")
+  program
+    .command("config")
     .description("Open Ark config in your editor")
     .option("--path", "Just print the config path")
     .action((opts) => {
@@ -165,19 +175,22 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       // Create default config if missing
       if (!existsSync(configPath)) {
         mkdirSync(dirname(configPath), { recursive: true });
-        writeFileSync(configPath, [
-          "# Ark configuration",
-          "# See: https://github.com/your-org/ark#configuration",
-          "",
-          "# hotkeys:",
-          "#   delete: x",
-          "#   fork: f",
-          "",
-          "# budgets:",
-          "#   dailyLimit: 50",
-          "#   weeklyLimit: 200",
-          "",
-        ].join("\n"));
+        writeFileSync(
+          configPath,
+          [
+            "# Ark configuration",
+            "# See: https://github.com/your-org/ark#configuration",
+            "",
+            "# hotkeys:",
+            "#   delete: x",
+            "#   fork: f",
+            "",
+            "# budgets:",
+            "#   dailyLimit: 50",
+            "#   weeklyLimit: 200",
+            "",
+          ].join("\n"),
+        );
       }
 
       if (opts.path) {
@@ -193,7 +206,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Web dashboard ──────────────────────────────────────────────────────────
 
-  program.command("web")
+  program
+    .command("web")
     .description("Start web dashboard")
     .option("--port <port>", "Listen port", "8420")
     .option("--read-only", "Read-only mode")
@@ -217,7 +231,10 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
         });
         console.log(chalk.green(`Ark web dashboard (proxying to ${remoteUrl}): ${proxy.url}`));
         console.log(chalk.dim("Press Ctrl+C to stop"));
-        process.on("SIGINT", () => { proxy.stop(); process.exit(0); });
+        process.on("SIGINT", () => {
+          proxy.stop();
+          process.exit(0);
+        });
         await new Promise(() => {});
       } else {
         const server = core.startWebServer(core.getApp(), {
@@ -228,14 +245,18 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
         });
         console.log(chalk.green(`Ark web dashboard: ${server.url}`));
         console.log(chalk.dim("Press Ctrl+C to stop"));
-        process.on("SIGINT", () => { server.stop(); process.exit(0); });
+        process.on("SIGINT", () => {
+          server.stop();
+          process.exit(0);
+        });
         await new Promise(() => {});
       }
     });
 
   // ── OpenAPI spec ──────────────────────────────────────────────────────────────
 
-  program.command("openapi")
+  program
+    .command("openapi")
     .description("Generate OpenAPI spec")
     .action(() => {
       console.log(JSON.stringify(core.generateOpenApiSpec(), null, 2));
@@ -243,7 +264,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── MCP proxy (internal, used by pooled MCP configs) ────────────────────────
 
-  program.command("mcp-proxy")
+  program
+    .command("mcp-proxy")
     .description("Bridge stdin/stdout to a pooled MCP socket (internal)")
     .argument("<socket-path>")
     .action((socketPath) => {
@@ -252,7 +274,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── ACP (headless JSON-RPC protocol) ──────────────────────────────────────
 
-  program.command("acp")
+  program
+    .command("acp")
     .description("Start headless ACP server on stdin/stdout (JSON-RPC)")
     .action(() => {
       core.runAcpServer(core.getApp());
@@ -260,7 +283,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Repo map ──────────────────────────────────────────────────────────────
 
-  program.command("repo-map")
+  program
+    .command("repo-map")
     .description("Generate repository structure map")
     .argument("[dir]", "Directory to scan", ".")
     .option("--max-files <n>", "Max files to include", "500")
@@ -286,7 +310,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Init wizard ───────────────────────────────────────────────────────────
 
-  program.command("init")
+  program
+    .command("init")
     .description("Initialize Ark for this repository")
     .action(async () => {
       const { checkPrereqs, formatPrereqCheck, hasRequiredPrereqs } = await import("../../core/prereqs.js");
@@ -313,15 +338,18 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       // 3. Create .ark.yaml in current dir if not exists
       const arkYamlPath = ".ark.yaml";
       if (!existsSync(arkYamlPath)) {
-        writeFileSync(arkYamlPath, [
-          "# Ark per-repository configuration",
-          "# flow: bare          # Default flow for sessions",
-          "# agent: implementer  # Default agent",
-          "# verify:             # Verification scripts",
-          "#   - npm test",
-          "# auto_pr: true       # Auto-create PR on completion",
-          "",
-        ].join("\n"));
+        writeFileSync(
+          arkYamlPath,
+          [
+            "# Ark per-repository configuration",
+            "# flow: bare          # Default flow for sessions",
+            "# agent: implementer  # Default agent",
+            "# verify:             # Verification scripts",
+            "#   - npm test",
+            "# auto_pr: true       # Auto-create PR on completion",
+            "",
+          ].join("\n"),
+        );
         console.log(chalk.green(`\nCreated ${arkYamlPath} (edit to customize)`));
       } else {
         console.log(chalk.dim(`\n${arkYamlPath} already exists`));

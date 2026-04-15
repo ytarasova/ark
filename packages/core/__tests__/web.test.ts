@@ -3,7 +3,6 @@ import { startWebServer } from "../hosted/web.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "../app.js";
 
-
 withTestContext();
 
 /** Helper: send a JSON-RPC request to the web server. */
@@ -18,15 +17,23 @@ async function rpc(port: number, method: string, params: Record<string, unknown>
   return resp;
 }
 
-async function rpcResult(port: number, method: string, params: Record<string, unknown> = {}, opts?: { token?: string }) {
+async function rpcResult(
+  port: number,
+  method: string,
+  params: Record<string, unknown> = {},
+  opts?: { token?: string },
+) {
   const resp = await rpc(port, method, params, opts);
-  const data = await resp.json() as Record<string, unknown>;
+  const data = (await resp.json()) as Record<string, unknown>;
   return data;
 }
 
 describe("web server", () => {
   let server: { stop: () => void; url: string } | null = null;
-  afterEach(() => { server?.stop(); server = null; });
+  afterEach(() => {
+    server?.stop();
+    server = null;
+  });
 
   it("starts and serves dashboard HTML", async () => {
     const { existsSync } = await import("fs");
@@ -134,7 +141,7 @@ describe("web server", () => {
     server = startWebServer(getApp(), { port: 18434, readOnly: true });
     const resp = await rpc(18434, "session/start", { summary: "should-fail" });
     expect(resp.status).toBe(403);
-    const data = await resp.json() as Record<string, unknown>;
+    const data = (await resp.json()) as Record<string, unknown>;
     expect(data.error).toBeDefined();
   });
 
@@ -277,7 +284,14 @@ describe("web server", () => {
       ws.onclose = () => resolve();
       ws.onerror = () => resolve();
       // Timeout after 2s in case nothing happens
-      setTimeout(() => { try { ws.close(); } catch {} resolve(); }, 2000);
+      setTimeout(() => {
+        try {
+          ws.close();
+        } catch {
+          /* timeout cleanup */
+        }
+        resolve();
+      }, 2000);
     });
     // Should have received either a connected or error message
     expect(messages.length).toBeGreaterThanOrEqual(1);

@@ -60,14 +60,13 @@ export async function getProcessTree(rootPid: number): Promise<ProcessInfo> {
 
   // Fetch process info for all descendants in a single ps call
   const allPids = [rootPid, ...descendants].join(",");
-  let children: ProcessInfo["children"] = [];
+  const children: ProcessInfo["children"] = [];
 
   try {
-    const { stdout } = await execFileAsync(
-      "ps",
-      ["-p", allPids, "-o", "pid=,ppid=,pcpu=,pmem=,args="],
-      { encoding: "utf-8", timeout: 5000 },
-    );
+    const { stdout } = await execFileAsync("ps", ["-p", allPids, "-o", "pid=,ppid=,pcpu=,pmem=,args="], {
+      encoding: "utf-8",
+      timeout: 5000,
+    });
 
     for (const line of stdout.split("\n")) {
       const trimmed = line.trim();
@@ -114,7 +113,11 @@ export async function killProcessTree(rootPid: number): Promise<void> {
 
   // SIGTERM pass
   for (const pid of pidsToKill) {
-    try { process.kill(pid, "SIGTERM"); } catch { /* ESRCH: already dead */ }
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      /* ESRCH: already dead */
+    }
   }
 
   // Brief wait for graceful shutdown
@@ -122,7 +125,11 @@ export async function killProcessTree(rootPid: number): Promise<void> {
 
   // SIGKILL survivors
   for (const pid of pidsToKill) {
-    try { process.kill(pid, "SIGKILL"); } catch { /* ESRCH: already dead */ }
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      /* ESRCH: already dead */
+    }
   }
 }
 

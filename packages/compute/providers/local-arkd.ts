@@ -11,15 +11,18 @@
 
 import { existsSync, rmSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+
 import { ArkdBackedProvider } from "./arkd-backed.js";
 import { safeAsync } from "../../core/safe.js";
 import {
-  pullImage, createContainer, startContainer, stopContainer, removeContainer, DEFAULT_IMAGE,
+  pullImage,
+  createContainer,
+  startContainer,
+  stopContainer,
+  removeContainer,
+  DEFAULT_IMAGE,
 } from "./docker/helpers.js";
-import type {
-  Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
-} from "../types.js";
+import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts } from "../types.js";
 import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL } from "../../core/constants.js";
 import { channelLaunchSpec } from "../../core/install-paths.js";
 
@@ -29,7 +32,9 @@ abstract class LocalArkdBase extends ArkdBackedProvider {
   readonly canReboot = false;
   readonly needsAuth = false;
 
-  getArkdUrl(_compute: Compute): string { return DEFAULT_ARKD_URL; }
+  getArkdUrl(_compute: Compute): string {
+    return DEFAULT_ARKD_URL;
+  }
 
   async attach(_compute: Compute, _session: Session): Promise<void> {
     // Local: tmux attach handled by CLI layer, no tunnels
@@ -44,7 +49,12 @@ abstract class LocalArkdBase extends ArkdBackedProvider {
     return ["tmux", "attach", "-t", session.session_id];
   }
 
-  buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown> {
     // channelLaunchSpec() self-spawns in compiled mode, uses bun+source in dev.
     const spec = channelLaunchSpec();
     return {
@@ -118,9 +128,7 @@ export class LocalWorktreeProvider extends LocalArkdBase {
 
 export class LocalDockerProvider extends LocalArkdBase {
   readonly name = "docker";
-  readonly isolationModes: IsolationMode[] = [
-    { value: "container", label: "Docker container (isolated)" },
-  ];
+  readonly isolationModes: IsolationMode[] = [{ value: "container", label: "Docker container (isolated)" }];
   readonly canDelete = true;
   readonly supportsWorktree = false;
   readonly initialStatus = "stopped";
@@ -201,9 +209,7 @@ export class LocalDockerProvider extends LocalArkdBase {
 
 export class LocalDevcontainerProvider extends LocalArkdBase {
   readonly name = "devcontainer";
-  readonly isolationModes: IsolationMode[] = [
-    { value: "devcontainer", label: "Devcontainer (project-defined)" },
-  ];
+  readonly isolationModes: IsolationMode[] = [{ value: "devcontainer", label: "Devcontainer (project-defined)" }];
   readonly canDelete = true;
   readonly supportsWorktree = false;
   readonly initialStatus = "stopped";
@@ -267,9 +273,7 @@ export class LocalDevcontainerProvider extends LocalArkdBase {
 
 export class LocalFirecrackerProvider extends LocalArkdBase {
   readonly name = "firecracker";
-  readonly isolationModes: IsolationMode[] = [
-    { value: "microvm", label: "Firecracker microVM (hardware isolation)" },
-  ];
+  readonly isolationModes: IsolationMode[] = [{ value: "microvm", label: "Firecracker microVM (hardware isolation)" }];
   readonly canDelete = true;
   readonly supportsWorktree = false;
   readonly initialStatus = "stopped";
@@ -280,7 +284,9 @@ export class LocalFirecrackerProvider extends LocalArkdBase {
       throw new Error("Firecracker requires Linux with /dev/kvm. Use ec2-firecracker for remote.");
     }
     if (!existsSync("/dev/kvm")) {
-      throw new Error("Firecracker requires /dev/kvm (KVM support). Enable nested virtualization or use a bare-metal host.");
+      throw new Error(
+        "Firecracker requires /dev/kvm (KVM support). Enable nested virtualization or use a bare-metal host.",
+      );
     }
 
     const cfg = compute.config as Record<string, unknown>;
@@ -295,7 +301,9 @@ export class LocalFirecrackerProvider extends LocalArkdBase {
     const rootfsPath = (cfg.rootfs as string) || "/opt/firecracker/rootfs.ext4";
 
     if (!existsSync(kernelPath)) {
-      throw new Error(`Firecracker kernel not found at ${kernelPath}. Download from https://github.com/firecracker-microvm/firecracker/releases`);
+      throw new Error(
+        `Firecracker kernel not found at ${kernelPath}. Download from https://github.com/firecracker-microvm/firecracker/releases`,
+      );
     }
     if (!existsSync(rootfsPath)) {
       throw new Error(`Firecracker rootfs not found at ${rootfsPath}. Build one with bun + tmux installed.`);
@@ -320,15 +328,33 @@ export class LocalFirecrackerProvider extends LocalArkdBase {
 
     await client.run({
       command: "curl",
-      args: ["--unix-socket", socketPath, "-X", "PUT", "http://localhost/machine-config",
-             "-H", "Content-Type: application/json", "-d", vmConfig],
+      args: [
+        "--unix-socket",
+        socketPath,
+        "-X",
+        "PUT",
+        "http://localhost/machine-config",
+        "-H",
+        "Content-Type: application/json",
+        "-d",
+        vmConfig,
+      ],
     });
 
     // Start the VM
     await client.run({
       command: "curl",
-      args: ["--unix-socket", socketPath, "-X", "PUT", "http://localhost/actions",
-             "-H", "Content-Type: application/json", "-d", '{"action_type":"InstanceStart"}'],
+      args: [
+        "--unix-socket",
+        socketPath,
+        "-X",
+        "PUT",
+        "http://localhost/actions",
+        "-H",
+        "Content-Type: application/json",
+        "-d",
+        '{"action_type":"InstanceStart"}',
+      ],
     });
 
     this.app.computes.mergeConfig(compute.name, {
@@ -347,8 +373,17 @@ export class LocalFirecrackerProvider extends LocalArkdBase {
       const client = this.getClient(compute);
       await client.run({
         command: "curl",
-        args: ["--unix-socket", socketPath, "-X", "PUT", "http://localhost/actions",
-               "-H", "Content-Type: application/json", "-d", '{"action_type":"SendCtrlAltDel"}'],
+        args: [
+          "--unix-socket",
+          socketPath,
+          "-X",
+          "PUT",
+          "http://localhost/actions",
+          "-H",
+          "Content-Type: application/json",
+          "-d",
+          '{"action_type":"SendCtrlAltDel"}',
+        ],
       });
     }
     this.app.computes.update(compute.name, { status: "destroyed" });

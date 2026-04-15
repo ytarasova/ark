@@ -8,6 +8,9 @@ Autonomous agent ecosystem. Orchestrates AI coding agents through DAG-based SDLC
 make install          # bun install + symlink ark to /usr/local/bin
 make test             # run all tests sequentially (NEVER parallel -- ports collide)
 make test-file F=path # run a single test file
+make lint             # ESLint (zero warnings allowed)
+make format-check     # Prettier check (CI gate)
+make format           # Prettier auto-fix
 make dev              # hot-reload: API (:8420) + Vite HMR (:5173)
 make dev-web          # same as dev (alias)
 make dev-daemon       # hot-reload: server daemon (conductor + arkd + WS)
@@ -177,6 +180,8 @@ Claude Code hooks detect agent status (busy/idle/error/done). `claude.writeSetti
 ## Code Style
 
 - TypeScript, `strict: false`, ES modules with `.js` extensions
+- Prettier for formatting (120 char line width, double quotes, trailing commas). Run `make format` to fix.
+- ESLint with zero warnings allowed. CI rejects any lint warning or error.
 - YAML for agent/flow/runtime/skill/recipe definitions
 - SQLite local, PostgreSQL hosted (IDatabase abstraction, no ORM)
 - Never use em dashes (U+2014)

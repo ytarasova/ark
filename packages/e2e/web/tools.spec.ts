@@ -10,7 +10,7 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
 import { chromium } from "playwright";
 import { readdirSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { setupWebServer, type WebServerEnv } from "../fixtures/web-server.js";
 
 let ws: WebServerEnv;

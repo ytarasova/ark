@@ -10,7 +10,6 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/cli/index.js",
-
     "test": "bun test",
     "test:watch": "bun test --watch",
     "lint": "eslint packages/",
@@ -73,6 +72,7 @@
     "@typescript-eslint/eslint-plugin": "^8.58.1",
     "@typescript-eslint/parser": "^8.58.1",
     "eslint": "^10.2.0",
+    "prettier": "^3.8.3",
     "typescript": "^5.5.0"
   }
 }

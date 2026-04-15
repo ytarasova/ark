@@ -238,10 +238,12 @@ describe("writeChannelConfig", () => {
 
   it("preserves existing .mcp.json content", () => {
     const workdir = getCtx().arkDir;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    writeFileSync(join(workdir, ".mcp.json"), JSON.stringify({
-      mcpServers: { "other-server": { command: "other" } },
-    }));
+    writeFileSync(
+      join(workdir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: { "other-server": { command: "other" } },
+      }),
+    );
 
     writeChannelConfig("s-abc123", "work", 19300, workdir);
 
@@ -273,12 +275,15 @@ describe("writeChannelConfig", () => {
     const workdir = getCtx().arkDir;
     const originalRepo = join(workdir, "original-repo");
     mkdirSync(originalRepo, { recursive: true });
-    writeFileSync(join(originalRepo, ".mcp.json"), JSON.stringify({
-      mcpServers: {
-        "context7": { command: "npx", args: ["-y", "@context7/mcp"] },
-        "playwright": { command: "npx", args: ["-y", "@playwright/mcp"] },
-      },
-    }));
+    writeFileSync(
+      join(originalRepo, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          context7: { command: "npx", args: ["-y", "@context7/mcp"] },
+          playwright: { command: "npx", args: ["-y", "@playwright/mcp"] },
+        },
+      }),
+    );
 
     const worktreeDir = join(workdir, "worktree");
     mkdirSync(worktreeDir, { recursive: true });
@@ -295,15 +300,21 @@ describe("writeChannelConfig", () => {
     const workdir = getCtx().arkDir;
     const originalRepo = join(workdir, "original-repo");
     mkdirSync(originalRepo, { recursive: true });
-    writeFileSync(join(originalRepo, ".mcp.json"), JSON.stringify({
-      mcpServers: { "my-server": { command: "old-cmd" } },
-    }));
+    writeFileSync(
+      join(originalRepo, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: { "my-server": { command: "old-cmd" } },
+      }),
+    );
 
     const worktreeDir = join(workdir, "worktree");
     mkdirSync(worktreeDir, { recursive: true });
-    writeFileSync(join(worktreeDir, ".mcp.json"), JSON.stringify({
-      mcpServers: { "my-server": { command: "new-cmd" } },
-    }));
+    writeFileSync(
+      join(worktreeDir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: { "my-server": { command: "new-cmd" } },
+      }),
+    );
 
     writeChannelConfig("s-abc123", "work", 19300, worktreeDir, { originalRepoDir: originalRepo });
 
@@ -317,12 +328,15 @@ describe("writeChannelConfig", () => {
     const workdir = getCtx().arkDir;
     const originalRepo = join(workdir, "original-repo");
     mkdirSync(originalRepo, { recursive: true });
-    writeFileSync(join(originalRepo, ".mcp.json"), JSON.stringify({
-      mcpServers: {
-        "ark-channel": { command: "stale-bun", env: { ARK_SESSION_ID: "s-old" } },
-        "useful-server": { command: "useful" },
-      },
-    }));
+    writeFileSync(
+      join(originalRepo, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          "ark-channel": { command: "stale-bun", env: { ARK_SESSION_ID: "s-old" } },
+          "useful-server": { command: "useful" },
+        },
+      }),
+    );
 
     const worktreeDir = join(workdir, "worktree");
     mkdirSync(worktreeDir, { recursive: true });
@@ -337,9 +351,12 @@ describe("writeChannelConfig", () => {
 
   it("does not merge when originalRepoDir equals workdir", () => {
     const workdir = getCtx().arkDir;
-    writeFileSync(join(workdir, ".mcp.json"), JSON.stringify({
-      mcpServers: { "existing": { command: "existing" } },
-    }));
+    writeFileSync(
+      join(workdir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: { existing: { command: "existing" } },
+      }),
+    );
 
     // When originalRepoDir === workdir, no merging happens (no worktree was created)
     writeChannelConfig("s-abc123", "work", 19300, workdir, { originalRepoDir: workdir });
@@ -381,9 +398,12 @@ describe("removeChannelConfig", () => {
 
   it("preserves other MCP servers in .mcp.json", () => {
     const workdir = getCtx().arkDir;
-    writeFileSync(join(workdir, ".mcp.json"), JSON.stringify({
-      mcpServers: { "other-server": { command: "other" } },
-    }));
+    writeFileSync(
+      join(workdir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: { "other-server": { command: "other" } },
+      }),
+    );
 
     writeChannelConfig("s-abc123", "work", 19300, workdir);
     removeChannelConfig(workdir);
@@ -395,10 +415,13 @@ describe("removeChannelConfig", () => {
 
   it("preserves non-mcpServers keys in .mcp.json", () => {
     const workdir = getCtx().arkDir;
-    writeFileSync(join(workdir, ".mcp.json"), JSON.stringify({
-      mcpServers: { "ark-channel": { command: "bun" } },
-      customKey: "preserved",
-    }));
+    writeFileSync(
+      join(workdir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: { "ark-channel": { command: "bun" } },
+        customKey: "preserved",
+      }),
+    );
 
     removeChannelConfig(workdir);
 
@@ -413,9 +436,12 @@ describe("removeChannelConfig", () => {
 
   it("does nothing if .mcp.json has no ark-channel", () => {
     const workdir = getCtx().arkDir;
-    writeFileSync(join(workdir, ".mcp.json"), JSON.stringify({
-      mcpServers: { "other-server": { command: "other" } },
-    }));
+    writeFileSync(
+      join(workdir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: { "other-server": { command: "other" } },
+      }),
+    );
 
     removeChannelConfig(workdir);
 
@@ -542,13 +568,13 @@ describe("buildLauncher", () => {
   it("does not include custom env when env is empty", () => {
     const { content } = buildLauncher({ ...baseOpts, env: {} });
     // PATH export is always present; custom env vars should not be
-    const lines = content.split("\n").filter(l => l.startsWith("export ") && !l.includes("PATH="));
+    const lines = content.split("\n").filter((l) => l.startsWith("export ") && !l.includes("PATH="));
     expect(lines.length).toBe(0);
   });
 
   it("does not include custom env when env is undefined", () => {
     const { content } = buildLauncher(baseOpts);
-    const lines = content.split("\n").filter(l => l.startsWith("export ") && !l.includes("PATH="));
+    const lines = content.split("\n").filter((l) => l.startsWith("export ") && !l.includes("PATH="));
     expect(lines.length).toBe(0);
   });
 
@@ -599,7 +625,7 @@ describe("buildLauncher initialPrompt", () => {
     const { content } = buildLauncher(baseOpts);
     // After the --remote-control line, script should just have exec bash
     const lines = content.split("\n");
-    const execLine = lines.findIndex(l => l.trim() === "exec bash");
+    const execLine = lines.findIndex((l) => l.trim() === "exec bash");
     // The line before exec bash should not contain a quoted prompt
     expect(lines[execLine - 1]).not.toMatch(/^\s+'.*'$/);
   });
