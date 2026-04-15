@@ -159,6 +159,8 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install
+      - name: Build web frontend
+        run: cd packages/web && bunx --bun vite build --logLevel error
       - name: Run install tests
         run: make test-install
 
