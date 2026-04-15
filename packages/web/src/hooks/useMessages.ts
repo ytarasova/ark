@@ -37,7 +37,6 @@ export function useMessages({ sessionId, enabled, pollMs = 2000 }: UseMessagesOp
       if (activeRef.current) {
         setMessages(prev => {
           // Remove optimistic messages that now have real counterparts
-          const realIds = new Set(list.map(m => m.id));
           const optimistic = prev.filter(m => m.id < 0 && !list.some(
             r => r.role === m.role && r.content === m.content &&
               Math.abs(new Date(r.created_at).getTime() - new Date(m.created_at).getTime()) < 5000
