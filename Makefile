@@ -14,7 +14,7 @@
 #   make package       Package everything for distribution
 
 .PHONY: help install dev dev-daemon dev-arkd dev-tui dev-web tui-standalone litellm litellm-start litellm-stop claude web desktop \
-        test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-watch lint \
+        test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-install test-watch lint \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
         vendor-tmux vendor-tensorzero vendor-codegraph \
@@ -34,7 +34,7 @@ help: ## Show available commands
 	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-tui|dev-web|tui-standalone|litellm-start|litellm-stop|litellm|claude|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
-	@grep -E '^(test|test-file|test-e2e|test-watch):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(test|test-file|test-e2e|test-install|test-watch):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mBuilding & Packaging\033[0m"
 	@grep -E '^(build|build-cli|build-web|build-desktop|package|package-cli|package-desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -197,6 +197,10 @@ test-web-e2e: build-web ## Run web end-to-end tests (Playwright against the web 
 	@cd packages/e2e && bun install --silent 2>/dev/null; \
 	  bunx --bun playwright install chromium --with-deps 2>/dev/null; \
 	  bunx --bun playwright test
+
+test-install: ## Run install.sh regression tests (docs/install.sh)
+	@./scripts/tests/install/test-symlink-preservation.sh
+	@./scripts/tests/install/test-installed-binary-runs.sh
 
 test-watch: ## Run unit tests in watch mode
 	$(BUN) test --watch

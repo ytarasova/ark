@@ -145,6 +145,19 @@ jobs:
             echo "TUI smoke test passed"
           fi
 
+  test-install-sh:
+    name: install.sh regression tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run install tests
+        run: make test-install
+
   web-e2e:
     runs-on: macos-latest
     timeout-minutes: 15

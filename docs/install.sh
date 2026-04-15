@@ -90,10 +90,29 @@ tar -xzf "$TMPDIR/ark.tar.gz" -C "$TMPDIR" || error "Extraction failed"
 # ── Install ─────────────────────────────────────────────────────────────────
 
 mkdir -p "$INSTALL_DIR"
+# Remove any pre-existing symlinks in the bin dir so `cp` does not write
+# through them to their targets. Example: `make install` creates
+# $BIN_DIR/ark as a symlink into the source repo, and without this cleanup
+# `cp -R` would clobber the source-tree file. Scoped to $BIN_DIR (not the
+# whole $INSTALL_DIR) so future legitimate symlinks elsewhere under
+# ~/.ark/ are preserved.
+if [ -d "$BIN_DIR" ]; then
+  find "$BIN_DIR" -maxdepth 1 -type l -delete 2>/dev/null || true
+fi
 # Copy bin/ (ark + tmux + codegraph + tensorzero), agents/, flows/, etc.
 cp -R "$TMPDIR/ark-$PLATFORM"/* "$INSTALL_DIR/"
 chmod +x "$BIN_DIR/ark" "$BIN_DIR/tmux" "$BIN_DIR/codegraph" 2>/dev/null || true
 chmod +x "$BIN_DIR/tensorzero-gateway" 2>/dev/null || true
+
+# macOS: the Bun-compiled ark binary ships with a malformed LC_CODE_SIGNATURE
+# that the kernel rejects with SIGKILL at launch time. Strip and ad-hoc
+# re-sign so the binary actually runs. No-op on Linux.
+if [ "$OS" = "darwin" ] && command -v codesign &>/dev/null; then
+  codesign --remove-signature "$BIN_DIR/ark" 2>/dev/null || true
+  if ! codesign --force --sign - "$BIN_DIR/ark" 2>/dev/null; then
+    error "Failed to ad-hoc sign $BIN_DIR/ark. On macOS 14+, unsigned arm64 binaries are killed by the kernel on launch. Try: codesign --force --sign - $BIN_DIR/ark"
+  fi
+fi
 
 info "Installed:"
 for bin in ark tmux codegraph tensorzero-gateway; do
