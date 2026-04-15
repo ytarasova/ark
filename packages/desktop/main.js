@@ -230,17 +230,34 @@ function buildMenu() {
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
 
-app.whenReady().then(async () => {
-  buildMenu();
-  await startServer();
-  createWindow();
+// Single-instance lock: prevents a second launch from spawning another
+// `ark web` subprocess on a different port. If we fail to acquire the lock,
+// the existing instance focuses its window and this process exits.
+const gotTheLock = app.requestSingleInstanceLock();
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
     }
   });
-});
+
+  app.whenReady().then(async () => {
+    buildMenu();
+    await startServer();
+    createWindow();
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  });
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

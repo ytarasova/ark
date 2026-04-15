@@ -631,10 +631,19 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.release-type.outputs.tag }}
         run: |
+          # Glob includes both lowercase (ark-*) and capitalized (Ark-*, "Ark Setup*")
+          # names -- electron-builder produces "Ark-<ver>-*.dmg", "Ark Setup <ver>.exe",
+          # "Ark-<ver>.AppImage" etc. with a capital A. Without this, mac + win +
+          # AppImage artifacts are silently dropped from the release (regression
+          # guard for Bug-017: desktop artifacts missing from v0.15.3).
+          shopt -s nullglob
+          files=(dist/ark-* dist/Ark-* dist/Ark\ Setup*)
+          echo "Uploading ${#files[@]} release assets:"
+          printf '  %s\n' "${files[@]}"
           gh release create "$RELEASE_TAG" \
             --title "$RELEASE_TAG" \
             --generate-notes \
-            dist/ark-*
+            "${files[@]}"
 
       - name: Update latest release
         if: steps.release-type.outputs.is_tag == 'false'
@@ -659,4 +668,9 @@ jobs:
           Each platform tarball (\`ark-<platform>.tar.gz\`) is self-contained: ark + tmux + codegraph + tensorzero-gateway. No system dependencies required.
 
           Commit: $COMMIT_SHA"
-          gh release upload latest dist/ark-* --clobber
+          # See tagged-release step above for why we glob both cases.
+          shopt -s nullglob
+          files=(dist/ark-* dist/Ark-* dist/Ark\ Setup*)
+          echo "Uploading ${#files[@]} rolling release assets:"
+          printf '  %s\n' "${files[@]}"
+          gh release upload latest "${files[@]}" --clobber
