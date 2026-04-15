@@ -16,6 +16,8 @@ interface FolderPickerModalProps {
   onClose: () => void;
 }
 
+const LAST_REPO_KEY = "ark:lastPickedRepo";
+
 /**
  * Server-backed folder picker. Lists directories via `fs/list-dir` and lets
  * the user navigate and pick one. Only reachable from local mode -- the
@@ -28,11 +30,15 @@ export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPick
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pathInput, setPathInput] = useState("");
-  // `requestedPath` is what we currently ask the server for. Undefined means
-  // "use the server default" (the user's home directory).
-  const [requestedPath, setRequestedPath] = useState<string | undefined>(
-    initialPath && initialPath !== "." ? initialPath : undefined,
-  );
+  // Priority: explicit initialPath > last picked (localStorage) > server default (home).
+  const [requestedPath, setRequestedPath] = useState<string | undefined>(() => {
+    if (initialPath && initialPath !== ".") return initialPath;
+    try {
+      return localStorage.getItem(LAST_REPO_KEY) ?? undefined;
+    } catch {
+      return undefined;
+    }
+  });
 
   const load = useCallback((path: string | undefined) => {
     setLoading(true);
@@ -64,7 +70,9 @@ export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPick
   }
 
   function submitSelection() {
-    if (cwd) onSelect(cwd);
+    if (!cwd) return;
+    try { localStorage.setItem(LAST_REPO_KEY, cwd); } catch { /* ignore */ }
+    onSelect(cwd);
   }
 
   function handlePathKeyDown(e: KeyboardEvent<HTMLInputElement>) {
