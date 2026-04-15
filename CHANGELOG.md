@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.15.4 (2026-04-15)
+
+### Desktop App
+- **Release pipeline**: fix `gh release create` glob in `.github/workflows/release.yml` so electron-builder artifacts actually reach the release. Previous `dist/ark-*` pattern matched only the lowercase Debian package; macOS `.dmg`/`.zip`, Windows `.exe`/`.zip`, and Linux `.AppImage` (all produced with capital A by electron-builder as `Ark-<ver>-*`) were silently dropped. Glob now covers `ark-*`, `Ark-*`, and `Ark Setup*`. Same fix applied to the rolling `latest` release upload.
+- **Single-instance lock**: desktop app now calls `app.requestSingleInstanceLock()` in `packages/desktop/main.js`. A second launch no longer spawns a second `ark web` subprocess on a new port -- it focuses the existing window.
+- **Install documentation**: new `packages/desktop/INSTALL.md` with platform downloads, the macOS Gatekeeper workaround (`xattr -dr com.apple.quarantine /Applications/Ark.app`) for the current unsigned build, and a full list of known limitations. Linked from root `README.md`.
+- **Remove stale playwright config**: `packages/desktop/playwright.config.ts` referenced `./tests`, which was deleted in the e2e migration (commit `1c6cb94`). `npm test` no longer errors out in the desktop package; the `test` script and `@playwright/test` dev dependency were removed. A real desktop smoke test will come when e2e coverage is restored.
+
+### Known Limitations (v0.15.4)
+- No bundled `ark` CLI runtime -- desktop app still requires the Ark CLI on `PATH` (install via `curl -fsSL https://ytarasova.github.io/ark/install.sh | bash`). Tracked as a follow-up.
+- Unsigned macOS DMG -- see `packages/desktop/INSTALL.md` for the Gatekeeper workaround. No Apple Developer certificate is configured in CI yet.
+- Unsigned Windows installer -- SmartScreen warns about unverified publisher.
+- No auto-updater, no system tray.
+
 ## v0.14.0 (2026-04-13)
 
 ### TUI

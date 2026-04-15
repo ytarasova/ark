@@ -26,6 +26,10 @@ make install    # requires Bun + tmux pre-installed
 
 Run `ark doctor` to verify your environment.
 
+Prefer a native window? Install the [Ark Desktop app](packages/desktop/INSTALL.md)
+(macOS, Windows, Linux). macOS users: there's an unsigned-build workaround
+documented in the desktop install guide.
+
 ## Quick Start
 
 ```bash
@@ -65,7 +69,7 @@ ark search "authentication"
 | **Dashboard** | Fleet status overview with cost charts (Recharts), budget tracking, and recent activity | [CLI](docs/cli-reference.md#ark-dashboard) |
 | **TUI Dashboard** | 10-tab terminal UI with keyboard-driven navigation, search, status filters | [TUI Reference](docs/tui-reference.md) |
 | **Web Dashboard** | Browser-based session management with SSE live updates, token auth, read-only mode | [Guide](docs/guide.md#web-dashboard) |
-| **Desktop App** | Electron wrapper around the web dashboard -- native menus, system tray, local-first | -- |
+| **Desktop App** | Electron wrapper around the web dashboard -- native menus, local-first | [Install](packages/desktop/INSTALL.md) |
 | **Compute Providers** | Local, Docker, DevContainer, Firecracker, EC2 + arkd (base/docker/devcontainer/firecracker), E2B (managed sandbox), K8s, K8s+Kata | [Guide](docs/guide.md#compute) |
 | **Git Worktrees** | Automatic branch isolation per session, diff preview, merge + auto-PR in one command | [Guide](docs/guide.md#git-worktrees) |
 | **Skills & Recipes** | Reusable prompt fragments and session templates with three-tier resolution | [Guide](docs/guide.md#skills--recipes) |
