@@ -4,16 +4,14 @@
 #
 # Quick reference:
 #   make install       Install deps + symlink ark CLI
-#   make litellm       Start LiteLLM proxy in background (same as litellm-start)
-#   make litellm-stop  Stop background LiteLLM
-#   make claude        Ensures litellm is up, then Claude Code with .env
+#   make claude-tfy    Claude Code -> TrueFoundry (direct; --continue + skip-permissions on by default)
 #   make dev           Hot-reload CLI + Web UI (two processes)
 #   make test          Run all unit tests (sequential)
 #   make test-e2e      Run Playwright E2E tests against Web UI
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-daemon dev-arkd dev-tui dev-web tui-standalone litellm litellm-start litellm-stop claude web desktop \
+.PHONY: help install dev dev-daemon dev-arkd dev-tui dev-web tui-standalone claude-tfy web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-install test-watch lint \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
@@ -22,16 +20,19 @@
 
 BUN := bun
 ARK_BIN := /usr/local/bin/ark
-LITELLM_MODEL ?= MiniMax-M2.5
-LITELLM_PORT ?= 4000
-LITELLM_DIR := $(CURDIR)/.litellm
-LITELLM_PID := $(LITELLM_DIR)/litellm.pid
-LITELLM_LOG := $(LITELLM_DIR)/litellm.log
+# Bedrock allowlist ids are pi-agentic/<slug> (two /-segments). Use that literal string for make claude-tfy.
+TRUEFOUNDRY_ANTHROPIC_MODEL_DEFAULT := pi-agentic/global.anthropic.claude-opus-4-6-v1
+# make claude-tfy passes --dangerously-skip-permissions unless CLAUDE_SKIP_PERMISSIONS=0 (unsafe; dev/sandbox only).
+CLAUDE_SKIP_PERMISSIONS ?= 1
+CLAUDE_DANGEROUSLY_SKIP_FLAGS := $(if $(filter 0,$(CLAUDE_SKIP_PERMISSIONS)),,--dangerously-skip-permissions)
+# Resume latest session in this directory unless CLAUDE_CONTINUE=0.
+CLAUDE_CONTINUE ?= 1
+CLAUDE_CONTINUE_FLAGS := $(if $(filter 0,$(CLAUDE_CONTINUE)),,--continue)
 
 help: ## Show available commands
 	@echo ""
 	@echo "  \033[1mDevelopment\033[0m"
-	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-tui|dev-web|tui-standalone|litellm-start|litellm-stop|litellm|claude|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-tui|dev-web|tui-standalone|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
 	@grep -E '^(test|test-file|test-e2e|test-install|test-watch):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -99,63 +100,29 @@ dev-web: ## Hot-reload: API server (:8420) + Vite frontend (:5173)
 tui-standalone: ## Launch TUI standalone (embedded mode, no daemon needed)
 	./ark tui
 
-litellm-start: ## Start LiteLLM on :$(LITELLM_PORT) in background (async; waits until healthy)
-	@command -v litellm >/dev/null 2>&1 || { echo "litellm not found. Install: uv tool install --python 3.12 'litellm[proxy]'"; exit 1; }; \
-	test -f "$(CURDIR)/litellm/config.yaml" || { echo "Missing litellm/config.yaml"; exit 1; }; \
-	test -f "$(CURDIR)/.env" || { echo "Missing .env (copy from .env.example)"; exit 1; }; \
-	if curl -sf "http://127.0.0.1:$(LITELLM_PORT)/health" >/dev/null 2>&1 || \
-	    curl -sf "http://127.0.0.1:$(LITELLM_PORT)/" >/dev/null 2>&1; then \
-	  echo "litellm already up on http://127.0.0.1:$(LITELLM_PORT)"; \
-	  exit 0; \
-	fi; \
-	if [ -f "$(LITELLM_PID)" ]; then \
-	  oldpid=$$(cat "$(LITELLM_PID)" 2>/dev/null); \
-	  if [ -n "$$oldpid" ] && kill -0 "$$oldpid" 2>/dev/null; then \
-	    echo "litellm pid $$oldpid running (waiting for http://127.0.0.1:$(LITELLM_PORT))..."; \
-	  else \
-	    rm -f "$(LITELLM_PID)"; \
-	  fi; \
-	fi; \
-	if [ ! -f "$(LITELLM_PID)" ] || ! kill -0 "$$(cat "$(LITELLM_PID)" 2>/dev/null)" 2>/dev/null; then \
-	  mkdir -p "$(LITELLM_DIR)"; \
-	  cd "$(CURDIR)" && set -a && . ./.env && set +a && \
-	    test -n "$$LITELLM_MASTER_KEY" || { echo "Set LITELLM_MASTER_KEY in .env"; exit 1; } && \
-	    test -n "$$SAMBANOVA_API_KEY" || { echo "Set SAMBANOVA_API_KEY in .env"; exit 1; } && \
-	    ( nohup litellm --config "$(CURDIR)/litellm/config.yaml" --port "$(LITELLM_PORT)" \
-	        >>"$(LITELLM_LOG)" 2>&1 & echo $$! >"$(LITELLM_PID)" ); \
-	  echo "litellm started (pid $$(cat "$(LITELLM_PID)"), log $(LITELLM_LOG))"; \
-	fi; \
-	echo "Waiting for litellm on :$(LITELLM_PORT)..."; \
-	i=0; \
-	while [ $$i -lt 45 ]; do \
-	  if curl -sf "http://127.0.0.1:$(LITELLM_PORT)/health" >/dev/null 2>&1 || \
-	      curl -sf "http://127.0.0.1:$(LITELLM_PORT)/" >/dev/null 2>&1; then \
-	    echo "litellm ready at http://127.0.0.1:$(LITELLM_PORT)"; \
-	    exit 0; \
-	  fi; \
-	  i=$$((i+1)); \
-	  sleep 1; \
-	done; \
-	echo "litellm did not become healthy (see $(LITELLM_LOG))"; \
-	sed -n '1,80p' "$(LITELLM_LOG)" 2>/dev/null || true; \
-	exit 1
-
-litellm-stop: ## Stop background LiteLLM on :$(LITELLM_PORT)
-	@if [ -f "$(LITELLM_PID)" ]; then \
-	  litellm_pid=$$(cat "$(LITELLM_PID)" 2>/dev/null); \
-	  [ -n "$$litellm_pid" ] && kill "$$litellm_pid" 2>/dev/null || true; \
-	  rm -f "$(LITELLM_PID)"; \
-	fi
-	@-lsof -ti:$(LITELLM_PORT) 2>/dev/null | xargs kill 2>/dev/null || true
-	@echo "litellm stopped (port $(LITELLM_PORT))."
-
-litellm: litellm-start ## Alias for litellm-start (background proxy)
-
-claude: litellm-start ## Claude Code with .env; default model $(LITELLM_MODEL) unless ARGS is set
+# TrueFoundry: https://truefoundry.com/docs/ai-gateway/claude-code (ANTHROPIC_BASE_URL + Bearer in ANTHROPIC_CUSTOM_HEADERS).
+# Claude Code gateway requirements: https://code.claude.com/docs/en/llm-gateway (Messages /v1/messages, forward anthropic-* headers).
+claude-tfy: ## Claude Code -> TrueFoundry (direct; --continue unless CLAUDE_CONTINUE=0)
 	@command -v claude >/dev/null 2>&1 || { echo "Claude Code not found. Install: https://docs.anthropic.com/en/docs/claude-code"; exit 1; }
 	cd "$(CURDIR)" && \
 	  if [ -f .env ]; then set -a && . ./.env && set +a; fi && \
-	  exec claude $(ARGS) $(if $(strip $(ARGS)),,--model $(LITELLM_MODEL))
+	  test -n "$$TRUEFOUNDRY_API_KEY" || { echo "Set TRUEFOUNDRY_API_KEY in .env"; exit 1; } && \
+	  tfy_anth_base="$$TRUEFOUNDRY_ANTHROPIC_BASE_URL"; \
+	  if [ -z "$$tfy_anth_base" ]; then tfy_anth_base="$$TRUEFOUNDRY_API_BASE"; fi; \
+	  if [ -z "$$tfy_anth_base" ]; then echo "Set TRUEFOUNDRY_ANTHROPIC_BASE_URL (preferred) or TRUEFOUNDRY_API_BASE in .env"; exit 1; fi; \
+	  unset ANTHROPIC_AUTH_TOKEN 2>/dev/null || true; \
+	  export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1 && \
+	  export ANTHROPIC_BASE_URL="$$tfy_anth_base" && \
+	  export ANTHROPIC_API_KEY=dummy && \
+	  export ANTHROPIC_CUSTOM_HEADERS="Authorization: Bearer $$TRUEFOUNDRY_API_KEY" && \
+	  if [ -z "$(strip $(ARGS))" ]; then \
+	    tfy_m="$$TRUEFOUNDRY_ANTHROPIC_MODEL"; \
+	    if [ -z "$$tfy_m" ]; then tfy_m="$(TRUEFOUNDRY_ANTHROPIC_MODEL_DEFAULT)"; fi; \
+	    export ANTHROPIC_MODEL="$$tfy_m" && \
+	    exec claude $(CLAUDE_DANGEROUSLY_SKIP_FLAGS) $(CLAUDE_CONTINUE_FLAGS); \
+	  else \
+	    exec claude $(CLAUDE_DANGEROUSLY_SKIP_FLAGS) $(CLAUDE_CONTINUE_FLAGS) $(ARGS); \
+	  fi
 
 self: ## Dispatch full SDLC (plan->implement->review->PR) against THIS repo
 	@test -n "$(TASK)" || (echo 'Usage: make self TASK="<description>"'; exit 1)
@@ -325,7 +292,6 @@ package-desktop: build-web ## Package Electron app (.dmg + .AppImage)
 
 clean: ## Remove all build artifacts
 	rm -rf dist packages/web/dist packages/desktop/out node_modules/.cache
-	rm -rf "$(LITELLM_DIR)"
 	rm -f ark-native ark-darwin-arm64 ark-darwin-x64 ark-linux-arm64 ark-linux-x64
 	@echo "Cleaned."
 
