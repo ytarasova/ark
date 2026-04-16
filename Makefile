@@ -12,10 +12,9 @@
 #   make package       Package everything for distribution
 
 .PHONY: help install dev dev-daemon dev-arkd dev-web claude-tfy web desktop \
-        tauri-dev tauri-build tauri-package \
         test test-file test-e2e test-e2e-fast test-e2e-web test-install test-watch lint lint-fix \
         format format-check \
-        build build-cli build-web build-desktop build-tauri \
+        build build-cli build-web build-desktop \
         package package-cli package-desktop \
         vendor-tmux vendor-tensorzero vendor-codegraph \
         clean uninstall
@@ -34,13 +33,13 @@ CLAUDE_CONTINUE_FLAGS := $(if $(filter 0,$(CLAUDE_CONTINUE)),,--continue)
 help: ## Show available commands
 	@echo ""
 	@echo "  \033[1mDevelopment\033[0m"
-	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|claude-tfy|web|desktop|tauri-dev):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
 	@grep -E '^(test|test-file|test-e2e|test-install|test-watch|lint|format):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mBuilding & Packaging\033[0m"
-	@grep -E '^(build|build-cli|build-web|build-desktop|build-tauri|tauri-build|tauri-package|package|package-cli|package-desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(build|build-cli|build-web|build-desktop|package|package-cli|package-desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mOther\033[0m"
 	@grep -E '^(clean|uninstall|lint):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -132,19 +131,6 @@ web: ## Launch the web dashboard (production build)
 desktop: build-web ## Launch the Electron desktop app
 	@cd packages/desktop && npm install --silent 2>/dev/null && npx electron .
 
-# ── Tauri preview (parallel to Electron; see packages/desktop-tauri/README.md)
-# These targets do NOT replace `desktop` / `build-desktop` / `package-desktop`;
-# they build the Tauri shell alongside it so we can A/B before swapping default.
-tauri-dev: build-web ## Launch the Tauri desktop shell (dev mode)
-	@cd packages/desktop-tauri && bun install --silent 2>/dev/null && bun run dev
-
-tauri-build: build-web ## Build the Tauri desktop shell for the current platform (release)
-	@cd packages/desktop-tauri && bun install --silent 2>/dev/null && bun run build
-
-tauri-package: tauri-build ## Alias for tauri-build (produces installers in src-tauri/target/release/bundle/)
-	@echo "Tauri bundles: packages/desktop-tauri/src-tauri/target/release/bundle/"
-	@ls -lh packages/desktop-tauri/src-tauri/target/release/bundle 2>/dev/null || true
-
 # ── Testing ──────────────────────────────────────────────────────────────────
 
 test: build-web ## Run all unit tests (sequential -- never parallel)
@@ -202,10 +188,13 @@ build-cli: ## Build native macOS CLI binary (current arch)
 build-web: ## Build web frontend (Vite production)
 	@cd packages/web && npx vite build --logLevel error 2>/dev/null || $(BUN) run packages/web/build.ts
 
-build-desktop: build-web ## Build Electron app for current platform
+build-desktop: build-web ## Build Electron app with bundled ark-native
+	@echo "Building ark-native for current platform..."
+	@$(MAKE) build-cli --no-print-directory
+	@mkdir -p packages/desktop/binaries/$$(uname -s | tr A-Z a-z)-$$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')
+	@cp ark-native packages/desktop/binaries/$$(uname -s | tr A-Z a-z)-$$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')/ark-native
+	@echo "Bundled ark-native into packages/desktop/binaries/"
 	cd packages/desktop && npm install --silent 2>/dev/null && npx electron-builder
-
-build-tauri: tauri-build ## Build the Tauri desktop shell (alias for tauri-build)
 
 # ── Packaging (all platforms) ────────────────────────────────────────────────
 
@@ -298,8 +287,7 @@ package-desktop: build-web ## Package Electron app (.dmg + .AppImage)
 # ── Other ────────────────────────────────────────────────────────────────────
 
 clean: ## Remove all build artifacts
-	rm -rf dist packages/web/dist packages/desktop/out node_modules/.cache
-	rm -rf packages/desktop-tauri/src-tauri/target packages/desktop-tauri/src-tauri/gen
+	rm -rf dist packages/web/dist packages/desktop/out packages/desktop/binaries node_modules/.cache
 	rm -f ark-native ark-darwin-arm64 ark-darwin-x64 ark-linux-arm64 ark-linux-x64
 	@echo "Cleaned."
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.17.0 (2026-04-15)
+
+### Desktop App
+- **Fully self-contained bundle** -- no prerequisites needed. The desktop app now embeds the `ark-native` binary inside the installer via electron-builder's `extraResources`. Users download, install, and launch -- no separate CLI install required.
+- **ark-native binary bundled inside the installer** -- approximately 78 MB, bringing total DMG size to ~172 MB. Trade-off: bigger download but zero-friction install.
+- **First-launch CLI installation dialog (macOS)** -- on first launch, the app offers to create a `/usr/local/bin/ark` symlink so `ark` is available in the terminal. Uses `osascript` for admin privilege escalation. Linux uses `pkexec`. Flag file `~/.ark/cli-installed` prevents repeat prompts.
+- **"Install CLI Tools..." menu item** -- under the Ark menu (macOS) or Tools menu (Linux/Windows). Users who skipped the first-launch dialog can install later.
+- **CI pipeline** -- the `desktop` job in `release.yml` now depends on `build-ark`, downloading the platform-specific ark-native artifact before running electron-builder.
+
+### Removed
+- **Tauri experimental package removed** -- `packages/desktop-tauri/` deleted. Tauri v2 was scaffolded (PR #105) and evaluated. Decision: stay with Electron for simpler toolchain and native Playwright testing support. The ~10x binary size advantage is moot once ark-native (~78 MB) is bundled regardless of shell. Evaluation notes preserved in `docs/ROADMAP.md`.
+- Removed CI job: `tauri-build` (macOS/Linux/Windows matrix)
+- Removed Makefile targets: `tauri-dev`, `tauri-build`, `tauri-package`, `build-tauri`
+- Cleaned up `.prettierignore`, `eslint.config.js` (Tauri ignore patterns)
+
+### Known Limitations (v0.17.0)
+- Unsigned macOS DMG -- see `packages/desktop/INSTALL.md` for Gatekeeper workaround.
+- Unsigned Windows installer -- SmartScreen warns about unverified publisher.
+- No auto-updater, no system tray.
+- Windows CLI install deferred (documented as limitation).
+
 ## v0.16.0 (2026-04-15)
 
 ### Breaking changes

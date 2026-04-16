@@ -514,8 +514,10 @@ jobs:
           fi
           echo "PASS: ark web serves dashboard from installed tarball layout"
 
-  # Electron desktop app
+  # Electron desktop app -- downloads ark-native from the build-ark job,
+  # places it in the extraResources path so electron-builder embeds it.
   desktop:
+    needs: [build-ark, build-web]
     strategy:
       fail-fast: false
       matrix:
@@ -523,12 +525,15 @@ jobs:
           - os: macos-latest
             build-flag: "--mac"
             name: mac
+            ark-platform: darwin-arm64
           - os: ubuntu-latest
             build-flag: "--linux"
             name: linux
+            ark-platform: linux-x64
           - os: windows-latest
             build-flag: "--win"
             name: win
+            ark-platform: linux-x64
 
     runs-on: ${{ matrix.os }}
     name: desktop (${{ matrix.name }})
@@ -548,8 +553,37 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Build web frontend
-        run: bun run packages/web/build.ts
+      - name: Download web dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: packages/web/dist
+
+      - name: Download ark-native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: ark-bin-${{ matrix.ark-platform }}
+          path: /tmp/ark-bin
+
+      - name: Place ark-native for electron-builder extraResources
+        shell: bash
+        env:
+          ARK_PLATFORM: ${{ matrix.ark-platform }}
+        run: |
+          # electron-builder uses ${os}-${arch} variables from the build config.
+          # We map our CI platform names to electron-builder's naming convention.
+          case "$ARK_PLATFORM" in
+            darwin-arm64) eb_os="mac"; eb_arch="arm64" ;;
+            darwin-x64)   eb_os="mac"; eb_arch="x64" ;;
+            linux-x64)    eb_os="linux"; eb_arch="x64" ;;
+            linux-arm64)  eb_os="linux"; eb_arch="arm64" ;;
+            *)            eb_os="linux"; eb_arch="x64" ;;
+          esac
+          mkdir -p "packages/desktop/binaries/${eb_os}-${eb_arch}"
+          cp "/tmp/ark-bin/ark-${ARK_PLATFORM}" "packages/desktop/binaries/${eb_os}-${eb_arch}/ark-native"
+          chmod +x "packages/desktop/binaries/${eb_os}-${eb_arch}/ark-native"
+          echo "Placed ark-native at packages/desktop/binaries/${eb_os}-${eb_arch}/ark-native"
+          ls -lh "packages/desktop/binaries/${eb_os}-${eb_arch}/"
 
       - name: Install Electron dependencies
         run: cd packages/desktop && npm install
