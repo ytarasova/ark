@@ -1,0 +1,2061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark -- Code Editor Native</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-sidebar: #1e1e1e;
+    --bg-editor: #1e1e1e;
+    --bg-panel: #252526;
+    --bg-titlebar: #333333;
+    --bg-statusbar: #007acc;
+    --bg-input: #3c3c3c;
+    --bg-hover: #2a2d2e;
+    --bg-active: #37373d;
+    --bg-badge: #4d4d4d;
+    --bg-selection: #264f78;
+    --bg-breadcrumb: #2d2d2d;
+
+    --border: #3e3e42;
+    --border-subtle: #2d2d2d;
+
+    --text-primary: #cccccc;
+    --text-secondary: #858585;
+    --text-bright: #e8e8e8;
+    --text-muted: #6a6a6a;
+    --text-link: #3794ff;
+
+    --accent-blue: #007acc;
+    --accent-green: #6a9955;
+    --accent-orange: #ce9178;
+    --accent-yellow: #dcdcaa;
+    --accent-purple: #c586c0;
+    --accent-red: #f44747;
+    --accent-cyan: #4ec9b0;
+    --accent-light-blue: #9cdcfe;
+
+    --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+    --radius-sm: 3px;
+    --radius-md: 4px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg-editor);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* =========================================
+     LAYOUT -- VS Code 3-column split
+     ========================================= */
+
+  .app {
+    display: grid;
+    grid-template-rows: 36px 28px 1fr 22px;
+    grid-template-columns: 48px 240px 1fr 320px;
+    grid-template-areas:
+      "titlebar titlebar titlebar titlebar"
+      "actbar breadcrumb breadcrumb breadcrumb"
+      "actbar sidebar editor panel"
+      "statusbar statusbar statusbar statusbar";
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* =========================================
+     TITLE BAR
+     ========================================= */
+
+  .titlebar {
+    grid-area: titlebar;
+    background: var(--bg-titlebar);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    -webkit-app-region: drag;
+    user-select: none;
+  }
+
+  .titlebar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .titlebar-logo {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-bright);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .titlebar-logo span {
+    color: var(--accent-blue);
+  }
+
+  .titlebar-menu {
+    display: flex;
+    gap: 2px;
+  }
+
+  .titlebar-menu-item {
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+  }
+
+  .titlebar-menu-item:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .titlebar-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .titlebar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    -webkit-app-region: no-drag;
+  }
+
+  .command-palette-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 3px 10px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    min-width: 200px;
+  }
+
+  .command-palette-trigger:hover {
+    border-color: var(--accent-blue);
+  }
+
+  .command-palette-trigger kbd {
+    font-size: 10px;
+    background: var(--bg-badge);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text-secondary);
+    margin-left: auto;
+  }
+
+  /* =========================================
+     ACTIVITY BAR (icon rail)
+     ========================================= */
+
+  .activity-bar {
+    grid-area: actbar;
+    background: var(--bg-titlebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 0;
+    gap: 0;
+  }
+
+  .activity-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    color: var(--text-muted);
+    transition: color 0.15s;
+  }
+
+  .activity-icon:hover {
+    color: var(--text-primary);
+  }
+
+  .activity-icon.active {
+    color: var(--text-bright);
+  }
+
+  .activity-icon.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: var(--text-bright);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .activity-icon svg {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+  }
+
+  .activity-icon .badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--accent-blue);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 600;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+  }
+
+  .activity-spacer {
+    flex: 1;
+  }
+
+  /* =========================================
+     BREADCRUMB BAR
+     ========================================= */
+
+  .breadcrumb-bar {
+    grid-area: breadcrumb;
+    background: var(--bg-breadcrumb);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    gap: 4px;
+    overflow: hidden;
+  }
+
+  .breadcrumb-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .breadcrumb-item:hover {
+    color: var(--text-primary);
+  }
+
+  .breadcrumb-sep {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .breadcrumb-active {
+    color: var(--text-primary);
+  }
+
+  /* =========================================
+     SIDEBAR -- Session Explorer
+     ========================================= */
+
+  .sidebar {
+    grid-area: sidebar;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 8px 12px;
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sidebar-header-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .sidebar-btn {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-muted);
+  }
+
+  .sidebar-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .sidebar-search {
+    margin: 0 8px 6px;
+    position: relative;
+  }
+
+  .sidebar-search input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px 8px 4px 26px;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    outline: none;
+  }
+
+  .sidebar-search input:focus {
+    border-color: var(--accent-blue);
+  }
+
+  .sidebar-search input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .sidebar-search-icon {
+    position: absolute;
+    left: 7px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+
+  .tree {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 0 8px;
+  }
+
+  .tree::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .tree::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+  }
+
+  .tree-group {
+    margin-bottom: 2px;
+  }
+
+  .tree-group-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px 3px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .tree-group-header:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .tree-chevron {
+    font-size: 10px;
+    width: 14px;
+    text-align: center;
+    transition: transform 0.15s;
+    color: var(--text-muted);
+  }
+
+  .tree-group.collapsed .tree-chevron {
+    transform: rotate(-90deg);
+  }
+
+  .tree-group.collapsed .tree-children {
+    display: none;
+  }
+
+  .tree-group-count {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .tree-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px 3px 30px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-primary);
+    position: relative;
+  }
+
+  .tree-item:hover {
+    background: var(--bg-hover);
+  }
+
+  .tree-item.active {
+    background: var(--bg-active);
+  }
+
+  .tree-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--accent-blue);
+  }
+
+  .tree-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tree-status.running {
+    background: var(--accent-green);
+    box-shadow: 0 0 6px rgba(106, 153, 85, 0.5);
+    animation: pulse-status 2s ease-in-out infinite;
+  }
+
+  .tree-status.completed {
+    background: var(--accent-blue);
+  }
+
+  .tree-status.failed {
+    background: var(--accent-red);
+  }
+
+  .tree-status.paused {
+    background: var(--accent-yellow);
+  }
+
+  @keyframes pulse-status {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .tree-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tree-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  /* =========================================
+     EDITOR -- Conversation as output pane
+     ========================================= */
+
+  .editor {
+    grid-area: editor;
+    background: var(--bg-editor);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .editor-tabs {
+    display: flex;
+    align-items: stretch;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    height: 35px;
+    overflow-x: auto;
+  }
+
+  .editor-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    position: relative;
+  }
+
+  .editor-tab:hover {
+    color: var(--text-primary);
+  }
+
+  .editor-tab.active {
+    background: var(--bg-editor);
+    color: var(--text-bright);
+  }
+
+  .editor-tab.active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--accent-blue);
+  }
+
+  .editor-tab-icon {
+    font-size: 14px;
+  }
+
+  .editor-tab-close {
+    font-size: 14px;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    margin-left: 4px;
+  }
+
+  .editor-tab:hover .editor-tab-close {
+    opacity: 1;
+  }
+
+  .editor-tab-close:hover {
+    color: var(--text-primary);
+  }
+
+  .editor-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+    position: relative;
+  }
+
+  .editor-content::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .editor-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .editor-content::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.08);
+    border-radius: 5px;
+  }
+
+  .editor-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.15);
+  }
+
+  /* Line numbers gutter */
+  .conversation {
+    counter-reset: line-counter;
+    padding: 8px 0;
+  }
+
+  .msg {
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    gap: 0;
+    padding: 2px 16px 2px 0;
+    min-height: 22px;
+    line-height: 1.6;
+  }
+
+  .msg:hover {
+    background: rgba(255,255,255,0.02);
+  }
+
+  .msg-gutter {
+    text-align: right;
+    padding-right: 12px;
+    color: var(--text-muted);
+    font-size: 11px;
+    user-select: none;
+    padding-top: 1px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .msg-body {
+    min-width: 0;
+  }
+
+  /* User messages -- styled as comments */
+  .msg.user .msg-body {
+    color: var(--accent-green);
+  }
+
+  .msg.user .msg-prefix {
+    color: var(--accent-green);
+    opacity: 0.7;
+    user-select: none;
+  }
+
+  /* Agent messages -- styled as output */
+  .msg.agent .msg-body {
+    color: var(--text-primary);
+  }
+
+  .msg.agent .msg-prefix {
+    color: var(--accent-cyan);
+    margin-right: 6px;
+    user-select: none;
+  }
+
+  /* System messages -- styled as compiler output */
+  .msg.system .msg-body {
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .msg.system .msg-prefix {
+    color: var(--text-muted);
+    user-select: none;
+  }
+
+  /* Tool calls -- styled as terminal commands */
+  .msg.tool {
+    margin: 6px 0;
+  }
+
+  .msg.tool .msg-body {
+    background: #1a1a2e;
+    border: 1px solid #2a2a3e;
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .tool-command {
+    color: var(--accent-yellow);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .tool-prompt-char {
+    color: var(--accent-green);
+    font-weight: 600;
+    user-select: none;
+  }
+
+  .tool-output {
+    color: var(--text-secondary);
+    padding-left: 16px;
+    border-left: 1px solid var(--border-subtle);
+    margin-top: 4px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .tool-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--accent-green);
+    margin-top: 4px;
+  }
+
+  .tool-status.error {
+    color: var(--accent-red);
+  }
+
+  /* Code blocks within conversation -- minimal since everything is mono */
+  .msg-code {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    margin: 4px 0;
+    font-size: 12px;
+    overflow-x: auto;
+  }
+
+  .msg-code .code-lang {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  /* Thinking indicator */
+  .msg.thinking .msg-body {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .thinking-dots {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: 6px;
+  }
+
+  .thinking-dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: blink-dot 1.4s infinite;
+  }
+
+  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes blink-dot {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
+
+  /* Stage dividers */
+  .stage-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px 10px 64px;
+    color: var(--accent-purple);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+
+  .stage-divider::before,
+  .stage-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+  }
+
+  /* Input area */
+  .editor-input {
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+    background: var(--bg-editor);
+  }
+
+  .editor-input-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+  }
+
+  .editor-input-wrapper:focus-within {
+    border-color: var(--accent-blue);
+  }
+
+  .editor-input-prefix {
+    color: var(--accent-green);
+    font-weight: 600;
+    user-select: none;
+    line-height: 1.6;
+  }
+
+  .editor-input-field {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    outline: none;
+    resize: none;
+    min-height: 22px;
+    max-height: 120px;
+  }
+
+  .editor-input-field::placeholder {
+    color: var(--text-muted);
+  }
+
+  .editor-input-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .input-action-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+  }
+
+  .input-action-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .input-action-btn.send {
+    background: var(--accent-blue);
+    color: #fff;
+  }
+
+  .input-action-btn.send:hover {
+    background: #1a8ad4;
+  }
+
+  /* =========================================
+     RIGHT PANEL -- Terminal/Output style
+     ========================================= */
+
+  .panel {
+    grid-area: panel;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-tabs {
+    display: flex;
+    align-items: stretch;
+    height: 35px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-tab {
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .panel-tab:hover {
+    color: var(--text-primary);
+  }
+
+  .panel-tab.active {
+    color: var(--text-bright);
+  }
+
+  .panel-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--accent-blue);
+  }
+
+  .panel-tab .tab-badge {
+    margin-left: 6px;
+    background: var(--accent-blue);
+    color: #fff;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+
+  .panel-content::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .panel-content::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+  }
+
+  /* Files tab -- tree view */
+  .file-tree-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 12px 3px 20px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-primary);
+  }
+
+  .file-tree-item:hover {
+    background: var(--bg-hover);
+  }
+
+  .file-tree-item.dir {
+    color: var(--text-secondary);
+  }
+
+  .file-icon {
+    font-size: 14px;
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .file-icon.ts { color: #3178c6; }
+  .file-icon.yaml { color: #cb171e; }
+  .file-icon.md { color: #519aba; }
+  .file-icon.json { color: #cbcb41; }
+  .file-icon.dir { color: #c09553; }
+  .file-icon.git { color: #f14e32; }
+
+  .file-status-badge {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0 5px;
+    border-radius: 3px;
+    line-height: 16px;
+  }
+
+  .file-status-badge.modified {
+    color: var(--accent-orange);
+  }
+
+  .file-status-badge.added {
+    color: var(--accent-green);
+  }
+
+  .file-status-badge.deleted {
+    color: var(--accent-red);
+  }
+
+  /* Changes tab -- diff preview */
+  .diff-file-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .diff-file-header:hover {
+    background: var(--bg-hover);
+  }
+
+  .diff-lines {
+    font-size: 11px;
+    line-height: 1.6;
+    padding: 4px 0;
+  }
+
+  .diff-line {
+    padding: 0 12px 0 20px;
+    white-space: pre;
+    font-family: var(--font-mono);
+  }
+
+  .diff-line.context {
+    color: var(--text-secondary);
+  }
+
+  .diff-line.added {
+    background: rgba(106, 153, 85, 0.15);
+    color: var(--accent-green);
+  }
+
+  .diff-line.removed {
+    background: rgba(244, 71, 71, 0.15);
+    color: var(--accent-red);
+  }
+
+  .diff-line-num {
+    display: inline-block;
+    width: 32px;
+    color: var(--text-muted);
+    text-align: right;
+    margin-right: 12px;
+    user-select: none;
+    font-size: 10px;
+  }
+
+  .diff-hunk {
+    padding: 4px 12px 4px 20px;
+    color: var(--accent-cyan);
+    font-size: 11px;
+  }
+
+  /* Metrics section */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .metric-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+  }
+
+  .metric-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .metric-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-bright);
+  }
+
+  .metric-value.cost {
+    color: var(--accent-orange);
+  }
+
+  .metric-value.tokens {
+    color: var(--accent-cyan);
+  }
+
+  .metric-value.time {
+    color: var(--accent-light-blue);
+  }
+
+  .metric-unit {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  /* Terminal section */
+  .terminal-embed {
+    background: #0d0d0d;
+    margin: 0 12px;
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    border: 1px solid #2a2a2a;
+  }
+
+  .terminal-line {
+    white-space: pre;
+  }
+
+  .terminal-line .prompt {
+    color: var(--accent-green);
+  }
+
+  .terminal-line .cmd {
+    color: var(--accent-yellow);
+  }
+
+  .terminal-line .output {
+    color: var(--text-secondary);
+  }
+
+  .terminal-cursor {
+    display: inline-block;
+    width: 7px;
+    height: 14px;
+    background: var(--text-primary);
+    animation: cursor-blink 1s step-end infinite;
+    vertical-align: text-bottom;
+  }
+
+  @keyframes cursor-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* =========================================
+     STATUS BAR -- THE SIGNATURE
+     ========================================= */
+
+  .statusbar {
+    grid-area: statusbar;
+    background: var(--accent-blue);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    font-size: 11px;
+    color: #fff;
+    user-select: none;
+    z-index: 100;
+  }
+
+  .statusbar-left,
+  .statusbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .statusbar-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    height: 22px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .statusbar-item:hover {
+    background: rgba(255,255,255,0.12);
+  }
+
+  .statusbar-icon {
+    font-size: 12px;
+  }
+
+  .statusbar-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #73e08a;
+    box-shadow: 0 0 4px rgba(115, 224, 138, 0.5);
+  }
+
+  .statusbar-separator {
+    width: 1px;
+    height: 14px;
+    background: rgba(255,255,255,0.2);
+    margin: 0 2px;
+  }
+
+  /* =========================================
+     COMMAND PALETTE OVERLAY
+     ========================================= */
+
+  .palette-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    padding-top: 80px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+  }
+
+  .palette-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .palette {
+    width: 560px;
+    max-height: 360px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    align-self: flex-start;
+  }
+
+  .palette-input {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .palette-input-icon {
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+
+  .palette-input input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+  }
+
+  .palette-input input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .palette-results {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+
+  .palette-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-primary);
+  }
+
+  .palette-item:hover,
+  .palette-item.selected {
+    background: var(--bg-selection);
+  }
+
+  .palette-item-icon {
+    width: 18px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  .palette-item-label {
+    flex: 1;
+  }
+
+  .palette-item-shortcut {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .palette-item-shortcut kbd {
+    background: var(--bg-badge);
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 2px;
+  }
+
+  /* =========================================
+     RESPONSIVE ADJUSTMENTS
+     ========================================= */
+
+  @media (max-width: 1200px) {
+    .app {
+      grid-template-columns: 48px 200px 1fr 280px;
+    }
+  }
+
+  @media (max-width: 960px) {
+    .app {
+      grid-template-columns: 48px 180px 1fr 0;
+    }
+    .panel { display: none; }
+  }
+
+  /* =========================================
+     MINIMAP (decorative)
+     ========================================= */
+
+  .minimap {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 100%;
+    background: rgba(255,255,255,0.02);
+    border-left: 1px solid var(--border-subtle);
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .minimap-line {
+    height: 2px;
+    margin: 1px 6px;
+    border-radius: 1px;
+    opacity: 0.3;
+  }
+
+  .minimap-line.short { width: 20px; background: var(--text-muted); }
+  .minimap-line.medium { width: 35px; background: var(--text-muted); }
+  .minimap-line.long { width: 48px; background: var(--text-muted); }
+  .minimap-line.green { background: var(--accent-green); opacity: 0.4; }
+  .minimap-line.blue { background: var(--accent-cyan); opacity: 0.4; }
+  .minimap-line.purple { background: var(--accent-purple); opacity: 0.4; }
+
+  .minimap-viewport {
+    position: absolute;
+    top: 10px;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ======== TITLE BAR ======== -->
+  <div class="titlebar">
+    <div class="titlebar-left">
+      <div class="titlebar-logo"><span>A</span>RK</div>
+      <div class="titlebar-menu">
+        <span class="titlebar-menu-item">File</span>
+        <span class="titlebar-menu-item">Session</span>
+        <span class="titlebar-menu-item">View</span>
+        <span class="titlebar-menu-item">Help</span>
+      </div>
+    </div>
+    <div class="titlebar-center">s-a1c9 -- autonomous-sdlc -- implement</div>
+    <div class="titlebar-actions">
+      <div class="command-palette-trigger" onclick="togglePalette()">
+        <span>&#x1F50D;</span> Ark: Command Palette
+        <kbd>Cmd+Shift+P</kbd>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== ACTIVITY BAR ======== -->
+  <div class="activity-bar">
+    <div class="activity-icon active" title="Sessions">
+      <svg viewBox="0 0 24 24"><path d="M17.5 0h-9L7 1.5V6H2.5L1 7.5v15.07L2.5 24h12.07L16 22.57V18h4.7l1.3-1.43V4.5L17.5 0zm0 2.12l2.38 2.38H17.5V2.12zm-3 20.38h-12v-15H7v9.07L8.5 18h6v4.5zm6-6h-12v-15H16V6h4.5v10.5z"/></svg>
+      <span class="badge">4</span>
+    </div>
+    <div class="activity-icon" title="Search">
+      <svg viewBox="0 0 24 24"><path d="M15.25 0a8.25 8.25 0 00-6.18 13.72L1 21.79l1.42 1.42 8.07-8.07A8.25 8.25 0 1015.25.01V0zm0 15a6.75 6.75 0 110-13.5 6.75 6.75 0 010 13.5z"/></svg>
+    </div>
+    <div class="activity-icon" title="Flows">
+      <svg viewBox="0 0 24 24"><path d="M11.93 8.5a4.002 4.002 0 01-7.86 0H1.5V7h2.57a4.002 4.002 0 017.86 0H22.5v1.5H11.93zM8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zm11.93 6.5a4.002 4.002 0 01-7.86 0H1.5V15.5h10.57a4.002 4.002 0 017.86 0H22.5V17h-2.57zM16 19a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"/></svg>
+    </div>
+    <div class="activity-icon" title="Agents">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+    </div>
+    <div class="activity-spacer"></div>
+    <div class="activity-icon" title="Settings">
+      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94 0 .31.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg>
+    </div>
+  </div>
+
+  <!-- ======== BREADCRUMB ======== -->
+  <div class="breadcrumb-bar">
+    <span class="breadcrumb-item">Ark</span>
+    <span class="breadcrumb-sep">&#x203A;</span>
+    <span class="breadcrumb-item">autonomous-sdlc</span>
+    <span class="breadcrumb-sep">&#x203A;</span>
+    <span class="breadcrumb-item">s-a1c9</span>
+    <span class="breadcrumb-sep">&#x203A;</span>
+    <span class="breadcrumb-item breadcrumb-active">implement</span>
+  </div>
+
+  <!-- ======== SIDEBAR ======== -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      Sessions
+      <div class="sidebar-header-actions">
+        <div class="sidebar-btn" title="New Session">+</div>
+        <div class="sidebar-btn" title="Refresh">&#x21bb;</div>
+        <div class="sidebar-btn" title="Collapse All">&#x2261;</div>
+      </div>
+    </div>
+
+    <div class="sidebar-search">
+      <span class="sidebar-search-icon">&#x1F50D;</span>
+      <input type="text" placeholder="Filter sessions...">
+    </div>
+
+    <div class="tree">
+      <!-- AUTONOMOUS-SDLC -->
+      <div class="tree-group">
+        <div class="tree-group-header">
+          <span class="tree-chevron">&#x25BC;</span>
+          AUTONOMOUS-SDLC
+          <span class="tree-group-count">3</span>
+        </div>
+        <div class="tree-children">
+          <div class="tree-item active">
+            <span class="tree-status running"></span>
+            <span class="tree-label">s-a1c9</span>
+            <span class="tree-meta">implement 2m</span>
+          </div>
+          <div class="tree-item">
+            <span class="tree-status running"></span>
+            <span class="tree-label">s-f4e2</span>
+            <span class="tree-meta">review 8m</span>
+          </div>
+          <div class="tree-item">
+            <span class="tree-status completed"></span>
+            <span class="tree-label">s-b7d3</span>
+            <span class="tree-meta">done 1h</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUICK -->
+      <div class="tree-group">
+        <div class="tree-group-header">
+          <span class="tree-chevron">&#x25BC;</span>
+          QUICK
+          <span class="tree-group-count">2</span>
+        </div>
+        <div class="tree-children">
+          <div class="tree-item">
+            <span class="tree-status running"></span>
+            <span class="tree-label">s-e891</span>
+            <span class="tree-meta">running 5m</span>
+          </div>
+          <div class="tree-item">
+            <span class="tree-status completed"></span>
+            <span class="tree-label">s-c234</span>
+            <span class="tree-meta">done 32m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PR-REVIEW collapsed -->
+      <div class="tree-group collapsed">
+        <div class="tree-group-header">
+          <span class="tree-chevron">&#x25BC;</span>
+          PR-REVIEW
+          <span class="tree-group-count">1</span>
+        </div>
+        <div class="tree-children">
+          <div class="tree-item">
+            <span class="tree-status completed"></span>
+            <span class="tree-label">s-d567</span>
+            <span class="tree-meta">done 2h</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAN-OUT collapsed -->
+      <div class="tree-group collapsed">
+        <div class="tree-group-header">
+          <span class="tree-chevron">&#x25BC;</span>
+          FAN-OUT
+          <span class="tree-group-count">0</span>
+        </div>
+        <div class="tree-children"></div>
+      </div>
+
+      <!-- STANDALONE collapsed -->
+      <div class="tree-group collapsed">
+        <div class="tree-group-header">
+          <span class="tree-chevron">&#x25BC;</span>
+          STANDALONE
+          <span class="tree-group-count">2</span>
+        </div>
+        <div class="tree-children">
+          <div class="tree-item">
+            <span class="tree-status paused"></span>
+            <span class="tree-label">s-aa12</span>
+            <span class="tree-meta">paused 4h</span>
+          </div>
+          <div class="tree-item">
+            <span class="tree-status failed"></span>
+            <span class="tree-label">s-bb34</span>
+            <span class="tree-meta">failed 1d</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== EDITOR / CONVERSATION ======== -->
+  <div class="editor">
+    <div class="editor-tabs">
+      <div class="editor-tab active">
+        <span class="editor-tab-icon">&#x25CF;</span>
+        s-a1c9 implement
+        <span class="editor-tab-close">&times;</span>
+      </div>
+      <div class="editor-tab">
+        <span class="editor-tab-icon" style="color: var(--accent-green);">&#x25CF;</span>
+        s-f4e2 review
+        <span class="editor-tab-close">&times;</span>
+      </div>
+      <div class="editor-tab">
+        <span class="editor-tab-icon" style="color: var(--accent-blue);">&#x25CF;</span>
+        s-b7d3 done
+        <span class="editor-tab-close">&times;</span>
+      </div>
+    </div>
+
+    <div class="editor-content">
+      <div class="conversation">
+
+        <!-- System: stage start -->
+        <div class="stage-divider">stage: plan</div>
+
+        <div class="msg system">
+          <div class="msg-gutter">14:31</div>
+          <div class="msg-body">
+            <span class="msg-prefix">[system]</span> Session s-a1c9 started -- flow: autonomous-sdlc, agent: planner
+          </div>
+        </div>
+
+        <!-- User message (comment style) -->
+        <div class="msg user">
+          <div class="msg-gutter">14:31</div>
+          <div class="msg-body">
+            <span class="msg-prefix">// </span>Implement OAuth2 PKCE flow for the API server. Support authorization_code grant with code_challenge. Add token endpoint, refresh token rotation, and revocation. Store grants in SQLite.
+          </div>
+        </div>
+
+        <!-- Agent response -->
+        <div class="msg agent">
+          <div class="msg-gutter">14:31</div>
+          <div class="msg-body">
+            <span class="msg-prefix">planner &gt;</span> Breaking this into implementation tasks. OAuth2 PKCE requires several coordinated pieces -- let me analyze the existing auth surface first.
+          </div>
+        </div>
+
+        <!-- Tool call: Read -->
+        <div class="msg tool">
+          <div class="msg-gutter">14:31</div>
+          <div class="msg-body">
+            <div class="tool-command">
+              <span class="tool-prompt-char">$</span> Read packages/server/src/routes/auth.ts
+            </div>
+            <div class="tool-output">export function authRoutes(app: Hono) {
+  app.post("/auth/login", async (c) =&gt; { ... })
+  app.post("/auth/logout", async (c) =&gt; { ... })
+  // No OAuth endpoints yet
+}</div>
+            <div class="tool-status">&#x2713; 42 lines read</div>
+          </div>
+        </div>
+
+        <!-- Agent analysis -->
+        <div class="msg agent">
+          <div class="msg-gutter">14:32</div>
+          <div class="msg-body">
+            <span class="msg-prefix">planner &gt;</span> Current auth is session-based only. No OAuth infrastructure exists. Here is the implementation plan:
+          </div>
+        </div>
+
+        <div class="msg agent">
+          <div class="msg-gutter"></div>
+          <div class="msg-body">
+            <div class="msg-code">
+              <div class="code-lang">plan</div>
+1. Schema -- oauth_clients, oauth_codes, oauth_tokens tables
+2. /oauth/authorize -- PKCE challenge, consent, code issuance
+3. /oauth/token -- code exchange, refresh rotation
+4. /oauth/revoke -- token revocation (RFC 7009)
+5. Middleware -- bearer token validation
+6. Tests -- full flow + edge cases
+            </div>
+          </div>
+        </div>
+
+        <div class="msg system">
+          <div class="msg-gutter">14:32</div>
+          <div class="msg-body">
+            <span class="msg-prefix">[system]</span> Plan approved by orchestrator. Dispatching to implementer.
+          </div>
+        </div>
+
+        <!-- Stage transition -->
+        <div class="stage-divider">stage: implement</div>
+
+        <div class="msg system">
+          <div class="msg-gutter">14:33</div>
+          <div class="msg-body">
+            <span class="msg-prefix">[system]</span> Agent switched: planner -> implementer (claude-opus-4)
+          </div>
+        </div>
+
+        <div class="msg agent">
+          <div class="msg-gutter">14:33</div>
+          <div class="msg-body">
+            <span class="msg-prefix">implementer &gt;</span> Starting with the schema. Adding three tables to the existing SQLite database.
+          </div>
+        </div>
+
+        <!-- Tool call: Write -->
+        <div class="msg tool">
+          <div class="msg-gutter">14:33</div>
+          <div class="msg-body">
+            <div class="tool-command">
+              <span class="tool-prompt-char">$</span> Write packages/server/src/oauth/schema.ts
+            </div>
+            <div class="tool-output">export const OAUTH_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS oauth_clients (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    redirect_uris TEXT NOT NULL,
+    secret_hash TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS oauth_codes (
+    code TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    code_challenge TEXT NOT NULL,
+    code_challenge_method TEXT DEFAULT 'S256',
+    scope TEXT,
+    expires_at TEXT NOT NULL
+  );
+`;</div>
+            <div class="tool-status">&#x2713; file written (18 lines)</div>
+          </div>
+        </div>
+
+        <!-- More agent output -->
+        <div class="msg agent">
+          <div class="msg-gutter">14:34</div>
+          <div class="msg-body">
+            <span class="msg-prefix">implementer &gt;</span> Schema done. Now implementing the authorize endpoint with PKCE support. The code_challenge_method will only accept S256 -- plain is insecure and explicitly disallowed.
+          </div>
+        </div>
+
+        <!-- Tool call: Write -->
+        <div class="msg tool">
+          <div class="msg-gutter">14:34</div>
+          <div class="msg-body">
+            <div class="tool-command">
+              <span class="tool-prompt-char">$</span> Write packages/server/src/oauth/authorize.ts
+            </div>
+            <div class="tool-output">import { createHash, randomBytes } from "crypto";
+
+export async function handleAuthorize(c: Context) {
+  const { client_id, redirect_uri, code_challenge,
+          code_challenge_method, scope, state } = c.req.query();
+
+  // Validate client
+  const client = await db.get("SELECT * FROM ...");
+  if (!client) return c.json({ error: "invalid_client" }, 400);
+
+  // Validate PKCE
+  if (code_challenge_method !== "S256")
+    return c.json({ error: "invalid_request" }, 400);
+
+  // Generate authorization code
+  const code = randomBytes(32).toString("base64url");
+  ...
+}</div>
+            <div class="tool-status">&#x2713; file written (47 lines)</div>
+          </div>
+        </div>
+
+        <!-- Tool call: Bash -->
+        <div class="msg tool">
+          <div class="msg-gutter">14:35</div>
+          <div class="msg-body">
+            <div class="tool-command">
+              <span class="tool-prompt-char">$</span> bun test packages/server/src/oauth/__tests__/pkce.test.ts
+            </div>
+            <div class="tool-output">bun test v1.2.4
+
+  oauth/pkce.test.ts:
+    &#x2713; generates valid authorization code (3ms)
+    &#x2713; rejects plain code_challenge_method (1ms)
+    &#x2713; exchanges code with valid verifier (12ms)
+    &#x2713; rejects invalid code_verifier (2ms)
+    &#x2713; rotates refresh token on use (8ms)
+    &#x2713; revokes token family on reuse (5ms)
+
+  6 pass | 0 fail (31ms)</div>
+            <div class="tool-status">&#x2713; 6 tests passed</div>
+          </div>
+        </div>
+
+        <div class="msg agent">
+          <div class="msg-gutter">14:36</div>
+          <div class="msg-body">
+            <span class="msg-prefix">implementer &gt;</span> All 6 tests passing. The PKCE flow is complete with refresh token rotation and family-based revocation. Moving to the bearer middleware next.
+          </div>
+        </div>
+
+        <!-- Thinking / streaming -->
+        <div class="msg thinking">
+          <div class="msg-gutter">14:36</div>
+          <div class="msg-body">
+            <span class="msg-prefix" style="color: var(--text-muted);">implementer &gt;</span>
+            analyzing middleware integration points
+            <span class="thinking-dots">
+              <span></span><span></span><span></span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Minimap -->
+      <div class="minimap">
+        <div class="minimap-viewport"></div>
+        <div style="padding-top: 4px;">
+          <div class="minimap-line purple" style="width: 40px;"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line green" style="width: 44px;"></div>
+          <div class="minimap-line medium"></div>
+          <div class="minimap-line long"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line blue" style="width: 48px;"></div>
+          <div class="minimap-line medium"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line long"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line medium"></div>
+          <div class="minimap-line blue" style="width: 48px;"></div>
+          <div class="minimap-line long"></div>
+          <div class="minimap-line medium"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line green" style="width: 44px;"></div>
+          <div class="minimap-line medium"></div>
+          <div class="minimap-line long"></div>
+          <div class="minimap-line purple" style="width: 40px;"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line medium"></div>
+          <div class="minimap-line blue" style="width: 48px;"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line long"></div>
+          <div class="minimap-line medium"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line long"></div>
+          <div class="minimap-line medium"></div>
+          <div class="minimap-line green" style="width: 44px;"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line medium"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line long"></div>
+          <div class="minimap-line blue" style="width: 48px;"></div>
+          <div class="minimap-line medium"></div>
+          <div class="minimap-line short"></div>
+          <div class="minimap-line medium"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="editor-input">
+      <div class="editor-input-wrapper">
+        <span class="editor-input-prefix">&gt;</span>
+        <textarea class="editor-input-field" rows="1" placeholder="Send a message to the agent..."></textarea>
+        <div class="editor-input-actions">
+          <button class="input-action-btn" title="Attach file">&#x1F4CE;</button>
+          <button class="input-action-btn send" title="Send (Enter)">&#x2191;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== RIGHT PANEL ======== -->
+  <div class="panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active">Files <span class="tab-badge">7</span></div>
+      <div class="panel-tab">Changes <span class="tab-badge">3</span></div>
+      <div class="panel-tab">Terminal</div>
+      <div class="panel-tab">Metrics</div>
+    </div>
+
+    <div class="panel-content" id="panel-files">
+      <!-- File tree -->
+      <div class="file-tree-item dir">
+        <span class="file-icon dir">&#x25BC;</span>
+        <span>packages/server/src/oauth/</span>
+      </div>
+      <div class="file-tree-item" style="padding-left: 36px;">
+        <span class="file-icon ts">TS</span>
+        <span>schema.ts</span>
+        <span class="file-status-badge added">A</span>
+      </div>
+      <div class="file-tree-item" style="padding-left: 36px;">
+        <span class="file-icon ts">TS</span>
+        <span>authorize.ts</span>
+        <span class="file-status-badge added">A</span>
+      </div>
+      <div class="file-tree-item" style="padding-left: 36px;">
+        <span class="file-icon ts">TS</span>
+        <span>token.ts</span>
+        <span class="file-status-badge added">A</span>
+      </div>
+      <div class="file-tree-item" style="padding-left: 36px;">
+        <span class="file-icon ts">TS</span>
+        <span>revoke.ts</span>
+        <span class="file-status-badge added">A</span>
+      </div>
+      <div class="file-tree-item" style="padding-left: 36px;">
+        <span class="file-icon ts">TS</span>
+        <span>middleware.ts</span>
+        <span class="file-status-badge added">A</span>
+      </div>
+      <div class="file-tree-item dir">
+        <span class="file-icon dir">&#x25BC;</span>
+        <span>packages/server/src/oauth/__tests__/</span>
+      </div>
+      <div class="file-tree-item" style="padding-left: 36px;">
+        <span class="file-icon ts">TS</span>
+        <span>pkce.test.ts</span>
+        <span class="file-status-badge added">A</span>
+      </div>
+
+      <div style="height: 12px;"></div>
+
+      <div class="file-tree-item">
+        <span class="file-icon ts">TS</span>
+        <span>packages/server/src/routes/auth.ts</span>
+        <span class="file-status-badge modified">M</span>
+      </div>
+
+      <!-- Diff preview for Changes tab (shown inline for demo) -->
+      <div style="margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+        <div style="padding: 4px 12px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+          Inline Preview -- auth.ts
+        </div>
+        <div class="diff-hunk">@@ -12,6 +12,8 @@ export function authRoutes</div>
+        <div class="diff-lines">
+          <div class="diff-line context"><span class="diff-line-num">12</span>  app.post("/auth/logout", ...)</div>
+          <div class="diff-line context"><span class="diff-line-num">13</span>  </div>
+          <div class="diff-line added"><span class="diff-line-num">14</span>+ // OAuth2 PKCE endpoints</div>
+          <div class="diff-line added"><span class="diff-line-num">15</span>+ oauthRoutes(app);</div>
+          <div class="diff-line context"><span class="diff-line-num">16</span>  return app;</div>
+          <div class="diff-line context"><span class="diff-line-num">17</span>}</div>
+        </div>
+      </div>
+
+      <!-- Metrics shown below files for demo -->
+      <div style="margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+        <div style="padding: 4px 12px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+          Session Metrics
+        </div>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label">Cost</div>
+            <div class="metric-value cost">$0.82</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Duration</div>
+            <div class="metric-value time">5<span class="metric-unit">m</span> 12<span class="metric-unit">s</span></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Tokens In</div>
+            <div class="metric-value tokens">148<span class="metric-unit">k</span></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Tokens Out</div>
+            <div class="metric-value tokens">12.4<span class="metric-unit">k</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal preview -->
+      <div style="margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+        <div style="padding: 4px 12px 6px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+          Terminal -- tmux ark-s-a1c9
+        </div>
+        <div class="terminal-embed">
+          <div class="terminal-line"><span class="prompt">~/project $</span> <span class="cmd">bun test oauth</span></div>
+          <div class="terminal-line"><span class="output">bun test v1.2.4</span></div>
+          <div class="terminal-line"><span class="output">  6 pass | 0 fail (31ms)</span></div>
+          <div class="terminal-line"><span class="prompt">~/project $</span> <span class="terminal-cursor"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== STATUS BAR ======== -->
+  <div class="statusbar">
+    <div class="statusbar-left">
+      <div class="statusbar-item">
+        <span class="statusbar-dot"></span>
+        <span>Running</span>
+      </div>
+      <div class="statusbar-separator"></div>
+      <div class="statusbar-item">
+        <span class="statusbar-icon">&#x2699;</span>
+        <span>implementer</span>
+      </div>
+      <div class="statusbar-separator"></div>
+      <div class="statusbar-item">
+        <span class="statusbar-icon">&#x25C6;</span>
+        <span>claude-opus-4</span>
+      </div>
+      <div class="statusbar-separator"></div>
+      <div class="statusbar-item">
+        <span class="statusbar-icon">&#x21BB;</span>
+        <span>implement (3/6)</span>
+      </div>
+    </div>
+    <div class="statusbar-right">
+      <div class="statusbar-item">
+        <span>$0.82</span>
+      </div>
+      <div class="statusbar-separator"></div>
+      <div class="statusbar-item">
+        <span>5m 12s</span>
+      </div>
+      <div class="statusbar-separator"></div>
+      <div class="statusbar-item">
+        <span class="statusbar-icon">&#x2387;</span>
+        <span>feat/oauth-v2</span>
+      </div>
+      <div class="statusbar-separator"></div>
+      <div class="statusbar-item">
+        <span>UTF-8</span>
+      </div>
+      <div class="statusbar-separator"></div>
+      <div class="statusbar-item">
+        <span>Bun 1.2.4</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======== COMMAND PALETTE OVERLAY ======== -->
+<div class="palette-overlay" id="palette">
+  <div class="palette">
+    <div class="palette-input">
+      <span class="palette-input-icon">&gt;</span>
+      <input type="text" placeholder="Type a command..." autofocus id="palette-input">
+    </div>
+    <div class="palette-results">
+      <div class="palette-item selected">
+        <span class="palette-item-icon">&#x25B6;</span>
+        <span class="palette-item-label">Session: New Session</span>
+        <span class="palette-item-shortcut"><kbd>Cmd</kbd><kbd>N</kbd></span>
+      </div>
+      <div class="palette-item">
+        <span class="palette-item-icon">&#x23F8;</span>
+        <span class="palette-item-label">Session: Pause Current</span>
+        <span class="palette-item-shortcut"><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>P</kbd></span>
+      </div>
+      <div class="palette-item">
+        <span class="palette-item-icon">&#x1F4CB;</span>
+        <span class="palette-item-label">Flow: Switch Flow</span>
+      </div>
+      <div class="palette-item">
+        <span class="palette-item-icon">&#x1F916;</span>
+        <span class="palette-item-label">Agent: Change Model</span>
+      </div>
+      <div class="palette-item">
+        <span class="palette-item-icon">&#x2699;</span>
+        <span class="palette-item-label">Settings: Open Configuration</span>
+        <span class="palette-item-shortcut"><kbd>Cmd</kbd><kbd>,</kbd></span>
+      </div>
+      <div class="palette-item">
+        <span class="palette-item-icon">&#x1F4C2;</span>
+        <span class="palette-item-label">View: Toggle Right Panel</span>
+        <span class="palette-item-shortcut"><kbd>Cmd</kbd><kbd>B</kbd></span>
+      </div>
+      <div class="palette-item">
+        <span class="palette-item-icon">&#x1F50D;</span>
+        <span class="palette-item-label">Search: Find in Sessions</span>
+        <span class="palette-item-shortcut"><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>F</kbd></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Command palette toggle
+  function togglePalette() {
+    const p = document.getElementById('palette');
+    p.classList.toggle('active');
+    if (p.classList.contains('active')) {
+      document.getElementById('palette-input').focus();
+    }
+  }
+
+  document.addEventListener('keydown', (e) => {
+    // Cmd+Shift+P to open palette
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
+      e.preventDefault();
+      togglePalette();
+    }
+    // Escape to close
+    if (e.key === 'Escape') {
+      document.getElementById('palette').classList.remove('active');
+    }
+  });
+
+  // Close palette on overlay click
+  document.getElementById('palette').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+      togglePalette();
+    }
+  });
+
+  // Tree group collapse toggle
+  document.querySelectorAll('.tree-group-header').forEach(h => {
+    h.addEventListener('click', () => {
+      h.closest('.tree-group').classList.toggle('collapsed');
+    });
+  });
+
+  // Auto-resize textarea
+  const textarea = document.querySelector('.editor-input-field');
+  if (textarea) {
+    textarea.addEventListener('input', () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    });
+  }
+</script>
+
+</body>
+</html>
