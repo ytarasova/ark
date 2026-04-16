@@ -40,6 +40,8 @@ export interface BurnQueryOpts {
   tenantId?: string;
   since?: string;
   until?: string;
+  /** Optional SQLite date modifier like "-4 hours" or IANA zone like "America/New_York". Resolved server-side. */
+  tz?: string;
 }
 
 export interface BurnOverview {
@@ -220,20 +222,61 @@ export class BurnRepository {
     return this.db.prepare(sql).all(...params) as ProjectBreakdownRow[];
   }
 
-  /** Daily breakdown grouped by DATE(timestamp). */
+  /** Daily breakdown grouped by DATE(timestamp), with optional tz offset. */
   getDailyBreakdown(opts: BurnQueryOpts): DailyBreakdownRow[] {
     const { where, params } = this._buildWhere(opts);
-    const sql = `
-      SELECT
-        DATE(timestamp) as date,
-        SUM(cost_usd) as cost,
-        SUM(api_calls) as calls
-      FROM burn_turns
-      WHERE ${where}
-      GROUP BY DATE(timestamp)
-      ORDER BY date
-    `;
-    return this.db.prepare(sql).all(...params) as DailyBreakdownRow[];
+    const modifier = this._resolveSqliteModifier(opts.tz);
+    const sql = modifier
+      ? `
+        SELECT
+          DATE(timestamp, ?) as date,
+          SUM(cost_usd) as cost,
+          SUM(api_calls) as calls
+        FROM burn_turns
+        WHERE ${where}
+        GROUP BY DATE(timestamp, ?)
+        ORDER BY date
+      `
+      : `
+        SELECT
+          DATE(timestamp) as date,
+          SUM(cost_usd) as cost,
+          SUM(api_calls) as calls
+        FROM burn_turns
+        WHERE ${where}
+        GROUP BY DATE(timestamp)
+        ORDER BY date
+      `;
+    const finalParams = modifier ? [modifier, ...params, modifier] : params;
+    return this.db.prepare(sql).all(...finalParams) as DailyBreakdownRow[];
+  }
+
+  /** Whitelist-style resolver: only allow "+/-N hours" modifiers or IANA-style zone names. */
+  private _resolveSqliteModifier(tz: string | undefined): string | null {
+    if (!tz) return null;
+    if (/^[+-]\d+(\.\d+)?\s+hours$/.test(tz)) return tz;
+    if (/^[A-Za-z_]+(?:\/[A-Za-z_+\-0-9]+){0,2}$/.test(tz)) {
+      try {
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: tz, hour12: false,
+          year: "numeric", month: "2-digit", day: "2-digit",
+          hour: "2-digit", minute: "2-digit", second: "2-digit",
+        }).formatToParts(new Date());
+        const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+        const now = Date.now();
+        const wall = Date.UTC(
+          get("year"), get("month") - 1, get("day"),
+          get("hour") === 24 ? 0 : get("hour"), get("minute"), get("second"),
+        );
+        const offsetMin = Math.round((wall - now) / 60000);
+        const hours = offsetMin / 60;
+        const sign = hours >= 0 ? "+" : "-";
+        return `${sign}${Math.abs(hours)} hours`;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 
   /** Aggregate tool usage from tools_json column, top 10. */
