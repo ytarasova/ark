@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ark - Flow Editor / Viewer</title>
+<style>
+  /* ── Ark Dark Theme (Midnight Circuit) ── */
+  :root {
+    --bg: #101014;
+    --bg-card: #1a1a20;
+    --bg-secondary: #252530;
+    --bg-hover: #202030;
+    --bg-input: #161620;
+    --fg: #e8e8ec;
+    --fg-muted: #8888a0;
+    --fg-dim: #555568;
+    --border: #2a2a35;
+    --border-light: #353545;
+    --primary: #7c6aef;
+    --primary-subtle: rgba(124,106,239,0.12);
+    --green: #34d399;
+    --green-subtle: rgba(52,211,153,0.12);
+    --blue: #60a5fa;
+    --blue-subtle: rgba(96,165,250,0.12);
+    --amber: #fbbf24;
+    --amber-subtle: rgba(251,191,36,0.12);
+    --red: #f87171;
+    --red-subtle: rgba(248,113,113,0.12);
+    --cyan: #22d3ee;
+    --cyan-subtle: rgba(34,211,238,0.12);
+    --radius: 8px;
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Layout ── */
+  .app-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr 300px;
+    grid-template-rows: 48px 1fr;
+    height: 100vh;
+  }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+  }
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .toolbar-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .toolbar-flow-name {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--primary);
+    padding: 3px 10px;
+    background: var(--primary-subtle);
+    border-radius: 4px;
+  }
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tb-btn {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font-sans);
+  }
+  .tb-btn:hover {
+    background: var(--bg-hover);
+    color: var(--fg);
+    border-color: var(--border-light);
+  }
+  .tb-btn.primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .tb-btn.primary:hover { opacity: 0.9; }
+  .tb-btn.success {
+    background: var(--green-subtle);
+    color: var(--green);
+    border-color: rgba(52,211,153,0.3);
+  }
+  .tb-btn.danger {
+    background: var(--red-subtle);
+    color: var(--red);
+    border-color: rgba(248,113,113,0.3);
+  }
+  .mode-toggle {
+    display: flex;
+    background: var(--bg);
+    border-radius: 5px;
+    padding: 2px;
+    gap: 2px;
+    margin-left: 16px;
+  }
+  .mode-btn {
+    font-size: 11px;
+    padding: 4px 12px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: var(--fg-muted);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-weight: 500;
+  }
+  .mode-btn.active {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  /* ── Flow list sidebar ── */
+  .flow-sidebar {
+    background: var(--bg-card);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .flow-sidebar-header {
+    padding: 12px 16px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-dim);
+  }
+  .flow-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(42,42,53,0.5);
+    transition: background 0.1s;
+  }
+  .flow-list-item:hover { background: var(--bg-hover); }
+  .flow-list-item.active {
+    background: var(--bg-hover);
+    border-left: 2px solid var(--primary);
+  }
+  .flow-item-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg);
+  }
+  .flow-item-stages {
+    font-size: 10px;
+    color: var(--fg-dim);
+    font-family: var(--font-mono);
+    padding: 1px 6px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+  }
+
+  /* ── Canvas (center) ── */
+  .canvas-area {
+    position: relative;
+    background: var(--bg);
+    overflow: hidden;
+  }
+  .canvas-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 24px 24px;
+    opacity: 0.4;
+  }
+  .canvas-content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+  }
+
+  /* ── SVG edges on canvas ── */
+  .canvas-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .canvas-edge {
+    fill: none;
+    stroke: var(--border-light);
+    stroke-width: 2;
+  }
+  .canvas-edge.conditional {
+    stroke-dasharray: 6 3;
+    stroke: var(--amber);
+    opacity: 0.6;
+  }
+  .canvas-edge.loopback {
+    stroke-dasharray: 4 3;
+    stroke: var(--cyan);
+    opacity: 0.5;
+  }
+  .canvas-edge-label {
+    font-size: 9px;
+    font-family: var(--font-mono);
+    text-anchor: middle;
+    fill: var(--fg-muted);
+  }
+  .canvas-edge-label-bg {
+    fill: var(--bg);
+    rx: 3;
+  }
+
+  /* ── Stage node on canvas ── */
+  .editor-node {
+    position: absolute;
+    width: 160px;
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: grab;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    z-index: 2;
+    user-select: none;
+  }
+  .editor-node:hover {
+    border-color: var(--fg-dim);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .editor-node.selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-subtle);
+  }
+  .editor-node-header {
+    padding: 8px 10px 6px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .editor-node-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .editor-node-gate {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .gate-auto { background: var(--green-subtle); color: var(--green); }
+  .gate-manual { background: var(--amber-subtle); color: var(--amber); }
+  .gate-condition { background: var(--blue-subtle); color: var(--blue); }
+  .gate-review { background: var(--bg-secondary); color: var(--fg-muted); }
+
+  .editor-node-body {
+    padding: 8px 10px;
+    font-size: 10px;
+    color: var(--fg-muted);
+  }
+  .editor-node-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .editor-node-field-label {
+    color: var(--fg-dim);
+    font-size: 9px;
+    width: 48px;
+    flex-shrink: 0;
+  }
+  .editor-node-field-value {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--fg-muted);
+  }
+  .editor-node-verify {
+    font-size: 9px;
+    font-family: var(--font-mono);
+    color: var(--cyan);
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+  .editor-node-failure {
+    font-size: 9px;
+    font-family: var(--font-mono);
+    color: var(--amber);
+    margin-top: 2px;
+  }
+  .editor-node-outcomes {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+  .outcome-route {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    margin-bottom: 2px;
+  }
+  .outcome-label {
+    font-family: var(--font-mono);
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--amber-subtle);
+    color: var(--amber);
+  }
+  .outcome-arrow {
+    color: var(--fg-dim);
+  }
+  .outcome-target {
+    font-family: var(--font-mono);
+    color: var(--fg-muted);
+  }
+
+  /* ── Port connectors ── */
+  .node-port {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-light);
+    cursor: crosshair;
+    z-index: 3;
+    transition: all 0.15s;
+  }
+  .node-port:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    transform: scale(1.3);
+  }
+  .node-port.input {
+    left: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .node-port.input:hover {
+    transform: translateY(-50%) scale(1.3);
+  }
+  .node-port.output {
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .node-port.output:hover {
+    transform: translateY(-50%) scale(1.3);
+  }
+
+  /* ── Properties panel (right) ── */
+  .properties-panel {
+    background: var(--bg-card);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 0;
+  }
+  .props-header {
+    padding: 14px 16px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-dim);
+    border-bottom: 1px solid var(--border);
+  }
+  .props-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .props-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-muted);
+    margin-bottom: 6px;
+  }
+  .props-input {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--fg);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .props-input:focus {
+    border-color: var(--primary);
+  }
+  .props-select {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: var(--font-sans);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--fg);
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+  }
+  .props-select:focus { border-color: var(--primary); }
+  .props-radio-group {
+    display: flex;
+    gap: 2px;
+    background: var(--bg);
+    border-radius: 5px;
+    padding: 2px;
+  }
+  .props-radio {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    padding: 5px 8px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: var(--fg-muted);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-weight: 500;
+    transition: all 0.1s;
+  }
+  .props-radio.active {
+    color: #fff;
+  }
+  .props-radio.active.auto-active { background: var(--green); }
+  .props-radio.active.manual-active { background: var(--amber); }
+  .props-radio.active.condition-active { background: var(--blue); }
+
+  .props-textarea {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--fg);
+    outline: none;
+    resize: vertical;
+    min-height: 60px;
+    line-height: 1.5;
+  }
+  .props-textarea:focus { border-color: var(--primary); }
+
+  .outcome-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .outcome-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .outcome-row input {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--fg);
+    outline: none;
+  }
+  .outcome-row input:focus { border-color: var(--primary); }
+  .outcome-arrow-static {
+    color: var(--fg-dim);
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .props-add-btn {
+    font-size: 10px;
+    color: var(--primary);
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+    width: 100%;
+    font-family: var(--font-sans);
+    transition: all 0.1s;
+  }
+  .props-add-btn:hover {
+    border-color: var(--primary);
+    background: var(--primary-subtle);
+  }
+
+  /* ── Validation panel ── */
+  .validation-bar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--green-subtle);
+    border: 1px solid rgba(52,211,153,0.3);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--green);
+    z-index: 10;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .validation-bar.error {
+    background: var(--red-subtle);
+    border-color: rgba(248,113,113,0.3);
+    color: var(--red);
+  }
+
+  /* ── Legend overlay ── */
+  .canvas-legend {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    z-index: 5;
+    font-size: 10px;
+    color: var(--fg-dim);
+  }
+  .canvas-legend-title {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-muted);
+    margin-bottom: 6px;
+  }
+  .canvas-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .legend-line {
+    width: 20px;
+    height: 2px;
+    border-radius: 1px;
+  }
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 3px;
+  }
+
+  /* ── YAML modal ── */
+  .yaml-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .yaml-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  .yaml-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .yaml-modal-title {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .yaml-modal-close {
+    font-size: 11px;
+    color: var(--fg-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 3px;
+  }
+  .yaml-modal-close:hover { background: var(--bg-secondary); }
+  .yaml-modal-body {
+    padding: 16px;
+    overflow-y: auto;
+    max-height: 60vh;
+  }
+  .yaml-code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--fg);
+    white-space: pre;
+    background: var(--bg);
+    padding: 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .yaml-key { color: var(--cyan); }
+  .yaml-string { color: var(--green); }
+  .yaml-comment { color: var(--fg-dim); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- ═══ Toolbar ═══ -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="toolbar-title">Flow Editor</span>
+      <span class="toolbar-flow-name">conditional</span>
+      <div class="mode-toggle">
+        <button class="mode-btn" onclick="setMode('view', this)">View</button>
+        <button class="mode-btn active" onclick="setMode('edit', this)">Edit</button>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <button class="tb-btn" onclick="addStage()">+ Add Stage</button>
+      <button class="tb-btn" title="Rearrange nodes into a clean DAG layout">Auto-layout</button>
+      <button class="tb-btn success" onclick="showValidation()">Validate</button>
+      <button class="tb-btn" onclick="showYaml()">Export YAML</button>
+      <button class="tb-btn">Import YAML</button>
+    </div>
+  </div>
+
+  <!-- ═══ Flow list sidebar ═══ -->
+  <div class="flow-sidebar">
+    <div class="flow-sidebar-header">Flows</div>
+    <div class="flow-list-item" onclick="selectFlow(this)">
+      <span class="flow-item-name">autonomous-sdlc</span>
+      <span class="flow-item-stages">6</span>
+    </div>
+    <div class="flow-list-item" onclick="selectFlow(this)">
+      <span class="flow-item-name">fan-out</span>
+      <span class="flow-item-stages">3</span>
+    </div>
+    <div class="flow-list-item active" onclick="selectFlow(this)">
+      <span class="flow-item-name">conditional</span>
+      <span class="flow-item-stages">6</span>
+    </div>
+    <div class="flow-list-item" onclick="selectFlow(this)">
+      <span class="flow-item-name">quick</span>
+      <span class="flow-item-stages">2</span>
+    </div>
+    <div class="flow-list-item" onclick="selectFlow(this)">
+      <span class="flow-item-name">parallel</span>
+      <span class="flow-item-stages">4</span>
+    </div>
+    <div class="flow-list-item" onclick="selectFlow(this)">
+      <span class="flow-item-name">pr-review</span>
+      <span class="flow-item-stages">3</span>
+    </div>
+  </div>
+
+  <!-- ═══ Canvas ═══ -->
+  <div class="canvas-area" id="canvas-area">
+    <div class="canvas-grid"></div>
+    <div class="canvas-content">
+      <!-- SVG edges -->
+      <svg class="canvas-svg" width="100%" height="100%">
+        <defs>
+          <marker id="ed-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#353545" />
+          </marker>
+          <marker id="ed-arrow-cond" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--amber)" opacity="0.6" />
+          </marker>
+          <marker id="ed-arrow-loop" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--cyan)" opacity="0.5" />
+          </marker>
+        </defs>
+
+        <!-- plan -> implement -->
+        <path d="M 208 130 C 250 130, 260 130, 290 130" class="canvas-edge" marker-end="url(#ed-arrow)" />
+
+        <!-- implement -> review -->
+        <path d="M 468 130 C 510 130, 520 130, 550 130" class="canvas-edge" marker-end="url(#ed-arrow)" />
+
+        <!-- review -> pr (approved) -->
+        <path d="M 728 115 C 770 115, 780 72, 810 72" class="canvas-edge conditional" marker-end="url(#ed-arrow-cond)" />
+        <rect x="742" y="78" width="52" height="14" rx="3" fill="var(--bg)" />
+        <text x="768" y="89" class="canvas-edge-label" style="fill:var(--amber);">approved</text>
+
+        <!-- review -> revise (needs_changes) -->
+        <path d="M 728 145 C 770 145, 780 175, 810 175" class="canvas-edge conditional" marker-end="url(#ed-arrow-cond)" />
+        <rect x="720" y="152" width="80" height="14" rx="3" fill="var(--bg)" />
+        <text x="760" y="163" class="canvas-edge-label" style="fill:var(--amber);">needs changes</text>
+
+        <!-- review -> reject-close (rejected) -->
+        <path d="M 728 150 C 770 150, 780 278, 810 278" class="canvas-edge conditional" marker-end="url(#ed-arrow-cond)" />
+        <rect x="742" y="228" width="48" height="14" rx="3" fill="var(--bg)" />
+        <text x="766" y="239" class="canvas-edge-label" style="fill:var(--amber);">rejected</text>
+
+        <!-- revise -> review (loopback) -->
+        <path d="M 988 175 C 1020 175, 1020 30, 640 30 C 580 30, 570 110, 568 115" class="canvas-edge loopback" marker-end="url(#ed-arrow-loop)" />
+        <rect x="770" y="18" width="50" height="14" rx="3" fill="var(--bg)" />
+        <text x="795" y="29" class="canvas-edge-label" style="fill:var(--cyan);">loop</text>
+      </svg>
+
+      <!-- plan node -->
+      <div class="editor-node" style="left:48px;top:88px;" onclick="selectNode(this, 'plan')">
+        <div class="node-port input" style="display:none;"></div>
+        <div class="node-port output"></div>
+        <div class="editor-node-header">
+          <span class="editor-node-name">plan</span>
+          <span class="editor-node-gate gate-manual">manual</span>
+        </div>
+        <div class="editor-node-body">
+          <div class="editor-node-field">
+            <span class="editor-node-field-label">Agent</span>
+            <span class="editor-node-field-value">planner</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- implement node -->
+      <div class="editor-node" style="left:308px;top:88px;" onclick="selectNode(this, 'implement')">
+        <div class="node-port input"></div>
+        <div class="node-port output"></div>
+        <div class="editor-node-header">
+          <span class="editor-node-name">implement</span>
+          <span class="editor-node-gate gate-auto">auto</span>
+        </div>
+        <div class="editor-node-body">
+          <div class="editor-node-field">
+            <span class="editor-node-field-label">Agent</span>
+            <span class="editor-node-field-value">implementer</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- review node (selected) -->
+      <div class="editor-node selected" style="left:568px;top:88px;" id="review-node" onclick="selectNode(this, 'review')">
+        <div class="node-port input"></div>
+        <div class="node-port output"></div>
+        <div class="editor-node-header">
+          <span class="editor-node-name">review</span>
+          <span class="editor-node-gate gate-auto">auto</span>
+        </div>
+        <div class="editor-node-body">
+          <div class="editor-node-field">
+            <span class="editor-node-field-label">Agent</span>
+            <span class="editor-node-field-value">reviewer</span>
+          </div>
+          <div class="editor-node-outcomes">
+            <div class="outcome-route">
+              <span class="outcome-label">approved</span>
+              <span class="outcome-arrow">-></span>
+              <span class="outcome-target">pr</span>
+            </div>
+            <div class="outcome-route">
+              <span class="outcome-label">needs changes</span>
+              <span class="outcome-arrow">-></span>
+              <span class="outcome-target">revise</span>
+            </div>
+            <div class="outcome-route">
+              <span class="outcome-label">rejected</span>
+              <span class="outcome-arrow">-></span>
+              <span class="outcome-target">reject-close</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- pr node (branch target: approved) -->
+      <div class="editor-node" style="left:828px;top:30px;" onclick="selectNode(this, 'pr')">
+        <div class="node-port input"></div>
+        <div class="node-port output" style="display:none;"></div>
+        <div class="editor-node-header">
+          <span class="editor-node-name">pr</span>
+          <span class="editor-node-gate gate-auto">auto</span>
+        </div>
+        <div class="editor-node-body">
+          <div class="editor-node-field">
+            <span class="editor-node-field-label">Action</span>
+            <span class="editor-node-field-value">create_pr</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- revise node (branch target: needs_changes) -->
+      <div class="editor-node" style="left:828px;top:133px;" onclick="selectNode(this, 'revise')">
+        <div class="node-port input"></div>
+        <div class="node-port output"></div>
+        <div class="editor-node-header">
+          <span class="editor-node-name">revise</span>
+          <span class="editor-node-gate gate-auto">auto</span>
+        </div>
+        <div class="editor-node-body">
+          <div class="editor-node-field">
+            <span class="editor-node-field-label">Agent</span>
+            <span class="editor-node-field-value">implementer</span>
+          </div>
+          <div class="editor-node-failure">on_failure: retry(2)</div>
+        </div>
+      </div>
+
+      <!-- reject-close node (branch target: rejected) -->
+      <div class="editor-node" style="left:828px;top:236px;" onclick="selectNode(this, 'reject-close')">
+        <div class="node-port input"></div>
+        <div class="node-port output" style="display:none;"></div>
+        <div class="editor-node-header">
+          <span class="editor-node-name">reject-close</span>
+          <span class="editor-node-gate gate-auto">auto</span>
+        </div>
+        <div class="editor-node-body">
+          <div class="editor-node-field">
+            <span class="editor-node-field-label">Agent</span>
+            <span class="editor-node-field-value">closer</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="canvas-legend">
+      <div class="canvas-legend-title">Legend</div>
+      <div class="canvas-legend-item">
+        <div class="legend-line" style="background:var(--border-light);"></div>
+        Linear edge
+      </div>
+      <div class="canvas-legend-item">
+        <div class="legend-line" style="background:var(--amber);opacity:0.6;background-image:repeating-linear-gradient(90deg,var(--amber) 0,var(--amber) 6px,transparent 6px,transparent 9px);background-color:transparent;"></div>
+        Conditional edge
+      </div>
+      <div class="canvas-legend-item">
+        <div class="legend-line" style="background:var(--cyan);opacity:0.5;background-image:repeating-linear-gradient(90deg,var(--cyan) 0,var(--cyan) 4px,transparent 4px,transparent 7px);background-color:transparent;"></div>
+        Loop-back edge
+      </div>
+      <div class="canvas-legend-item">
+        <div class="legend-dot gate-auto"></div>
+        Auto gate
+      </div>
+      <div class="canvas-legend-item">
+        <div class="legend-dot gate-manual"></div>
+        Manual gate
+      </div>
+      <div class="canvas-legend-item">
+        <div class="legend-dot gate-condition"></div>
+        Condition gate
+      </div>
+    </div>
+
+    <!-- Validation toast -->
+    <div class="validation-bar" id="validation-bar" style="display:none;">
+      <span id="validation-icon"></span>
+      <span id="validation-msg"></span>
+    </div>
+  </div>
+
+  <!-- ═══ Properties panel ═══ -->
+  <div class="properties-panel">
+    <div class="props-header">Stage Properties -- review</div>
+
+    <div class="props-section">
+      <label class="props-label">Name</label>
+      <input class="props-input" value="review" />
+    </div>
+
+    <div class="props-section">
+      <label class="props-label">Agent</label>
+      <select class="props-select">
+        <option>planner</option>
+        <option>implementer</option>
+        <option>verifier</option>
+        <option selected>reviewer</option>
+        <option>merger</option>
+        <option>closer</option>
+        <option value="custom">custom...</option>
+      </select>
+    </div>
+
+    <div class="props-section">
+      <label class="props-label">Gate</label>
+      <div class="props-radio-group">
+        <button class="props-radio active auto-active" onclick="setGate(this,'auto')">Auto</button>
+        <button class="props-radio" onclick="setGate(this,'manual')">Manual</button>
+        <button class="props-radio" onclick="setGate(this,'condition')">Condition</button>
+      </div>
+    </div>
+
+    <div class="props-section" id="condition-section" style="display:none;">
+      <label class="props-label">Condition expression</label>
+      <input class="props-input" placeholder="session.review_result === 'approved'" />
+    </div>
+
+    <div class="props-section">
+      <label class="props-label">Verify scripts</label>
+      <textarea class="props-textarea" placeholder="bun test&#10;make lint">Run tests and confirm all pass.
+Check for security issues.</textarea>
+    </div>
+
+    <div class="props-section">
+      <label class="props-label">On failure</label>
+      <select class="props-select">
+        <option selected>fail</option>
+        <option>retry(1)</option>
+        <option>retry(2)</option>
+        <option>retry(3)</option>
+      </select>
+    </div>
+
+    <div class="props-section">
+      <label class="props-label">Outcome routes</label>
+      <div class="outcome-editor">
+        <div class="outcome-row">
+          <input value="approved" placeholder="outcome" />
+          <span class="outcome-arrow-static">-></span>
+          <input value="pr" placeholder="target stage" />
+        </div>
+        <div class="outcome-row">
+          <input value="needs changes" placeholder="outcome" />
+          <span class="outcome-arrow-static">-></span>
+          <input value="revise" placeholder="target stage" />
+        </div>
+        <div class="outcome-row">
+          <input value="rejected" placeholder="outcome" />
+          <span class="outcome-arrow-static">-></span>
+          <input value="reject-close" placeholder="target stage" />
+        </div>
+        <button class="props-add-btn">+ Add outcome route</button>
+      </div>
+    </div>
+
+    <div class="props-section">
+      <label class="props-label">Task prompt</label>
+      <textarea class="props-textarea" style="min-height:100px;">Review the implementation. Set session.config.review_result to "approved", "needs_changes", or "rejected".</textarea>
+    </div>
+  </div>
+</div>
+
+<!-- YAML Export Modal -->
+<div class="yaml-modal-overlay" id="yaml-modal" style="display:none;" onclick="if(event.target===this)hideYaml()">
+  <div class="yaml-modal">
+    <div class="yaml-modal-header">
+      <span class="yaml-modal-title">Export YAML -- conditional</span>
+      <button class="yaml-modal-close" onclick="hideYaml()">Close</button>
+    </div>
+    <div class="yaml-modal-body">
+      <div class="yaml-code"><span class="yaml-key">name:</span> <span class="yaml-string">conditional</span>
+<span class="yaml-key">description:</span> <span class="yaml-string">"Conditional routing -- branch based on review outcome"</span>
+
+<span class="yaml-key">stages:</span>
+  - <span class="yaml-key">name:</span> <span class="yaml-string">plan</span>
+    <span class="yaml-key">agent:</span> <span class="yaml-string">planner</span>
+    <span class="yaml-key">gate:</span> <span class="yaml-string">manual</span>
+    <span class="yaml-key">task:</span> |
+      <span class="yaml-string">Analyze {summary} and create PLAN.md.</span>
+
+  - <span class="yaml-key">name:</span> <span class="yaml-string">implement</span>
+    <span class="yaml-key">agent:</span> <span class="yaml-string">implementer</span>
+    <span class="yaml-key">gate:</span> <span class="yaml-string">auto</span>
+    <span class="yaml-key">task:</span> |
+      <span class="yaml-string">Implement the changes from PLAN.md for: {summary}</span>
+
+  - <span class="yaml-key">name:</span> <span class="yaml-string">review</span>
+    <span class="yaml-key">agent:</span> <span class="yaml-string">reviewer</span>
+    <span class="yaml-key">gate:</span> <span class="yaml-string">auto</span>
+    <span class="yaml-key">task:</span> |
+      <span class="yaml-string">Review the implementation. Set session.config.review_result</span>
+      <span class="yaml-string">to "approved", "needs_changes", or "rejected".</span>
+
+  - <span class="yaml-key">name:</span> <span class="yaml-string">revise</span>
+    <span class="yaml-key">agent:</span> <span class="yaml-string">implementer</span>
+    <span class="yaml-key">gate:</span> <span class="yaml-string">auto</span>
+    <span class="yaml-key">on_failure:</span> <span class="yaml-string">"retry(2)"</span>
+
+  - <span class="yaml-key">name:</span> <span class="yaml-string">reject-close</span>
+    <span class="yaml-key">agent:</span> <span class="yaml-string">closer</span>
+    <span class="yaml-key">gate:</span> <span class="yaml-string">auto</span>
+
+  - <span class="yaml-key">name:</span> <span class="yaml-string">pr</span>
+    <span class="yaml-key">action:</span> <span class="yaml-string">create_pr</span>
+    <span class="yaml-key">gate:</span> <span class="yaml-string">auto</span>
+
+<span class="yaml-key">edges:</span>
+  - <span class="yaml-key">from:</span> <span class="yaml-string">plan</span>
+    <span class="yaml-key">to:</span> <span class="yaml-string">implement</span>
+  - <span class="yaml-key">from:</span> <span class="yaml-string">implement</span>
+    <span class="yaml-key">to:</span> <span class="yaml-string">review</span>
+  <span class="yaml-comment"># Conditional branching after review</span>
+  - <span class="yaml-key">from:</span> <span class="yaml-string">review</span>
+    <span class="yaml-key">to:</span> <span class="yaml-string">pr</span>
+    <span class="yaml-key">condition:</span> <span class="yaml-string">"session.review_result === 'approved'"</span>
+    <span class="yaml-key">label:</span> <span class="yaml-string">approved</span>
+  - <span class="yaml-key">from:</span> <span class="yaml-string">review</span>
+    <span class="yaml-key">to:</span> <span class="yaml-string">revise</span>
+    <span class="yaml-key">condition:</span> <span class="yaml-string">"session.review_result === 'needs_changes'"</span>
+    <span class="yaml-key">label:</span> <span class="yaml-string">needs changes</span>
+  - <span class="yaml-key">from:</span> <span class="yaml-string">review</span>
+    <span class="yaml-key">to:</span> <span class="yaml-string">reject-close</span>
+    <span class="yaml-key">condition:</span> <span class="yaml-string">"session.review_result === 'rejected'"</span>
+    <span class="yaml-key">label:</span> <span class="yaml-string">rejected</span>
+  <span class="yaml-comment"># After revision, go back to review</span>
+  - <span class="yaml-key">from:</span> <span class="yaml-string">revise</span>
+    <span class="yaml-key">to:</span> <span class="yaml-string">review</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function selectFlow(el) {
+  document.querySelectorAll('.flow-list-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function selectNode(el, name) {
+  document.querySelectorAll('.editor-node').forEach(n => n.classList.remove('selected'));
+  el.classList.add('selected');
+  document.querySelector('.props-header').textContent = 'Stage Properties -- ' + name;
+}
+
+function setMode(mode, btn) {
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function setGate(btn, gate) {
+  const group = btn.parentElement;
+  group.querySelectorAll('.props-radio').forEach(b => {
+    b.classList.remove('active', 'auto-active', 'manual-active', 'condition-active');
+  });
+  btn.classList.add('active', gate + '-active');
+  document.getElementById('condition-section').style.display =
+    gate === 'condition' ? 'block' : 'none';
+}
+
+function showValidation() {
+  const bar = document.getElementById('validation-bar');
+  bar.className = 'validation-bar';
+  document.getElementById('validation-icon').textContent = '\u2713';
+  document.getElementById('validation-msg').textContent =
+    'Flow is valid: 6 stages, 7 edges, no cycles detected, all stages reachable.';
+  bar.style.display = 'flex';
+  setTimeout(() => { bar.style.display = 'none'; }, 4000);
+}
+
+function addStage() {
+  const bar = document.getElementById('validation-bar');
+  bar.className = 'validation-bar';
+  bar.style.display = 'flex';
+  document.getElementById('validation-icon').textContent = '+';
+  document.getElementById('validation-msg').textContent =
+    'New stage added. Drag to position, then connect ports.';
+  setTimeout(() => { bar.style.display = 'none'; }, 3000);
+}
+
+function showYaml() {
+  document.getElementById('yaml-modal').style.display = 'flex';
+}
+function hideYaml() {
+  document.getElementById('yaml-modal').style.display = 'none';
+}
+</script>
+
+</body>
+</html>
