@@ -11,6 +11,7 @@ import type { TokenUsage } from "./pricing.js";
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 import { PricingRegistry } from "./pricing.js";
+import { syncBurn } from "./burn/sync.js";
 
 // Shared registry instance for standalone function calls
 const _registry = new PricingRegistry();
@@ -155,6 +156,9 @@ export function syncCosts(app: AppContext): { synced: number; skipped: number } 
     });
     synced++;
   }
+
+  // Also sync burn data from transcripts
+  try { syncBurn(app); } catch { /* burn sync is best-effort */ }
 
   return { synced, skipped };
 }
