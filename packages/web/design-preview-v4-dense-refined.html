@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ark -- Dense Refined Design Preview v4</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Geist+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet" />
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"Geist Mono"', '"IBM Plex Mono"', 'monospace'],
+        prose: ['"Source Serif 4"', 'Georgia', 'serif'],
+      },
+    },
+  },
+};
+</script>
+<style>
+  :root {
+    --page-bg: #09090b;
+    --panel-bg: #0c0c0e;
+    --surface: #111113;
+    --surface-hover: #16161a;
+    --border: rgba(255,255,255,0.07);
+    --border-strong: rgba(255,255,255,0.12);
+
+    --text-white: #f4f4f5;
+    --text-gray: #a1a1aa;
+    --text-dim: #52525b;
+    --text-ghost: #3f3f46;
+
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --blue: #60a5fa;
+
+    --code-bg: #0a0a0c;
+    --user-bg: rgba(255,255,255,0.03);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--page-bg);
+    color: var(--text-white);
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    height: 100%;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-ghost); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  .font-mono { font-family: 'Geist Mono', 'IBM Plex Mono', monospace; }
+  .font-prose { font-family: 'Source Serif 4', Georgia, serif; }
+
+  /* Global transition helper */
+  .trans { transition: all 150ms ease; }
+
+  /* Three-panel layout */
+  .app-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr 300px;
+    grid-template-rows: 40px 1fr 48px;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Header bar */
+  .header-bar {
+    grid-column: 1 / -1;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+    font-size: 12px;
+    -webkit-app-region: drag;
+  }
+
+  /* Left panel */
+  .left-panel {
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Center panel */
+  .center-panel {
+    background: var(--page-bg);
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  /* Right panel */
+  .right-panel {
+    background: var(--panel-bg);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  /* Bottom input bar */
+  .input-bar {
+    grid-column: 1 / -1;
+    background: var(--panel-bg);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+  }
+
+  /* Keyboard shortcut badge (from Linear) */
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+    line-height: 1;
+  }
+
+  /* Session list items */
+  .session-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    padding: 5px 16px;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 150ms ease;
+  }
+  .session-item:hover { background: var(--surface); }
+  .session-item.selected { background: var(--surface-hover); }
+
+  /* Group headers */
+  .group-header {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-ghost);
+    padding: 12px 16px 4px;
+  }
+
+  /* Nav items with keyboard shortcuts (from Linear) */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 150ms ease;
+  }
+  .nav-item:hover { color: var(--text-gray); background: var(--surface); }
+
+  /* Timeline messages */
+  .msg { padding: 6px 24px; }
+  .msg + .msg { border-top: none; }
+
+  .msg-system {
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 8px 24px;
+    font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+  }
+
+  .msg-stage {
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 10px 24px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Agent messages -- serif prose for readability (from Warm) */
+  .msg-agent {
+    padding: 8px 24px 10px;
+    line-height: 1.65;
+    color: var(--text-gray);
+    font-size: 13.5px;
+    font-family: 'Source Serif 4', Georgia, serif;
+  }
+
+  .msg-agent-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+    font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .msg-user {
+    padding: 10px 24px;
+    background: var(--user-bg);
+    border-left: 2px solid rgba(255,255,255,0.1);
+    color: var(--text-white);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .tool-call {
+    font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    padding: 2px 0;
+    line-height: 1.5;
+    transition: color 150ms ease;
+  }
+  .tool-call:hover { color: var(--text-gray); }
+  .tool-call .chevron { color: var(--text-ghost); margin-right: 4px; }
+  .tool-call .duration { color: var(--text-ghost); }
+
+  /* Git command rendering with checkmarks (from Linear) */
+  .tool-call-done {
+    font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    padding: 2px 0;
+    line-height: 1.5;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 150ms ease;
+  }
+  .tool-call-done:hover { color: var(--text-gray); }
+  .tool-call-done .check { color: var(--green); font-size: 11px; flex-shrink: 0; }
+
+  /* Code blocks */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    margin: 6px 0;
+    font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.55;
+    overflow-x: auto;
+  }
+
+  /* Ordered list inside agent messages */
+  .msg-agent ol {
+    padding-left: 20px;
+    margin: 6px 0;
+    color: var(--text-white);
+    font-size: 13.5px;
+    font-family: 'Source Serif 4', Georgia, serif;
+    line-height: 1.7;
+  }
+  .msg-agent ol li { padding: 1px 0; }
+
+  /* Review badges (from Linear) */
+  .review-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .review-badge.good {
+    background: rgba(74, 222, 128, 0.1);
+    color: var(--green);
+  }
+  .review-badge.note {
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--amber);
+  }
+
+  /* Diff styling */
+  .diff-add { color: var(--green); }
+  .diff-del { color: var(--red); }
+  .diff-hunk { color: var(--blue); }
+  .diff-context { color: var(--text-dim); }
+
+  /* Right panel tabs */
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .panel-tab {
+    padding: 8px 14px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+    margin-bottom: -1px;
+    transition: color 150ms ease;
+  }
+  .panel-tab:hover { color: var(--text-gray); }
+  .panel-tab.active {
+    color: var(--text-white);
+    border-bottom-color: var(--text-gray);
+  }
+
+  /* File tree */
+  .file-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+    cursor: pointer;
+    transition: background 150ms ease;
+  }
+  .file-row:hover { background: var(--surface); }
+  .file-row.selected { background: var(--surface-hover); }
+  .file-dir {
+    padding: 6px 14px 2px;
+    font-size: 11px;
+    color: var(--text-ghost);
+    font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 150ms ease;
+    font-family: inherit;
+  }
+  .btn-primary {
+    background: var(--text-white);
+    color: var(--page-bg);
+    border-color: var(--text-white);
+  }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-gray);
+    border-color: var(--border-strong);
+  }
+  .btn-secondary:hover { border-color: var(--text-dim); color: var(--text-white); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+  }
+  .btn-ghost:hover { color: var(--text-gray); }
+
+  /* Status dot */
+  .status-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    margin-right: 1px;
+  }
+  .status-dot.running { background: var(--blue); box-shadow: 0 0 4px var(--blue); }
+  .status-dot.waiting { background: var(--amber); }
+  .status-dot.completed { background: var(--green); }
+  .status-dot.failed { background: var(--red); }
+  .status-dot.stopped { background: var(--text-ghost); }
+
+  /* Pipeline */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+    font-size: 11px;
+  }
+  .pipeline-stage {
+    padding: 3px 10px;
+    color: var(--text-dim);
+    transition: color 150ms ease;
+  }
+  .pipeline-stage.done { color: var(--green); }
+  .pipeline-stage.active { color: var(--blue); font-weight: 500; }
+  .pipeline-stage.pending { color: var(--text-ghost); }
+  .pipeline-connector { color: var(--text-ghost); font-size: 10px; }
+
+  /* Command palette (from Linear) */
+  .cmd-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 18vh;
+    z-index: 100;
+  }
+  .cmd-overlay.open { display: flex; }
+
+  .cmd-box {
+    width: 520px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .cmd-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cmd-input-wrap input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-white);
+    font-size: 14px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .cmd-input-wrap input::placeholder { color: var(--text-ghost); }
+  .cmd-results {
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .cmd-group-label {
+    padding: 6px 10px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-ghost);
+  }
+  .cmd-result-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-gray);
+    transition: background 150ms ease;
+  }
+  .cmd-result-item:hover { background: var(--surface); }
+
+  /* Pulse animation for running indicator */
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .pulse { animation: pulse-glow 2s ease-in-out infinite; }
+
+  /* Component showcase section */
+  .showcase-section {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 60px 40px;
+  }
+  .showcase-section h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================ -->
+<!-- MAIN APPLICATION LAYOUT                      -->
+<!-- ============================================ -->
+<div style="height:100vh; overflow:hidden;">
+<div class="app-layout">
+
+  <!-- HEADER BAR -->
+  <div class="header-bar">
+    <span style="font-weight:600; font-size:13px; color:var(--text-white); letter-spacing:-0.02em;">ark</span>
+    <span style="color:var(--text-ghost);">|</span>
+    <span style="color:var(--text-dim);">autonomous-sdlc</span>
+    <span style="color:var(--text-ghost);">/</span>
+    <span style="color:var(--text-gray);">s-abc123</span>
+
+    <div style="flex:1;"></div>
+
+    <!-- Pipeline in header -->
+    <div class="pipeline">
+      <span class="pipeline-stage done">plan</span>
+      <span class="pipeline-connector">--></span>
+      <span class="pipeline-stage done">implement</span>
+      <span class="pipeline-connector">--></span>
+      <span class="pipeline-stage done">verify</span>
+      <span class="pipeline-connector">--></span>
+      <span class="pipeline-stage active pulse">review</span>
+      <span class="pipeline-connector">--></span>
+      <span class="pipeline-stage pending">merge</span>
+    </div>
+
+    <div style="flex:1;"></div>
+
+    <!-- Cmd+K search trigger (from Linear) -->
+    <button onclick="toggleCmdPalette()" class="trans" style="display:flex; align-items:center; gap:8px; padding:4px 10px; background:var(--surface); border:1px solid var(--border-strong); border-radius:4px; cursor:pointer; -webkit-app-region:no-drag; color:var(--text-dim); font-size:12px; font-family:inherit;">
+      Search...
+      <span class="kbd">&#8984;K</span>
+    </button>
+
+    <span style="color:var(--text-ghost);">|</span>
+    <span class="font-mono" style="font-size:11px; color:var(--text-dim);">local</span>
+    <span style="color:var(--text-ghost);">|</span>
+    <span class="font-mono" style="font-size:11px; color:var(--text-dim);">opus-4</span>
+    <span style="color:var(--text-ghost);">|</span>
+    <span class="font-mono" style="font-size:11px; color:var(--green);">$0.82</span>
+  </div>
+
+  <!-- LEFT PANEL - Session List -->
+  <div class="left-panel">
+    <div class="group-header">autonomous-sdlc</div>
+    <div class="session-item selected">
+      <span>
+        <span class="status-dot running pulse"></span>
+        <span class="font-mono" style="color:var(--text-gray); font-size:11px;">s-abc123</span>
+      </span>
+      <span style="color:var(--text-dim); font-size:11px;">implement</span>
+      <span class="font-mono" style="color:var(--blue); font-size:10px;">2m</span>
+    </div>
+    <div class="session-item">
+      <span>
+        <span class="status-dot waiting"></span>
+        <span class="font-mono" style="color:var(--text-gray); font-size:11px;">s-def456</span>
+      </span>
+      <span style="color:var(--text-dim); font-size:11px;">review</span>
+      <span class="font-mono" style="color:var(--amber); font-size:10px;">8m</span>
+    </div>
+    <div class="session-item">
+      <span>
+        <span class="status-dot completed"></span>
+        <span class="font-mono" style="color:var(--text-gray); font-size:11px;">s-ghi789</span>
+      </span>
+      <span style="color:var(--text-dim); font-size:11px;">completed</span>
+      <span class="font-mono" style="color:var(--text-dim); font-size:10px;">1h</span>
+    </div>
+
+    <div class="group-header">quick</div>
+    <div class="session-item">
+      <span>
+        <span class="status-dot running pulse"></span>
+        <span class="font-mono" style="color:var(--text-gray); font-size:11px;">s-jkl012</span>
+      </span>
+      <span style="color:var(--text-dim); font-size:11px;">implement</span>
+      <span class="font-mono" style="color:var(--blue); font-size:10px;">5m</span>
+    </div>
+
+    <div class="group-header">pr-review</div>
+    <div class="session-item">
+      <span>
+        <span class="status-dot failed"></span>
+        <span class="font-mono" style="color:var(--text-gray); font-size:11px;">s-mno345</span>
+      </span>
+      <span style="color:var(--text-dim); font-size:11px;">failed</span>
+      <span class="font-mono" style="color:var(--red); font-size:10px;">3h</span>
+    </div>
+    <div class="session-item">
+      <span>
+        <span class="status-dot completed"></span>
+        <span class="font-mono" style="color:var(--text-gray); font-size:11px;">s-pqr678</span>
+      </span>
+      <span style="color:var(--text-dim); font-size:11px;">completed</span>
+      <span class="font-mono" style="color:var(--text-dim); font-size:10px;">1d</span>
+    </div>
+
+    <div class="group-header">standalone</div>
+    <div class="session-item">
+      <span>
+        <span class="status-dot completed"></span>
+        <span class="font-mono" style="color:var(--text-gray); font-size:11px;">s-stu901</span>
+      </span>
+      <span style="color:var(--text-dim); font-size:11px;">completed</span>
+      <span class="font-mono" style="color:var(--text-dim); font-size:10px;">2d</span>
+    </div>
+    <div class="session-item">
+      <span>
+        <span class="status-dot stopped"></span>
+        <span class="font-mono" style="color:var(--text-gray); font-size:11px;">s-vwx234</span>
+      </span>
+      <span style="color:var(--text-dim); font-size:11px;">stopped</span>
+      <span class="font-mono" style="color:var(--text-dim); font-size:10px;">4d</span>
+    </div>
+
+    <!-- Spacer to push nav + summary to bottom -->
+    <div style="flex:1;"></div>
+
+    <!-- Nav items with keyboard shortcuts (from Linear) -->
+    <div style="border-top: 1px solid var(--border); padding: 6px 0;">
+      <div class="nav-item">
+        <span>Agents</span>
+        <span class="kbd">A</span>
+      </div>
+      <div class="nav-item">
+        <span>Flows</span>
+        <span class="kbd">F</span>
+      </div>
+      <div class="nav-item">
+        <span>Compute</span>
+        <span class="kbd">C</span>
+      </div>
+      <div class="nav-item">
+        <span>Costs</span>
+        <span class="kbd">$</span>
+      </div>
+      <div class="nav-item">
+        <span>Settings</span>
+        <span class="kbd">,</span>
+      </div>
+    </div>
+
+    <!-- Bottom of left panel: summary -->
+    <div style="border-top: 1px solid var(--border); padding: 10px 16px;">
+      <div style="display:flex; justify-content:space-between; font-size:11px; font-family:'Geist Mono','IBM Plex Mono',monospace;">
+        <span style="color:var(--text-dim);">8 sessions</span>
+        <span><span style="color:var(--blue);">2 running</span></span>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:11px; font-family:'Geist Mono','IBM Plex Mono',monospace; margin-top:3px;">
+        <span style="color:var(--text-dim);">total cost</span>
+        <span style="color:var(--text-gray);">$4.37</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER PANEL - Conversation Timeline -->
+  <div class="center-panel" id="conversation">
+
+    <!-- System: session start -->
+    <div class="msg-system" style="padding-top:14px;">
+      <span style="color:var(--text-ghost);">14:34</span>&nbsp;&nbsp;Session started -- flow: autonomous-sdlc, agent: planner, compute: local, model: claude-opus-4
+    </div>
+
+    <!-- System: stage dispatched -->
+    <div class="msg-stage">
+      <span style="color:var(--text-ghost);">14:34</span>
+      <span style="color:var(--green);">&#9654;</span>
+      <span>Stage: <strong style="color:var(--text-gray);">plan</strong> dispatched</span>
+    </div>
+
+    <!-- Agent: planner analysis -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">planner</div>
+      I'll analyze the codebase structure and create an implementation plan for the OAuth authentication feature.
+    </div>
+
+    <!-- Tool calls: reads -->
+    <div class="msg" style="padding: 2px 24px 2px;">
+      <div class="tool-call"><span class="chevron">></span> Read 5 files (auth.ts, session.ts, config.yaml, routes.ts, middleware.ts) <span class="duration">-- 1.2s</span></div>
+      <div class="tool-call"><span class="chevron">></span> Searched "authenticate" across 12 files <span class="duration">-- 0.8s</span></div>
+      <div class="tool-call"><span class="chevron">></span> Read packages/types/auth.ts (45 lines) <span class="duration">-- 0.1s</span></div>
+      <div class="tool-call"><span class="chevron">></span> Searched "OAuthProvider" across 8 files -- 3 matches <span class="duration">-- 0.4s</span></div>
+    </div>
+
+    <!-- Agent: planner plan -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">planner</div>
+      Based on my analysis, here's the plan:
+      <ol>
+        <li>Add OAuth provider abstraction in <span class="font-mono" style="font-size:12px; color:var(--text-white);">packages/core/auth/</span></li>
+        <li>Implement GitHub OAuth flow (authorize -> callback -> token exchange)</li>
+        <li>Add session token management with refresh rotation</li>
+        <li>Wire middleware to validate tokens on protected routes</li>
+        <li>Add user profile endpoint</li>
+      </ol>
+      <div style="margin-top:8px; font-size:12px; color:var(--text-dim); font-family:'Plus Jakarta Sans',sans-serif;">
+        Estimated: 45 minutes, ~$0.80 in API costs.
+      </div>
+    </div>
+
+    <!-- Tool call: file created -->
+    <div class="msg" style="padding: 2px 24px;">
+      <div class="tool-call"><span class="chevron">></span> Created <span style="color:var(--text-gray);">PLAN.md</span> (127 lines) <span class="duration">-- 0.3s</span></div>
+    </div>
+
+    <!-- Stage transition -->
+    <div class="msg-stage">
+      <span style="color:var(--text-ghost);">14:38</span>
+      <span style="color:var(--green);">&#10003;</span>
+      <span>Stage: <strong style="color:var(--text-gray);">plan</strong> completed -- advancing to implement</span>
+    </div>
+
+    <div class="msg-stage">
+      <span style="color:var(--text-ghost);">14:38</span>
+      <span style="color:var(--green);">&#9654;</span>
+      <span>Stage: <strong style="color:var(--text-gray);">implement</strong> dispatched (agent: implementer)</span>
+    </div>
+
+    <!-- Agent: implementer starts -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">implementer</div>
+      Starting implementation based on PLAN.md. I'll create the OAuth provider abstraction first, then the GitHub-specific implementation, and wire everything together.
+    </div>
+
+    <!-- Tool calls: file operations -->
+    <div class="msg" style="padding: 2px 24px;">
+      <div class="tool-call"><span class="chevron">></span> Created <span style="color:var(--green);">packages/core/auth/provider.ts</span> (89 lines) <span class="duration">-- 0.8s</span></div>
+      <div class="tool-call"><span class="chevron">></span> Created <span style="color:var(--green);">packages/core/auth/github.ts</span> (134 lines) <span class="duration">-- 1.1s</span></div>
+      <div class="tool-call"><span class="chevron">></span> Edited <span style="color:var(--amber);">packages/core/auth/session.ts</span> <span style="color:var(--green);">+45</span> <span style="color:var(--red);">-3</span> <span class="duration">-- 0.6s</span></div>
+      <div class="tool-call"><span class="chevron">></span> Edited <span style="color:var(--amber);">packages/server/routes.ts</span> <span style="color:var(--green);">+28</span> <span style="color:var(--red);">-0</span> <span class="duration">-- 0.4s</span></div>
+      <div class="tool-call"><span class="chevron">></span> Edited <span style="color:var(--amber);">packages/server/middleware.ts</span> <span style="color:var(--green);">+15</span> <span style="color:var(--red);">-2</span> <span class="duration">-- 0.3s</span></div>
+    </div>
+
+    <!-- Agent: explains the implementation -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">implementer</div>
+      Provider abstraction is done. The <span class="font-mono" style="font-size:12px; color:var(--text-white);">OAuthProvider</span> interface defines three methods: <span class="font-mono" style="font-size:12px; color:var(--text-white);">getAuthorizationUrl()</span>, <span class="font-mono" style="font-size:12px; color:var(--text-white);">exchangeCode()</span>, and <span class="font-mono" style="font-size:12px; color:var(--text-white);">getUserProfile()</span>. The GitHub implementation handles the full flow including PKCE.
+    </div>
+
+    <!-- Code block -->
+    <div class="msg" style="padding:4px 24px;">
+      <div class="code-block">
+        <span style="color:var(--blue);">export interface</span> <span style="color:var(--text-white);">OAuthProvider</span> {<br>
+        &nbsp;&nbsp;<span style="color:var(--text-gray);">name</span>: <span style="color:var(--green);">string</span>;<br>
+        &nbsp;&nbsp;<span style="color:var(--amber);">getAuthorizationUrl</span>(<span style="color:var(--text-gray);">state</span>: <span style="color:var(--green);">string</span>): <span style="color:var(--green);">string</span>;<br>
+        &nbsp;&nbsp;<span style="color:var(--amber);">exchangeCode</span>(<span style="color:var(--text-gray);">code</span>: <span style="color:var(--green);">string</span>): <span style="color:var(--blue);">Promise</span>&lt;<span style="color:var(--text-white);">TokenPair</span>&gt;;<br>
+        &nbsp;&nbsp;<span style="color:var(--amber);">getUserProfile</span>(<span style="color:var(--text-gray);">token</span>: <span style="color:var(--green);">string</span>): <span style="color:var(--blue);">Promise</span>&lt;<span style="color:var(--text-white);">UserProfile</span>&gt;;<br>
+        }
+      </div>
+    </div>
+
+    <!-- User message -->
+    <div class="msg-user">
+      <div style="font-size:11px; color:var(--text-dim); margin-bottom:3px; font-family:'Geist Mono','IBM Plex Mono',monospace;">
+        <span style="color:var(--text-ghost);">14:42</span>&nbsp;&nbsp;YOU
+      </div>
+      Use the v2 OAuth endpoints, not v1. The v1 endpoints are deprecated and will be removed in Q3.
+    </div>
+
+    <!-- Agent: acknowledges correction -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">implementer</div>
+      Got it -- switching from <span class="font-mono" style="font-size:12px; color:var(--text-white);">/login/oauth/authorize</span> to <span class="font-mono" style="font-size:12px; color:var(--text-white);">/api/v2/oauth/authorize</span> and updating the token exchange endpoint accordingly.
+    </div>
+
+    <!-- Tool calls: edits -->
+    <div class="msg" style="padding: 2px 24px;">
+      <div class="tool-call"><span class="chevron">></span> Edited <span style="color:var(--amber);">packages/core/auth/github.ts</span> <span style="color:var(--green);">+8</span> <span style="color:var(--red);">-8</span> <span class="duration">-- 0.5s</span></div>
+    </div>
+
+    <!-- Agent: implementation complete -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">implementer</div>
+      Implementation complete. 6 files changed, 319 additions, 13 deletions. Running verification before marking done.
+    </div>
+
+    <!-- Tool calls: tests -- git-style with checkmarks (from Linear) -->
+    <div class="msg" style="padding: 2px 24px;">
+      <div class="tool-call-done"><span class="check">&#10003;</span> bash: <span style="color:var(--text-gray);">bun test packages/core/__tests__/auth.test.ts</span> -- <span style="color:var(--green);">12 passed</span> <span class="duration" style="color:var(--text-ghost);">(3.2s)</span></div>
+      <div class="tool-call-done"><span class="check">&#10003;</span> bash: <span style="color:var(--text-gray);">make lint</span> -- <span style="color:var(--green);">clean</span> <span class="duration" style="color:var(--text-ghost);">(1.1s)</span></div>
+    </div>
+
+    <!-- Stage transition -->
+    <div class="msg-stage">
+      <span style="color:var(--text-ghost);">14:52</span>
+      <span style="color:var(--green);">&#10003;</span>
+      <span>Stage: <strong style="color:var(--text-gray);">implement</strong> completed -- advancing to verify</span>
+    </div>
+
+    <div class="msg-stage">
+      <span style="color:var(--text-ghost);">14:52</span>
+      <span style="color:var(--green);">&#9654;</span>
+      <span>Stage: <strong style="color:var(--text-gray);">verify</strong> dispatched (agent: verifier)</span>
+    </div>
+
+    <!-- Agent: verifier -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">verifier</div>
+      Running verification suite against the full test matrix.
+    </div>
+
+    <div class="msg" style="padding: 2px 24px;">
+      <div class="tool-call-done"><span class="check">&#10003;</span> bash: <span style="color:var(--text-gray);">make test</span> -- <span style="color:var(--green);">2857 passed</span>, 0 failed <span class="duration" style="color:var(--text-ghost);">(45s)</span></div>
+      <div class="tool-call-done"><span class="check">&#10003;</span> bash: <span style="color:var(--text-gray);">make lint</span> -- <span style="color:var(--green);">clean</span> <span class="duration" style="color:var(--text-ghost);">(1.1s)</span></div>
+      <div class="tool-call-done"><span class="check">&#10003;</span> Security check: no hardcoded tokens found <span class="duration" style="color:var(--text-ghost);">(0.8s)</span></div>
+      <div class="tool-call-done"><span class="check">&#10003;</span> Type check: <span style="color:var(--green);">0 errors</span> <span class="duration" style="color:var(--text-ghost);">(2.4s)</span></div>
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">verifier</div>
+      Verification passed. All 2,857 tests green, lint clean, type-safe, no security issues detected. The OAuth implementation correctly uses v2 endpoints as requested.
+    </div>
+
+    <!-- Stage transition -->
+    <div class="msg-stage">
+      <span style="color:var(--text-ghost);">14:54</span>
+      <span style="color:var(--green);">&#10003;</span>
+      <span>Stage: <strong style="color:var(--text-gray);">verify</strong> completed -- advancing to review</span>
+    </div>
+
+    <div class="msg-stage">
+      <span style="color:var(--text-ghost);">14:54</span>
+      <span style="color:var(--green);">&#9654;</span>
+      <span>Stage: <strong style="color:var(--text-gray);">review</strong> dispatched (agent: reviewer)</span>
+    </div>
+
+    <!-- Agent: reviewer -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">reviewer</div>
+      Reviewing the implementation against PLAN.md and security best practices.
+    </div>
+
+    <div class="msg" style="padding: 2px 24px;">
+      <div class="tool-call"><span class="chevron">></span> Read 6 changed files <span class="duration">-- 0.6s</span></div>
+      <div class="tool-call"><span class="chevron">></span> Diffed against main branch <span class="duration">-- 0.3s</span></div>
+    </div>
+
+    <!-- Agent: review findings with Good/Note badges (from Linear) and bold prefixes (from Warm) -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">reviewer</div>
+      Review findings:
+      <ol style="list-style:none; padding-left:0; margin-top:8px;">
+        <li style="display:flex; align-items:flex-start; gap:8px; padding:3px 0;">
+          <span class="review-badge good">Good</span>
+          <span><strong style="color:var(--text-white);">PKCE flow:</strong> Implemented correctly with S256 challenge method</span>
+        </li>
+        <li style="display:flex; align-items:flex-start; gap:8px; padding:3px 0;">
+          <span class="review-badge good">Good</span>
+          <span><strong style="color:var(--text-white);">Token rotation:</strong> Refresh rotation prevents replay attacks</span>
+        </li>
+        <li style="display:flex; align-items:flex-start; gap:8px; padding:3px 0;">
+          <span class="review-badge note">Note</span>
+          <span><strong style="color:var(--text-white);">Rate limiting:</strong> Consider adding rate limiting on the callback endpoint to prevent brute-force attacks on the state parameter</span>
+        </li>
+        <li style="display:flex; align-items:flex-start; gap:8px; padding:3px 0;">
+          <span class="review-badge good">Good</span>
+          <span><strong style="color:var(--text-white);">Separation of concerns:</strong> Clean separation between provider abstraction and GitHub-specific logic</span>
+        </li>
+      </ol>
+      <div style="margin-top:8px;">
+        Overall: approve with minor suggestion. The rate limiting is not blocking -- the state parameter is cryptographically random and short-lived.
+      </div>
+    </div>
+
+    <!-- User message 2 -->
+    <div class="msg-user">
+      <div style="font-size:11px; color:var(--text-dim); margin-bottom:3px; font-family:'Geist Mono','IBM Plex Mono',monospace;">
+        <span style="color:var(--text-ghost);">14:56</span>&nbsp;&nbsp;YOU
+      </div>
+      Add the rate limiting. Better safe than sorry. Use the existing RateLimiter from packages/core/utils.
+    </div>
+
+    <!-- Agent: reviewer acts on feedback -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">reviewer</div>
+      Adding rate limiting to the OAuth callback endpoint.
+    </div>
+
+    <div class="msg" style="padding: 2px 24px;">
+      <div class="tool-call"><span class="chevron">></span> Read <span style="color:var(--text-gray);">packages/core/utils/rate-limiter.ts</span> <span class="duration">-- 0.1s</span></div>
+      <div class="tool-call"><span class="chevron">></span> Edited <span style="color:var(--amber);">packages/server/routes.ts</span> <span style="color:var(--green);">+6</span> <span style="color:var(--red);">-1</span> <span class="duration">-- 0.3s</span></div>
+      <div class="tool-call-done"><span class="check">&#10003;</span> bash: <span style="color:var(--text-gray);">bun test packages/core/__tests__/auth.test.ts</span> -- <span style="color:var(--green);">12 passed</span> <span class="duration" style="color:var(--text-ghost);">(3.1s)</span></div>
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">reviewer</div>
+      Rate limiter added: 10 requests per minute per IP on <span class="font-mono" style="font-size:12px; color:var(--text-white);">/auth/callback</span>. All tests still passing. Marking review as approved.
+    </div>
+
+    <!-- Git commands rendered as completed steps with checkmarks (from Linear) -->
+    <div class="msg" style="padding: 2px 24px;">
+      <div class="tool-call-done"><span class="check">&#10003;</span> git add -A && git commit -m "feat(auth): add OAuth v2 with PKCE" <span class="duration" style="color:var(--text-ghost);">(0.4s)</span></div>
+      <div class="tool-call-done"><span class="check">&#10003;</span> git push origin feat/oauth-v2 <span class="duration" style="color:var(--text-ghost);">(1.2s)</span></div>
+    </div>
+
+    <!-- System message -->
+    <div class="msg-system">
+      <span style="color:var(--text-ghost);">14:57</span>&nbsp;&nbsp;Review approved. Waiting for user to advance to merge stage.
+    </div>
+
+    <!-- Some bottom padding for scroll -->
+    <div style="height: 20px;"></div>
+
+  </div>
+
+  <!-- RIGHT PANEL - Workspace -->
+  <div class="right-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" onclick="switchRightTab('files')">Files</div>
+      <div class="panel-tab" onclick="switchRightTab('changes')">Changes</div>
+      <div class="panel-tab" onclick="switchRightTab('pr')">PR</div>
+    </div>
+
+    <!-- Files tab -->
+    <div id="tab-files">
+      <!-- File count -->
+      <div style="padding:8px 14px; font-size:11px; color:var(--text-dim); border-bottom:1px solid var(--border); display:flex; justify-content:space-between;">
+        <span>6 files changed</span>
+        <span><span style="color:var(--green);">+325</span>&nbsp;&nbsp;<span style="color:var(--red);">-14</span></span>
+      </div>
+
+      <!-- File tree -->
+      <div class="file-dir">packages/core/auth/</div>
+      <div class="file-row selected">
+        <span style="color:var(--text-gray);">provider.ts</span>
+        <span style="color:var(--green); font-size:11px;">+89</span>
+      </div>
+      <div class="file-row">
+        <span style="color:var(--text-gray);">github.ts</span>
+        <span><span style="color:var(--green); font-size:11px;">+142</span> <span style="color:var(--red); font-size:11px;">-8</span></span>
+      </div>
+      <div class="file-row">
+        <span style="color:var(--text-gray);">session.ts</span>
+        <span><span style="color:var(--green); font-size:11px;">+45</span> <span style="color:var(--red); font-size:11px;">-3</span></span>
+      </div>
+      <div class="file-dir">packages/server/</div>
+      <div class="file-row">
+        <span style="color:var(--text-gray);">routes.ts</span>
+        <span><span style="color:var(--green); font-size:11px;">+34</span> <span style="color:var(--red); font-size:11px;">-1</span></span>
+      </div>
+      <div class="file-row">
+        <span style="color:var(--text-gray);">middleware.ts</span>
+        <span><span style="color:var(--green); font-size:11px;">+15</span> <span style="color:var(--red); font-size:11px;">-2</span></span>
+      </div>
+
+      <!-- Diff preview -->
+      <div style="border-top:1px solid var(--border); padding:8px 14px;">
+        <div style="font-size:11px; color:var(--text-dim); margin-bottom:6px; font-family:'Geist Mono','IBM Plex Mono',monospace;">
+          packages/core/auth/github.ts
+        </div>
+        <div class="code-block" style="font-size:11px; line-height:1.6;">
+          <span class="diff-hunk">@@ -12,7 +12,7 @@</span><br>
+          <span class="diff-context"> import { OAuthProvider } from "./provider.js";</span><br>
+          <span class="diff-context"> import { generatePKCE } from "./pkce.js";</span><br>
+          <span class="diff-context"> </span><br>
+          <span class="diff-del">-const AUTH_URL = "https://github.com/login/oauth/authorize";</span><br>
+          <span class="diff-add">+const AUTH_URL = "https://api.github.com/v2/oauth/authorize";</span><br>
+          <span class="diff-context"> </span><br>
+          <span class="diff-del">-const TOKEN_URL = "https://github.com/login/oauth/access_token";</span><br>
+          <span class="diff-add">+const TOKEN_URL = "https://api.github.com/v2/oauth/token";</span><br>
+          <span class="diff-context"> </span><br>
+          <span class="diff-context"> export class GitHubOAuth implements OAuthProvider {</span><br>
+          <span class="diff-hunk">@@ -45,6 +45,8 @@</span><br>
+          <span class="diff-context">   async exchangeCode(code: string): Promise&lt;TokenPair&gt; {</span><br>
+          <span class="diff-add">+    const verifier = this.pkceStore.get(code);</span><br>
+          <span class="diff-add">+    if (!verifier) throw new AuthError("PKCE verifier not found");</span><br>
+          <span class="diff-context">     const res = await fetch(TOKEN_URL, {</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Changes tab (hidden) -->
+    <div id="tab-changes" style="display:none;">
+      <div style="padding:12px 14px; font-size:12px; color:var(--text-dim);">
+        Full diff view across all 6 files. Showing unified diff with 3 lines of context.
+      </div>
+      <div style="padding:0 14px;">
+        <div class="code-block" style="font-size:11px; line-height:1.6;">
+          <span class="diff-hunk">@@ packages/core/auth/provider.ts (new) @@</span><br>
+          <span class="diff-add">+export interface OAuthProvider {</span><br>
+          <span class="diff-add">+  name: string;</span><br>
+          <span class="diff-add">+  getAuthorizationUrl(state: string): string;</span><br>
+          <span class="diff-add">+  exchangeCode(code: string): Promise&lt;TokenPair&gt;;</span><br>
+          <span class="diff-add">+  getUserProfile(token: string): Promise&lt;UserProfile&gt;;</span><br>
+          <span class="diff-add">+}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PR tab (hidden) -->
+    <div id="tab-pr" style="display:none;">
+      <div style="padding:12px 14px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <span class="font-mono" style="font-size:11px; padding:2px 8px; background:rgba(74,222,128,0.1); color:var(--green); border-radius:3px;">Open</span>
+          <span style="font-size:13px; font-weight:600; color:var(--text-white);">#125</span>
+        </div>
+        <div style="font-size:13px; font-weight:500; color:var(--text-white); margin-bottom:8px;">feat(auth): add OAuth v2 authentication with PKCE</div>
+        <div style="font-size:12px; color:var(--text-dim); line-height:1.6;">
+          Adds GitHub OAuth with PKCE flow, refresh token rotation, rate-limited callback, and protected route middleware. 6 files, +325 -14.
+        </div>
+        <div style="display:flex; gap:12px; margin-top:10px; font-size:11px; color:var(--text-ghost); font-family:'Geist Mono','IBM Plex Mono',monospace;">
+          <span>0 comments</span>
+          <span>0 reviews</span>
+          <span>just now</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session metadata (kept from D, enhanced with model info from Warm) -->
+    <div style="border-top:1px solid var(--border); padding:10px 14px;">
+      <div style="font-size:10px; color:var(--text-ghost); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px;">Session</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; font-size:11px; font-family:'Geist Mono','IBM Plex Mono',monospace;">
+        <span style="color:var(--text-dim);">id</span><span style="color:var(--text-gray);">s-abc123</span>
+        <span style="color:var(--text-dim);">flow</span><span style="color:var(--text-gray);">autonomous-sdlc</span>
+        <span style="color:var(--text-dim);">runtime</span><span style="color:var(--text-gray);">claude</span>
+        <span style="color:var(--text-dim);">compute</span><span style="color:var(--text-gray);">local</span>
+        <span style="color:var(--text-dim);">branch</span><span style="color:var(--text-gray);">feat/oauth-v2</span>
+        <span style="color:var(--text-dim);">cost</span><span style="color:var(--green);">$0.82</span>
+        <span style="color:var(--text-dim);">tokens</span><span style="color:var(--text-gray);">48.2k</span>
+        <span style="color:var(--text-dim);">elapsed</span><span style="color:var(--text-gray);">23m 14s</span>
+      </div>
+    </div>
+
+    <!-- Agent model info (from Warm) -->
+    <div style="border-top:1px solid var(--border); padding:10px 14px;">
+      <div style="font-size:10px; color:var(--text-ghost); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px;">Agents</div>
+      <div style="display:flex; flex-direction:column; gap:3px; font-size:11px; font-family:'Geist Mono','IBM Plex Mono',monospace;">
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:var(--text-dim);">planner</span>
+          <span style="color:var(--text-ghost);">opus-4</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:var(--text-dim);">implementer</span>
+          <span style="color:var(--text-ghost);">opus-4</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:var(--text-dim);">verifier</span>
+          <span style="color:var(--text-ghost);">sonnet-4</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:var(--blue);">reviewer</span>
+          <span style="color:var(--text-ghost);">opus-4</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div style="border-top:1px solid var(--border); padding:10px 14px; display:flex; gap:8px;">
+      <button class="btn btn-primary" style="flex:1;">Create PR</button>
+      <button class="btn btn-secondary">Advance</button>
+    </div>
+  </div>
+
+  <!-- BOTTOM INPUT BAR -->
+  <div class="input-bar">
+    <!-- Clip button -->
+    <button class="btn-ghost trans" style="font-size:14px; padding:4px;" title="Attach file">
+      &#128206;
+    </button>
+
+    <!-- Input field -->
+    <div style="flex:1; display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); padding:6px 14px; gap:8px; transition: border-color 150ms ease;" onfocus="this.style.borderColor='var(--border-strong)'" onblur="this.style.borderColor='var(--border)'">
+      <input type="text" placeholder="Request changes or ask a question..." style="flex:1; background:transparent; border:none; outline:none; color:var(--text-white); font-size:13px; font-family:inherit;" />
+    </div>
+
+    <!-- Meta info -->
+    <span class="font-mono" style="font-size:11px; color:var(--text-dim);">Claude Opus 4.6</span>
+    <span class="font-mono" style="font-size:11px; color:var(--green);">$0.82</span>
+
+    <!-- Send button -->
+    <button class="btn btn-primary trans" style="padding:6px 12px; font-size:12px;">Send</button>
+  </div>
+
+</div>
+</div>
+
+<!-- ============================================ -->
+<!-- COMMAND PALETTE (from Linear)                -->
+<!-- ============================================ -->
+<div class="cmd-overlay" id="cmd-overlay" onclick="if(event.target===this)closeCmdPalette()">
+  <div class="cmd-box">
+    <div class="cmd-input-wrap">
+      <span style="color:var(--text-ghost); font-size:14px;">&#128269;</span>
+      <input type="text" placeholder="Search sessions, agents, flows..." id="cmd-input" />
+      <span class="kbd">Esc</span>
+    </div>
+    <div class="cmd-results">
+      <div class="cmd-group-label">Recent</div>
+      <div class="cmd-result-item">
+        <span>OAuth authentication</span>
+        <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">s-abc123</span>
+      </div>
+      <div class="cmd-result-item">
+        <span>Fix pagination in search API</span>
+        <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">s-def456</span>
+      </div>
+      <div class="cmd-result-item">
+        <span>WebSocket reconnection logic</span>
+        <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">s-ghi789</span>
+      </div>
+      <div class="cmd-group-label" style="margin-top:4px;">Commands</div>
+      <div class="cmd-result-item">
+        <span>New session</span>
+        <span class="kbd">N</span>
+      </div>
+      <div class="cmd-result-item">
+        <span>View agents</span>
+        <span class="kbd">A</span>
+      </div>
+      <div class="cmd-result-item">
+        <span>View flows</span>
+        <span class="kbd">F</span>
+      </div>
+      <div class="cmd-result-item">
+        <span>View costs</span>
+        <span class="kbd">$</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- COMPONENT SHOWCASE (below the fold)          -->
+<!-- ============================================ -->
+<div style="background:var(--page-bg); border-top:1px solid var(--border); overflow-y:auto;">
+
+  <!-- Buttons -->
+  <div class="showcase-section">
+    <h2>Buttons</h2>
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <button class="btn btn-primary trans">Create Session</button>
+      <button class="btn btn-secondary trans">Cancel</button>
+      <button class="btn btn-ghost trans">Skip</button>
+      <button class="btn trans" style="background:transparent; color:var(--red); border-color:rgba(248,113,113,0.3);">Terminate</button>
+      <button class="btn btn-primary" disabled style="opacity:0.4; cursor:not-allowed;">Disabled</button>
+      <button class="btn btn-secondary trans" style="font-size:11px; padding:4px 10px;">Small</button>
+    </div>
+  </div>
+
+  <!-- Status Indicators -->
+  <div class="showcase-section" style="padding-top:0;">
+    <h2>Status Indicators</h2>
+    <div style="display:flex; gap:24px; align-items:center; font-size:12px; font-family:'Geist Mono','IBM Plex Mono',monospace;">
+      <span><span class="status-dot running pulse"></span> <span style="color:var(--blue);">running</span></span>
+      <span><span class="status-dot waiting"></span> <span style="color:var(--amber);">waiting</span></span>
+      <span><span class="status-dot completed"></span> <span style="color:var(--green);">completed</span></span>
+      <span><span class="status-dot failed"></span> <span style="color:var(--red);">failed</span></span>
+      <span><span class="status-dot stopped"></span> <span style="color:var(--text-dim);">stopped</span></span>
+    </div>
+  </div>
+
+  <!-- Review Badges -->
+  <div class="showcase-section" style="padding-top:0;">
+    <h2>Review Badges</h2>
+    <div style="display:flex; gap:12px; align-items:center;">
+      <span class="review-badge good">Good</span>
+      <span class="review-badge note">Note</span>
+      <span class="review-badge" style="background:rgba(248,113,113,0.1); color:var(--red);">Issue</span>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcut Badges -->
+  <div class="showcase-section" style="padding-top:0;">
+    <h2>Keyboard Shortcuts</h2>
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <span class="kbd">&#8984;K</span>
+      <span class="kbd">A</span>
+      <span class="kbd">F</span>
+      <span class="kbd">C</span>
+      <span class="kbd">$</span>
+      <span class="kbd">,</span>
+      <span class="kbd">N</span>
+      <span class="kbd">Esc</span>
+    </div>
+  </div>
+
+  <!-- Stage Pipeline -->
+  <div class="showcase-section" style="padding-top:0;">
+    <h2>Stage Pipeline</h2>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div class="pipeline">
+        <span class="pipeline-stage done">plan</span>
+        <span class="pipeline-connector">--></span>
+        <span class="pipeline-stage done">implement</span>
+        <span class="pipeline-connector">--></span>
+        <span class="pipeline-stage active pulse">verify</span>
+        <span class="pipeline-connector">--></span>
+        <span class="pipeline-stage pending">review</span>
+        <span class="pipeline-connector">--></span>
+        <span class="pipeline-stage pending">merge</span>
+      </div>
+      <div class="pipeline">
+        <span class="pipeline-stage done">plan</span>
+        <span class="pipeline-connector">--></span>
+        <span class="pipeline-stage done">implement</span>
+        <span class="pipeline-connector">--></span>
+        <span class="pipeline-stage done">verify</span>
+        <span class="pipeline-connector">--></span>
+        <span class="pipeline-stage done">review</span>
+        <span class="pipeline-connector">--></span>
+        <span class="pipeline-stage done">merge</span>
+        <span style="color:var(--green); margin-left:8px;">&#10003; complete</span>
+      </div>
+      <div class="pipeline">
+        <span class="pipeline-stage done">plan</span>
+        <span class="pipeline-connector">--></span>
+        <span class="pipeline-stage done">implement</span>
+        <span class="pipeline-connector">--></span>
+        <span class="pipeline-stage" style="color:var(--red);">verify</span>
+        <span style="color:var(--red); margin-left:8px;">&#10007; 3 tests failed</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Typography Scale -->
+  <div class="showcase-section" style="padding-top:0;">
+    <h2>Typography</h2>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="font-size:20px; font-weight:600; color:var(--text-white);">Session Dashboard -- 20px/600 Jakarta Sans</div>
+      <div style="font-size:16px; font-weight:500; color:var(--text-white);">OAuth Implementation -- 16px/500 Jakarta Sans</div>
+      <div class="font-prose" style="font-size:14px; font-weight:400; color:var(--text-gray); line-height:1.65;">Agent prose uses Source Serif 4 for readability. This is what agent analysis and explanations look like -- slightly larger, slightly more line-height, serif typeface. It reads like careful engineering analysis rather than chat output. -- 14px/400 Source Serif 4</div>
+      <div style="font-size:13px; font-weight:400; color:var(--text-gray);">UI body text stays in Plus Jakarta Sans -- 13px/400</div>
+      <div style="font-size:12px; font-weight:400; color:var(--text-dim);">Secondary label -- 12px/400 dim</div>
+      <div class="font-mono" style="font-size:12px; font-weight:400; color:var(--text-gray);">Monospace data: s-abc123 | 2,857 passed | $0.82 -- 12px mono</div>
+      <div class="font-mono" style="font-size:11px; font-weight:400; color:var(--text-dim);">Tool call: > Read 5 files (auth.ts, session.ts) -- 1.2s -- 11px mono dim</div>
+      <div style="font-size:10px; font-weight:600; color:var(--text-ghost); text-transform:uppercase; letter-spacing:0.08em;">GROUP HEADER -- 10px/600 ghost uppercase</div>
+    </div>
+  </div>
+
+  <!-- Git Command Rendering -->
+  <div class="showcase-section" style="padding-top:0;">
+    <h2>Git Command Rendering</h2>
+    <div style="display:flex; flex-direction:column; gap:4px;">
+      <div class="tool-call-done"><span class="check">&#10003;</span> git add -A && git commit -m "feat(auth): add OAuth v2" <span class="duration" style="color:var(--text-ghost);">(0.4s)</span></div>
+      <div class="tool-call-done"><span class="check">&#10003;</span> git push origin feat/oauth-v2 <span class="duration" style="color:var(--text-ghost);">(1.2s)</span></div>
+      <div class="tool-call-done"><span class="check">&#10003;</span> gh pr create --title "feat(auth): add OAuth v2" <span class="duration" style="color:var(--text-ghost);">(2.1s)</span></div>
+    </div>
+  </div>
+
+  <!-- Color usage reference -->
+  <div class="showcase-section" style="padding-top:0; padding-bottom:80px;">
+    <h2>Color = Meaning Only</h2>
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; font-size:12px;">
+      <div>
+        <div style="color:var(--green); font-weight:500; margin-bottom:4px;">Green</div>
+        <div style="color:var(--text-dim);">Success, passed, complete, additions</div>
+      </div>
+      <div>
+        <div style="color:var(--red); font-weight:500; margin-bottom:4px;">Red</div>
+        <div style="color:var(--text-dim);">Failure, error, danger, deletions</div>
+      </div>
+      <div>
+        <div style="color:var(--amber); font-weight:500; margin-bottom:4px;">Amber</div>
+        <div style="color:var(--text-dim);">Waiting, warning, pending action</div>
+      </div>
+      <div>
+        <div style="color:var(--blue); font-weight:500; margin-bottom:4px;">Blue</div>
+        <div style="color:var(--text-dim);">Running, active, info, in progress</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Command palette
+  function toggleCmdPalette() {
+    var overlay = document.getElementById('cmd-overlay');
+    overlay.classList.toggle('open');
+    if (overlay.classList.contains('open')) {
+      document.getElementById('cmd-input').focus();
+    }
+  }
+  function closeCmdPalette() {
+    document.getElementById('cmd-overlay').classList.remove('open');
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      toggleCmdPalette();
+    }
+    if (e.key === 'Escape') {
+      closeCmdPalette();
+    }
+  });
+
+  // Right panel tab switching
+  function switchRightTab(tab) {
+    document.querySelectorAll('#tab-files, #tab-changes, #tab-pr').forEach(function(el) { el.style.display = 'none'; });
+    document.getElementById('tab-' + tab).style.display = 'block';
+    document.querySelectorAll('.panel-tab').forEach(function(t) {
+      t.classList.remove('active');
+    });
+    event.target.classList.add('active');
+  }
+
+  // Scroll conversation to bottom
+  document.getElementById('conversation').scrollTop = document.getElementById('conversation').scrollHeight;
+</script>
+
+</body>
+</html>
