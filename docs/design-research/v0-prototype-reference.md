@@ -1,8 +1,13 @@
-# V0 Prototype Reference -- "Mission Control"
+# Early Prototype References
+
+**Screenshots:** [v0-prototype/](v0-prototype/)
+
+---
+
+## 1. V0 Prototype -- "Mission Control"
 
 **Source:** https://v0-gmc-gold.vercel.app/
 **Date:** Early 2026 (pre-design-spec exploration)
-**Screenshots:** [v0-prototype/](v0-prototype/)
 
 ## What It Was
 
@@ -78,10 +83,97 @@ A simple linear progress bar (e.g., "65%") pinned at the bottom of the session d
 | Keyboard | None | Cmd+K, j/k, 1-5, / | Power-user first |
 | Density | Standard spacing | Compact (52px cards, 13px base) | Fleet monitoring density |
 
-## Next Steps
+---
 
-1. **Add Overview tab** to Session Detail mockups -- contextual integration cards based on connected tools
-2. **Design Workflow page** -- DAG flow graph with external integration nodes
-3. **Itemize cost badge** -- expand to show token/compute split on hover or in a detail row
-4. **Add runtime launcher** -- "Open in [runtime]" button in session header
-5. **Derive progress %** -- from DAG stage completion, show as subtle bar or badge
+## 2. Product Grooming Prototype -- Stage-Based Rich Output
+
+**Source:** Internal prototype (localhost:3333)
+**Date:** Early 2026
+**Context:** A product management flow where each stage produces structured output, not chat
+
+<!-- Screenshot: grooming-side-view.png (to be added) -->
+
+### What It Shows
+
+A multi-stage product refinement session with:
+
+**Left sidebar -- stage progression:**
+- Intelligence (research gathering)
+- Wiki & JIRA Context (completed, with timing badges)
+- VOC Synthesis (completed)
+- Problem Refinement (completed)
+- Pre-Grooming (active, "Running...")
+- "Approve & Continue" gate button at bottom
+
+**Detail panel -- structured rich output (not conversation):**
+The active "Pre-Grooming" stage renders structured sections:
+- Dependency/constraint bullets (Vendor lock, Latency SLA, Privacy, Offline fallback)
+- Red "Blocker" callout (contractual confirmation of telephony vendor)
+- "Data & Analytics Readiness" gap analysis
+- "Recommended Spike / Investigation Items" with interactive checkboxes
+- "Rough Complexity Signal" with sprint allocation estimates and risk callouts
+- "PM Next Step" action item
+
+### Why This Matters for Ark
+
+This represents a **non-SDLC flow** through Ark's DAG engine. The same session/stage/gate architecture that powers `plan -> implement -> verify -> review -> merge` can also power:
+
+```
+research -> PRD -> design planner -> mockups -> ... -> implementation
+```
+
+Key design implications:
+
+1. **Stage sidebar as primary nav (not session list):** When viewing a session in this mode, the left panel shows the flow's stages with completion status -- not a list of other sessions. This is a detail-view variant where the DAG itself becomes the navigation.
+
+2. **Rich output renderers per stage type:** Each stage can produce different output formats:
+   - Code stages -> conversation + terminal + diff (current mockups)
+   - Research stages -> structured findings with citations
+   - PRD stages -> requirement tables, gap analysis, blockers
+   - Design stages -> mockup renders (via Figma MCP, v0, etc.)
+   - Grooming stages -> complexity estimates, spike recommendations, checklists
+
+3. **Interactive elements in output:** Checkboxes, approve/reject buttons, editable fields within the stage output. Not just read-only -- the operator can interact with stage results before gating to the next stage.
+
+4. **Tool-contextual output:** Just like integration cards are contextual to the org's tools, stage output format depends on the connected MCPs:
+   - Figma MCP connected -> design stages render Figma embeds
+   - Jira MCP connected -> grooming stages link to/create Jira tickets
+   - GitHub MCP connected -> implementation stages show PR status
+
+### Generalized Flow Types
+
+| Flow | Stages | Output Type |
+|------|--------|-------------|
+| SDLC | plan -> implement -> verify -> review -> merge | Conversation, terminal, diff |
+| Product Refinement | research -> VOC -> problem -> grooming -> planning | Structured docs, gap analysis, estimates |
+| Design | research -> PRD -> design -> mockups -> review | Figma embeds, visual comparisons |
+| PR Review | fetch -> analyze -> comment | Structured review, inline annotations |
+| Incident Response | detect -> investigate -> mitigate -> postmortem | Structured findings, timelines |
+
+The web UI should handle all of these -- the session detail view adapts its panel layout and renderers based on the flow type and stage.
+
+---
+
+## Design Takeaways -- Combined
+
+### For the Session Detail View
+
+1. **Add Overview tab** -- contextual integration cards based on org's connected tools
+2. **Stage sidebar variant** -- for non-SDLC flows, show stage progression as left nav instead of session list
+3. **Rich output renderers** -- per-stage typed output (structured docs, not just chat)
+4. **Interactive stage output** -- checkboxes, approve/reject, editable fields within rendered content
+5. **Runtime launcher** -- "Open in [runtime]" button in session header
+
+### For the Workflow/Flow View
+
+6. **Connected workflow graph** -- DAG with external integration nodes (tickets, PRs, deploys)
+7. **Flow type selector** -- SDLC, Product Refinement, Design, PR Review, etc.
+
+### For Cost/Progress
+
+8. **Itemized cost breakdown** -- token/compute split on hover or in detail row
+9. **Progress derivation** -- `completed_stages / total_stages` as bar or badge
+
+### For Integration Architecture
+
+10. **Contextual surfaces everywhere** -- cards, output renderers, stage types all adapt to the org's connected tools. No hardcoded Jira/Bitbucket assumptions.
