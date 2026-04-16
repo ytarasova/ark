@@ -10,9 +10,8 @@
  * as chat messages via app.messages.send(), making them visible in the web
  * ChatPanel instead of requiring users to read raw JSON in the terminal.
  *
- * Tmux wraps long lines at the terminal width (~220 chars), so a single JSON
- * object often spans multiple captured lines. We reassemble them by tracking
- * brace depth before attempting JSON.parse.
+ * Uses tmux capture-pane -J to join wrapped lines so long JSON objects parse
+ * correctly even when tmux wraps at the terminal width (~220 chars).
  *
  * Integrated into the status poller -- every tick it captures new tmux output,
  * parses any new JSON lines, and persists extracted messages.
@@ -35,79 +34,13 @@ function contentHash(role: string, text: string): string {
 }
 
 /**
- * Reassemble JSON objects from tmux-wrapped lines.
- *
- * Tmux wraps at terminal width, splitting `{"type":"message",...}` across
- * multiple lines. We scan for lines starting with `{`, then accumulate
- * continuation lines until brace depth returns to zero.
- */
-function reassembleJsonLines(lines: string[]): string[] {
-  const results: string[] = [];
-  let buffer = "";
-  let depth = 0;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    if (depth === 0) {
-      // Looking for the start of a new JSON object
-      if (!trimmed.startsWith("{")) continue;
-      buffer = trimmed;
-      depth = countBraceDepth(trimmed);
-      if (depth === 0) {
-        // Complete object on one line
-        results.push(buffer);
-        buffer = "";
-      }
-    } else {
-      // Continuation of a wrapped JSON line
-      buffer += trimmed;
-      depth += countBraceDepth(trimmed);
-      if (depth <= 0) {
-        results.push(buffer);
-        buffer = "";
-        depth = 0;
-      }
-    }
-  }
-
-  return results;
-}
-
-/** Count net brace depth change, ignoring braces inside JSON strings. */
-function countBraceDepth(s: string): number {
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (escape) {
-      escape = false;
-      continue;
-    }
-    if (ch === "\\") {
-      if (inString) escape = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (ch === "{") depth++;
-    else if (ch === "}") depth--;
-  }
-  return depth;
-}
-
-/**
  * Capture tmux output, parse stream-json lines, and store new assistant
  * messages. Safe to call repeatedly -- tracks a cursor to skip already-parsed
  * lines and deduplicates by content hash.
  */
 export async function parseStreamJsonOutput(app: AppContext, sessionId: string, handle: string): Promise<void> {
-  const raw = await tmux.capturePaneAsync(handle, { lines: 2000 });
+  // Use -J to join wrapped lines so long JSON objects aren't split across lines
+  const raw = await tmux.capturePaneAsync(handle, { lines: 2000, joinWrapped: true });
   if (!raw) return;
 
   const lines = raw.split("\n");
@@ -117,18 +50,18 @@ export async function parseStreamJsonOutput(app: AppContext, sessionId: string, 
   const newLines = lines.slice(cursor);
   if (newLines.length === 0) return;
 
-  // Reassemble wrapped JSON objects
-  const jsonObjects = reassembleJsonLines(newLines);
-
   // Get or create the dedup set for this session
   if (!seenHashes.has(sessionId)) {
     seenHashes.set(sessionId, new Set());
   }
   const seen = seenHashes.get(sessionId)!;
 
-  for (const jsonStr of jsonObjects) {
+  for (const line of newLines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) continue;
+
     try {
-      const obj = JSON.parse(jsonStr);
+      const obj = JSON.parse(trimmed);
       if (obj.type !== "message") continue;
 
       const msg = obj.message;

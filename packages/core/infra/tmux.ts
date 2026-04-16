@@ -186,17 +186,29 @@ export async function createSessionWithSendKeysAsync(
   await execFileAsync(tmuxBin(), ["send-keys", "-t", name, command, "Enter"]);
 }
 
+/** Set a tmux option on a session (async). */
+export async function setOptionAsync(name: string, option: string, value: string): Promise<void> {
+  try {
+    await execFileAsync(tmuxBin(), ["set-option", "-t", name, option, value]);
+  } catch {
+    /* ignore -- session may not exist */
+  }
+}
+
 /** Capture pane output (async) */
 export async function capturePaneAsync(
   name: string,
   opts?: {
     lines?: number;
     ansi?: boolean;
+    /** Pass -J to join wrapped lines (useful for parsing long JSON lines). */
+    joinWrapped?: boolean;
   },
 ): Promise<string> {
   try {
     const args = ["capture-pane", "-t", name, "-p", "-S", `-${opts?.lines ?? 50}`];
     if (opts?.ansi) args.splice(4, 0, "-e");
+    if (opts?.joinWrapped) args.push("-J");
     const { stdout } = await execFileAsync(tmuxBin(), args, { encoding: "utf-8" });
     return stdout;
   } catch {
