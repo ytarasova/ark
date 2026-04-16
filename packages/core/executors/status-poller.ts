@@ -4,17 +4,26 @@
  * Claude Code reports status via HTTP hooks. Other CLI tools don't.
  * This poller checks tmux session existence periodically and updates
  * session status when the process exits.
+ *
+ * For stream-json runtimes (goose), the poller also parses tmux output
+ * and extracts assistant messages into the chat UI.
  */
 
 import type { AppContext } from "../app.js";
 import { getExecutor } from "../executor.js";
 import { logInfo } from "../observability/structured-log.js";
+import { parseStreamJsonOutput, clearStreamJsonCursor } from "./stream-json-parser.js";
+
+// Runtimes whose stdout is stream-json and should be parsed into chat messages.
+const STREAM_JSON_RUNTIMES = new Set(["goose"]);
 
 const activePollers = new Map<string, ReturnType<typeof setInterval>>();
 
 export function startStatusPoller(app: AppContext, sessionId: string, handle: string, executorName: string): void {
   // Don't double-poll
   if (activePollers.has(sessionId)) return;
+
+  const parseChat = STREAM_JSON_RUNTIMES.has(executorName);
 
   let tick = 0;
   const interval = setInterval(async () => {
@@ -27,6 +36,15 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
       }
 
       const status = await executor.status(handle);
+
+      // Parse stream-json output into chat messages while the session runs
+      if (parseChat && status.state === "running") {
+        try {
+          await parseStreamJsonOutput(app, sessionId, handle);
+        } catch {
+          /* best-effort */
+        }
+      }
 
       // Every 5th tick (~15s), snapshot the process tree for observability
       if (tick % 5 === 0 && status.state === "running") {
@@ -42,6 +60,16 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
       }
 
       if (status.state === "completed" || status.state === "failed" || status.state === "not_found") {
+        // Final parse to catch any remaining output before session exited
+        if (parseChat) {
+          try {
+            await parseStreamJsonOutput(app, sessionId, handle);
+          } catch {
+            /* best-effort */
+          }
+          clearStreamJsonCursor(sessionId);
+        }
+
         stopStatusPoller(sessionId);
 
         const session = app.sessions.get(sessionId);
