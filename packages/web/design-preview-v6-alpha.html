@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark - Design Preview v6-alpha</title>
+<style>
+/* ===== Fonts ===== */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap');
+
+/* ===== CSS Variables (from guidelines appendix) ===== */
+:root {
+  /* Surfaces */
+  --page: #0a0a0b;
+  --panel: #111113;
+  --recessed: #18181b;
+  --hover: #1c1c1f;
+  --active: #222226;
+
+  /* Text */
+  --text: #fafafa;
+  --text-2: #a1a1aa;
+  --text-3: #52525b;
+  --text-4: #3f3f46;
+
+  /* Accent */
+  --accent: #8b5cf6;
+  --accent-faint: rgba(139, 92, 246, 0.07);
+
+  /* Border */
+  --border: #1e1e22;
+
+  /* Status */
+  --green: #4ade80;
+  --red: #f87171;
+  --amber: #fbbf24;
+
+  /* Fonts */
+  --sans: 'Geist Sans', 'Geist', system-ui, -apple-system, sans-serif;
+  --mono: 'Geist Mono', 'SF Mono', 'Cascadia Code', monospace;
+}
+
+/* ===== Reset ===== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100vh;
+  overflow: hidden;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Text selection -- accent at 25% */
+::selection {
+  background: rgba(139, 92, 246, 0.25);
+}
+
+/* Scrollbar -- 4px, near-invisible */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-4); border-radius: 2px; }
+
+/* ===== App Shell ===== */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ===== Header Bar -- 44px ===== */
+.header {
+  height: 44px;
+  min-height: 44px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 16px;
+}
+
+.wordmark {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.pipeline-stage {
+  color: var(--text-3);
+}
+.pipeline-stage.done {
+  color: var(--green);
+}
+.pipeline-stage.active {
+  color: var(--accent);
+}
+.pipeline-arrow {
+  color: var(--text-4);
+  font-size: 10px;
+}
+
+.header-spacer { flex: 1; }
+
+.search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 10px;
+  height: 28px;
+  color: var(--text-2);
+  font-family: var(--sans);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.search-trigger:hover { background: var(--hover); }
+
+.kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-4);
+  background: var(--recessed);
+  border-radius: 3px;
+  padding: 1px 5px;
+  line-height: 1.3;
+}
+
+.session-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* ===== Main Content Area ===== */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== Sidebar -- 216px ===== */
+.sidebar {
+  width: 216px;
+  min-width: 216px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-sessions {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.session-group-header {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  padding: 12px 10px 4px;
+}
+
+.session-item {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.session-item:hover { background: var(--hover); }
+.session-item.selected {
+  background: var(--accent-faint);
+  border-left-color: var(--accent);
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+
+.session-name {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.session-item.selected .session-name { color: var(--text); }
+
+.session-status {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.session-status .status-text { }
+.session-status.running .status-text {
+  color: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+.session-status.completed .status-text { color: var(--text-3); }
+.session-status.failed .status-text { color: var(--red); }
+.session-status.waiting .status-text { color: var(--amber); }
+.session-status.stopped .status-text { color: var(--text-4); }
+
+.session-time {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-4);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Sidebar bottom nav */
+.sidebar-nav {
+  border-top: 1px solid var(--border);
+  padding: 6px 8px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.nav-item:hover { background: var(--hover); }
+
+.sidebar-version {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-4);
+  padding: 4px 10px 8px;
+  text-align: center;
+}
+
+/* ===== Center Panel ===== */
+.center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--page);
+}
+
+.conversation {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.conversation-inner {
+  width: 100%;
+  max-width: 720px;
+  padding: 0 16px;
+}
+
+/* ===== System Events ===== */
+.system-event {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 3px 0;
+  margin-left: 46px;
+}
+
+.event-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-4);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.event-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+.event-text .stage-name {
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+/* ===== Agent Messages ===== */
+.agent-message {
+  margin: 16px 0;
+  margin-left: 46px;
+}
+
+.agent-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+
+.agent-prose p {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.7;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.agent-prose p:last-child { margin-bottom: 0; }
+
+.agent-prose strong {
+  font-weight: 500;
+}
+
+.agent-prose code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--recessed);
+  color: var(--text-2);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.agent-prose ul, .agent-prose ol {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+.agent-prose li {
+  margin-bottom: 4px;
+}
+
+/* ===== User Messages ===== */
+.user-message {
+  margin: 16px 0;
+  margin-left: 46px;
+  border-left: 2px solid var(--accent);
+  background: var(--accent-faint);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+}
+
+.user-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.user-prose p {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.7;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.user-prose p:last-child { margin-bottom: 0; }
+
+/* ===== Tool Call Rows ===== */
+.tool-group {
+  margin: 8px 0;
+  margin-left: 46px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tool-row {
+  background: var(--recessed);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.tool-row:hover { background: var(--active); }
+
+.tool-icon {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+.tool-icon.success { color: var(--green); }
+.tool-icon.error { color: var(--red); }
+
+.tool-expand {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  color: var(--text-4);
+  transition: transform 150ms ease;
+}
+.tool-row.expanded .tool-expand {
+  transform: rotate(90deg);
+}
+
+.tool-summary {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-3);
+  flex: 1;
+}
+
+.tool-timing {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-4);
+  flex-shrink: 0;
+}
+
+.tool-detail {
+  background: var(--active);
+  padding: 8px 12px 8px 28px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--text-3);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ===== Review Findings ===== */
+.finding {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.finding-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.3;
+  border-radius: 3px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.finding-badge.good {
+  color: var(--green);
+  background: rgba(74, 222, 128, 0.08);
+}
+.finding-badge.note {
+  color: var(--amber);
+  background: rgba(251, 191, 36, 0.08);
+}
+.finding-badge.issue {
+  color: var(--red);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.finding-text {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.7;
+  color: var(--text);
+}
+.finding-text strong {
+  font-weight: 500;
+}
+
+/* ===== Summary Blocks ===== */
+.summary-block {
+  margin: 12px 0;
+  margin-left: 46px;
+  background: var(--recessed);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.summary-row {
+  display: flex;
+  gap: 12px;
+}
+.summary-key {
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.summary-value {
+  color: var(--text-2);
+}
+.summary-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 8px 0;
+}
+
+/* ===== Input Bar ===== */
+.input-bar {
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.input-inner {
+  width: 100%;
+  max-width: 720px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.input-field {
+  flex: 1;
+  background: var(--recessed);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 14px;
+  height: 40px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 200ms ease;
+}
+.input-field::placeholder { color: var(--text-4); }
+.input-field:focus { border-color: var(--accent); }
+
+.model-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.send-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 150ms ease;
+  flex-shrink: 0;
+}
+.send-btn:hover { opacity: 0.85; }
+.send-btn svg { color: white; }
+
+/* ===== Right Workspace -- 320px ===== */
+.workspace {
+  width: 320px;
+  min-width: 320px;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  height: 40px;
+}
+
+.workspace-tab {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: color 150ms ease;
+  position: relative;
+}
+.workspace-tab.active {
+  color: var(--text);
+}
+.workspace-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+.workspace-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+/* Overview tab content */
+.overview-section {
+  margin-bottom: 16px;
+}
+
+.overview-section-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.overview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.overview-key {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.overview-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+/* Files tab */
+.file-item {
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.file-item:hover { background: var(--hover); }
+
+.file-name {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.file-stat {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-4);
+  margin-left: auto;
+}
+.file-stat .added { color: var(--green); }
+.file-stat .removed { color: var(--red); }
+
+/* Diff tab */
+.diff-block {
+  margin-bottom: 12px;
+}
+.diff-header {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--recessed);
+  padding: 6px 10px;
+  border-radius: 6px 6px 0 0;
+}
+.diff-body {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.7;
+  background: var(--page);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+}
+.diff-line { white-space: pre; }
+.diff-line.added { color: var(--green); background: rgba(74, 222, 128, 0.04); }
+.diff-line.removed { color: var(--red); background: rgba(248, 113, 113, 0.04); }
+.diff-line.context { color: var(--text-3); }
+.diff-line.hunk { color: var(--text-4); }
+
+/* Metrics */
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+.metric-label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.metric-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* Spacing helper */
+.gap-sm { margin-top: 6px; }
+.gap-md { margin-top: 12px; }
+.gap-lg { margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== HEADER BAR (44px) ===== -->
+  <header class="header">
+    <span class="wordmark">Ark</span>
+
+    <div class="pipeline">
+      <span class="pipeline-stage done">plan</span>
+      <span class="pipeline-arrow">--></span>
+      <span class="pipeline-stage done">implement</span>
+      <span class="pipeline-arrow">--></span>
+      <span class="pipeline-stage done">verify</span>
+      <span class="pipeline-arrow">--></span>
+      <span class="pipeline-stage active">review</span>
+      <span class="pipeline-arrow">--></span>
+      <span class="pipeline-stage">merge</span>
+    </div>
+
+    <div class="header-spacer"></div>
+
+    <button class="search-trigger">
+      Search...
+      <span class="kbd">&#8984;K</span>
+    </button>
+
+    <div class="session-meta">
+      <span>$1.47</span>
+      <span>14m 32s</span>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- ===== LEFT SIDEBAR (216px) ===== -->
+    <aside class="sidebar">
+      <div class="sidebar-sessions">
+
+        <div class="session-group-header">Autonomous SDLC</div>
+
+        <div class="session-item selected">
+          <div class="session-name">Add OAuth2 PKCE flow</div>
+          <div class="session-status running">
+            <span class="status-text">running</span>
+            <span class="session-time">14m</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-name">Refactor compute pool</div>
+          <div class="session-status completed">
+            <span class="status-text">completed</span>
+            <span class="session-time">23m</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-name">Fix tmux session leak</div>
+          <div class="session-status completed">
+            <span class="status-text">completed</span>
+            <span class="session-time">8m</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-name">Migrate router metrics</div>
+          <div class="session-status failed">
+            <span class="status-text">failed</span>
+            <span class="session-time">11m</span>
+          </div>
+        </div>
+
+        <div class="session-group-header">Quick</div>
+
+        <div class="session-item">
+          <div class="session-name">Update CLI help text</div>
+          <div class="session-status completed">
+            <span class="status-text">completed</span>
+            <span class="session-time">2m</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-name">Add cost breakdown query</div>
+          <div class="session-status completed">
+            <span class="status-text">completed</span>
+            <span class="session-time">5m</span>
+          </div>
+        </div>
+
+        <div class="session-group-header">Fan-out</div>
+
+        <div class="session-item">
+          <div class="session-name">Lint all compute providers</div>
+          <div class="session-status waiting">
+            <span class="status-text">waiting</span>
+            <span class="session-time">--</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-name">Test e2b + k8s providers</div>
+          <div class="session-status stopped">
+            <span class="status-text">stopped</span>
+            <span class="session-time">6m</span>
+          </div>
+        </div>
+
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-item">Agents <span class="kbd">A</span></div>
+        <div class="nav-item">Flows <span class="kbd">F</span></div>
+        <div class="nav-item">Compute <span class="kbd">C</span></div>
+        <div class="nav-item">Costs <span class="kbd">$</span></div>
+        <div class="nav-item">Settings <span class="kbd">,</span></div>
+      </nav>
+      <div class="sidebar-version">v0.9.4-alpha</div>
+    </aside>
+
+    <!-- ===== CENTER PANEL ===== -->
+    <main class="center">
+      <div class="conversation">
+        <div class="conversation-inner">
+
+          <!-- SESSION START -->
+          <div class="system-event">
+            <span class="event-time">09:41</span>
+            <span class="event-text">Session started -- flow: <span class="stage-name">autonomous-sdlc</span> -- compute: local</span>
+          </div>
+          <div class="system-event">
+            <span class="event-time">09:41</span>
+            <span class="event-text">Agent <span class="stage-name">planner</span> assigned -- runtime: claude -- model: opus-4</span>
+          </div>
+          <div class="system-event">
+            <span class="event-time">09:41</span>
+            <span class="event-text">Stage <span class="stage-name">plan</span> dispatched</span>
+          </div>
+
+          <!-- PLAN STAGE -->
+          <div class="agent-message">
+            <div class="agent-label">Planner</div>
+            <div class="agent-prose">
+              <p>I will implement OAuth2 PKCE (Proof Key for Code Exchange) for the Ark web dashboard. This is the recommended auth flow for public clients -- it replaces the implicit grant flow which is now considered insecure.</p>
+              <p>The implementation covers four areas:</p>
+              <ul>
+                <li>A new <code>packages/core/auth/pkce.ts</code> module that generates code verifiers and S256 challenges</li>
+                <li>An auth callback handler in <code>packages/server/routes/auth-callback.ts</code> that exchanges the authorization code</li>
+                <li>Token storage and refresh logic in <code>packages/web/src/auth/token-store.ts</code></li>
+                <li>Session middleware update to validate tokens on protected routes</li>
+              </ul>
+              <p>I will use the existing <code>AppContext</code> configuration for the OAuth provider URL and client ID. No new environment variables are needed -- the values come from the settings store.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Read settings.ts, app.ts, config.yaml</span>
+              <span class="tool-timing">0.4s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Searched 'oauth|pkce|auth' across packages/</span>
+              <span class="tool-timing">1.2s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Read packages/server/routes.ts</span>
+              <span class="tool-timing">0.2s</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Planner</div>
+            <div class="agent-prose">
+              <p>The codebase has no existing auth implementation. The server routes file registers handlers via <code>registerRoutes(app)</code> but has no auth middleware. I will add the PKCE module, the callback route, the token store, and then wire the middleware into the existing route registration.</p>
+              <p>Estimated scope: 4 files created, 2 files modified, roughly 280 lines of new code. No database schema changes -- tokens are stored in-memory with a configurable TTL.</p>
+            </div>
+          </div>
+
+          <div class="system-event">
+            <span class="event-time">09:43</span>
+            <span class="event-text">Stage <span class="stage-name">plan</span> completed -- advancing to <span class="stage-name">implement</span></span>
+          </div>
+          <div class="system-event">
+            <span class="event-time">09:43</span>
+            <span class="event-text">Agent <span class="stage-name">implementer</span> assigned -- runtime: claude -- model: opus-4</span>
+          </div>
+          <div class="system-event">
+            <span class="event-time">09:43</span>
+            <span class="event-text">Stage <span class="stage-name">implement</span> dispatched</span>
+          </div>
+
+          <!-- IMPLEMENT STAGE -->
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-prose">
+              <p>Starting implementation. I will create the PKCE module first since everything else depends on it.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Created packages/core/auth/pkce.ts (47 lines)</span>
+              <span class="tool-timing">0.3s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Created packages/core/auth/token-store.ts (82 lines)</span>
+              <span class="tool-timing">0.4s</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-prose">
+              <p>The PKCE module uses <code>crypto.subtle.digest</code> for the S256 challenge and <code>crypto.getRandomValues</code> for the 128-byte code verifier. Both are available in Bun's global scope without imports.</p>
+              <p>The token store uses a simple <code>Map&lt;string, TokenEntry&gt;</code> with a 15-minute TTL and a background sweep interval. On expiry, it attempts a silent refresh using the stored refresh token before evicting.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Created packages/server/routes/auth-callback.ts (63 lines)</span>
+              <span class="tool-timing">0.5s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Created packages/server/middleware/auth.ts (54 lines)</span>
+              <span class="tool-timing">0.3s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Edited packages/server/routes.ts (+12 -1)</span>
+              <span class="tool-timing">0.2s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Edited packages/web/src/App.tsx (+8 -2)</span>
+              <span class="tool-timing">0.2s</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-prose">
+              <p>The callback handler validates the <code>state</code> parameter against a stored nonce, exchanges the authorization code with the code verifier, and stores the resulting access and refresh tokens. The middleware checks the <code>Authorization</code> header, validates the token against the store, and injects the user context into the request.</p>
+              <p>I have wired the auth middleware into the route registration so all JSON-RPC endpoints require a valid token. The auth callback route itself is excluded from the middleware.</p>
+            </div>
+          </div>
+
+          <!-- USER CORRECTION -->
+          <div class="user-message">
+            <div class="user-label">You</div>
+            <div class="user-prose">
+              <p>The token store should not use a background sweep. Use lazy eviction on access instead -- check TTL when the token is read and evict if expired. Background timers cause issues in tests and during shutdown.</p>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-prose">
+              <p>Good call. I will remove the <code>setInterval</code> sweep and switch to lazy eviction. Each <code>get()</code> call will check the token's expiry timestamp and attempt a refresh if within the grace window, or evict if fully expired.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Edited packages/core/auth/token-store.ts (+18 -31)</span>
+              <span class="tool-timing">0.3s</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-prose">
+              <p>Updated. The token store is now stateless between accesses -- no background timers, no interval cleanup. The <code>get()</code> method checks <code>expiresAt</code> on every call. If the token has less than 60 seconds remaining and a refresh token exists, it refreshes inline. If the token is fully expired, it deletes the entry and returns <code>null</code>.</p>
+              <p>This is cleaner for testing since there are no dangling intervals to clear in <code>afterAll</code> hooks.</p>
+            </div>
+          </div>
+
+          <div class="system-event">
+            <span class="event-time">09:49</span>
+            <span class="event-text">Stage <span class="stage-name">implement</span> completed -- advancing to <span class="stage-name">verify</span></span>
+          </div>
+          <div class="system-event">
+            <span class="event-time">09:49</span>
+            <span class="event-text">Agent <span class="stage-name">verifier</span> assigned -- runtime: claude -- model: sonnet-4</span>
+          </div>
+          <div class="system-event">
+            <span class="event-time">09:49</span>
+            <span class="event-text">Stage <span class="stage-name">verify</span> dispatched</span>
+          </div>
+
+          <!-- VERIFY STAGE -->
+          <div class="agent-message">
+            <div class="agent-label">Verifier</div>
+            <div class="agent-prose">
+              <p>Running the existing test suite to check for regressions, then writing tests for the new auth modules.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">bun test packages/core/__tests__/ -- 34 passed</span>
+              <span class="tool-timing">4.1s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">bun test packages/server/__tests__/ -- 21 passed</span>
+              <span class="tool-timing">3.8s</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Verifier</div>
+            <div class="agent-prose">
+              <p>All existing tests pass. No regressions. Now writing tests for the PKCE module and token store.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Created packages/core/__tests__/auth-pkce.test.ts (68 lines)</span>
+              <span class="tool-timing">0.4s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Created packages/core/__tests__/auth-token-store.test.ts (91 lines)</span>
+              <span class="tool-timing">0.5s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">bun test packages/core/__tests__/auth-pkce.test.ts -- 6 passed</span>
+              <span class="tool-timing">1.2s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">bun test packages/core/__tests__/auth-token-store.test.ts -- 8 passed</span>
+              <span class="tool-timing">1.5s</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Verifier</div>
+            <div class="agent-prose">
+              <p>All 14 new tests pass. Coverage includes: verifier generation (length, character set, uniqueness), S256 challenge computation (known test vectors), token storage and retrieval, lazy expiry eviction, and inline refresh behavior.</p>
+              <p>Running the full test suite one more time to confirm everything works together.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">bun test -- 69 passed, 0 failed</span>
+              <span class="tool-timing">12.3s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">make lint -- 0 warnings, 0 errors</span>
+              <span class="tool-timing">3.1s</span>
+            </div>
+          </div>
+
+          <div class="system-event">
+            <span class="event-time">09:52</span>
+            <span class="event-text">Stage <span class="stage-name">verify</span> completed -- advancing to <span class="stage-name">review</span></span>
+          </div>
+          <div class="system-event">
+            <span class="event-time">09:52</span>
+            <span class="event-text">Agent <span class="stage-name">reviewer</span> assigned -- runtime: claude -- model: opus-4</span>
+          </div>
+          <div class="system-event">
+            <span class="event-time">09:52</span>
+            <span class="event-text">Stage <span class="stage-name">review</span> dispatched</span>
+          </div>
+
+          <!-- REVIEW STAGE -->
+          <div class="agent-message">
+            <div class="agent-label">Reviewer</div>
+            <div class="agent-prose">
+              <p>Reviewing the implementation against the plan. I will check security, correctness, code style, and test coverage.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Read pkce.ts, token-store.ts, auth-callback.ts, auth.ts</span>
+              <span class="tool-timing">0.3s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Read auth-pkce.test.ts, auth-token-store.test.ts</span>
+              <span class="tool-timing">0.2s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Read routes.ts, App.tsx</span>
+              <span class="tool-timing">0.2s</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Reviewer</div>
+            <div class="agent-prose">
+              <p>Review complete. Six findings across security, correctness, and test coverage.</p>
+            </div>
+          </div>
+
+          <!-- REVIEW FINDINGS -->
+          <div class="agent-message">
+            <div class="agent-label" style="margin-bottom: 10px;">Findings</div>
+
+            <div class="finding">
+              <span class="finding-badge good">Good</span>
+              <span class="finding-text"><strong>PKCE flow</strong> implemented correctly with S256 challenge method. Verifier length and entropy meet RFC 7636 requirements.</span>
+            </div>
+
+            <div class="finding">
+              <span class="finding-badge good">Good</span>
+              <span class="finding-text"><strong>Lazy eviction</strong> is the right pattern. No background timers, no shutdown concerns, deterministic behavior in tests.</span>
+            </div>
+
+            <div class="finding">
+              <span class="finding-badge good">Good</span>
+              <span class="finding-text"><strong>State parameter</strong> validated against stored nonce before code exchange. Prevents CSRF on the callback endpoint.</span>
+            </div>
+
+            <div class="finding">
+              <span class="finding-badge issue">Issue</span>
+              <span class="finding-text"><strong>Missing rate limit</strong> on the auth callback route. An attacker could brute-force authorization codes. Add a per-IP rate limiter (10 req/min is reasonable).</span>
+            </div>
+
+            <div class="finding">
+              <span class="finding-badge note">Note</span>
+              <span class="finding-text"><strong>Token refresh race</strong> -- if two concurrent requests hit <code>get()</code> with an expiring token, both will attempt refresh. Consider a mutex or deduplication lock on the refresh call.</span>
+            </div>
+
+            <div class="finding">
+              <span class="finding-badge note">Note</span>
+              <span class="finding-text"><strong>Missing test</strong> for the auth middleware's behavior when the token store returns <code>null</code>. The middleware should respond with 401 and a <code>WWW-Authenticate</code> header.</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Reviewer</div>
+            <div class="agent-prose">
+              <p>Overall: <strong>approve with suggestions</strong>. The PKCE implementation is correct and well-structured. The rate limit issue should be addressed before merge -- it is a real attack surface. The token refresh race and missing middleware test are lower priority but worth a follow-up.</p>
+            </div>
+          </div>
+
+          <div class="system-event">
+            <span class="event-time">09:54</span>
+            <span class="event-text">Review completed -- verdict: <span class="stage-name">approve with suggestions</span></span>
+          </div>
+
+          <!-- IMPLEMENTER ADDRESSES REVIEW -->
+          <div class="system-event">
+            <span class="event-time">09:54</span>
+            <span class="event-text">Agent <span class="stage-name">implementer</span> re-assigned -- addressing review findings</span>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-prose">
+              <p>Addressing the rate limit issue from the review. I will add a simple in-memory rate limiter to the auth callback route.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Created packages/server/middleware/rate-limit.ts (34 lines)</span>
+              <span class="tool-timing">0.3s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Edited packages/server/routes/auth-callback.ts (+6 -1)</span>
+              <span class="tool-timing">0.2s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">Created packages/server/__tests__/auth-middleware.test.ts (42 lines)</span>
+              <span class="tool-timing">0.4s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">bun test packages/server/__tests__/auth-middleware.test.ts -- 5 passed</span>
+              <span class="tool-timing">1.8s</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-prose">
+              <p>Rate limiter added -- 10 requests per minute per IP using a sliding window counter with lazy cleanup. Also added the missing auth middleware test covering the 401 response with <code>WWW-Authenticate: Bearer</code> header when the token is expired or missing.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">bun test -- 76 passed, 0 failed</span>
+              <span class="tool-timing">14.1s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">make lint -- 0 warnings, 0 errors</span>
+              <span class="tool-timing">3.2s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">make format -- no changes</span>
+              <span class="tool-timing">2.4s</span>
+            </div>
+          </div>
+
+          <!-- PR CREATION -->
+          <div class="system-event">
+            <span class="event-time">09:55</span>
+            <span class="event-text">All review findings addressed -- preparing pull request</span>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-prose">
+              <p>All checks pass. Creating the pull request.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">git commit -m "feat: add OAuth2 PKCE auth flow" (7 files, +438 lines)</span>
+              <span class="tool-timing">0.8s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+              <span class="tool-summary">gh pr create -- #247 opened</span>
+              <span class="tool-timing">2.1s</span>
+            </div>
+          </div>
+
+          <!-- PR SUMMARY BLOCK -->
+          <div class="summary-block">
+            <div class="summary-row"><span class="summary-key">PR</span> <span class="summary-value">#247 -- Add OAuth2 PKCE auth flow</span></div>
+            <div class="summary-row"><span class="summary-key">Branch</span> <span class="summary-value">feat/oauth2-pkce</span></div>
+            <div class="summary-row"><span class="summary-key">Files</span> <span class="summary-value">7 changed (+438 -3)</span></div>
+            <hr class="summary-divider">
+            <div class="summary-row"><span class="summary-key">Created</span> <span class="summary-value">pkce.ts, token-store.ts, auth-callback.ts, auth.ts, rate-limit.ts</span></div>
+            <div class="summary-row"><span class="summary-key">Modified</span> <span class="summary-value">routes.ts, App.tsx</span></div>
+            <div class="summary-row"><span class="summary-key">Tests</span> <span class="summary-value">3 new files, 19 tests, all passing</span></div>
+            <hr class="summary-divider">
+            <div class="summary-row"><span class="summary-key">Cost</span> <span class="summary-value">$1.47 (plan: $0.31, implement: $0.68, verify: $0.29, review: $0.19)</span></div>
+            <div class="summary-row"><span class="summary-key">Duration</span> <span class="summary-value">14m 32s</span></div>
+          </div>
+
+          <div class="system-event">
+            <span class="event-time">09:55</span>
+            <span class="event-text">Stage <span class="stage-name">review</span> completed -- awaiting <span class="stage-name">merge</span> approval</span>
+          </div>
+
+          <!-- Extra spacing at bottom for scroll -->
+          <div style="height: 24px;"></div>
+
+        </div>
+      </div>
+
+      <!-- ===== INPUT BAR ===== -->
+      <div class="input-bar">
+        <div class="input-inner">
+          <input class="input-field" type="text" placeholder="Send a message..." />
+          <span class="model-badge">opus-4</span>
+          <button class="send-btn">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 7h12M8 2l5 5-5 5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ===== RIGHT WORKSPACE (320px) ===== -->
+    <aside class="workspace">
+      <div class="workspace-tabs">
+        <button class="workspace-tab active">Overview</button>
+        <button class="workspace-tab">Files</button>
+        <button class="workspace-tab">Diff</button>
+        <button class="workspace-tab">Metrics</button>
+      </div>
+
+      <div class="workspace-content">
+
+        <!-- Overview Tab -->
+        <div class="overview-section">
+          <div class="overview-section-label">Session</div>
+          <div class="overview-grid">
+            <div class="overview-item">
+              <span class="overview-key">ID</span>
+              <span class="overview-value">s-a4f2</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Status</span>
+              <span class="overview-value" style="color: var(--green);">running</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Flow</span>
+              <span class="overview-value">autonomous-sdlc</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Compute</span>
+              <span class="overview-value">local</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Runtime</span>
+              <span class="overview-value">claude</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Model</span>
+              <span class="overview-value">opus-4</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="overview-section">
+          <div class="overview-section-label">Pipeline</div>
+          <div class="overview-grid">
+            <div class="overview-item">
+              <span class="overview-key">Stage</span>
+              <span class="overview-value">review</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Progress</span>
+              <span class="overview-value">4/5</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Agents used</span>
+              <span class="overview-value">4</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Tool calls</span>
+              <span class="overview-value">28</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="overview-section">
+          <div class="overview-section-label">Costs</div>
+          <div class="overview-grid">
+            <div class="overview-item">
+              <span class="overview-key">Input tokens</span>
+              <span class="overview-value">124,830</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Output tokens</span>
+              <span class="overview-value">18,420</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Total cost</span>
+              <span class="overview-value">$1.47</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Elapsed</span>
+              <span class="overview-value">14m 32s</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="overview-section">
+          <div class="overview-section-label">Files Changed</div>
+          <div>
+            <div class="file-item">
+              <span class="file-name">packages/core/auth/pkce.ts</span>
+              <span class="file-stat"><span class="added">+47</span></span>
+            </div>
+            <div class="file-item">
+              <span class="file-name">packages/core/auth/token-store.ts</span>
+              <span class="file-stat"><span class="added">+69</span></span>
+            </div>
+            <div class="file-item">
+              <span class="file-name">packages/server/routes/auth-callback.ts</span>
+              <span class="file-stat"><span class="added">+68</span></span>
+            </div>
+            <div class="file-item">
+              <span class="file-name">packages/server/middleware/auth.ts</span>
+              <span class="file-stat"><span class="added">+54</span></span>
+            </div>
+            <div class="file-item">
+              <span class="file-name">packages/server/middleware/rate-limit.ts</span>
+              <span class="file-stat"><span class="added">+34</span></span>
+            </div>
+            <div class="file-item">
+              <span class="file-name">packages/server/routes.ts</span>
+              <span class="file-stat"><span class="added">+18</span> <span class="removed">-2</span></span>
+            </div>
+            <div class="file-item">
+              <span class="file-name">packages/web/src/App.tsx</span>
+              <span class="file-stat"><span class="added">+8</span> <span class="removed">-2</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="overview-section">
+          <div class="overview-section-label">Test Results</div>
+          <div class="overview-grid">
+            <div class="overview-item">
+              <span class="overview-key">Total</span>
+              <span class="overview-value" style="color: var(--green);">76 passed</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">New</span>
+              <span class="overview-value">19 tests</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Lint</span>
+              <span class="overview-value" style="color: var(--green);">0 warnings</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-key">Format</span>
+              <span class="overview-value" style="color: var(--green);">clean</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </div>
+</div>
+</body>
+</html>
