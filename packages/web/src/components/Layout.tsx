@@ -39,7 +39,7 @@ export function Layout({
   return (
     <div
       className={cn(
-        "grid h-screen bg-transparent",
+        "grid h-screen bg-transparent transition-[grid-template-columns] duration-200 ease-in-out",
         collapsed ? "grid-cols-[48px_1fr]" : "grid-cols-[200px_1fr] max-md:grid-cols-[48px_1fr]",
       )}
     >
