@@ -7,11 +7,13 @@
     "frontendDist": "../../web/dist",
     "beforeBuildCommand": {
       "script": "bun run build:web",
-      "cwd": "../../.."
+      "cwd": "../../..",
+      "wait": true
     },
     "beforeDevCommand": {
       "script": "bun run build:web",
-      "cwd": "../../.."
+      "cwd": "../../..",
+      "wait": true
     }
   },
   "app": {
