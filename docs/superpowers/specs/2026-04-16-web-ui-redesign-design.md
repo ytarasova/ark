@@ -263,16 +263,21 @@ Three typographic voices:
 
 ### 4.2 Type Scale
 
-Base: 13px. Ratio: 1.2 (minor third). Tight but legible for dense dashboards.
+Base: 13px. 9-step semantic scale aligned with the design system research (Appendix B). Tight but legible for dense dashboards.
 
-| Token       | Size | Weight  | Line Height | Letter Spacing | Usage                                        |
-| ----------- | ---- | ------- | ----------- | -------------- | -------------------------------------------- |
-| `text-xs`   | 10px | 500     | 14px        | +0.02em        | Micro labels, badge text, keyboard shortcuts |
-| `text-sm`   | 11px | 400-500 | 16px        | +0.01em        | Timestamps, secondary info, table metadata   |
-| `text-base` | 13px | 400     | 20px        | 0              | Body text, list items, form inputs           |
-| `text-md`   | 14px | 500     | 20px        | -0.005em       | Emphasized body, nav labels, section headers |
-| `text-lg`   | 16px | 600     | 22px        | -0.01em        | Card titles, panel headers                   |
-| `text-xl`   | 20px | 600     | 28px        | -0.015em       | Page titles (maximum size in app)            |
+| Token              | Size  | Weight  | Line Height | Letter Spacing | Usage                                        |
+| ------------------ | ----- | ------- | ----------- | -------------- | -------------------------------------------- |
+| `text-display`     | 24px  | 600     | 32px        | -0.015em       | Page titles (rarely used)                    |
+| `text-title`       | 18px  | 600     | 28px        | -0.01em        | Section titles                               |
+| `text-heading`     | 15px  | 600     | 22px        | -0.01em        | Card titles, dialog titles, panel headers    |
+| `text-body`        | 13px  | 400     | 20px        | 0              | Default body text, list items, form inputs   |
+| `text-body-medium` | 13px  | 500     | 20px        | 0              | Emphasized body, nav labels, section headers |
+| `text-label`       | 12px  | 500     | 16px        | 0              | Form labels, tab labels, metadata            |
+| `text-caption`     | 11px  | 400-500 | 16px        | +0.01em        | Timestamps, secondary info, table metadata   |
+| `text-micro`       | 10px  | 500     | 14px        | +0.02em        | Badges, status text, keyboard shortcuts      |
+| `text-2xs`         | 9px   | 500     | 12px        | +0.04em        | Superscripts, count badges (use sparingly)   |
+
+Letter spacing rules: >= 15px use -0.01em (tight), 12-14px use 0 (normal), <= 11px uppercase use 0.04-0.08em (tracked).
 
 **Monospace is always 1px smaller** than its corresponding sans context to appear optically equal.
 
