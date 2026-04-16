@@ -62,7 +62,7 @@ export function ChatPanel({ sessionId, session, onClose, onToast }: ChatPanelPro
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5" onScroll={handleScroll}>
         {messages.length === 0 && (
           <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground">
-            No messages yet. Type below to send.
+            {isActive ? "No messages yet. Type below to send." : "No messages recorded for this session."}
           </div>
         )}
         {messages.map((m) => (
