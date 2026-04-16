@@ -19,8 +19,6 @@
  *     model without touching goose config.
  *   - Stateless: `--no-session` disables goose's own session store so Ark
  *     owns all session state.
- *   - Structured output: `--output-format stream-json` gives a parseable
- *     event stream (future: hook-like status parsing).
  */
 
 import { mkdirSync, writeFileSync } from "fs";
@@ -55,7 +53,7 @@ export interface GooseCommandOpts {
  */
 export function buildGooseCommand(opts: GooseCommandOpts): string[] {
   const bin = opts.binaryPath ?? "goose";
-  const args: string[] = [bin, "run", "--no-session", "--quiet", "--output-format", "stream-json"];
+  const args: string[] = [bin, "run", "--no-session"];
 
   if (opts.agent.model) {
     args.push("--model", opts.agent.model);

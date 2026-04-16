@@ -92,7 +92,7 @@ function SessionActions({
           {terminalOpen ? "Detach" : "Attach"}
         </Button>
       )}
-      {s !== "deleting" && s !== "archived" && (
+      {(s === "running" || s === "waiting") && (
         <Button variant={chatOpen ? "default" : "outline"} size="xs" onClick={() => onChatOpenChange?.(!chatOpen)}>
           {chatOpen ? "Close Chat" : "Chat"}
         </Button>
