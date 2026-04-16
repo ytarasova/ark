@@ -1,5 +1,5 @@
 /**
- * Tests for hooks.ts — EventBus with replay buffer and cancellable before handlers.
+ * Tests for hooks.ts -- EventBus with replay buffer and cancellable before handlers.
  */
 
 import { describe, it, expect, beforeEach } from "bun:test";

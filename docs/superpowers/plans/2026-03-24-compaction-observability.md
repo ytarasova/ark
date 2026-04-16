@@ -1,4 +1,4 @@
-# Context Compaction Observability — Implementation Plan
+# Context Compaction Observability -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -72,7 +72,7 @@ Update the existing "contains hooks for all 6 status events" test to expect 8 ev
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `bun test packages/core/__tests__/claude-hooks.test.ts`
-Expected: FAIL — PreCompact/PostCompact not in hook config yet.
+Expected: FAIL -- PreCompact/PostCompact not in hook config yet.
 
 - [ ] **Step 3: Add PreCompact/PostCompact to buildHooksConfig in claude.ts**
 
@@ -83,7 +83,7 @@ In `buildHooksConfig()` (~line 152-163), add two entries to the returned object:
     PostCompact: [{ hooks: [hook] }],
 ```
 
-These have no `matcher` field — they fire for both `auto` and `manual` compaction triggers.
+These have no `matcher` field -- they fire for both `auto` and `manual` compaction triggers.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -149,7 +149,7 @@ Add to `conductor-hooks.test.ts`:
 
 Run: `bun test packages/core/__tests__/claude-hooks.test.ts packages/core/__tests__/conductor-hooks.test.ts`
 
-The conductor tests should already pass — PreCompact/PostCompact are "unknown events" that get logged but don't change status (the existing no-op path). The `StopFailure` with `max_output_tokens` uses the existing `StopFailure` → `failed` mapping.
+The conductor tests should already pass -- PreCompact/PostCompact are "unknown events" that get logged but don't change status (the existing no-op path). The `StopFailure` with `max_output_tokens` uses the existing `StopFailure` → `failed` mapping.
 
 If `getEvents` returns events with `data` as a string (JSON), parse it in the assertions. If it returns objects, access directly.
 
@@ -157,7 +157,7 @@ If `getEvents` returns events with `data` as a string (JSON), parse it in the as
 
 ```bash
 git add packages/core/claude.ts packages/core/conductor.ts packages/core/__tests__/claude-hooks.test.ts packages/core/__tests__/conductor-hooks.test.ts
-git commit -m "feat: add compaction observability — PreCompact/PostCompact hooks + max_output_tokens handling"
+git commit -m "feat: add compaction observability -- PreCompact/PostCompact hooks + max_output_tokens handling"
 ```
 
 ---
@@ -190,7 +190,7 @@ Add to the `buildLauncher` describe block in `claude.test.ts`:
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `bun test packages/core/__tests__/claude.test.ts`
-Expected: FAIL — `env` not in LauncherOpts, no env var export in launcher.
+Expected: FAIL -- `env` not in LauncherOpts, no env var export in launcher.
 
 - [ ] **Step 3: Add env support to LauncherOpts and buildLauncher**
 

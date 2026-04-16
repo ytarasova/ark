@@ -1,8 +1,8 @@
 /**
- * Claude Code executor — wraps existing launch/kill/status/send/capture logic
+ * Claude Code executor -- wraps existing launch/kill/status/send/capture logic
  * from claude.ts, tmux.ts, and session.ts into the Executor interface.
  *
- * No new behavior — this is a refactor that delegates to existing modules.
+ * No new behavior -- this is a refactor that delegates to existing modules.
  */
 
 import { mkdirSync, writeFileSync } from "fs";

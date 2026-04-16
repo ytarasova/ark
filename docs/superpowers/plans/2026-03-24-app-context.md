@@ -4,7 +4,7 @@
 
 **Goal:** Replace scattered module-level singletons with a unified AppContext that manages configuration, database, conductor, and metrics lifecycle.
 
-**Architecture:** A class-based `AppContext` owns all services and boots them in explicit order. CLI and TUI share it — TUI opts into conductor and metrics. Migration-safe shims keep existing code working during gradual adoption.
+**Architecture:** A class-based `AppContext` owns all services and boots them in explicit order. CLI and TUI share it -- TUI opts into conductor and metrics. Migration-safe shims keep existing code working during gradual adoption.
 
 **Tech Stack:** Bun, TypeScript, bun:sqlite, React/Ink (TUI only)
 
@@ -12,7 +12,7 @@
 
 ---
 
-### Task 1: Create `config.ts` — typed configuration
+### Task 1: Create `config.ts` -- typed configuration
 
 **Files:**
 - Create: `packages/core/config.ts`
@@ -76,7 +76,7 @@ describe("loadConfig", () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `bun test packages/core/__tests__/config.test.ts`
-Expected: FAIL — module not found
+Expected: FAIL -- module not found
 
 - [ ] **Step 3: Implement config.ts**
 
@@ -136,7 +136,7 @@ git commit -m "feat: add ArkConfig type and loadConfig()"
 
 ---
 
-### Task 2: Create `app.ts` — AppContext class with boot/shutdown
+### Task 2: Create `app.ts` -- AppContext class with boot/shutdown
 
 **Files:**
 - Create: `packages/core/app.ts`
@@ -235,20 +235,20 @@ describe("AppContext", () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `bun test packages/core/__tests__/app.test.ts`
-Expected: FAIL — module not found
+Expected: FAIL -- module not found
 
 - [ ] **Step 3: Implement app.ts**
 
 Create `packages/core/app.ts` with:
 - `AppContext` class with `phase`, `config`, `db`, `eventBus`, `conductor`, `metricsPoller`
-- `constructor(opts?)` — zero side effects, just stores config
-- `boot()` — ensures dirs, opens DB, inits schema, seeds local compute, creates EventBus, optionally starts conductor and metrics poller, registers SIGINT/SIGTERM
-- `shutdown()` — idempotent reverse teardown: stop poller, stop conductor, close DB, remove temp dir if test
-- `static forTest(overrides?)` — creates temp dir, returns AppContext with test config
-- `getApp()` / `setApp()` / `clearApp()` — global singleton accessors
-- `initSchema(db)` — extracted from store.ts, creates all 5 tables
-- `ensureLocalCompute(db)` — ensures local compute row exists
-- `createMetricsPoller()` — extracted from conductor.ts, returns `{ stop() }` handle
+- `constructor(opts?)` -- zero side effects, just stores config
+- `boot()` -- ensures dirs, opens DB, inits schema, seeds local compute, creates EventBus, optionally starts conductor and metrics poller, registers SIGINT/SIGTERM
+- `shutdown()` -- idempotent reverse teardown: stop poller, stop conductor, close DB, remove temp dir if test
+- `static forTest(overrides?)` -- creates temp dir, returns AppContext with test config
+- `getApp()` / `setApp()` / `clearApp()` -- global singleton accessors
+- `initSchema(db)` -- extracted from store.ts, creates all 5 tables
+- `ensureLocalCompute(db)` -- ensures local compute row exists
+- `createMetricsPoller()` -- extracted from conductor.ts, returns `{ stop() }` handle
 
 Key implementation details:
 - Signal handlers track themselves for cleanup in shutdown
@@ -270,10 +270,10 @@ git commit -m "feat: add AppContext with boot/shutdown lifecycle"
 
 ---
 
-### Task 3: Wire shims — store.ts delegates to AppContext
+### Task 3: Wire shims -- store.ts delegates to AppContext
 
 **Files:**
-- Modify: `packages/core/store.ts` (lines 17-37 — imports and path functions; lines 91-106 — getDb)
+- Modify: `packages/core/store.ts` (lines 17-37 -- imports and path functions; lines 91-106 -- getDb)
 - Modify: `packages/core/index.ts` (add app.ts/config.ts exports)
 
 - [ ] **Step 1: Add appOrFallback helper and update path functions in store.ts**

@@ -3,7 +3,7 @@
  *
  * The provider registry lives on AppContext. These functions are thin
  * delegates that require AppContext to be booted. No fallback map,
- * no auto-registration — all lifecycle goes through AppContext.boot().
+ * no auto-registration -- all lifecycle goes through AppContext.boot().
  */
 
 import type { ComputeProvider } from "./types.js";
@@ -58,7 +58,7 @@ export function listProviders(): string[] {
 }
 
 export function clearProviders(): void {
-  // noop — AppContext owns the registry
+  // noop -- AppContext owns the registry
 }
 
 // Legacy provider classes (kept for backward compatibility during migration)

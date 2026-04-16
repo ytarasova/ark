@@ -450,7 +450,7 @@ export function startConductor(
 
   if (!opts?.quiet) logInfo("conductor", `Ark conductor listening on localhost:${port}`);
 
-  // Schedule poller — check every 60 seconds
+  // Schedule poller -- check every 60 seconds
   const scheduleTimer = setInterval(
     () =>
       safeAsync("schedule polling", async () => {
@@ -543,7 +543,7 @@ export async function deliverToChannel(
       const result = await client.channelDeliver({ channelPort, payload });
       if (result.delivered) return;
     } catch {
-      /* arkd not available — fall through to direct HTTP */
+      /* arkd not available -- fall through to direct HTTP */
     }
   }
 
@@ -555,7 +555,7 @@ export async function deliverToChannel(
       body: JSON.stringify(payload),
     });
   } catch {
-    /* channel not reachable — expected when agent hasn't started channel yet */
+    /* channel not reachable -- expected when agent hasn't started channel yet */
   }
 }
 

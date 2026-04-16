@@ -1,4 +1,4 @@
-# Cost Tracking from Transcripts — Implementation Plan
+# Cost Tracking from Transcripts -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -14,14 +14,14 @@
 
 | File | Change |
 |------|--------|
-| `packages/core/claude.ts` | **Add:** `parseTranscriptUsage(transcriptPath)` — reads JSONL, sums token usage across all assistant messages |
+| `packages/core/claude.ts` | **Add:** `parseTranscriptUsage(transcriptPath)` -- reads JSONL, sums token usage across all assistant messages |
 | `packages/core/conductor.ts` | **Modify:** On `Stop`/`SessionEnd` hooks, call `parseTranscriptUsage` and store results |
 | `packages/core/__tests__/claude-transcript.test.ts` | **Create:** Tests for transcript parsing |
 | `packages/core/__tests__/conductor-hooks.test.ts` | **Modify:** Add tests for cost tracking on Stop/SessionEnd |
 
 ---
 
-### Task 1: parseTranscriptUsage — read JSONL and sum tokens
+### Task 1: parseTranscriptUsage -- read JSONL and sum tokens
 
 **Files:**
 - Create: `packages/core/__tests__/claude-transcript.test.ts`
@@ -31,7 +31,7 @@
 
 ```ts
 /**
- * Tests for claude.ts transcript parsing — token usage extraction.
+ * Tests for claude.ts transcript parsing -- token usage extraction.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
@@ -127,7 +127,7 @@ describe("parseTranscriptUsage", () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `bun test packages/core/__tests__/claude-transcript.test.ts`
-Expected: FAIL — `parseTranscriptUsage` not exported.
+Expected: FAIL -- `parseTranscriptUsage` not exported.
 
 - [ ] **Step 3: Implement parseTranscriptUsage in claude.ts**
 
@@ -273,7 +273,7 @@ git commit -m "feat: parseTranscriptUsage reads Claude JSONL transcripts for tok
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `bun test packages/core/__tests__/conductor-hooks.test.ts`
-Expected: FAIL — no usage tracking in conductor yet.
+Expected: FAIL -- no usage tracking in conductor yet.
 
 - [ ] **Step 3: Add usage tracking to conductor /hooks/status**
 

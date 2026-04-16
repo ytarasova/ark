@@ -1,6 +1,6 @@
 /**
  * SSH, rsync, and key-generation primitives for EC2 hosts.
- * ALL operations are async — no sync exec calls.
+ * ALL operations are async -- no sync exec calls.
  */
 
 import { execFile } from "child_process";

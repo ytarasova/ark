@@ -1,5 +1,5 @@
 /**
- * Tests for recipe "use" — creating sessions from recipes.
+ * Tests for recipe "use" -- creating sessions from recipes.
  */
 
 import { describe, it, expect } from "bun:test";

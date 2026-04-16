@@ -1,5 +1,5 @@
 /**
- * Tests for the messages table — addMessage, getMessages, unread counts.
+ * Tests for the messages table -- addMessage, getMessages, unread counts.
  */
 
 import { describe, it, expect } from "bun:test";

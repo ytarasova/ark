@@ -152,7 +152,7 @@ async function syncClaudePush(key: string, ip: string): Promise<void> {
       try {
         const tmpFile = join(tmp, ".claude.json");
         writeFileSync(tmpFile, JSON.stringify(remote, null, 2));
-        // scp directly — rsync has edge cases with dotfiles and --update
+        // scp directly -- rsync has edge cases with dotfiles and --update
         await execFileAsync(
           "scp",
           [

@@ -173,6 +173,37 @@ export function initSchema(db: IDatabase): void {
       updated_at TEXT NOT NULL,
       PRIMARY KEY (name, kind, tenant_id)
     );
+
+    CREATE TABLE IF NOT EXISTS burn_turns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      turn_index INTEGER NOT NULL,
+      project TEXT,
+      timestamp TEXT NOT NULL,
+      user_message_preview TEXT,
+      category TEXT NOT NULL,
+      model TEXT,
+      provider TEXT,
+      runtime TEXT,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+      cost_usd REAL NOT NULL DEFAULT 0,
+      api_calls INTEGER NOT NULL DEFAULT 0,
+      has_edits INTEGER NOT NULL DEFAULT 0,
+      retries INTEGER NOT NULL DEFAULT 0,
+      is_one_shot INTEGER NOT NULL DEFAULT 0,
+      tools_json TEXT NOT NULL DEFAULT '[]',
+      mcp_tools_json TEXT NOT NULL DEFAULT '[]',
+      bash_cmds_json TEXT NOT NULL DEFAULT '[]',
+      speed TEXT NOT NULL DEFAULT 'standard',
+      transcript_mtime INTEGER,
+      UNIQUE(session_id, turn_index)
+    );
+    CREATE INDEX IF NOT EXISTS idx_burn_turns_tenant_timestamp ON burn_turns(tenant_id, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_burn_turns_tenant_category ON burn_turns(tenant_id, category, timestamp);
   `);
 
   // Compute pools table (defined in its own module so the pool manager can

@@ -41,7 +41,7 @@ export class SessionService {
 
   /**
    * Create a new session with sensible defaults.
-   * Port of session.ts startSession() — simplified: no flow-stage resolution,
+   * Port of session.ts startSession() -- simplified: no flow-stage resolution,
    * no telemetry, no OTLP spans (those belong at the orchestration layer above).
    */
   start(opts: CreateSessionOpts): Session {
@@ -66,7 +66,7 @@ export class SessionService {
   }
 
   /**
-   * Stop a session. Idempotent — already-stopped/completed/failed returns ok.
+   * Stop a session. Idempotent -- already-stopped/completed/failed returns ok.
    * When a running process exists (session_id set) and orchestration is available,
    * delegates for proper tmux/provider cleanup. Otherwise does a local state transition.
    */
@@ -117,7 +117,7 @@ export class SessionService {
 
   /**
    * Resume a stopped/failed session back to ready.
-   * Port of session.ts resume() — does NOT auto-dispatch (caller handles that).
+   * Port of session.ts resume() -- does NOT auto-dispatch (caller handles that).
    */
   async resume(id: string): Promise<SessionOpResult> {
     const session = this.sessions.get(id);
@@ -148,7 +148,7 @@ export class SessionService {
 
   /**
    * Mark session as completed.
-   * Port of session.ts complete() — simplified: just marks ready + logs event.
+   * Port of session.ts complete() -- simplified: just marks ready + logs event.
    * The advance() call is the caller's responsibility.
    */
   complete(id: string): SessionOpResult {
@@ -218,7 +218,7 @@ export class SessionService {
 
   /**
    * Soft-delete a session (90s undo window).
-   * Port of session.ts deleteSessionAsync() — simplified: no tmux/provider
+   * Port of session.ts deleteSessionAsync() -- simplified: no tmux/provider
    * cleanup (caller handles), just state transition.
    */
   async delete(id: string): Promise<SessionOpResult> {
@@ -245,7 +245,7 @@ export class SessionService {
     return { ok: true, message: "OK", sessionId: id };
   }
 
-  // ── Delegating methods (complex orchestration — call through to session.ts) ──
+  // ── Delegating methods (complex orchestration -- call through to session.ts) ──
 
   /**
    * Dispatch a session: resolve agent, build task, launch executor.

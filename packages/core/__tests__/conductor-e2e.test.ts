@@ -49,7 +49,7 @@ async function postReport(sessionId: string, report: Record<string, unknown>): P
   });
 }
 
-describe("Conductor E2E — report pipeline", () => {
+describe("Conductor E2E -- report pipeline", () => {
   it("progress report creates an agent message in the DB", async () => {
     const session = getApp().sessions.create({ summary: "test session" });
 
@@ -229,7 +229,7 @@ describe("Conductor E2E — report pipeline", () => {
   });
 
   it("progress report does not override non-waiting statuses", async () => {
-    // stopped — agent may send a stale report before being killed
+    // stopped -- agent may send a stale report before being killed
     const s1 = getApp().sessions.create({ summary: "stopped session" });
     getApp().sessions.update(s1.id, { status: "stopped" });
 
@@ -241,7 +241,7 @@ describe("Conductor E2E — report pipeline", () => {
     });
     expect(getApp().sessions.get(s1.id)?.status).toBe("stopped");
 
-    // running — should stay running (no-op)
+    // running -- should stay running (no-op)
     const s2 = getApp().sessions.create({ summary: "running session" });
     getApp().sessions.update(s2.id, { status: "running" });
 
@@ -253,7 +253,7 @@ describe("Conductor E2E — report pipeline", () => {
     });
     expect(getApp().sessions.get(s2.id)?.status).toBe("running");
 
-    // completed — should stay completed
+    // completed -- should stay completed
     const s3 = getApp().sessions.create({ summary: "completed session" });
     getApp().sessions.update(s3.id, { status: "completed" });
 
@@ -307,7 +307,7 @@ describe("Conductor cleanup", () => {
     // Should have created at least 2 timers (schedule + PR poller)
     expect(trackedTimers.length).toBeGreaterThanOrEqual(2);
 
-    // Stop the conductor — this should clear the intervals
+    // Stop the conductor -- this should clear the intervals
     testServer.stop();
 
     // Verify the timers were cleared by checking they don't fire
@@ -321,7 +321,7 @@ describe("Conductor cleanup", () => {
       // If we get here, server didn't stop properly
       expect(false).toBe(true);
     } catch {
-      // Expected — server is stopped
+      // Expected -- server is stopped
     }
   });
 });

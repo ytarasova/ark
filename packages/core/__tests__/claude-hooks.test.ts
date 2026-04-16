@@ -1,5 +1,5 @@
 /**
- * Tests for claude.ts settings bundle — writeSettings / removeSettings.
+ * Tests for claude.ts settings bundle -- writeSettings / removeSettings.
  */
 import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
@@ -74,7 +74,7 @@ describe("writeSettings", () => {
     expect(settings.hooks).toBeDefined();
   });
 
-  it("is idempotent — calling twice doesn't duplicate hooks", () => {
+  it("is idempotent -- calling twice doesn't duplicate hooks", () => {
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));

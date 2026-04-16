@@ -27,6 +27,7 @@ import {
   executeAction,
   recordSessionUsage,
 } from "./session-orchestration.js";
+import { recordBurnTurns } from "../observability/burn/record.js";
 
 // ── Hook status logic ─────────────────────────────────────────────────────────
 
@@ -250,6 +251,12 @@ export function applyHookStatus(
     } catch (e: any) {
       logError("session", "transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) });
     }
+
+    // Record burn turns alongside usage data
+    try {
+      const burnProject = session.repo ?? session.workdir ?? "unknown";
+      recordBurnTurns(app, session.id, transcriptPath, "claude", burnProject);
+    } catch (e: any) { logError("session", "burn turn recording failed", { sessionId: session.id, error: String(e?.message ?? e) }); }
 
     // Index transcript for FTS5 search -- only if the transcript belongs to THIS session's agent
     const hookClaudeSession = payload.session_id as string | undefined;

@@ -52,6 +52,7 @@ import { generateRepoMap, formatRepoMap } from "../repo-map.js";
 import { getExecutor } from "../executor.js";
 import type { ComputeProvider } from "../../compute/types.js";
 import { resolveProvider } from "../provider-registry.js";
+import { recordBurnTurns } from "../observability/burn/record.js";
 
 const DEFAULT_BASE_BRANCH = "main";
 
@@ -1226,6 +1227,10 @@ function parseNonClaudeTranscript(app: AppContext, session: Session): void {
       const provider = parserKind === "codex" ? "openai" : parserKind === "gemini" ? "google" : parserKind;
       recordSessionUsage(app, session, result.usage, provider, "transcript");
     }
+
+    // Record burn turns alongside usage data
+    const burnProject = session.repo ?? session.workdir ?? "unknown";
+    recordBurnTurns(app, session.id, transcriptPath, parserKind, burnProject);
   } catch (e: any) {
     logError("session", "non-Claude transcript parsing failed", {
       sessionId: session.id,

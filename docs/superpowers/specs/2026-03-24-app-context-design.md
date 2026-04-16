@@ -9,18 +9,18 @@ Ark's application state is scattered across module-level singletons, frozen cons
 
 ## Solution
 
-A unified `AppContext` class that owns all services, boots them in explicit order, and shuts them down on signal or request. Inspired by Spring's application context — but hand-rolled for 6 services, not a framework.
+A unified `AppContext` class that owns all services, boots them in explicit order, and shuts them down on signal or request. Inspired by Spring's application context -- but hand-rolled for 6 services, not a framework.
 
 ## Design Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Container style | Class-based AppContext | Simple, discoverable, TypeScript autocomplete. 6 services don't need a DI framework. |
-| Entry points | Unified — CLI and TUI share AppContext | CLI skips conductor/metrics via options. Avoids duplication. |
+| Entry points | Unified -- CLI and TUI share AppContext | CLI skips conductor/metrics via options. Avoids duplication. |
 | TUI state | Keep polling, managed as a service | Fix lifecycle first. Plan for event-driven as follow-up. |
 | Configuration | Plain typed object from env vars + defaults | YAGNI on hierarchical config. Plan for config file later. |
 | Shutdown | Signal-based (SIGINT/SIGTERM) + explicit `shutdown()` | Automatic cleanup. Both paths use same ordered teardown. |
-| Module access | Global singleton via `getApp()`/`setApp()` | Gradual migration — shims keep existing imports working. |
+| Module access | Global singleton via `getApp()`/`setApp()` | Gradual migration -- shims keep existing imports working. |
 
 ## Architecture
 
@@ -78,8 +78,8 @@ function setApp(app: AppContext): void;
 1. Ensure directories exist (`arkDir`, `tracksDir`, `worktreesDir`, `logDir`)
 2. Open database + run schema migrations + seed local compute row
 3. Create event bus
-4. Start conductor (if opted in) — extracted from current `startConductor()`, metrics polling extracted into separate stoppable service
-5. Start metrics poller (if opted in) — extracted from conductor.ts into its own interval with a stored handle
+4. Start conductor (if opted in) -- extracted from current `startConductor()`, metrics polling extracted into separate stoppable service
+5. Start metrics poller (if opted in) -- extracted from conductor.ts into its own interval with a stored handle
 6. Register SIGINT/SIGTERM handlers (double-signal force-exits if shutdown is already in progress)
 7. Set phase to `ready`, emit `app_ready`
 
@@ -91,7 +91,7 @@ function setApp(app: AppContext): void;
 5. Remove temp dir if `env === "test"`
 6. Set phase to `stopped`
 
-Shutdown is idempotent — safe to call multiple times. `boot()` throws if called when phase is not `created`.
+Shutdown is idempotent -- safe to call multiple times. `boot()` throws if called when phase is not `created`.
 
 ### Entry Points
 
@@ -137,7 +137,7 @@ Components access `app.config`, `app.db`, `app.eventBus` via the hook. The `useS
 Existing code keeps working during migration. The current path functions and `getDb()` become thin delegates:
 
 ```ts
-// store.ts shims — migration-safe, fall back to legacy context if AppContext not yet set
+// store.ts shims -- migration-safe, fall back to legacy context if AppContext not yet set
 import { getApp } from "./app.js";
 import { getContext } from "./context.js";
 
@@ -152,14 +152,14 @@ export function WORKTREES_DIR(): string { return appOrFallback().config.worktree
 export function getDb(): Database { return appOrFallback().db; }
 ```
 
-The `appOrFallback()` pattern prevents breakage during migration — code that runs before `setApp()` still works via the legacy `getContext()` path, but logs a deprecation warning. Once all entry points boot via AppContext, the fallback is removed.
+The `appOrFallback()` pattern prevents breakage during migration -- code that runs before `setApp()` still works via the legacy `getContext()` path, but logs a deprecation warning. Once all entry points boot via AppContext, the fallback is removed.
 
 Modules migrate gradually from `import { TRACKS_DIR } from "./store.js"` to `import { getApp } from "./app.js"`. Shims are removed once all consumers are migrated.
 
 ### What Gets Deleted
 
 After full migration:
-- `context.ts` — replaced by `config.ts` + `app.ts`
+- `context.ts` -- replaced by `config.ts` + `app.ts`
 - `createTestContext()` / `TestContext` / `setContext()` / `resetContext()`
 - `_initialized` WeakSet in store.ts
 - Scattered `process.env` reads for paths and ports
@@ -186,10 +186,10 @@ packages/core/app.ts       # AppContext class + getApp()/setApp()
 | `flow.ts` | Same as agent.ts. |
 | `claude.ts` | Reads `tracksDir` from `getApp().config`. |
 | `tmux.ts` | Reads `tracksDir` from `getApp().config`. |
-| `hooks.ts` | EventBus singleton replaced — AppContext owns instance. |
+| `hooks.ts` | EventBus singleton replaced -- AppContext owns instance. |
 | `tui/index.tsx` | Boot becomes: AppContext → boot → setApp → render. |
 | `cli/index.ts` | Same pattern without conductor/metrics. |
-| `test-setup.ts` | Simplified — AppContext.forTest() handles isolation. |
+| `test-setup.ts` | Simplified -- AppContext.forTest() handles isolation. |
 
 ## Future Work
 
@@ -200,9 +200,9 @@ packages/core/app.ts       # AppContext class + getApp()/setApp()
 
 ## Testing Strategy
 
-- Unit tests for `loadConfig()` — env var parsing, defaults, overrides.
-- Unit tests for `AppContext` lifecycle — boot order, shutdown order, idempotent shutdown, phase transitions, double-boot guard.
-- Boot failure tests — locked DB file, conductor port already in use. Verify partial boot cleans up (if step 4 fails, steps 1-3 are torn down).
+- Unit tests for `loadConfig()` -- env var parsing, defaults, overrides.
+- Unit tests for `AppContext` lifecycle -- boot order, shutdown order, idempotent shutdown, phase transitions, double-boot guard.
+- Boot failure tests -- locked DB file, conductor port already in use. Verify partial boot cleans up (if step 4 fails, steps 1-3 are torn down).
 - Integration test: `AppContext.forTest()` creates isolated DB, queries work, shutdown cleans up temp dir.
 - E2e: TuiDriver uses `AppContext.forTest()` for in-process state + passes config to tmux subprocess.
 - Migration: existing tests keep passing through shims during gradual migration.

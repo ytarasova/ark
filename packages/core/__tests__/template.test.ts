@@ -1,5 +1,5 @@
 /**
- * Tests for template.ts — shared variable substitution.
+ * Tests for template.ts -- shared variable substitution.
  */
 
 import { describe, it, expect } from "bun:test";

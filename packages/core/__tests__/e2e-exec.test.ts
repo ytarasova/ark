@@ -1,8 +1,8 @@
 /**
- * End-to-end tests for ark exec — headless CI mode.
+ * End-to-end tests for ark exec -- headless CI mode.
  *
  * Tests waitForCompletion polling logic and the exec CLI help output.
- * Does NOT actually run Claude — uses direct store mutations to simulate
+ * Does NOT actually run Claude -- uses direct store mutations to simulate
  * session state transitions.
  */
 

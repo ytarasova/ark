@@ -11,6 +11,7 @@ const VALID_VIEWS = new Set([
   "tools",
   "schedules",
   "costs",
+  "burn",
   "settings",
 ]);
 

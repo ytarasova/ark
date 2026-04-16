@@ -100,7 +100,7 @@ export class SSHPool {
         try {
           rmSync(this.socketPath);
         } catch {
-          // Stale socket file may already be gone — safe to ignore
+          // Stale socket file may already be gone -- safe to ignore
         }
       }
 
@@ -254,13 +254,13 @@ export class SSHPool {
         timeout: SSH_CHECK_TIMEOUT_MS,
       });
     } catch {
-      // Master may already be dead — expected during cleanup
+      // Master may already be dead -- expected during cleanup
     }
     try {
       // Clean up control socket file at this.socketPath
       if (existsSync(this.socketPath)) rmSync(this.socketPath);
     } catch {
-      // Socket file at this.socketPath may already be removed — safe to ignore
+      // Socket file at this.socketPath may already be removed -- safe to ignore
     }
   }
 

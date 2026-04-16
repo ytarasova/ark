@@ -1,8 +1,8 @@
-# Session Search — Implementation Plan
+# Session Search -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add grep-style search across Claude transcripts, Ark event logs, and session metadata — CLI command + TUI integration.
+**Goal:** Add grep-style search across Claude transcripts, Ark event logs, and session metadata -- CLI command + TUI integration.
 
 **Architecture:** A new `search.ts` module in core provides `searchSessions(query, opts)` that searches three sources: (1) Ark's SQLite event/message tables via SQL LIKE, (2) Claude transcript JSONL files via line-by-line grep, (3) session metadata (summary, ticket, repo). Results are unified into a common `SearchResult` type. CLI exposes `ark search <query>`. TUI adds `/` search in the Sessions tab.
 
@@ -14,16 +14,16 @@
 
 | File | Change |
 |------|--------|
-| `packages/core/search.ts` | **Create:** Search engine — `searchSessions()`, `searchTranscripts()`, `searchEvents()` |
+| `packages/core/search.ts` | **Create:** Search engine -- `searchSessions()`, `searchTranscripts()`, `searchEvents()` |
 | `packages/core/index.ts` | **Modify:** Re-export search module |
 | `packages/core/__tests__/search.test.ts` | **Create:** Tests for search functions |
 | `packages/cli/index.ts` | **Modify:** Add `ark search <query>` command |
 
-TUI integration (filtering sessions by search) is a follow-up — the core + CLI is the deliverable here.
+TUI integration (filtering sessions by search) is a follow-up -- the core + CLI is the deliverable here.
 
 ---
 
-### Task 1: Core search module — searchSessions
+### Task 1: Core search module -- searchSessions
 
 **Files:**
 - Create: `packages/core/search.ts`
@@ -34,7 +34,7 @@ TUI integration (filtering sessions by search) is a follow-up — the core + CLI
 
 ```ts
 /**
- * Tests for search.ts — session search across metadata, events, messages, and transcripts.
+ * Tests for search.ts -- session search across metadata, events, messages, and transcripts.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
@@ -164,7 +164,7 @@ describe("searchTranscripts", () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `bun test packages/core/__tests__/search.test.ts`
-Expected: FAIL — `search.ts` doesn't exist.
+Expected: FAIL -- `search.ts` doesn't exist.
 
 - [ ] **Step 3: Implement search.ts**
 
@@ -172,12 +172,12 @@ Create `packages/core/search.ts`:
 
 ```ts
 /**
- * Session search — grep across metadata, events, messages, and Claude transcripts.
+ * Session search -- grep across metadata, events, messages, and Claude transcripts.
  *
  * Three search sources:
- * 1. Session metadata (summary, ticket, repo) — SQL LIKE
- * 2. Events + messages — SQL LIKE on data/content
- * 3. Claude transcripts — JSONL line scanning
+ * 1. Session metadata (summary, ticket, repo) -- SQL LIKE
+ * 2. Events + messages -- SQL LIKE on data/content
+ * 3. Claude transcripts -- JSONL line scanning
  */
 
 import { existsSync, readdirSync, readFileSync } from "fs";
@@ -185,7 +185,7 @@ import { join } from "path";
 import { homedir } from "os";
 import { getContext } from "./context.js";
 
-// Lazy import to avoid circular deps — store uses context, context doesn't use store
+// Lazy import to avoid circular deps -- store uses context, context doesn't use store
 function getDb() {
   const { getDb } = require("./context.js");
   return getDb();
@@ -360,7 +360,7 @@ git commit -m "feat: add session search across metadata, events, messages, and t
 
 ---
 
-### Task 2: CLI command — `ark search`
+### Task 2: CLI command -- `ark search`
 
 **Files:**
 - Modify: `packages/cli/index.ts`

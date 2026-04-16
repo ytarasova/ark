@@ -1,5 +1,5 @@
 /**
- * Extension catalog — known MCP servers with metadata.
+ * Extension catalog -- known MCP servers with metadata.
  * Used by the MCP Manager UI for discovery and one-click installation.
  */
 

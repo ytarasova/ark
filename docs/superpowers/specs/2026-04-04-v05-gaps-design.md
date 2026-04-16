@@ -1,4 +1,4 @@
-# Ark v0.5 Gaps — Design Spec
+# Ark v0.5 Gaps -- Design Spec
 
 > CLI create/delete, OTEL observability, auto-rollback pipeline, hybrid search with LLM re-ranking.
 
@@ -26,13 +26,13 @@ ark recipe delete <name> [--scope global|project]
 - `skill create` with flags: `--name` and `--prompt` required, `--description` optional (defaults to empty string).
 - `skill create --from` reads a YAML file and writes it to the scope directory via `saveSkill()`.
 - `recipe create --from-session` calls existing `sessionToRecipe()`, writes result to scope directory.
-- `delete` refuses builtins — exit with error message. Only global/project scope is deletable.
+- `delete` refuses builtins -- exit with error message. Only global/project scope is deletable.
 - `delete` is silent (no confirmation prompt) for user-created skills/recipes.
 
 ### Files
 
-- **Modify:** `packages/cli/index.ts` — add `create` and `delete` subcommands under existing `skillCmd` and `recipeCmd`.
-- **No new core code** — `saveSkill()`, `deleteSkill()`, `sessionToRecipe()`, `saveRecipe()` all exist.
+- **Modify:** `packages/cli/index.ts` -- add `create` and `delete` subcommands under existing `skillCmd` and `recipeCmd`.
+- **No new core code** -- `saveSkill()`, `deleteSkill()`, `sessionToRecipe()`, `saveRecipe()` all exist.
 
 ### Testing
 
@@ -83,8 +83,8 @@ otlp:
 
 - Spans buffered in-memory, flushed on session complete/fail or every 30 seconds.
 - Single `POST` to endpoint with `Content-Type: application/json`.
-- OTLP JSON format (not protobuf) — universally accepted by Grafana Tempo, Datadog, Honeycomb, Jaeger.
-- Fire-and-forget — export failure logged, never blocks session lifecycle.
+- OTLP JSON format (not protobuf) -- universally accepted by Grafana Tempo, Datadog, Honeycomb, Jaeger.
+- Fire-and-forget -- export failure logged, never blocks session lifecycle.
 
 ### Integration Points
 
@@ -97,10 +97,10 @@ otlp:
 
 ### Files
 
-- **Create:** `packages/core/otlp.ts` — span builder, buffer, OTLP JSON formatter, HTTP sender.
-- **Modify:** `packages/core/session.ts` — emit span events at session/stage boundaries.
-- **Modify:** `packages/core/app.ts` — initialize exporter from config at boot.
-- **Modify:** `packages/core/config.ts` — add `otlp` config schema.
+- **Create:** `packages/core/otlp.ts` -- span builder, buffer, OTLP JSON formatter, HTTP sender.
+- **Modify:** `packages/core/session.ts` -- emit span events at session/stage boundaries.
+- **Modify:** `packages/core/app.ts` -- initialize exporter from config at boot.
+- **Modify:** `packages/core/config.ts` -- add `otlp` config schema.
 
 ### Testing
 
@@ -133,7 +133,7 @@ Extend existing `/hooks/github` webhook handler in `conductor.ts` to handle `pul
 ### Rollback Action
 
 1. Create revert branch: `revert-{original-branch}`.
-2. Create revert commit via GitHub GraphQL `revertPullRequest` mutation (cleanest path — handles merge commits correctly).
+2. Create revert commit via GitHub GraphQL `revertPullRequest` mutation (cleanest path -- handles merge commits correctly).
 3. Create PR via GitHub API:
    - Title: `"Revert: {original PR title}"`
    - Body: links to failed checks, references original PR.
@@ -143,7 +143,7 @@ Extend existing `/hooks/github` webhook handler in `conductor.ts` to handle `pul
 
 ### No Autonomy Demotion
 
-Session stops on rollback. Human decides next steps. No automatic demotion to lower autonomy tiers — a rollback means the agent shipped broken code and should not silently continue.
+Session stops on rollback. Human decides next steps. No automatic demotion to lower autonomy tiers -- a rollback means the agent shipped broken code and should not silently continue.
 
 ### Config
 
@@ -159,14 +159,14 @@ rollback:
 
 ### Files
 
-- **Create:** `packages/core/rollback.ts` — health polling loop, revert PR creation, session stop, event emission.
-- **Modify:** `packages/core/conductor.ts` — extend GitHub webhook handler for merge events, delegate to rollback.ts.
-- **Modify:** `packages/core/config.ts` — add `rollback` config schema.
+- **Create:** `packages/core/rollback.ts` -- health polling loop, revert PR creation, session stop, event emission.
+- **Modify:** `packages/core/conductor.ts` -- extend GitHub webhook handler for merge events, delegate to rollback.ts.
+- **Modify:** `packages/core/config.ts` -- add `rollback` config schema.
 
 ### Testing
 
-- Unit test: health check polling with mock GitHub API — success path (no rollback).
-- Unit test: health check polling — failure triggers rollback sequence.
+- Unit test: health check polling with mock GitHub API -- success path (no rollback).
+- Unit test: health check polling -- failure triggers rollback sequence.
 - Unit test: timeout behavior for both `rollback` and `ignore` modes.
 - Unit test: revert PR creation with correct title/body.
 - Unit test: `auto_merge: true` merges the revert PR.
@@ -230,19 +230,19 @@ async function hybridSearch(
 
 ### Integration Points
 
-- `recall()` in memory.ts stays as-is — `hybridSearch` calls it as a source.
-- `queryKnowledge()` in knowledge.ts stays as-is — called as a source.
-- `searchTranscripts()` in search.ts stays as-is — called as a source.
+- `recall()` in memory.ts stays as-is -- `hybridSearch` calls it as a source.
+- `queryKnowledge()` in knowledge.ts stays as-is -- called as a source.
+- `searchTranscripts()` in search.ts stays as-is -- called as a source.
 - Agents call `hybridSearch()` when they need context (replaces direct `recall()` calls in agent dispatch).
 - CLI: `ark search <query>` gains `--hybrid` flag to use this pipeline.
 - Export from `packages/core/index.ts`.
 
 ### Files
 
-- **Create:** `packages/core/hybrid-search.ts` — orchestrates retrieval from all three sources, dedup, re-rank via Claude, return.
-- **Modify:** `packages/core/agent.ts` — use `hybridSearch()` for context injection at dispatch.
-- **Modify:** `packages/cli/index.ts` — add `--hybrid` flag to `ark search`.
-- **Modify:** `packages/core/index.ts` — export `hybridSearch` and `SearchResult`.
+- **Create:** `packages/core/hybrid-search.ts` -- orchestrates retrieval from all three sources, dedup, re-rank via Claude, return.
+- **Modify:** `packages/core/agent.ts` -- use `hybridSearch()` for context injection at dispatch.
+- **Modify:** `packages/cli/index.ts` -- add `--hybrid` flag to `ark search`.
+- **Modify:** `packages/core/index.ts` -- export `hybridSearch` and `SearchResult`.
 
 ### Testing
 

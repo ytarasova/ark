@@ -4,24 +4,24 @@
 
 **Goal:** Close the 8 identified test coverage gaps across core logic and TUI hooks.
 
-**Architecture:** Each task adds a test file matching existing conventions — `bun:test` imports, `createTestContext()` isolation for core tests, `ink-testing-library` for hooks. Flow and agent tests use temp YAML files instead of hitting real builtins. The `exec.ts` file uses `bun:ffi` and `posix_spawnp` — only testable via real process execution (integration-style), so we test it by spawning a known command.
+**Architecture:** Each task adds a test file matching existing conventions -- `bun:test` imports, `createTestContext()` isolation for core tests, `ink-testing-library` for hooks. Flow and agent tests use temp YAML files instead of hitting real builtins. The `exec.ts` file uses `bun:ffi` and `posix_spawnp` -- only testable via real process execution (integration-style), so we test it by spawning a known command.
 
 **Tech Stack:** Vitest 2.0 + Bun runtime, ink-testing-library for React hooks
 
 ---
 
-### Task 1: agent.ts — CRUD and template resolution
+### Task 1: agent.ts -- CRUD and template resolution
 
 **Files:**
 - Test: `packages/core/__tests__/agent.test.ts`
 
-Tests `loadAgent`, `listAgents`, `saveAgent`, `deleteAgent`, `resolveAgent`, and `buildClaudeArgs`. Uses a temp user dir via `createTestContext` to write YAML files. Does NOT test builtins (filesystem-dependent) — tests user-dir CRUD and template variable substitution.
+Tests `loadAgent`, `listAgents`, `saveAgent`, `deleteAgent`, `resolveAgent`, and `buildClaudeArgs`. Uses a temp user dir via `createTestContext` to write YAML files. Does NOT test builtins (filesystem-dependent) -- tests user-dir CRUD and template variable substitution.
 
 - [ ] **Step 1: Write the test file**
 
 ```ts
 /**
- * Tests for agent.ts — CRUD, template resolution, CLI arg building.
+ * Tests for agent.ts -- CRUD, template resolution, CLI arg building.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
@@ -225,7 +225,7 @@ git commit -m "test: add unit tests for agent CRUD and template resolution"
 
 ---
 
-### Task 2: flow.ts — loading, navigation, gate evaluation
+### Task 2: flow.ts -- loading, navigation, gate evaluation
 
 **Files:**
 - Test: `packages/core/__tests__/flow.test.ts`
@@ -236,7 +236,7 @@ Tests `loadFlow`, `listFlows`, `getStages`, `getStage`, `getFirstStage`, `getNex
 
 ```ts
 /**
- * Tests for flow.ts — load YAML definitions, stage navigation, gate evaluation.
+ * Tests for flow.ts -- load YAML definitions, stage navigation, gate evaluation.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
@@ -494,7 +494,7 @@ git commit -m "test: add unit tests for flow loading, navigation, and gate evalu
 
 ---
 
-### Task 3: exec.ts — posix_spawnp integration test
+### Task 3: exec.ts -- posix_spawnp integration test
 
 **Files:**
 - Test: `packages/core/__tests__/exec.test.ts`
@@ -505,7 +505,7 @@ This is a thin FFI wrapper. Test it by spawning `true` (exit 0) and `false` (exi
 
 ```ts
 /**
- * Tests for exec.ts — posix_spawnp + waitpid wrapper.
+ * Tests for exec.ts -- posix_spawnp + waitpid wrapper.
  * Integration-style: spawns real processes.
  */
 
@@ -538,7 +538,7 @@ Run: `cd /Users/yana/Projects/ark && npx vitest run packages/core/__tests__/exec
 
 - [ ] **Step 3: Fix any issues, re-run until green**
 
-Note: The "throws for non-existent command" test may need adjustment — `posix_spawnp` returns an error code rather than throwing. If `err !== 0` it does throw, but the actual error code depends on the system. If this fails, check whether the function returns a non-zero exit code instead of throwing.
+Note: The "throws for non-existent command" test may need adjustment -- `posix_spawnp` returns an error code rather than throwing. If `err !== 0` it does throw, but the actual error code depends on the system. If this fails, check whether the function returns a non-zero exit code instead of throwing.
 
 - [ ] **Step 4: Commit**
 
@@ -549,18 +549,18 @@ git commit -m "test: add integration tests for posix_spawnp exec wrapper"
 
 ---
 
-### Task 4: tmux.ts — helper functions (unit-testable subset)
+### Task 4: tmux.ts -- helper functions (unit-testable subset)
 
 **Files:**
 - Test: `packages/core/__tests__/tmux.test.ts`
 
-Many tmux functions need a real tmux server. Focus on the pure/deterministic helpers: `attachCommand`, `writeLauncher`. For `hasTmux`, `sessionExists`, `killSession` — test the happy paths (tmux is available in CI/dev). Skip `createSession`/`capturePane`/`sendText` — those are covered by E2E tests.
+Many tmux functions need a real tmux server. Focus on the pure/deterministic helpers: `attachCommand`, `writeLauncher`. For `hasTmux`, `sessionExists`, `killSession` -- test the happy paths (tmux is available in CI/dev). Skip `createSession`/`capturePane`/`sendText` -- those are covered by E2E tests.
 
 - [ ] **Step 1: Write the test file**
 
 ```ts
 /**
- * Tests for tmux.ts — pure helpers + basic tmux operations.
+ * Tests for tmux.ts -- pure helpers + basic tmux operations.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
@@ -696,7 +696,7 @@ Pure timer-based hook. Test show/clear/auto-clear behavior using `ink-testing-li
 
 ```tsx
 /**
- * Tests for useStatusMessage — temporary status message with auto-clear.
+ * Tests for useStatusMessage -- temporary status message with auto-clear.
  */
 
 import { describe, it, expect } from "bun:test";
@@ -793,7 +793,7 @@ This is a plain function (not a React hook despite the name). It takes an `async
 
 ```ts
 /**
- * Tests for useComputeActions — compute action dispatcher.
+ * Tests for useComputeActions -- compute action dispatcher.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
@@ -928,7 +928,7 @@ Run: `cd /Users/yana/Projects/ark && npx vitest run packages/tui/__tests__/useCo
 
 - [ ] **Step 3: Fix any issues**
 
-Note: The mock `run()` executes synchronously. For async actions like `provision` (which uses `Promise.race`), the inner await won't complete. This is fine — the tests validate that `run()` was called with the correct label, not the full async lifecycle. If deeper testing is needed, make `run()` async: `async run(label, fn) { await fn(); }`.
+Note: The mock `run()` executes synchronously. For async actions like `provision` (which uses `Promise.race`), the inner await won't complete. This is fine -- the tests validate that `run()` was called with the correct label, not the full async lifecycle. If deeper testing is needed, make `run()` async: `async run(label, fn) { await fn(); }`.
 
 - [ ] **Step 4: Commit**
 
@@ -944,13 +944,13 @@ git commit -m "test: add unit tests for useComputeActions dispatcher"
 **Files:**
 - Test: `packages/tui/__tests__/useAgentOutput.test.tsx`
 
-Polls tmux pane output on an interval. Test: returns empty when not running, clears on parameter change. Full polling requires a real tmux session — skip that (E2E covers it).
+Polls tmux pane output on an interval. Test: returns empty when not running, clears on parameter change. Full polling requires a real tmux session -- skip that (E2E covers it).
 
 - [ ] **Step 1: Write the test file**
 
 ```tsx
 /**
- * Tests for useAgentOutput — tmux pane output polling hook.
+ * Tests for useAgentOutput -- tmux pane output polling hook.
  */
 
 import { describe, it, expect } from "bun:test";
@@ -1040,7 +1040,7 @@ Polls provider metrics for running computes. Test: returns empty snapshots when 
 
 ```tsx
 /**
- * Tests for useComputeMetrics — metrics polling and log management.
+ * Tests for useComputeMetrics -- metrics polling and log management.
  */
 
 import { describe, it, expect } from "bun:test";
@@ -1150,7 +1150,7 @@ git commit -m "test: add unit tests for useComputeMetrics hook"
 
 ---
 
-### Task 9: Final — run full suite, verify no regressions
+### Task 9: Final -- run full suite, verify no regressions
 
 - [ ] **Step 1: Run the full test suite**
 

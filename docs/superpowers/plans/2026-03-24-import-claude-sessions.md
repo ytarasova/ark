@@ -1,4 +1,4 @@
-# Import Claude Sessions — Implementation Plan
+# Import Claude Sessions -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -14,14 +14,14 @@
 
 | File | Change |
 |------|--------|
-| `packages/core/claude-sessions.ts` | **Create:** `listClaudeSessions()`, `getClaudeSession()` — discover Claude sessions from disk |
+| `packages/core/claude-sessions.ts` | **Create:** `listClaudeSessions()`, `getClaudeSession()` -- discover Claude sessions from disk |
 | `packages/core/index.ts` | **Modify:** Re-export claude-sessions |
 | `packages/core/__tests__/claude-sessions.test.ts` | **Create:** Tests |
 | `packages/cli/index.ts` | **Modify:** Add `ark claude list` and `ark session import --claude-session` |
 
 ---
 
-### Task 1: listClaudeSessions — discover Claude sessions from disk
+### Task 1: listClaudeSessions -- discover Claude sessions from disk
 
 **Files:**
 - Create: `packages/core/claude-sessions.ts`
@@ -32,7 +32,7 @@
 
 ```ts
 /**
- * Tests for claude-sessions.ts — discover Claude Code sessions from disk.
+ * Tests for claude-sessions.ts -- discover Claude Code sessions from disk.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
@@ -176,13 +176,13 @@ Create `packages/core/claude-sessions.ts`:
 
 ```ts
 /**
- * Claude Code session discovery — scan ~/.claude/projects/ for transcripts.
+ * Claude Code session discovery -- scan ~/.claude/projects/ for transcripts.
  *
  * Claude stores sessions as JSONL files at:
  *   ~/.claude/projects/<encoded-path>/<session-uuid>.jsonl
  *
  * The encoded path replaces / with - and strips leading dots.
- * Subagent transcripts live in <session-uuid>/subagents/ — skip these.
+ * Subagent transcripts live in <session-uuid>/subagents/ -- skip these.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
@@ -345,12 +345,12 @@ Run: `bun test packages/core/__tests__/claude-sessions.test.ts`
 
 ```bash
 git add packages/core/claude-sessions.ts packages/core/index.ts packages/core/__tests__/claude-sessions.test.ts
-git commit -m "feat: discover Claude Code sessions from disk — listClaudeSessions/getClaudeSession"
+git commit -m "feat: discover Claude Code sessions from disk -- listClaudeSessions/getClaudeSession"
 ```
 
 ---
 
-### Task 2: CLI commands — `ark claude list` + `ark session import`
+### Task 2: CLI commands -- `ark claude list` + `ark session import`
 
 **Files:**
 - Modify: `packages/cli/index.ts`
@@ -461,7 +461,7 @@ git commit -m "feat: ark claude list + session start --claude-session for import
 
 ---
 
-### Task 3: TUI — import Claude session from new session flow
+### Task 3: TUI -- import Claude session from new session flow
 
 **Files:**
 - Modify: `packages/tui/tabs/SessionsTab.tsx` (or the new session form)

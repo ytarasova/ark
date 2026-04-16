@@ -115,7 +115,7 @@ export class DockerProvider implements ComputeProvider {
 
     try {
       if (useDevcontainer) {
-        // Devcontainer path — delegate to `devcontainer up`
+        // Devcontainer path -- delegate to `devcontainer up`
         const workdir = (cfg.workdir as string) || process.cwd();
         if (!detectDevcontainer(workdir)) {
           throw new Error(`No devcontainer.json found in ${workdir}`);
@@ -213,7 +213,7 @@ export class DockerProvider implements ComputeProvider {
   // ── Attach ───────────────────────────────────────────────────────────────
 
   async attach(_compute: Compute, _session: Session): Promise<void> {
-    // No tunnels needed for local Docker — tmux attach handled by CLI layer
+    // No tunnels needed for local Docker -- tmux attach handled by CLI layer
   }
 
   // ── Session lifecycle ─────────────────────────────────────────────────

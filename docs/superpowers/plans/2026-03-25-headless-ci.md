@@ -1,10 +1,10 @@
-# Headless CI Mode (ark exec) — Implementation Plan
+# Headless CI Mode (ark exec) -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add `ark exec` command that runs a session non-interactively — creates, dispatches, waits for completion, and exits with an appropriate code. Designed for CI/CD pipelines.
+**Goal:** Add `ark exec` command that runs a session non-interactively -- creates, dispatches, waits for completion, and exits with an appropriate code. Designed for CI/CD pipelines.
 
-**Architecture:** `ark exec` creates a session, dispatches it, then polls session status until terminal state (completed/failed). Output modes: `text` (human log) and `json` (structured). Exit codes: 0=success, 1=failure, 2=timeout. The conductor handles hooks — `ark exec` just polls and exits.
+**Architecture:** `ark exec` creates a session, dispatches it, then polls session status until terminal state (completed/failed). Output modes: `text` (human log) and `json` (structured). Exit codes: 0=success, 1=failure, 2=timeout. The conductor handles hooks -- `ark exec` just polls and exits.
 
 **Tech Stack:** Existing CLI (Commander), existing session/dispatch/conductor
 
@@ -38,7 +38,7 @@ ark exec --repo . --summary "Deploy" --timeout 600
 
 ### Task 1: waitForCompletion + exec command + tests
 
-This is a single focused deliverable — the polling function, the CLI command, and tests.
+This is a single focused deliverable -- the polling function, the CLI command, and tests.
 
 **waitForCompletion in session.ts:**
 
@@ -76,7 +76,7 @@ export async function waitForCompletion(
 - [ ] **Step 7: Commit and push**
 
 ```bash
-git commit -m "feat: ark exec — headless CI mode for non-interactive session running"
+git commit -m "feat: ark exec -- headless CI mode for non-interactive session running"
 git commit -m "test: E2E tests for ark exec"
 git push
 ```

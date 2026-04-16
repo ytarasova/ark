@@ -30,7 +30,7 @@ export class ArkServer {
 
     transport.onMessage(async (msg) => {
       if (isRequest(msg)) {
-        // Special handling for initialize — extract subscriptions
+        // Special handling for initialize -- extract subscriptions
         if (msg.method === "initialize" && msg.params?.subscribe) {
           conn.subscriptions = msg.params.subscribe as string[];
         }
@@ -43,7 +43,7 @@ export class ArkServer {
         }
       }
       if (isNotification(msg) && msg.method === "initialized") {
-        // Client confirms ready — no-op, just acknowledgment
+        // Client confirms ready -- no-op, just acknowledgment
       }
     });
 

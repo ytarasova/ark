@@ -1,0 +1,9 @@
+{"sessionId":"gemini-test-001","projectHash":"abc123def456","startTime":"2026-04-15T10:00:00.000Z","lastUpdated":"2026-04-15T10:05:00.000Z","kind":"chat","directories":["/tmp/testproject"]}
+{"id":"msg_001","timestamp":"2026-04-15T10:00:01.000Z","type":"user","content":"Fix the bug in the authentication module"}
+{"id":"msg_002","timestamp":"2026-04-15T10:00:05.000Z","type":"gemini","content":"I'll look into the authentication module and fix the bug.","model":"gemini-2.5-pro","tokens":{"input":500,"output":200,"cached":100,"thoughts":50,"tool":0,"total":850}}
+{"id":"msg_003","timestamp":"2026-04-15T10:01:00.000Z","type":"user","content":"Now add a new endpoint for user registration"}
+{"id":"msg_004","timestamp":"2026-04-15T10:01:05.000Z","type":"gemini","content":"I'll create the user registration endpoint.","model":"gemini-2.5-pro","tokens":{"input":800,"output":350,"cached":200,"thoughts":80,"tool":0,"total":1430}}
+{"id":"msg_005","timestamp":"2026-04-15T10:02:00.000Z","type":"user","content":"Brainstorm ideas for improving the API design"}
+{"id":"msg_006","timestamp":"2026-04-15T10:02:05.000Z","type":"gemini","content":"Here are some ideas for improving the API design...","model":"gemini-2.5-pro","tokens":{"input":600,"output":400,"cached":150,"thoughts":100,"tool":0,"total":1250}}
+{"id":"msg_007","timestamp":"2026-04-15T10:03:00.000Z","type":"user","content":"Thanks, that looks great"}
+{"id":"msg_008","timestamp":"2026-04-15T10:03:05.000Z","type":"gemini","content":"You're welcome! Let me know if you need anything else.","model":"gemini-2.5-pro","tokens":{"input":300,"output":100,"cached":50,"thoughts":20,"tool":0,"total":470}}

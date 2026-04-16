@@ -135,7 +135,7 @@ describe("Bridge config", () => {
   it("createBridge returns null without config", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createBridge } = require("../integrations/bridge.js");
-    // Same as above — depends on whether ~/.ark/bridge.json exists
+    // Same as above -- depends on whether ~/.ark/bridge.json exists
     const bridge = createBridge();
     expect(bridge === null || typeof bridge === "object").toBe(true);
     if (bridge) bridge.stop();
@@ -154,7 +154,7 @@ describe("Bridge handler invocation", () => {
       results.push(`h2:${msg.text}`);
     });
 
-    // Directly simulate — we can't trigger pollTelegram in tests
+    // Directly simulate -- we can't trigger pollTelegram in tests
     // but we can verify the handler registration pattern
     expect(results).toHaveLength(0);
   });
@@ -166,7 +166,7 @@ describe("Bridge handler invocation", () => {
       slack: { webhookUrl: "https://invalid.example.com/webhook" },
     });
 
-    // Should not throw — errors are caught internally
+    // Should not throw -- errors are caught internally
     await bridge.notify("test");
   }, 15_000);
 

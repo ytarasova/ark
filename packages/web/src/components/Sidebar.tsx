@@ -10,6 +10,7 @@ import {
   Calendar,
   BookOpen,
   DollarSign,
+  Flame,
   Cog,
   ChevronLeft,
   ChevronRight,
@@ -63,6 +64,7 @@ const NAV: { id: string; icon: LucideIcon; label: string }[] = [
   { id: "tools", icon: Wrench, label: "Tools" },
   { id: "schedules", icon: Calendar, label: "Schedules" },
   { id: "costs", icon: DollarSign, label: "Costs" },
+  { id: "burn", icon: Flame, label: "CodeBurn (local)" },
 ];
 
 export function Sidebar({ activeView, onNavigate, readOnly, collapsed, onToggle, daemonStatus }: SidebarProps) {

@@ -165,6 +165,7 @@ test-watch: ## Run unit tests in watch mode
 
 lint: ## Lint the codebase (ESLint + TypeScript)
 	npx eslint packages/ --max-warnings 0
+	bash scripts/check-no-em-dashes.sh
 
 lint-fix: ## Auto-fix lint issues
 	npx eslint packages/ --fix

@@ -1,5 +1,5 @@
 /**
- * Minimal OTLP JSON exporter — session and stage spans.
+ * Minimal OTLP JSON exporter -- session and stage spans.
  * No OpenTelemetry SDK dependency. Posts to any OTLP HTTP collector.
  */
 
@@ -153,7 +153,7 @@ export async function flushSpans(): Promise<void> {
       body: JSON.stringify(formatOtlpJson(spans)),
     });
   } catch {
-    // Fire-and-forget — don't throw or re-buffer
+    // Fire-and-forget -- don't throw or re-buffer
   }
 }
 

@@ -12,6 +12,7 @@ import { ComputePage } from "./pages/ComputePage.js";
 import { SchedulesPage } from "./pages/SchedulesPage.js";
 import { MemoryPage } from "./pages/MemoryPage.js";
 import { CostsPage } from "./pages/CostsPage.js";
+import { BurnPage } from "./pages/BurnPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
@@ -109,6 +110,9 @@ function App() {
       )}
       {view === "costs" && (
         <CostsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+      )}
+      {view === "burn" && (
+        <BurnPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "settings" && (
         <SettingsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />

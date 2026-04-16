@@ -1,5 +1,5 @@
 /**
- * Log file management — max size, orphan cleanup.
+ * Log file management -- max size, orphan cleanup.
  */
 
 import { readdirSync, statSync, readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";

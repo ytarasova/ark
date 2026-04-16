@@ -1,5 +1,5 @@
 /**
- * Tests for schedules table — CRUD operations and cron matching.
+ * Tests for schedules table -- CRUD operations and cron matching.
  */
 
 import { describe, it, expect } from "bun:test";

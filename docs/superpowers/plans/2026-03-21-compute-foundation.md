@@ -2,17 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Create the `packages/compute/` package with the ComputeProvider interface, host CRUD in SQLite, arc.json parser, and a working local provider — the foundation that all other compute providers (EC2, Docker, K8s) build on.
+**Goal:** Create the `packages/compute/` package with the ComputeProvider interface, host CRUD in SQLite, arc.json parser, and a working local provider -- the foundation that all other compute providers (EC2, Docker, K8s) build on.
 
-**Architecture:** A `ComputeProvider` interface defines the contract for all compute targets. Host records are stored in the existing SQLite database via new functions in `packages/core/store.ts`. The local provider is the simplest implementation — no provisioning needed, launches tmux sessions directly, collects metrics via local shell commands. `arc.json` is parsed at dispatch time to resolve ports and sync file declarations.
+**Architecture:** A `ComputeProvider` interface defines the contract for all compute targets. Host records are stored in the existing SQLite database via new functions in `packages/core/store.ts`. The local provider is the simplest implementation -- no provisioning needed, launches tmux sessions directly, collects metrics via local shell commands. `arc.json` is parsed at dispatch time to resolve ports and sync file declarations.
 
 **Tech Stack:** TypeScript, Bun, `bun:sqlite`, `bun:test`
 
-**Note on test runner:** The project's `package.json` has `"test": "vitest run"` but uses `bun:sqlite` (Bun-specific). All tests in this plan use `bun:test` and are run via `bun test`. If you prefer vitest, change the imports to `import { describe, it, expect } from "vitest"` — but `bun test` is simpler since Bun is already the runtime.
+**Note on test runner:** The project's `package.json` has `"test": "vitest run"` but uses `bun:sqlite` (Bun-specific). All tests in this plan use `bun:test` and are run via `bun test`. If you prefer vitest, change the imports to `import { describe, it, expect } from "vitest"` -- but `bun test` is simpler since Bun is already the runtime.
 
 **Spec:** `docs/superpowers/specs/2026-03-21-compute-layer-design.md`
 
-**Depends on:** Nothing — this is the foundation plan.
+**Depends on:** Nothing -- this is the foundation plan.
 
 **Followed by:**
 - Plan 2: EC2 provider (Pulumi, SSH, cloud-init, sync, cost)
@@ -151,7 +151,7 @@ describe("host CRUD", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd /Users/yana/Projects/ark && bun test packages/core/__tests__/store-hosts.test.ts`
-Expected: FAIL — `createHost` is not exported from `../store.js`
+Expected: FAIL -- `createHost` is not exported from `../store.js`
 
 - [ ] **Step 3: Add Host interface to store.ts**
 
@@ -291,7 +291,7 @@ Create `packages/compute/types.ts`:
 
 ```typescript
 /**
- * Compute layer types — provider interface and shared models.
+ * Compute layer types -- provider interface and shared models.
  */
 
 import type { Host, Session } from "../core/store.js";
@@ -508,7 +508,7 @@ describe("provider registry", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd /Users/yana/Projects/ark && bun test packages/compute/__tests__/provider-registry.test.ts`
-Expected: FAIL — module not found
+Expected: FAIL -- module not found
 
 - [ ] **Step 3: Implement the registry**
 
@@ -516,7 +516,7 @@ Create `packages/compute/index.ts`:
 
 ```typescript
 /**
- * Compute layer — provider registry and public API.
+ * Compute layer -- provider registry and public API.
  */
 
 import type { ComputeProvider } from "./types.js";
@@ -680,7 +680,7 @@ describe("resolvePortDecls", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd /Users/yana/Projects/ark && bun test packages/compute/__tests__/arc-json.test.ts`
-Expected: FAIL — module not found
+Expected: FAIL -- module not found
 
 - [ ] **Step 3: Implement arc-json.ts**
 
@@ -860,7 +860,7 @@ describe("local metrics", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd /Users/yana/Projects/ark && bun test packages/compute/__tests__/local-metrics.test.ts`
-Expected: FAIL — module not found
+Expected: FAIL -- module not found
 
 - [ ] **Step 3: Implement local metrics**
 
@@ -1037,7 +1037,7 @@ git commit -m "feat: add local host metrics collection"
 
 ## Task 6: LocalProvider implementation
 
-The local provider — simplest ComputeProvider. No provisioning, launches tmux sessions directly, delegates to existing `packages/core/tmux.ts`. Uses `execFileSync` for port probing.
+The local provider -- simplest ComputeProvider. No provisioning, launches tmux sessions directly, delegates to existing `packages/core/tmux.ts`. Uses `execFileSync` for port probing.
 
 **Files:**
 - Create: `packages/compute/providers/local/index.ts`
@@ -1109,7 +1109,7 @@ describe("LocalProvider", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd /Users/yana/Projects/ark && bun test packages/compute/__tests__/local-provider.test.ts`
-Expected: FAIL — module not found
+Expected: FAIL -- module not found
 
 - [ ] **Step 3: Implement LocalProvider**
 
@@ -1117,7 +1117,7 @@ Create `packages/compute/providers/local/index.ts`:
 
 ```typescript
 /**
- * Local compute provider — runs sessions on the local machine.
+ * Local compute provider -- runs sessions on the local machine.
  * No provisioning needed. Uses existing tmux module for session management.
  */
 
@@ -1204,7 +1204,7 @@ git commit -m "feat: add LocalProvider with metrics and port probing"
 
 ## Task 7: Run all tests, verify everything works together
 
-**Files:** None new — verification only.
+**Files:** None new -- verification only.
 
 - [ ] **Step 1: Install dependencies**
 
@@ -1244,7 +1244,7 @@ git add -A && git commit -m "fix: resolve test/type issues in compute foundation
 | 4 | arc.json parser | `compute/arc-json.ts` | 7 tests |
 | 5 | Local metrics | `compute/providers/local/metrics.ts` | 2 tests |
 | 6 | LocalProvider | `compute/providers/local/index.ts` | 7 tests |
-| 7 | Integration verification | — | full suite |
+| 7 | Integration verification | -- | full suite |
 
 After this plan, the compute foundation is in place:
 - Provider interface defined

@@ -1,5 +1,5 @@
 /**
- * E2E tests for tiered autonomy — full pipeline from flow YAML through
+ * E2E tests for tiered autonomy -- full pipeline from flow YAML through
  * argument building and settings.local.json permission deny rules.
  *
  * Tests: flow YAML with autonomy -> resolveFlow preserves it -> buildArgs

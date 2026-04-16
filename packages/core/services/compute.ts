@@ -1,5 +1,5 @@
 /**
- * ComputeService — thin orchestration layer over ComputeRepository.
+ * ComputeService -- thin orchestration layer over ComputeRepository.
  *
  * For now, all methods delegate directly to the repository.
  * Provider operations (provision, destroy, startInstance, etc.) will be

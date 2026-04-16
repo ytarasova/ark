@@ -1,1 +1,8 @@
-{}
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv ~/.mcp.json ~/.mcp.json.pre-repro)",
+      "Read(//Users/zineng/**)"
+    ]
+  }
+}

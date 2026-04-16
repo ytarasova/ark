@@ -1,5 +1,5 @@
 /**
- * Per-agent message filtering — control what context each agent sees.
+ * Per-agent message filtering -- control what context each agent sees.
  * Reduces token usage by limiting history to relevant messages.
  */
 

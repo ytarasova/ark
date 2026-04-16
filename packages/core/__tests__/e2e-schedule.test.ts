@@ -1,5 +1,5 @@
 /**
- * E2E tests for cron scheduling — full lifecycle through the database.
+ * E2E tests for cron scheduling -- full lifecycle through the database.
  *
  * Tests the complete schedule lifecycle: create, list, get, enable/disable,
  * cronMatches with specific dates, updateScheduleLastRun double-fire guard,

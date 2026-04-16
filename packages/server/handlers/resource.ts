@@ -367,11 +367,11 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
         if (real && real !== compute.status) {
           app.computes.update(compute.name, { status: real });
         }
-        return { reachable: false, message: `Unreachable — AWS status: ${real ?? "unknown"}` };
+        return { reachable: false, message: `Unreachable -- AWS status: ${real ?? "unknown"}` };
       }
-      return { reachable: false, message: "Unreachable — SSH connection failed" };
+      return { reachable: false, message: "Unreachable -- SSH connection failed" };
     } catch {
-      return { reachable: false, message: "Unreachable — SSH connection failed" };
+      return { reachable: false, message: "Unreachable -- SSH connection failed" };
     }
   });
   router.handle("compute/clean-zombies", async () => {
