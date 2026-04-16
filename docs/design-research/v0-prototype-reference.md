@@ -154,6 +154,65 @@ The web UI should handle all of these -- the session detail view adapts its pane
 
 ---
 
+## 3. PRD Feature Planning Prototype -- Hierarchical Stages with Acceptance Criteria
+
+**Source:** Internal prototype (localhost:3333, Feature Planning view)
+**Date:** Early 2026
+**Context:** A PRD-oriented flow where stages form a collapsible tree and output includes structured feature backlogs with acceptance criteria
+
+### What It Shows
+
+A multi-stage feature planning session with hierarchical stage navigation:
+
+**Left sidebar -- collapsible stage tree (not flat list):**
+- Feature Planning (expandable, contains "Auto App (v1)" sub-item)
+- Solution Review
+- Design Spec
+- Screen Mockups
+- PRD
+- JIRA & Confluence
+- Expand all / Collapse all controls at top
+
+Each stage is a tree node that can have child items. Completed stages show checkmarks, active stage is highlighted. This is a DAG rendered as a **collapsible tree** rather than a flat vertical list.
+
+**Detail panel -- structured PRD output:**
+The "Feature Planning" stage renders:
+- **Critical finding callout** (yellow/warning): "The GQ App can launch a call but has no end-to-end pipeline to capture the outcome or auto-create the follow-up task."
+- **Feature backlog table** (max 5 items):
+  | Priority | Feature | Evidence |
+  | P0 | Call-outcome capture SDK | Low evidence |
+  | P0 | Call-outcome event API | ... |
+  | P1 | Call recording API | ... |
+  | P1 | Task manager integration | ... |
+  | P2 | Offline queue & sync | ... |
+- **Per-feature deep dive** -- "PG - Call-outcome capture SDK":
+  - What it does (technical description)
+  - **User story**: "As an FSE, I want the app to automatically record who I called and whether the call was answered, so I spend 5 seconds logging per call vs the next task."
+  - **Acceptance criteria** in Given/When/Then format:
+    - Given a call initiated from the GQ App, when the call ends, then the SDK emits a CALL_ENDED event
+    - Given a CALL_ENDED event, when the app receives it, then a pre-populated log is created...
+
+**Header metadata:**
+- Cost: $223.70
+- Token usage: 4.4k / 80,000 (with visual bar)
+- History and Auto Run toggles
+
+### Key Patterns for Ark
+
+1. **Hierarchical collapsible stage tree:** Stages aren't always a flat list. Complex flows (feature planning across multiple features) produce a tree where each stage can expand to show sub-items. The sidebar needs `Expand all / Collapse all` controls and tree-node expand/collapse per stage.
+
+2. **Feature backlog as structured output:** A prioritized table (P0/P1/P2) with feature name, description, and evidence level. This is a typed renderer -- not markdown, but an actual sortable/filterable table component.
+
+3. **Given/When/Then acceptance criteria:** Stages that produce PRD-style output render acceptance criteria in structured BDD format with keyword highlighting (Given/When/Then bolded or color-coded).
+
+4. **Critical finding callouts:** Warning-level callouts (distinct from error/blocker callouts in the grooming prototype) that surface the most important insight from a stage's analysis.
+
+5. **Token budget visibility:** The header shows token usage as a fraction (4.4k / 80,000) with a visual progress bar -- letting the operator see how much budget remains for the session.
+
+6. **Per-feature drill-down:** The detail panel can show a summary table of all features, then drill into a specific feature's user story + acceptance criteria + technical details. This is a master-detail pattern within a single stage's output.
+
+---
+
 ## Design Takeaways -- Combined
 
 ### For the Session Detail View
@@ -164,16 +223,29 @@ The web UI should handle all of these -- the session detail view adapts its pane
 4. **Interactive stage output** -- checkboxes, approve/reject, editable fields within rendered content
 5. **Runtime launcher** -- "Open in [runtime]" button in session header
 
+### For the Stage Sidebar
+
+6. **Collapsible hierarchical tree** -- stages can have child items, with expand/collapse per node and Expand all / Collapse all controls
+7. **Master-detail within stages** -- summary table view that drills into per-item detail (e.g., feature backlog -> single feature's acceptance criteria)
+
 ### For the Workflow/Flow View
 
-6. **Connected workflow graph** -- DAG with external integration nodes (tickets, PRs, deploys)
-7. **Flow type selector** -- SDLC, Product Refinement, Design, PR Review, etc.
+8. **Connected workflow graph** -- DAG with external integration nodes (tickets, PRs, deploys)
+9. **Flow type selector** -- SDLC, Product Refinement, Design, PR Review, etc.
+
+### For Structured Output Renderers
+
+10. **Feature backlog tables** -- prioritized (P0/P1/P2) with sortable columns
+11. **Given/When/Then blocks** -- BDD acceptance criteria with keyword highlighting
+12. **Critical finding callouts** -- warning-level (yellow) distinct from blocker-level (red)
+13. **User story cards** -- "As a [role], I want [goal], so [benefit]" formatted blocks
 
 ### For Cost/Progress
 
-8. **Itemized cost breakdown** -- token/compute split on hover or in detail row
-9. **Progress derivation** -- `completed_stages / total_stages` as bar or badge
+14. **Itemized cost breakdown** -- token/compute split on hover or in detail row
+15. **Token budget bar** -- usage fraction (4.4k / 80,000) with visual progress indicator
+16. **Progress derivation** -- `completed_stages / total_stages` as bar or badge
 
 ### For Integration Architecture
 
-10. **Contextual surfaces everywhere** -- cards, output renderers, stage types all adapt to the org's connected tools. No hardcoded Jira/Bitbucket assumptions.
+17. **Contextual surfaces everywhere** -- cards, output renderers, stage types all adapt to the org's connected tools. No hardcoded Jira/Bitbucket assumptions.
