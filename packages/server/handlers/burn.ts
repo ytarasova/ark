@@ -11,6 +11,64 @@ import { syncBurn } from "../../core/observability/burn/sync.js";
 import type { BurnPeriod, BurnSummaryResponse } from "../../core/observability/burn/types.js";
 
 /**
+ * Returns the UTC offset in minutes for a given timezone at a specific Date.
+ * Positive = east of UTC, negative = west of UTC.
+ */
+export function zoneOffsetMinutes(tz: string, at: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(at);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const asUtcMs = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") === 24 ? 0 : get("hour"),
+    get("minute"),
+    get("second"),
+  );
+  return Math.round((asUtcMs - at.getTime()) / 60000);
+}
+
+/**
+ * Returns a Date representing midnight (00:00:00) in the given timezone
+ * for the calendar day that `at` falls in within that timezone.
+ */
+export function zoneMidnight(tz: string, at: Date): Date {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(at);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const year = get("year");
+  const month = get("month");
+  const day = get("day");
+  const wallUtc = Date.UTC(year, month - 1, day, 0, 0, 0);
+  const offset = zoneOffsetMinutes(tz, new Date(wallUtc));
+  return new Date(wallUtc - offset * 60000);
+}
+
+/**
+ * Returns a SQLite datetime modifier string (e.g. '+0 hours', '-4 hours')
+ * to convert UTC timestamps stored in the DB to the local timezone wall-clock.
+ */
+export function zoneSqliteModifier(tz: string, at: Date): string {
+  const offMin = zoneOffsetMinutes(tz, at);
+  const hours = offMin / 60;
+  const sign = hours >= 0 ? "+" : "-";
+  return `${sign}${Math.abs(hours)} hours`;
+}
+
+/**
  * Compute ISO date range strings for a given period name.
  */
 function getDateRange(period: BurnPeriod): { start: string; end: string } {
