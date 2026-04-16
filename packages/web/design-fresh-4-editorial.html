@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark -- Editorial Design Concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,300;1,6..72,400;1,6..72,500&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,300;1,8..60,400;1,8..60,500&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* ========================================================
+     RESET & FOUNDATION
+     ======================================================== */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --paper: #faf9f7;
+    --paper-warm: #f5f3f0;
+    --ink: #2c2c2c;
+    --ink-light: #6b6560;
+    --ink-faint: #a09a93;
+    --navy: #1a365d;
+    --navy-light: #2a5298;
+    --navy-faint: rgba(26, 54, 93, 0.08);
+    --rule: #d4cfc8;
+    --rule-light: #e8e4de;
+    --accent-warm: #8b4513;
+    --success: #2d6a4f;
+    --warning: #b8860b;
+    --error: #9b2c2c;
+    --running: #1a365d;
+
+    --font-headline: "Newsreader", "Georgia", serif;
+    --font-body: "Source Serif 4", "Georgia", serif;
+    --font-mono: "JetBrains Mono", "Menlo", monospace;
+
+    --content-width: 720px;
+    --margin-wide: 80px;
+  }
+
+  html {
+    font-size: 17px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: var(--navy-faint);
+    color: var(--navy);
+  }
+
+  /* ========================================================
+     TOP NAVIGATION -- tiny, unobtrusive, top-right
+     ======================================================== */
+  .top-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 32px;
+    background: var(--paper);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .top-nav.scrolled {
+    border-bottom-color: var(--rule-light);
+    box-shadow: 0 1px 8px rgba(0,0,0,0.03);
+  }
+
+  .nav-masthead {
+    font-family: var(--font-headline);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--navy);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 28px;
+    align-items: center;
+  }
+
+  .nav-links a {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--ink-light);
+    text-decoration: none;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+    cursor: pointer;
+  }
+
+  .nav-links a:hover,
+  .nav-links a.active {
+    color: var(--navy);
+  }
+
+  .nav-links a.active {
+    font-weight: 500;
+  }
+
+  .nav-separator {
+    width: 1px;
+    height: 14px;
+    background: var(--rule);
+  }
+
+  .nav-workspace-btn {
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    padding: 4px 12px;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: transparent;
+    color: var(--ink-light) !important;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .nav-workspace-btn:hover {
+    border-color: var(--navy);
+    color: var(--navy) !important;
+    background: var(--navy-faint);
+  }
+
+  /* ========================================================
+     SESSIONS DRAWER -- slide from left
+     ======================================================== */
+  .sessions-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(44, 44, 44, 0.15);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .sessions-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .sessions-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 380px;
+    z-index: 201;
+    background: var(--paper);
+    border-right: 1px solid var(--rule);
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    overflow-y: auto;
+    padding: 32px 28px;
+  }
+
+  .sessions-overlay.open .sessions-drawer {
+    transform: translateX(0);
+  }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+
+  .drawer-title {
+    font-family: var(--font-headline);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .drawer-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--ink-light);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+
+  .drawer-close:hover {
+    background: var(--navy-faint);
+    color: var(--ink);
+  }
+
+  .drawer-section-label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+    margin-top: 24px;
+  }
+
+  .drawer-section-label:first-of-type { margin-top: 0; }
+
+  .session-card {
+    padding: 14px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 4px;
+  }
+
+  .session-card:hover {
+    background: var(--navy-faint);
+  }
+
+  .session-card.active {
+    background: var(--navy-faint);
+    border-left: 3px solid var(--navy);
+    padding-left: 13px;
+  }
+
+  .session-card-title {
+    font-family: var(--font-headline);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.35;
+    margin-bottom: 4px;
+  }
+
+  .session-card-meta {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+  }
+
+  .status-dot.completed { background: var(--success); }
+  .status-dot.running { background: var(--running); animation: pulse-dot 2s infinite; }
+  .status-dot.waiting { background: var(--warning); }
+  .status-dot.error { background: var(--error); }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ========================================================
+     BREADCRUMB
+     ======================================================== */
+  .breadcrumb-bar {
+    max-width: var(--content-width);
+    margin: 0 auto;
+    padding: 72px var(--margin-wide) 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.02em;
+  }
+
+  .breadcrumb-bar span {
+    color: var(--ink-light);
+  }
+
+  /* ========================================================
+     ARTICLE -- the main content
+     ======================================================== */
+  .article {
+    max-width: var(--content-width);
+    margin: 0 auto;
+    padding: 24px var(--margin-wide) 120px;
+    position: relative;
+  }
+
+  /* --- Article header --- */
+  .article-header {
+    margin-bottom: 48px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .article-title {
+    font-family: var(--font-headline);
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--ink);
+    margin-bottom: 14px;
+    letter-spacing: -0.01em;
+  }
+
+  .article-subtitle {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    letter-spacing: 0.02em;
+    margin-bottom: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .article-subtitle .separator {
+    color: var(--rule);
+  }
+
+  .cost-tag {
+    display: inline-block;
+    padding: 1px 8px;
+    background: var(--navy-faint);
+    border-radius: 3px;
+    color: var(--navy);
+    font-weight: 500;
+  }
+
+  .article-byline {
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--ink-light);
+    font-style: italic;
+  }
+
+  .article-byline strong {
+    font-style: normal;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* --- Progress bar (subtle) --- */
+  .progress-strip {
+    display: flex;
+    gap: 3px;
+    margin-top: 20px;
+  }
+
+  .progress-segment {
+    height: 3px;
+    flex: 1;
+    border-radius: 2px;
+    background: var(--rule-light);
+    transition: background 0.5s;
+  }
+
+  .progress-segment.done { background: var(--navy); }
+  .progress-segment.active {
+    background: linear-gradient(90deg, var(--navy), var(--navy-light));
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  /* --- Section headers --- */
+  .section {
+    margin-bottom: 52px;
+    position: relative;
+  }
+
+  .section-header {
+    font-family: var(--font-headline);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--navy);
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--navy);
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-header-right {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0.02em;
+    color: var(--ink-faint);
+  }
+
+  /* --- Drop caps --- */
+  .drop-cap::first-letter {
+    font-family: var(--font-headline);
+    float: left;
+    font-size: 58px;
+    line-height: 0.85;
+    font-weight: 700;
+    color: var(--navy);
+    margin-right: 8px;
+    margin-top: 6px;
+  }
+
+  /* --- Body text --- */
+  .article p {
+    margin-bottom: 18px;
+    font-size: 1rem;
+  }
+
+  .article p + .ordered-list,
+  .article p + .tool-actions {
+    margin-top: -6px;
+  }
+
+  /* --- Ordered list (plan steps) --- */
+  .ordered-list {
+    list-style: none;
+    counter-reset: plan-steps;
+    margin-bottom: 24px;
+    padding-left: 0;
+  }
+
+  .ordered-list li {
+    counter-increment: plan-steps;
+    position: relative;
+    padding-left: 36px;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+    line-height: 1.65;
+  }
+
+  .ordered-list li::before {
+    content: counter(plan-steps) ".";
+    position: absolute;
+    left: 0;
+    font-family: var(--font-headline);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: 15px;
+  }
+
+  /* --- Pull quotes (user messages) in the margin --- */
+  .pull-quote {
+    position: relative;
+    margin: 32px 0;
+    padding: 0;
+  }
+
+  @media (min-width: 1100px) {
+    .pull-quote {
+      position: absolute;
+      left: -220px;
+      width: 180px;
+      margin: 0;
+    }
+  }
+
+  .pull-quote-inner {
+    border-left: 2px solid var(--navy);
+    padding-left: 14px;
+  }
+
+  .pull-quote-text {
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--ink-light);
+  }
+
+  .pull-quote-attr {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-faint);
+    margin-top: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* inline pull quote fallback for narrow screens */
+  @media (max-width: 1099px) {
+    .pull-quote {
+      margin: 28px 0;
+      padding: 0 0 0 0;
+    }
+
+    .pull-quote-inner {
+      padding: 16px 20px;
+      background: var(--navy-faint);
+      border-left: 3px solid var(--navy);
+      border-radius: 0 4px 4px 0;
+    }
+  }
+
+  /* --- Tool calls (footnote style) --- */
+  .tool-actions {
+    margin: 20px 0 28px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tool-action {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    padding: 5px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.5;
+  }
+
+  .tool-action-icon {
+    color: var(--ink-faint);
+    font-size: 10px;
+    margin-top: 3px;
+    flex-shrink: 0;
+    opacity: 0.6;
+  }
+
+  .tool-action-duration {
+    color: var(--rule);
+    margin-left: 4px;
+  }
+
+  /* --- Code blocks --- */
+  .code-block {
+    background: var(--paper-warm);
+    border: 1px solid var(--rule-light);
+    border-radius: 4px;
+    padding: 18px 20px;
+    margin: 20px 0 28px;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .code-block-header {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .code-block-badge {
+    font-size: 9.5px;
+    padding: 2px 8px;
+    background: var(--navy-faint);
+    color: var(--navy);
+    border-radius: 3px;
+    font-weight: 500;
+  }
+
+  .code-block pre {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink);
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  .code-line-add { color: var(--success); }
+  .code-line-del { color: var(--error); text-decoration: line-through; opacity: 0.6; }
+  .code-comment { color: var(--ink-faint); }
+  .code-keyword { color: var(--navy); font-weight: 500; }
+  .code-string { color: var(--accent-warm); }
+
+  /* --- Review findings --- */
+  .findings {
+    margin: 20px 0 28px;
+    list-style: none;
+    padding: 0;
+  }
+
+  .finding {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--rule-light);
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .finding:last-child { border-bottom: none; }
+
+  .finding-badge {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 8px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .finding-badge.good {
+    background: rgba(45, 106, 79, 0.08);
+    color: var(--success);
+  }
+
+  .finding-badge.note {
+    background: rgba(184, 134, 11, 0.08);
+    color: var(--warning);
+  }
+
+  .finding-badge.issue {
+    background: rgba(155, 44, 44, 0.08);
+    color: var(--error);
+  }
+
+  /* --- File changes summary --- */
+  .file-summary {
+    margin: 24px 0;
+    padding: 20px 24px;
+    background: var(--paper-warm);
+    border: 1px solid var(--rule-light);
+    border-radius: 4px;
+  }
+
+  .file-summary-title {
+    font-family: var(--font-headline);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-light);
+    margin-bottom: 14px;
+  }
+
+  .file-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink);
+    border-bottom: 1px solid var(--rule-light);
+  }
+
+  .file-row:last-child { border-bottom: none; }
+
+  .file-path { color: var(--ink-light); }
+  .file-stat {
+    display: flex;
+    gap: 8px;
+  }
+  .file-add { color: var(--success); }
+  .file-del { color: var(--error); }
+
+  /* ========================================================
+     FLOATING TABLE OF CONTENTS (appears on scroll)
+     ======================================================== */
+  .floating-toc {
+    position: fixed;
+    right: 32px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+
+  .floating-toc.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .toc-item {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-faint);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-right: 2px solid transparent;
+    text-align: right;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .toc-item:hover {
+    color: var(--ink-light);
+  }
+
+  .toc-item.active {
+    color: var(--navy);
+    border-right-color: var(--navy);
+    font-weight: 500;
+  }
+
+  /* ========================================================
+     WORKSPACE DRAWER (right side overlay)
+     ======================================================== */
+  .workspace-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(44, 44, 44, 0.15);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .workspace-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .workspace-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 520px;
+    z-index: 201;
+    background: var(--paper);
+    border-left: 1px solid var(--rule);
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    overflow-y: auto;
+    padding: 28px;
+  }
+
+  .workspace-overlay.open .workspace-drawer {
+    transform: translateX(0);
+  }
+
+  .workspace-section {
+    margin-bottom: 32px;
+  }
+
+  .workspace-section-title {
+    font-family: var(--font-headline);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-light);
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule-light);
+    margin-bottom: 16px;
+  }
+
+  .ws-metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    font-size: 13px;
+  }
+
+  .ws-metric-label {
+    font-family: var(--font-body);
+    color: var(--ink-light);
+  }
+
+  .ws-metric-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .ws-file-tree {
+    list-style: none;
+    padding: 0;
+  }
+
+  .ws-file-tree li {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: var(--ink-light);
+  }
+
+  .ws-file-tree li:hover {
+    background: var(--navy-faint);
+    color: var(--ink);
+  }
+
+  .ws-file-tree .tree-indent {
+    color: var(--rule);
+    margin-right: 4px;
+  }
+
+  /* ========================================================
+     RESOLUTION / COMPLETED STATE
+     ======================================================== */
+  .resolution-banner {
+    margin: 40px 0;
+    padding: 28px 32px;
+    background: rgba(45, 106, 79, 0.04);
+    border: 1px solid rgba(45, 106, 79, 0.15);
+    border-radius: 6px;
+    text-align: center;
+  }
+
+  .resolution-title {
+    font-family: var(--font-headline);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--success);
+    margin-bottom: 6px;
+  }
+
+  .resolution-detail {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+
+  .resolution-detail a {
+    color: var(--navy);
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-underline-offset: 2px;
+  }
+
+  /* ========================================================
+     RUNNING STATE -- live indicator
+     ======================================================== */
+  .live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--running);
+    font-weight: 500;
+  }
+
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--running);
+    animation: pulse-dot 2s infinite;
+  }
+
+  /* ========================================================
+     BOTTOM STATUS BAR
+     ======================================================== */
+  .status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    background: var(--paper);
+    border-top: 1px solid var(--rule-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    z-index: 100;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+  }
+
+  .status-bar-left, .status-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .status-bar kbd {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    padding: 1px 5px;
+    background: var(--paper-warm);
+    border: 1px solid var(--rule-light);
+    border-radius: 3px;
+    color: var(--ink-faint);
+  }
+
+  /* ========================================================
+     RESPONSIVE -- graceful collapse
+     ======================================================== */
+  @media (max-width: 900px) {
+    :root {
+      --margin-wide: 24px;
+    }
+
+    .article-title {
+      font-size: 26px;
+    }
+
+    .floating-toc {
+      display: none;
+    }
+
+    .sessions-drawer {
+      width: 100%;
+    }
+
+    .workspace-drawer {
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 600px) {
+    html { font-size: 15.5px; }
+
+    .article-title {
+      font-size: 22px;
+    }
+
+    .breadcrumb-bar {
+      padding-top: 60px;
+    }
+
+    .nav-links {
+      gap: 14px;
+    }
+
+    .drop-cap::first-letter {
+      font-size: 42px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ====================================================
+     TOP NAVIGATION
+     ==================================================== -->
+<nav class="top-nav" id="topNav">
+  <div class="nav-masthead" onclick="toggleSessions()">ARK</div>
+  <div class="nav-links">
+    <a class="active">Sessions</a>
+    <a>Agents</a>
+    <a>Flows</a>
+    <a>Costs</a>
+    <div class="nav-separator"></div>
+    <a class="nav-workspace-btn" onclick="toggleWorkspace()">Workspace</a>
+  </div>
+</nav>
+
+<!-- ====================================================
+     SESSIONS DRAWER
+     ==================================================== -->
+<div class="sessions-overlay" id="sessionsOverlay" onclick="toggleSessions()">
+  <div class="sessions-drawer" onclick="event.stopPropagation()">
+    <div class="drawer-header">
+      <div class="drawer-title">Sessions</div>
+      <button class="drawer-close" onclick="toggleSessions()">&times;</button>
+    </div>
+
+    <div class="drawer-section-label">Today</div>
+    <div class="session-card active">
+      <div class="session-card-title">OAuth PKCE Authentication Implementation</div>
+      <div class="session-card-meta">
+        <span><span class="status-dot completed"></span>completed</span>
+        <span>24m</span>
+        <span>$0.82</span>
+      </div>
+    </div>
+    <div class="session-card">
+      <div class="session-card-title">Webhook Retry Logic with Exponential Backoff</div>
+      <div class="session-card-meta">
+        <span><span class="status-dot running"></span>running</span>
+        <span>8m</span>
+        <span>$0.31</span>
+      </div>
+    </div>
+    <div class="session-card">
+      <div class="session-card-title">Database Connection Pool Tuning</div>
+      <div class="session-card-meta">
+        <span><span class="status-dot running"></span>running</span>
+        <span>3m</span>
+        <span>$0.12</span>
+      </div>
+    </div>
+
+    <div class="drawer-section-label">Yesterday</div>
+    <div class="session-card">
+      <div class="session-card-title">Rate Limiter Middleware for API Gateway</div>
+      <div class="session-card-meta">
+        <span><span class="status-dot waiting"></span>waiting</span>
+        <span>--</span>
+        <span>$0.00</span>
+      </div>
+    </div>
+    <div class="session-card">
+      <div class="session-card-title">Migrate User Settings to JSON Schema</div>
+      <div class="session-card-meta">
+        <span><span class="status-dot completed"></span>completed</span>
+        <span>41m</span>
+        <span>$1.47</span>
+      </div>
+    </div>
+    <div class="session-card">
+      <div class="session-card-title">Fix Stale WebSocket Connections on Reconnect</div>
+      <div class="session-card-meta">
+        <span><span class="status-dot completed"></span>completed</span>
+        <span>12m</span>
+        <span>$0.38</span>
+      </div>
+    </div>
+
+    <div class="drawer-section-label">April 13</div>
+    <div class="session-card">
+      <div class="session-card-title">Add OpenTelemetry Tracing to Core Services</div>
+      <div class="session-card-meta">
+        <span><span class="status-dot completed"></span>completed</span>
+        <span>53m</span>
+        <span>$2.10</span>
+      </div>
+    </div>
+    <div class="session-card">
+      <div class="session-card-title">GraphQL Schema Stitching for Multi-tenant API</div>
+      <div class="session-card-meta">
+        <span><span class="status-dot error"></span>errored</span>
+        <span>17m</span>
+        <span>$0.65</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     WORKSPACE DRAWER (right)
+     ==================================================== -->
+<div class="workspace-overlay" id="workspaceOverlay" onclick="toggleWorkspace()">
+  <div class="workspace-drawer" onclick="event.stopPropagation()">
+    <div class="drawer-header">
+      <div class="drawer-title">Workspace</div>
+      <button class="drawer-close" onclick="toggleWorkspace()">&times;</button>
+    </div>
+
+    <div class="workspace-section">
+      <div class="workspace-section-title">Session Metrics</div>
+      <div class="ws-metric-row">
+        <span class="ws-metric-label">Duration</span>
+        <span class="ws-metric-value">24m 12s</span>
+      </div>
+      <div class="ws-metric-row">
+        <span class="ws-metric-label">Total cost</span>
+        <span class="ws-metric-value">$0.82</span>
+      </div>
+      <div class="ws-metric-row">
+        <span class="ws-metric-label">Input tokens</span>
+        <span class="ws-metric-value">142,380</span>
+      </div>
+      <div class="ws-metric-row">
+        <span class="ws-metric-label">Output tokens</span>
+        <span class="ws-metric-value">18,204</span>
+      </div>
+      <div class="ws-metric-row">
+        <span class="ws-metric-label">Tool calls</span>
+        <span class="ws-metric-value">34</span>
+      </div>
+      <div class="ws-metric-row">
+        <span class="ws-metric-label">Agent</span>
+        <span class="ws-metric-value">claude-opus-4</span>
+      </div>
+      <div class="ws-metric-row">
+        <span class="ws-metric-label">Compute</span>
+        <span class="ws-metric-value">local</span>
+      </div>
+    </div>
+
+    <div class="workspace-section">
+      <div class="workspace-section-title">Changed Files</div>
+      <ul class="ws-file-tree">
+        <li><span class="tree-indent">+</span> packages/core/auth/provider.ts <span style="color:var(--success); float:right">+89</span></li>
+        <li><span class="tree-indent">+</span> packages/core/auth/github.ts <span style="color:var(--success); float:right">+134</span></li>
+        <li><span class="tree-indent">+</span> packages/core/auth/token-store.ts <span style="color:var(--success); float:right">+67</span></li>
+        <li><span class="tree-indent">~</span> packages/core/auth/session.ts <span style="color:var(--warning); float:right">+18 -4</span></li>
+        <li><span class="tree-indent">+</span> packages/core/__tests__/auth.test.ts <span style="color:var(--success); float:right">+142</span></li>
+        <li><span class="tree-indent">~</span> packages/core/config.ts <span style="color:var(--warning); float:right">+6 -1</span></li>
+      </ul>
+    </div>
+
+    <div class="workspace-section">
+      <div class="workspace-section-title">Diff Preview</div>
+      <div class="code-block" style="margin:0">
+        <div class="code-block-header">
+          <span>packages/core/auth/provider.ts</span>
+          <span class="code-block-badge">new file</span>
+        </div>
+        <pre><span class="code-keyword">export interface</span> OAuthProvider {
+  <span class="code-comment">/** Build the authorization URL with PKCE challenge */</span>
+  getAuthorizationUrl(state: <span class="code-keyword">string</span>, challenge: <span class="code-keyword">string</span>): <span class="code-keyword">string</span>;
+
+  <span class="code-comment">/** Exchange auth code for tokens */</span>
+  exchangeCode(code: <span class="code-keyword">string</span>, verifier: <span class="code-keyword">string</span>): Promise&lt;TokenSet&gt;;
+
+  <span class="code-comment">/** Fetch the authenticated user profile */</span>
+  getUserProfile(accessToken: <span class="code-keyword">string</span>): Promise&lt;UserProfile&gt;;
+}</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     BREADCRUMB
+     ==================================================== -->
+<div class="breadcrumb-bar">
+  autonomous-sdlc <span>/</span> s-a3f8c1 <span>/</span> <span style="color:var(--navy)">completed</span>
+</div>
+
+<!-- ====================================================
+     THE ARTICLE
+     ==================================================== -->
+<article class="article" id="article">
+
+  <!-- HEADER -->
+  <header class="article-header">
+    <h1 class="article-title">OAuth PKCE Authentication Implementation</h1>
+    <div class="article-subtitle">
+      Autonomous SDLC flow
+      <span class="separator">/</span>
+      24 minutes
+      <span class="separator">/</span>
+      <span class="cost-tag">$0.82</span>
+      <span class="separator">/</span>
+      6 files changed
+      <span class="separator">/</span>
+      +456 -5 lines
+    </div>
+    <div class="article-byline">
+      By <strong>Planner</strong> (Claude Opus 4) -- April 16, 2026
+    </div>
+    <div class="progress-strip">
+      <div class="progress-segment done" title="Plan"></div>
+      <div class="progress-segment done" title="Implement"></div>
+      <div class="progress-segment done" title="Review"></div>
+      <div class="progress-segment done" title="Merge"></div>
+    </div>
+  </header>
+
+  <!-- SECTION: PLAN -->
+  <section class="section" id="section-plan">
+    <div class="section-header">
+      Plan
+      <span class="section-header-right">4m 12s -- 12,400 tokens</span>
+    </div>
+
+    <p class="drop-cap">The OAuth implementation requires a provider abstraction layer in <code>packages/core/auth/</code>. Analysis of the existing codebase reveals a session-based authentication system in <code>session.ts</code> that can be extended with pluggable OAuth providers without disrupting the current flow.</p>
+
+    <p>The PKCE extension (RFC 7636) is mandatory for public clients. The implementation will use S256 challenge method exclusively -- plain challenges are deprecated and most providers reject them.</p>
+
+    <ol class="ordered-list">
+      <li>Create <code>packages/core/auth/provider.ts</code> with the <code>OAuthProvider</code> interface defining three methods: <code>getAuthorizationUrl()</code>, <code>exchangeCode()</code>, and <code>getUserProfile()</code></li>
+      <li>Implement the GitHub provider in <code>github.ts</code> with full PKCE flow, including code verifier generation using <code>crypto.randomBytes()</code> and S256 challenge derivation</li>
+      <li>Build a token store in <code>token-store.ts</code> with encrypted-at-rest storage, automatic refresh rotation, and replay detection</li>
+      <li>Wire the new auth layer into the existing session bootstrap in <code>session.ts</code>, gated behind a feature flag</li>
+      <li>Write comprehensive tests covering the full authorization flow, token refresh, and error cases</li>
+    </ol>
+
+    <ul class="tool-actions">
+      <li class="tool-action">
+        <span class="tool-action-icon">&#9656;</span>
+        Read auth.ts, session.ts, config.yaml
+        <span class="tool-action-duration">-- 1.2s</span>
+      </li>
+      <li class="tool-action">
+        <span class="tool-action-icon">&#9656;</span>
+        Searched "authenticate" across packages/
+        <span class="tool-action-duration">-- 0.8s</span>
+      </li>
+      <li class="tool-action">
+        <span class="tool-action-icon">&#9656;</span>
+        Read RFC 7636 Section 4.1 (PKCE specification)
+        <span class="tool-action-duration">-- 0.3s</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- SECTION: IMPLEMENTATION -->
+  <section class="section" id="section-implement" style="position:relative;">
+    <div class="section-header">
+      Implementation
+      <span class="section-header-right">14m 38s -- 98,200 tokens</span>
+    </div>
+
+    <!-- Pull quote from user, positioned in the margin -->
+    <div class="pull-quote" style="top: 180px;">
+      <div class="pull-quote-inner">
+        <div class="pull-quote-text">"Use the v2 OAuth endpoints, not v1. The v1 endpoints are deprecated as of March 2026."</div>
+        <div class="pull-quote-attr">-- You, mid-flow</div>
+      </div>
+    </div>
+
+    <p class="drop-cap">Starting with the provider abstraction. The <code>OAuthProvider</code> interface defines three methods that any provider must implement. This keeps the core auth system provider-agnostic while allowing easy addition of Google, GitLab, or Bitbucket providers later.</p>
+
+    <p>The interface is deliberately minimal. Authentication is a domain where simplicity directly correlates with security -- every additional method is a potential misconfiguration vector.</p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>packages/core/auth/provider.ts</span>
+        <span class="code-block-badge">new -- 89 lines</span>
+      </div>
+      <pre><span class="code-keyword">import</span> { randomBytes, createHash } <span class="code-keyword">from</span> <span class="code-string">"crypto"</span>;
+
+<span class="code-keyword">export interface</span> TokenSet {
+  accessToken: <span class="code-keyword">string</span>;
+  refreshToken: <span class="code-keyword">string</span>;
+  expiresAt: <span class="code-keyword">number</span>;
+  scope: <span class="code-keyword">string</span>;
+}
+
+<span class="code-keyword">export interface</span> OAuthProvider {
+  getAuthorizationUrl(state: <span class="code-keyword">string</span>, challenge: <span class="code-keyword">string</span>): <span class="code-keyword">string</span>;
+  exchangeCode(code: <span class="code-keyword">string</span>, verifier: <span class="code-keyword">string</span>): Promise&lt;TokenSet&gt;;
+  getUserProfile(accessToken: <span class="code-keyword">string</span>): Promise&lt;UserProfile&gt;;
+}
+
+<span class="code-keyword">export function</span> generateVerifier(): <span class="code-keyword">string</span> {
+  <span class="code-keyword">return</span> randomBytes(32).toString(<span class="code-string">"base64url"</span>);
+}
+
+<span class="code-keyword">export function</span> deriveChallenge(verifier: <span class="code-keyword">string</span>): <span class="code-keyword">string</span> {
+  <span class="code-keyword">return</span> createHash(<span class="code-string">"sha256"</span>)
+    .update(verifier)
+    .digest(<span class="code-string">"base64url"</span>);
+}</pre>
+    </div>
+
+    <p>The GitHub provider consumes the v2 endpoints as specified. Token refresh uses rotation -- each refresh produces a new refresh token, and the old one is immediately invalidated. This prevents token replay attacks if a refresh token is intercepted.</p>
+
+    <ul class="tool-actions">
+      <li class="tool-action">
+        <span class="tool-action-icon">&#9656;</span>
+        Created packages/core/auth/provider.ts (89 lines)
+      </li>
+      <li class="tool-action">
+        <span class="tool-action-icon">&#9656;</span>
+        Created packages/core/auth/github.ts (134 lines)
+      </li>
+      <li class="tool-action">
+        <span class="tool-action-icon">&#9656;</span>
+        Created packages/core/auth/token-store.ts (67 lines)
+      </li>
+      <li class="tool-action">
+        <span class="tool-action-icon">&#9656;</span>
+        Modified packages/core/auth/session.ts (+18 -4)
+      </li>
+      <li class="tool-action">
+        <span class="tool-action-icon">&#9656;</span>
+        Modified packages/core/config.ts (+6 -1)
+      </li>
+    </ul>
+
+    <!-- Second pull quote -->
+    <div class="pull-quote" style="top: 620px;">
+      <div class="pull-quote-inner">
+        <div class="pull-quote-text">"Store tokens encrypted at rest. Use the existing keychain integration from config.ts."</div>
+        <div class="pull-quote-attr">-- You, mid-flow</div>
+      </div>
+    </div>
+
+    <p>Token storage leverages the existing keychain integration. The <code>TokenStore</code> class wraps <code>config.getSecret()</code> and <code>config.setSecret()</code>, adding an in-memory LRU cache with a 5-minute TTL to avoid repeated keychain lookups.</p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>packages/core/auth/token-store.ts</span>
+        <span class="code-block-badge">new -- 67 lines</span>
+      </div>
+      <pre><span class="code-keyword">export class</span> TokenStore {
+  <span class="code-keyword">private</span> cache = <span class="code-keyword">new</span> Map&lt;<span class="code-keyword">string</span>, CacheEntry&gt;();
+
+  <span class="code-keyword">async</span> store(provider: <span class="code-keyword">string</span>, tokens: TokenSet): Promise&lt;<span class="code-keyword">void</span>&gt; {
+    <span class="code-keyword">const</span> key = <span class="code-string">`oauth_</span>${provider}<span class="code-string">`</span>;
+    <span class="code-keyword">await</span> config.setSecret(key, JSON.stringify(tokens));
+    <span class="code-keyword">this</span>.cache.set(key, {
+      tokens,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+    });
+  }
+
+  <span class="code-keyword">async</span> retrieve(provider: <span class="code-keyword">string</span>): Promise&lt;TokenSet | <span class="code-keyword">null</span>&gt; {
+    <span class="code-keyword">const</span> key = <span class="code-string">`oauth_</span>${provider}<span class="code-string">`</span>;
+    <span class="code-keyword">const</span> cached = <span class="code-keyword">this</span>.cache.get(key);
+    <span class="code-keyword">if</span> (cached &amp;&amp; cached.expiresAt &gt; Date.now()) {
+      <span class="code-keyword">return</span> cached.tokens;
+    }
+    <span class="code-keyword">const</span> raw = <span class="code-keyword">await</span> config.getSecret(key);
+    <span class="code-keyword">return</span> raw ? JSON.parse(raw) : <span class="code-keyword">null</span>;
+  }
+}</pre>
+    </div>
+  </section>
+
+  <!-- SECTION: REVIEW -->
+  <section class="section" id="section-review">
+    <div class="section-header">
+      Review
+      <span class="section-header-right">3m 41s -- 24,800 tokens</span>
+    </div>
+
+    <p class="drop-cap">The implementation follows the plan specification closely. All five tasks were completed. Four files were created, two were modified. The test suite covers the authorization URL generation, code exchange, token refresh rotation, and error handling paths.</p>
+
+    <ul class="findings">
+      <li class="finding">
+        <span class="finding-badge good">Good</span>
+        <span>PKCE flow uses S256 challenge method correctly. Code verifier is 32 bytes of cryptographic randomness, exceeding the RFC minimum of 43 characters.</span>
+      </li>
+      <li class="finding">
+        <span class="finding-badge good">Good</span>
+        <span>Token refresh rotation prevents replay attacks. Each refresh invalidates the previous token. The token store correctly handles the atomic swap.</span>
+      </li>
+      <li class="finding">
+        <span class="finding-badge note">Note</span>
+        <span>Consider rate limiting on the callback endpoint. A malicious client could flood the token exchange endpoint. Not blocking for this PR, but worth a follow-up.</span>
+      </li>
+      <li class="finding">
+        <span class="finding-badge good">Good</span>
+        <span>Clean separation between the provider abstraction and concrete implementation. Adding a new provider requires only a single file with no changes to core.</span>
+      </li>
+      <li class="finding">
+        <span class="finding-badge good">Good</span>
+        <span>Tests cover 94% of branches. The untested path is the keychain unavailable fallback, which requires OS-level mocking.</span>
+      </li>
+    </ul>
+
+    <div class="file-summary">
+      <div class="file-summary-title">Files Changed</div>
+      <div class="file-row">
+        <span class="file-path">packages/core/auth/provider.ts</span>
+        <span class="file-stat"><span class="file-add">+89</span></span>
+      </div>
+      <div class="file-row">
+        <span class="file-path">packages/core/auth/github.ts</span>
+        <span class="file-stat"><span class="file-add">+134</span></span>
+      </div>
+      <div class="file-row">
+        <span class="file-path">packages/core/auth/token-store.ts</span>
+        <span class="file-stat"><span class="file-add">+67</span></span>
+      </div>
+      <div class="file-row">
+        <span class="file-path">packages/core/auth/session.ts</span>
+        <span class="file-stat"><span class="file-add">+18</span> <span class="file-del">-4</span></span>
+      </div>
+      <div class="file-row">
+        <span class="file-path">packages/core/__tests__/auth.test.ts</span>
+        <span class="file-stat"><span class="file-add">+142</span></span>
+      </div>
+      <div class="file-row">
+        <span class="file-path">packages/core/config.ts</span>
+        <span class="file-stat"><span class="file-add">+6</span> <span class="file-del">-1</span></span>
+      </div>
+    </div>
+
+    <ul class="tool-actions">
+      <li class="tool-action">
+        <span class="tool-action-icon">&#9656;</span>
+        Ran bun test packages/core/__tests__/auth.test.ts -- 14 passed, 0 failed
+        <span class="tool-action-duration">-- 2.1s</span>
+      </li>
+      <li class="tool-action">
+        <span class="tool-action-icon">&#9656;</span>
+        Ran make lint -- 0 warnings, 0 errors
+        <span class="tool-action-duration">-- 4.3s</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- RESOLUTION -->
+  <section class="section" id="section-merge">
+    <div class="section-header">
+      Resolution
+      <span class="section-header-right">1m 21s</span>
+    </div>
+
+    <div class="resolution-banner">
+      <div class="resolution-title">Pull Request Merged</div>
+      <div class="resolution-detail">
+        <a href="#">PR #847</a> -- feat: add OAuth PKCE authentication with GitHub provider
+        <br>merged into main -- 6 files, +456 -5 lines -- all checks passed
+      </div>
+    </div>
+  </section>
+
+</article>
+
+<!-- ====================================================
+     FLOATING TABLE OF CONTENTS
+     ==================================================== -->
+<div class="floating-toc" id="floatingToc">
+  <a class="toc-item active" onclick="scrollToSection('section-plan')">Plan</a>
+  <a class="toc-item" onclick="scrollToSection('section-implement')">Implement</a>
+  <a class="toc-item" onclick="scrollToSection('section-review')">Review</a>
+  <a class="toc-item" onclick="scrollToSection('section-merge')">Resolution</a>
+</div>
+
+<!-- ====================================================
+     BOTTOM STATUS BAR
+     ==================================================== -->
+<div class="status-bar">
+  <div class="status-bar-left">
+    <span>s-a3f8c1</span>
+    <span>autonomous-sdlc</span>
+    <span>local compute</span>
+  </div>
+  <div class="status-bar-right">
+    <span><kbd>S</kbd> sessions</span>
+    <span><kbd>W</kbd> workspace</span>
+    <span><kbd>J</kbd><kbd>K</kbd> scroll sections</span>
+  </div>
+</div>
+
+<!-- ====================================================
+     JAVASCRIPT
+     ==================================================== -->
+<script>
+  // --- Navigation scroll effect ---
+  const topNav = document.getElementById("topNav");
+  const floatingToc = document.getElementById("floatingToc");
+  const sections = document.querySelectorAll(".section");
+  const tocItems = document.querySelectorAll(".toc-item");
+
+  window.addEventListener("scroll", () => {
+    const scrollY = window.scrollY;
+
+    // Nav border on scroll
+    topNav.classList.toggle("scrolled", scrollY > 20);
+
+    // Show floating TOC after scrolling past header
+    floatingToc.classList.toggle("visible", scrollY > 350);
+
+    // Active section tracking
+    let currentSection = "";
+    sections.forEach((section) => {
+      const rect = section.getBoundingClientRect();
+      if (rect.top < window.innerHeight * 0.4) {
+        currentSection = section.id;
+      }
+    });
+
+    tocItems.forEach((item) => {
+      const target = item.getAttribute("onclick")?.match(/'([^']+)'/)?.[1];
+      item.classList.toggle("active", target === currentSection);
+    });
+  });
+
+  // --- Scroll to section ---
+  function scrollToSection(id) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  // --- Sessions drawer ---
+  function toggleSessions() {
+    document.getElementById("sessionsOverlay").classList.toggle("open");
+  }
+
+  // --- Workspace drawer ---
+  function toggleWorkspace() {
+    document.getElementById("workspaceOverlay").classList.toggle("open");
+  }
+
+  // --- Keyboard shortcuts ---
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+
+    switch (e.key.toLowerCase()) {
+      case "s":
+        e.preventDefault();
+        toggleSessions();
+        break;
+      case "w":
+        e.preventDefault();
+        toggleWorkspace();
+        break;
+      case "j": {
+        e.preventDefault();
+        const sectionIds = Array.from(sections).map((s) => s.id);
+        let current = 0;
+        sectionIds.forEach((id, i) => {
+          const rect = document.getElementById(id).getBoundingClientRect();
+          if (rect.top < window.innerHeight * 0.4) current = i;
+        });
+        const next = Math.min(current + 1, sectionIds.length - 1);
+        scrollToSection(sectionIds[next]);
+        break;
+      }
+      case "k": {
+        e.preventDefault();
+        const sectionIds = Array.from(sections).map((s) => s.id);
+        let current = 0;
+        sectionIds.forEach((id, i) => {
+          const rect = document.getElementById(id).getBoundingClientRect();
+          if (rect.top < window.innerHeight * 0.4) current = i;
+        });
+        const prev = Math.max(current - 1, 0);
+        scrollToSection(sectionIds[prev]);
+        break;
+      }
+      case "escape":
+        document.getElementById("sessionsOverlay").classList.remove("open");
+        document.getElementById("workspaceOverlay").classList.remove("open");
+        break;
+    }
+  });
+
+  // --- Close drawers on clicking session card ---
+  document.querySelectorAll(".session-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      document.querySelectorAll(".session-card").forEach((c) => c.classList.remove("active"));
+      card.classList.add("active");
+      // In a real app this would load the session
+      setTimeout(() => toggleSessions(), 250);
+    });
+  });
+</script>
+
+</body>
+</html>
