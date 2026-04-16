@@ -64,7 +64,7 @@ packages/
   server/    -> JSON-RPC handlers (delegate to services via AppContext)
   protocol/  -> ArkClient (typed JSON-RPC client)
   web/       -> Vite web dashboard (SSE live updates, Recharts)
-  desktop/   -> Electron shell wrapping the web dashboard
+  desktop/   -> Tauri v2 desktop shell wrapping the web dashboard
   types/     -> Domain interfaces (Session, Compute, Event, Message, Tenant, etc.)
 agents/      -> 12 agent YAML definitions
 runtimes/    -> 5 runtime definitions (claude, claude-max, codex, gemini, goose)

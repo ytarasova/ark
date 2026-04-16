@@ -22,7 +22,7 @@ This symlinks `ark` to `/usr/local/bin`. Verify with `ark --help`.
 - **Local sessions with Claude Code** -- dispatch a task, agent works in an isolated git worktree, creates a PR
 - **Autonomous SDLC flow** -- plan -> implement -> verify -> review -> PR -> merge (all auto-gated)
 - **Quick flow** -- implement -> verify -> PR -> merge (skip planning/review)
-- **Web dashboard** -- `ark web` for a browser-based view, or the Electron desktop app
+- **Web dashboard** -- `ark web` for a browser-based view, or the Tauri desktop app
 - **Knowledge graph** -- auto-indexes your codebase at dispatch for agent context
 - **Cost tracking** -- per-session token usage, works with subscription mode ($0 cost display)
 - **Multiple runtimes** -- `claude` (API), `claude-max` (subscription), `codex`, `gemini`, `goose`
@@ -33,7 +33,7 @@ This symlinks `ark` to `/usr/local/bin`. Verify with `ark --help`.
 # 1. Start the server daemon (conductor + arkd + WS)
 ark server daemon start --detach
 
-# 2. Launch the web UI (in a browser tab) or the Electron desktop app
+# 2. Launch the web UI (in a browser tab) or the Tauri desktop app
 ark web                 # browser
 # or: open the Ark Desktop app
 

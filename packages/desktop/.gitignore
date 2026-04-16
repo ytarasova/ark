@@ -1,2 +1,12 @@
-test-results/
-playwright-report/
+# Rust build output
+src-tauri/target/
+
+# Tauri-generated assets and capability schemas (regenerated on build).
+src-tauri/gen/
+
+# Sidecar binaries (build artifacts -- populated by CI or `make build-desktop`).
+src-tauri/binaries/
+
+# Node
+node_modules/
+

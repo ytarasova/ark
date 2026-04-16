@@ -199,7 +199,7 @@ impl Sidecar {
 /// Find the `ark` CLI binary on disk.
 ///
 /// Search order (matches Electron main.js):
-///   1. `<cwd>/../../ark`    (dev tree: running from packages/desktop-tauri/src-tauri)
+///   1. `<cwd>/../../ark`    (dev tree: running from packages/desktop/src-tauri)
 ///   2. `<resource_dir>/ark` (future: bundled externalBin)
 ///   3. `/usr/local/bin/ark`
 ///   4. `~/.bun/bin/ark`, `~/.ark/bin/ark`
@@ -209,7 +209,7 @@ pub fn find_ark_binary(handle: &tauri::AppHandle) -> Result<PathBuf> {
 
     // 1. Repo-relative (dev mode). CWD is the crate dir when running `tauri dev`.
     if let Ok(cwd) = std::env::current_dir() {
-        // src-tauri -> desktop-tauri -> packages -> repo root
+        // src-tauri -> desktop -> packages -> repo root
         let repo_root = cwd
             .parent()
             .and_then(|p| p.parent())

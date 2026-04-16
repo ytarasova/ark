@@ -1,11 +1,8 @@
 node_modules/
 dist/
 packages/web/dist/
-packages/desktop/out/
-packages/desktop/test-results/
-packages/desktop/playwright-report/
-packages/desktop-tauri/src-tauri/target/
-packages/desktop-tauri/src-tauri/gen/
+packages/desktop/src-tauri/target/
+packages/desktop/src-tauri/gen/
 *.db
 *.db-journal
 *.db-wal

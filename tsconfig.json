@@ -21,7 +21,7 @@
     "tests",
     "packages/web",
     "packages/e2e",
-    "packages/desktop/tests",
+    "packages/desktop/src-tauri",
     "**/__tests__/**",
     "packages/test-setup.ts"
   ]

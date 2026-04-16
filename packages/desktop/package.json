@@ -1,69 +1,21 @@
 {
   "name": "ark-desktop",
-  "version": "0.16.0",
-  "description": "Ark Desktop - AI Agent Orchestration",
-  "homepage": "https://github.com/ytarasova/ark",
-  "author": {
-    "name": "Ark Contributors",
-    "email": "ark@users.noreply.github.com"
-  },
-  "main": "main.js",
+  "version": "0.17.0",
+  "description": "Ark Desktop -- AI Agent Orchestration",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "start": "electron .",
-    "build": "electron-builder --mac --win --linux",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux",
-    "test": "playwright test",
-    "test:headed": "playwright test --headed",
-    "test:ui": "playwright test --ui"
-  },
-  "build": {
-    "appId": "com.ark.desktop",
-    "productName": "Ark",
-    "directories": {
-      "output": "out"
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "icon.png",
-      "icon.icns"
-    ],
-    "extraResources": [
-      {
-        "from": "../../packages/web/dist",
-        "to": "web-dist"
-      }
-    ],
-    "mac": {
-      "category": "public.app-category.developer-tools",
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "icon": "icon.icns"
-    },
-    "win": {
-      "target": [
-        "nsis",
-        "zip"
-      ],
-      "icon": "icon.png"
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "category": "Development",
-      "icon": "icon.png"
-    }
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:debug": "tauri build --debug"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0",
-    "playwright": "^1.59.1"
+    "@tauri-apps/cli": "^2.0.0"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-opener": "^2.0.0",
+    "@tauri-apps/plugin-shell": "^2.0.0"
   }
 }

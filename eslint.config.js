@@ -10,8 +10,8 @@ export default [
       "**/*.d.ts",
       // Tauri build output -- codegen embeds binary assets as .js which
       // trips the parser. The Rust source is out of scope for eslint.
-      "packages/desktop-tauri/src-tauri/target/**",
-      "packages/desktop-tauri/src-tauri/gen/**",
+      "packages/desktop/src-tauri/target/**",
+      "packages/desktop/src-tauri/gen/**",
     ],
   },
   {

@@ -26,9 +26,10 @@ make install    # requires Bun + tmux pre-installed
 
 Run `ark doctor` to verify your environment.
 
-Prefer a native window? Install the [Ark Desktop app](packages/desktop/INSTALL.md)
-(macOS, Windows, Linux). macOS users: there's an unsigned-build workaround
-documented in the desktop install guide.
+Prefer a native window? Install the [Ark Desktop app](packages/desktop/README.md)
+(macOS, Windows, Linux -- 3.2 MB installer). macOS users: run
+`xattr -dr com.apple.quarantine /Applications/Ark.app` on first launch
+(unsigned build).
 
 ## Quick Start
 
@@ -65,7 +66,7 @@ ark search "authentication"
 | **Runtime Billing Modes** | `api` (per-token pricing), `subscription` (e.g. Claude Max $200/mo, tokens recorded for rate limits), `free`. Polymorphic transcript parsers per runtime | [CLAUDE.md](CLAUDE.md#runtimes) |
 | **Dashboard** | Fleet status overview with cost charts (Recharts), budget tracking, and recent activity | [CLI](docs/cli-reference.md#ark-dashboard) |
 | **Web Dashboard** | Browser-based session management with SSE live updates, token auth, read-only mode | [Guide](docs/guide.md#web-dashboard) |
-| **Desktop App** | Electron wrapper around the web dashboard -- native menus, local-first | [Install](packages/desktop/INSTALL.md) |
+| **Desktop App** | Tauri v2 wrapper around the web dashboard -- native window, 3.2 MB installer | [Install](packages/desktop/README.md) |
 | **Compute Providers** | Local, Docker, DevContainer, Firecracker, EC2 + arkd (base/docker/devcontainer/firecracker), E2B (managed sandbox), K8s, K8s+Kata | [Guide](docs/guide.md#compute) |
 | **Git Worktrees** | Automatic branch isolation per session, diff preview, merge + auto-PR in one command | [Guide](docs/guide.md#git-worktrees) |
 | **Skills & Recipes** | Reusable prompt fragments and session templates with three-tier resolution | [Guide](docs/guide.md#skills--recipes) |
@@ -100,7 +101,7 @@ packages/
   arkd/       Universal agent daemon -- HTTP server on every compute target
   router/     LLM Router -- OpenAI-compatible proxy with routing policies
   web/        Vite-based web dashboard (SSE live updates, Dashboard page)
-  desktop/    Electron shell wrapping the web dashboard
+  desktop/    Tauri v2 desktop shell wrapping the web dashboard
   server/     JSON-RPC handlers (delegate to services via AppContext)
   protocol/   ArkClient (typed JSON-RPC client)
   types/      Domain interfaces (Session, Compute, Event, Message, Tenant, etc.)
@@ -137,8 +138,8 @@ make dev              # TypeScript watch mode
 make test             # Run all tests sequentially (never parallel -- ports collide)
 make test-file F=path # Run a single test file
 make web              # Launch web dashboard
-make desktop          # Launch Electron desktop app
-make desktop-build    # Package Electron app for distribution
+make desktop          # Launch Tauri desktop app (dev mode)
+make build-desktop    # Build Tauri desktop app for distribution
 make lint             # Lint
 make clean            # Remove build artifacts
 make uninstall        # Remove ark symlink

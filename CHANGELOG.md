@@ -1,10 +1,27 @@
 # Changelog
 
+## v0.17.0 (2026-04-15)
+
+### Breaking changes
+- **Desktop app migrated from Electron to Tauri v2.** The `packages/desktop/` package is now a Tauri v2 shell instead of Electron. The Electron code has been removed entirely.
+  - 29x smaller installer (94.3 MB -> 3.2 MB macOS DMG).
+  - Faster launch, ~3x less memory usage at runtime.
+  - Rust backend with system webview -- no bundled Chromium.
+  - Single-instance lock, clean process-group teardown (fixes orphan `bun` grandchild leak from the Electron build).
+  - Electron package (`packages/desktop/` main.js, preload.js, electron-builder) deleted.
+  - Electron Playwright E2E tests (`desktop-e2e` CI job) removed. Desktop E2E tests need porting from Electron Playwright to Tauri WebDriver -- tracked as follow-up.
+  - Makefile targets updated: `make desktop` now launches Tauri dev mode, `make build-desktop` builds the Tauri release, `make package-desktop` produces installers.
+  - Release pipeline (`.github/workflows/release.yml`) now builds Tauri bundles (DMG, deb, AppImage, exe) instead of Electron artifacts.
+  - **Known: unsigned.** macOS Gatekeeper quarantine workaround: `xattr -dr com.apple.quarantine /Applications/Ark.app`
+
+### Migration
+- If you previously installed the Electron desktop app, download the new Tauri build from the [GitHub releases page](https://github.com/ytarasova/ark/releases). The Tauri app is functionally identical (same web UI) but much smaller and faster.
+
 ## v0.16.0 (2026-04-15)
 
 ### Breaking changes
 - **Removed: TUI** (`ark tui` command, `packages/tui/`, `packages/tui-e2e/`).
-  - The terminal dashboard was retired per team decision on 2026-04-14. Supported user-facing surfaces are now **Web UI** (`ark web`), **CLI** (`ark session ...`), and the **Electron desktop app** (see [`packages/desktop/INSTALL.md`](packages/desktop/INSTALL.md)).
+  - The terminal dashboard was retired per team decision on 2026-04-14. Supported user-facing surfaces are now **Web UI** (`ark web`), **CLI** (`ark session ...`), and the **Desktop app** (see [`packages/desktop/README.md`](packages/desktop/README.md)).
   - Dropped deps: all `ink*` packages and the `react-devtools-core` shim (`shims/react-devtools-core.js`).
   - Removed Makefile targets: `make tui`, `make dev-tui`, `make tui-standalone`.
   - Removed CI smoke test step: "Test TUI starts without crash".
