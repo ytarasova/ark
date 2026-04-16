@@ -158,7 +158,11 @@ export function syncCosts(app: AppContext): { synced: number; skipped: number } 
   }
 
   // Also sync burn data from transcripts
-  try { syncBurn(app); } catch { /* burn sync is best-effort */ }
+  try {
+    syncBurn(app);
+  } catch (err) {
+    console.warn("[burn] sync failed:", err);
+  }
 
   return { synced, skipped };
 }
