@@ -30,8 +30,25 @@ let serverPort = DEFAULT_PORT;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Find the ark CLI binary */
+/** Find the ark CLI binary.
+ * Priority:
+ *   1. Bundled ark-native inside the packaged app (process.resourcesPath)
+ *   2. Development: repo-root ark wrapper (../../ark)
+ *   3. /usr/local/bin/ark (installed via CLI install dialog or manually)
+ *   4. ~/.bun/bin/ark (bun global install)
+ */
 function findArkBin() {
+  // In a packaged app, prefer the bundled ark-native binary
+  if (app.isPackaged) {
+    const bundled = path.join(process.resourcesPath, "ark-native");
+    try {
+      fs.accessSync(bundled, fs.constants.X_OK);
+      return bundled;
+    } catch {
+      // Bundled binary missing or not executable -- fall through to PATH lookup
+    }
+  }
+
   const candidates = [
     path.join(__dirname, "..", "..", "ark"),
     "/usr/local/bin/ark",
@@ -46,6 +63,147 @@ function findArkBin() {
     }
   }
   return null;
+}
+
+/** Get the path to the bundled ark-native binary (packaged app only). */
+function getBundledArkPath() {
+  if (!app.isPackaged) return null;
+  const bundled = path.join(process.resourcesPath, "ark-native");
+  try {
+    fs.accessSync(bundled, fs.constants.X_OK);
+    return bundled;
+  } catch {
+    return null;
+  }
+}
+
+/** Check if the CLI install flag file exists. */
+function isCliInstalled() {
+  const flagPath = path.join(process.env.HOME || "", ".ark", "cli-installed");
+  try {
+    fs.accessSync(flagPath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Mark CLI as installed by writing the flag file. */
+function markCliInstalled() {
+  const arkDir = path.join(process.env.HOME || "", ".ark");
+  try {
+    fs.mkdirSync(arkDir, { recursive: true });
+    fs.writeFileSync(path.join(arkDir, "cli-installed"), new Date().toISOString());
+  } catch {
+    // Non-critical -- dialog will just show again next launch
+  }
+}
+
+/** Install CLI tools by symlinking the bundled binary to /usr/local/bin/ark.
+ * On macOS, uses osascript for admin privilege escalation if needed.
+ * On Linux AppImage, uses pkexec if available.
+ * Returns true on success.
+ */
+async function installCliTools() {
+  const bundledPath = getBundledArkPath();
+  if (!bundledPath) return false;
+
+  const targetPath = "/usr/local/bin/ark";
+  const isMac = process.platform === "darwin";
+  const isLinux = process.platform === "linux";
+
+  // Try direct symlink first (works if user has write access to /usr/local/bin)
+  try {
+    try { fs.unlinkSync(targetPath); } catch { /* may not exist */ }
+    fs.symlinkSync(bundledPath, targetPath);
+    markCliInstalled();
+    return true;
+  } catch {
+    // Permission denied -- escalate
+  }
+
+  if (isMac) {
+    // Use osascript to prompt for admin password (inputs are hardcoded paths,
+    // not user-supplied -- no injection risk)
+    try {
+      execFile("/usr/bin/osascript", [
+        "-e",
+        `do shell script "ln -sf '${bundledPath}' '${targetPath}'" with administrator privileges`,
+      ], { timeout: 30000 }, (err) => { if (err) throw err; });
+      // Wait briefly for the async execFile to complete
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      markCliInstalled();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  if (isLinux) {
+    // Try pkexec for graphical sudo
+    try {
+      execFile("pkexec", ["ln", "-sf", bundledPath, targetPath], { timeout: 30000 }, () => {});
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      markCliInstalled();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/** Show the first-launch CLI install dialog (if not already installed). */
+async function maybeOfferCliInstall() {
+  if (!app.isPackaged) return;
+  if (isCliInstalled()) return;
+
+  const bundledPath = getBundledArkPath();
+  if (!bundledPath) return;
+
+  // Check if /usr/local/bin/ark already exists and works
+  try {
+    fs.accessSync("/usr/local/bin/ark", fs.constants.X_OK);
+    markCliInstalled();
+    return;
+  } catch {
+    // Not installed -- offer to install
+  }
+
+  const result = await dialog.showMessageBox(mainWindow || null, {
+    type: "question",
+    buttons: ["Install", "Skip"],
+    defaultId: 0,
+    cancelId: 1,
+    title: "Install CLI Tools",
+    message: "Install Ark CLI tools?",
+    detail:
+      "Ark can install its CLI tools so you can use `ark` from the terminal.\n\n" +
+      "This creates a symlink at /usr/local/bin/ark pointing to the bundled binary.\n" +
+      "You may be prompted for your administrator password.",
+  });
+
+  if (result.response === 0) {
+    const success = await installCliTools();
+    if (success) {
+      dialog.showMessageBox(mainWindow || null, {
+        type: "info",
+        title: "CLI Installed",
+        message: "Ark CLI tools installed successfully.",
+        detail: "You can now use `ark` from any terminal window.",
+      });
+    } else {
+      dialog.showMessageBox(mainWindow || null, {
+        type: "warning",
+        title: "Installation Failed",
+        message: "Could not install CLI tools.",
+        detail:
+          "You can install manually by running:\n\n" +
+          `  sudo ln -sf "${bundledPath}" /usr/local/bin/ark`,
+      });
+    }
+  }
 }
 
 /** Find a free port starting from the default */
@@ -196,6 +354,40 @@ function buildMenu() {
             submenu: [
               { role: "about" },
               { type: "separator" },
+              {
+                label: "Install CLI Tools...",
+                click: async () => {
+                  const bundledPath = getBundledArkPath();
+                  if (!bundledPath) {
+                    dialog.showMessageBox(mainWindow || null, {
+                      type: "info",
+                      title: "CLI Tools",
+                      message: "CLI tools are only available in the packaged app.",
+                      detail: "In development mode, use `make install` from the repo root.",
+                    });
+                    return;
+                  }
+                  const success = await installCliTools();
+                  if (success) {
+                    dialog.showMessageBox(mainWindow || null, {
+                      type: "info",
+                      title: "CLI Installed",
+                      message: "Ark CLI tools installed successfully.",
+                      detail: "You can now use `ark` from any terminal window.",
+                    });
+                  } else {
+                    dialog.showMessageBox(mainWindow || null, {
+                      type: "warning",
+                      title: "Installation Failed",
+                      message: "Could not install CLI tools.",
+                      detail:
+                        "You can install manually by running:\n\n" +
+                        `  sudo ln -sf "${bundledPath}" /usr/local/bin/ark`,
+                    });
+                  }
+                },
+              },
+              { type: "separator" },
               { role: "hide" },
               { role: "hideOthers" },
               { role: "unhide" },
@@ -239,6 +431,48 @@ function buildMenu() {
         ...(isMac ? [{ type: "separator" }, { role: "front" }] : [{ role: "close" }]),
       ],
     },
+    ...(!isMac
+      ? [
+          {
+            label: "Tools",
+            submenu: [
+              {
+                label: "Install CLI Tools...",
+                click: async () => {
+                  const bundledPath = getBundledArkPath();
+                  if (!bundledPath) {
+                    dialog.showMessageBox(mainWindow || null, {
+                      type: "info",
+                      title: "CLI Tools",
+                      message: "CLI tools are only available in the packaged app.",
+                      detail: "In development mode, use `make install` from the repo root.",
+                    });
+                    return;
+                  }
+                  const success = await installCliTools();
+                  if (success) {
+                    dialog.showMessageBox(mainWindow || null, {
+                      type: "info",
+                      title: "CLI Installed",
+                      message: "Ark CLI tools installed successfully.",
+                      detail: "You can now use `ark` from any terminal window.",
+                    });
+                  } else {
+                    dialog.showMessageBox(mainWindow || null, {
+                      type: "warning",
+                      title: "Installation Failed",
+                      message: "Could not install CLI tools.",
+                      detail:
+                        "You can install manually by running:\n\n" +
+                        `  sudo ln -sf "${bundledPath}" /usr/local/bin/ark`,
+                    });
+                  }
+                },
+              },
+            ],
+          },
+        ]
+      : []),
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -266,6 +500,9 @@ if (!gotTheLock) {
     buildMenu();
     await startServer();
     createWindow();
+
+    // Offer CLI install on first launch (packaged app only)
+    await maybeOfferCliInstall();
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {

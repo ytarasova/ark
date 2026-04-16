@@ -34,6 +34,10 @@
       {
         "from": "../../packages/web/dist",
         "to": "web-dist"
+      },
+      {
+        "from": "binaries/${os}-${arch}/ark-native",
+        "to": "ark-native"
       }
     ],
     "mac": {
