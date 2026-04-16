@@ -1,0 +1,47 @@
+name: Claude Vendor Review
+
+# Triggers when the vendor-freshness workflow opens a PR.
+# Claude reviews the diff and auto-merges if it only contains version pin changes.
+
+on:
+  pull_request:
+    types: [opened]
+    branches: [main]
+
+jobs:
+  review-and-merge:
+    if: startsWith(github.head_ref, 'vendor-freshness/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude review and merge
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Review the vendor version bump PR.
+
+            Steps:
+            1. Read the PR diff: gh pr diff "$PR_NUMBER"
+            2. Verify the diff ONLY changes version strings in vendor/versions.yaml
+            3. If it contains ONLY version pin changes (no code, no scripts, no config beyond version strings):
+               - Approve: gh pr review "$PR_NUMBER" --approve --body "Vendor version bump -- versions only, safe to merge."
+               - Merge: gh pr merge "$PR_NUMBER" --squash --delete-branch
+            4. If the diff contains ANYTHING other than version pins in vendor/versions.yaml, post a comment explaining the concern and do NOT merge.
+
+            The PR number is in the PR_NUMBER env var. The repo is in the REPO env var.
+          additional_permissions: |
+            contents: write
+            pull-requests: write
