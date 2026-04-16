@@ -242,7 +242,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Worktree untracked file setup** | Git worktrees don't include untracked files (.env, .envrc, config/local.yaml). Agents in worktrees lose access to env vars and local config. Add `.ark.yaml` `worktree.copy` list and optional `worktree.setup` script hook. | Abhimanyu 2026-04-13 |
 | **ACP (Agent Communication Protocol) integration** | Standard agent interface for cross-tool communication. Goose uses it via Claude SDP adapter. Claude Code/Codex don't officially support it; Gemini does natively. Explore as parallel interface alongside channels. Would make the platform more agent-runtime-agnostic. | 2026-04-14 meeting |
 | **Task-based benchmarking framework** | Model comparison on real-world tasks (not just prompting). 100 tasks across categories: JWT updates, code graph, PR review, MCP tool calling. Results feed LLM Router routing weights (model X good at tool calling, model Y good at review). Abhimanyu building. | 2026-04-14 meeting |
-| **Web UI conversation interface** | Send messages to running agents from web UI. Currently only TUI has this via `t` shortcut. Channels work for Claude Code; need tmux send-keys fallback for other runtimes. Borrow structured question pattern from Open Agents (`ask_user_question` tool with options UI) instead of plain free-text. | 2026-04-14 meeting (Zineng) |
+| **Web UI conversation interface** | Send messages to running agents from web UI. Channels work for Claude Code; need tmux send-keys fallback for other runtimes. Borrow structured question pattern from Open Agents (`ask_user_question` tool with options UI) instead of plain free-text. | 2026-04-14 meeting (Zineng) |
 | **Web UI repo dropdown** | Pick repos from session history / Claude projects dir instead of typing full paths. | 2026-04-14 meeting (Zineng) |
 | **Web UI tool call renderers** | Per-tool-type rendering (bash: cmd+output, read: file+line numbers, edit: diff, glob: file tree, grep: results). Borrow from Open Agents `/apps/web/components/tool-call/renderers/` (14 renderers, framework-agnostic React). | Open Agents competitive analysis |
 | **Agent-driven todo panel** | Agent creates/manages its own task list visible in a pinned UI panel. Users see real-time progress. Borrow from Open Agents `/packages/agent/tools/todo.ts` + `pinned-todo-panel.tsx`. | Open Agents competitive analysis |
@@ -360,7 +360,7 @@ The orchestration platform for AI-powered software development. Manages the full
 **Ship-blockers to resolve this week:**
 | Blocker | Owner | Notes |
 |---------|-------|-------|
-| Web UI conversation interface | Zineng | Send messages to agents from web UI. Currently only TUI has this (`t` shortcut). Zineng flagged as blocker. |
+| Web UI conversation interface | Zineng | Send messages to agents from web UI. Currently only works via CLI. Zineng flagged as blocker. |
 | Web UI repo dropdown | Zineng | List known repos from session history / Claude projects. Users shouldn't have to type full paths. |
 | Electron DMG packaging | Yana (deferred to Thu+) | DMG build was started but dropped. macOS Intel + ARM, Linux Intel + ARM. No Windows. |
 | MiniMax custom provider in LLM Router | Abhimanyu | Accept arbitrary OpenAI-compatible base URL + key. cost_mode=free. |
@@ -461,7 +461,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | Deploy Helm chart on K8s, verify | 1 day | Production |
 | Build + publish Docker image to registry | 0.5 day | Deployment |
 | End-to-end: real Jira ticket through full SDLC flow | 2-3 days | "Send to dev" workflow |
-| Test remote client mode (TUI/CLI → remote server) | 1 day | Multi-user |
+| Test remote client mode (CLI -> remote server) | 1 day | Multi-user |
 | Test ops-codegraph indexer with real codebase | 0.5 day | Knowledge graph |
 
 ### Camp 2: Workflow Persistence & Recovery
@@ -518,7 +518,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | Injection attempt tracking | 0.5 day |
 | Exec approval queue (interactive approve/deny) | 1-2 days |
 | Trust scoring per agent | 1 day |
-| Security dashboard panel (Web+TUI) | 1 day |
+| Security dashboard panel (Web) | 1 day |
 
 ### Camp 6: Integrations & Webhooks
 
@@ -531,7 +531,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | GitHub Issues bidirectional sync | 2-3 days |
 | Slack commands + thread-based interaction | 2-3 days |
 | Linear integration | 1-2 days |
-| Webhook/alert management panels (Web+TUI) | 1 day |
+| Webhook/alert management panels (Web) | 1 day |
 
 ### Camp 7: Task Management
 
@@ -541,7 +541,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 |------|--------|
 | Task table (new schema -- separate from sessions) | 1 day |
 | Kanban board UI (Web) | 2-3 days |
-| Task list view (TUI) | 1 day |
+| Task list view (Web) | 1 day |
 | `ark task create/list/assign/dispatch` CLI | 1 day |
 | Quality gate / Aegis review system (agent-to-agent review) | 2-3 days |
 | Task → session mapping | 1 day |
@@ -554,7 +554,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | Task | Effort | Status |
 |------|--------|--------|
 | **Desktop app packaging (Electron)** | 1-2 days | **DONE (v0.17.0)** -- Electron app with bundled ark-native, first-launch CLI install, fully self-contained. Tauri v2 evaluated and rejected (simpler toolchain wins). |
-| **Web UI conversation interface** | 1-2 days | Not started. Send messages to agents from web UI. Currently only works via CLI/TUI. |
+| **Web UI conversation interface** | 1-2 days | Not started. Send messages to agents from web UI. Currently only works via CLI. |
 | **Web UI repo dropdown** | 0.5-1 day | Not started. List repos from session history + Claude projects dir. |
 | **Web UI session creation wizard** | 1 day | Not started. Guided flow selection, agent selection, compute selection. |
 | **Web UI facelift** | 2-3 days | Not started. Borrow from v0 Electron mockups (Nov 2025 aspirational design). |
@@ -606,7 +606,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | Knowledge graph: `repo_id` on every node, cross-repo edges | 2-3 days | Migration adds the column. Indexer writes it on insert. Context builder pulls from all session repos. New edge types for cross-repo dependency. |
 | Atomic multi-PR auto-merge coordinator | 3-5 days | Create N PRs on dispatch; watch CI on all of them; merge only when all green AND approved. Needs a background worker. Partial-merge rollback if any fails post-merge. |
 | Dispatch CLI + recipe schema | 1 day | `ark session start --product <name>` or `--repo X --repo Y`. Recipe `repos:` list. |
-| Web + TUI: multi-repo session list, multi-repo diff preview | 2 days | Surface parity rule applies -- every surface shows all session repos. |
+| Web: multi-repo session list, multi-repo diff preview | 2 days | Every surface shows all session repos. |
 | arkd workdir handling | 1-2 days | N workdirs per session pushed / pulled to remote compute. |
 | Verify scripts across repos | 1 day | `verify:` field scopes per-repo or all-repos. |
 | Flow engine: stage `target_repo` field | 1 day | Optional per-stage scoping when a stage naturally touches one repo only. |
