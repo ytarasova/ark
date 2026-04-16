@@ -1,3 +1,5 @@
+// idea borrowed from https://raw.githubusercontent.com/AgentSeal/codeburn
+import { Info } from "lucide-react";
 import { useState } from "react";
 import { useBurnSummary, type BurnPeriod } from "../../hooks/useBurnQueries.js";
 import { Card } from "../ui/card.js";
@@ -14,8 +16,24 @@ import { McpServersPanel } from "./McpServersPanel.js";
 
 function BurnNote() {
   return (
-    <div className="text-[11px] text-muted-foreground bg-accent/40 border border-border rounded px-3 py-2">
-      Local sessions only. Burn tracking currently supports Claude Code, Codex, and Gemini CLI. Goose sessions are not recorded.
+    <div className="flex items-start gap-2.5 bg-accent/60 border-l-4 border-primary/60 border border-border rounded px-4 py-3">
+      <Info className="mt-0.5 shrink-0 h-4 w-4 text-primary/70" />
+      <div>
+        <p className="text-sm font-medium text-foreground">
+          Local sessions only. Burn tracking currently supports Claude Code, Codex, and Gemini CLI. Goose sessions are not recorded.
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          inspired by{" "}
+          <a
+            href="https://github.com/AgentSeal/codeburn"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            codeburn
+          </a>
+        </p>
+      </div>
     </div>
   );
 }
