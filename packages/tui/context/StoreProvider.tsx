@@ -18,7 +18,7 @@ interface StoreProviderProps {
   store?: StoreData;
 }
 
-/** Live provider — calls useArkStore() which requires ArkClientContext. */
+/** Live provider -- calls useArkStore() which requires ArkClientContext. */
 function LiveStoreProvider({ children }: { children: React.ReactNode }) {
   const live = useArkStore();
   return (

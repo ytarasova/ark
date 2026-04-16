@@ -1,5 +1,5 @@
 /**
- * Tests for sessionFormatting — pure helpers for session detail pane.
+ * Tests for sessionFormatting -- pure helpers for session detail pane.
  */
 
 import { describe, it, expect } from "bun:test";

@@ -271,7 +271,7 @@ export function SessionsTab({ sessions, refresh, pane, unreadCounts, asyncState,
       return;
     }
 
-    // Global keys — work regardless of selection
+    // Global keys -- work regardless of selection
     if (matchesHotkey("search", input, key)) { setOverlay("find"); return; }
     if (matchesHotkey("newSession", input, key)) { onShowForm(); return; }
     if (matchesHotkey("inbox", input, key)) { setOverlay("inbox"); return; }

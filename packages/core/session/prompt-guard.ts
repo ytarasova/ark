@@ -1,5 +1,5 @@
 /**
- * Prompt injection detection — scans content for injection attempts.
+ * Prompt injection detection -- scans content for injection attempts.
  * Lightweight heuristic detection, not a security boundary.
  */
 
@@ -40,7 +40,7 @@ export function detectInjection(text: string): InjectionResult {
   return { detected: found.length > 0, patterns: found, severity: maxSeverity };
 }
 
-/** Quick check — returns true if injection detected. */
+/** Quick check -- returns true if injection detected. */
 export function hasInjection(text: string): boolean {
   return detectInjection(text).detected;
 }

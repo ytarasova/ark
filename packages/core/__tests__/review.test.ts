@@ -1,5 +1,5 @@
 /**
- * Tests for review.ts — structured review output parser.
+ * Tests for review.ts -- structured review output parser.
  */
 
 import { describe, it, expect } from "bun:test";

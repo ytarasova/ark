@@ -408,7 +408,7 @@ export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: {
 
   if (!opts?.quiet) logInfo("conductor", `Ark conductor listening on localhost:${port}`);
 
-  // Schedule poller — check every 60 seconds
+  // Schedule poller -- check every 60 seconds
   const scheduleTimer = setInterval(() => safeAsync("schedule polling", async () => {
     const schedules = listSchedules(app).filter(s => s.enabled);
     const now = new Date();
@@ -499,7 +499,7 @@ export async function deliverToChannel(
       const client = new ArkdClient(arkdUrl);
       const result = await client.channelDeliver({ channelPort, payload });
       if (result.delivered) return;
-    } catch { /* arkd not available — fall through to direct HTTP */ }
+    } catch { /* arkd not available -- fall through to direct HTTP */ }
   }
 
   // Fallback: direct HTTP to channel port (local only)
@@ -509,7 +509,7 @@ export async function deliverToChannel(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-  } catch { /* channel not reachable — expected when agent hasn't started channel yet */ }
+  } catch { /* channel not reachable -- expected when agent hasn't started channel yet */ }
 }
 
 // ── Worker management handlers ──────────────────────────────────────────────

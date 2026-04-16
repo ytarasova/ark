@@ -76,11 +76,11 @@ export function findOrphanedSessions(app: AppContext): Session[] {
   const candidates = [...running, ...waiting];
 
   return candidates.filter((session) => {
-    if (!session.session_id) return true; // no tmux session recorded — orphaned
+    if (!session.session_id) return true; // no tmux session recorded -- orphaned
     try {
       return !tmux.sessionExists(session.session_id);
     } catch {
-      // tmux not available — treat as orphaned
+      // tmux not available -- treat as orphaned
       return true;
     }
   });

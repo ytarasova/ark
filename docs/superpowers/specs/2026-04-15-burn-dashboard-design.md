@@ -1,4 +1,4 @@
-# Burn Dashboard — codeburn-inspired cost observability page
+# Burn Dashboard -- codeburn-inspired cost observability page
 
 **Date:** 2026-04-15
 **Status:** Approved for implementation
@@ -72,12 +72,12 @@ Ship a new `/burn` page in Ark's web dashboard that mirrors codeburn's 8-panel o
 
 | Module | Responsibility | Depends on |
 |---|---|---|
-| `core/observability/burn/types.ts` | `TaskCategory`, `ClassifiedTurn`, `SessionSummary`, `ProjectSummary`, `BurnPeriod`, `BurnSummaryResponse` | — |
-| `core/observability/burn/bash-utils.ts` | Extract command names from shell strings (e.g. `"pytest tests/"` → `["pytest"]`) | — |
+| `core/observability/burn/types.ts` | `TaskCategory`, `ClassifiedTurn`, `SessionSummary`, `ProjectSummary`, `BurnPeriod`, `BurnSummaryResponse` | -- |
+| `core/observability/burn/bash-utils.ts` | Extract command names from shell strings (e.g. `"pytest tests/"` → `["pytest"]`) | -- |
 | `core/observability/burn/classifier.ts` | Pure functions: classify a `ParsedTurn` into one of 13 categories, count edit-cycle retries, derive 1-shot flag | types |
 | `core/observability/burn/parser.ts` | Given a runtime + transcript path, emit `ClassifiedTurn[]` with full breakdowns (tools, MCP, bash, cost) | types, classifier, bash-utils, `PricingRegistry` |
 | `core/observability/burn/sync.ts` | Walk sessions, resolve transcript via existing `TranscriptParser.findForSession()`, upsert `burn_turns` rows | parser, `AppContext` |
-| `core/repositories/burn.ts` | `BurnRepository` — CRUD + aggregation queries against `burn_turns` | `IDatabase` |
+| `core/repositories/burn.ts` | `BurnRepository` -- CRUD + aggregation queries against `burn_turns` | `IDatabase` |
 | `server/handlers/burn.ts` | RPC handlers: `burn/summary`, `burn/sync` | `AppContext`, `BurnRepository` |
 | `web/hooks/useBurnQueries.ts` | TanStack Query hooks: `useBurnSummary(period)`, `useBurnSync()` | `useApi` |
 | `web/components/burn/panels/*.tsx` | One component per panel: pure presentation, no data fetching | Recharts, `Card` |
@@ -133,7 +133,7 @@ CREATE INDEX IF NOT EXISTS idx_burn_turns_tenant_category_timestamp
 
 - `usage_records` has one row per API call. `burn_turns` has one row per turn (user message + all its assistant API calls). Different granularity.
 - `usage_records` is the authoritative billing table; pollution with display-only fields (category, tool lists) would couple billing to observability.
-- Drop-and-rebuild: `burn_turns` is fully derivable from transcripts, so changing classifier logic is safe — drop the table and re-sync. `usage_records` rows are often irreplaceable (transcripts get rotated, subscription mode records zero cost).
+- Drop-and-rebuild: `burn_turns` is fully derivable from transcripts, so changing classifier logic is safe -- drop the table and re-sync. `usage_records` rows are often irreplaceable (transcripts get rotated, subscription mode records zero cost).
 
 ### Schema addition (one column on `usage_records`)
 
@@ -155,9 +155,9 @@ CREATE INDEX IF NOT EXISTS idx_burn_turns_tenant_category_timestamp
 | `src/parser.ts` (Claude section) | `core/observability/burn/parser.ts` | Replace codeburn's `discoverAllSessions()` with `app.transcriptParsers.get(kind).findForSession()`. Keep `groupIntoTurns`, `parseApiCall`, `buildSessionSummary` verbatim (adapted to Ark's `PricingRegistry`). |
 | `src/providers/codex.ts` decoding | `core/runtimes/codex/parser.ts` (augment) | Extend Ark's existing Codex parser with the tool/token decoding logic needed for classification. |
 | `src/models.ts` pricing | `core/observability/pricing.ts` (augment) | Add `fastMultiplier`, `webSearchCostPerRequest`, disk cache at `~/.ark/cache/litellm-pricing.json` with 24h TTL. |
-| `src/providers/claude.ts` | — | **Skipped.** Ark's `ClaudeTranscriptParser.findForSession()` uses the explicit `--session-id` handoff Ark already maintains, which is more reliable than codeburn's latest-mtime guess. |
+| `src/providers/claude.ts` | -- | **Skipped.** Ark's `ClaudeTranscriptParser.findForSession()` uses the explicit `--session-id` handoff Ark already maintains, which is more reliable than codeburn's latest-mtime guess. |
 | `src/dashboard.tsx` | `web/components/burn/*` (rewritten) | Ink → Recharts + Tailwind. Layout, panel titles, color palette, period tabs come from the codeburn spec. |
-| `src/cli.ts`, `src/menubar.ts`, `src/currency.ts`, `src/export.ts`, `src/config.ts`, `src/cursor-cache.ts`, `src/sqlite.ts`, `src/providers/{cursor,opencode}.ts` | — | **Out of scope.** |
+| `src/cli.ts`, `src/menubar.ts`, `src/currency.ts`, `src/export.ts`, `src/config.ts`, `src/cursor-cache.ts`, `src/sqlite.ts`, `src/providers/{cursor,opencode}.ts` | -- | **Out of scope.** |
 
 ### `PricingRegistry` augmentation
 
@@ -260,7 +260,7 @@ Each panel component is pure presentation: it receives its slice of `BurnSummary
 
 ### Styling
 
-- Tailwind CSS with Ark's existing tokens: `bg-background`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-accent`, `hover:bg-accent/50`. No new colors in the global theme — dark mode works automatically.
+- Tailwind CSS with Ark's existing tokens: `bg-background`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-accent`, `hover:bg-accent/50`. No new colors in the global theme -- dark mode works automatically.
 - shadcn `Card` primitive from `./ui/card.js` (same import path already used in `CostsView`).
 - Panel accent colors match codeburn's palette but mapped through CSS variables so theme swaps cascade:
   - Overview: `text-orange-400` (matches codeburn's CodeBurn orange)
@@ -342,39 +342,39 @@ Per `CLAUDE.md`:
    - Empty state: MSW returns empty summary, view shows "Run sync" CTA, clicking triggers the sync mutation.
    - No assertions on component internals, refs, or state.
 
-2. **Per-panel smoke tests** are skipped by design — the user's CLAUDE.md requires integration over unit. If a panel breaks, `BurnView.test.tsx` catches it.
+2. **Per-panel smoke tests** are skipped by design -- the user's CLAUDE.md requires integration over unit. If a panel breaks, `BurnView.test.tsx` catches it.
 
 ## Implementation order
 
 The build sequence is chosen so every intermediate commit compiles and tests stay green.
 
-1. **Types + fixtures** — `burn/types.ts`, test fixture JSONL files. No runtime behavior yet.
-2. **bash-utils + classifier** — pure logic + tests. Independently verifiable.
-3. **Parser** — wraps 1 and 2, consumes Claude JSONL, emits `SessionSummary`. Test with fixtures.
-4. **PricingRegistry augmentation** — fast mode + web search + disk cache. Extend existing tests.
-5. **Schema + repository** — `burn_turns` table, `BurnRepository`, upsert + aggregation queries. Unit-test with in-memory SQLite.
-6. **Sync** — wires parser + repository + session walk. End-to-end tested with a seeded session and fixture JSONL.
-7. **RPC handler** — `burn/summary` + `burn/sync`. End-to-end tested via the server router.
-8. **Web hook + types** — `useBurnQueries.ts` + shared types package wiring.
-9. **Panel components** — 8 isolated presentation components with synthetic data stories (Storybook-style but inline in tests).
-10. **BurnView + BurnPage + routing** — full integration test.
-11. **Sidebar entry + icon** — final wiring.
-12. **Full test suite** — `make test` sequentially on the worktree; all tests green before push.
+1. **Types + fixtures** -- `burn/types.ts`, test fixture JSONL files. No runtime behavior yet.
+2. **bash-utils + classifier** -- pure logic + tests. Independently verifiable.
+3. **Parser** -- wraps 1 and 2, consumes Claude JSONL, emits `SessionSummary`. Test with fixtures.
+4. **PricingRegistry augmentation** -- fast mode + web search + disk cache. Extend existing tests.
+5. **Schema + repository** -- `burn_turns` table, `BurnRepository`, upsert + aggregation queries. Unit-test with in-memory SQLite.
+6. **Sync** -- wires parser + repository + session walk. End-to-end tested with a seeded session and fixture JSONL.
+7. **RPC handler** -- `burn/summary` + `burn/sync`. End-to-end tested via the server router.
+8. **Web hook + types** -- `useBurnQueries.ts` + shared types package wiring.
+9. **Panel components** -- 8 isolated presentation components with synthetic data stories (Storybook-style but inline in tests).
+10. **BurnView + BurnPage + routing** -- full integration test.
+11. **Sidebar entry + icon** -- final wiring.
+12. **Full test suite** -- `make test` sequentially on the worktree; all tests green before push.
 
 ## Open questions resolved during design
 
 | Question | Resolution |
 |---|---|
-| Reuse codeburn's `dashboard.tsx`? | No — Ink is terminal-only. Rebuild UI in web React. |
-| Store classification in `usage_records`? | No — different granularity, separation of concerns. New `burn_turns` table. |
-| Support Cursor / OpenCode? | Not in v1 — Ark has no runtime for them. Defer. |
-| Currency conversion? | No — USD only. Can extend via `fmtCost` later. |
-| TUI command? | No — web-only per user directive. |
-| Full-parity panels or minimal? | Full parity — user directive "exactly follow the codeburn". |
-| Replace `/costs` or coexist? | Coexist — `/costs` stays for billing, `/burn` adds observability. |
-| Sync trigger? | On existing `syncCosts` path + manual button in UI. No cron — matches Ark's current model. |
+| Reuse codeburn's `dashboard.tsx`? | No -- Ink is terminal-only. Rebuild UI in web React. |
+| Store classification in `usage_records`? | No -- different granularity, separation of concerns. New `burn_turns` table. |
+| Support Cursor / OpenCode? | Not in v1 -- Ark has no runtime for them. Defer. |
+| Currency conversion? | No -- USD only. Can extend via `fmtCost` later. |
+| TUI command? | No -- web-only per user directive. |
+| Full-parity panels or minimal? | Full parity -- user directive "exactly follow the codeburn". |
+| Replace `/costs` or coexist? | Coexist -- `/costs` stays for billing, `/burn` adds observability. |
+| Sync trigger? | On existing `syncCosts` path + manual button in UI. No cron -- matches Ark's current model. |
 
-## Appendix — file manifest
+## Appendix -- file manifest
 
 ### New files
 - `packages/core/observability/burn/types.ts`
@@ -408,15 +408,15 @@ The build sequence is chosen so every intermediate commit compiles and tests sta
 - `packages/web/__tests__/BurnView.test.tsx`
 
 ### Modified files
-- `packages/core/repositories/schema.ts` — add `burn_turns` table
-- `packages/core/observability/pricing.ts` — augment with fast mode, web search, disk cache
-- `packages/core/observability/costs.ts` — `syncCosts` also calls `syncBurn`
-- `packages/core/app.ts` — register `BurnRepository` on `AppContext`
-- `packages/server/router.ts` (or wherever handlers are registered) — register burn handlers
-- `packages/web/src/App.tsx` — new `/burn` route
-- `packages/web/src/components/Sidebar.tsx` — new Burn entry with Flame icon
-- `packages/web/src/hooks/useHashRouter.ts` — add `burn` as a known view
-- `packages/web/src/hooks/useApi.ts` — add `getBurnSummary`, `syncBurn` helpers (optional; can inline in useBurnQueries)
+- `packages/core/repositories/schema.ts` -- add `burn_turns` table
+- `packages/core/observability/pricing.ts` -- augment with fast mode, web search, disk cache
+- `packages/core/observability/costs.ts` -- `syncCosts` also calls `syncBurn`
+- `packages/core/app.ts` -- register `BurnRepository` on `AppContext`
+- `packages/server/router.ts` (or wherever handlers are registered) -- register burn handlers
+- `packages/web/src/App.tsx` -- new `/burn` route
+- `packages/web/src/components/Sidebar.tsx` -- new Burn entry with Flame icon
+- `packages/web/src/hooks/useHashRouter.ts` -- add `burn` as a known view
+- `packages/web/src/hooks/useApi.ts` -- add `getBurnSummary`, `syncBurn` helpers (optional; can inline in useBurnQueries)
 
 ### License
 

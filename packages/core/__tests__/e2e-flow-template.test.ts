@@ -1,5 +1,5 @@
 /**
- * E2E tests for flow templating — verifies the full pipeline:
+ * E2E tests for flow templating -- verifies the full pipeline:
  * flow YAML with task templates -> resolveFlow with session vars -> substituted output.
  * Also verifies resolveAgent still works with the shared template helper.
  */

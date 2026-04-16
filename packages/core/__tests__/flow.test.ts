@@ -1,5 +1,5 @@
 /**
- * Tests for flow.ts — flow loading, stage navigation, gate evaluation,
+ * Tests for flow.ts -- flow loading, stage navigation, gate evaluation,
  * and stage action resolution.
  */
 

@@ -1,5 +1,5 @@
 /**
- * Repository map — compressed codebase structure for agent context.
+ * Repository map -- compressed codebase structure for agent context.
  * Scans files and extracts function/class/export signatures.
  */
 

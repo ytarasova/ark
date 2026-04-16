@@ -1,5 +1,5 @@
 /**
- * E2E tests for session stop behavior — preserving claude_session_id.
+ * E2E tests for session stop behavior -- preserving claude_session_id.
  *
  * Validates that:
  * - stop(app) sets status to "stopped"

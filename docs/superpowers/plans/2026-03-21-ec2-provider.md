@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the EC2 compute provider using Pulumi Automation API — SSH primitives, cloud-init, provisioning, environment sync, metrics, port tunneling, cost tracking, and idle shutdown.
+**Goal:** Build the EC2 compute provider using Pulumi Automation API -- SSH primitives, cloud-init, provisioning, environment sync, metrics, port tunneling, cost tracking, and idle shutdown.
 
 **Architecture:** The EC2 provider implements the `ComputeProvider` interface from Plan 1. It uses `@pulumi/pulumi` + `@pulumi/aws` for infrastructure lifecycle (provision/destroy), SSH for remote operations (metrics, sync, launch, port tunneling), and cloud-init for instance bootstrapping. Each host gets its own Pulumi stack (`ark-compute-{name}`) with local backend state at `~/.ark/pulumi/`.
 
@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-21-compute-layer-design.md`
 
-**Depends on:** Plan 1 (Compute Foundation) — completed.
+**Depends on:** Plan 1 (Compute Foundation) -- completed.
 
 **Note on test runner:** Tests use `bun:test` and are run via `bun test`.
 
@@ -115,7 +115,7 @@ describe("ec2 ssh", () => {
 
 - [ ] **Step 3: Implement ssh.ts**
 
-Create `packages/compute/providers/ec2/ssh.ts` — port from BigBox's `ssh.py`:
+Create `packages/compute/providers/ec2/ssh.ts` -- port from BigBox's `ssh.py`:
 - `sshKeyPath(hostName)` → `~/.ssh/ark-{hostName}`
 - `SSH_OPTS` array (StrictHostKeyChecking=no, ConnectTimeout=10, ServerAliveInterval=10, LogLevel=ERROR)
 - `sshBaseArgs(key, ip, ports?)` → build SSH command args with optional -L forwards
@@ -219,7 +219,7 @@ Test `rewritePaths(content, "push")` converts `/Users/{user}` → `/home/ubuntu`
 
 Port from BigBox's `sync/settings.py`:
 - `rewritePaths(content, direction)` → string replacement for Claude config path rewriting
-- `SYNC_CATEGORIES` — array of `{ name, push(key, ip), pull(key, ip) }`:
+- `SYNC_CATEGORIES` -- array of `{ name, push(key, ip), pull(key, ip) }`:
   - `ssh`: rsync `~/.ssh/` (push only, filter out `ark-*` keys)
   - `aws`: rsync `~/.aws/config` + `~/.aws/credentials` (push only)
   - `git`: rsync `~/.gitconfig` (push only)
@@ -251,8 +251,8 @@ Test `parseSnapshot(sampleOutput)` with a multi-section sample SSH output (same 
 - [ ] **Step 2: Implement metrics.ts**
 
 Port from BigBox's `dashboard/fetch.py` + `parse.py`:
-- `SSH_FAST_CMD` — single SSH command with section-delimited output (`=== CPU ===`, etc.)
-- `SSH_DOCKER_CMD` — docker stats + docker ps
+- `SSH_FAST_CMD` -- single SSH command with section-delimited output (`=== CPU ===`, etc.)
+- `SSH_DOCKER_CMD` -- docker stats + docker ps
 - `parseSections(stdout)` → parse `=== SECTION ===` delimited output into `Record<string, string[]>`
 - `parseSnapshot(stdout)` → parse sections into `HostSnapshot`
 - `fetchMetrics(key, ip)` → `sshExec` + `parseSnapshot`
@@ -308,7 +308,7 @@ Test `hourlyRate("m6i.2xlarge")` returns a positive number. Test `estimateDailyC
 - [ ] **Step 2: Implement cost.ts**
 
 Port from BigBox's `config.py` pricing + `aws.py` cost explorer:
-- `PRICING` — hourly rates for all m6i/m6g instance types
+- `PRICING` -- hourly rates for all m6i/m6g instance types
 - `hourlyRate(instanceType)` → lookup
 - `estimateDailyCost(instanceType, diskGb)` → compute + storage
 - `fetchAwsCost(hostName, opts?)` → Cost Explorer query with 4-hour cache
@@ -470,4 +470,4 @@ bunx tsc --noEmit
 | 7 | Cost tracking | `ec2/cost.ts` |
 | 8 | Clipboard sync | `ec2/clipboard.ts` |
 | 9 | EC2Provider class | `ec2/index.ts` |
-| 10 | Integration verification | — |
+| 10 | Integration verification | -- |

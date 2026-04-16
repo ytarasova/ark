@@ -94,7 +94,7 @@ function parseDevcontainerPorts(repoDir: string): number[] {
       if (Array.isArray(json.forwardPorts)) {
         return json.forwardPorts.filter((p: unknown): p is number => typeof p === "number");
       }
-    } catch { /* invalid JSON — skip */ }
+    } catch { /* invalid JSON -- skip */ }
   }
 
   return [];

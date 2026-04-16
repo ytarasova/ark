@@ -15,8 +15,8 @@ interface QueuedAction {
 
 /**
  * Async action runner with loading/error state and action queue.
- * Actions are queued — rapid-fire calls don't drop silently.
- * @param onComplete — called after every successful action (e.g. store.refresh)
+ * Actions are queued -- rapid-fire calls don't drop silently.
+ * @param onComplete -- called after every successful action (e.g. store.refresh)
  */
 export function useAsync(onComplete?: () => void): AsyncState {
   const [loading, setLoading] = useState(false);

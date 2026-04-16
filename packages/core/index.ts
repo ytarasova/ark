@@ -272,14 +272,14 @@ export { generateRepoMap, extractExports, formatRepoMap, type RepoMap, type Repo
 // Hybrid search (migrated to KnowledgeStore -- old hybrid-search removed)
 // hybridSearch, mergeAndDeduplicate removed -- use app.knowledge.search() directly
 
-// Types from packages/types — stricter domain types (aliased to avoid collision with store types)
+// Types from packages/types -- stricter domain types (aliased to avoid collision with store types)
 export type { Session as SessionDomain, SessionStatus, SessionConfig, CreateSessionOpts, SessionListFilters } from "../types/index.js";
 export type { Compute as ComputeDomain, ComputeStatus, ComputeProviderName, ComputeConfig, CreateComputeOpts } from "../types/index.js";
 export type { Event as EventDomain } from "../types/index.js";
 export type { Message as MessageDomain, MessageRole, MessageType } from "../types/index.js";
 export type { ComputeSnapshot, PortDecl } from "../types/index.js";
 export type { AgentDefinition as AgentDefinitionDomain } from "../types/index.js";
-// GateType is from types/flow.ts — FlowDefinition/StageDefinition already come from ./flow.js via export *
+// GateType is from types/flow.ts -- FlowDefinition/StageDefinition already come from ./flow.js via export *
 export type { GateType } from "../types/index.js";
 
 // Auth and multi-tenancy

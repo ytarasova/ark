@@ -1,5 +1,5 @@
 /**
- * Tests for useAgentOutput — poll agent output for a running session.
+ * Tests for useAgentOutput -- poll agent output for a running session.
  * Uses a mock ArkClient instead of direct core imports.
  */
 

@@ -1,5 +1,5 @@
 /**
- * MCP Socket Pool — shares MCP server processes across sessions.
+ * MCP Socket Pool -- shares MCP server processes across sessions.
  *
  * Instead of each session spawning its own MCP server (N sessions x M servers = N*M processes),
  * the pool runs each MCP server once and proxies connections via Unix domain sockets.
@@ -87,18 +87,18 @@ class SocketProxy {
           try {
             const msg = JSON.parse(line);
             if (msg.id !== undefined && this.requestMap.has(msg.id)) {
-              // Routed response — send to originating client
+              // Routed response -- send to originating client
               const client = this.requestMap.get(msg.id)!;
               this.requestMap.delete(msg.id);
               this.safeWrite(client, line + "\n");
             } else {
-              // Notification — broadcast to all clients
+              // Notification -- broadcast to all clients
               for (const client of this.clients) {
                 this.safeWrite(client, line + "\n");
               }
             }
           } catch {
-            // Non-JSON output — broadcast
+            // Non-JSON output -- broadcast
             for (const client of this.clients) {
               this.safeWrite(client, line + "\n");
             }

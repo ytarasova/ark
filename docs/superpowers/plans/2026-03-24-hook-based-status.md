@@ -1,10 +1,10 @@
-# Hook-Based Agent Status Detection — Implementation Plan
+# Hook-Based Agent Status Detection -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace fragile tmux pane polling with Claude Code's native hook system for instant, reliable agent status detection.
 
-**Architecture:** At dispatch time, `claude.ts` writes `.claude/settings.local.json` into the session working directory with HTTP hooks that POST status events to the conductor. The conductor maps hook events to session statuses in SQLite. Hooks are ONLY for status — channels remain the agent↔human communication system.
+**Architecture:** At dispatch time, `claude.ts` writes `.claude/settings.local.json` into the session working directory with HTTP hooks that POST status events to the conductor. The conductor maps hook events to session statuses in SQLite. Hooks are ONLY for status -- channels remain the agent↔human communication system.
 
 **Tech Stack:** Claude Code hooks (HTTP type), Bun HTTP server (existing conductor), SQLite (existing store)
 
@@ -14,8 +14,8 @@
 
 | File | Responsibility |
 |------|---------------|
-| `packages/core/claude.ts` | **Modify:** Add `writeHooksConfig()` and `removeHooksConfig()` — write/clean `.claude/settings.local.json` with status hooks |
-| `packages/core/conductor.ts` | **Modify:** Add `POST /hooks/status` endpoint — tiny status receiver, maps hook events to session status |
+| `packages/core/claude.ts` | **Modify:** Add `writeHooksConfig()` and `removeHooksConfig()` -- write/clean `.claude/settings.local.json` with status hooks |
+| `packages/core/conductor.ts` | **Modify:** Add `POST /hooks/status` endpoint -- tiny status receiver, maps hook events to session status |
 | `packages/core/session.ts` | **Modify:** Call `writeHooksConfig()` in `launchAgentTmux()` after `writeChannelConfig()` (line 345) |
 | `packages/core/__tests__/claude-hooks.test.ts` | **Create:** Tests for writeHooksConfig/removeHooksConfig |
 | `packages/core/__tests__/conductor-hooks.test.ts` | **Create:** Tests for the /hooks/status endpoint |
@@ -24,7 +24,7 @@ No new files beyond tests. No schema changes. No new dependencies.
 
 ---
 
-### Task 1: writeHooksConfig() — generate .claude/settings.local.json
+### Task 1: writeHooksConfig() -- generate .claude/settings.local.json
 
 **Files:**
 - Test: `packages/core/__tests__/claude-hooks.test.ts`
@@ -34,7 +34,7 @@ No new files beyond tests. No schema changes. No new dependencies.
 
 ```ts
 /**
- * Tests for claude.ts hook config — writeHooksConfig / removeHooksConfig.
+ * Tests for claude.ts hook config -- writeHooksConfig / removeHooksConfig.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
@@ -127,7 +127,7 @@ describe("writeHooksConfig", () => {
     expect(settings.hooks).toBeDefined();
   });
 
-  it("is idempotent — calling twice doesn't duplicate hooks", () => {
+  it("is idempotent -- calling twice doesn't duplicate hooks", () => {
     const workdir = ctx.arkDir;
     writeHooksConfig("s-test", "http://localhost:19100", workdir);
     writeHooksConfig("s-test", "http://localhost:19100", workdir);
@@ -179,7 +179,7 @@ describe("removeHooksConfig", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `bun test packages/core/__tests__/claude-hooks.test.ts`
-Expected: FAIL — `writeHooksConfig` and `removeHooksConfig` not exported.
+Expected: FAIL -- `writeHooksConfig` and `removeHooksConfig` not exported.
 
 - [ ] **Step 3: Implement writeHooksConfig and removeHooksConfig**
 
@@ -222,7 +222,7 @@ function buildHooksConfig(sessionId: string, conductorUrl: string): Record<strin
 
 /**
  * Write .claude/settings.local.json with status hooks.
- * Merges with existing settings — preserves all non-hook keys.
+ * Merges with existing settings -- preserves all non-hook keys.
  * Idempotent: replaces any existing ark hooks.
  */
 export function writeHooksConfig(
@@ -294,7 +294,7 @@ export function removeHooksConfig(workdir: string): void {
 
 Notes:
 - Add `renameSync` to the existing `import { ... } from "fs"` at the top of `claude.ts` (line 10).
-- We use `type: "command"` with `curl` rather than `type: "http"` because `curl` works on all compute targets (local, EC2, Docker) regardless of Claude Code version. The `# ark-status` comment prefix is a marker for idempotent cleanup — it's a bash comment, so it doesn't execute or block the curl command.
+- We use `type: "command"` with `curl` rather than `type: "http"` because `curl` works on all compute targets (local, EC2, Docker) regardless of Claude Code version. The `# ark-status` comment prefix is a marker for idempotent cleanup -- it's a bash comment, so it doesn't execute or block the curl command.
 - `SessionStart` is included to detect agent start before the first `UserPromptSubmit`.
 
 - [ ] **Step 4: Run tests, fix issues until green**
@@ -469,7 +469,7 @@ describe("Conductor /hooks/status", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `bun test packages/core/__tests__/conductor-hooks.test.ts`
-Expected: FAIL — /hooks/status endpoint returns 404.
+Expected: FAIL -- /hooks/status endpoint returns 404.
 
 - [ ] **Step 3: Add the /hooks/status endpoint to conductor.ts**
 
@@ -559,7 +559,7 @@ git commit -m "feat: conductor /hooks/status endpoint for agent status detection
 In `launchAgentTmux()`, after line 345 (`const mcpConfigPath = claude.writeChannelConfig(...)`), add:
 
 ```ts
-  // Status hooks — write .claude/settings.local.json for agent status detection
+  // Status hooks -- write .claude/settings.local.json for agent status detection
   claude.writeHooksConfig(session.id, conductorUrl, effectiveWorkdir);
 ```
 
@@ -567,7 +567,7 @@ This is a one-line change. The `conductorUrl` variable is already computed on li
 
 - [ ] **Step 2: Add removeHooksConfig to session cleanup in session.ts**
 
-In `session.ts`, in the `stop()` function and in `deleteSession()` (if it exists — otherwise in whatever function handles session teardown), add after the tmux kill:
+In `session.ts`, in the `stop()` function and in `deleteSession()` (if it exists -- otherwise in whatever function handles session teardown), add after the tmux kill:
 
 ```ts
   // Clean up hook config from working directory
@@ -576,7 +576,7 @@ In `session.ts`, in the `stop()` function and in `deleteSession()` (if it exists
   }
 ```
 
-This goes in `session.ts` (not `store.ts`) to avoid circular dependencies — `claude.ts` imports from `store.ts`, so `store.ts` cannot import from `claude.ts`.
+This goes in `session.ts` (not `store.ts`) to avoid circular dependencies -- `claude.ts` imports from `store.ts`, so `store.ts` cannot import from `claude.ts`.
 
 - [ ] **Step 3: Run existing session tests to verify no regressions**
 
@@ -598,7 +598,7 @@ git commit -m "feat: wire hook config into session dispatch and cleanup"
 ### Task 4: Verify status mapping + handle race conditions
 
 **Files:**
-- No file changes expected — this is a verification task.
+- No file changes expected -- this is a verification task.
 
 The hook status mapping is already aligned with existing statuses in Tasks 2-3:
 
@@ -621,8 +621,8 @@ The conductor's `handleReport` function (channel protocol) also sets statuses:
 Hook events and channel reports may arrive for the same session. This is OK because:
 - Channel reports are the **authoritative** state transitions (they trigger pipeline advancement)
 - Hook status updates are **advisory** (they provide real-time UI feedback)
-- If a hook sets `ready` and then a channel `completed` report arrives, the channel handler sets `ready` again and calls `advance()` — idempotent
-- The conductor endpoint should NOT call `advance()` on hook events — only channel reports trigger pipeline progression
+- If a hook sets `ready` and then a channel `completed` report arrives, the channel handler sets `ready` again and calls `advance()` -- idempotent
+- The conductor endpoint should NOT call `advance()` on hook events -- only channel reports trigger pipeline progression
 
 Verify that the conductor `/hooks/status` handler does NOT call `session.advance()`.
 

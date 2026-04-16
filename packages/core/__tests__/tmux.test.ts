@@ -1,5 +1,5 @@
 /**
- * Tests for tmux.ts — pure/deterministic helpers.
+ * Tests for tmux.ts -- pure/deterministic helpers.
  *
  * Covers: hasTmux, attachCommand, writeLauncher, sessionExists, listArkSessionsAsync.
  * Skips functions that create/kill real tmux sessions (covered by E2E tests).

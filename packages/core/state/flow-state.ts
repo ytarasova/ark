@@ -1,5 +1,5 @@
 /**
- * Flow state persistence — save/restore flow execution state.
+ * Flow state persistence -- save/restore flow execution state.
  * Auto-saves after each stage completion. Enables resume mid-pipeline.
  */
 

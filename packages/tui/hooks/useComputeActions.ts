@@ -69,11 +69,11 @@ export function useComputeActions(
     ping: (compute: ComputeLike) => {
       const cfg = compute.config as Record<string, unknown>;
       const ip = cfg?.ip as string | undefined;
-      if (!ip) { addLog(compute.name, "Local — always available"); return; }
+      if (!ip) { addLog(compute.name, "Local -- always available"); return; }
       addLog(compute.name, `Checking connectivity to ${ip}...`);
       run(`Pinging ${compute.name}`, async () => {
         const result = await ark.computePing(compute.name);
-        addLog(compute.name, result.reachable ? `Reachable — ${result.message}` : result.message);
+        addLog(compute.name, result.reachable ? `Reachable -- ${result.message}` : result.message);
       });
     },
 

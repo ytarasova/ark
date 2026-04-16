@@ -257,16 +257,16 @@ describe("indexTranscripts", () => {
     const bravoResults = searchTranscripts(getApp(), "bravo");
     expect(bravoResults.some(r => r.sessionId === "sess-multi")).toBe(true);
 
-    // Multi-term: both terms exist in the session (different turns) — should find it
+    // Multi-term: both terms exist in the session (different turns) -- should find it
     const multiResults = searchTranscripts(getApp(), "alpha bravo");
     expect(multiResults.some(r => r.sessionId === "sess-multi")).toBe(true);
 
-    // Multi-term with a non-existent term — should NOT find it
+    // Multi-term with a non-existent term -- should NOT find it
     const noResults = searchTranscripts(getApp(), "alpha zzzznonexistent");
     expect(noResults.some(r => r.sessionId === "sess-multi")).toBe(false);
   });
 
-  it("is fast — sub-100ms for indexed search", async () => {
+  it("is fast -- sub-100ms for indexed search", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
     const lines = [];
@@ -370,7 +370,7 @@ describe("indexSession", () => {
     expect(count).toBe(1);
   });
 
-  it("incremental — does not duplicate on second call", () => {
+  it("incremental -- does not duplicate on second call", () => {
     const transcriptPath = join(getCtx().arkDir, "replace.jsonl");
     writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: "first version here" }, timestamp: "2026-01-01T00:01:00Z" }));
     indexSession(getApp(), transcriptPath, "s-replace");
@@ -493,7 +493,7 @@ describe("indexSession improvements", () => {
     expect(count).toBe(1); // only the user message
   });
 
-  it("incremental — second call adds only new entries", () => {
+  it("incremental -- second call adds only new entries", () => {
     const path = join(getCtx().arkDir, "incr-test.jsonl");
     writeFileSync(path, JSON.stringify({ type: "user", message: { role: "user", content: "first message here" }, timestamp: "2026-01-01T00:01:00Z" }));
     indexSession(getApp(), path, "incr-test");

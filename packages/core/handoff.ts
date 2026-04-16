@@ -1,5 +1,5 @@
 /**
- * Agent-initiated handoff — agents signal which agent should run next.
+ * Agent-initiated handoff -- agents signal which agent should run next.
  * Detected from agent output patterns like "HANDOFF: reviewer" or structured JSON.
  */
 
@@ -11,13 +11,13 @@ export interface HandoffSignal {
 
 /** Detect handoff signals in agent output. */
 export function detectHandoff(output: string): HandoffSignal | null {
-  // Pattern 1: HANDOFF: <agent> — <reason>
+  // Pattern 1: HANDOFF: <agent> -- <reason>
   const handoffMatch = output.match(/HANDOFF:\s*(\w+)\s*(?:\u2014|-)\s*(.+?)(?:\n|$)/i);
   if (handoffMatch) {
     return { targetAgent: handoffMatch[1], reason: handoffMatch[2].trim() };
   }
 
-  // Pattern 2: JSON block with handoff — capture everything between ```json and ```
+  // Pattern 2: JSON block with handoff -- capture everything between ```json and ```
   const jsonBlockMatch = output.match(/```json\s*\n?([\s\S]*?)\n?```/);
   if (jsonBlockMatch && jsonBlockMatch[1].includes('"handoff"')) {
     try {

@@ -1,5 +1,5 @@
 /**
- * Select field — inline dropdown menu.
+ * Select field -- inline dropdown menu.
  *
  * When active: SelectMenu renders, j/k navigate options, Enter picks.
  * When inactive: shows current value as plain text.

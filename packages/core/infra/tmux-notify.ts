@@ -2,7 +2,7 @@
  * Tmux status bar integration.
  * Shows waiting sessions with jump shortcuts in tmux status-left.
  *
- * Uses execSync intentionally — tmux CLI requires shell invocation
+ * Uses execSync intentionally -- tmux CLI requires shell invocation
  * and all arguments are internally constructed (no user input).
  */
 
@@ -30,7 +30,7 @@ export function updateTmuxStatusBar(app: AppContext): void {
     const bar = `#[fg=yellow,bold]⚡ ${entries.join(" ")} `;
     execFileSync(tmuxBin(), ["set-option", "-g", "status-left", bar], { stdio: "ignore" });
   } catch {
-    // tmux not available or not in tmux — silently ignore
+    // tmux not available or not in tmux -- silently ignore
   }
 }
 

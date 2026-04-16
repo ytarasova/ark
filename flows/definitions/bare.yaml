@@ -1,5 +1,5 @@
 name: bare
-description: "Single agent session — interactive, user decides when done"
+description: "Single agent session -- interactive, user decides when done"
 stages:
   - name: work
     agent: worker

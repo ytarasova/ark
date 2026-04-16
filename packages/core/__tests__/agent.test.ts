@@ -1,5 +1,5 @@
 /**
- * Tests for agent.ts — CRUD, template resolution, CLI arg building.
+ * Tests for agent.ts -- CRUD, template resolution, CLI arg building.
  */
 
 import { describe, it, expect, beforeEach } from "bun:test";
@@ -339,7 +339,7 @@ describe("resolveAgent", () => {
     expect(agent!.system_prompt).toBe("Known: T-1, Unknown: {custom_var}");
   });
 
-  it("handles empty session — vars resolve to empty strings", () => {
+  it("handles empty session -- vars resolve to empty strings", () => {
     writeAgentYaml("empty-session", {
       name: "empty-session",
       system_prompt: "Ticket={ticket}, Repo={repo}",

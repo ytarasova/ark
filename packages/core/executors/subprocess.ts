@@ -1,5 +1,5 @@
 /**
- * Subprocess executor — runs arbitrary commands as child processes.
+ * Subprocess executor -- runs arbitrary commands as child processes.
  *
  * For agent YAML with `runtime: subprocess` and a `command` field.
  * Spawns the command, tracks the process, buffers output.
@@ -55,7 +55,7 @@ export const subprocessExecutor: Executor = {
             tracked.stdout.push(new TextDecoder().decode(value));
           }
         } catch {
-          // Stream ended or errored — expected during process exit
+          // Stream ended or errored -- expected during process exit
         }
       })();
     }
@@ -71,7 +71,7 @@ export const subprocessExecutor: Executor = {
             tracked.stderr.push(new TextDecoder().decode(value));
           }
         } catch {
-          // Stream ended or errored — expected during process exit
+          // Stream ended or errored -- expected during process exit
         }
       })();
     }
@@ -107,7 +107,7 @@ export const subprocessExecutor: Executor = {
   async send(handle: string, message: string): Promise<void> {
     const tracked = processes.get(handle);
     if (!tracked || tracked.exited) return;
-    // Bun's stdin is a FileSink — write directly
+    // Bun's stdin is a FileSink -- write directly
     const sink = tracked.proc.stdin;
     if (sink) {
       (sink as { write(data: Uint8Array): number }).write(new TextEncoder().encode(message + "\n"));

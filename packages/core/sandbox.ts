@@ -1,5 +1,5 @@
 /**
- * Docker sandbox mode — run sessions in isolated containers.
+ * Docker sandbox mode -- run sessions in isolated containers.
  * Project directory is bind-mounted RW, system is protected.
  */
 

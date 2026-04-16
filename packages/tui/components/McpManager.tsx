@@ -100,7 +100,7 @@ export function McpManager({ session, onClose, onApply }: McpManagerProps) {
     <Box flexDirection="column" borderStyle="round" borderColor={theme.accent} paddingX={1}>
       <Box marginBottom={1}>
         <Text bold color={theme.accent}>MCP Manager</Text>
-        <Text color={theme.dimText}> — {projectDir}</Text>
+        <Text color={theme.dimText}> -- {projectDir}</Text>
       </Box>
 
       {serverNames.map((name, i) => {
@@ -114,7 +114,7 @@ export function McpManager({ session, onClose, onApply }: McpManagerProps) {
             <Text color={isCursor ? theme.accent : undefined} bold={isCursor}>
               {isCursor ? ">" : " "} {enabled ? "[x]" : "[ ]"} {name}
             </Text>
-            <Text color={theme.dimText}> — {info.description}</Text>
+            <Text color={theme.dimText}> -- {info.description}</Text>
             {changed && <Text color={theme.waiting}> *</Text>}
           </Box>
         );

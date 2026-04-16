@@ -1,5 +1,5 @@
 /**
- * Tests for useArkStore — fetchAll running guard and error recovery.
+ * Tests for useArkStore -- fetchAll running guard and error recovery.
  *
  * These are unit tests for the fetchAll locking logic. We test the
  * core behavior (running flag in finally block) without React rendering,

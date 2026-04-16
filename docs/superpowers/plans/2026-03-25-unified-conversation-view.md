@@ -1,10 +1,10 @@
-# Unified Conversation View — Implementation Plan
+# Unified Conversation View -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Unify conversation history across Sessions and History tabs — all powered by the FTS5 `transcript_index`, fed in real-time by hooks, with per-session and cross-session search.
+**Goal:** Unify conversation history across Sessions and History tabs -- all powered by the FTS5 `transcript_index`, fed in real-time by hooks, with per-session and cross-session search.
 
-**Architecture:** The FTS5 `transcript_index` table becomes the single source of truth for all conversation data. Hooks feed it in real-time (on `Stop`/`SessionEnd`). The Session detail pane reads conversation from FTS5 instead of raw tmux output. History tab already reads from FTS5. A new `searchSessionConversation(sessionId, query)` function enables per-session search. The `indexSession` function gets smarter — skips tool_use/tool_result entries, only indexes real conversation.
+**Architecture:** The FTS5 `transcript_index` table becomes the single source of truth for all conversation data. Hooks feed it in real-time (on `Stop`/`SessionEnd`). The Session detail pane reads conversation from FTS5 instead of raw tmux output. History tab already reads from FTS5. A new `searchSessionConversation(sessionId, query)` function enables per-session search. The `indexSession` function gets smarter -- skips tool_use/tool_result entries, only indexes real conversation.
 
 **Tech Stack:** SQLite FTS5, existing hooks infrastructure, existing search.ts module
 
@@ -16,7 +16,7 @@
 |------|--------|
 | `packages/core/search.ts` | **Modify:** Add `getSessionConversation(sessionId)` and `searchSessionConversation(sessionId, query)` |
 | `packages/core/index.ts` | **Modify:** Re-export new functions |
-| `packages/core/conductor.ts` | **Modify:** Index on every `Stop` (not just `SessionEnd`) — more frequent updates |
+| `packages/core/conductor.ts` | **Modify:** Index on every `Stop` (not just `SessionEnd`) -- more frequent updates |
 | `packages/tui/tabs/SessionsTab.tsx` | **Modify:** Session detail shows conversation from FTS5, add `/` key for in-session search |
 | `packages/tui/tabs/HistoryTab.tsx` | **Modify:** Conversation preview reads from FTS5 instead of file tail |
 | `packages/core/__tests__/search.test.ts` | **Modify:** Add tests for new functions |
@@ -87,23 +87,23 @@ export { ..., getSessionConversation, searchSessionConversation } from "./search
 - [ ] **Step 5: Commit**
 
 ```bash
-git commit -m "feat: getSessionConversation + searchSessionConversation — per-session FTS5 queries"
+git commit -m "feat: getSessionConversation + searchSessionConversation -- per-session FTS5 queries"
 ```
 
 ---
 
-### Task 2: Improve indexSession — filter noise, support incremental
+### Task 2: Improve indexSession -- filter noise, support incremental
 
 **Files:**
 - Modify: `packages/core/search.ts` (the `indexSession` function)
 - Modify: `packages/core/__tests__/search.test.ts`
 
 Current `indexSession` reads the ENTIRE transcript file and indexes everything. Fix:
-1. Read only the tail (64KB) for large files — same as `indexTranscripts`
+1. Read only the tail (64KB) for large files -- same as `indexTranscripts`
 2. Skip `tool_result` and `tool_use`-only entries (already done in `indexTranscripts` but not in `indexSession`)
 3. Skip messages under 10 chars
 
-Also: don't delete+reinsert on every call — check if the session already has entries and only add new ones (append-only). Use `rowid` or `timestamp` to determine what's new.
+Also: don't delete+reinsert on every call -- check if the session already has entries and only add new ones (append-only). Use `rowid` or `timestamp` to determine what's new.
 
 Tests:
 - `indexSession` skips tool_result entries
@@ -133,7 +133,7 @@ The `SessionDetail` component currently shows live tmux output (`useAgentOutput`
 1. Use `useMemo` or `useEffect` to call `core.getSessionConversation(s.claude_session_id || s.id)` when the session changes
 2. Display conversation turns below the events section
 3. Each turn shows `You:` or `Claude:` with the text, using `wrap="wrap"` for long messages
-4. All I/O through `asyncState.run()` — load conversation asynchronously
+4. All I/O through `asyncState.run()` -- load conversation asynchronously
 
 The `claude_session_id` is the key that links an Ark session to its Claude transcript. If null, fall back to the Ark session ID.
 
@@ -170,7 +170,7 @@ When viewing a session's right pane (detail), pressing `/` opens a search input.
 - [ ] **Step 5: Commit**
 
 ```bash
-git commit -m "feat: in-session search — / key searches conversation within a session"
+git commit -m "feat: in-session search -- / key searches conversation within a session"
 ```
 
 ---
@@ -202,30 +202,30 @@ Falls back to empty if session isn't indexed yet (user hasn't pressed `r` or hoo
 - [ ] **Step 4: Commit**
 
 ```bash
-git commit -m "refactor: History conversation preview reads from FTS5 — no more file I/O"
+git commit -m "refactor: History conversation preview reads from FTS5 -- no more file I/O"
 ```
 
 ---
 
-### Task 6: Index more frequently — on every Stop hook, not just SessionEnd
+### Task 6: Index more frequently -- on every Stop hook, not just SessionEnd
 
 **Files:**
 - Modify: `packages/core/conductor.ts`
 
-Currently `indexSession` is called on `Stop` and `SessionEnd`. The `Stop` hook fires after every agent turn — that's the right time to index because:
+Currently `indexSession` is called on `Stop` and `SessionEnd`. The `Stop` hook fires after every agent turn -- that's the right time to index because:
 - The transcript has new content
 - The user might switch to the session detail to see what happened
 
 The current code already does this (line 165). Verify it works and that the incremental indexing (from Task 2) makes this cheap.
 
-Also: on `UserPromptSubmit`, the user just sent a message. We could index that too — but it's redundant since `Stop` fires right after.
+Also: on `UserPromptSubmit`, the user just sent a message. We could index that too -- but it's redundant since `Stop` fires right after.
 
 - [ ] **Step 1: Verify existing hook indexing works with incremental mode**
 - [ ] **Step 2: Add test for the full flow: create session → post hook → verify indexed**
 - [ ] **Step 3: Commit**
 
 ```bash
-git commit -m "test: verify real-time indexing via hooks — Stop and SessionEnd"
+git commit -m "test: verify real-time indexing via hooks -- Stop and SessionEnd"
 ```
 
 ---
@@ -249,6 +249,6 @@ End-to-end tests for the full flow:
 - [ ] **Step 4: Commit and push**
 
 ```bash
-git commit -m "test: E2E tests for unified conversation view — hooks, indexing, search"
+git commit -m "test: E2E tests for unified conversation view -- hooks, indexing, search"
 git push
 ```

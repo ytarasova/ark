@@ -1,5 +1,5 @@
 /**
- * Guardrails — pattern-based tool authorization.
+ * Guardrails -- pattern-based tool authorization.
  *
  * Evaluates tool calls against a set of rules to determine
  * whether they should be blocked, warned about, or allowed.

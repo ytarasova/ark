@@ -1,5 +1,5 @@
 /**
- * Tests for useComputeMetrics — polling metrics hook with log management.
+ * Tests for useComputeMetrics -- polling metrics hook with log management.
  */
 
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";

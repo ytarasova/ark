@@ -4,7 +4,7 @@
 
 **Goal:** Add Claude Code Channels as the programmatic communication layer between Ark conductor and agent sessions, while keeping tmux for human attach/detach/deep-dive.
 
-**Architecture:** Two communication paths — Channels (MCP over stdio) for structured agent↔conductor messaging, tmux for human observation and interaction. The ark-channel MCP server runs alongside each Claude session, receiving task assignments and reporting progress/completion back. The conductor sends tasks via channel notifications, agents reply via channel tools. Humans can still `tmux attach` at any time.
+**Architecture:** Two communication paths -- Channels (MCP over stdio) for structured agent↔conductor messaging, tmux for human observation and interaction. The ark-channel MCP server runs alongside each Claude session, receiving task assignments and reporting progress/completion back. The conductor sends tasks via channel notifications, agents reply via channel tools. Humans can still `tmux attach` at any time.
 
 **Tech Stack:** Bun, TypeScript, `@modelcontextprotocol/sdk`, `bun:sqlite`, tmux
 
@@ -246,7 +246,7 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           message: {
             type: "string",
-            description: "Report content — summary, question text, or error message",
+            description: "Report content -- summary, question text, or error message",
           },
           filesChanged: {
             type: "array",
@@ -290,7 +290,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         body: JSON.stringify(report),
       });
     } catch {
-      // Conductor not running — log locally
+      // Conductor not running -- log locally
       console.error(`[ark-channel] Conductor unreachable: ${JSON.stringify(report)}`);
     }
 
@@ -343,7 +343,7 @@ echo '{"mcpServers":{"ark":{"command":"bun","args":["packages/core/channel.ts"],
 claude --mcp-config /tmp/ark-mcp.json --dangerously-load-development-channels server:ark
 ```
 
-Verify: Claude starts, shows ark channel loaded. Type "report progress" — Claude should call the `report` tool.
+Verify: Claude starts, shows ark channel loaded. Type "report progress" -- Claude should call the `report` tool.
 
 - [ ] **Step 3: Commit**
 
@@ -364,7 +364,7 @@ Instead of `tmux.waitAndSend()` to inject the task, the channel server pushes th
 
 - [ ] **Step 1: Add channel MCP config to agent launch**
 
-Modify `packages/core/agent.ts` — add function to generate channel MCP config:
+Modify `packages/core/agent.ts` -- add function to generate channel MCP config:
 
 ```typescript
 export function channelMcpConfig(sessionId: string, stage: string, channelPort: number): Record<string, unknown> {
@@ -452,11 +452,11 @@ Create `packages/core/conductor.ts`:
  * Conductor: HTTP server that receives channel reports from agents.
  *
  * Routes:
- *   POST /api/channel/:sessionId — receive agent report (progress/completed/question/error)
- *   GET  /api/sessions            — list sessions (for TUI/web)
- *   GET  /api/sessions/:id        — get session detail
- *   GET  /api/events/:id          — get events
- *   GET  /health                  — health check
+ *   POST /api/channel/:sessionId -- receive agent report (progress/completed/question/error)
+ *   GET  /api/sessions            -- list sessions (for TUI/web)
+ *   GET  /api/sessions/:id        -- get session detail
+ *   GET  /api/events/:id          -- get events
+ *   GET  /health                  -- health check
  */
 
 import * as store from "./store.js";
@@ -616,7 +616,7 @@ Handler: POST to conductor's `/api/relay` endpoint.
 - [ ] **Step 2: Add relay endpoint to conductor**
 
 ```typescript
-// POST /api/relay — route message from one agent to another
+// POST /api/relay -- route message from one agent to another
 if (req.method === "POST" && path === "/api/relay") {
   const { from, target, message } = await req.json();
   // Find target's channel port
@@ -658,7 +658,7 @@ git commit -m "feat: agent-to-agent communication via channel relay"
 - Modify: `packages/core/conductor.ts` (handleReport → auto-dispatch next stage)
 - Modify: `packages/core/session.ts` (advance auto-dispatches)
 
-When an agent reports `type: "completed"`, the conductor advances the pipeline and auto-dispatches the next agent stage — fully automated for auto-gate stages.
+When an agent reports `type: "completed"`, the conductor advances the pipeline and auto-dispatches the next agent stage -- fully automated for auto-gate stages.
 
 - [ ] **Step 1: Enhance handleReport for auto-advancement**
 
@@ -669,7 +669,7 @@ case "completed":
   store.updateSession(sessionId, { status: "ready", session_id: null });
   const advResult = session.advance(sessionId);
   if (advResult.ok) {
-    // Check if next stage is an agent — auto-dispatch
+    // Check if next stage is an agent -- auto-dispatch
     const updated = store.getSession(sessionId);
     if (updated && updated.status === "ready") {
       const nextAction = pipeline.getStageAction(updated.pipeline, updated.stage!);
@@ -762,8 +762,8 @@ git commit -m "feat: TUI shows channel connection status and agent reports"
 | **Agent asks question** | Never (stays at `❯` prompt) | `report` tool → session status = "waiting" |
 | **Pipeline advancement** | Manual (`c` key or conductor polling) | Automatic via channel completion |
 | **Agent-to-agent** | Not possible | `send_to_agent` tool via conductor relay |
-| **Human watches** | `tmux capture-pane` | Same — tmux capture (unchanged) |
-| **Human steers** | `tmux attach` + type | Same — tmux attach (unchanged) |
+| **Human watches** | `tmux capture-pane` | Same -- tmux capture (unchanged) |
+| **Human steers** | `tmux attach` + type | Same -- tmux attach (unchanged) |
 | **Human answers question** | `ark session send` (tmux send-keys) | Channel notification via conductor |
 
 **tmux stays for:** human attach/detach, visual monitoring, interactive steering, debugging.

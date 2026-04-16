@@ -1,5 +1,5 @@
 /**
- * Tests for guardrails.ts — tool authorization rules.
+ * Tests for guardrails.ts -- tool authorization rules.
  */
 
 import { describe, it, expect } from "bun:test";

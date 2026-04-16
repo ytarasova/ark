@@ -1,5 +1,5 @@
 /**
- * Tests for tools.ts — unified tool discovery, MCP server CRUD, command CRUD.
+ * Tests for tools.ts -- unified tool discovery, MCP server CRUD, command CRUD.
  */
 
 import { describe, it, expect } from "bun:test";

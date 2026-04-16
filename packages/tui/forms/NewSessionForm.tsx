@@ -35,7 +35,7 @@ interface NewSessionFormProps {
   prefill?: SessionPrefill;
 }
 
-// Isolation choices are provider-driven — see ComputeProvider.isolationModes
+// Isolation choices are provider-driven -- see ComputeProvider.isolationModes
 
 export function NewSessionForm({ store, asyncState, onDone, prefill }: NewSessionFormProps) {
   const theme = getTheme();

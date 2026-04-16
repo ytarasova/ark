@@ -1,16 +1,16 @@
-# Ark Compute Layer — Design Spec
+# Ark Compute Layer -- Design Spec
 
 ## Goal
 
-Integrate compute provisioning, host management, environment sync, and full observability into Ark — absorbing key capabilities from the original Arc (Python/Pulumi) and BigBox (Python/boto3) into Ark's TypeScript/Bun stack. This makes Ark a complete autonomous agent platform that can dispatch agents to local machines, Docker containers, and remote EC2 instances.
+Integrate compute provisioning, host management, environment sync, and full observability into Ark -- absorbing key capabilities from the original Arc (Python/Pulumi) and BigBox (Python/boto3) into Ark's TypeScript/Bun stack. This makes Ark a complete autonomous agent platform that can dispatch agents to local machines, Docker containers, and remote EC2 instances.
 
 ## Context
 
 Three codebases contribute to this design:
 
-- **Ark** (`/Users/yana/Projects/ark`) — TypeScript/Bun. The conductor, pipeline orchestration, agent management, channels, TUI. This is the target and keeps its existing architecture intact.
-- **Original Arc** (`ytarasova/arc` on GitHub) — Python. Pulumi EC2 provisioning, multi-compute pools, instance size tiers, devcontainer support, remote session execution. The compute layer that was lost in the TypeScript rewrite.
-- **BigBox** (`/Users/yana/Projects/bigbox`) — Python. SSH-based host metrics, environment sync, idle shutdown, cost tracking, clipboard sync, port forwarding. Operational tooling for managing remote dev boxes.
+- **Ark** (`/Users/yana/Projects/ark`) -- TypeScript/Bun. The conductor, pipeline orchestration, agent management, channels, TUI. This is the target and keeps its existing architecture intact.
+- **Original Arc** (`ytarasova/arc` on GitHub) -- Python. Pulumi EC2 provisioning, multi-compute pools, instance size tiers, devcontainer support, remote session execution. The compute layer that was lost in the TypeScript rewrite.
+- **BigBox** (`/Users/yana/Projects/bigbox`) -- Python. SSH-based host metrics, environment sync, idle shutdown, cost tracking, clipboard sync, port forwarding. Operational tooling for managing remote dev boxes.
 
 After this integration, both Python codebases can be retired.
 
@@ -22,28 +22,28 @@ After this integration, both Python codebases can be retired.
 
 ```
 packages/
-  core/              # existing — orchestration (unchanged interface, extended internals)
+  core/              # existing -- orchestration (unchanged interface, extended internals)
     store.ts          # adds: hosts table, port records on sessions
     session.ts        # adds: calls compute.launch() at dispatch time
     conductor.ts      # adds: host health polling, port probing, clipboard routing
 
-  compute/            # NEW — everything about getting code running on a machine
+  compute/            # NEW -- everything about getting code running on a machine
     index.ts          # public API, provider registry
     types.ts          # ComputeProvider interface, Host, HostSnapshot, PortDecl, etc.
     arc-json.ts       # parse arc.json (ports, sync files, compose/devcontainer flags)
 
     providers/
       local/
-        index.ts      # LocalProvider — no provisioning, local tmux, shell metrics
+        index.ts      # LocalProvider -- no provisioning, local tmux, shell metrics
         metrics.ts    # local metrics via shell commands
 
       docker/
-        index.ts      # DockerProvider — Pulumi @pulumi/docker
+        index.ts      # DockerProvider -- Pulumi @pulumi/docker
         metrics.ts    # docker stats, container inspection
         devcontainer.ts  # detect, build, mount creds, resolve ports
 
       ec2/
-        index.ts      # EC2Provider — Pulumi @pulumi/aws
+        index.ts      # EC2Provider -- Pulumi @pulumi/aws
         provision.ts  # Pulumi Automation API (stacks, resources)
         metrics.ts    # SSH-based metrics collection + parsing
         cloud-init.ts # user-data script builder
@@ -154,7 +154,7 @@ interface Host {
 ### Local provider config
 
 ```typescript
-{}  // empty — the machine is already there
+{}  // empty -- the machine is already there
 ```
 
 ### Default compute
@@ -253,9 +253,9 @@ Files declared in `arc.json` `"sync"` array are pushed from the local repo direc
 
 ### Port declaration sources
 
-1. `arc.json` `"ports"` — explicit project-level declaration
-2. `devcontainer.json` `"forwardPorts"` — auto-detected
-3. `docker-compose.yml` exposed ports — auto-detected
+1. `arc.json` `"ports"` -- explicit project-level declaration
+2. `devcontainer.json` `"forwardPorts"` -- auto-detected
+3. `docker-compose.yml` exposed ports -- auto-detected
 
 ### Port lifecycle
 
@@ -349,7 +349,7 @@ At dispatch time, if the project has a `docker-compose.yml` (or `arc.json` has `
 3. Extract exposed ports from compose config, add to session port list
 4. On session end: optionally `docker compose down`
 
-This is not a provider concern — it's part of the dispatch layer's project setup, and works on any provider that has Docker installed (EC2 with cloud-init, Docker provider natively, local if Docker is installed).
+This is not a provider concern -- it's part of the dispatch layer's project setup, and works on any provider that has Docker installed (EC2 with cloud-init, Docker provider natively, local if Docker is installed).
 
 ---
 
@@ -426,7 +426,7 @@ Per-repo config file, committed to the repository:
 ```
 
 - `ports`: what to forward between local machine and compute target
-- `sync`: project-specific files to push from local repo to remote working directory (not secrets themselves — the files like `.env` that contain them and are gitignored locally)
+- `sync`: project-specific files to push from local repo to remote working directory (not secrets themselves -- the files like `.env` that contain them and are gitignored locally)
 - `compose`: opt in/out of Docker Compose lifecycle (default: auto-detect)
 - `devcontainer`: opt in/out of devcontainer usage (default: auto-detect)
 
@@ -485,11 +485,11 @@ ark session attach <id>                  # re-establishes tunnels automatically
 
 ## Dropped
 
-- **Runner.sh** — conductor replaces it
-- **Local mode / MCP-over-SSE** — Claude always runs on compute target
-- **VCS integration** — agents handle their own PRs
-- **Kubernetes** — parked, provider interface ready for it
-- **Bitbucket CLI** — not needed (GitHub now)
+- **Runner.sh** -- conductor replaces it
+- **Local mode / MCP-over-SSE** -- Claude always runs on compute target
+- **VCS integration** -- agents handle their own PRs
+- **Kubernetes** -- parked, provider interface ready for it
+- **Bitbucket CLI** -- not needed (GitHub now)
 
 ## Dependencies
 

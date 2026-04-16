@@ -1,5 +1,5 @@
 /**
- * Replay — build a step-by-step timeline from a session's events.
+ * Replay -- build a step-by-step timeline from a session's events.
  *
  * Used by the TUI replay view to let users step through a completed
  * session's history event-by-event.

@@ -1,5 +1,5 @@
 /**
- * Unified threads panel — like a Slack channel where all agents
+ * Unified threads panel -- like a Slack channel where all agents
  * and the user participate. Shows messages from all sessions in
  * chronological order. User can reply with @session-name to target
  * a specific agent.
@@ -157,7 +157,7 @@ export function ThreadsPanel({ sessions, onDone }: ThreadsPanelProps) {
       <Text bold color={theme.accent}>{" Threads "}</Text>
       <Text> </Text>
 
-      {/* Message stream — j/k/g/G scroll when focused, auto-follow when input focused */}
+      {/* Message stream -- j/k/g/G scroll when focused, auto-follow when input focused */}
       {allMessages.length === 0 ? (
         <Box flexGrow={1}><Text dimColor>{"  No messages yet. Agents will post here."}</Text></Box>
       ) : (

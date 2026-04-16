@@ -1,5 +1,5 @@
 /**
- * Tests for claude.ts — model mapping, argument building, shell quoting,
+ * Tests for claude.ts -- model mapping, argument building, shell quoting,
  * channel config writing, and launcher generation.
  */
 

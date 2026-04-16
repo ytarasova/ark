@@ -1,5 +1,5 @@
 /**
- * Tests for useConfirmation — two-press confirmation pattern with auto-clear.
+ * Tests for useConfirmation -- two-press confirmation pattern with auto-clear.
  */
 
 import { describe, it, expect } from "bun:test";

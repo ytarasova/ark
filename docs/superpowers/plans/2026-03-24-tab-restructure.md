@@ -1,4 +1,4 @@
-# Tab Restructure + History Tab — Implementation Plan
+# Tab Restructure + History Tab -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -18,11 +18,11 @@
 | `packages/tui/App.tsx` | **Modify:** Update number key routing, add HistoryTab, remove Recipes placeholder |
 | `packages/tui/tabs/HistoryTab.tsx` | **Create:** Claude sessions browser + search + index |
 | `packages/tui/tabs/SessionsTab.tsx` | **Modify:** Remove `I` and `/` key handlers + Claude import overlay |
-| `packages/tui/components/StatusBar.tsx` | **Modify:** Update hints — remove `I`/`/` from sessions, add history hints |
+| `packages/tui/components/StatusBar.tsx` | **Modify:** Update hints -- remove `I`/`/` from sessions, add history hints |
 
 ---
 
-### Task 1: Update TabBar — new tab type and ordering
+### Task 1: Update TabBar -- new tab type and ordering
 
 **Files:**
 - Modify: `packages/tui/components/TabBar.tsx`
@@ -50,12 +50,12 @@ const TAB_KEYS: Record<Tab, string> = {
 
 ```bash
 git add packages/tui/components/TabBar.tsx
-git commit -m "refactor: reorder tabs — Sessions|Agents|Tools|Flows|History|Compute"
+git commit -m "refactor: reorder tabs -- Sessions|Agents|Tools|Flows|History|Compute"
 ```
 
 ---
 
-### Task 2: Create HistoryTab — Claude sessions + search + index
+### Task 2: Create HistoryTab -- Claude sessions + search + index
 
 **Files:**
 - Create: `packages/tui/tabs/HistoryTab.tsx`
@@ -63,8 +63,8 @@ git commit -m "refactor: reorder tabs — Sessions|Agents|Tools|Flows|History|Co
 - [ ] **Step 1: Create HistoryTab**
 
 The History tab has two modes:
-- **Browse** (default) — list Claude sessions, navigate with j/k, Enter to import
-- **Search** — type a query, see results from FTS5 + SQLite
+- **Browse** (default) -- list Claude sessions, navigate with j/k, Enter to import
+- **Search** -- type a query, see results from FTS5 + SQLite
 
 ```tsx
 import React, { useState, useMemo, useEffect } from "react";
@@ -223,12 +223,12 @@ export function HistoryTab({ pane, async: asyncState, refresh }: HistoryTabProps
 
 ```bash
 git add packages/tui/tabs/HistoryTab.tsx
-git commit -m "feat: add HistoryTab — Claude sessions browser with import + search + index"
+git commit -m "feat: add HistoryTab -- Claude sessions browser with import + search + index"
 ```
 
 ---
 
-### Task 3: Update App.tsx — route to new tabs
+### Task 3: Update App.tsx -- route to new tabs
 
 **Files:**
 - Modify: `packages/tui/App.tsx`
@@ -264,9 +264,9 @@ Replace the number key handlers in `useInput`:
 
 Replace the tab conditional rendering block. Key changes:
 - Agents moves to position 2
-- Tools (formerly Recipes) at position 3 — keep the "coming soon" placeholder for now
+- Tools (formerly Recipes) at position 3 -- keep the "coming soon" placeholder for now
 - Flows at position 4
-- History at position 5 — renders `<HistoryTab>`
+- History at position 5 -- renders `<HistoryTab>`
 - Compute moves to position 6
 
 ```tsx
@@ -290,7 +290,7 @@ Replace the tab conditional rendering block. Key changes:
         <AgentsTab {...store} pane={pane} />
       ) : tab === "tools" ? (
         <Box flexGrow={1} justifyContent="center" alignItems="center">
-          <Text dimColor>{"Tools — coming soon (recipes, skills, prompt templates)"}</Text>
+          <Text dimColor>{"Tools -- coming soon (recipes, skills, prompt templates)"}</Text>
         </Box>
       ) : tab === "flows" ? (
         <FlowsTab {...store} pane={pane} />
@@ -313,12 +313,12 @@ Replace the tab conditional rendering block. Key changes:
 
 ```bash
 git add packages/tui/App.tsx
-git commit -m "feat: route new tab order — Sessions|Agents|Tools|Flows|History|Compute"
+git commit -m "feat: route new tab order -- Sessions|Agents|Tools|Flows|History|Compute"
 ```
 
 ---
 
-### Task 4: Clean up SessionsTab — remove I and / handlers
+### Task 4: Clean up SessionsTab -- remove I and / handlers
 
 **Files:**
 - Modify: `packages/tui/tabs/SessionsTab.tsx`
@@ -341,7 +341,7 @@ Run: `bun test packages/tui/__tests__/`
 
 ```bash
 git add packages/tui/tabs/SessionsTab.tsx
-git commit -m "refactor: remove I and / handlers from SessionsTab — moved to HistoryTab"
+git commit -m "refactor: remove I and / handlers from SessionsTab -- moved to HistoryTab"
 ```
 
 ---
@@ -392,7 +392,7 @@ git commit -m "feat: update StatusBar hints for new tab structure"
 
 ---
 
-### Task 6: Update CLAUDE.md — new tab structure
+### Task 6: Update CLAUDE.md -- new tab structure
 
 **Files:**
 - Modify: `CLAUDE.md`

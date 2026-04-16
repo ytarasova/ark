@@ -1,5 +1,5 @@
 /**
- * Task/Progress Ledger — structured tracking for conductor orchestration.
+ * Task/Progress Ledger -- structured tracking for conductor orchestration.
  * Maintains facts, hypotheses, plan, and progress with stall detection.
  */
 
@@ -69,7 +69,7 @@ export function updateEntry(app: AppContext, conductorId: string, entryId: strin
   }
 }
 
-/** Detect stalls — no progress entries in the last N minutes. */
+/** Detect stalls -- no progress entries in the last N minutes. */
 export function detectStall(app: AppContext, conductorId: string, thresholdMinutes: number = 10): boolean {
   const ledger = loadLedger(app, conductorId);
   const progressEntries = ledger.entries.filter(e => e.type === "progress");

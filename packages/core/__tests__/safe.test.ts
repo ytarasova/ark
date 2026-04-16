@@ -26,7 +26,7 @@ describe("safeAsync", () => {
   });
 
   it("does not propagate the error", async () => {
-    // Should not throw — the point of safeAsync is error suppression
+    // Should not throw -- the point of safeAsync is error suppression
     let threw = false;
     try {
       await safeAsync("test", async () => { throw new Error("should be caught"); });

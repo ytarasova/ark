@@ -1,5 +1,5 @@
 /**
- * Tests for GitHub webhook handler — HMAC validation, comment extraction,
+ * Tests for GitHub webhook handler -- HMAC validation, comment extraction,
  * session binding, and main webhook dispatch.
  */
 

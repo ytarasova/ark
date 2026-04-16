@@ -1,5 +1,5 @@
 /**
- * Tests for useArkStore / StoreProvider — central store with push-based updates.
+ * Tests for useArkStore / StoreProvider -- central store with push-based updates.
  *
  * The old useStore hook (direct DB polling) was replaced by useArkStore
  * (JSON-RPC via ArkClient). These tests validate the StoreData interface

@@ -67,7 +67,7 @@ export function TalkToSession({ session, asyncState, onDone }: TalkToSessionProp
       <Text bold color={theme.accent}>{` Chat: ${session.summary ?? session.id} `}</Text>
       <Text> </Text>
 
-      {/* Messages — j/k/g/G scroll when focused, auto-follow when input focused */}
+      {/* Messages -- j/k/g/G scroll when focused, auto-follow when input focused */}
       {messages.length === 0 ? (
         <Box flexGrow={1}><Text dimColor>{"  No messages yet. Type below to send."}</Text></Box>
       ) : (

@@ -11,7 +11,7 @@ import type { SSHPool } from "./pool.js";
 export class SSHQueue {
   private pool: SSHPool;
 
-  // Metrics: drop-newest — only one in-flight at a time
+  // Metrics: drop-newest -- only one in-flight at a time
   private metricsInFlight = false;
 
   // Commands: FIFO chain
@@ -25,7 +25,7 @@ export class SSHQueue {
   }
 
   /**
-   * Metrics queue — drop-newest policy.
+   * Metrics queue -- drop-newest policy.
    * Returns null immediately if a metrics fetch is already in flight.
    * This prevents accumulation when SSH is slow.
    */
@@ -40,7 +40,7 @@ export class SSHQueue {
   }
 
   /**
-   * Command queue — FIFO.
+   * Command queue -- FIFO.
    * Used for: clone, upload configs, launch tmux, kill agent, capture output.
    */
   async command<T>(fn: (pool: SSHPool) => Promise<T>): Promise<T> {
@@ -53,7 +53,7 @@ export class SSHQueue {
   }
 
   /**
-   * Sync queue — FIFO, separate from commands.
+   * Sync queue -- FIFO, separate from commands.
    * Used for: rsync push/pull, credential sync, project file sync.
    */
   async sync<T>(fn: (pool: SSHPool) => Promise<T>): Promise<T> {

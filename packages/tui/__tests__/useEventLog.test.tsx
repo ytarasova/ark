@@ -1,5 +1,5 @@
 /**
- * Tests for useEventLog — fetches and transforms session events into display list.
+ * Tests for useEventLog -- fetches and transforms session events into display list.
  * Tests the data fetching and transformation logic through the React hook.
  *
  * Uses a mock ArkClient that returns data from the local DB, matching the

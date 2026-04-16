@@ -1,4 +1,4 @@
-# CI + GitHub Release + Install Script — Implementation Plan
+# CI + GitHub Release + Install Script -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -14,8 +14,8 @@
 
 | File | Change | Purpose |
 |------|--------|---------|
-| `.github/workflows/ci.yml` | **Create** | Test workflow — runs on push to main + PRs |
-| `.github/workflows/release.yml` | **Create** | Release workflow — tagged + rolling latest |
+| `.github/workflows/ci.yml` | **Create** | Test workflow -- runs on push to main + PRs |
+| `.github/workflows/release.yml` | **Create** | Release workflow -- tagged + rolling latest |
 | `docs/install.sh` | **Create** | Curl-installable install script |
 | `docs/index.html` | **Create** | GitHub Pages landing page |
 
@@ -65,7 +65,7 @@ jobs:
 
 Run: `cat .github/workflows/ci.yml | python3 -c "import sys, yaml; yaml.safe_load(sys.stdin.read()); print('YAML valid')"` (or `brew install yq && yq . .github/workflows/ci.yml > /dev/null && echo valid`)
 
-If neither yaml tool is available, visual inspection is fine — GitHub will validate on push.
+If neither yaml tool is available, visual inspection is fine -- GitHub will validate on push.
 
 - [ ] **Step 3: Commit**
 
@@ -146,7 +146,7 @@ jobs:
 
 ```bash
 git add .github/workflows/release.yml
-git commit -m "ci: add release workflow — tagged + rolling latest"
+git commit -m "ci: add release workflow -- tagged + rolling latest"
 ```
 
 ---
@@ -162,7 +162,7 @@ git commit -m "ci: add release workflow — tagged + rolling latest"
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Ark installer — downloads source from GitHub, installs via Bun.
+# Ark installer -- downloads source from GitHub, installs via Bun.
 # Usage: curl -fsSL https://ytarasova.github.io/ark/install.sh | bash
 # Pin version: curl ... | ARK_VERSION=v0.2.0 bash
 
@@ -191,12 +191,12 @@ command -v tar &>/dev/null || error "tar is required but not found."
 
 # Check for git (needed for worktree features at runtime)
 if ! command -v git &>/dev/null; then
-  warn "git not found — some features (worktrees, cloning) won't work."
+  warn "git not found -- some features (worktrees, cloning) won't work."
 fi
 
 # Check for tmux (needed at runtime for agent sessions)
 if ! command -v tmux &>/dev/null; then
-  warn "tmux not found — required for running agent sessions."
+  warn "tmux not found -- required for running agent sessions."
   warn "Install it: brew install tmux"
 fi
 
@@ -218,7 +218,7 @@ info "Installing Ark ($VERSION) to $INSTALL_DIR..."
 # Resolve download URL
 if [ "$VERSION" = "latest" ]; then
   TARBALL_URL="https://github.com/$REPO/releases/download/latest/latest.tar.gz"
-  # GitHub auto-generates source archives — but for rolling latest we use the API
+  # GitHub auto-generates source archives -- but for rolling latest we use the API
   TARBALL_URL=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/tags/latest" \
     | grep '"tarball_url"' | head -1 | cut -d'"' -f4)
 else
@@ -314,7 +314,7 @@ Run: `chmod +x docs/install.sh`
 
 - [ ] **Step 3: Test locally (dry run)**
 
-Run: `bash -n docs/install.sh` — checks for syntax errors without executing.
+Run: `bash -n docs/install.sh` -- checks for syntax errors without executing.
 Expected: No output (clean parse).
 
 - [ ] **Step 4: Commit**
@@ -339,7 +339,7 @@ git commit -m "feat: add curl-installable install script"
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ark — Autonomous Agent Ecosystem</title>
+  <title>Ark -- Autonomous Agent Ecosystem</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -420,12 +420,12 @@ Wait 1-2 minutes for the first deploy.
 
 - [ ] **Step 3: Verify CI runs**
 
-Go to https://github.com/ytarasova/ark/actions — the CI workflow should trigger on the push and run tests.
+Go to https://github.com/ytarasova/ark/actions -- the CI workflow should trigger on the push and run tests.
 
 - [ ] **Step 4: Verify Pages**
 
-Open https://ytarasova.github.io/ark/ — should show the landing page.
-Open https://ytarasova.github.io/ark/install.sh — should show the install script.
+Open https://ytarasova.github.io/ark/ -- should show the landing page.
+Open https://ytarasova.github.io/ark/install.sh -- should show the install script.
 
 - [ ] **Step 5: Test the release workflow**
 
@@ -435,7 +435,7 @@ git tag v0.1.0
 git push --tags
 ```
 
-Go to https://github.com/ytarasova/ark/releases — should show both a `v0.1.0` release and a `latest` release.
+Go to https://github.com/ytarasova/ark/releases -- should show both a `v0.1.0` release and a `latest` release.
 
 - [ ] **Step 6: Test the install script**
 

@@ -1,5 +1,5 @@
 /**
- * Push-based store — replaces useStore polling with ArkClient notifications.
+ * Push-based store -- replaces useStore polling with ArkClient notifications.
  *
  * On mount: fetches initial sessions, computes, agents, flows via RPC.
  * On notification: merges updates into local state.
@@ -7,7 +7,7 @@
  *
  * Key improvements over useStore:
  *   - session/* notifications → immediate UI update (no 3s polling lag)
- *   - Fallback refresh every 30s (vs 3s) — much less DB churn
+ *   - Fallback refresh every 30s (vs 3s) -- much less DB churn
  *   - Metrics fetched every 30s (same cadence as full refresh)
  */
 
@@ -66,7 +66,7 @@ export function useArkStore(): StoreData {
       setAgents(a);
       setFlows(f);
 
-      // Unread counts — batch over sessions
+      // Unread counts -- batch over sessions
       const counts = new Map<string, number>();
       await Promise.all(
         s.map(async (session: any) => {
@@ -81,7 +81,7 @@ export function useArkStore(): StoreData {
       );
       setUnreadCounts(counts);
 
-      // Metrics — fetch for every running compute
+      // Metrics -- fetch for every running compute
       const next = new Map<string, ComputeSnapshot>();
       await Promise.all(
         c
@@ -111,7 +111,7 @@ export function useArkStore(): StoreData {
     fetchAll();
   }, [fetchAll]);
 
-  // ── Notification subscriptions — real-time session updates ─────────────────
+  // ── Notification subscriptions -- real-time session updates ─────────────────
 
   useEffect(() => {
     const handleUpdated = (data: any) => {

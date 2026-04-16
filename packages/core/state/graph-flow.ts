@@ -1,5 +1,5 @@
 /**
- * Graph-based flow definitions — DAGs with conditional routing.
+ * Graph-based flow definitions -- DAGs with conditional routing.
  * Extends the existing linear flow system with parallel branches,
  * conditional edges, and join barriers.
  */

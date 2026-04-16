@@ -1,5 +1,5 @@
 /**
- * Tests for FormField — the base form field wrapper component.
+ * Tests for FormField -- the base form field wrapper component.
  * Verifies label display, active/inactive states, and editing indicator.
  */
 

@@ -75,7 +75,7 @@ export function SkillsManager({ session, asyncState, onClose }: SkillsManagerPro
             <Text color={isCursor ? "magenta" : undefined} bold={isCursor}>
               {isCursor ? ">" : " "} {enabled ? "[x]" : "[ ]"} {name}
             </Text>
-            {skill?.description && <Text color={theme.dimText}> — {skill.description.slice(0, 50)}</Text>}
+            {skill?.description && <Text color={theme.dimText}> -- {skill.description.slice(0, 50)}</Text>}
           </Box>
         );
       })}

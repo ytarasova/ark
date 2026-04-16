@@ -1,5 +1,5 @@
 /**
- * Hotkey configuration — remappable keyboard shortcuts.
+ * Hotkey configuration -- remappable keyboard shortcuts.
  * Config in ~/.ark/config.yaml under `hotkeys:` section.
  */
 

@@ -1,9 +1,9 @@
 /**
- * Test setup preload — isolate test state from production.
+ * Test setup preload -- isolate test state from production.
  *
  * Sets ARK_TEST_DIR for legacy code paths that haven't migrated to AppContext.
  * Tests using AppContext.forTest() create their own isolated temp dir and
- * don't need this — they get full isolation via app.boot() + app.shutdown().
+ * don't need this -- they get full isolation via app.boot() + app.shutdown().
  */
 
 import { mkdtempSync } from "fs";

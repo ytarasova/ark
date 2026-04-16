@@ -1,5 +1,5 @@
 /**
- * Claude Code session discovery — cached in SQLite, refreshed from disk on demand.
+ * Claude Code session discovery -- cached in SQLite, refreshed from disk on demand.
  *
  * On first call or explicit refresh, scans ~/.claude/projects/ and caches
  * results in claude_sessions_cache table. Subsequent reads are instant SQLite queries.
@@ -71,7 +71,7 @@ function isRealUserMessage(text: string): boolean {
 }
 
 /**
- * Fast metadata extraction — reads only first 8KB + last 2KB of the file,
+ * Fast metadata extraction -- reads only first 8KB + last 2KB of the file,
  * NOT the entire 100MB transcript. Uses grep -c for message counting.
  */
 async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession, "project" | "projectDir" | "transcriptPath"> | null> {
@@ -136,7 +136,7 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
         const entry = JSON.parse(tailLines[i]);
         if (entry.timestamp) { lastActivity = entry.timestamp; break; }
       } catch {
-          // Truncated JSON in tail buffer is expected — last line is often incomplete
+          // Truncated JSON in tail buffer is expected -- last line is often incomplete
         }
     }
 
@@ -147,7 +147,7 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
       });
       messageCount = parseInt(out.trim()) || 0;
     } catch {
-      // grep returns exit 1 if no matches — that's 0 messages
+      // grep returns exit 1 if no matches -- that's 0 messages
       messageCount = 0;
     }
   } catch (e: any) {
@@ -212,7 +212,7 @@ export function listClaudeSessions(app: AppContext, opts?: ListOpts): ClaudeSess
       lastActivity: r.last_activity,
     }));
   } catch (e: any) {
-    // Table may not exist yet on first run — SQLITE_ERROR is expected
+    // Table may not exist yet on first run -- SQLITE_ERROR is expected
     if (!String(e?.message).includes("no such table")) {
       console.error("listClaudeSessions:", e?.message ?? e);
     }
@@ -265,7 +265,7 @@ export async function refreshClaudeSessionsCache(app: AppContext, opts?: { baseD
     const row = db.prepare("SELECT MAX(cached_at) as max_ts FROM claude_sessions_cache").get() as MaxTsRow | undefined;
     lastCachedAt = row?.max_ts ?? "";
   } catch (e: any) {
-    // Table may not exist yet on first refresh — that's fine, we'll do a full scan
+    // Table may not exist yet on first refresh -- that's fine, we'll do a full scan
     if (!String(e?.message).includes("no such table")) {
       console.error("refreshClaudeSessionsCache (read max cached_at):", e?.message ?? e);
     }

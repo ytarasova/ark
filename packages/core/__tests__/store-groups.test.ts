@@ -1,5 +1,5 @@
 /**
- * Tests for groups table — createGroup, getGroups, deleteGroup.
+ * Tests for groups table -- createGroup, getGroups, deleteGroup.
  * Verifies group persistence, union with session group_names,
  * and cascade unassignment on delete.
  */
@@ -21,7 +21,7 @@ describe("groups table", () => {
     getApp().sessions.createGroup("beta");
     getApp().sessions.createGroup("beta");
     const groups = getApp().sessions.getGroupNames();
-    // Should appear only once — indexOf === lastIndexOf proves no duplicates
+    // Should appear only once -- indexOf === lastIndexOf proves no duplicates
     expect(groups).toContain("beta");
     expect(groups.indexOf("beta")).toBe(groups.lastIndexOf("beta"));
   });

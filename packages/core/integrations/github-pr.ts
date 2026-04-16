@@ -74,7 +74,7 @@ export function formatReviewPrompt(
   state?: string,
 ): string {
   const parts: string[] = [];
-  parts.push(`## PR Review — #${prNumber}: ${prTitle}`);
+  parts.push(`## PR Review -- #${prNumber}: ${prTitle}`);
 
   if (state) {
     parts.push(`Review state: ${state}`);
@@ -172,7 +172,7 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
     return { action: "approve", sessionId: session.id, message: "Review approved" };
   }
 
-  // Handle changes_requested or inline comments — steer the agent
+  // Handle changes_requested or inline comments -- steer the agent
   if (comments.length > 0) {
     const prompt = formatReviewPrompt(prTitle, prNumber, comments, payload.review?.state);
 

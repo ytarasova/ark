@@ -234,7 +234,7 @@ export async function provisionStack(
       createdKey = true;
     } catch (e: any) {
       if (e.Code === "InvalidKeyPair.Duplicate") {
-        // Key already exists — reuse it
+        // Key already exists -- reuse it
         log(`Key pair ${keyName} already exists, reusing`);
       } else {
         throw e;
@@ -266,7 +266,7 @@ export async function provisionStack(
   }));
 
   const instanceId = runResult.Instances?.[0]?.InstanceId;
-  if (!instanceId) throw new Error("Failed to launch EC2 instance — no instance ID returned");
+  if (!instanceId) throw new Error("Failed to launch EC2 instance -- no instance ID returned");
 
   log(`Instance launched: ${instanceId}`);
 

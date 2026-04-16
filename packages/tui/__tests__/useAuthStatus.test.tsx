@@ -1,5 +1,5 @@
 /**
- * Tests for useAuthStatus — checks env vars and file existence for auth status.
+ * Tests for useAuthStatus -- checks env vars and file existence for auth status.
  * Uses React rendering pattern to test the hook via a capture component.
  */
 

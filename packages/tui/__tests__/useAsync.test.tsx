@@ -1,5 +1,5 @@
 /**
- * Tests for useAsync — queued action runner with onComplete.
+ * Tests for useAsync -- queued action runner with onComplete.
  */
 
 import { describe, it, expect } from "bun:test";
@@ -57,7 +57,7 @@ describe("useAsync", () => {
     unmount();
   });
 
-  it("queues multiple actions — executes in order", async () => {
+  it("queues multiple actions -- executes in order", async () => {
     const order: string[] = [];
     let asyncRef: ReturnType<typeof useAsync> | null = null;
     function Capture() {

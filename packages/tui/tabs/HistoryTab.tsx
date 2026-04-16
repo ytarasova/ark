@@ -153,7 +153,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh: _
       return;
     }
 
-    // R (shift) — force full rebuild (clear cache first)
+    // R (shift) -- force full rebuild (clear cache first)
     if (input === "R" && mode !== "search") {
       asyncState.run("Full rebuild...", async () => {
         status.show("Rebuilding...");
@@ -164,7 +164,7 @@ export function HistoryTab({ sessions: arkSessions, pane, asyncState, refresh: _
       return;
     }
 
-    // r — incremental refresh + reindex
+    // r -- incremental refresh + reindex
     if (input === "r" && mode !== "search") {
       asyncState.run("Refreshing...", async () => {
         status.show("Refreshing and indexing...");

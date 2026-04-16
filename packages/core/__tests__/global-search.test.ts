@@ -73,7 +73,7 @@ describe("global search with fixture data", () => {
       JSON.stringify({ message: { content: "This is a unique-test-sentinel value" } }),
       JSON.stringify({ message: { content: "Another line with different text" } }),
       JSON.stringify({ content: "Top-level content field also works" }),
-      "not-valid-json{{{",  // malformed line — should be skipped
+      "not-valid-json{{{",  // malformed line -- should be skipped
     ];
     writeFileSync(join(fixtureDir, "test-session.jsonl"), lines.join("\n"));
   });
@@ -100,7 +100,7 @@ describe("global search with fixture data", () => {
   });
 
   it("skips malformed JSONL lines without crashing", () => {
-    // The fixture has a malformed line — search should still work
+    // The fixture has a malformed line -- search should still work
     const results = searchAllConversations("Another line", { maxResults: 10, recentDays: 1 });
     expect(results.length).toBeGreaterThanOrEqual(1);
   });

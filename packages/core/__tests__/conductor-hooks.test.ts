@@ -53,7 +53,7 @@ describe("Conductor /hooks/status endpoint", () => {
     const resp = await postHook(session.id, { hook_event_name: "Stop" });
     expect(resp.status).toBe(200);
 
-    // Stop no longer maps to a status change — session stays running
+    // Stop no longer maps to a status change -- session stays running
     const updated = getApp().sessions.get(session.id);
     expect(updated?.status).toBe("running");
   });

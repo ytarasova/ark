@@ -1,5 +1,5 @@
 /**
- * Tests for useStatusMessage — temporary status message with auto-clear.
+ * Tests for useStatusMessage -- temporary status message with auto-clear.
  */
 
 import { describe, it, expect } from "bun:test";
@@ -70,7 +70,7 @@ describe("useStatusMessage", () => {
     // Reset the timer by showing a new message
     statusRef!.show("Second");
     await new Promise(r => setTimeout(r, 150));
-    // 150ms after "Second" — should still be visible (timer is 200ms)
+    // 150ms after "Second" -- should still be visible (timer is 200ms)
     expect(statusRef!.message).toBe("Second");
 
     // Wait for the remaining time + buffer for the auto-clear

@@ -1,5 +1,5 @@
 /**
- * Tests for search bug fixes — transaction safety, ftsTableExists, MIN_MESSAGE_COUNT.
+ * Tests for search bug fixes -- transaction safety, ftsTableExists, MIN_MESSAGE_COUNT.
  */
 
 import { describe, it, expect } from "bun:test";
@@ -15,7 +15,7 @@ const { getCtx } = withTestContext();
 // ── indexTranscripts transaction safety ─────────────────────────────────────
 
 describe("indexTranscripts transaction safety", () => {
-  it("uses transaction — old data is preserved if indexing fails mid-way", async () => {
+  it("uses transaction -- old data is preserved if indexing fails mid-way", async () => {
     const transcriptsDir = join(getCtx().arkDir, "claude-projects");
     const projectDir = join(transcriptsDir, "-tx-project");
     mkdirSync(projectDir, { recursive: true });

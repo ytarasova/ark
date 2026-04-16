@@ -1,5 +1,5 @@
 /**
- * Tests for TUI constants — icon and color mappings for session statuses.
+ * Tests for TUI constants -- icon and color mappings for session statuses.
  */
 
 import { describe, it, expect } from "bun:test";

@@ -1,6 +1,6 @@
 /**
  * Computes whether Claude auth credentials are available for remote compute.
- * Uses useMemo to avoid blocking the render loop — all I/O is sync-safe
+ * Uses useMemo to avoid blocking the render loop -- all I/O is sync-safe
  * (env var reads + single small file check).
  */
 

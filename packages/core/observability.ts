@@ -1,5 +1,5 @@
 /**
- * Observability hooks — send agent events to external platforms.
+ * Observability hooks -- send agent events to external platforms.
  * Supports Laminar, Langfuse, or custom HTTP endpoints.
  */
 

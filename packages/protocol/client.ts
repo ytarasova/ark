@@ -1,5 +1,5 @@
 /**
- * ArkClient — typed JSON-RPC 2.0 client for the Ark protocol.
+ * ArkClient -- typed JSON-RPC 2.0 client for the Ark protocol.
  *
  * Sends requests with auto-incrementing IDs, tracks pending promises,
  * and routes server notifications to event listeners.

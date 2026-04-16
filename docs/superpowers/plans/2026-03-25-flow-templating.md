@@ -1,4 +1,4 @@
-# Flow Templating — Implementation Plan
+# Flow Templating -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -36,7 +36,7 @@ Create `packages/core/template.ts`:
 
 ```ts
 /**
- * Template variable substitution — shared by agents and flows.
+ * Template variable substitution -- shared by agents and flows.
  * Replaces {variable} placeholders with session data.
  */
 
@@ -112,7 +112,7 @@ export interface StageDefinition {
   type?: "agent" | "action" | "fork";
   agent?: string;
   action?: string;
-  task?: string;  // NEW — template for the agent task prompt
+  task?: string;  // NEW -- template for the agent task prompt
   gate: "auto" | "manual" | "condition";
   on_failure?: string;
   optional?: boolean;
@@ -172,7 +172,7 @@ stages:
 - [ ] **Step 4: Commit**
 
 ```bash
-git commit -m "feat: resolveFlow + stage task field — {variable} substitution in flow definitions"
+git commit -m "feat: resolveFlow + stage task field -- {variable} substitution in flow definitions"
 ```
 
 ---
@@ -222,7 +222,7 @@ export { resolveFlow } from "./flow.js";  // add to existing flow exports
 - [ ] **Step 5: Commit**
 
 ```bash
-git commit -m "feat: wire flow templating into session dispatch — stage task field used as prompt"
+git commit -m "feat: wire flow templating into session dispatch -- stage task field used as prompt"
 ```
 
 ---
@@ -241,6 +241,6 @@ Also verify the flow's `resolveFlow` with real session data produces correct sta
 - [ ] **Step 3: Commit and push**
 
 ```bash
-git commit -m "test: E2E tests for flow templating — variable substitution in stage tasks"
+git commit -m "test: E2E tests for flow templating -- variable substitution in stage tasks"
 git push
 ```

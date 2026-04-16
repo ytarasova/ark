@@ -16,7 +16,7 @@ export const ICON: Record<string, string> = {
   archived: "▫",   // small square = archived/stored
 };
 
-// Static fallback for compatibility — prefers getStatusColor() for theme support
+// Static fallback for compatibility -- prefers getStatusColor() for theme support
 export const COLOR: Record<string, string> = {
   running: "green",
   ready: "cyan",

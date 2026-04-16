@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fix the EC2 provider's `launch()` so it properly sets up the remote environment before running Claude — clone repo, sync credentials, sync project files, pre-trust the directory, and launch Claude in the correct remote path.
+**Goal:** Fix the EC2 provider's `launch()` so it properly sets up the remote environment before running Claude -- clone repo, sync credentials, sync project files, pre-trust the directory, and launch Claude in the correct remote path.
 
-**Architecture:** The provider is responsible for the full remote setup. `session.dispatch()` passes the session info to `provider.launch()`, and the provider handles everything: repo checkout, credential sync, project file sync, trust pre-acceptance, and Claude execution. The core dispatch layer should NOT know about remote paths — it passes the local context and the provider translates it to the remote environment.
+**Architecture:** The provider is responsible for the full remote setup. `session.dispatch()` passes the session info to `provider.launch()`, and the provider handles everything: repo checkout, credential sync, project file sync, trust pre-acceptance, and Claude execution. The core dispatch layer should NOT know about remote paths -- it passes the local context and the provider translates it to the remote environment.
 
 **Tech Stack:** TypeScript, SSH (via `sshExecAsync`), rsync, git
 
@@ -13,7 +13,7 @@
 ## Current Problem
 
 When dispatching a session to an EC2 host:
-- `Workdir` shows `/Users/yana/Projects/ark` — a local macOS path that doesn't exist on the remote
+- `Workdir` shows `/Users/yana/Projects/ark` -- a local macOS path that doesn't exist on the remote
 - No repo clone happens on the remote
 - No credential sync happens
 - No arc.json project files are synced

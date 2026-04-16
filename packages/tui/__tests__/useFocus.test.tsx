@@ -1,5 +1,5 @@
 /**
- * Tests for useFocus — focus stack for keyboard input ownership.
+ * Tests for useFocus -- focus stack for keyboard input ownership.
  */
 
 import { describe, it, expect } from "bun:test";

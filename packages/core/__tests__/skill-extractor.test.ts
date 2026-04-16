@@ -1,5 +1,5 @@
 /**
- * Tests for skill-extractor.ts — heuristic skill extraction from conversations.
+ * Tests for skill-extractor.ts -- heuristic skill extraction from conversations.
  */
 
 import { describe, it, expect } from "bun:test";

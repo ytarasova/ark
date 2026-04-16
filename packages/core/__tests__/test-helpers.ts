@@ -1,5 +1,5 @@
 /**
- * Shared test context helper — eliminates boilerplate for beforeEach/afterAll
+ * Shared test context helper -- eliminates boilerplate for beforeEach/afterAll
  * context setup across core test files.
  *
  * Usage:

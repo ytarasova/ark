@@ -1,5 +1,5 @@
 /**
- * Profile system — isolated session namespaces.
+ * Profile system -- isolated session namespaces.
  * Each profile gets its own set of sessions via group_name prefix.
  */
 

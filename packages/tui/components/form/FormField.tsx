@@ -1,5 +1,5 @@
 /**
- * Base form field wrapper — consistent label, focus indicator, spacing.
+ * Base form field wrapper -- consistent label, focus indicator, spacing.
  * All specialized fields (Text, Select, Path, TextArea) use this.
  */
 

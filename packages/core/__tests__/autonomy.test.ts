@@ -1,5 +1,5 @@
 /**
- * Tests for tiered autonomy — full/execute/edit/read-only per flow stage.
+ * Tests for tiered autonomy -- full/execute/edit/read-only per flow stage.
  *
  * Covers: buildArgs permission gating, writeSettings permission deny rules,
  * flow YAML loading with autonomy field, and resolveFlow preservation.

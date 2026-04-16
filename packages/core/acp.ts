@@ -1,5 +1,5 @@
 /**
- * Agent Client Protocol (ACP) — JSON-RPC for headless session management.
+ * Agent Client Protocol (ACP) -- JSON-RPC for headless session management.
  * Enables CI/CD integration and programmatic agent control.
  */
 

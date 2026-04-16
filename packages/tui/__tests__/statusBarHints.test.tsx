@@ -1,5 +1,5 @@
 /**
- * Tests for statusBarHints — hint arrays for the TUI status bar.
+ * Tests for statusBarHints -- hint arrays for the TUI status bar.
  *
  * We inspect the React element tree directly instead of rendering to avoid
  * Ink test renderer width limitations that split words across lines.

@@ -237,7 +237,7 @@ export function TextInputEnhanced({
       return;
     }
 
-    // Regular character input — supports single chars and pasted text (multi-char)
+    // Regular character input -- supports single chars and pasted text (multi-char)
     if (input && !key.ctrl && !key.meta) {
       // Strip control characters but preserve newlines (\n=0x0a, \r=0x0d)
       const clean = input.replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, "").replace(/\r\n?/g, "\n");

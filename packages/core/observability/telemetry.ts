@@ -1,5 +1,5 @@
 /**
- * Optional telemetry — tracks usage events for improving Ark.
+ * Optional telemetry -- tracks usage events for improving Ark.
  * Disabled by default. Enable via config or ARK_TELEMETRY=1.
  */
 
