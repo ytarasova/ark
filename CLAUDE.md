@@ -20,30 +20,16 @@ make claude-tfy       # Claude Code via TrueFoundry gateway
 
 Key CLI commands: `ark session start|list|show|stop|events`, `ark search <query>`, `ark index`, `ark arkd`, `ark server daemon start|stop|status`, `ark skill|recipe|runtime|agent list|show`, `ark knowledge search|index|stats`.
 
-## Ark on Ark (Dogfooding)
+## Dogfooding
 
 ```bash
-# Full SDLC flow (plan -> implement -> verify -> review -> PR -> merge)
-./ark session start --flow autonomous-sdlc --repo /Users/paytmlabs/Projects/ark \
-  --summary "Describe the feature" --dispatch
-
-# Quick flow (implement -> verify -> PR -> merge)
-./ark session start --flow quick --repo /Users/paytmlabs/Projects/ark \
-  --summary "Quick task" --dispatch
-
-# Check status / attach
-./ark session list && ./ark session show <id>
+ark server daemon start --detach   # prerequisite: conductor (:19100) + arkd (:19300)
+ark session start --flow autonomous-sdlc --repo "$(pwd)" --summary "Task" --dispatch
+ark session list && ark session show <id>
 tmux attach -t ark-s-<id>
 ```
 
-**Prerequisites:** Server daemon must be running (`ark server daemon start --detach`) -- it starts conductor (:19100) and arkd (:19300). Or use `make dev-daemon` for hot-reload.
-
-**Report pipeline:** Agent calls `report(completed)` via channel MCP -> arkd (:19300) -> conductor (:19100) -> `applyReport` -> `mediateStageHandoff` -> `advance` -> auto-dispatches next stage.
-
-**Common issues:**
-- Session stuck at "ready": check arkd (`curl localhost:19300/health`) and conductor (`curl localhost:19100/health`). Kill stale: `lsof -ti:19100 | xargs kill`.
-- `--repo` must be a full path, not relative.
-- Agent worktrees live under `~/.ark/worktrees/<session-id>/`.
+Stuck session? `curl localhost:19100/health` + `curl localhost:19300/health`. Kill stale: `lsof -ti:19100 | xargs kill`.
 
 ## Project Structure
 
@@ -167,21 +153,33 @@ When `router.enabled`, executors inject `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL`
 
 ## Hook-Based Agent Status
 
-Claude Code hooks detect agent status (busy/idle/error/done). `claude.writeSettings()` writes `.claude/settings.local.json` with HTTP hooks that POST to the conductor. Hooks are ONLY for status -- channels handle messaging via MCP.
+Claude Code hooks POST status (busy/idle/error/done) to conductor. Written by `claude.writeSettings()`. Hooks = status only; channels = messaging via MCP.
 
 ## Hosted Mode
 
-`hosted.ts` boots multi-tenant control plane: worker registry (health-checked every 60s), session scheduler, tenant policies (compute limits, cost caps, integration toggles), SSE bus (in-memory or Redis), PostgreSQL via `DATABASE_URL`, DB-backed resource stores. Every table has `tenant_id`. `app.forTenant(id)` returns scoped AppContext. Start: `ark server start --hosted`.
+Multi-tenant control plane via `ark server start --hosted`. PostgreSQL (`DATABASE_URL`), Redis SSE bus (`REDIS_URL`), tenant-scoped AppContext (`app.forTenant(id)`). Every table has `tenant_id`.
 
 ## LLM Router
 
-`packages/router/` -- OpenAI-compatible `/v1/chat/completions` proxy. 3 policies (quality/balanced/cost), circuit breakers, request classification, cost tracking. Optional TensorZero backend (`router/tensorzero.ts`): auto-starts in sidecar/native/Docker mode. Config in `~/.ark/config.yaml` under `tensorZero:`. Start: `ark router start [--port 8430]`.
+`packages/router/` -- OpenAI-compatible proxy with 3 routing policies + circuit breakers. Optional TensorZero backend. Config: `~/.ark/config.yaml` under `tensorZero:`. Start: `ark router start`.
+
+## Before Committing (CRITICAL)
+
+**Every commit MUST pass formatting and linting. CI will reject otherwise.**
+
+```bash
+make format           # auto-fix Prettier (MUST run before every commit)
+make lint             # ESLint zero-warning check (MUST pass)
+make test             # run if you touched core logic
+```
+
+If you skip `make format`, CI fails with "Code style issues found." If you skip `make lint`, CI fails with lint warnings. No exceptions.
 
 ## Code Style
 
 - TypeScript, `strict: false`, ES modules with `.js` extensions
-- Prettier for formatting (120 char line width, double quotes, trailing commas). Run `make format` to fix.
-- ESLint with zero warnings allowed. CI rejects any lint warning or error.
+- Prettier: 120 char line width, double quotes, trailing commas
+- ESLint: zero warnings allowed
 - YAML for agent/flow/runtime/skill/recipe definitions
 - SQLite local, PostgreSQL hosted (IDatabase abstraction, no ORM)
-- Never use em dashes (U+2014)
+- Never use em dashes (U+2014). Use hyphens (-) or double dashes (--)
