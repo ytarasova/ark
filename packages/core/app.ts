@@ -51,6 +51,7 @@ import type { TenantPolicyManager } from "./auth/index.js";
 import { KnowledgeStore } from "./knowledge/store.js";
 import { PricingRegistry } from "./observability/pricing.js";
 import { UsageRecorder } from "./observability/usage.js";
+import { BurnRepository } from "./repositories/burn.js";
 import type { TensorZeroManager } from "./router/tensorzero.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -158,6 +159,7 @@ export class AppContext {
 
   get pricing(): PricingRegistry { return this._resolve("pricing"); }
   get usageRecorder(): UsageRecorder { return this._resolve("usageRecorder"); }
+  get burn(): BurnRepository { return this._resolve("burn"); }
 
   // ── Runtime transcript parsers ────────────────────────────────────────
 
@@ -469,6 +471,7 @@ export class AppContext {
       // Cost tracking
       pricing: asValue(pricingRegistry),
       usageRecorder: asValue(new UsageRecorder(db, pricingRegistry)),
+      burn: asValue(new BurnRepository(db)),
 
       // Runtime transcript parsers (polymorphic, one per agent tool)
       transcriptParsers: asValue(this.createTranscriptParserRegistry()),
