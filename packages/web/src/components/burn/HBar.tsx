@@ -45,7 +45,7 @@ export function HBar({ data, maxItems = 10, valueFormatter }: HBarProps) {
         <YAxis
           type="category"
           dataKey="name"
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: "#a0aec0" }}
           tickLine={false}
           axisLine={false}
           width={100}
@@ -54,13 +54,15 @@ export function HBar({ data, maxItems = 10, valueFormatter }: HBarProps) {
         <Tooltip
           formatter={(val: number) => fmt(val)}
           contentStyle={{
-            background: "hsl(var(--card))",
-            border: "1px solid hsl(var(--border))",
+            background: "#1e1e2e",
+            border: "1px solid #333",
             borderRadius: "8px",
             fontSize: "12px",
+            color: "#e0e0e0",
           }}
-          itemStyle={{ color: "hsl(var(--foreground))" }}
-          cursor={{ fill: "hsl(var(--accent))", opacity: 0.3 }}
+          labelStyle={{ color: "#e0e0e0" }}
+          itemStyle={{ color: "#e0e0e0" }}
+          cursor={{ fill: "#ffffff", opacity: 0.08 }}
         />
         <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={16}>
           {items.map((_entry, idx) => (

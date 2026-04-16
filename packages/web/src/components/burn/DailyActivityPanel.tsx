@@ -53,7 +53,7 @@ export function DailyActivityPanel({ data }: DailyActivityPanelProps) {
           <BarChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+              tick={{ fontSize: 9, fill: "#a0aec0" }}
               tickLine={false}
               axisLine={false}
               interval={0}
@@ -62,7 +62,7 @@ export function DailyActivityPanel({ data }: DailyActivityPanelProps) {
               height={40}
             />
             <YAxis
-              tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+              tick={{ fontSize: 10, fill: "#a0aec0" }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v) => `$${v}`}
@@ -71,12 +71,14 @@ export function DailyActivityPanel({ data }: DailyActivityPanelProps) {
             <Tooltip
               formatter={(val: number) => fmtCost(val)}
               contentStyle={{
-                background: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
+                background: "#1e1e2e",
+                border: "1px solid #333",
                 borderRadius: "8px",
                 fontSize: "12px",
+                color: "#e0e0e0",
               }}
-              itemStyle={{ color: "hsl(var(--foreground))" }}
+              labelStyle={{ color: "#e0e0e0" }}
+              itemStyle={{ color: "#e0e0e0" }}
             />
             <Bar dataKey="cost" radius={[4, 4, 0, 0]}>
               {chartData.map((_entry, idx) => (
