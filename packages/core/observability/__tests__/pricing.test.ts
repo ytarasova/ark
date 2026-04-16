@@ -145,4 +145,51 @@ describe("PricingRegistry", () => {
       expect(cost).toBeCloseTo(2.70, 2);
     });
   });
+
+  describe("fast mode", () => {
+    it("applies fast multiplier when speed is fast", () => {
+      const reg = new PricingRegistry();
+      const normalCost = reg.calculateCost("claude-opus-4-6", {
+        input_tokens: 1_000_000,
+        output_tokens: 100_000,
+      });
+      const fastCost = reg.calculateCost("claude-opus-4-6", {
+        input_tokens: 1_000_000,
+        output_tokens: 100_000,
+      }, { speed: "fast" });
+      // Opus 4.6 has fastMultiplier: 6, so fast cost should be 6x normal
+      expect(fastCost).toBeGreaterThan(normalCost);
+      expect(fastCost).toBeCloseTo(normalCost * 6, 2);
+    });
+
+    it("defaults to 1 for models without fast multiplier", () => {
+      const reg = new PricingRegistry();
+      const normalCost = reg.calculateCost("gpt-4.1", {
+        input_tokens: 1_000_000,
+        output_tokens: 500_000,
+      });
+      const fastCost = reg.calculateCost("gpt-4.1", {
+        input_tokens: 1_000_000,
+        output_tokens: 500_000,
+      }, { speed: "fast" });
+      // GPT-4.1 has no fastMultiplier, defaults to 1 -- fast === normal
+      expect(fastCost).toBeCloseTo(normalCost, 2);
+    });
+  });
+
+  describe("web search", () => {
+    it("adds web search cost when requests > 0", () => {
+      const reg = new PricingRegistry();
+      const baseCost = reg.calculateCost("claude-opus-4-6", {
+        input_tokens: 1_000_000,
+        output_tokens: 100_000,
+      });
+      const withSearch = reg.calculateCost("claude-opus-4-6", {
+        input_tokens: 1_000_000,
+        output_tokens: 100_000,
+      }, { webSearchRequests: 3 });
+      // 3 web search requests at $0.01 each = $0.03 extra
+      expect(withSearch).toBeCloseTo(baseCost + 0.03, 2);
+    });
+  });
 });

@@ -12,6 +12,8 @@ export interface ModelPricing {
   cache_write_per_token?: number;
   max_tokens?: number;
   max_input_tokens?: number;
+  fastMultiplier?: number;
+  webSearchCostPerRequest?: number;
 }
 
 export interface TokenUsage {
@@ -83,15 +85,20 @@ export class PricingRegistry {
   }
 
   /** Calculate cost in USD from token counts and model name. */
-  calculateCost(model: string, usage: TokenUsage): number {
+  calculateCost(model: string, usage: TokenUsage, opts?: { speed?: "standard" | "fast"; webSearchRequests?: number }): number {
     const p = this.getPrice(model);
     if (!p) return 0;
-    return (
+    let cost = (
       (usage.input_tokens ?? 0) * p.input_cost_per_token +
       (usage.output_tokens ?? 0) * p.output_cost_per_token +
       (usage.cache_read_tokens ?? 0) * (p.cache_read_per_token ?? p.input_cost_per_token * 0.1) +
       (usage.cache_write_tokens ?? 0) * (p.cache_write_per_token ?? p.input_cost_per_token * 1.25)
     );
+    if (opts?.speed === "fast") {
+      cost *= p.fastMultiplier ?? 1;
+    }
+    cost += (opts?.webSearchRequests ?? 0) * (p.webSearchCostPerRequest ?? 0.01);
+    return cost;
   }
 
   /** Check if any prices are loaded. */
@@ -109,38 +116,47 @@ export class PricingRegistry {
     this.prices.set("claude-opus-4-6", {
       input_cost_per_token: 15 / 1e6, output_cost_per_token: 75 / 1e6,
       cache_read_per_token: 1.5 / 1e6, cache_write_per_token: 18.75 / 1e6,
+      fastMultiplier: 6, webSearchCostPerRequest: 0.01,
     });
     this.prices.set("claude-sonnet-4-6", {
       input_cost_per_token: 3 / 1e6, output_cost_per_token: 15 / 1e6,
       cache_read_per_token: 0.3 / 1e6, cache_write_per_token: 3.75 / 1e6,
+      webSearchCostPerRequest: 0.01,
     });
     this.prices.set("claude-haiku-4-5", {
       input_cost_per_token: 0.8 / 1e6, output_cost_per_token: 4 / 1e6,
       cache_read_per_token: 0.08 / 1e6, cache_write_per_token: 1 / 1e6,
+      webSearchCostPerRequest: 0.01,
     });
 
     // OpenAI
     this.prices.set("gpt-4.1", {
       input_cost_per_token: 2 / 1e6, output_cost_per_token: 8 / 1e6,
+      webSearchCostPerRequest: 0.01,
     });
     this.prices.set("gpt-4.1-mini", {
       input_cost_per_token: 0.4 / 1e6, output_cost_per_token: 1.6 / 1e6,
+      webSearchCostPerRequest: 0.01,
     });
     this.prices.set("gpt-4.1-nano", {
       input_cost_per_token: 0.1 / 1e6, output_cost_per_token: 0.4 / 1e6,
+      webSearchCostPerRequest: 0.01,
     });
 
     // Google
     this.prices.set("gemini-2.5-pro", {
       input_cost_per_token: 1.25 / 1e6, output_cost_per_token: 10 / 1e6,
+      webSearchCostPerRequest: 0.01,
     });
     this.prices.set("gemini-2.5-flash", {
       input_cost_per_token: 0.15 / 1e6, output_cost_per_token: 0.6 / 1e6,
+      webSearchCostPerRequest: 0.01,
     });
 
     // OpenAI reasoning
     this.prices.set("o4-mini", {
       input_cost_per_token: 1.1 / 1e6, output_cost_per_token: 4.4 / 1e6,
+      webSearchCostPerRequest: 0.01,
     });
   }
 }
