@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ark -- Design Preview v2 -- Terminal Noir</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'monospace'],
+            display: ['"Outfit"', 'sans-serif'],
+          },
+          colors: {
+            noir: {
+              bg: "var(--noir-bg)",
+              surface: "var(--noir-surface)",
+              border: "var(--noir-border)",
+              text: "var(--noir-text)",
+              muted: "var(--noir-muted)",
+              dim: "var(--noir-dim)",
+            },
+            syntax: {
+              green: "var(--syntax-green)",
+              cyan: "var(--syntax-cyan)",
+              magenta: "var(--syntax-magenta)",
+              red: "var(--syntax-red)",
+              yellow: "var(--syntax-yellow)",
+              gray: "var(--syntax-gray)",
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    :root {
+      --noir-bg: #000000;
+      --noir-surface: #0a0a0a;
+      --noir-border: #333333;
+      --noir-text: #ffffff;
+      --noir-muted: #888888;
+      --noir-dim: #555555;
+      --syntax-green: #4ec9b0;
+      --syntax-cyan: #9cdcfe;
+      --syntax-magenta: #c586c0;
+      --syntax-red: #f44747;
+      --syntax-yellow: #dcdcaa;
+      --syntax-gray: #6a9955;
+    }
+
+    .light-theme {
+      --noir-bg: #ffffff;
+      --noir-surface: #f5f5f5;
+      --noir-border: #cccccc;
+      --noir-text: #000000;
+      --noir-muted: #666666;
+      --noir-dim: #999999;
+      --syntax-green: #2b8a6e;
+      --syntax-cyan: #0070c1;
+      --syntax-magenta: #9b2fa0;
+      --syntax-red: #c72828;
+      --syntax-yellow: #a67f1a;
+      --syntax-gray: #4d7a33;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "JetBrains Mono", monospace;
+      background: var(--noir-bg);
+      color: var(--noir-text);
+      margin: 0;
+      padding: 0;
+      font-size: 13px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection {
+      background: var(--noir-text);
+      color: var(--noir-bg);
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .cursor-blink {
+      animation: blink 1s step-end infinite;
+    }
+
+    .row-hover:hover {
+      background: var(--noir-surface);
+    }
+
+    .row-selected {
+      background: var(--noir-text) !important;
+      color: var(--noir-bg) !important;
+    }
+
+    .row-selected .syntax-override {
+      color: var(--noir-bg) !important;
+    }
+
+    details summary {
+      cursor: pointer;
+      list-style: none;
+    }
+
+    details summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .diff-add { color: var(--syntax-green); }
+    .diff-del { color: var(--syntax-red); }
+    .diff-hunk { color: var(--syntax-cyan); }
+    .diff-meta { color: var(--noir-muted); }
+
+    .section-label {
+      font-family: "Outfit", sans-serif;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--noir-dim);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--noir-border);
+    }
+
+    input[type="text"] {
+      background: var(--noir-bg);
+      border: 1px solid var(--noir-border);
+      color: var(--noir-text);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      padding: 8px 12px;
+      outline: none;
+      width: 100%;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--noir-text);
+    }
+
+    .btn-primary {
+      background: var(--noir-text);
+      color: var(--noir-bg);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 20px;
+      border: 1px solid var(--noir-text);
+      cursor: pointer;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.85;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--noir-text);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      padding: 8px 20px;
+      border: 1px solid var(--noir-border);
+      cursor: pointer;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--noir-text);
+    }
+  </style>
+</head>
+<body id="body">
+
+<!-- ============================================================ -->
+<!-- THEME TOGGLE                                                  -->
+<!-- ============================================================ -->
+<div style="position:fixed;top:12px;right:12px;z-index:100;">
+  <button onclick="document.body.classList.toggle('light-theme')"
+          class="btn-secondary" style="font-size:11px;padding:4px 10px;">
+    toggle theme
+  </button>
+</div>
+
+<!-- ============================================================ -->
+<!-- DESIGN SYSTEM PREVIEW                                         -->
+<!-- ============================================================ -->
+<div style="max-width:1200px;margin:0 auto;padding:40px 24px 80px;">
+
+  <!-- Title -->
+  <div style="margin-bottom:48px;">
+    <h1 style="font-family:'Outfit',sans-serif;font-size:28px;font-weight:700;margin:0 0 8px;">
+      Terminal Noir
+    </h1>
+    <p style="color:var(--noir-muted);margin:0;font-size:12px;">
+      Ark Design System v2 -- component preview
+    </p>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 1. HEADER                                                 -->
+  <!-- ======================================================== -->
+  <div class="section-label">1. Header</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--noir-border);">
+      <div style="display:flex;align-items:center;gap:24px;">
+        <span style="font-weight:600;font-size:14px;">ark</span>
+        <span style="color:var(--noir-dim);font-size:12px;">v0.17.0</span>
+        <span style="color:var(--noir-dim);font-size:12px;">
+          <span style="color:var(--noir-muted);">sessions</span>
+          <span style="color:var(--noir-dim);margin:0 6px;">/</span>
+          <span style="color:var(--syntax-cyan);">s-abc123</span>
+          <span style="color:var(--noir-dim);margin:0 6px;">/</span>
+          <span style="color:var(--syntax-magenta);">implement</span>
+        </span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;font-size:12px;">
+        <span><span style="color:var(--syntax-green);">&#9679;</span> conductor</span>
+        <span><span style="color:var(--syntax-green);">&#9679;</span> arkd</span>
+        <span><span style="color:var(--noir-dim);">&#9675;</span> <span style="color:var(--noir-muted);">router</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 2. FULL APP LAYOUT                                        -->
+  <!-- ======================================================== -->
+  <div class="section-label">2. Application Layout</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;display:grid;grid-template-columns:160px 1fr;min-height:520px;">
+
+    <!-- Sidebar -->
+    <div style="border-right:1px solid var(--noir-border);padding:16px 0;">
+      <div style="padding:0 16px;margin-bottom:20px;">
+        <span style="font-weight:600;font-size:14px;">ark</span>
+        <span style="color:var(--noir-dim);font-size:11px;margin-left:8px;">v0.17.0</span>
+      </div>
+      <div style="font-size:12px;letter-spacing:0.08em;">
+        <div style="padding:6px 16px;color:var(--noir-text);font-weight:500;">
+          <span style="color:var(--syntax-cyan);margin-right:6px;">&gt;</span>SESSIONS
+        </div>
+        <div style="padding:6px 16px;color:var(--noir-muted);">
+          <span style="margin-right:6px;opacity:0;">&gt;</span>AGENTS
+        </div>
+        <div style="padding:6px 16px;color:var(--noir-muted);">
+          <span style="margin-right:6px;opacity:0;">&gt;</span>FLOWS
+        </div>
+        <div style="padding:6px 16px;color:var(--noir-muted);">
+          <span style="margin-right:6px;opacity:0;">&gt;</span>COMPUTE
+        </div>
+        <div style="padding:6px 0;margin:4px 16px;border-top:1px solid var(--noir-border);"></div>
+        <div style="padding:6px 16px;color:var(--noir-muted);">
+          <span style="margin-right:6px;opacity:0;">&gt;</span>COSTS
+        </div>
+        <div style="padding:6px 16px;color:var(--noir-muted);">
+          <span style="margin-right:6px;opacity:0;">&gt;</span>SETTINGS
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div style="display:flex;flex-direction:column;">
+
+      <!-- Stats bar -->
+      <div style="padding:10px 16px;border-bottom:1px solid var(--noir-border);font-size:12px;color:var(--noir-muted);display:flex;gap:4px;">
+        <span>running: <span style="color:var(--syntax-green);">3</span></span>
+        <span style="color:var(--noir-dim);margin:0 8px;">|</span>
+        <span>completed: <span style="color:var(--noir-text);">47</span></span>
+        <span style="color:var(--noir-dim);margin:0 8px;">|</span>
+        <span>failed: <span style="color:var(--syntax-red);">2</span></span>
+        <span style="color:var(--noir-dim);margin:0 8px;">|</span>
+        <span>cost: <span style="color:var(--syntax-yellow);">$12.40</span></span>
+      </div>
+
+      <!-- Session table -->
+      <div style="flex:1;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="color:var(--noir-dim);text-align:left;font-size:11px;letter-spacing:0.06em;">
+              <th style="padding:8px 16px;border-bottom:1px solid var(--noir-border);font-weight:500;">ID</th>
+              <th style="padding:8px 12px;border-bottom:1px solid var(--noir-border);font-weight:500;">STATUS</th>
+              <th style="padding:8px 12px;border-bottom:1px solid var(--noir-border);font-weight:500;">AGENT</th>
+              <th style="padding:8px 12px;border-bottom:1px solid var(--noir-border);font-weight:500;">FLOW</th>
+              <th style="padding:8px 12px;border-bottom:1px solid var(--noir-border);font-weight:500;">RUNTIME</th>
+              <th style="padding:8px 12px;border-bottom:1px solid var(--noir-border);font-weight:500;text-align:right;">COST</th>
+              <th style="padding:8px 16px;border-bottom:1px solid var(--noir-border);font-weight:500;text-align:right;">AGE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="row-selected">
+              <td style="padding:6px 16px;" class="syntax-override"><span>s-abc123</span></td>
+              <td style="padding:6px 12px;" class="syntax-override">running</td>
+              <td style="padding:6px 12px;" class="syntax-override">implementer</td>
+              <td style="padding:6px 12px;" class="syntax-override">autonomous-sdlc</td>
+              <td style="padding:6px 12px;" class="syntax-override">claude</td>
+              <td style="padding:6px 12px;text-align:right;" class="syntax-override">$3.21</td>
+              <td style="padding:6px 16px;text-align:right;" class="syntax-override">2m</td>
+            </tr>
+            <tr class="row-hover" style="cursor:pointer;">
+              <td style="padding:6px 16px;color:var(--syntax-cyan);">s-def456</td>
+              <td style="padding:6px 12px;color:var(--syntax-green);">completed</td>
+              <td style="padding:6px 12px;">planner</td>
+              <td style="padding:6px 12px;color:var(--syntax-magenta);">quick</td>
+              <td style="padding:6px 12px;">codex</td>
+              <td style="padding:6px 12px;text-align:right;color:var(--syntax-yellow);">$1.87</td>
+              <td style="padding:6px 16px;text-align:right;color:var(--syntax-gray);">1h</td>
+            </tr>
+            <tr class="row-hover" style="cursor:pointer;">
+              <td style="padding:6px 16px;color:var(--syntax-cyan);">s-ghi789</td>
+              <td style="padding:6px 12px;color:var(--syntax-red);">failed</td>
+              <td style="padding:6px 12px;">reviewer</td>
+              <td style="padding:6px 12px;color:var(--syntax-magenta);">pr-review</td>
+              <td style="padding:6px 12px;">gemini</td>
+              <td style="padding:6px 12px;text-align:right;color:var(--syntax-yellow);">$0.42</td>
+              <td style="padding:6px 16px;text-align:right;color:var(--syntax-gray);">3d</td>
+            </tr>
+            <tr class="row-hover" style="cursor:pointer;">
+              <td style="padding:6px 16px;color:var(--syntax-cyan);">s-jkl012</td>
+              <td style="padding:6px 12px;color:var(--syntax-green);">completed</td>
+              <td style="padding:6px 12px;">architect</td>
+              <td style="padding:6px 12px;color:var(--syntax-magenta);">fan-out</td>
+              <td style="padding:6px 12px;">claude</td>
+              <td style="padding:6px 12px;text-align:right;color:var(--syntax-yellow);">$5.14</td>
+              <td style="padding:6px 16px;text-align:right;color:var(--syntax-gray);">5h</td>
+            </tr>
+            <tr class="row-hover" style="cursor:pointer;">
+              <td style="padding:6px 16px;color:var(--syntax-cyan);">s-mno345</td>
+              <td style="padding:6px 12px;color:var(--syntax-green);">completed</td>
+              <td style="padding:6px 12px;">implementer</td>
+              <td style="padding:6px 12px;color:var(--syntax-magenta);">autonomous-sdlc</td>
+              <td style="padding:6px 12px;">goose</td>
+              <td style="padding:6px 12px;text-align:right;color:var(--syntax-yellow);">$1.76</td>
+              <td style="padding:6px 16px;text-align:right;color:var(--syntax-gray);">1d</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 3. STAGE PROGRESS                                         -->
+  <!-- ======================================================== -->
+  <div class="section-label">3. Stage Progress</div>
+  <div style="border:1px solid var(--noir-border);padding:20px 24px;margin-bottom:48px;">
+    <div style="display:flex;align-items:center;gap:0;font-size:12px;margin-bottom:8px;">
+      <span style="color:var(--syntax-green);">&#9679;</span>
+      <span style="margin:0 8px;">plan</span>
+      <span style="color:var(--noir-border);letter-spacing:-2px;">&#9473;&#9473;&#9473;&#9473;&#9473;</span>
+      <span style="color:var(--syntax-cyan);margin-left:8px;">&#9679;</span>
+      <span style="margin:0 8px;color:var(--syntax-cyan);">implement</span>
+      <span style="color:var(--noir-border);letter-spacing:-2px;">&#9473;&#9473;&#9473;&#9473;&#9473;</span>
+      <span style="color:var(--noir-dim);margin-left:8px;">&#9675;</span>
+      <span style="margin:0 8px;color:var(--noir-dim);">verify</span>
+      <span style="color:var(--noir-border);letter-spacing:-2px;">&#9473;&#9473;&#9473;&#9473;&#9473;</span>
+      <span style="color:var(--noir-dim);margin-left:8px;">&#9675;</span>
+      <span style="margin:0 8px;color:var(--noir-dim);">review</span>
+      <span style="color:var(--noir-border);letter-spacing:-2px;">&#9473;&#9473;&#9473;&#9473;&#9473;</span>
+      <span style="color:var(--noir-dim);margin-left:8px;">&#9675;</span>
+      <span style="margin:0 8px;color:var(--noir-dim);">pr</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:0;font-size:11px;color:var(--noir-muted);">
+      <span style="margin-left:14px;">done</span>
+      <span style="margin-left:52px;">running</span>
+      <span style="margin-left:42px;">pending</span>
+      <span style="margin-left:38px;">pending</span>
+      <span style="margin-left:36px;">pending</span>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 4. CHAT / CONVERSATION                                    -->
+  <!-- ======================================================== -->
+  <div class="section-label">4. Chat Conversation</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;display:flex;flex-direction:column;">
+    <div style="flex:1;padding:16px;font-size:12px;line-height:1.8;">
+      <div><span style="color:var(--noir-muted);">[system]</span> session started -- flow: autonomous-sdlc, agent: planner</div>
+      <div><span style="color:var(--noir-muted);">[system]</span> stage: <span style="color:var(--syntax-magenta);">plan</span> -- assigned to <span style="color:var(--syntax-cyan);">planner</span></div>
+      <div><span style="color:var(--syntax-green);">[planner]</span> analyzing codebase structure...</div>
+      <div><span style="color:var(--syntax-green);">[planner]</span> found 47 source files across 8 packages</div>
+      <div><span style="color:var(--syntax-green);">[planner]</span> PLAN.md created (5 steps)</div>
+      <div style="margin:8px 0;border-top:1px solid var(--noir-border);"></div>
+      <div><span style="color:var(--noir-muted);">[system]</span> stage: plan -&gt; <span style="color:var(--syntax-green);">completed</span>, advancing to <span style="color:var(--syntax-magenta);">implement</span></div>
+      <div><span style="color:var(--syntax-green);">[implementer]</span> starting implementation step 1/5</div>
+      <div><span style="color:var(--syntax-green);">[implementer]</span> modifying packages/core/auth.ts</div>
+      <div style="margin-top:4px;"><span style="color:var(--syntax-cyan);">[you]</span> use the v2 API endpoints instead of v1</div>
+      <div><span style="color:var(--syntax-green);">[implementer]</span> understood, switching to v2 endpoints</div>
+      <div><span style="color:var(--syntax-red);">[error]</span> npm test exited with code 1 -- retrying after fix</div>
+      <div><span style="color:var(--syntax-green);">[implementer]</span> fixed import path, tests passing</div>
+    </div>
+    <!-- Input -->
+    <div style="border-top:1px solid var(--noir-border);padding:10px 16px;display:flex;align-items:center;gap:8px;font-size:13px;">
+      <span style="color:var(--syntax-cyan);">&gt;</span>
+      <span style="color:var(--noir-muted);">type a message...</span><span class="cursor-blink" style="color:var(--noir-text);">&#9608;</span>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 5. TOOL CALLS                                             -->
+  <!-- ======================================================== -->
+  <div class="section-label">5. Tool Calls</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;font-size:12px;">
+    <details>
+      <summary style="padding:8px 16px;border-bottom:1px solid var(--noir-border);" class="row-hover">
+        <span style="color:var(--noir-dim);margin-right:8px;">&#9656;</span>
+        <span style="color:var(--syntax-magenta);">bash</span>:
+        <span>npm test</span>
+        <span style="color:var(--noir-muted);margin-left:12px;">(2.3s)</span>
+        <span style="color:var(--syntax-green);margin-left:8px;">&#10003;</span>
+      </summary>
+      <div style="padding:12px 16px 12px 32px;border-bottom:1px solid var(--noir-border);background:var(--noir-surface);">
+        <pre style="margin:0;color:var(--noir-muted);font-size:11px;line-height:1.6;">$ npm test
+> ark@0.17.0 test
+> bun test --bail
+
+ PASS  packages/core/__tests__/session.test.ts (4 tests)
+ PASS  packages/core/__tests__/conductor.test.ts (7 tests)
+ PASS  packages/server/__tests__/rpc.test.ts (3 tests)
+
+ 14 tests passed, 0 failed</pre>
+      </div>
+    </details>
+    <details>
+      <summary style="padding:8px 16px;border-bottom:1px solid var(--noir-border);" class="row-hover">
+        <span style="color:var(--noir-dim);margin-right:8px;">&#9656;</span>
+        <span style="color:var(--syntax-magenta);">read</span>:
+        <span>packages/core/auth.ts</span>
+        <span style="color:var(--noir-muted);margin-left:12px;">(234 lines)</span>
+        <span style="color:var(--syntax-green);margin-left:8px;">&#10003;</span>
+      </summary>
+      <div style="padding:12px 16px 12px 32px;border-bottom:1px solid var(--noir-border);background:var(--noir-surface);">
+        <pre style="margin:0;color:var(--noir-muted);font-size:11px;line-height:1.6;"><span style="color:var(--noir-dim);">  1</span>  import { verify } from "./crypto.js";
+<span style="color:var(--noir-dim);">  2</span>  import { AuthConfig } from "../types/auth.js";
+<span style="color:var(--noir-dim);">  3</span>
+<span style="color:var(--noir-dim);">  4</span>  export async function authenticate(token: string) {
+<span style="color:var(--noir-dim);">  5</span>    const payload = await verify(token);
+<span style="color:var(--noir-dim);">...</span></pre>
+      </div>
+    </details>
+    <details>
+      <summary style="padding:8px 16px;" class="row-hover">
+        <span style="color:var(--noir-dim);margin-right:8px;">&#9656;</span>
+        <span style="color:var(--syntax-magenta);">edit</span>:
+        <span>packages/core/auth.ts</span>
+        <span style="color:var(--syntax-green);margin-left:12px;">+12</span>
+        <span style="color:var(--syntax-red);margin-left:4px;">-3</span>
+        <span style="color:var(--syntax-green);margin-left:8px;">&#10003;</span>
+      </summary>
+      <div style="padding:12px 16px 12px 32px;background:var(--noir-surface);">
+        <pre style="margin:0;font-size:11px;line-height:1.6;"><span class="diff-meta">--- a/packages/core/auth.ts</span>
+<span class="diff-meta">+++ b/packages/core/auth.ts</span>
+<span class="diff-hunk">@@ -1,4 +1,6 @@</span>
+<span class="diff-del">-import { auth } from "./auth-v1.js";</span>
+<span class="diff-add">+import { auth } from "./auth-v2.js";</span>
+<span class="diff-add">+import { oauthScopes } from "./scopes.js";</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+export async function oauthCallback(code: string) {</span>
+<span class="diff-add">+  const token = await auth.exchange(code);</span>
+<span class="diff-add">+  return { token, scopes: oauthScopes };</span>
+<span class="diff-add">+}</span></pre>
+      </div>
+    </details>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 6. DIFF VIEWER                                            -->
+  <!-- ======================================================== -->
+  <div class="section-label">6. Diff Viewer</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;padding:16px;font-size:12px;line-height:1.7;">
+    <pre style="margin:0;"><span class="diff-meta">--- a/packages/core/session-orchestration.ts</span>
+<span class="diff-meta">+++ b/packages/core/session-orchestration.ts</span>
+<span class="diff-hunk">@@ -142,8 +142,14 @@</span>
+   export async function advanceStage(app: AppContext, session: Session) {
+     const flow = app.flows.get(session.flowId);
+     const current = flow.stages[session.stageIndex];
+<span class="diff-del">-    if (current.status === "failed") {</span>
+<span class="diff-del">-      return handleFailure(app, session, current);</span>
+<span class="diff-add">+    if (current.status === "failed" && current.retries &lt; 3) {</span>
+<span class="diff-add">+      log.warn("stage failed, retrying", {</span>
+<span class="diff-add">+        session: session.id,</span>
+<span class="diff-add">+        stage: current.name,</span>
+<span class="diff-add">+        attempt: current.retries + 1,</span>
+<span class="diff-add">+      });</span>
+<span class="diff-add">+      current.retries++;</span>
+<span class="diff-add">+      return retryStage(app, session, current);</span>
+     }
+
+     session.stageIndex++;</pre>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 7. MODAL                                                  -->
+  <!-- ======================================================== -->
+  <div class="section-label">7. Modal</div>
+  <div style="margin-bottom:48px;position:relative;">
+    <!-- Backdrop simulation -->
+    <div style="background:var(--noir-bg);opacity:0.7;position:absolute;inset:0;"></div>
+    <div style="position:relative;border:1px solid var(--noir-border);background:var(--noir-bg);max-width:480px;margin:0 auto;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--noir-border);font-size:13px;font-weight:500;">
+        new session
+      </div>
+      <div style="padding:20px;">
+        <div style="margin-bottom:16px;">
+          <label style="display:block;color:var(--noir-muted);font-size:11px;margin-bottom:6px;letter-spacing:0.05em;">AGENT</label>
+          <input type="text" value="implementer" />
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="display:block;color:var(--noir-muted);font-size:11px;margin-bottom:6px;letter-spacing:0.05em;">FLOW</label>
+          <input type="text" value="autonomous-sdlc" />
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="display:block;color:var(--noir-muted);font-size:11px;margin-bottom:6px;letter-spacing:0.05em;">RUNTIME</label>
+          <input type="text" value="claude" />
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="display:block;color:var(--noir-muted);font-size:11px;margin-bottom:6px;letter-spacing:0.05em;">COMPUTE</label>
+          <input type="text" value="local" />
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="display:block;color:var(--noir-muted);font-size:11px;margin-bottom:6px;letter-spacing:0.05em;">PROMPT</label>
+          <input type="text" value="implement the oauth callback handler" />
+        </div>
+      </div>
+      <div style="padding:12px 20px;border-top:1px solid var(--noir-border);display:flex;justify-content:flex-end;gap:8px;">
+        <button class="btn-secondary">cancel</button>
+        <button class="btn-primary">create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 8. EMPTY STATE                                            -->
+  <!-- ======================================================== -->
+  <div class="section-label">8. Empty State</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;padding:80px 24px;text-align:center;">
+    <div style="color:var(--noir-muted);font-size:13px;margin-bottom:8px;">no sessions.</div>
+    <div style="color:var(--noir-dim);font-size:12px;">press <span style="color:var(--noir-text);border:1px solid var(--noir-border);padding:1px 6px;font-size:11px;">n</span> to create one.</div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 9. TYPOGRAPHY                                             -->
+  <!-- ======================================================== -->
+  <div class="section-label">9. Typography Scale</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;padding:24px;">
+    <div style="font-family:'Outfit',sans-serif;font-size:28px;font-weight:700;margin-bottom:12px;">Display -- Outfit 28/700</div>
+    <div style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:600;margin-bottom:12px;">Heading -- Outfit 20/600</div>
+    <div style="font-size:14px;font-weight:500;margin-bottom:12px;">Label -- JetBrains Mono 14/500</div>
+    <div style="font-size:13px;margin-bottom:12px;">Body -- JetBrains Mono 13/400</div>
+    <div style="font-size:12px;color:var(--noir-muted);margin-bottom:12px;">Secondary -- JetBrains Mono 12/400</div>
+    <div style="font-size:11px;color:var(--noir-dim);">Caption -- JetBrains Mono 11/400</div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 10. COLOR TOKENS                                          -->
+  <!-- ======================================================== -->
+  <div class="section-label">10. Syntax Palette</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;padding:16px;font-size:12px;">
+    <table style="width:100%;border-collapse:collapse;">
+      <tr>
+        <td style="padding:6px 16px;"><span style="color:var(--syntax-green);">&#9679;</span></td>
+        <td style="padding:6px 12px;color:var(--syntax-green);">green</td>
+        <td style="padding:6px 12px;color:var(--noir-muted);">success, agents, strings</td>
+        <td style="padding:6px 12px;color:var(--noir-dim);">#4ec9b0</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px;"><span style="color:var(--syntax-cyan);">&#9679;</span></td>
+        <td style="padding:6px 12px;color:var(--syntax-cyan);">cyan</td>
+        <td style="padding:6px 12px;color:var(--noir-muted);">IDs, user, info</td>
+        <td style="padding:6px 12px;color:var(--noir-dim);">#9cdcfe</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px;"><span style="color:var(--syntax-magenta);">&#9679;</span></td>
+        <td style="padding:6px 12px;color:var(--syntax-magenta);">magenta</td>
+        <td style="padding:6px 12px;color:var(--noir-muted);">keywords, flow names, tools</td>
+        <td style="padding:6px 12px;color:var(--noir-dim);">#c586c0</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px;"><span style="color:var(--syntax-red);">&#9679;</span></td>
+        <td style="padding:6px 12px;color:var(--syntax-red);">red</td>
+        <td style="padding:6px 12px;color:var(--noir-muted);">errors, failures, deletions</td>
+        <td style="padding:6px 12px;color:var(--noir-dim);">#f44747</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px;"><span style="color:var(--syntax-yellow);">&#9679;</span></td>
+        <td style="padding:6px 12px;color:var(--syntax-yellow);">yellow</td>
+        <td style="padding:6px 12px;color:var(--noir-muted);">numbers, costs, warnings</td>
+        <td style="padding:6px 12px;color:var(--noir-dim);">#dcdcaa</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 16px;"><span style="color:var(--syntax-gray);">&#9679;</span></td>
+        <td style="padding:6px 12px;color:var(--syntax-gray);">gray</td>
+        <td style="padding:6px 12px;color:var(--noir-muted);">comments, timestamps</td>
+        <td style="padding:6px 12px;color:var(--noir-dim);">#6a9955</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 11. BUTTONS & INPUTS                                      -->
+  <!-- ======================================================== -->
+  <div class="section-label">11. Interactive Elements</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;padding:24px;">
+    <div style="display:flex;gap:12px;margin-bottom:24px;align-items:center;">
+      <button class="btn-primary">primary</button>
+      <button class="btn-secondary">secondary</button>
+      <button class="btn-secondary" style="opacity:0.4;cursor:not-allowed;">disabled</button>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <input type="text" placeholder="search sessions..." style="max-width:280px;" />
+      <span style="font-size:12px;color:var(--noir-muted);border:1px solid var(--noir-border);padding:2px 8px;font-size:11px;">ctrl+k</span>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 12. COMPUTE GRID                                          -->
+  <!-- ======================================================== -->
+  <div class="section-label">12. Compute Providers</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;font-size:12px;">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="color:var(--noir-dim);text-align:left;font-size:11px;letter-spacing:0.06em;">
+          <th style="padding:8px 16px;border-bottom:1px solid var(--noir-border);font-weight:500;">PROVIDER</th>
+          <th style="padding:8px 12px;border-bottom:1px solid var(--noir-border);font-weight:500;">STATUS</th>
+          <th style="padding:8px 12px;border-bottom:1px solid var(--noir-border);font-weight:500;">ACTIVE</th>
+          <th style="padding:8px 12px;border-bottom:1px solid var(--noir-border);font-weight:500;">REGION</th>
+          <th style="padding:8px 16px;border-bottom:1px solid var(--noir-border);font-weight:500;text-align:right;">LATENCY</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="row-hover">
+          <td style="padding:6px 16px;">local</td>
+          <td style="padding:6px 12px;"><span style="color:var(--syntax-green);">&#9679;</span> online</td>
+          <td style="padding:6px 12px;color:var(--syntax-yellow);">3</td>
+          <td style="padding:6px 12px;color:var(--noir-muted);">--</td>
+          <td style="padding:6px 16px;text-align:right;color:var(--syntax-gray);">&lt;1ms</td>
+        </tr>
+        <tr class="row-hover">
+          <td style="padding:6px 16px;">docker</td>
+          <td style="padding:6px 12px;"><span style="color:var(--syntax-green);">&#9679;</span> online</td>
+          <td style="padding:6px 12px;color:var(--syntax-yellow);">1</td>
+          <td style="padding:6px 12px;color:var(--noir-muted);">--</td>
+          <td style="padding:6px 16px;text-align:right;color:var(--syntax-gray);">12ms</td>
+        </tr>
+        <tr class="row-hover">
+          <td style="padding:6px 16px;">ec2-micro</td>
+          <td style="padding:6px 12px;"><span style="color:var(--syntax-green);">&#9679;</span> online</td>
+          <td style="padding:6px 12px;color:var(--syntax-yellow);">0</td>
+          <td style="padding:6px 12px;color:var(--noir-muted);">us-east-1</td>
+          <td style="padding:6px 16px;text-align:right;color:var(--syntax-gray);">45ms</td>
+        </tr>
+        <tr class="row-hover">
+          <td style="padding:6px 16px;">e2b</td>
+          <td style="padding:6px 12px;"><span style="color:var(--noir-dim);">&#9675;</span> <span style="color:var(--noir-muted);">offline</span></td>
+          <td style="padding:6px 12px;color:var(--noir-dim);">0</td>
+          <td style="padding:6px 12px;color:var(--noir-muted);">--</td>
+          <td style="padding:6px 16px;text-align:right;color:var(--noir-dim);">--</td>
+        </tr>
+        <tr class="row-hover">
+          <td style="padding:6px 16px;">firecracker</td>
+          <td style="padding:6px 12px;"><span style="color:var(--noir-dim);">&#9675;</span> <span style="color:var(--noir-muted);">offline</span></td>
+          <td style="padding:6px 12px;color:var(--noir-dim);">0</td>
+          <td style="padding:6px 12px;color:var(--noir-muted);">--</td>
+          <td style="padding:6px 16px;text-align:right;color:var(--noir-dim);">--</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 13. KEYBOARD SHORTCUTS                                    -->
+  <!-- ======================================================== -->
+  <div class="section-label">13. Keyboard Shortcuts</div>
+  <div style="border:1px solid var(--noir-border);margin-bottom:48px;padding:16px 20px;font-size:12px;display:grid;grid-template-columns:1fr 1fr;gap:0;">
+    <div style="padding:4px 0;display:flex;justify-content:space-between;padding-right:32px;">
+      <span style="color:var(--noir-muted);">new session</span>
+      <span style="border:1px solid var(--noir-border);padding:1px 6px;font-size:11px;">n</span>
+    </div>
+    <div style="padding:4px 0;display:flex;justify-content:space-between;padding-right:32px;">
+      <span style="color:var(--noir-muted);">search</span>
+      <span style="border:1px solid var(--noir-border);padding:1px 6px;font-size:11px;">ctrl+k</span>
+    </div>
+    <div style="padding:4px 0;display:flex;justify-content:space-between;padding-right:32px;">
+      <span style="color:var(--noir-muted);">cancel session</span>
+      <span style="border:1px solid var(--noir-border);padding:1px 6px;font-size:11px;">ctrl+c</span>
+    </div>
+    <div style="padding:4px 0;display:flex;justify-content:space-between;padding-right:32px;">
+      <span style="color:var(--noir-muted);">toggle theme</span>
+      <span style="border:1px solid var(--noir-border);padding:1px 6px;font-size:11px;">ctrl+t</span>
+    </div>
+    <div style="padding:4px 0;display:flex;justify-content:space-between;padding-right:32px;">
+      <span style="color:var(--noir-muted);">focus chat</span>
+      <span style="border:1px solid var(--noir-border);padding:1px 6px;font-size:11px;">i</span>
+    </div>
+    <div style="padding:4px 0;display:flex;justify-content:space-between;padding-right:32px;">
+      <span style="color:var(--noir-muted);">navigate up/down</span>
+      <span style="border:1px solid var(--noir-border);padding:1px 6px;font-size:11px;">j / k</span>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
