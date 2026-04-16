@@ -41,7 +41,7 @@
         --failed: #f87171;
         --stopped: rgba(107, 114, 128, 0.4);
 
-        /* Brand gradient -- amber to orange */
+        /* Brand gradient */
         --gradient-brand: linear-gradient(135deg, #d4a847 0%, #e07a2f 100%);
       }
 
@@ -53,6 +53,7 @@
         --bg-hover: #242424;
         --bg-input: #191919;
         --bg-overlay: rgba(0, 0, 0, 0.6);
+        --bg-code: #202020;
 
         --fg: #ededed;
         --fg-muted: #878787;
@@ -85,6 +86,7 @@
         --bg-hover: #e8e6e1;
         --bg-input: #ffffff;
         --bg-overlay: rgba(0, 0, 0, 0.3);
+        --bg-code: #e8e6e1;
 
         --fg: #1c1c1c;
         --fg-muted: #787878;
@@ -125,6 +127,7 @@
       .tab-bar,
       .tab-content,
       .chat-input-area,
+      .tab-footer,
       .message-body,
       .code-block,
       .tool-call,
@@ -232,7 +235,7 @@
         stroke-width: 1.5;
       }
 
-      /* -- List Panel (300px) -- */
+      /* -- List Panel (300px, resizable) -- */
       .list-panel {
         width: var(--list-w);
         min-width: var(--list-w);
@@ -241,6 +244,23 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        position: relative;
+      }
+
+      .resize-handle {
+        position: absolute;
+        right: -1px;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        cursor: col-resize;
+        z-index: 5;
+        background: transparent;
+        transition: background 0.15s ease;
+      }
+      .resize-handle:hover,
+      .resize-handle:active {
+        background: var(--primary);
       }
 
       .list-header {
@@ -278,6 +298,75 @@
       }
       .list-btn-new:hover {
         background: var(--primary-hover);
+      }
+
+      /* -- New Session Form -- */
+      .new-session-form {
+        display: none;
+        padding: 10px;
+        margin: 0 8px 8px;
+        border: 1px solid var(--primary);
+        border-radius: var(--radius-md);
+        background: var(--bg-card);
+        flex-direction: column;
+        gap: 8px;
+      }
+      .new-session-form.visible {
+        display: flex;
+      }
+      .new-session-form input {
+        width: 100%;
+        height: 30px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        background: var(--bg-input);
+        padding: 0 10px;
+        font-size: 12px;
+        font-family: var(--font-sans);
+        color: var(--fg);
+        outline: none;
+      }
+      .new-session-form input:focus {
+        border-color: var(--primary);
+      }
+      .new-session-form select {
+        width: 100%;
+        height: 30px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        background: var(--bg-input);
+        padding: 0 8px;
+        font-size: 12px;
+        font-family: var(--font-sans);
+        color: var(--fg);
+        outline: none;
+        cursor: pointer;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      .new-session-form-actions {
+        display: flex;
+        gap: 6px;
+        justify-content: flex-end;
+      }
+      .new-session-form-actions button {
+        height: 26px;
+        padding: 0 10px;
+        border-radius: var(--radius-sm);
+        font-size: 11px;
+        font-weight: 500;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        border: 1px solid var(--border);
+      }
+      .new-session-start {
+        background: var(--primary);
+        color: var(--primary-fg);
+        border-color: var(--primary) !important;
+      }
+      .new-session-cancel {
+        background: transparent;
+        color: var(--fg-muted);
       }
 
       .list-search {
@@ -411,7 +500,7 @@
 
       .session-card-time {
         font-size: 10px;
-        color: var(--fg-faint);
+        color: var(--fg-muted);
         margin-left: auto;
       }
 
@@ -451,7 +540,7 @@
 
       .session-card-agent {
         font-size: 10px;
-        color: var(--fg-faint);
+        color: var(--fg-muted);
       }
 
       .session-card-cost {
@@ -467,6 +556,22 @@
         flex-direction: column;
         min-width: 0;
         background: var(--bg);
+      }
+
+      /* -- Scroll Progress Indicator -- */
+      .scroll-progress {
+        height: 2px;
+        width: 100%;
+        background: transparent;
+        flex-shrink: 0;
+        position: relative;
+      }
+      .scroll-progress-bar {
+        height: 100%;
+        width: 0%;
+        background: var(--primary);
+        border-radius: 0 1px 1px 0;
+        transition: width 0.1s linear;
       }
 
       /* -- Session Header -- */
@@ -519,7 +624,7 @@
         font-weight: 500;
         padding: 3px 8px;
         border-radius: 4px;
-        color: var(--fg-faint);
+        color: var(--fg-muted);
         letter-spacing: 0.02em;
       }
       .pipeline-stage.done {
@@ -531,7 +636,7 @@
       }
 
       .pipeline-arrow {
-        color: var(--fg-faint);
+        color: var(--fg-muted);
         font-size: 10px;
         padding: 0 1px;
       }
@@ -769,6 +874,17 @@
         flex: 1;
         overflow-y: auto;
         padding: 24px 24px;
+        position: relative;
+      }
+
+      /* Cross-fade animation for session switching */
+      .tab-content.switching {
+        opacity: 0.6;
+        transition: opacity 0.075s ease;
+      }
+      .tab-content.switching-in {
+        opacity: 1;
+        transition: opacity 0.075s ease;
       }
 
       .tab-panel {
@@ -838,12 +954,12 @@
       .message-model {
         font-family: var(--font-mono-ui);
         font-size: 10px;
-        color: var(--fg-faint);
+        color: var(--fg-muted);
       }
 
       .message-time {
         font-size: 10px;
-        color: var(--fg-faint);
+        color: var(--fg-muted);
         margin-left: auto;
         font-family: var(--font-mono-ui);
       }
@@ -866,6 +982,15 @@
         border-radius: var(--radius-md);
         padding: 10px 14px;
         margin-left: 30px;
+      }
+
+      /* Inline code -- uses --bg-code for proper contrast in both modes */
+      .inline-code {
+        background: var(--bg-code);
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-family: var(--font-mono);
+        font-size: 12px;
       }
 
       /* -- Code Block -- */
@@ -914,7 +1039,7 @@
 
       .tool-call-icon {
         font-size: 10px;
-        color: var(--fg-faint);
+        color: var(--fg-muted);
         width: 14px;
         text-align: center;
         flex-shrink: 0;
@@ -924,12 +1049,35 @@
       }
       .tool-call-dur {
         font-size: 10px;
-        color: var(--fg-faint);
+        color: var(--fg-muted);
         font-family: var(--font-mono-ui);
       }
       .tool-call-ok {
         color: var(--running);
         font-size: 11px;
+      }
+
+      /* Failed tool call */
+      .tool-call.failed {
+        background: var(--diff-rm-bg);
+        border: 1px solid rgba(248, 113, 113, 0.15);
+      }
+      .tool-call.failed:hover {
+        background: rgba(248, 113, 113, 0.12);
+      }
+      .tool-call-fail {
+        color: var(--failed);
+        font-size: 11px;
+      }
+      .tool-call-error {
+        padding: 6px 8px 6px 22px;
+        margin: 0 0 3px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--failed);
+        background: var(--diff-rm-bg);
+        border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+        line-height: 1.5;
       }
 
       /* -- Stage Event -- */
@@ -938,7 +1086,7 @@
         align-items: center;
         gap: 12px;
         margin: 20px 0;
-        color: var(--fg-faint);
+        color: var(--fg-muted);
         font-size: 11px;
         font-weight: 500;
       }
@@ -953,12 +1101,120 @@
         white-space: nowrap;
       }
 
-      /* -- Chat Input -- */
+      /* -- Typing Indicator -- */
+      .typing-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-left: 30px;
+        margin-top: 8px;
+      }
+      .typing-indicator-dots {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .typing-indicator-dots span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--fg-muted);
+        animation: typingBounce 1.2s infinite;
+      }
+      .typing-indicator-dots span:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .typing-indicator-dots span:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      @keyframes typingBounce {
+        0%,
+        60%,
+        100% {
+          opacity: 0.3;
+          transform: translateY(0);
+        }
+        30% {
+          opacity: 1;
+          transform: translateY(-3px);
+        }
+      }
+      .typing-indicator-label {
+        font-size: 11px;
+        color: var(--fg-muted);
+        font-style: italic;
+      }
+
+      /* -- Session Summary Card -- */
+      .session-summary-card {
+        max-width: 720px;
+        margin: 24px auto 0;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--bg-card);
+        padding: 16px 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      }
+      .session-summary-title {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--fg-muted);
+        margin-bottom: 12px;
+      }
+      .session-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+      .session-summary-stat {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .session-summary-stat-label {
+        font-size: 10px;
+        color: var(--fg-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .session-summary-stat-value {
+        font-size: 16px;
+        font-weight: 600;
+        font-family: var(--font-mono-ui);
+      }
+      .session-summary-stat-value.cost {
+        color: var(--primary);
+      }
+      .session-summary-stat-value.success {
+        color: var(--running);
+      }
+      .session-summary-link {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--primary);
+        text-decoration: none;
+      }
+      .session-summary-link:hover {
+        text-decoration: underline;
+      }
+
+      /* -- Chat Input (conversation tab only) -- */
       .chat-input-area {
         border-top: 1px solid var(--border);
         padding: 14px 24px 16px;
         flex-shrink: 0;
         background: var(--bg);
+        display: none;
+      }
+      .chat-input-area.visible {
+        display: block;
       }
 
       .chat-input-wrap {
@@ -1024,6 +1280,258 @@
         border: 1px solid var(--border);
         background: var(--bg-card);
         color: var(--fg-muted);
+      }
+
+      /* -- Tab Footers (non-conversation tabs) -- */
+      .tab-footer {
+        border-top: 1px solid var(--border);
+        padding: 8px 24px;
+        flex-shrink: 0;
+        background: var(--bg);
+        font-size: 11px;
+        color: var(--fg-muted);
+        font-family: var(--font-mono-ui);
+        display: none;
+      }
+      .tab-footer.visible {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      /* -- Events Tab -- */
+      .events-timeline {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      .event-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 6px 0;
+        font-size: 12px;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .event-row:last-child {
+        border-bottom: none;
+      }
+      .event-time {
+        font-family: var(--font-mono-ui);
+        font-size: 11px;
+        color: var(--fg-muted);
+        min-width: 60px;
+        flex-shrink: 0;
+      }
+      .event-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-top: 4px;
+        flex-shrink: 0;
+      }
+      .event-dot.system {
+        background: var(--fg-muted);
+      }
+      .event-dot.agent {
+        background: var(--primary);
+      }
+      .event-dot.tool {
+        background: var(--completed);
+      }
+      .event-dot.success {
+        background: var(--running);
+      }
+      .event-dot.error {
+        background: var(--failed);
+      }
+      .event-dot.review {
+        background: var(--waiting);
+      }
+      .event-desc {
+        flex: 1;
+        color: var(--fg);
+        line-height: 1.5;
+      }
+      .event-desc .event-agent {
+        font-weight: 500;
+        color: var(--primary);
+      }
+      .event-desc .event-detail {
+        color: var(--fg-muted);
+      }
+
+      /* -- Diff Tab -- */
+      .diff-viewer {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .diff-file-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 0;
+      }
+      .diff-file-tab {
+        padding: 8px 14px;
+        font-size: 12px;
+        font-family: var(--font-mono);
+        color: var(--fg-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .diff-file-tab:hover {
+        color: var(--fg);
+        background: var(--bg-hover);
+      }
+      .diff-file-tab.active {
+        color: var(--fg);
+        border-bottom-color: var(--primary);
+      }
+      .diff-file-stat {
+        font-size: 10px;
+      }
+      .diff-file-stat .add {
+        color: var(--diff-add-fg);
+      }
+      .diff-file-stat .rm {
+        color: var(--diff-rm-fg);
+      }
+      .diff-content {
+        border: 1px solid var(--border);
+        border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+        overflow: hidden;
+      }
+      .diff-hunk-header {
+        background: var(--bg-card);
+        padding: 4px 12px;
+        font-size: 11px;
+        font-family: var(--font-mono);
+        color: var(--fg-muted);
+        border-bottom: 1px solid var(--border);
+      }
+      .diff-line {
+        display: flex;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      .diff-line-num {
+        min-width: 40px;
+        padding: 0 8px;
+        text-align: right;
+        color: var(--fg-muted);
+        user-select: none;
+        flex-shrink: 0;
+        font-size: 11px;
+      }
+      .diff-line-content {
+        flex: 1;
+        padding: 0 12px;
+        white-space: pre;
+        overflow-x: auto;
+      }
+      .diff-line.add {
+        background: var(--diff-add-bg);
+      }
+      .diff-line.add .diff-line-content {
+        color: var(--diff-add-fg);
+      }
+      .diff-line.rm {
+        background: var(--diff-rm-bg);
+      }
+      .diff-line.rm .diff-line-content {
+        color: var(--diff-rm-fg);
+      }
+      .diff-line.ctx .diff-line-content {
+        color: var(--fg-muted);
+      }
+      .diff-file-panel {
+        display: none;
+      }
+      .diff-file-panel.active {
+        display: block;
+      }
+
+      /* -- Todos Tab -- */
+      .todos-list {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      .todo-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .todo-item:last-child {
+        border-bottom: none;
+      }
+      .todo-checkbox {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        border: 1.5px solid var(--border);
+        background: transparent;
+        cursor: pointer;
+        flex-shrink: 0;
+        margin-top: 1px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: var(--running);
+      }
+      .todo-checkbox.checked {
+        background: var(--primary-subtle);
+        border-color: var(--primary);
+        color: var(--primary);
+      }
+      .todo-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .todo-text {
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .todo-text.done {
+        text-decoration: line-through;
+        color: var(--fg-muted);
+      }
+      .todo-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      .todo-priority {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 1px 6px;
+        border-radius: 3px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .todo-priority.high {
+        background: var(--diff-rm-bg);
+        color: var(--failed);
+      }
+      .todo-priority.medium {
+        background: rgba(251, 191, 36, 0.12);
+        color: var(--waiting);
+      }
+      .todo-priority.low {
+        background: var(--primary-subtle);
+        color: var(--primary);
+      }
+      .todo-source {
+        font-size: 10px;
+        color: var(--fg-muted);
+        font-family: var(--font-mono-ui);
       }
 
       /* -- Command Palette -- */
@@ -1231,10 +1739,24 @@
 
       <!-- List Panel -->
       <aside class="list-panel">
+        <div class="resize-handle"></div>
         <div class="list-header">
           <div class="list-header-row">
             <span class="list-title">Sessions</span>
-            <button class="list-btn-new">+ New</button>
+            <button class="list-btn-new" id="btn-new-session">+ New</button>
+          </div>
+          <div class="new-session-form" id="new-session-form">
+            <input type="text" placeholder="Describe the task..." />
+            <select>
+              <option>autonomous-sdlc</option>
+              <option>quick</option>
+              <option>fan-out</option>
+              <option>product-flow</option>
+            </select>
+            <div class="new-session-form-actions">
+              <button class="new-session-cancel" id="new-session-cancel">Cancel</button>
+              <button class="new-session-start">Start</button>
+            </div>
           </div>
           <div class="list-search">
             <input type="text" placeholder="Search sessions... (/)" />
@@ -1408,19 +1930,22 @@
 
       <!-- Detail Panel -->
       <main class="detail-panel">
+        <!-- Scroll Progress -->
+        <div class="scroll-progress"><div class="scroll-progress-bar" id="scroll-progress-bar"></div></div>
+
         <div class="session-header">
           <span class="session-header-dot status-dot running"></span>
           <span class="session-header-id">s-a1b2</span>
           <span class="session-header-summary">Add payment webhooks</span>
           <div class="pipeline">
             <span class="pipeline-stage done">plan</span>
-            <span class="pipeline-arrow">&rsaquo;</span>
+            <span class="pipeline-arrow">&#8250;</span>
             <span class="pipeline-stage done">implement</span>
-            <span class="pipeline-arrow">&rsaquo;</span>
+            <span class="pipeline-arrow">&#8250;</span>
             <span class="pipeline-stage done">verify</span>
-            <span class="pipeline-arrow">&rsaquo;</span>
+            <span class="pipeline-arrow">&#8250;</span>
             <span class="pipeline-stage active">review</span>
-            <span class="pipeline-arrow">&rsaquo;</span>
+            <span class="pipeline-arrow">&#8250;</span>
             <span class="pipeline-stage">merge</span>
           </div>
           <div class="cost-detail">
@@ -1442,39 +1967,10 @@
           </div>
           <button class="btn-stop">Stop</button>
           <button class="btn-theme" id="theme-toggle" title="Toggle light/dark">
-            <svg
-              class="icon-sun"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="12" cy="12" r="5" />
-              <line x1="12" y1="1" x2="12" y2="3" />
-              <line x1="12" y1="21" x2="12" y2="23" />
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-              <line x1="1" y1="12" x2="3" y2="12" />
-              <line x1="21" y1="12" x2="23" y2="12" />
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            <svg class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
             </svg>
-            <svg
-              class="icon-moon"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              style="display: none"
-            >
+            <svg class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
             </svg>
           </button>
@@ -1482,58 +1978,20 @@
 
         <div class="session-meta-row">
           <button class="runtime-btn" title="Open in Claude Code">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"
-              /></svg
-            >Open in Claude
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" /></svg>Open in Claude
           </button>
           <button class="runtime-btn" title="Open Terminal">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3" /></svg
-            >Terminal
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3" /></svg>Terminal
           </button>
           <div class="meta-sep"></div>
           <div class="integration-pill">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5"
-              /></svg
-            >Jira <span class="pill-count">PROJ-123</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5" /></svg>Jira <span class="pill-count">PROJ-123</span>
           </div>
           <div class="integration-pill">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
-              /></svg
-            >GitHub <span class="pill-count">PR #42</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>GitHub <span class="pill-count">PR #42</span>
           </div>
           <div class="integration-pill">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"
-              /></svg
-            >CI <span class="pill-count">passing</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" /></svg>CI <span class="pill-count">passing</span>
           </div>
           <div class="meta-spacer"></div>
           <div class="progress-mini">
@@ -1548,13 +2006,13 @@
           <div class="tab" data-tab="terminal">Terminal</div>
           <div class="tab" data-tab="events">Events <span class="tab-badge">24</span></div>
           <div class="tab" data-tab="diff">Diff <span class="tab-badge">+42/-8</span></div>
-          <div class="tab" data-tab="todos">Todos <span class="tab-badge">3</span></div>
+          <div class="tab" data-tab="todos">Todos <span class="tab-badge">6</span></div>
         </div>
 
-        <div class="tab-content">
+        <div class="tab-content" id="tab-content">
+          <!-- Conversation Tab -->
           <div class="tab-panel active" data-panel="conversation">
             <div class="conversation">
-              <!-- User message -->
               <div class="message user-msg">
                 <div class="message-header">
                   <div class="message-avatar user">Y</div>
@@ -1562,17 +2020,12 @@
                   <span class="message-time">4:12 PM</span>
                 </div>
                 <div class="message-body">
-                  <p>
-                    Add Stripe webhook handlers for payment_intent.succeeded, payment_intent.failed, and
-                    charge.refunded. Include signature verification, idempotency checks, and update the orders table
-                    accordingly. Write tests.
-                  </p>
+                  <p>Add Stripe webhook handlers for <code class="inline-code">payment_intent.succeeded</code>, <code class="inline-code">payment_intent.failed</code>, and <code class="inline-code">charge.refunded</code>. Include signature verification, idempotency checks, and update the orders table accordingly. Write tests.</p>
                 </div>
               </div>
 
               <div class="stage-event"><span>plan phase started</span></div>
 
-              <!-- Planner -->
               <div class="message">
                 <div class="message-header">
                   <div class="message-avatar planner">P</div>
@@ -1581,10 +2034,7 @@
                   <span class="message-time">4:12 PM</span>
                 </div>
                 <div class="message-body">
-                  <p>
-                    I'll create a plan for implementing Stripe webhook handlers. Let me examine the existing codebase
-                    structure first.
-                  </p>
+                  <p>I'll create a plan for implementing Stripe webhook handlers. Let me examine the existing codebase structure first.</p>
                   <div class="tool-call">
                     <span class="tool-call-icon">&#9654;</span>
                     <span class="tool-call-label">Read 8 files (src/payments/, src/orders/, src/middleware/)</span>
@@ -1597,62 +2047,16 @@
                     <span class="tool-call-dur">0.8s</span>
                     <span class="tool-call-ok">&#10003;</span>
                   </div>
-                  <p>
-                    <strong>1. Create webhook handler module</strong> --
-                    <code
-                      style="
-                        background: var(--bg-card);
-                        padding: 2px 5px;
-                        border-radius: 3px;
-                        font-family: var(--font-mono);
-                        font-size: 12px;
-                      "
-                      >src/payments/webhooks.ts</code
-                    >
-                    with signature verification and dispatch map.
-                  </p>
-                  <p>
-                    <strong>2. Add idempotency layer</strong> -- new
-                    <code
-                      style="
-                        background: var(--bg-card);
-                        padding: 2px 5px;
-                        border-radius: 3px;
-                        font-family: var(--font-mono);
-                        font-size: 12px;
-                      "
-                      >webhook_events</code
-                    >
-                    table tracking processed event IDs.
-                  </p>
-                  <p>
-                    <strong>3. Implement event handlers</strong> -- three handlers: handlePaymentSucceeded,
-                    handlePaymentFailed, handleChargeRefunded.
-                  </p>
-                  <p>
-                    <strong>4. Register route</strong> -- POST
-                    <code
-                      style="
-                        background: var(--bg-card);
-                        padding: 2px 5px;
-                        border-radius: 3px;
-                        font-family: var(--font-mono);
-                        font-size: 12px;
-                      "
-                      >/api/webhooks/stripe</code
-                    >
-                    with raw body parsing.
-                  </p>
-                  <p>
-                    <strong>5. Write tests</strong> -- unit + integration tests for each handler and signature
-                    verification.
-                  </p>
+                  <p><strong>1. Create webhook handler module</strong> -- <code class="inline-code">src/payments/webhooks.ts</code> with signature verification and dispatch map.</p>
+                  <p><strong>2. Add idempotency layer</strong> -- new <code class="inline-code">webhook_events</code> table tracking processed event IDs.</p>
+                  <p><strong>3. Implement event handlers</strong> -- three handlers: handlePaymentSucceeded, handlePaymentFailed, handleChargeRefunded.</p>
+                  <p><strong>4. Register route</strong> -- POST <code class="inline-code">/api/webhooks/stripe</code> with raw body parsing.</p>
+                  <p><strong>5. Write tests</strong> -- unit + integration tests for each handler and signature verification.</p>
                 </div>
               </div>
 
               <div class="stage-event"><span>plan completed, advancing to implement</span></div>
 
-              <!-- Implementer -->
               <div class="message">
                 <div class="message-header">
                   <div class="message-avatar implementer">I</div>
@@ -1681,10 +2085,7 @@
                     <span class="tool-call-ok">&#10003;</span>
                   </div>
                   <div class="code-block">
-                    <div class="code-block-header">
-                      <span>src/payments/webhooks.ts</span>
-                      <span>lines 24-48</span>
-                    </div>
+                    <div class="code-block-header"><span>src/payments/webhooks.ts</span><span>lines 24-48</span></div>
                     <pre>
 export async function handleStripeWebhook(
   req: Request, db: Database
@@ -1708,13 +2109,11 @@ export async function handleStripeWebhook(
     [event.id]
   ).get();
   if (existing) return new Response("Already processed");
-  ...</pre
-                    >
+  ...</pre>
                   </div>
                 </div>
               </div>
 
-              <!-- Implementer tests -->
               <div class="message">
                 <div class="message-header">
                   <div class="message-avatar implementer">I</div>
@@ -1729,19 +2128,32 @@ export async function handleStripeWebhook(
                     <span class="tool-call-dur">1.1s</span>
                     <span class="tool-call-ok">&#10003;</span>
                   </div>
+                  <!-- Failed tool call -->
+                  <div class="tool-call failed">
+                    <span class="tool-call-icon">&#9654;</span>
+                    <span class="tool-call-label">Run bun test src/payments/__tests__/webhooks.test.ts</span>
+                    <span class="tool-call-dur">8.2s</span>
+                    <span class="tool-call-fail">&#10007;</span>
+                  </div>
+                  <div class="tool-call-error">FAIL: handleChargeRefunded - expected refund amount to be negative<br>2 passed, 1 failed</div>
+                  <div class="tool-call">
+                    <span class="tool-call-icon">&#9654;</span>
+                    <span class="tool-call-label">Edit src/payments/webhooks.ts (fix refund amount sign)</span>
+                    <span class="tool-call-dur">0.3s</span>
+                    <span class="tool-call-ok">&#10003;</span>
+                  </div>
                   <div class="tool-call">
                     <span class="tool-call-icon">&#9654;</span>
                     <span class="tool-call-label">Run bun test src/payments/__tests__/webhooks.test.ts</span>
                     <span class="tool-call-dur">3.2s</span>
                     <span class="tool-call-ok">&#10003;</span>
                   </div>
-                  <p>All 7 tests passing. 3 files created, 2 modified.</p>
+                  <p>All 7 tests passing after fixing the refund sign. 3 files created, 2 modified.</p>
                 </div>
               </div>
 
               <div class="stage-event"><span>implement completed, advancing to verify</span></div>
 
-              <!-- Verifier -->
               <div class="message">
                 <div class="message-header">
                   <div class="message-avatar verifier">V</div>
@@ -1774,7 +2186,6 @@ export async function handleStripeWebhook(
 
               <div class="stage-event"><span>verify completed, advancing to review</span></div>
 
-              <!-- Reviewer -->
               <div class="message">
                 <div class="message-header">
                   <div class="message-avatar reviewer">R</div>
@@ -1784,20 +2195,13 @@ export async function handleStripeWebhook(
                 </div>
                 <div class="message-body">
                   <p>Reviewing the webhook implementation. Two items to address:</p>
-                  <p>
-                    <strong>1. Missing transaction wrapper</strong> -- the order update and webhook_events insert should
-                    be wrapped in a transaction.
-                  </p>
-                  <p>
-                    <strong>2. Add index on webhook_events.event_id</strong> -- idempotency lookup will be O(n) without
-                    it.
-                  </p>
+                  <p><strong>1. Missing transaction wrapper</strong> -- the order update and webhook_events insert should be wrapped in a transaction.</p>
+                  <p><strong>2. Add index on webhook_events.event_id</strong> -- idempotency lookup will be O(n) without it.</p>
                 </div>
               </div>
 
               <div class="stage-event"><span>review feedback -- returning to implement</span></div>
 
-              <!-- Implementer fix -->
               <div class="message">
                 <div class="message-header">
                   <div class="message-avatar implementer">I</div>
@@ -1831,7 +2235,6 @@ export async function handleStripeWebhook(
 
               <div class="stage-event"><span>review approved, advancing to merge</span></div>
 
-              <!-- User follow-up -->
               <div class="message user-msg">
                 <div class="message-header">
                   <div class="message-avatar user">Y</div>
@@ -1839,15 +2242,12 @@ export async function handleStripeWebhook(
                   <span class="message-time">4:21 PM</span>
                 </div>
                 <div class="message-body">
-                  <p>
-                    Looks great. Can you also add a webhook for invoice.payment_failed so we can send dunning emails?
-                  </p>
+                  <p>Looks great. Can you also add a webhook for <code class="inline-code">invoice.payment_failed</code> so we can send dunning emails?</p>
                 </div>
               </div>
 
               <div class="stage-event"><span>plan phase started</span></div>
 
-              <!-- Planner responding -->
               <div class="message">
                 <div class="message-header">
                   <div class="message-avatar planner">P</div>
@@ -1868,77 +2268,284 @@ export async function handleStripeWebhook(
                   <p><strong>3. Add retry tracking</strong> -- extend webhook_events with attempt_count column.</p>
                 </div>
               </div>
+
+              <!-- Typing indicator -->
+              <div class="typing-indicator">
+                <div class="message-avatar planner" style="width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: #fff; background: #7c6aef">P</div>
+                <div class="typing-indicator-dots">
+                  <span></span><span></span><span></span>
+                </div>
+                <span class="typing-indicator-label">planner is working...</span>
+              </div>
+
+              <!-- Session Summary Card -->
+              <div class="session-summary-card" style="margin-top: 32px">
+                <div class="session-summary-title">Session Summary</div>
+                <div class="session-summary-grid">
+                  <div class="session-summary-stat">
+                    <span class="session-summary-stat-label">Duration</span>
+                    <span class="session-summary-stat-value">9m 14s</span>
+                  </div>
+                  <div class="session-summary-stat">
+                    <span class="session-summary-stat-label">Total Cost</span>
+                    <span class="session-summary-stat-value cost">$0.42</span>
+                  </div>
+                  <div class="session-summary-stat">
+                    <span class="session-summary-stat-label">Files Changed</span>
+                    <span class="session-summary-stat-value">5</span>
+                  </div>
+                  <div class="session-summary-stat">
+                    <span class="session-summary-stat-label">Tests</span>
+                    <span class="session-summary-stat-value success">44/44</span>
+                  </div>
+                </div>
+                <a href="#" class="session-summary-link">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                  View PR #42 on GitHub
+                </a>
+              </div>
             </div>
           </div>
 
+          <!-- Terminal Tab -->
           <div class="tab-panel" data-panel="terminal">
             <div style="font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted); padding: 20px">
-              <p style="margin-bottom: 4px">
-                <span style="color: var(--running)">$</span> bun test src/payments/__tests__/webhooks.test.ts
-              </p>
-              <p style="margin-bottom: 4px; color: var(--fg-faint)">bun test v1.1.34</p>
-              <p style="margin-bottom: 4px">
-                <span style="color: var(--running)">PASS</span> src/payments/__tests__/webhooks.test.ts
-              </p>
-              <p style="margin-bottom: 4px; color: var(--fg-faint)">webhook handlers</p>
-              <p style="margin-bottom: 4px">
-                <span style="color: var(--running)">&#10003;</span> verifies Stripe signature (12ms)
-              </p>
-              <p style="margin-bottom: 4px">
-                <span style="color: var(--running)">&#10003;</span> rejects invalid signature (3ms)
-              </p>
-              <p style="margin-bottom: 4px">
-                <span style="color: var(--running)">&#10003;</span> handles payment_intent.succeeded (18ms)
-              </p>
-              <p style="margin-bottom: 4px">
-                <span style="color: var(--running)">&#10003;</span> handles payment_intent.failed (15ms)
-              </p>
-              <p style="margin-bottom: 4px">
-                <span style="color: var(--running)">&#10003;</span> handles charge.refunded (14ms)
-              </p>
-              <p style="margin-bottom: 4px">
-                <span style="color: var(--running)">&#10003;</span> deduplicates events (idempotency) (8ms)
-              </p>
-              <p style="margin-bottom: 4px">
-                <span style="color: var(--running)">&#10003;</span> rolls back on handler failure (22ms)
-              </p>
-              <p style="margin-bottom: 12px">
-                <span style="color: var(--running)">&#10003;</span> invoice.payment_failed sends dunning email (31ms)
-              </p>
+              <p style="margin-bottom: 4px"><span style="color: var(--running)">$</span> bun test src/payments/__tests__/webhooks.test.ts</p>
+              <p style="margin-bottom: 4px; color: var(--fg-muted)">bun test v1.1.34</p>
+              <p style="margin-bottom: 4px"><span style="color: var(--running)">PASS</span> src/payments/__tests__/webhooks.test.ts</p>
+              <p style="margin-bottom: 4px; color: var(--fg-muted)">webhook handlers</p>
+              <p style="margin-bottom: 4px"><span style="color: var(--running)">&#10003;</span> verifies Stripe signature (12ms)</p>
+              <p style="margin-bottom: 4px"><span style="color: var(--running)">&#10003;</span> rejects invalid signature (3ms)</p>
+              <p style="margin-bottom: 4px"><span style="color: var(--running)">&#10003;</span> handles payment_intent.succeeded (18ms)</p>
+              <p style="margin-bottom: 4px"><span style="color: var(--running)">&#10003;</span> handles payment_intent.failed (15ms)</p>
+              <p style="margin-bottom: 4px"><span style="color: var(--running)">&#10003;</span> handles charge.refunded (14ms)</p>
+              <p style="margin-bottom: 4px"><span style="color: var(--running)">&#10003;</span> deduplicates events (idempotency) (8ms)</p>
+              <p style="margin-bottom: 4px"><span style="color: var(--running)">&#10003;</span> rolls back on handler failure (22ms)</p>
+              <p style="margin-bottom: 12px"><span style="color: var(--running)">&#10003;</span> invoice.payment_failed sends dunning email (31ms)</p>
               <p><span style="color: var(--running)">8 pass</span> | 0 fail | 8 total (103ms)</p>
             </div>
           </div>
 
+          <!-- Events Tab -->
           <div class="tab-panel" data-panel="events">
-            <div style="font-size: 12px; color: var(--fg-muted); padding: 4px 0">Events timeline will render here</div>
+            <div class="events-timeline">
+              <div class="event-row"><span class="event-time">4:12:01</span><span class="event-dot system"></span><span class="event-desc">Session <strong>s-a1b2</strong> created -- flow: autonomous-sdlc, compute: local</span></div>
+              <div class="event-row"><span class="event-time">4:12:01</span><span class="event-dot system"></span><span class="event-desc">Stage <strong>plan</strong> dispatched to <span class="event-agent">planner</span> (opus-4)</span></div>
+              <div class="event-row"><span class="event-time">4:12:03</span><span class="event-dot agent"></span><span class="event-desc"><span class="event-agent">planner</span> started -- reading project structure</span></div>
+              <div class="event-row"><span class="event-time">4:12:05</span><span class="event-dot tool"></span><span class="event-desc">Tool call: <code class="inline-code">Read</code> 8 files (src/payments/, src/orders/) <span class="event-detail">-- 2.1s</span></span></div>
+              <div class="event-row"><span class="event-time">4:12:08</span><span class="event-dot tool"></span><span class="event-desc">Tool call: <code class="inline-code">Search</code> "webhook" across codebase <span class="event-detail">-- 0.8s</span></span></div>
+              <div class="event-row"><span class="event-time">4:12:14</span><span class="event-dot success"></span><span class="event-desc">Stage <strong>plan</strong> completed -- 5 steps defined</span></div>
+              <div class="event-row"><span class="event-time">4:12:15</span><span class="event-dot system"></span><span class="event-desc">Agent switched: <span class="event-agent">planner</span> -> <span class="event-agent">implementer</span></span></div>
+              <div class="event-row"><span class="event-time">4:12:15</span><span class="event-dot system"></span><span class="event-desc">Stage <strong>implement</strong> dispatched to <span class="event-agent">implementer</span> (sonnet-4)</span></div>
+              <div class="event-row"><span class="event-time">4:12:18</span><span class="event-dot tool"></span><span class="event-desc">Tool call: <code class="inline-code">Write</code> src/payments/webhooks.ts (142 lines) <span class="event-detail">-- 1.4s</span></span></div>
+              <div class="event-row"><span class="event-time">4:12:20</span><span class="event-dot tool"></span><span class="event-desc">Tool call: <code class="inline-code">Write</code> src/db/migrations/004_webhook_events.ts <span class="event-detail">-- 0.6s</span></span></div>
+              <div class="event-row"><span class="event-time">4:12:21</span><span class="event-dot tool"></span><span class="event-desc">Tool call: <code class="inline-code">Edit</code> src/routes/index.ts (+4 lines) <span class="event-detail">-- 0.4s</span></span></div>
+              <div class="event-row"><span class="event-time">4:12:24</span><span class="event-dot error"></span><span class="event-desc">Tool call: <code class="inline-code">Run</code> bun test -- <strong style="color: var(--failed)">1 failed</strong> (handleChargeRefunded) <span class="event-detail">-- 8.2s</span></span></div>
+              <div class="event-row"><span class="event-time">4:12:33</span><span class="event-dot tool"></span><span class="event-desc">Tool call: <code class="inline-code">Edit</code> src/payments/webhooks.ts (fix refund sign) <span class="event-detail">-- 0.3s</span></span></div>
+              <div class="event-row"><span class="event-time">4:12:37</span><span class="event-dot success"></span><span class="event-desc">Tool call: <code class="inline-code">Run</code> bun test -- <strong style="color: var(--running)">7/7 passed</strong> <span class="event-detail">-- 3.2s</span></span></div>
+              <div class="event-row"><span class="event-time">4:12:38</span><span class="event-dot success"></span><span class="event-desc">Stage <strong>implement</strong> completed -- 3 created, 2 modified</span></div>
+              <div class="event-row"><span class="event-time">4:12:39</span><span class="event-dot system"></span><span class="event-desc">Agent switched: <span class="event-agent">implementer</span> -> <span class="event-agent">verifier</span></span></div>
+              <div class="event-row"><span class="event-time">4:13:08</span><span class="event-dot success"></span><span class="event-desc">Stage <strong>verify</strong> completed -- 43/43 tests, tsc clean, lint clean</span></div>
+              <div class="event-row"><span class="event-time">4:13:09</span><span class="event-dot system"></span><span class="event-desc">Agent switched: <span class="event-agent">verifier</span> -> <span class="event-agent">reviewer</span></span></div>
+              <div class="event-row"><span class="event-time">4:13:42</span><span class="event-dot review"></span><span class="event-desc"><span class="event-agent">reviewer</span> raised 2 issues -- returning to implement</span></div>
+              <div class="event-row"><span class="event-time">4:13:43</span><span class="event-dot system"></span><span class="event-desc">Agent switched: <span class="event-agent">reviewer</span> -> <span class="event-agent">implementer</span></span></div>
+              <div class="event-row"><span class="event-time">4:14:10</span><span class="event-dot success"></span><span class="event-desc">Review fixes applied -- 44/44 tests passing</span></div>
+              <div class="event-row"><span class="event-time">4:14:11</span><span class="event-dot review"></span><span class="event-desc"><span class="event-agent">reviewer</span> approved -- advancing to merge</span></div>
+              <div class="event-row"><span class="event-time">4:21:00</span><span class="event-dot system"></span><span class="event-desc">User message received -- re-entering plan phase</span></div>
+              <div class="event-row"><span class="event-time">4:21:02</span><span class="event-dot agent"></span><span class="event-desc"><span class="event-agent">planner</span> reading updated files for dunning extension</span></div>
+              <div class="event-row"><span class="event-time">4:21:08</span><span class="event-dot agent"></span><span class="event-desc"><span class="event-agent">planner</span> drafting 3-step extension plan</span></div>
+            </div>
           </div>
+
+          <!-- Diff Tab -->
           <div class="tab-panel" data-panel="diff">
-            <div style="font-size: 12px; color: var(--fg-muted); padding: 4px 0">Diff viewer will render here</div>
+            <div class="diff-viewer">
+              <div class="diff-file-tabs">
+                <div class="diff-file-tab active" data-diff="webhooks"><span>src/payments/webhooks.ts</span> <span class="diff-file-stat"><span class="add">+48</span> <span class="rm">-2</span></span></div>
+                <div class="diff-file-tab" data-diff="migration"><span>src/db/migrations/004_webhook_events.ts</span> <span class="diff-file-stat"><span class="add">+18</span></span></div>
+                <div class="diff-file-tab" data-diff="routes"><span>src/routes/index.ts</span> <span class="diff-file-stat"><span class="add">+4</span></span></div>
+                <div class="diff-file-tab" data-diff="tests"><span>src/payments/__tests__/webhooks.test.ts</span> <span class="diff-file-stat"><span class="add">+98</span></span></div>
+              </div>
+              <div class="diff-file-panel active" data-diff-panel="webhooks">
+                <div class="diff-content">
+                  <div class="diff-hunk-header">@@ -1,4 +1,8 @@</div>
+                  <div class="diff-line ctx"><span class="diff-line-num">1</span><span class="diff-line-content">import Stripe from "stripe";</span></div>
+                  <div class="diff-line ctx"><span class="diff-line-num">2</span><span class="diff-line-content">import { env } from "../config.js";</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+import { Database } from "bun:sqlite";</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+import type { Order } from "../types.js";</span></div>
+                  <div class="diff-line ctx"><span class="diff-line-num">3</span><span class="diff-line-content"></span></div>
+                  <div class="diff-line ctx"><span class="diff-line-num">4</span><span class="diff-line-content">const stripe = new Stripe(env.STRIPE_SECRET_KEY);</span></div>
+                  <div class="diff-hunk-header">@@ -22,6 +26,32 @@</div>
+                  <div class="diff-line ctx"><span class="diff-line-num">22</span><span class="diff-line-content">  if (existing) return new Response("Already processed");</span></div>
+                  <div class="diff-line ctx"><span class="diff-line-num">23</span><span class="diff-line-content"></span></div>
+                  <div class="diff-line rm"><span class="diff-line-num">24</span><span class="diff-line-content">-  await dispatchEvent(event, db);</span></div>
+                  <div class="diff-line rm"><span class="diff-line-num">25</span><span class="diff-line-content">-  return new Response("OK");</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  return db.transaction(() => {</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    db.run(</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      "INSERT INTO webhook_events (event_id, type) VALUES (?, ?)",</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      [event.id, event.type]</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    );</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    switch (event.type) {</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      case "payment_intent.succeeded":</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+        handlePaymentSucceeded(event.data.object, db);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+        break;</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      case "payment_intent.failed":</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+        handlePaymentFailed(event.data.object, db);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+        break;</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      case "charge.refunded":</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+        handleChargeRefunded(event.data.object, db);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+        break;</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    }</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    return new Response("OK");</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  })();</span></div>
+                  <div class="diff-line ctx"><span class="diff-line-num">26</span><span class="diff-line-content">}</span></div>
+                </div>
+              </div>
+              <div class="diff-file-panel" data-diff-panel="migration">
+                <div class="diff-content">
+                  <div class="diff-hunk-header">@@ -0,0 +1,18 @@ (new file)</div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+import { Database } from "bun:sqlite";</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+export function up(db: Database) {</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  db.run(`</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    CREATE TABLE webhook_events (</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      id INTEGER PRIMARY KEY AUTOINCREMENT,</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      event_id TEXT NOT NULL,</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      type TEXT NOT NULL,</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      processed_at TEXT DEFAULT CURRENT_TIMESTAMP</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    );</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    CREATE UNIQUE INDEX idx_webhook_event_id</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      ON webhook_events(event_id);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  `);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+}</span></div>
+                </div>
+              </div>
+              <div class="diff-file-panel" data-diff-panel="routes">
+                <div class="diff-content">
+                  <div class="diff-hunk-header">@@ -12,6 +12,10 @@</div>
+                  <div class="diff-line ctx"><span class="diff-line-num">12</span><span class="diff-line-content">  app.get("/api/health", healthHandler);</span></div>
+                  <div class="diff-line ctx"><span class="diff-line-num">13</span><span class="diff-line-content"></span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  // Stripe webhooks (raw body required)</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  app.post("/api/webhooks/stripe", handleStripeWebhook);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+</span></div>
+                  <div class="diff-line ctx"><span class="diff-line-num">14</span><span class="diff-line-content">  app.get("/api/orders", listOrders);</span></div>
+                </div>
+              </div>
+              <div class="diff-file-panel" data-diff-panel="tests">
+                <div class="diff-content">
+                  <div class="diff-hunk-header">@@ -0,0 +1,24 @@ (new file, showing first 24 lines)</div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+import { describe, it, expect, beforeAll } from "bun:test";</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+import { handleStripeWebhook } from "../webhooks.js";</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+describe("webhook handlers", () => {</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  it("verifies Stripe signature", async () => {</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    const req = new Request("http://localhost", {</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      method: "POST",</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      body: "{}"</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    });</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    const res = await handleStripeWebhook(req, db);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    expect(res.status).toBe(400);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  });</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  it("handles charge.refunded", async () => {</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    const event = mockEvent("charge.refunded", {</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      amount_refunded: -2500,</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+      currency: "usd"</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    });</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    const res = await processWebhook(event);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    expect(res.status).toBe(200);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    const order = db.query("SELECT * FROM orders WHERE id = ?").get(orderId);</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+    expect(order.status).toBe("refunded");</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  });</span></div>
+                  <div class="diff-line add"><span class="diff-line-num"></span><span class="diff-line-content">+  // ... 5 more tests</span></div>
+                </div>
+              </div>
+            </div>
           </div>
+
+          <!-- Todos Tab -->
           <div class="tab-panel" data-panel="todos">
-            <div style="font-size: 12px; color: var(--fg-muted); padding: 4px 0">Todo list will render here</div>
+            <div class="todos-list">
+              <div class="todo-item">
+                <div class="todo-checkbox checked">&#10003;</div>
+                <div class="todo-body">
+                  <div class="todo-text done">Create webhook signature verification middleware</div>
+                  <div class="todo-meta"><span class="todo-priority high">high</span><span class="todo-source">from plan step 1</span></div>
+                </div>
+              </div>
+              <div class="todo-item">
+                <div class="todo-checkbox checked">&#10003;</div>
+                <div class="todo-body">
+                  <div class="todo-text done">Add idempotency tracking table with UNIQUE index</div>
+                  <div class="todo-meta"><span class="todo-priority high">high</span><span class="todo-source">from plan step 2 + review</span></div>
+                </div>
+              </div>
+              <div class="todo-item">
+                <div class="todo-checkbox"></div>
+                <div class="todo-body">
+                  <div class="todo-text">Add rate limiting to the webhook callback endpoint</div>
+                  <div class="todo-meta"><span class="todo-priority medium">medium</span><span class="todo-source">from reviewer suggestion</span></div>
+                </div>
+              </div>
+              <div class="todo-item">
+                <div class="todo-checkbox"></div>
+                <div class="todo-body">
+                  <div class="todo-text">Write integration tests for concurrent webhook delivery edge cases</div>
+                  <div class="todo-meta"><span class="todo-priority medium">medium</span><span class="todo-source">from verifier note</span></div>
+                </div>
+              </div>
+              <div class="todo-item">
+                <div class="todo-checkbox"></div>
+                <div class="todo-body">
+                  <div class="todo-text">Add Datadog metrics for webhook processing latency and error rates</div>
+                  <div class="todo-meta"><span class="todo-priority low">low</span><span class="todo-source">from plan step 5</span></div>
+                </div>
+              </div>
+              <div class="todo-item">
+                <div class="todo-checkbox"></div>
+                <div class="todo-body">
+                  <div class="todo-text">Implement dead letter queue for webhooks that fail 3 times</div>
+                  <div class="todo-meta"><span class="todo-priority low">low</span><span class="todo-source">from reviewer suggestion</span></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="chat-input-area">
+        <!-- Chat input: conversation tab only -->
+        <div class="chat-input-area visible" id="chat-input-area">
           <div class="chat-input-wrap">
             <textarea class="chat-input" placeholder="Send message to agent..." rows="1"></textarea>
             <button class="chat-send">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M5 12h14M12 5l7 7-7 7"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
             </button>
           </div>
           <div class="chat-hints">
             <span>Enter to send, Shift+Enter for newline</span>
             <span><kbd>Cmd</kbd> <kbd>K</kbd> command palette</span>
           </div>
+        </div>
+
+        <!-- Tab footers for non-conversation tabs -->
+        <div class="tab-footer" id="footer-terminal">
+          <span>Last command: bun test -- 8 pass, 0 fail</span>
+          <span style="margin-left: auto">103ms</span>
+        </div>
+        <div class="tab-footer" id="footer-events">
+          <span>24 events</span>
+          <span style="margin-left: auto">Last: 4:21:08 PM</span>
+        </div>
+        <div class="tab-footer" id="footer-diff">
+          <span>4 files changed</span>
+          <span style="margin-left: 8px; color: var(--diff-add-fg)">+168</span>
+          <span style="color: var(--diff-rm-fg)">-2</span>
+          <span style="margin-left: auto">webhooks.ts selected</span>
+        </div>
+        <div class="tab-footer" id="footer-todos">
+          <span>2 of 6 completed</span>
+          <span style="margin-left: auto">4 remaining</span>
         </div>
       </main>
     </div>
@@ -1947,55 +2554,20 @@ export async function handleStripeWebhook(
     <div class="cmd-overlay" id="cmd-overlay">
       <div class="cmd-dialog">
         <div class="cmd-input-wrap">
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
           <input class="cmd-input" id="cmd-input" type="text" placeholder="Type a command..." autofocus />
         </div>
         <div class="cmd-list">
           <div class="cmd-section">Actions</div>
-          <div class="cmd-item selected">
-            <span class="cmd-icon">+</span>
-            <span class="cmd-label">New session</span>
-            <span class="cmd-shortcut">Cmd+N</span>
-          </div>
-          <div class="cmd-item">
-            <span class="cmd-icon">&#9654;</span>
-            <span class="cmd-label">Resume session</span>
-          </div>
-          <div class="cmd-item">
-            <span class="cmd-icon">&#9632;</span>
-            <span class="cmd-label">Stop session</span>
-          </div>
+          <div class="cmd-item selected"><span class="cmd-icon">+</span><span class="cmd-label">New session</span><span class="cmd-shortcut">Cmd+N</span></div>
+          <div class="cmd-item"><span class="cmd-icon">&#9654;</span><span class="cmd-label">Resume session</span></div>
+          <div class="cmd-item"><span class="cmd-icon">&#9632;</span><span class="cmd-label">Stop session</span></div>
           <div class="cmd-section">Navigation</div>
-          <div class="cmd-item">
-            <span class="cmd-icon">/</span>
-            <span class="cmd-label">Search sessions</span>
-            <span class="cmd-shortcut">/</span>
-          </div>
-          <div class="cmd-item">
-            <span class="cmd-icon">&#9881;</span>
-            <span class="cmd-label">Settings</span>
-          </div>
+          <div class="cmd-item"><span class="cmd-icon">/</span><span class="cmd-label">Search sessions</span><span class="cmd-shortcut">/</span></div>
+          <div class="cmd-item"><span class="cmd-icon">&#9881;</span><span class="cmd-label">Settings</span></div>
           <div class="cmd-section">Theme</div>
-          <div class="cmd-item">
-            <span class="cmd-icon">&#9788;</span>
-            <span class="cmd-label">Switch to light mode</span>
-          </div>
-          <div class="cmd-item">
-            <span class="cmd-icon">&#9790;</span>
-            <span class="cmd-label">Switch to dark mode</span>
-          </div>
+          <div class="cmd-item"><span class="cmd-icon">&#9788;</span><span class="cmd-label">Switch to light mode</span></div>
+          <div class="cmd-item"><span class="cmd-icon">&#9790;</span><span class="cmd-label">Switch to dark mode</span></div>
         </div>
       </div>
     </div>
@@ -2021,14 +2593,53 @@ export async function handleStripeWebhook(
         setMode(html.className === "dark" ? "light" : "dark");
       });
 
-      // -- Tabs --
+      // -- Tabs with footer/chat visibility --
+      const footerMap = {
+        terminal: "footer-terminal",
+        events: "footer-events",
+        diff: "footer-diff",
+        todos: "footer-todos",
+      };
+
+      function switchTab(tabName) {
+        document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+        const tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
+        if (tab) tab.classList.add("active");
+        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+        const target = document.querySelector('.tab-panel[data-panel="' + tabName + '"]');
+        if (target) target.classList.add("active");
+
+        // Chat input only for conversation
+        const chatArea = document.getElementById("chat-input-area");
+        if (tabName === "conversation") {
+          chatArea.classList.add("visible");
+        } else {
+          chatArea.classList.remove("visible");
+        }
+
+        // Show appropriate footer
+        Object.values(footerMap).forEach((id) => {
+          document.getElementById(id).classList.remove("visible");
+        });
+        if (footerMap[tabName]) {
+          document.getElementById(footerMap[tabName]).classList.add("visible");
+        }
+      }
+
       document.querySelectorAll(".tab").forEach((tab) => {
         tab.addEventListener("click", () => {
-          document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+          switchTab(tab.getAttribute("data-tab"));
+        });
+      });
+
+      // -- Diff file tab switching --
+      document.querySelectorAll(".diff-file-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".diff-file-tab").forEach((t) => t.classList.remove("active"));
           tab.classList.add("active");
-          const name = tab.getAttribute("data-tab");
-          document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
-          const target = document.querySelector('.tab-panel[data-panel="' + name + '"]');
+          const name = tab.getAttribute("data-diff");
+          document.querySelectorAll(".diff-file-panel").forEach((p) => p.classList.remove("active"));
+          const target = document.querySelector('.diff-file-panel[data-diff-panel="' + name + '"]');
           if (target) target.classList.add("active");
         });
       });
@@ -2056,12 +2667,38 @@ export async function handleStripeWebhook(
         if (e.target === cmdOverlay) closeCmd();
       });
 
-      // -- Session selection --
+      // -- New Session Form --
+      const btnNew = document.getElementById("btn-new-session");
+      const newForm = document.getElementById("new-session-form");
+      const cancelNew = document.getElementById("new-session-cancel");
+
+      btnNew.addEventListener("click", () => {
+        newForm.classList.toggle("visible");
+        if (newForm.classList.contains("visible")) {
+          newForm.querySelector("input").focus();
+        }
+      });
+      cancelNew.addEventListener("click", () => {
+        newForm.classList.remove("visible");
+      });
+
+      // -- Session selection with cross-fade --
       let activeIdx = 0;
       const cards = document.querySelectorAll(".session-card[data-idx]");
+      const tabContent = document.getElementById("tab-content");
 
       function selectCard(idx) {
         if (idx < 0 || idx >= cards.length) return;
+        if (idx === activeIdx) return;
+
+        // Cross-fade animation
+        tabContent.classList.add("switching");
+        setTimeout(() => {
+          tabContent.classList.remove("switching");
+          tabContent.classList.add("switching-in");
+          setTimeout(() => tabContent.classList.remove("switching-in"), 75);
+        }, 75);
+
         cards[activeIdx].classList.remove("active");
         activeIdx = idx;
         cards[activeIdx].classList.add("active");
@@ -2069,6 +2706,16 @@ export async function handleStripeWebhook(
       }
 
       cards.forEach((c) => c.addEventListener("click", () => selectCard(parseInt(c.getAttribute("data-idx")))));
+
+      // -- Scroll progress indicator --
+      const scrollEl = document.getElementById("tab-content");
+      const progressBar = document.getElementById("scroll-progress-bar");
+
+      scrollEl.addEventListener("scroll", () => {
+        const max = scrollEl.scrollHeight - scrollEl.clientHeight;
+        const pct = max > 0 ? (scrollEl.scrollTop / max) * 100 : 0;
+        progressBar.style.width = pct + "%";
+      });
 
       // -- Keyboard shortcuts --
       document.addEventListener("keydown", (e) => {
@@ -2082,6 +2729,10 @@ export async function handleStripeWebhook(
         if (e.key === "Escape") {
           if (cmdOverlay.classList.contains("open")) {
             closeCmd();
+            return;
+          }
+          if (newForm.classList.contains("visible")) {
+            newForm.classList.remove("visible");
             return;
           }
           if (isInput) {
@@ -2110,7 +2761,9 @@ export async function handleStripeWebhook(
           e.preventDefault();
           const tabs = document.querySelectorAll(".tab");
           const idx = parseInt(e.key) - 1;
-          if (idx < tabs.length) tabs[idx].click();
+          if (idx < tabs.length) {
+            switchTab(tabs[idx].getAttribute("data-tab"));
+          }
         }
       });
     </script>
